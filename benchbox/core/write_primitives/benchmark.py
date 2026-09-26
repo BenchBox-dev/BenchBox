@@ -24,7 +24,9 @@ if TYPE_CHECKING:
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.primitives_benchmark_utils import (
     build_tpch_staging_tables_sql,
-    quote_identifier,
+    failed_platform_error,
+    fetch_count_probe,
+    quote_identifier_for_dialect,
     summarize_validation_failures,
     table_exists,
 )
@@ -157,7 +159,14 @@ def _check_validation_query(val_query: Any, actual_rows: int, val_result: list |
         if not val_result:
             return False
         for row in val_result:
-            if not row:
+            if not row or row[0] is None:
+                # A None first column means the row is a placeholder the
+                # adapter synthesized for a FAILED payload or an
+                # unmaterialized result (PlatformAdapterCursor emits (None,)
+                # past index 0 without real rows): it certifies nothing, so
+                # the value check fails. Count modes are mutually exclusive
+                # with value modes at load time, so no count fallback exists
+                # here.
                 return False
             try:
                 scalar = float(row[0])
@@ -280,13 +289,16 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         # Create lock table if it doesn't exist (atomic operation)
         try:
-            connection.execute("""
+            lock_res = connection.execute("""
                 CREATE TABLE IF NOT EXISTS write_primitives_setup_lock (
                     lock_name VARCHAR(255) PRIMARY KEY,
                     holder_info VARCHAR(1000),
                     acquired_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            if (err := failed_platform_error(lock_res)) is not None:
+                self.log_verbose(f"Warning: Could not create lock table: {err}")
+                return False
         except Exception as e:
             self.log_verbose(f"Warning: Could not create lock table: {e}")
             return False
@@ -306,10 +318,19 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 escaped_lock_name = lock_name.replace("'", "''")
                 escaped_holder_info = holder_info.replace("'", "''")
 
-                connection.execute(
+                ins_res = connection.execute(
                     f"INSERT INTO write_primitives_setup_lock (lock_name, holder_info) "
                     f"VALUES ('{escaped_lock_name}', '{escaped_holder_info}')"
                 )
+                if (err := failed_platform_error(ins_res)) is not None:
+                    error_msg = err.lower()
+                    if "unique" in error_msg or "duplicate" in error_msg or "constraint" in error_msg:
+                        # Lock held by another process - wait and retry
+                        time.sleep(0.5)
+                        continue
+                    else:
+                        self.log_verbose(f"Unexpected error acquiring lock: {err}")
+                        return False
                 self.log_verbose(f"Acquired setup lock (waited {elapsed_seconds(start_time):.1f}s)")
                 return True
             except Exception as e:
@@ -359,7 +380,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         """Quote SQL identifier to prevent SQL injection.
 
         Uses double quotes (SQL standard) for most dialects. Uses backticks for
-        StarRocks, which runs in MySQL mode where double-quotes are string literals.
+        StarRocks, which runs in MySQL mode where double-quotes are string literals,
+        and for BigQuery, where double quotes also denote string literals.
+        Uppercases for dialects whose catalogs are uppercase (Snowflake folds
+        unquoted names to upper; BigQuery is case-sensitive with uppercase
+        tables), so setup probes resolve the adapter-created tables.
 
         Args:
             identifier: Table, column, or schema name
@@ -373,7 +398,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         if self._setup_dialect == "starrocks":
             escaped = identifier.replace("`", "``")
             return f"`{escaped}`"
-        return quote_identifier(identifier)
+        return quote_identifier_for_dialect(identifier, self._setup_dialect)
 
     def _get_effective_write_sql(
         self,
@@ -506,8 +531,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 continue
             try:
                 quoted = self._quote_identifier(table_name)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                row_count = result[0] if result else 0
+                row_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
             except Exception:
                 # Table missing entirely (never created) is the same "unavailable" case.
                 row_count = 0
@@ -552,31 +576,10 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         return ", ".join(missing)
 
     def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
-        """Check if a table exists in the database.
+        """Check if a table exists in the database."""
+        return table_exists(connection, table_name, self.log_verbose, getattr(self, "_setup_dialect", None))
 
-        Uses a platform-agnostic approach that attempts to query the table
-        with LIMIT 0, which should work across most SQL databases without
-        requiring INFORMATION_SCHEMA access.
-
-        Args:
-            connection: Database connection
-            table_name: Name of table to check (will be quoted for safety)
-
-        Returns:
-            True if table exists, False otherwise
-
-        Note:
-            This method catches exceptions to distinguish between:
-            - Table doesn't exist (expected, returns False)
-            - Other errors (logged, returns False for safety)
-
-        Security:
-            Table name is quoted using _quote_identifier() to prevent SQL injection.
-        """
-        return table_exists(connection, table_name, self.log_verbose)
-
-    @staticmethod
-    def _scd2_row_hash_expr(acctbal_expr: str) -> str:
+    def _scd2_row_hash_expr(self, acctbal_expr: str) -> str:
         """Build the portable SCD2 change-detection fingerprint expression.
 
         Concatenates the tracked dimension attributes into a single string so
@@ -594,6 +597,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         Returns:
             A portable SQL string expression yielding the row fingerprint.
 
+        The numeric-to-text CAST spells the target type per setup dialect
+        (BigQuery has no VARCHAR type); like _date_literal, this spelling
+        must be applied here because staging population runs directly on
+        the connection, before the normal operation SQL translation path.
+
         Safety assumptions (verified for TPC-H; revisit if reused elsewhere):
             - Same-engine comparison only. The dimension and staging ``row_hash``
               are both computed by this expression during setup on the SAME
@@ -608,7 +616,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
               changed row look unchanged (or vice versa); use a collision-
               resistant separator or length-prefixed encoding in that case.
         """
-        return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS VARCHAR) || '|' || c_mktsegment"
+        text_type = "STRING" if getattr(self, "_setup_dialect", "standard").lower() == "bigquery" else "VARCHAR"
+        return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS {text_type}) || '|' || c_mktsegment"
 
     def _date_literal(self, value: str) -> str:
         """Return a date literal accepted by the active setup dialect.
@@ -724,9 +733,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         if self._setup_dialect.lower() == "sqlite":
             for statement in sql.split(";"):
                 if statement.strip():
-                    connection.execute(statement)
+                    stmt_res = connection.execute(statement)
+                    if (err := failed_platform_error(stmt_res)) is not None:
+                        raise RuntimeError(f"Population SQL statement failed: {err}")
             return
-        connection.execute(sql)
+        res = connection.execute(sql)
+        if (err := failed_platform_error(res)) is not None:
+            raise RuntimeError(f"Population SQL failed: {err}")
 
     def _populate_staging_tables(self, connection: DatabaseConnection, tables: dict[str, str]) -> dict[str, int]:
         """Populate staging tables from source tables.
@@ -745,8 +758,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             # Check if table needs population
             try:
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
-                current_count = result[0] if result else 0
+                current_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
             except Exception:
                 current_count = 0
 
@@ -754,8 +766,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 # Validate source table exists and has data before copying
                 try:
                     quoted_source = self._quote_identifier(source_table)
-                    source_result = connection.execute(f"SELECT COUNT(*) FROM {quoted_source}").fetchone()
-                    source_count = source_result[0] if source_result else 0
+                    source_count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_source}")
                 except Exception as e:
                     # Source table doesn't exist - skip population for optional tables
                     # (see _OPTIONAL_WHEN_SOURCE_MISSING). Minimal test fixtures load
@@ -791,8 +802,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 populate_sql = self._get_population_sql(table_name, source_table)
                 self._execute_population_sql(connection, populate_sql)
 
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted_table}").fetchone()
-                status[table_name] = result[0] if result else 0
+                status[table_name] = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted_table}")
                 self.log_verbose(f"Populated {table_name} with {status[table_name]} rows")
             else:
                 # Table already has data
@@ -829,7 +839,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         required_tables = ["orders", "lineitem"]
         for table in required_tables:
             try:
-                connection.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                probe_res = connection.execute(f"SELECT 1 FROM {table} LIMIT 1")
+                if (err := failed_platform_error(probe_res)) is not None:
+                    raise RuntimeError(f"Source table check failed: {err}")
             except Exception as e:
                 raise RuntimeError(
                     f"Required TPC-H table '{table}' not found. "
@@ -875,7 +887,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 table_existed = self._table_exists(connection, table_name)
                 create_sql = get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
                 try:
-                    connection.execute(create_sql)
+                    create_res = connection.execute(create_sql)
+                    if (err := failed_platform_error(create_res)) is not None:
+                        raise RuntimeError(f"Failed to create {table_name}: {err}")
                     if not table_existed:
                         created_tables.append(table_name)
                         self.log_verbose(f"Created {table_name}")
@@ -906,8 +920,7 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 if table_name not in status:
                     try:
                         quoted = self._quote_identifier(table_name)
-                        result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                        status[table_name] = result[0] if result else 0
+                        status[table_name] = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
                     except Exception:
                         status[table_name] = 0
 
@@ -1052,8 +1065,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
             for table_name in required_tables:
                 quoted = self._quote_identifier(table_name)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                if not result or result[0] == 0:
+                count = fetch_count_probe(connection, f"SELECT COUNT(*) FROM {quoted}")
+                if count <= 0:
                     return False
             return self._staging_manifest_matches(connection, ["orders", "lineitem"])
         except Exception:
@@ -1299,6 +1312,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             write_start = time.perf_counter()
             write_result = connection.execute(write_sql)
             write_duration_ms = (time.perf_counter() - write_start) * 1000
+            # Adapters that report failures as a FAILED result payload do not
+            # raise here: without this check a failed write reads as executed
+            # and only content-checking validations can catch it (verified
+            # live on Snowflake, where multi-statement writes no-op'd while
+            # COUNT(*) validations kept passing).
+            if (write_error := failed_platform_error(write_result)) is not None:
+                raise RuntimeError(f"Write SQL failed on platform: {write_error}")
 
             rows_affected = self._extract_rows_affected(write_result, operation_id)
 
@@ -1403,7 +1423,26 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
                 continue
 
             val_sql = self._replace_placeholders(effective_sql)
-            val_result = connection.execute(val_sql).fetchall()
+            val_cursor = connection.execute(val_sql)
+            # A failed validation SELECT surfaces here as an empty row set
+            # (adapters materialize placeholder rows for FAILED payloads),
+            # which vacuous COUNT(*) checks would accept. Fail the validation
+            # with the adapter-reported error instead.
+            if (val_error := failed_platform_error(val_cursor)) is not None:
+                validation_passed = False
+                validation_results.append(
+                    {
+                        "query_id": val_query.id,
+                        "sql": effective_sql,
+                        "expected_rows": val_query.expected_rows,
+                        "actual_rows": 0,
+                        "passed": False,
+                        "error": val_error,
+                        "sample": [],
+                    }
+                )
+                continue
+            val_result = val_cursor.fetchall()
             actual_rows = len(val_result)
             passed = _check_validation_query(val_query, actual_rows, val_result)
             validation_passed = validation_passed and passed
@@ -1433,7 +1472,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
 
         if operation.cleanup_sql:
             try:
-                connection.execute(operation.cleanup_sql)
+                cleanup_res = connection.execute(operation.cleanup_sql)
+                if (cleanup_err := failed_platform_error(cleanup_res)) is not None:
+                    raise RuntimeError(cleanup_err)
                 self.log_verbose(f"Executed cleanup SQL for {operation_id}")
             except Exception as e:
                 cleanup_error = str(e)

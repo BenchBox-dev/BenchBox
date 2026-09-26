@@ -298,7 +298,17 @@ class DataFusionAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         # Force recreate
         adapter_config["force_recreate"] = config.get("force", False)
 
-        # Pass through other relevant config
+        # Pass through other relevant config, plus the shared plan
+        # display/capture keys (skipping None so adapter defaults apply):
+        # __init__ only ever sees this rebuilt config -- nested options were
+        # already merged into config above, so these reads see both shapes --
+        # and dropping them silently disables console plan display and
+        # capture/filtering even when requested.
+        from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
+
+        for key in PLAN_FORWARD_KEYS:
+            if key in config and config[key] is not None:
+                adapter_config[key] = config[key]
         for key in [
             "tuning_config",
             "tuning_enabled",

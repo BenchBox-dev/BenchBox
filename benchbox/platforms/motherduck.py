@@ -167,7 +167,15 @@ class MotherDuckAdapter(PlatformAdapter):
         if config.get("memory_limit"):
             adapter_config["memory_limit"] = config["memory_limit"]
 
-        # Pass through tuning provenance/config
+        # Pass through tuning provenance/config plus the shared plan
+        # display/capture keys (skipping None so adapter defaults apply):
+        # __init__ only ever sees this rebuilt config, so dropping them
+        # silently disables console plan display and capture/filtering.
+        from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
+
+        for key in PLAN_FORWARD_KEYS:
+            if key in config and config[key] is not None:
+                adapter_config[key] = config[key]
         for key in [
             "tuning_config",
             "tuning_enabled",

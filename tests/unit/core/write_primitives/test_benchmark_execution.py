@@ -122,6 +122,14 @@ class TestQuoteIdentifier:
         assert wp_benchmark._quote_identifier("Orders") == '"Orders"'
         assert wp_benchmark._quote_identifier("_private") == '"_private"'
 
+    def test_databricks_uses_backticks(self, wp_benchmark):
+        """Databricks warehouses without ANSI mode reject double-quoted
+        identifiers with PARSE_SYNTAX_ERROR (verified live)."""
+        from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect
+
+        assert quote_identifier_for_dialect("orders", "databricks") == "`orders`"
+        assert quote_identifier_for_dialect("orders", "standard") == '"orders"'
+
     def test_identifier_with_numbers(self, wp_benchmark):
         """Test quoting identifiers with numbers."""
         assert wp_benchmark._quote_identifier("table123") == '"table123"'
@@ -148,6 +156,109 @@ class TestQuoteIdentifier:
             wp_benchmark._quote_identifier("table-name")
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
             wp_benchmark._quote_identifier("table.name")
+
+    def test_uppercase_dialects_quote_uppercase(self, wp_benchmark, tmp_path):
+        """Snowflake/BigQuery catalogs are uppercase; probes must match."""
+        from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect
+
+        assert quote_identifier_for_dialect("orders", "snowflake") == '"ORDERS"'
+        # BigQuery uses backticks: double quotes are string literals there.
+        assert quote_identifier_for_dialect("orders", "bigquery") == "`ORDERS`"
+        assert quote_identifier_for_dialect("orders", "BigQuery") == "`ORDERS`"
+        assert quote_identifier_for_dialect("orders", "Snowflake") == '"ORDERS"'
+        assert quote_identifier_for_dialect("orders", "duckdb") == '"orders"'
+        assert quote_identifier_for_dialect("orders", None) == '"orders"'
+
+        wp_benchmark._setup_dialect = "snowflake"
+        assert wp_benchmark._quote_identifier("orders") == '"ORDERS"'
+        wp_benchmark._setup_dialect = "bigquery"
+        assert wp_benchmark._quote_identifier("orders") == "`ORDERS`"
+        wp_benchmark._setup_dialect = "standard"
+        assert wp_benchmark._quote_identifier("orders") == '"orders"'
+
+    def test_scd2_hash_cast_per_setup_dialect(self, wp_benchmark, tmp_path):
+        """SCD2 fingerprint CAST spells the setup dialect's text type."""
+        wp_benchmark._setup_dialect = "standard"
+        assert "AS VARCHAR" in wp_benchmark._scd2_row_hash_expr("c_acctbal")
+        wp_benchmark._setup_dialect = "bigquery"
+        expr = wp_benchmark._scd2_row_hash_expr("c_acctbal")
+        assert "AS STRING" in expr
+        assert "VARCHAR" not in expr
+
+    def test_bigquery_quote_rejects_unsafe_identifier(self, wp_benchmark, tmp_path):
+        """BigQuery backtick quoting keeps the injection guard."""
+        from benchbox.core.primitives_benchmark_utils import quote_identifier_for_dialect
+
+        with pytest.raises(ValueError, match="Invalid SQL identifier"):
+            quote_identifier_for_dialect("table-name", "bigquery")
+
+    def test_fetch_count_probe_raises_on_failed_platform_result(self, wp_benchmark, tmp_path):
+        """A FAILED adapter payload must raise, not read as 0 rows."""
+        from benchbox.core.primitives_benchmark_utils import fetch_count_probe
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error_type": "BadRequest", "error": "Syntax error"}
+
+            def fetchone(self):
+                return None
+
+        class OkCursor:
+            def fetchone(self):
+                return (15000,)
+
+        class RawCursor:
+            """Plain DB-API cursor without a platform_result payload."""
+
+            def fetchone(self):
+                return (42,)
+
+        connection = Mock()
+        connection.execute.return_value = OkCursor()
+        assert fetch_count_probe(connection, "SELECT COUNT(*) FROM `ORDERS`") == 15000
+
+        connection.execute.return_value = FailedCursor()
+        with pytest.raises(RuntimeError, match="Count probe failed.*Syntax error"):
+            fetch_count_probe(connection, "SELECT COUNT(*) FROM `ORDERS`")
+
+        connection.execute.return_value = RawCursor()
+        assert fetch_count_probe(connection, "SELECT COUNT(*) FROM orders") == 42
+
+
+class TestFailedPlatformError:
+    """Tests for the shared fail-loud adapter-payload helper."""
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    def test_failed_result_returns_error(self):
+        from benchbox.core.primitives_benchmark_utils import failed_platform_error
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error": "Syntax error"}
+
+        assert failed_platform_error(FailedCursor()) == "Syntax error"
+
+    def test_success_result_returns_none(self):
+        from benchbox.core.primitives_benchmark_utils import failed_platform_error
+
+        class OkCursor:
+            platform_result = {"status": "SUCCESS", "rows_returned": 1}
+
+            def fetchall(self):
+                return [(1,)]
+
+        assert failed_platform_error(OkCursor()) is None
+
+    def test_plain_cursor_returns_none(self):
+        from benchbox.core.primitives_benchmark_utils import failed_platform_error
+
+        class RawCursor:
+            def fetchall(self):
+                return [(1,)]
+
+        assert failed_platform_error(RawCursor()) is None
 
 
 class TestSnowflakeCatalogCoverage:
@@ -180,7 +291,12 @@ class TestSnowflakeCatalogCoverage:
         assert "UPPER(table_name) = UPPER('test_simple')" in table_exists_sql
 
     def test_batch_ops_use_generator_on_snowflake(self, wp_benchmark):
-        """Snowflake has no generate_series/unnest set function."""
+        """Snowflake has no generate_series/unnest set function.
+
+        `SEQ4()` is increasing but not gap-free, so the override wraps it in
+        `ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1` to reproduce the zero-based
+        dense domain the base SQL and the cleanup range assume.
+        """
         for op_id, base, rows in (
             ("insert_batch_values_100", "9000100", 100),
             ("insert_batch_values_1000", "9001000", 1000),
@@ -189,7 +305,7 @@ class TestSnowflakeCatalogCoverage:
             override = operation.platform_overrides.get("snowflake")
             assert override is not None
             assert f"GENERATOR(ROWCOUNT => {rows})" in override
-            assert "SEQ4()" in override
+            assert "ROW_NUMBER() OVER (ORDER BY SEQ4()) - 1 AS n" in override
             assert "generate_series" not in override
             assert base in override
 
@@ -216,74 +332,6 @@ class TestSnowflakeCatalogCoverage:
         operation = wp_benchmark.get_operation(op_id)
         assert "snowflake" in operation.platform_overrides
         assert operation.platform_overrides.get("snowflake") is None
-
-
-class TestPortableDmlTargetCorrelation:
-    """UPDATE/DELETE targets must not carry a target-table alias.
-
-    Base SQL runs verbatim through ``connection.execute()``: the write path
-    bypasses ``execute_query()``, so neither dialect translation nor BigQuery
-    table qualification rewrites these statements. Correlating a self-reference
-    by table name (``UPDATE t ... WHERE t.col``) is the portable form. T-SQL
-    has no alias slot in its UPDATE/DELETE target, so ``UPDATE t AS u`` is a
-    syntax error on Synapse Dedicated SQL Pools and Fabric Warehouse; SQL
-    Server itself only accepts an alias that a FROM clause introduces.
-    BigQuery's grammar makes the alias optional and its own documented
-    examples correlate by table name without one.
-
-    ``MERGE INTO t AS x`` is deliberate and stays allowed: the MERGE target
-    alias is valid T-SQL, and these operations need it to qualify the source.
-    """
-
-    @pytest.fixture
-    def wp_benchmark(self, tmp_path):
-        """Create a benchmark instance for testing."""
-        return WritePrimitivesBenchmark(output_dir=tmp_path)
-
-    def test_no_update_or_delete_target_alias_anywhere(self, wp_benchmark):
-        """UPDATE/DELETE targets stay unaliased so T-SQL can parse them."""
-        import re
-
-        aliased_target = re.compile(r"\b(?:UPDATE|DELETE\s+FROM)\s+[\w.`\"]+\s+AS\s+\w+", re.IGNORECASE)
-        offenders = []
-        for op_id, operation in wp_benchmark.get_all_operations().items():
-            statements = [(field, getattr(operation, field, None)) for field in ("write_sql", "cleanup_sql")]
-            statements.extend(operation.platform_overrides.items())
-            for field, sql in statements:
-                if sql and aliased_target.search(sql):
-                    offenders.append(f"{op_id}.{field}")
-        assert offenders == []
-
-    def test_update_and_delete_self_reference_by_table_name(self, wp_benchmark):
-        """Correlated self-references qualify by table name, not by alias."""
-        expectations = {
-            "delete_with_aggregation": "delete_ops_orders.o_orderkey",
-            "delete_with_join": "delete_ops_orders.o_custkey",
-            "delete_with_not_exists": "delete_ops_orders.o_orderkey",
-            "update_from_select": "update_ops_orders.o_orderkey",
-            "update_with_aggregate": "update_ops_orders.o_orderkey",
-            "update_with_join": "update_ops_orders.o_custkey",
-            "update_with_subquery": "update_ops_orders.o_orderkey",
-        }
-        for op_id, qualified_column in expectations.items():
-            operation = wp_benchmark.get_operation(op_id)
-            assert qualified_column in operation.write_sql
-
-    def test_scd2_update_targets_self_reference_by_table_name(self, wp_benchmark):
-        for op_id in ("merge_scd_type2_basic", "merge_scd_type2_no_change"):
-            operation = wp_benchmark.get_operation(op_id)
-            assert "UPDATE scd2_ops_dim_customer\n" in operation.write_sql
-            assert "scd2_ops_dim_customer.c_custkey" in operation.write_sql
-            assert "scd2_ops_dim_customer.row_hash" in operation.write_sql
-
-    def test_cleanup_sql_matches_write_sql_correlation_style(self, wp_benchmark):
-        """Cleanup runs raw too, so it must stay as portable as the write."""
-        for op_id in ("update_with_aggregate", "update_with_subquery"):
-            operation = wp_benchmark.get_operation(op_id)
-            cleanup = operation.cleanup_sql or ""
-            assert cleanup.strip()
-            assert "AS u" not in cleanup
-            assert "update_ops_orders.o_orderkey" in cleanup
 
 
 class TestSnowflakeMergeAndIndexCoverage:
@@ -540,6 +588,74 @@ class TestBigQueryBatchAndMergeCoverage:
         assert "FROM (SELECT 1 AS _one) AS _t WHERE" in override
 
 
+class TestPortableDmlTargetCorrelation:
+    """UPDATE/DELETE targets must not carry a target-table alias.
+
+    Base SQL runs verbatim through ``connection.execute()``: the write path
+    bypasses ``execute_query()``, so neither dialect translation nor BigQuery
+    table qualification rewrites these statements. Correlating a self-reference
+    by table name (``UPDATE t ... WHERE t.col``) is the portable form. T-SQL
+    has no alias slot in its UPDATE/DELETE target, so ``UPDATE t AS u`` is a
+    syntax error on Synapse Dedicated SQL Pools and Fabric Warehouse; SQL
+    Server itself only accepts an alias that a FROM clause introduces.
+    BigQuery's grammar makes the alias optional and its own documented
+    examples correlate by table name without one.
+
+    ``MERGE INTO t AS x`` is deliberate and stays allowed: the MERGE target
+    alias is valid T-SQL, and these operations need it to qualify the source.
+    """
+
+    @pytest.fixture
+    def wp_benchmark(self, tmp_path):
+        """Create a benchmark instance for testing."""
+        return WritePrimitivesBenchmark(output_dir=tmp_path)
+
+    def test_no_update_or_delete_target_alias_anywhere(self, wp_benchmark):
+        """UPDATE/DELETE targets stay unaliased so T-SQL can parse them."""
+        import re
+
+        aliased_target = re.compile(r"\b(?:UPDATE|DELETE\s+FROM)\s+[\w.`\"]+\s+AS\s+\w+", re.IGNORECASE)
+        offenders = []
+        for op_id, operation in wp_benchmark.get_all_operations().items():
+            statements = [(field, getattr(operation, field, None)) for field in ("write_sql", "cleanup_sql")]
+            statements.extend(operation.platform_overrides.items())
+            for field, sql in statements:
+                if sql and aliased_target.search(sql):
+                    offenders.append(f"{op_id}.{field}")
+        assert offenders == []
+
+    def test_update_and_delete_self_reference_by_table_name(self, wp_benchmark):
+        """Correlated self-references qualify by table name, not by alias."""
+        expectations = {
+            "delete_with_aggregation": "delete_ops_orders.o_orderkey",
+            "delete_with_join": "delete_ops_orders.o_custkey",
+            "delete_with_not_exists": "delete_ops_orders.o_orderkey",
+            "update_from_select": "update_ops_orders.o_orderkey",
+            "update_with_aggregate": "update_ops_orders.o_orderkey",
+            "update_with_join": "update_ops_orders.o_custkey",
+            "update_with_subquery": "update_ops_orders.o_orderkey",
+        }
+        for op_id, qualified_column in expectations.items():
+            operation = wp_benchmark.get_operation(op_id)
+            assert qualified_column in operation.write_sql
+
+    def test_scd2_update_targets_self_reference_by_table_name(self, wp_benchmark):
+        for op_id in ("merge_scd_type2_basic", "merge_scd_type2_no_change"):
+            operation = wp_benchmark.get_operation(op_id)
+            assert "UPDATE scd2_ops_dim_customer\n" in operation.write_sql
+            assert "scd2_ops_dim_customer.c_custkey" in operation.write_sql
+            assert "scd2_ops_dim_customer.row_hash" in operation.write_sql
+
+    def test_cleanup_sql_matches_write_sql_correlation_style(self, wp_benchmark):
+        """Cleanup runs raw too, so it must stay as portable as the write."""
+        for op_id in ("update_with_aggregate", "update_with_subquery"):
+            operation = wp_benchmark.get_operation(op_id)
+            cleanup = operation.cleanup_sql or ""
+            assert cleanup.strip()
+            assert "AS u" not in cleanup
+            assert "update_ops_orders.o_orderkey" in cleanup
+
+
 class TestReplacePlaceholders:
     """Tests for placeholder replacement in SQL."""
 
@@ -602,6 +718,21 @@ class TestTableExists:
 
         result = wp_benchmark._table_exists(mock_conn, "orders")
         assert result is False
+
+    def test_table_exists_uses_setup_dialect_quoting(self, wp_benchmark):
+        """Existence probes quote per setup dialect (BigQuery: backtick upper)."""
+        mock_conn = Mock()
+        mock_conn.execute.return_value = None
+
+        wp_benchmark._setup_dialect = "bigquery"
+        assert wp_benchmark._table_exists(mock_conn, "orders") is True
+        sent_sql = mock_conn.execute.call_args[0][0]
+        assert sent_sql == "SELECT 1 FROM `ORDERS` LIMIT 0"
+
+        wp_benchmark._setup_dialect = "snowflake"
+        assert wp_benchmark._table_exists(mock_conn, "orders") is True
+        sent_sql = mock_conn.execute.call_args[0][0]
+        assert sent_sql == 'SELECT 1 FROM "ORDERS" LIMIT 0'
 
 
 class TestOperationManagement:
@@ -895,6 +1026,47 @@ class TestExecuteOperation:
         assert result.status == "SUCCESS"
         assert "FROM (SELECT generate_series(0, 99) AS n) t" in sql_calls[0]
         assert "unnest(generate_series" not in sql_calls[0]
+
+    def test_execute_operation_fails_loud_on_failed_platform_write(self, wp_benchmark, monkeypatch):
+        """A FAILED adapter payload must fail the op, never read as executed."""
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error": "Actual statement count 2 did not match"}
+
+        mock_conn = Mock()
+        mock_conn.execute.return_value = FailedCursor()
+        mock_conn.rollback = Mock()
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_select_simple", mock_conn)
+
+        assert result.status == "FAILED"
+        assert result.success is False
+        assert "Actual statement count 2" in (result.error or "")
+
+    def test_execute_operation_fails_validation_on_failed_platform_select(self, wp_benchmark, monkeypatch):
+        """A FAILED validation SELECT must fail validation, not pass vacuously."""
+
+        class OkCursor:
+            rowcount = 1
+
+            def fetchall(self):
+                return [(1,)]
+
+        class FailedCursor:
+            platform_result = {"status": "FAILED", "error": "Object does not exist"}
+
+            def fetchall(self):
+                return []
+
+        mock_conn = Mock()
+        mock_conn.execute.side_effect = [OkCursor(), FailedCursor(), OkCursor()]
+        monkeypatch.setattr(wp_benchmark, "is_setup", lambda conn: True)
+
+        result = wp_benchmark.execute_operation("insert_single_row", mock_conn)
+
+        assert result.status == "VALIDATION_FAILED"
+        assert result.validation_passed is False
 
 
 class TestRunBenchmark:

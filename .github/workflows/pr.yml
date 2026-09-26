@@ -434,6 +434,11 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: make sqlglot-repro-retirement-check
 
+      - name: Stale _project/ reference check
+        id: guard-project-references
+        continue-on-error: true
+        run: uv run -- python _project/scripts/check_project_references.py
+
       - name: Lint and format check with ruff
         id: guard-ruff
         continue-on-error: true
