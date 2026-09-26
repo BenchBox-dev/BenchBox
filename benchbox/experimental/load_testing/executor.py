@@ -15,7 +15,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from benchbox.experimental.load_testing.patterns import SteadyPattern, WorkloadPattern
+from benchbox.experimental.load_testing.patterns import SteadyPattern, WorkloadPattern, WorkloadPhase
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 logger = logging.getLogger(__name__)
@@ -70,8 +70,24 @@ class ConcurrentLoadConfig:
     query_factory: Callable[[int], tuple[str, str]]
     """Factory returning (query_id, sql) for stream iteration index."""
 
+    role_factories: dict[str, Callable[[int], tuple[str, str]]] | None = field(default=None, kw_only=True)
+    """Optional per-role query factories for role-aware patterns.
+
+    Maps a stream role (e.g. "writer", "reader") to the factory used for
+    streams launched in that role. When a pattern phase declares `roles`
+    targets, launched streams use the matching role factory; phases without
+    role targets keep using `query_factory`. Every role named by the
+    pattern must have a factory entry.
+    """
+
     connection_factory: Callable[[], Any]
-    """Factory creating new database connections."""
+    """Factory creating new database connections.
+
+    Must return an independent, thread-confined connection per call: one
+    stream owns its connection for its whole lifetime and closes it on
+    exit. Never return a shared connection; concurrent streams closing or
+    writing through the same handle corrupts every in-flight stream.
+    """
 
     execute_query: Callable[[Any, str], tuple[bool, int | None, str | None]]
     """Function to execute query: (connection, sql) -> (success, rows, error)."""
@@ -177,6 +193,7 @@ class ConcurrentLoadExecutor:
         self._lock = threading.Lock()
         self._stream_results: list[StreamResult] = []
         self._active_streams = 0
+        self._active_roles: dict[str, int] = {}
         self._max_concurrency_reached = 0
         self._queue: deque[tuple[int, float]] = deque()  # (stream_id, enqueue_time)
         self._resource_samples: list[dict[str, float]] = []
@@ -187,9 +204,14 @@ class ConcurrentLoadExecutor:
 
         Returns:
             Results from the load test
+
+        Raises:
+            ValueError: If the pattern declares stream roles but the config
+                does not provide a matching `role_factories` entry.
         """
         start_time = time.time()
         pattern = self._config.pattern
+        self._validate_role_factories(pattern)
 
         logger.info(
             f"Starting concurrent load test: pattern={pattern.__class__.__name__}, "
@@ -250,17 +272,63 @@ class ConcurrentLoadExecutor:
 
         return result
 
+    def _validate_role_factories(self, pattern: WorkloadPattern) -> None:
+        """Validate role factory coverage for role-aware patterns.
+
+        Args:
+            pattern: Workload pattern about to execute.
+
+        Raises:
+            ValueError: If any phase declares roles without a matching
+                factory entry, or a role target is negative.
+        """
+        declared_roles: set[str] = set()
+        for phase in pattern.iter_phases():
+            if phase.roles:
+                for role, target in phase.roles.items():
+                    if target < 0:
+                        raise ValueError(f"phase '{phase.phase_name}': negative target for role '{role}'")
+                declared_roles.update(phase.roles)
+        if declared_roles:
+            missing = declared_roles - set(self._config.role_factories or {})
+            if missing:
+                raise ValueError(
+                    f"pattern declares roles {sorted(declared_roles)} but role_factories is missing {sorted(missing)}"
+                )
+
+    def _role_targets(self, phase: WorkloadPhase) -> dict[str, int]:
+        """Compute per-role stream launch counts for a phase.
+
+        For role-aware phases, each role is topped up to its declared
+        target independently, so roles absent from the phase (such as
+        readers during a writer-only drain) get no replacement streams
+        once their in-flight streams finish. Phases without role targets
+        keep the historical behavior of topping up total concurrency.
+
+        Must be called with `self._lock` held.
+
+        Args:
+            phase: Phase currently executing.
+
+        Returns:
+            Mapping of role (or "" for undifferentiated phases) to the
+            number of streams to launch now.
+        """
+        if phase.roles:
+            return {role: max(0, target - self._active_roles.get(role, 0)) for role, target in phase.roles.items()}
+        return {"": max(0, phase.concurrency - self._active_streams)}
+
     def _execute_pattern(self, pattern: WorkloadPattern) -> None:
         """Execute the workload pattern."""
-        time.time()
         stream_counter = 0
 
         # Use ThreadPoolExecutor for managing concurrent streams
         with ThreadPoolExecutor(max_workers=pattern.max_concurrency) as executor:
-            futures: dict[Future, int] = {}
+            futures: dict[Future, tuple[int, str]] = {}
             phase_streams: dict[str, int] = {}
+            phases = list(pattern.iter_phases())
 
-            for phase in pattern.iter_phases():
+            for index, phase in enumerate(phases):
                 phase_start = mono_time()
                 phase_streams[phase.phase_name] = 0
 
@@ -271,29 +339,31 @@ class ConcurrentLoadExecutor:
 
                 # Launch streams for this phase
                 while elapsed_seconds(phase_start) < phase.duration_seconds:
-                    # Maintain target concurrency
                     with self._lock:
                         current_active = self._active_streams
                         if current_active > self._max_concurrency_reached:
                             self._max_concurrency_reached = current_active
+                        targets = self._role_targets(phase)
 
-                    streams_to_launch = phase.concurrency - current_active
+                    for role, streams_to_launch in targets.items():
+                        for _ in range(max(0, streams_to_launch)):
+                            stream_id = stream_counter
+                            stream_counter += 1
+                            phase_streams[phase.phase_name] += 1
 
-                    for _ in range(max(0, streams_to_launch)):
-                        stream_id = stream_counter
-                        stream_counter += 1
-                        phase_streams[phase.phase_name] += 1
+                            # Track queue time on the monotonic clock: queue_wait
+                            # is computed against mono_time() in _execute_stream,
+                            # so wall-clock time.time() here would corrupt it.
+                            enqueue_time = mono_time() if self._config.track_queue_times else 0.0
 
-                        # Track queue time
-                        enqueue_time = time.time() if self._config.track_queue_times else 0
+                            with self._lock:
+                                self._active_streams += 1
+                                self._active_roles[role] = self._active_roles.get(role, 0) + 1
+                                if self._config.track_queue_times:
+                                    self._queue.append((stream_id, enqueue_time))
 
-                        with self._lock:
-                            self._active_streams += 1
-                            if self._config.track_queue_times:
-                                self._queue.append((stream_id, enqueue_time))
-
-                        future = executor.submit(self._execute_stream, stream_id, enqueue_time)
-                        futures[future] = stream_id
+                            future = executor.submit(self._execute_stream, stream_id, enqueue_time, role)
+                            futures[future] = (stream_id, role)
 
                     # Check for completed streams
                     completed = [f for f in futures if f.done()]
@@ -302,7 +372,7 @@ class ConcurrentLoadExecutor:
                             result = future.result()
                             self._stream_results.append(result)
                         except Exception as e:
-                            stream_id = futures[future]
+                            stream_id = futures[future][0]
                             self._stream_results.append(
                                 StreamResult(
                                     stream_id=stream_id,
@@ -314,12 +384,21 @@ class ConcurrentLoadExecutor:
                                 )
                             )
                         finally:
+                            _, role = futures[future]
                             with self._lock:
                                 self._active_streams -= 1
+                                self._decrement_role_locked(role)
                         del futures[future]
 
                     # Small sleep to prevent busy-waiting
                     time.sleep(0.1)
+
+                # Phase boundary: roles excluded from the next phase (readers
+                # during a writer-only drain) must finish before the next
+                # phase clock starts, otherwise they bleed into the drain.
+                # Roles continuing into the next phase keep running.
+                upcoming = phases[index + 1].roles if index + 1 < len(phases) else None
+                self._await_role_drain(futures, next_phase_roles=upcoming)
 
             # Wait for remaining streams to complete
             for future in as_completed(futures):
@@ -327,7 +406,7 @@ class ConcurrentLoadExecutor:
                     result = future.result()
                     self._stream_results.append(result)
                 except Exception as e:
-                    stream_id = futures[future]
+                    stream_id = futures[future][0]
                     self._stream_results.append(
                         StreamResult(
                             stream_id=stream_id,
@@ -339,18 +418,71 @@ class ConcurrentLoadExecutor:
                         )
                     )
                 finally:
+                    _, role = futures[future]
                     with self._lock:
                         self._active_streams -= 1
+                        self._decrement_role_locked(role)
 
-    def _execute_stream(self, stream_id: int, enqueue_time: float) -> StreamResult:
-        """Execute a single stream of queries."""
+    def _decrement_role_locked(self, role: str) -> None:
+        """Release one active-stream slot. Call with `self._lock` held."""
+        remaining = self._active_roles.get(role, 0) - 1
+        if remaining > 0:
+            self._active_roles[role] = remaining
+        else:
+            self._active_roles.pop(role, None)
+
+    def _decrement_role(self, role: str) -> None:
+        """Release one active-stream slot for a finished stream role."""
+        with self._lock:
+            self._decrement_role_locked(role)
+
+    def _await_role_drain(
+        self,
+        futures: dict[Future, tuple[int, str]],
+        next_phase_roles: dict[str, int] | None,
+    ) -> None:
+        """Wait for in-flight streams whose role ends at a phase boundary."""
+        if not next_phase_roles:
+            return
+        draining = [f for f, (_, role) in futures.items() if role not in next_phase_roles]
+        for future in as_completed(draining):
+            try:
+                self._stream_results.append(future.result())
+            except Exception as e:  # noqa: BLE001 - record per-stream failures as data
+                stream_id = futures[future][0]
+                self._stream_results.append(
+                    StreamResult(
+                        stream_id=stream_id,
+                        queries_executed=0,
+                        queries_succeeded=0,
+                        queries_failed=0,
+                        total_time_seconds=0,
+                        error=str(e),
+                    )
+                )
+            finally:
+                _, role = futures[future]
+                with self._lock:
+                    self._active_streams -= 1
+                    self._decrement_role_locked(role)
+            del futures[future]
+
+    def _execute_stream(self, stream_id: int, enqueue_time: float, role: str = "") -> StreamResult:
+        """Execute a single stream of queries.
+
+        Args:
+            stream_id: Unique stream identifier.
+            enqueue_time: Queue entry timestamp for wait-time tracking.
+            role: Stream role used to select a per-role query factory.
+        """
         stream_start = mono_time()
         queue_wait = stream_start - enqueue_time if enqueue_time > 0 else 0
+        query_factory = self._query_factory_for(role)
 
-        # Remove from queue
+        # Remove from queue by identity: ThreadPoolExecutor does not start
+        # streams in enqueue order, so head-of-queue removal strands entries.
         with self._lock:
-            if self._queue and self._queue[0][0] == stream_id:
-                self._queue.popleft()
+            self._queue = deque((sid, ts) for sid, ts in self._queue if sid != stream_id)
 
         executions: list[QueryExecution] = []
         queries_succeeded = 0
@@ -362,7 +494,7 @@ class ConcurrentLoadExecutor:
 
             try:
                 for i in range(self._config.queries_per_stream):
-                    query_id, sql = self._config.query_factory(i)
+                    query_id, sql = query_factory(i)
                     query_start = time.time()
 
                     try:
@@ -426,6 +558,19 @@ class ConcurrentLoadExecutor:
             total_time_seconds=elapsed_seconds(stream_start),
             query_executions=executions,
         )
+
+    def _query_factory_for(self, role: str) -> Callable[[int], tuple[str, str]]:
+        """Select the query factory for a stream role.
+
+        Args:
+            role: Stream role; "" denotes an undifferentiated stream.
+
+        Returns:
+            The per-role factory when one is configured, else the default.
+        """
+        if role and self._config.role_factories and role in self._config.role_factories:
+            return self._config.role_factories[role]
+        return self._config.query_factory
 
     def _monitor_resources(self) -> None:
         """Background thread for resource monitoring."""
