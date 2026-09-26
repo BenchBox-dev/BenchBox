@@ -191,6 +191,7 @@ def validate_tuning_template(
     issues.extend(_config_validation_issues(platform_key, tuning_config))
     mappings: list[CandidateTemplateMapping] = []
 
+    capped_slots: dict[tuple[str, str], int] = {}
     for candidate in candidates:
         if candidate.is_dropped:
             if _candidate_present(template_columns, candidate):
@@ -218,6 +219,19 @@ def validate_tuning_template(
             for tuning_type in platform_mapping.tuning_types
             if candidate.column in template_columns.get(candidate.table, {}).get(tuning_type, set())
         )
+        # Platforms with a per-table column cap (BigQuery clustering ≤ 4)
+        # cannot carry every mapped candidate. The template holds the first
+        # N profile-order candidates per table and tuning type; overflow
+        # candidates are reported as capped, not missing.
+        capped_types: list[str] = []
+        if platform_mapping.max_columns is not None:
+            for tuning_type in platform_mapping.tuning_types:
+                slot = (candidate.table, tuning_type)
+                used = capped_slots.get(slot, 0)
+                if used >= platform_mapping.max_columns and tuning_type not in mapped_tuning_types:
+                    capped_types.append(tuning_type)
+                elif tuning_type in mapped_tuning_types:
+                    capped_slots[slot] = used + 1
         mappings.append(
             CandidateTemplateMapping(
                 candidate=candidate,
@@ -226,7 +240,7 @@ def validate_tuning_template(
             )
         )
 
-        missing_tuning_types = mappings[-1].missing_tuning_types
+        missing_tuning_types = tuple(t for t in mappings[-1].missing_tuning_types if t not in capped_types)
         if platform_mapping.decision == MAPPED and missing_tuning_types:
             expected = ", ".join(missing_tuning_types) or "a mapped tuning type"
             issues.append(
