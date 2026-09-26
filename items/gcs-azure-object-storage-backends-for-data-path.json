@@ -5,5 +5,16 @@
       "created_at": "2026-07-19T12:33:38Z",
       "worktree": "ducklake-platform"
     }
-  }
+  },
+  "sessions": [
+    {
+      "actor": "jcode-batch-c",
+      "at": "2026-09-26T05:04:47Z",
+      "client": "jcode",
+      "generation": "7b65acd478af47dcbb9f045d1814a48f",
+      "op": "take",
+      "op_id": "cec2c195b9b54dc4baff7203d01b17b9",
+      "session_id": "5b5b1959708f4da0b8d75e62f981a358"
+    }
+  ]
 }
