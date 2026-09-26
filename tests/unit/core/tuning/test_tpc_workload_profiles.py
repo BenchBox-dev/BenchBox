@@ -106,3 +106,25 @@ profile:
 
     with pytest.raises(ValueError, match="accepted candidates require query_count >= 3"):
         load_workload_tuning_profile(profile_path)
+
+
+def test_tpc_profile_ssb_extension() -> None:
+    profile = load_tpc_tuning_profile()
+
+    assert "ssb" in profile.benchmarks()
+    ssb = {(candidate.table, candidate.column): candidate for candidate in profile.candidates("ssb")}
+    assert len(ssb) == 8
+    assert ssb[("LINEORDER", "LO_ORDERDATE")].status == EXISTING_BASELINE
+    assert ssb[("LINEORDER", "LO_ORDERDATE")].query_count == 13
+    assert ssb[("LINEORDER", "LO_SUPPKEY")].query_count == 10
+    assert ssb[("LINEORDER", "LO_CUSTKEY")].query_count == 7
+    assert ssb[("LINEORDER", "LO_PARTKEY")].query_count == 6
+    # LO_ORDERKEY is never referenced by any SSB query (LINEORDER is
+    # denormalized; there is no ORDERS join), so it must not be a candidate.
+    assert ("LINEORDER", "LO_ORDERKEY") not in ssb
+    required = {(candidate.table, candidate.column) for candidate in profile.required_candidates("ssb")}
+    assert ("LINEORDER", "LO_ORDERDATE") in required
+    assert ("LINEORDER", "LO_SUPPKEY") in required
+    assert ("LINEORDER", "LO_PARTKEY") in required
+    assert ("DATE", "D_DATEKEY") in required
+    assert ("SUPPLIER", "S_SUPPKEY") in required
