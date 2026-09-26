@@ -9985,15 +9985,10 @@
       "title": "Create metrics command group and consolidate calculate-qphh"
     },
     "migrate-adapters-not-listed-in-this-todo-that-already-use-da": {
-      "claim": {
-        "expires_at": "2026-09-27T03:35:32Z",
-        "generation": "d9257cef3a2c4e06b8a73419e5c1eeb8",
-        "renewals": 1,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Migrate adapters not listed in this TODO that already use DataSourceResolver but do not construct CSV/TBL options themselves."
     },
     "migrate-ascii-chart-tests-to-textcharts": {
