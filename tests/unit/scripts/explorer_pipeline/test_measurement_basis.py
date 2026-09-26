@@ -22,6 +22,7 @@ from _project.scripts.explorer_pipeline.pipeline import ExplorerPipeline
 from _project.scripts.explorer_pipeline.transformer import (
     BundleTransformer,
     _compute_basis_availability,
+    _parse_bundle,
     _query_display_ms,
     _query_timings,
 )
@@ -45,7 +46,7 @@ def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measure
         {"id": "Q6", "ms": 420.0, "iter": 3, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
     ]
 
-    timings = _query_timings(data)
+    timings = _query_timings(_parse_bundle(data))
     q1_timings = [t for t in timings if t.query_id == "Q1"]
     assert len(q1_timings) == 4
 
@@ -119,7 +120,7 @@ def test_bundle_with_no_warmup_ingests_cleanly_and_reports_warmup_unavailable(
         {"id": "Q6", "ms": 420.0, "iter": 3, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
     ]
 
-    timings = _query_timings(data)
+    timings = _query_timings(_parse_bundle(data))
     avail = _compute_basis_availability(timings)
     assert avail.has_warmup is False
     assert avail.warmup_status == "no_warmup_recorded"
@@ -162,7 +163,7 @@ def test_query_with_fewer_measurement_passes_reports_own_pass_count(tmp_path: Pa
         {"id": "Q3", "ms": 30.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
     ]
 
-    timings = _query_timings(data)
+    timings = _query_timings(_parse_bundle(data))
     avail = _compute_basis_availability(timings)
     assert avail.measurement_pass_count == 3
     assert avail.query_pass_counts["Q1"] == 3
@@ -211,8 +212,8 @@ def test_display_ms_does_not_move_when_warmup_rows_present() -> None:
         *base_measurements,
     ]
 
-    timings_no_warm = _query_timings(bundle_without_warmup)
-    timings_with_warm = _query_timings(bundle_with_warmup)
+    timings_no_warm = _query_timings(_parse_bundle(bundle_without_warmup))
+    timings_with_warm = _query_timings(_parse_bundle(bundle_with_warmup))
 
     d_no_warm, s_no_warm = _query_display_ms(timings_no_warm)
     d_with_warm, s_with_warm = _query_display_ms(timings_with_warm)
@@ -231,7 +232,7 @@ def test_metadata_and_summary_rows_are_filtered_out() -> None:
         {"id": "summary_1", "ms": 0.0, "run_type": "summary", "status": "SKIPPED"},
         {"id": "Q1", "ms": 50.0, "run_type": "measurement", "status": "SUCCESS"},
     ]
-    timings = _query_timings(data)
+    timings = _query_timings(_parse_bundle(data))
     assert len(timings) == 1
     assert timings[0].query_id == "Q1"
 
@@ -243,7 +244,7 @@ def test_failed_warmup_query_does_not_claim_warmup_available() -> None:
         {"id": "Q1", "ms": 0.0, "iter": 0, "stream": 0, "run_type": "warmup", "status": "FAILED"},
         {"id": "Q1", "ms": 100.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
     ]
-    timings = _query_timings(data)
+    timings = _query_timings(_parse_bundle(data))
     avail = _compute_basis_availability(timings)
     assert avail.has_warmup is False
     assert avail.warmup_status == "no_warmup_recorded"
@@ -263,7 +264,7 @@ def test_completely_failed_measurement_query_reported_in_varying_pass_queries() 
         {"id": "Q3", "ms": 0.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "FAILED"},
         {"id": "Q3", "ms": 0.0, "iter": 2, "stream": 0, "run_type": "measurement", "status": "FAILED"},
     ]
-    timings = _query_timings(data)
+    timings = _query_timings(_parse_bundle(data))
     avail = _compute_basis_availability(timings)
     assert avail.measurement_pass_count == 2
     assert avail.query_pass_counts["Q3"] == 0
