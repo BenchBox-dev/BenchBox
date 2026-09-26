@@ -2510,15 +2510,10 @@
       "title": "ClickHouse multi-column PARTITION BY (a, b) can never corroborate: system.tables returns '(a, b)' and normalize_columns keeps the parens"
     },
     "clickhouse-native-sketch-variants-using-state-merge-combinat": {
-      "claim": {
-        "expires_at": "2026-09-27T08:01:12Z",
-        "generation": "9c25b56ed4344ccca45b00945492a2e4",
-        "renewals": 2,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "ClickHouse-native sketch variants using -State / -Merge combinators"
     },
     "clickhouse-nyctaxi-extract-overrides": {
