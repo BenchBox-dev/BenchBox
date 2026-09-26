@@ -250,7 +250,9 @@ def _map_snowflake(roles: set[str]) -> PlatformTuningMapping:
             platform="snowflake",
             tuning_types=(CLUSTERING,),
             physical_mechanisms=(CLUSTERING,),
-            reason=reason,
+            reason=reason
+            + " Tables carry at most four clustering columns so the adapter resumes automatic reclustering.",
+            max_columns=4,
         )
     if DISTRIBUTION_CANDIDATE in roles:
         return PlatformTuningMapping(
