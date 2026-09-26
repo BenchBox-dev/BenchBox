@@ -82,3 +82,72 @@ class TestCustomDirectoryReplacement:
         assert {qid for ids in complexity.values() for qid in ids} == {"custom"}
         patterns = manager.get_queries_by_pattern()
         assert {qid for ids in patterns.values() for qid in ids} == {"custom"}
+
+
+class TestCanonicalIdentity:
+    """The synthetic surface is the canonical JOB set, verbatim (F2)."""
+
+    def test_default_surface_matches_canonical_text(self):
+        from benchbox.core.joinorder.queries import JoinOrderQueryManager as CanonicalManager
+
+        manager = JoinOrderQueryManager()
+        canonical = CanonicalManager()
+        assert manager.get_all_queries() == canonical.get_all_queries()
+
+    def test_historical_10a_collision_is_gone(self):
+        """10a is the canonical Russian-actor variant, not a copy of 10c."""
+        manager = JoinOrderQueryManager()
+        sql_10a = manager.get_query("10a")
+        sql_10c = manager.get_query("10c")
+        assert "[ru]" in sql_10a
+        assert sql_10a != sql_10c
+
+    def test_canonical_manager_is_cached_per_instance(self):
+        first = JoinOrderQueryManager()
+        second = JoinOrderQueryManager()
+        assert first._canonical is not None
+        assert second._canonical is not None
+        assert first._canonical is not second._canonical
+        assert first.get_query("1a") == second.get_query("1a")
+
+    def test_disk_queries_receive_portable_alias_normalization(self, tmp_path):
+        query_dir = tmp_path / "queries"
+        query_dir.mkdir()
+        (query_dir / "15a.sql").write_text("SELECT at.movie_id FROM aka_title at WHERE at.movie_id = 1;")
+        from benchbox.core.joinorder.queries import JoinOrderQueryManager as CanonicalManager
+
+        manager = CanonicalManager(str(query_dir))
+        assert "at1.movie_id" in manager.get_query("15a")
+        assert "FROM aka_title at " not in manager.get_query("15a")
+
+
+class TestScalarVacuityGuard:
+    """All-NULL scalar rows count as vacuous, never as coverage (F1)."""
+
+    def test_report_fails_on_unclassified_vacuous_query(self):
+        from benchbox.core.equivalence.cross_surface import _report
+
+        exit_code = _report(
+            [],
+            total=2,
+            coverage={"expression": 1, "pandas": 1},
+            known={},
+            benchmark="joinorder_synthetic",
+            reference_row_counts={"1a": 0},
+            legitimately_empty={},
+        )
+        assert exit_code == 1
+
+    def test_report_tolerates_classified_vacuous_query(self):
+        from benchbox.core.equivalence.cross_surface import _report
+
+        exit_code = _report(
+            [],
+            total=2,
+            coverage={"expression": 1, "pandas": 1},
+            known={},
+            benchmark="joinorder_synthetic",
+            reference_row_counts={"1a": 0},
+            legitimately_empty={"1a": "test rationale"},
+        )
+        assert exit_code == 0

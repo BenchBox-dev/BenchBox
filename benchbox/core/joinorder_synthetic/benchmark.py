@@ -29,8 +29,10 @@ if TYPE_CHECKING:
 class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """Synthetic Join Order Benchmark implementation.
 
-    This internal surface is for fast schema and loader smoke tests only.
-    It is not a cardinality-estimation substitute for canonical JOB.
+    This internal surface runs the canonical 113-query JOB surface,
+    verbatim, over fast uniformly-random synthetic data with golden
+    entities planted so conjunctive filters match. It is not a
+    cardinality-estimation substitute for canonical JOB.
     """
 
     # CSV dialect for resolve_csv_dialect path (b) — used when manifest metadata is absent

@@ -79,7 +79,7 @@ integrity spec, query count, dataset/source, scales, and DataFrame capability.
 | `tpchavoc` | `experimental` | 220-variant optimizer stress (22 queries × 10 syntax variants); generated; integrity spec; docs; DataFrame-capable. | Optimizer-stress research tool, not a standard comparison workload. |
 | `tpch_skew` | `experimental` | 22-query TPC-H over skewed distributions; generated; integrity spec; docs; DataFrame-capable. | Non-canonical skew parameters; research workload. |
 | `datavault` | `experimental` | 22-query Data Vault 2.0 variant; generated from TPC-H source; integrity spec; docs; DataFrame-capable. | Modeling-variant research; still on the deprecated core base. |
-| `joinorder_synthetic` | `repo_only` | 113-query synthetic Join Order scaling harness (13 historical smoke plus 100 canonical extensions); `surface: internal`; no integrity spec; DataFrame-capable; runnable by explicit ID only. | Public/beta promotion would need user docs, an integrity spec, and a separate `surface` decision — out of scope for this matrix. |
+| `joinorder_synthetic` | `repo_only` | 113-query synthetic Join Order scaling harness (canonical JOB surface, verbatim); `surface: internal`; no integrity spec; DataFrame-capable; runnable by explicit ID only. | Public/beta promotion would need user docs, an integrity spec, and a separate `surface` decision — out of scope for this matrix. |
 
 ## Promotion Candidates and Blockers
 

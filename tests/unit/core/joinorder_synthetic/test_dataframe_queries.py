@@ -327,7 +327,7 @@ class TestPandasImplExecute:
 
         result = q6a_pandas_impl(pandas_ctx)
         assert result is not None
-        assert "hero_movie" in result
+        assert "marvel_movie" in result
 
     @pytest.mark.parametrize("actor_name", ["Robert Downey Jr.", "Downey Robert"])
     def test_q6a_pandas_actor_filter_matches_name_parts_in_any_order(self, actor_name):
@@ -339,10 +339,10 @@ class TestPandasImplExecute:
             def __init__(self):
                 self.tables = {
                     "cast_info": pd.DataFrame({"id": [1], "person_id": [1], "movie_id": [1]}),
-                    "keyword": pd.DataFrame({"id": [1], "keyword": ["superhero"]}),
+                    "keyword": pd.DataFrame({"id": [1], "keyword": ["marvel-cinematic-universe"]}),
                     "movie_keyword": pd.DataFrame({"id": [1], "movie_id": [1], "keyword_id": [1]}),
                     "name": pd.DataFrame({"id": [1], "name": [actor_name]}),
-                    "title": pd.DataFrame({"id": [1], "title": ["Iron Man"], "production_year": [2008]}),
+                    "title": pd.DataFrame({"id": [1], "title": ["Iron Man"], "production_year": [2012]}),
                 }
 
             def get_table(self, name):
@@ -355,7 +355,7 @@ class TestPandasImplExecute:
                 raise NotImplementedError("Expression API not available in pandas context")
 
         assert q6a_pandas_impl(MinimalPandasContext()).to_dict("records") == [
-            {"movie_keyword": "superhero", "actor_name": actor_name, "hero_movie": "Iron Man"}
+            {"movie_keyword": "marvel-cinematic-universe", "actor_name": actor_name, "marvel_movie": "Iron Man"}
         ]
 
     def test_q7a_pandas(self, pandas_ctx):
@@ -377,14 +377,14 @@ class TestPandasImplExecute:
 
         result = q9a_pandas_impl(pandas_ctx)
         assert result is not None
-        assert "american_movie" in result
+        assert "movie" in result
 
     def test_q10a_pandas(self, pandas_ctx):
         from benchbox.core.joinorder_synthetic.dataframe_queries import q10a_pandas_impl
 
         result = q10a_pandas_impl(pandas_ctx)
         assert result is not None
-        assert "movie_with_american_producer" in result
+        assert "russian_movie" in result
 
     def test_q11a_pandas(self, pandas_ctx):
         from benchbox.core.joinorder_synthetic.dataframe_queries import q11a_pandas_impl
