@@ -214,6 +214,7 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
         "platform": platform.get("name", "unknown"),
         "platform_version": _platform_version(data),
         "scale_factor": benchmark.get("scale_factor", 0),
+        "phase": benchmark.get("test_type", "unknown"),
         "timestamp": run.get("timestamp"),
         "query_count": _query_count(data),
         "trust_label": _bundle_trust_label(bundle_path, bundles_dir),
@@ -266,6 +267,7 @@ def generate_inventory(bundles_dir: Path) -> dict:
     by_platform = Counter(entry["platform"] for entry in entries)
     by_trust_label = Counter(entry["trust_label"] for entry in entries)
     by_funding = Counter(entry["funding"] for entry in entries)
+    by_phase = Counter(entry.get("phase", "unknown") for entry in entries)
 
     return {
         "schema_version": "2.3",
@@ -278,6 +280,7 @@ def generate_inventory(bundles_dir: Path) -> dict:
             "by_platform": dict(sorted(by_platform.items())),
             "by_trust_label": dict(sorted(by_trust_label.items())),
             "by_funding": dict(sorted(by_funding.items())),
+            "by_phase": dict(sorted(by_phase.items())),
         },
     }
 

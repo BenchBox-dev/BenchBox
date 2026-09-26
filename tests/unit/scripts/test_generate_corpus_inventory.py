@@ -67,6 +67,7 @@ class TestGenerateInventory:
             "by_platform": {},
             "by_trust_label": {},
             "by_funding": {},
+            "by_phase": {},
         }
 
     def test_sidecar_sets_community_trust_label(self, tmp_path: Path) -> None:
@@ -317,3 +318,18 @@ class TestMain:
 
         assert script.main(["--check"]) == 1
         assert "out of date" in capsys.readouterr().err
+
+    def test_phase_extraction_and_summary(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        power["benchmark"]["test_type"] = "power"
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        tp["benchmark"]["test_type"] = "throughput"
+        (tmp_path / "throughput.json").write_text(json.dumps(tp), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases["power.json"] == "power"
+        assert phases["throughput.json"] == "throughput"
+        assert inventory["summary"]["by_phase"] == {"power": 1, "throughput": 1}
