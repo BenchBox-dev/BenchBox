@@ -48,7 +48,12 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #      detail projection). A v10 snapshot lacks the columns, so a v10
 #      snapshot would hit a DuckDB binder error instead of the intended
 #      rebuild message.
-EXPLORER_READ_MODEL_VERSION = 11
+# v12: results gained benchmark_support_status (registry-declared product
+#      support status, stored per row and selected unconditionally by the
+#      listResults() projection that powers the benchmark browser). A v11
+#      snapshot lacks the column, so a v11 snapshot would hit a DuckDB
+#      binder error instead of the intended rebuild message.
+EXPLORER_READ_MODEL_VERSION = 12
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,
     "newer_policy": "warn-and-continue",

@@ -7,7 +7,7 @@ test.describe("benchmark and platform section indexes", () => {
     await waitForShell(page);
     await waitForDataElement(page, page.getByTestId("benchmarks-index-list").getByRole("listitem").first());
 
-    await expect(page.getByRole("heading", { name: "Benchmarks" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Benchmarks", exact: true })).toBeVisible();
     const explorerNav = page.getByRole("navigation", { name: "Results Explorer" });
     await expect(explorerNav.getByRole("link", { name: "Benchmarks" })).toHaveAttribute("aria-current", "page");
     await expect(explorerNav.getByRole("link", { name: "Benchmarks" })).toHaveAttribute(
@@ -27,7 +27,7 @@ test.describe("benchmark and platform section indexes", () => {
     await page.goto("/results/platforms/");
     await waitForDataElement(page, page.getByTestId("platforms-index-list").getByRole("listitem").first());
 
-    await expect(page.getByRole("heading", { name: "Platforms" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Platforms", exact: true })).toBeVisible();
     await expect(explorerNav.getByRole("link", { name: "Platforms" })).toHaveAttribute("aria-current", "page");
     await expect(explorerNav.getByRole("link", { name: "Platforms" })).toHaveAttribute(
       "href",
