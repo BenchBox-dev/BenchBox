@@ -80,6 +80,36 @@ uv run -- python -m pytest -m "docker_integration" --tb=short -v
 uv run -- python -m pytest -m "live_postgresql" --tb=short -v
 ```
 
+## Apple Container Without Docker Desktop
+
+On Apple-silicon macOS without Docker Desktop, the same stacks run through
+`mocker` (a Docker-compatible CLI over the Apple `container` runtime).
+`CONTAINER_ENGINE=mocker` swaps only the compose driver; the compose files
+stay unmodified. This is local-dev only and must not run in CI. Verified
+2026-09-26 against the `postgres-integration` CI job's two steps:
+
+```bash
+# 1. Start PostgreSQL through the sanctioned pipeline
+CONTAINER_ENGINE=mocker make test-docker-up-postgresql
+
+# 2. Run the CI live-integration step verbatim
+uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
+  -m "live_postgresql" --tb=short -v -p no:cacheprovider
+
+# 3. Run the CI TPC-Havoc equivalence sample verbatim
+PGHOST=localhost PGPORT=5432 PGUSER=benchbox PGPASSWORD=benchbox \
+  PGDATABASE=benchbox_test uv run -- python -m pytest \
+  tests/integration/platforms/test_tpchavoc_postgres_equivalence.py \
+  -m "live_postgresql" -n 0 --tb=short -v -p no:cacheprovider
+
+# 4. Stop when done
+CONTAINER_ENGINE=mocker make test-docker-down-postgresql
+```
+
+Result on that run: 8 live integration tests passed, 2 equivalence tests
+passed, matching the CI job's pass criteria (at least one passing test per
+step, so the sample cannot silently render as green).
+
 ## Pytest Markers
 
 | Marker | Description |
