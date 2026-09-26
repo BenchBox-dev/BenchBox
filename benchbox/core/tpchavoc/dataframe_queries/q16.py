@@ -31,7 +31,7 @@ _DESCRIPTIONS = [
     "Per-predicate branches: one filtered branch per size, concatenated after",
     "Chained style: maximum method chaining, no named intermediates",
     "Complaint-first ordering: anti-join before the part filter",
-    "Materialized complaint set: distinct complaint keys before the anti-join",
+    "Two-stage aggregation: distinct group-supplier pairs counted before the final sort",
     "Group-first ordering: group keys projected before aggregation",
 ]
 
@@ -144,12 +144,17 @@ def _make_q16_expression_impl(variant: int) -> VariantImpl:
             return _q16_expr_aggregate(joined, col)
 
         if variant == 9:
-            complaint_keys = _q16_expr_complaint_keys(ctx, col).distinct()
             joined = part.filter(_q16_expr_parts(col, lit, params)).join(
                 partsupp, left_on="p_partkey", right_on="ps_partkey"
             )
-            return _q16_expr_aggregate(
-                joined.join(complaint_keys, left_on="ps_suppkey", right_on="s_suppkey", how="anti"), col
+            clean = joined.join(
+                _q16_expr_complaint_keys(ctx, col), left_on="ps_suppkey", right_on="s_suppkey", how="anti"
+            )
+            pairs = clean.select(*_GROUP_KEYS, "ps_suppkey").distinct()
+            return (
+                pairs.group_by(*_GROUP_KEYS)
+                .agg(col("ps_suppkey").count().alias("supplier_cnt"))
+                .sort(_SORT_KEYS, descending=_SORT_DESC)
             )
 
         projected = (
@@ -258,11 +263,17 @@ def _make_q16_pandas_impl(variant: int) -> VariantImpl:
             return _q16_pandas_aggregate(joined)
 
         if variant == 9:
-            complaint_keys = _to_list(_q16_pandas_complaint_keys(supplier))
             joined = part[_q16_pandas_parts_mask(part, params)].merge(
                 partsupp, left_on="p_partkey", right_on="ps_partkey"
             )
-            return _q16_pandas_aggregate(joined[~joined["ps_suppkey"].isin(complaint_keys)])
+            complaint_keys = _q16_pandas_complaint_keys(supplier)
+            clean = joined[~joined["ps_suppkey"].isin(_to_list(complaint_keys))]
+            pairs = clean[["p_brand", "p_type", "p_size", "ps_suppkey"]].drop_duplicates()
+            return (
+                pairs.groupby(["p_brand", "p_type", "p_size"], as_index=False)
+                .agg(supplier_cnt=("ps_suppkey", "count"))
+                .sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
+            )
 
         joined = part[_q16_pandas_parts_mask(part, params)].merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
         complaint_keys = _q16_pandas_complaint_keys(supplier)
@@ -287,4 +298,8 @@ Q16_VARIANTS = build_variants(
     [(_make_q16_expression_impl(v), _make_q16_pandas_impl(v)) for v in range(1, 11)],
     _DESCRIPTIONS,
     _Q16_BASE.categories,
+    expected_row_count=_Q16_BASE.expected_row_count,
+    scale_factor_dependent=_Q16_BASE.scale_factor_dependent,
+    timeout_seconds=_Q16_BASE.timeout_seconds,
+    skip_platforms=_Q16_BASE.skip_platforms,
 )

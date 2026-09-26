@@ -117,8 +117,18 @@ def _make_q18_expression_impl(variant: int) -> VariantImpl:
             return _q18_expr_aggregate(joined, col)
 
         if variant == 6:
-            lower = _q18_expr_large_orders(lineitem, col, lit, threshold)
-            upper = _q18_expr_large_orders(lineitem.filter(col("l_quantity") > lit(threshold)), col, lit, threshold)
+            lower = (
+                lineitem.group_by("l_orderkey")
+                .agg(col("l_quantity").sum().alias("total_qty"))
+                .filter((col("total_qty") > lit(threshold)) & (col("total_qty") <= lit(threshold * 2)))
+                .select("l_orderkey")
+            )
+            upper = (
+                lineitem.group_by("l_orderkey")
+                .agg(col("l_quantity").sum().alias("total_qty"))
+                .filter(col("total_qty") > lit(threshold * 2))
+                .select("l_orderkey")
+            )
             large_orders = ctx.concat([lower, upper]).distinct()
             joined = (
                 customer.join(orders, left_on="c_custkey", right_on="o_custkey")
@@ -235,8 +245,13 @@ def _make_q18_pandas_impl(variant: int) -> VariantImpl:
             return _q18_pandas_aggregate(joined.merge(lineitem_cols, left_on="o_orderkey", right_on="l_orderkey"))
 
         if variant == 6:
-            lower = _q18_pandas_large_orders(lineitem, threshold)
-            upper = _q18_pandas_large_orders(lineitem[lineitem["l_quantity"] > threshold], threshold)
+            order_qty = lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
+            lower = _to_list(
+                order_qty[(order_qty["total_qty"] > threshold) & (order_qty["total_qty"] <= threshold * 2)][
+                    "l_orderkey"
+                ]
+            )
+            upper = _to_list(order_qty[order_qty["total_qty"] > threshold * 2]["l_orderkey"])
             large_orders = list(dict.fromkeys(lower + upper))
             joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
             joined = joined[joined["o_orderkey"].isin(large_orders)]
@@ -292,4 +307,8 @@ Q18_VARIANTS = build_variants(
     [(_make_q18_expression_impl(v), _make_q18_pandas_impl(v)) for v in range(1, 11)],
     _DESCRIPTIONS,
     _Q18_BASE.categories,
+    expected_row_count=_Q18_BASE.expected_row_count,
+    scale_factor_dependent=_Q18_BASE.scale_factor_dependent,
+    timeout_seconds=_Q18_BASE.timeout_seconds,
+    skip_platforms=_Q18_BASE.skip_platforms,
 )
