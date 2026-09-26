@@ -23,10 +23,19 @@ two release Make targets handle the cut and finalization. Wheel install,
 release canary, and correctness remain the blocking gates; UAT is a
 non-blocking matrix campaign.
 
-This flow releases the Python package. It does not publish `benchbox.dev` while independent
-publication owns Pages: the site publishes from `develop` through the candidate build plus
-`github-pages`-approved transaction in `docs/operations/publication-deployer-soak-and-retirement.md`.
-The `docs.yml` release-to-Pages job is a legacy fallback that is skipped while a recent
+This flow releases the Python package. Publishing `benchbox.dev` is handled by
+the release-to-publication handoff: when the GitHub Release is created,
+`publication-release-handoff.yml` dispatches a `candidate_only=true` build of
+`Publication Control Plane Deployment` from `develop`, waits for the
+successful candidate bundle, then dispatches the promotion transaction, which
+waits for the `github-pages` approval before writing. A candidate stays
+promotable while its `develop` commit is the protected tip or a recent
+ancestor of it (at most 50 commits behind), so queued approvals survive
+merge-queue landings; unreachable or older bundles are rejected. If the
+handoff fails at any step it opens a tracked `publication` issue with the
+manual promotion steps, which follow
+`docs/operations/publication-deployer-soak-and-retirement.md`. The `docs.yml`
+release-to-Pages job remains a legacy fallback that is skipped while a recent
 independent publication owns Pages. The guard detects ownership through unexpired
 `publication-live-receipt-*` artifacts (live receipts are retained 90 days), so the skip
 guarantee lapses if no publication has run within that window or the receipt artifacts are
