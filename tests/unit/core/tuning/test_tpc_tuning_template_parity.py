@@ -285,3 +285,55 @@ def _load_tuning(platform: str, benchmark: str):
         TUNING_ROOT / platform / f"{benchmark}_tuned.yaml",
         platform=platform,
     )
+
+
+@pytest.mark.parametrize(
+    ("platform", "benchmark_id"),
+    [
+        ("bigquery", "tpch"),
+        ("bigquery", "tpcds"),
+        ("redshift", "tpch"),
+        ("redshift", "tpcds"),
+        ("snowflake", "tpch"),
+        ("snowflake", "tpcds"),
+    ],
+)
+def test_cloud_tpc_tuned_templates_certify_against_logical_profile(platform: str, benchmark_id: str) -> None:
+    tuning_config = ConfigManager().load_unified_tuning_config(
+        TUNING_ROOT / platform / f"{benchmark_id}_tuned.yaml",
+        platform=platform,
+    )
+    result = validate_tuning_template(
+        profile=load_tpc_tuning_profile(),
+        benchmark=benchmark_id,
+        platform=platform,
+        tuning_config=tuning_config,
+    )
+
+    assert result.is_valid, [issue.to_dict() for issue in result.issues]
+    # BigQuery clustering caps at 4 columns per table, so a capped table
+    # maps required-1 instead of required; every other platform maps all.
+    if platform == "bigquery" and benchmark_id == "tpcds":
+        assert result.mapped_count == result.required_count - 1
+    else:
+        assert result.mapped_count == result.required_count
+    assert result.unsupported_count == 0
+    assert result.waived_count == 0
+
+
+def test_bigquery_cap_overflow_is_capped_not_missing() -> None:
+    tuning_config = ConfigManager().load_unified_tuning_config(
+        TUNING_ROOT / "bigquery" / "tpcds_tuned.yaml",
+        platform="bigquery",
+    )
+    result = validate_tuning_template(
+        profile=load_tpc_tuning_profile(),
+        benchmark="tpcds",
+        platform="bigquery",
+        tuning_config=tuning_config,
+    )
+
+    assert result.is_valid
+    store_sales = [m for m in result.mappings if m.candidate.table == "STORE_SALES"]
+    clustered = [m for m in store_sales if "clustering" in m.mapped_tuning_types]
+    assert len(clustered) == 4
