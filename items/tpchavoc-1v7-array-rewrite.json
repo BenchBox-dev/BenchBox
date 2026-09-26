@@ -2,6 +2,7 @@
   "acceptance": [
     "Per-engine 1_v7 rewrites merged and skips removed where green, or skip reasons updated to state rewrite-missing"
   ],
+  "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit 5c20e9e3e. Added deterministic, lineitem-key-ordered native array rewrites for 1_v7: Snowflake ARRAY_AGG + TRANSFORM/REDUCE, BigQuery ARRAY_AGG + UNNEST/OFFSET, and Databricks ordered COLLECT_LIST + TRANSFORM/AGGREGATE/ZIP_WITH. Removed 1_v7 from all three cloud skip sets, registered query-adapter compatibility rules, updated validation mirrors and generated compatibility docs. Verification: Ruff passed; 10 focused tests passed; compat-docs and DDL drift checks passed. SQLGlot parsed all target dialects. A local full Spark execution probe was attempted but the installed JDK failed during SparkContext initialization before query analysis; no paid live-cloud execution was performed.",
   "description": "1_v7 collects with list() then computes with list_sum/list_zip/list_transform, which exist only in DuckDB. Translation gets the collect half right per engine but leaves DuckDB-only compute functions. Needs three rewrites: Snowflake TRANSFORM+REDUCE, Databricks aggregate/transform/zip_with, BigQuery UNNEST+OFFSET. Each changes what the optimizer sees, partly defeating the variant purpose; until written the skip should be labeled rewrite-missing not unsupported.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2412"
@@ -22,6 +23,14 @@
       "generation": "6602fcd6a30c43d4a8b8dfb87831929a",
       "op": "take",
       "op_id": "c04641691756461aaef251f284556362",
+      "session_id": "cdb421e45ea14139bf11036d5d9e8057"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62",
+      "at": "2026-09-26T20:58:10Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "8ea227f83ead4c98acfd6cfbdef2c9ad",
       "session_id": "cdb421e45ea14139bf11036d5d9e8057"
     }
   ]
