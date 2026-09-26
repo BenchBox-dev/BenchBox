@@ -11,6 +11,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 
+def _require_at_least(name: str, value: float, minimum: float, expectation: str) -> None:
+    """Raise ValueError unless a numeric pattern argument meets its floor."""
+    if value < minimum:
+        raise ValueError(f"{name} must be {expectation}")
+
+
 @dataclass
 class WorkloadPhase:
     """A phase in the workload pattern."""
@@ -480,14 +486,12 @@ class WavePattern(WorkloadPattern):
             period_seconds: Duration of one complete wave cycle
             num_periods: Number of wave cycles to execute
         """
-        if min_concurrency < 1:
-            raise ValueError("min_concurrency must be at least 1")
+        _require_at_least("min_concurrency", min_concurrency, 1, "at least 1")
         if max_concurrency < min_concurrency:
             raise ValueError("max_concurrency must be >= min_concurrency")
         if period_seconds <= 0:
             raise ValueError("period_seconds must be positive")
-        if num_periods < 1:
-            raise ValueError("num_periods must be at least 1")
+        _require_at_least("num_periods", num_periods, 1, "at least 1")
 
         self._min = min_concurrency
         self._max = max_concurrency
@@ -554,14 +558,11 @@ class MultiWriterPattern(WorkloadPattern):
             duration_seconds: Overlapped read/write duration.
             drain_seconds: Writer-only drain tail after readers stop.
         """
-        if writers < 1:
-            raise ValueError("writers must be at least 1")
-        if readers < 1:
-            raise ValueError("readers must be at least 1")
+        _require_at_least("writers", writers, 1, "at least 1")
+        _require_at_least("readers", readers, 1, "at least 1")
         if duration_seconds <= 0:
             raise ValueError("duration_seconds must be positive")
-        if drain_seconds < 0:
-            raise ValueError("drain_seconds must be non-negative")
+        _require_at_least("drain_seconds", drain_seconds, 0, "non-negative")
 
         self._writers = writers
         self._readers = readers
