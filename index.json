@@ -9963,6 +9963,13 @@
       "status": "done",
       "title": "Activate native merge queue on develop ruleset and verify live operations"
     },
+    "merge-queue-drain-20260926": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Drain develop merge queue to zero after bulk-enrollment backlog"
+    },
     "metadata-primitives-benchmark": {
       "claim": null,
       "needs": [],
