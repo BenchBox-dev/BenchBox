@@ -18200,15 +18200,10 @@
       "title": "Tuning batch residual cleanups: display-name path, dead CH optimizations code, guardrail headroom, blind-spot bookkeeping"
     },
     "tuning-snowpark-session-ledger-capture-20260723": {
-      "claim": {
-        "expires_at": "2026-09-27T02:54:42Z",
-        "generation": "16de8dc55b0a4a91b9e2ac6ed62a7973",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Applied-ledger capture for Snowpark session tuning"
     },
     "tuning-soundness-test-coverage-20260712": {
