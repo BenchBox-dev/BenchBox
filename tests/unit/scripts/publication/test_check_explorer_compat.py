@@ -166,6 +166,10 @@ def test_validate_database_schema_detects_missing_view_column() -> None:
             "view 'result_detail_metrics' missing required columns:" in err and "override_rules" in err
             for err in errors
         )
+        assert any(
+            "view 'result_detail_metrics' missing required columns:" in err and "benchmark_support_status" in err
+            for err in errors
+        )
     finally:
         con.close()
 
