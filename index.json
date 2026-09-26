@@ -13230,10 +13230,15 @@
       "title": "Regenerate BenchBox skill mirrors from canonical main and add a principled wrapper-command capability boundary to the contract test"
     },
     "regenerate-dropped-tuned-corpus-cells": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T03:46:56Z",
+        "generation": "f2d7524d2b0d4805a2d2ac667a8e894e",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Regenerate dropped tuned corpus cells, starting with zero-coverage benchmarks"
     },
     "register-adapter-ddl-rewrites-under-sql-compat": {

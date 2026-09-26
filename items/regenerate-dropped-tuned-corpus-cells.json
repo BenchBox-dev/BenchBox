@@ -10,5 +10,16 @@
     "results-data/REGENERATION.md",
     "results-data/bundles",
     "results-data/corpus-inventory.json"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-26T03:46:56Z",
+      "client": "jcode",
+      "generation": "f2d7524d2b0d4805a2d2ac667a8e894e",
+      "op": "take",
+      "op_id": "238373a193d14fbe8039c296e06abb0b",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
   ]
 }
