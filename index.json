@@ -2566,15 +2566,10 @@
       "title": "Close pre-Beta release blockers in status messaging, install docs, packaging policy, and typecheck gating"
     },
     "cloud-adapter-staged-load-template": {
-      "claim": {
-        "expires_at": "2026-09-27T02:43:11Z",
-        "generation": "a6b48f9461804b2894b97d5217f5db44",
-        "renewals": 0,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Extract a shared staged-load template method for redshift/snowflake (and evaluate bigquery/databricks)"
     },
     "cloud-config-error-messages-give-broken-instructions": {
