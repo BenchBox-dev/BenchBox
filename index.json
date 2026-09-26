@@ -17812,10 +17812,15 @@
       "title": "Revalidate postgres HAVING-alias tpchavoc skips by inlining"
     },
     "tpchavoc-pg-ambiguous-cols": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T21:05:10Z",
+        "generation": "10dab8460a134a80abfa94c89ad1442d",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Revalidate postgres ambiguous-column tpchavoc skips"
     },
     "tpchavoc-pg-dual-rewrite": {
