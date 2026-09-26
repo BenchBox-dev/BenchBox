@@ -49,6 +49,16 @@ def test_filtered_aggregate_rewrite_preserves_null_and_distinct_semantics():
     assert duckdb.sql(executable).fetchall() == expected
 
 
+def test_snowflake_2_v2_is_unskipped_and_parseable():
+    benchmark = TPCHavocBenchmark(scale_factor=0.1)
+    query = benchmark.get_query("2_v2", dialect="snowflake")
+
+    assert "2_v2" not in CLOUD_TPCHAVOC_SKIPS["snowflake"]
+    assert sqlglot.parse_one(query, read="snowflake")
+    assert "SELECT MIN(ps_supplycost)" in query
+    assert "GROUP BY ps_partkey" in query
+
+
 def test_snowflake_empty_group_rewrite_is_targeted():
     benchmark = TPCHavocBenchmark(scale_factor=0.1)
     snowflake = benchmark.get_queries(dialect="snowflake")

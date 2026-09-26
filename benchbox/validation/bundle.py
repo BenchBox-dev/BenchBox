@@ -302,7 +302,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
     "snowflake": frozenset(
         [
             "1_v7",
-            "2_v2",
         ]
     ),
     "databricks": frozenset(
