@@ -274,10 +274,15 @@
       "title": "Add PrestoDB Platform Adapter"
     },
     "add-remaining-job-queries-beyond-the-core-13": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T03:17:29Z",
+        "generation": "1a1b5a1bb9ce49b3982d966704807d82",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Add remaining JOB queries beyond the core 13"
     },
     "add-sphinx-tags": {
