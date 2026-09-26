@@ -1644,15 +1644,10 @@
       "title": "Bulk loading for PostgreSQL COPY FROM PROGRAM or COPY FROM STDIN multi-file"
     },
     "bulk-s3-gcs-loading-for-clickhouse-cloud-adapter-using-s3-gl": {
-      "claim": {
-        "expires_at": "2026-09-27T04:10:31Z",
-        "generation": "8c45c94a769c47479aba7c32ef4198ba",
-        "renewals": 0,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Bulk S3/GCS loading for ClickHouse Cloud adapter using s3() glob patterns"
     },
     "bulk-shard-loading-clickhouse": {
