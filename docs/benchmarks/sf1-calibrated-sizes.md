@@ -1,12 +1,22 @@
 # Calibrated SF=1 Uncompressed Source-Data Sizes
 
 Measured 2026-09-26 with `scripts/measure_sf1_sizes.py`: each benchmark's
-generator ran at `scale_factor=1.0` with compression disabled, and every
-file the generator owns under its output root was summed (returned table
-paths plus auxiliary corpora such as the primitives bulk-load files).
+generator ran at `scale_factor=1.0` with compression disabled, and the
+generator's own outputs were summed (returned table paths plus auxiliary
+corpora such as the primitives bulk-load files). Upstream staging caches
+(the TPC-DS source behind `tpcds_obt`, the TPC-H source behind
+`datavault`) are build-time scratch and are never counted. Compressed
+variants (`.gz`, `.zst`, `.bz2`), columnar Parquet footprints, and
+run-metadata files are excluded: Parquet-native benchmarks report
+on-disk footprints, not uncompressed bytes. Any run whose downloader
+substituted synthetic fallback months fails loudly instead of
+calibrating.
 Real-data benchmarks (nyctaxi, flightdata) were decompressed from retained
 SF=1 caches; `ai_primitives` reuses TPC-H data; `metadata_primitives`
-generates no data files.
+generates no data files; `tpchavoc` aliases the TPC-H generator output.
+Byte counts carry POSIX line endings and the local toolchain's Parquet
+footers: treat them as calibrated within a few percent, not as
+bit-exact constants across platforms.
 
 These are uncompressed source bytes. They are larger than the retained
 on-disk caches, which stay zstd- or gzip-compressed: `flightdata` measures
@@ -30,17 +40,17 @@ where available; otherwise the generator baseline.
 | h2odb | 1,413,528,658 | 1.316 | ~1.4 GB | generated |
 | coffeeshop | 900,141,206 | 0.838 | ~0.9 GB | generated |
 | tsbs_devops | 919,491,614 | 0.856 | ~0.9 GB | generated |
-| joinorder | 959,479,691 | 0.894 | ~1.0 GB | generated (canonical IMDB) |
+| joinorder | 959,479,691 | 0.894 | ~1.0 GB | on-disk Parquet footprint (canonical IMDB; no uncompressed source) |
 | joinorder_synthetic | 444,365,227 | 0.414 | ~0.4 GB | generated |
 | read_primitives | 1,092,043,700 | 1.017 | ~1.1 GB | generated (TPC-H data) |
-| write_primitives | 1,849,207,752 | 1.722 | ~1.8 GB | generated |
-| transaction_primitives | 1,849,207,752 | 1.722 | ~1.8 GB | generated |
+| write_primitives | 1,572,187,172 | 1.464 | ~1.6 GB | generated |
+| transaction_primitives | 1,572,187,172 | 1.464 | ~1.6 GB | generated |
 | vector_search | 1,342,083,621 | 1.250 | ~1.3 GB | generated |
 | clickbench | 552,136,075 | 0.514 | ~0.6 GB | generated |
 | nyctaxi | 863,567,123 | 0.804 | ~0.9 GB | decompressed SF=1 cache |
 | flightdata | 2,750,362,238 | 2.561 | ~2.8 GB | decompressed SF=1 cache |
-| tpcds_obt | 2,406,484,046 | 2.241 | ~2.4 GB | generated (includes TPC-DS source) |
-| datavault | 4,795,724,939 | 4.466 | ~4.8 GB | generated (includes TPC-H source) |
+| tpcds_obt | 2,406,484,046 | 2.241 | ~2.4 GB | legacy total incl. TPC-DS source (method superseded; derived-only remeasure pending scratch) |
+| datavault | 3,703,681,239 | 3.449 | ~3.7 GB | generated (derived tables only) |
 
 ## Notes
 
@@ -60,9 +70,9 @@ where available; otherwise the generator baseline.
   `row_count` entries where generators write them; generators without
   manifest row metadata report no row count.
 - `tpcds_obt` and `datavault` derive from TPC-DS and TPC-H source data;
-  the totals include the source corpus the measurement generated alongside
-  the derived tables. A run that reuses an existing source cache needs
-  only the incremental derived bytes.
+  the totals count only the derived tables, never the staged source
+  corpus. A run that reuses an existing source cache needs only the
+  incremental derived bytes.
 - `nyctaxi` at SF=1 samples the 2019 corpus at rate 0.1 (one month slice);
   `flightdata` at SF=1 spans ~41 months of BTS data.
 - Regenerate with `uv run -- python scripts/measure_sf1_sizes.py --output <path>`

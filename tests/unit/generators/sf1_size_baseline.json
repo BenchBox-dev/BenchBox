@@ -18,13 +18,13 @@
     "joinorder": 959479691,
     "joinorder_synthetic": 444365227,
     "read_primitives": 1092043700,
-    "write_primitives": 1849207752,
-    "transaction_primitives": 1849207752,
+    "write_primitives": 1572187172,
+    "transaction_primitives": 1572187172,
     "vector_search": 1342083621,
     "clickbench": 552136075,
     "nyctaxi": 863567123,
     "flightdata": 2750362238,
     "tpcds_obt": 2406484046,
-    "datavault": 4795724939
+    "datavault": 3703681239
   }
 }

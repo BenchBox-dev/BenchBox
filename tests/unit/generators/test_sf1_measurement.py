@@ -41,6 +41,10 @@ def test_all_registry_benchmarks_have_measurement_entry():
 def test_measurement_entries_resolve_to_importable_classes():
     mod = _load_script()
     for benchmark, module, cls_name, _ in mod.GENERATORS + mod.BENCHMARK_LEVEL:
+        if module.startswith("__alias__:"):
+            target = module.split(":", 1)[1]
+            assert target in mod.all_benchmark_ids(), f"{benchmark}: alias target {target} missing"
+            continue
         module_obj = __import__(module, fromlist=[cls_name])
         assert hasattr(module_obj, cls_name), f"{benchmark}: {module}.{cls_name} missing"
 
@@ -70,11 +74,20 @@ def test_sum_paths_skips_transport_archives(tmp_path):
     mod = _load_script()
     archive = tmp_path / "joinorder-imdb-2013-v1.tar.zst"
     archive.write_text("z" * 70)
-    data = tmp_path / "cast_info.parquet"
+    data = tmp_path / "cast_info.tbl"
     data.write_text("y" * 50)
     total, count = mod._sum_paths(tmp_path)
     assert total == 50
     assert count == 1
+
+
+def test_sum_paths_skips_parquet_footprints(tmp_path):
+    """Parquet is encoded bytes, not uncompressed source: never counted."""
+    mod = _load_script()
+    (tmp_path / "cast_info.parquet").write_bytes(b"y" * 50)
+    total, count = mod._sum_paths(tmp_path)
+    assert total == 0
+    assert count == 0
 
 
 def test_measure_unknown_benchmark_records_error():
@@ -151,6 +164,86 @@ def test_jobs_option_runs_subset():
     assert mod.main(["--benchmark", "no-such-benchmark", "--jobs", "2"]) == 2
     with pytest.raises(ValueError, match="--jobs must be"):
         mod.measure_many(["tpch"], jobs=0)
+
+
+def test_measure_one_runs_a_lightweight_generator_end_to_end():
+    """measure_one executes a real generator and counts only its outputs."""
+    mod = _load_script()
+    record = mod.measure_one("coffeeshop")
+    assert record.error is None, record.error
+    assert record.total_bytes > 0
+    assert record.file_count > 0
+
+
+def test_compressed_variants_and_parquet_do_not_count(tmp_path):
+    mod = _load_script()
+    (tmp_path / "a.tbl").write_text("x" * 100)
+    (tmp_path / "a.tbl.gz").write_text("x" * 10)
+    (tmp_path / "b.parquet").write_bytes(b"y" * 50)
+    (tmp_path / ".bulk_load_metadata.json").write_text('{"ts": "now"}')
+    total, count = mod._sum_paths(str(tmp_path))
+    assert total == 100
+    assert count == 1
+
+
+def test_source_cache_is_excluded_from_measurement(tmp_path):
+    mod = _load_script()
+    (tmp_path / "orders.tbl").write_text("x" * 64)
+    cache = tmp_path / "source_cache" / "tpch_sf1"
+    cache.mkdir(parents=True)
+    (cache / "lineitem.tbl").write_text("y" * 1024)
+    total, count = mod._sum_tree_excluding(tmp_path, {tmp_path / "source_cache"}, set())
+    assert total == 64
+    assert count == 1
+
+
+def test_manifest_rows_use_first_format_only(tmp_path):
+    mod = _load_script()
+    manifest = {
+        "tables": {
+            "orders": {
+                "formats": {
+                    "tbl": [{"path": "orders.tbl", "row_count": 1500000}],
+                    "parquet": [{"path": "orders.parquet", "row_count": 1500000}],
+                }
+            }
+        }
+    }
+    (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest))
+    assert mod._sum_manifest_rows(tmp_path) == 1500000
+
+
+def test_synthetic_fallback_aborts_measurement():
+    mod = _load_script()
+
+    class _Downloader:
+        _synthetic_fallback_months = ["2024-01"]
+
+    class _Benchmark:
+        downloader = _Downloader()
+
+    with pytest.raises(RuntimeError, match="synthetic fallback"):
+        mod._reject_synthetic_fallback(_Benchmark(), "NYCTaxiBenchmark")
+
+
+def test_tpchavoc_aliases_tpch_without_regeneration(monkeypatch):
+    mod = _load_script()
+    calls: list[str] = []
+    real_run = mod._run_generator
+
+    def _spy(module: str, cls_name: str, extra: dict):
+        calls.append(module)
+        return real_run(module, cls_name, extra)
+
+    monkeypatch.setattr(mod, "_run_generator", _spy)
+    tpch = mod.measure_one("tpch")
+    assert tpch.error is None, tpch.error
+    assert calls == ["benchbox.core.tpch.generator"]
+    havoc = mod.measure_one("tpchavoc")
+    assert havoc.error is None, havoc.error
+    assert havoc.total_bytes == tpch.total_bytes
+    assert "alias of tpch" in havoc.notes
+    assert calls == ["benchbox.core.tpch.generator"], "alias must not regenerate"
 
 
 def test_size_record_json_shape():
