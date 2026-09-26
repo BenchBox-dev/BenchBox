@@ -1,4 +1,4 @@
-# Redshift TPCH Tuned Configuration
+# Snowflake TPCH Tuned Configuration
 # Generated from the logical tuning profile (benchbox/core/tuning/profiles/tpc.yaml)
 # by scripts/generate_cloud_tpc_templates.py. Do not hand-edit: re-run the
 # generator after changing the profile. Provides platform-native tuning for
@@ -36,11 +36,7 @@ platform_optimizations:
 table_tunings:
   CUSTOMER:
     table_name: CUSTOMER
-    distribution:
-    - name: C_CUSTKEY
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: C_CUSTKEY
       type: INTEGER
       order: 1
@@ -50,11 +46,7 @@ table_tunings:
 
   LINEITEM:
     table_name: LINEITEM
-    distribution:
-    - name: L_ORDERKEY
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: L_SHIPDATE
       type: DATE
       order: 1
@@ -70,11 +62,7 @@ table_tunings:
 
   ORDERS:
     table_name: ORDERS
-    distribution:
-    - name: O_ORDERKEY
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: O_ORDERDATE
       type: DATE
       order: 1
@@ -87,11 +75,7 @@ table_tunings:
 
   PART:
     table_name: PART
-    distribution:
-    - name: P_PARTKEY
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: P_PARTKEY
       type: INTEGER
       order: 1
@@ -104,11 +88,7 @@ table_tunings:
 
   PARTSUPP:
     table_name: PARTSUPP
-    distribution:
-    - name: PS_PARTKEY
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: PS_PARTKEY
       type: INTEGER
       order: 1
@@ -118,11 +98,7 @@ table_tunings:
 
   SUPPLIER:
     table_name: SUPPLIER
-    distribution:
-    - name: S_SUPPKEY
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: S_SUPPKEY
       type: INTEGER
       order: 1

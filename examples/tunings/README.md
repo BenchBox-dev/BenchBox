@@ -16,6 +16,11 @@ a matching `<benchmark>_notuning.yaml`):
   `tpch_liquid_tuned.yaml` / `tpcds_liquid_tuned.yaml` (Liquid Clustering AUTO
   variants of the same logical profile, alongside the legacy Z-ORDER
   `tpch_tuned.yaml` / `tpcds_tuned.yaml`)
+- `snowflake/` - `tpch`, `tpcds` (generated from the logical tuning profile
+  by `scripts/generate_cloud_tpc_templates.py`; the only certified
+  cloud-template platform today because its clustering renders post-load via
+  `ALTER TABLE ... CLUSTER BY`, while BigQuery and Redshift layouts stay
+  preview-only in the current adapters)
 
 DataFrame platforms live under `dataframe/` with a flat
 `<platform>_<profile>.yaml` naming (e.g. `polars_optimized.yaml`,

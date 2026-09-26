@@ -82,8 +82,8 @@ command_examples:
     - benchbox run --platform bigquery --benchmark tpch --output gs://bucket/benchbox/
     - benchbox run --platform bigquery --benchmark tpcds --scale 100 \
     - '  --platform-option project_id=my-project --output gs://my-bucket/results/'
-    - benchbox run --platform bigquery --benchmark tpch --tuning tuned \
-    - '  --output gs://bucket/benchbox/  # Uses partitioning, clustering'
+    - benchbox run --platform snowflake --benchmark tpch --tuning tuned \
+    - '  --output s3://bucket/benchbox/  # Uses clustering (packaged template)'
     - benchbox run --platform bigquery --benchmark tpch --table-mode external \
     - '  --platform-option staging_root=gs://bucket/benchbox/  # External table over GCS Parquet'
     Redshift:

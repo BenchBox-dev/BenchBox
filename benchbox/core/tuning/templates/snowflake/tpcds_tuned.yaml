@@ -1,4 +1,4 @@
-# Redshift TPCDS Tuned Configuration
+# Snowflake TPCDS Tuned Configuration
 # Generated from the logical tuning profile (benchbox/core/tuning/profiles/tpc.yaml)
 # by scripts/generate_cloud_tpc_templates.py. Do not hand-edit: re-run the
 # generator after changing the profile. Provides platform-native tuning for
@@ -36,11 +36,7 @@ platform_optimizations:
 table_tunings:
   CATALOG_RETURNS:
     table_name: CATALOG_RETURNS
-    distribution:
-    - name: CR_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: CR_RETURNED_DATE_SK
       type: INTEGER
       order: 1
@@ -50,11 +46,7 @@ table_tunings:
 
   CATALOG_SALES:
     table_name: CATALOG_SALES
-    distribution:
-    - name: CS_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: CS_SOLD_DATE_SK
       type: INTEGER
       order: 1
@@ -67,11 +59,7 @@ table_tunings:
 
   CUSTOMER:
     table_name: CUSTOMER
-    distribution:
-    - name: C_CUSTOMER_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: C_CUSTOMER_SK
       type: INTEGER
       order: 1
@@ -84,11 +72,7 @@ table_tunings:
 
   DATE_DIM:
     table_name: DATE_DIM
-    distribution:
-    - name: D_DATE_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: D_DATE_SK
       type: INTEGER
       order: 1
@@ -101,11 +85,7 @@ table_tunings:
 
   ITEM:
     table_name: ITEM
-    distribution:
-    - name: I_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: I_ITEM_SK
       type: INTEGER
       order: 1
@@ -118,11 +98,7 @@ table_tunings:
 
   STORE_RETURNS:
     table_name: STORE_RETURNS
-    distribution:
-    - name: SR_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: SR_RETURNED_DATE_SK
       type: INTEGER
       order: 1
@@ -141,11 +117,7 @@ table_tunings:
 
   STORE_SALES:
     table_name: STORE_SALES
-    distribution:
-    - name: SS_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: SS_SOLD_DATE_SK
       type: INTEGER
       order: 1
@@ -167,11 +139,7 @@ table_tunings:
 
   WEB_RETURNS:
     table_name: WEB_RETURNS
-    distribution:
-    - name: WR_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: WR_RETURNED_DATE_SK
       type: INTEGER
       order: 1
@@ -181,11 +149,7 @@ table_tunings:
 
   WEB_SALES:
     table_name: WEB_SALES
-    distribution:
-    - name: WS_ITEM_SK
-      type: INTEGER
-      order: 1
-    sorting:
+    clustering:
     - name: WS_SOLD_DATE_SK
       type: INTEGER
       order: 1

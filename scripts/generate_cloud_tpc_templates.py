@@ -13,6 +13,14 @@ Platform rules honored here (mirroring the mappers, not reimplementing them):
   remaining locality roles become compound sortkey entries.
 - Snowflake: everything the mapper accepts becomes clustering.
 
+Only platforms whose mapped tuning types reach the physical layout at
+execution time are generated here. BigQuery partitioning/clustering and
+Redshift distribution/sorting are preview-only or inspect-and-log in the
+current adapters (see benchbox/core/tuning/capability_registry.py), so they
+stay out of the certified set until the adapters render them for real;
+Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY and
+is the one certified platform in this generator today.
+
 Usage:
     uv run -- python scripts/generate_cloud_tpc_templates.py --write
     uv run -- python scripts/generate_cloud_tpc_templates.py --check
@@ -39,7 +47,7 @@ from benchbox.core.tuning.workload_profiles import (  # noqa: E402
     load_tpc_tuning_profile,
 )
 
-PLATFORMS = ("bigquery", "redshift", "snowflake")
+PLATFORMS = ("snowflake",)
 BENCHMARKS = ("tpch", "tpcds")
 
 PLATFORM_TITLES = {

@@ -22,7 +22,7 @@ cp examples/tunings/<platform>/<benchmark>_tuned.yaml \
 ```
 
 Only the platforms/benchmarks with real auto-discovery naming
-(`duckdb/`, `databricks/`) are packaged here. DataFrame tuning files
+(`duckdb/`, `databricks/`, `snowflake/`) are packaged here. DataFrame tuning files
 (`examples/tunings/dataframe/`) are never auto-discovered (see
 `examples/tunings/README.md`) and are not packaged.
 
