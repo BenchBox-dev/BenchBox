@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "bundle_file": "vector_search_sf001_duckdb_sql_20260925_234945_9a024f54.json",
+  "bundle_hash": "0da331449af6e8b22e61b7015dcc72f56d5554a5b200f5318f5a4baf12cfd81c",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "funding": "unspecified"
+}

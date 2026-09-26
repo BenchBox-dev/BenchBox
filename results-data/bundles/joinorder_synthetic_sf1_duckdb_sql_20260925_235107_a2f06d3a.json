@@ -1,0 +1,1085 @@
+{
+  "benchmark": {
+    "id": "joinorder_synthetic",
+    "name": "JoinOrderSyntheticBenchmark",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "generate",
+      "load",
+      "power"
+    ],
+    "platform_option_sources": {
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "memory_limit": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "show_query_plans": "saved_config",
+      "tuning_source": "saved_config"
+    },
+    "platform_options": {
+      "force_recreate": false,
+      "force_upload": false,
+      "memory_limit": "8GB",
+      "normalize_plan_literals": false,
+      "show_query_plans": false,
+      "tuning_source": "fallback"
+    }
+  },
+  "cost": {
+    "model": "actual",
+    "total_usd": 0
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 25.6.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 0.039,
+        "min": 0.036,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 25.6.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "local_process",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "duckdb",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "1.5.5",
+    "driver_version_resolved": "1.5.5",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "phases": [
+      "generate",
+      "load",
+      "power"
+    ],
+    "timestamp": "2026-09-25T23:50:43.564857",
+    "translation": {
+      "attempt_count": 1,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 1,
+          "count": 1,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "duckdb",
+          "parser_grammar": "postgres",
+          "scope": "schema_ddl",
+          "source_dialect": "standard",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "duckdb",
+          "translator": "sqlglot",
+          "unique_queries": 1
+        }
+      ],
+      "schema_statements_translated": 1,
+      "source_dialects": [
+        "standard"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 1,
+      "target_dialects": [
+        "duckdb"
+      ],
+      "total_transpilation_calls": 1,
+      "translators": [
+        "sqlglot"
+      ]
+    },
+    "tuning_mode": "tuned-fallback"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-09-25T23:51:07.381569",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "not_applicable",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "not_applicable_local",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": null,
+      "cloud_region": null,
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0",
+    "pricing_region": "not_applicable"
+  },
+  "phases": {
+    "data_generation": {
+      "status": "NOT_RUN"
+    },
+    "data_loading": {
+      "duration_ms": 4366,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 342,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 21,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 50,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "1.5.5",
+    "cloud": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "compute": {
+      "collection_status": "partial",
+      "result_cache_enabled": false,
+      "source": "requested"
+    },
+    "config": {
+      "connection_mode": "file",
+      "driver_package": "duckdb",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "1.5.5",
+      "driver_version_resolved": "1.5.5",
+      "enable_progress_bar": false,
+      "execution_mode": "sql",
+      "memory_limit": "8GB",
+      "result_cache_enabled": false,
+      "thread_limit": 8
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "file",
+      "deployment_type": "embedded",
+      "endpoint_class": "embedded_process",
+      "metadata_source": "inferred"
+    },
+    "driver_actual_version": "1.5.5",
+    "driver_package": "duckdb",
+    "driver_resolved_version": "1.5.5",
+    "driver_runtime_strategy": "current-process",
+    "name": "DuckDB",
+    "raw_config": {
+      "enable_progress_bar": false,
+      "force_recreate": false,
+      "memory_limit": "8GB",
+      "result_cache_enabled": false,
+      "thread_limit": 8,
+      "tuning_source": "fallback",
+      "type": "duckdb"
+    },
+    "storage": {
+      "collection_status": "unavailable",
+      "source": "unavailable"
+    },
+    "tuning": {
+      "applied": {
+        "dropped": [],
+        "receipt": {
+          "corroborated": false,
+          "entries": [
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            },
+            {
+              "phase": "ddl",
+              "reason_redacted": true,
+              "statement_redacted": true,
+              "verdict": "unverifiable"
+            }
+          ],
+          "platform": "duckdb",
+          "summary": {
+            "gate_relevant_total": 21,
+            "unverifiable": 21
+          }
+        },
+        "statements": [
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "ddl",
+            "statement_redacted": true,
+            "status": "executed"
+          }
+        ],
+        "status": "applied_unverified"
+      },
+      "applied_ledger_hash": "f3f154ba74b0da64fac9341dd7438df79a69fad416f52899fc85517119832d85",
+      "counts": {
+        "tables_tuned": 0,
+        "tuning_types": [
+          "check_constraints",
+          "foreign_keys",
+          "primary_keys",
+          "unique_constraints"
+        ]
+      },
+      "hash": "bb837da77fe3b4152fd189ac493c7eab95341ab4ac44733a6e9f9df6c5466668",
+      "requested": {
+        "constraints": {
+          "check_constraints": {
+            "enabled": true,
+            "enforce_on_insert": true,
+            "enforce_on_update": true
+          },
+          "foreign_keys": {
+            "enabled": true,
+            "enforce_referential_integrity": true,
+            "on_delete_action": "RESTRICT",
+            "on_update_action": "RESTRICT"
+          },
+          "primary_keys": {
+            "enabled": true,
+            "enforce_uniqueness": true,
+            "nullable": false
+          },
+          "unique_constraints": {
+            "enabled": true,
+            "ignore_nulls": false
+          }
+        }
+      },
+      "requested_config_hash": "bb837da77fe3b4152fd189ac493c7eab95341ab4ac44733a6e9f9df6c5466668",
+      "source": "auto",
+      "tuning_policy_generation": "adr-003",
+      "tuning_source": "fallback",
+      "validation_status": "applied_unverified"
+    },
+    "version": "1.5.5"
+  },
+  "queries": [
+    {
+      "id": "1a",
+      "iter": 0,
+      "ms": 8.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1b",
+      "iter": 0,
+      "ms": 4.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "2a",
+      "iter": 0,
+      "ms": 2.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "3a",
+      "iter": 0,
+      "ms": 24.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "4a",
+      "iter": 0,
+      "ms": 11.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "5a",
+      "iter": 0,
+      "ms": 5.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "6a",
+      "iter": 0,
+      "ms": 8.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "7a",
+      "iter": 0,
+      "ms": 2.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "8a",
+      "iter": 0,
+      "ms": 3.2,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "9a",
+      "iter": 0,
+      "ms": 5.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "10a",
+      "iter": 0,
+      "ms": 13.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "11a",
+      "iter": 0,
+      "ms": 5.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "12a",
+      "iter": 0,
+      "ms": 7.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "1a",
+      "iter": 1,
+      "ms": 3.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1b",
+      "iter": 1,
+      "ms": 3.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "2a",
+      "iter": 1,
+      "ms": 1.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "3a",
+      "iter": 1,
+      "ms": 15.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "4a",
+      "iter": 1,
+      "ms": 8.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "5a",
+      "iter": 1,
+      "ms": 5.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "6a",
+      "iter": 1,
+      "ms": 7.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "7a",
+      "iter": 1,
+      "ms": 1.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "8a",
+      "iter": 1,
+      "ms": 3.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "9a",
+      "iter": 1,
+      "ms": 5.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "10a",
+      "iter": 1,
+      "ms": 13.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "11a",
+      "iter": 1,
+      "ms": 5.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "12a",
+      "iter": 1,
+      "ms": 7.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "1a",
+      "iter": 2,
+      "ms": 3.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1b",
+      "iter": 2,
+      "ms": 3.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "2a",
+      "iter": 2,
+      "ms": 1.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "3a",
+      "iter": 2,
+      "ms": 15.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "4a",
+      "iter": 2,
+      "ms": 8.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "5a",
+      "iter": 2,
+      "ms": 5.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "6a",
+      "iter": 2,
+      "ms": 8.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "7a",
+      "iter": 2,
+      "ms": 1.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "8a",
+      "iter": 2,
+      "ms": 2.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "9a",
+      "iter": 2,
+      "ms": 5.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "10a",
+      "iter": 2,
+      "ms": 13.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "11a",
+      "iter": 2,
+      "ms": 5.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "12a",
+      "iter": 2,
+      "ms": 7.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "1a",
+      "iter": 3,
+      "ms": 3.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "1b",
+      "iter": 3,
+      "ms": 3.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "2a",
+      "iter": 3,
+      "ms": 2.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "3a",
+      "iter": 3,
+      "ms": 14.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "4a",
+      "iter": 3,
+      "ms": 8.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "5a",
+      "iter": 3,
+      "ms": 5.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "6a",
+      "iter": 3,
+      "ms": 7.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "7a",
+      "iter": 3,
+      "ms": 1.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "8a",
+      "iter": 3,
+      "ms": 3.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "9a",
+      "iter": 3,
+      "ms": 5.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "10a",
+      "iter": 3,
+      "ms": 12.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "11a",
+      "iter": 3,
+      "ms": 5.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "12a",
+      "iter": 3,
+      "ms": 7.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "a2f06d3a",
+    "iterations": 3,
+    "query_time_ms": 240,
+    "streams": 4,
+    "timestamp": "2026-09-25T23:51:07.041434",
+    "total_duration_ms": 4768
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 4366.5,
+      "rows_loaded": 14680069
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 39,
+      "total": 39
+    },
+    "timing": {
+      "avg_ms": 6.2,
+      "geometric_mean_ms": 5.1,
+      "max_ms": 15.1,
+      "min_ms": 1.8,
+      "p90_ms": 13.4,
+      "p95_ms": 15.0,
+      "p99_ms": 15.1,
+      "stdev_ms": 4.0,
+      "total_ms": 240.5
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "aka_name": {
+      "rows": 180000
+    },
+    "aka_title": {
+      "rows": 80000
+    },
+    "cast_info": {
+      "rows": 7000000
+    },
+    "char_name": {
+      "rows": 600000
+    },
+    "comp_cast_type": {
+      "rows": 4
+    },
+    "company_name": {
+      "rows": 60000
+    },
+    "company_type": {
+      "rows": 4
+    },
+    "complete_cast": {
+      "rows": 30000
+    },
+    "info_type": {
+      "rows": 24
+    },
+    "keyword": {
+      "rows": 24000
+    },
+    "kind_type": {
+      "rows": 7
+    },
+    "link_type": {
+      "rows": 18
+    },
+    "movie_companies": {
+      "rows": 520000
+    },
+    "movie_info": {
+      "rows": 3000000
+    },
+    "movie_info_idx": {
+      "rows": 280000
+    },
+    "movie_keyword": {
+      "rows": 1000000
+    },
+    "movie_link": {
+      "rows": 6000
+    },
+    "name": {
+      "rows": 800000
+    },
+    "person_info": {
+      "rows": 600000
+    },
+    "role_type": {
+      "rows": 12
+    },
+    "title": {
+      "rows": 500000
+    }
+  },
+  "version": "2.2"
+}

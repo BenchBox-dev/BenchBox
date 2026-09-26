@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-20T02:20:27.958881+00:00",
+  "generated_at": "2026-09-26T03:51:27.410384+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -3290,6 +3290,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
+    },
+    {
+      "file": "vector_search_sf001_duckdb_sql_20260925_234945_9a024f54.json",
+      "benchmark": "vector_search",
+      "benchmark_name": "Vector Search",
+      "platform": "DuckDB",
+      "platform_version": "1.5.5",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-25T23:49:45.028092",
+      "query_count": 18,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "0da331449af6e8b22e61b7015dcc72f56d5554a5b200f5318f5a4baf12cfd81c"
     }
   ],
   "cohorts": {
@@ -3603,10 +3616,13 @@
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
+    ],
+    "vector_search@sf0.01": [
+      "DuckDB v1.5.5"
     ]
   },
   "summary": {
-    "total_bundles": 253,
+    "total_bundles": 254,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
@@ -3623,7 +3639,8 @@
       "tpcds_obt": 3,
       "tpch": 53,
       "tpch_skew": 15,
-      "tpchavoc": 9
+      "tpchavoc": 9,
+      "vector_search": 1
     },
     "by_platform": {
       "BigQuery": 3,
@@ -3632,7 +3649,7 @@
       "ClickHouse Server": 1,
       "DataFusion": 45,
       "Databricks": 3,
-      "DuckDB": 80,
+      "DuckDB": 81,
       "DuckLake": 1,
       "LakeSail": 1,
       "Pandas": 17,
@@ -3645,10 +3662,10 @@
     },
     "by_trust_label": {
       "community-submission": 9,
-      "maintainer-run": 244
+      "maintainer-run": 245
     },
     "by_funding": {
-      "unspecified": 253
+      "unspecified": 254
     }
   }
 }
