@@ -16987,15 +16987,10 @@
       "title": "Let the throughput executor return without blocking on a hung/leaked stream at shutdown"
     },
     "throughput-floor-numeric-threshold-from-baseline": {
-      "claim": {
-        "expires_at": "2026-09-27T02:22:40Z",
-        "generation": "163cc24b77e74959b65b22da0a2cd86a",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Throughput UAT gate: activate numeric Throughput@Size floor from baseline"
     },
     "throughput-independent-sessions-per-stream": {
