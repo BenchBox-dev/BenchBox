@@ -143,6 +143,7 @@ jobs:
             --artifact-metadata candidate-validation/artifact.json \
             --run-metadata candidate-validation/run.json \
             --expected-develop-sha "$EXPECTED_DEVELOP_SHA" \
+            --develop-max-behind-commits 50 \
             --expected-published-results-sha "$EXPECTED_PUBLISHED_RESULTS_SHA" \
             --expected-generation "$EXPECTED_GENERATION" \
             "${PARENT_ARGS[@]}" \
@@ -274,7 +275,6 @@ jobs:
           CANDIDATE_ARTIFACT_ID: ${{ needs.prepare.outputs.candidate_artifact_id }}
           EXPECTED_SITE_DIGEST: ${{ needs.prepare.outputs.candidate_site_tree_sha256 }}
           EXPECTED_ARCHIVE_DIGEST: ${{ needs.prepare.outputs.candidate_archive_sha256 }}
-          EXPECTED_DEVELOP_SHA: ${{ needs.prepare.outputs.develop_sha }}
           EXPECTED_PUBLISHED_RESULTS_SHA: ${{ needs.prepare.outputs.published_results_sha }}
           EXPECTED_GENERATION: ${{ needs.prepare.outputs.generation }}
           EXPECTED_PARENT_SHA: ${{ needs.prepare.outputs.candidate_parent_sha }}
@@ -287,6 +287,11 @@ jobs:
           test -n "$PRODUCER_RUN_ID" || { echo "::error::candidate artifact has no producing run"; exit 1; }
           gh api "repos/${{ github.repository }}/actions/runs/$PRODUCER_RUN_ID" > candidate-validation/run.json
           gh api "repos/${{ github.repository }}/actions/artifacts/$CANDIDATE_ARTIFACT_ID/zip" > candidate-validation/candidate.zip
+          # Re-resolve the protected tip after the approval wait: the
+          # candidate stays valid while built from the tip or a recent
+          # ancestor of it, so queued approvals survive merge-queue landings.
+          git fetch --no-tags origin develop:refs/remotes/origin/develop
+          CURRENT_DEVELOP_SHA=$(git rev-parse refs/remotes/origin/develop)
           PARENT_ARGS=()
           [ -z "$EXPECTED_PARENT_SHA" ] || PARENT_ARGS+=(--expected-parent-sha "$EXPECTED_PARENT_SHA")
           [ -z "$EXPECTED_PARENT_GENERATION" ] || PARENT_ARGS+=(--expected-parent-generation "$EXPECTED_PARENT_GENERATION")
@@ -296,7 +301,8 @@ jobs:
             --artifact-id "$CANDIDATE_ARTIFACT_ID" \
             --artifact-metadata candidate-validation/artifact.json \
             --run-metadata candidate-validation/run.json \
-            --expected-develop-sha "$EXPECTED_DEVELOP_SHA" \
+            --expected-develop-sha "$CURRENT_DEVELOP_SHA" \
+            --develop-max-behind-commits 50 \
             --expected-published-results-sha "$EXPECTED_PUBLISHED_RESULTS_SHA" \
             --expected-generation "$EXPECTED_GENERATION" \
             "${PARENT_ARGS[@]}" \

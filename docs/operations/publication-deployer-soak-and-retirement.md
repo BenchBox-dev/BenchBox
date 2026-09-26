@@ -16,13 +16,22 @@ does not perform a normal Pages write.
 2. Select the immutable numeric artifact ID from that run. The transaction
    workflow downloads and validates the artifact before the approval job is
    entered. Validation checks the producing run, workflow path, successful
-   develop dispatch, exact source pins, manifest digest, unpacked tree digest,
+   develop dispatch, develop freshness, manifest digest, unpacked tree digest,
    safe archive extraction, target, parent, and all required route checksums:
    `/`, `/docs/`, `/docs/api.html`, `/results/`, and
-   `/results/data/results.duckdb`.
+   `/results/data/results.duckdb`. Develop freshness is an ancestry rule, not
+   an exact-tip match: the candidate's `develop` commit must be reachable
+   from the protected tip and trail it by at most 50 commits, so queued
+   approvals survive merge-queue landings. The deploy job re-resolves the
+   tip and revalidates after approval. The `published-results` pin keeps its
+   exact-match semantics.
 3. Review the generated candidate summary and approve the protected
    `github-pages` environment once. There is no permit hash, comment, tracker
    claim, generation entry, or author footer to copy into the workflow.
+   Package releases start this flow automatically:
+   `publication-release-handoff.yml` dispatches the candidate build and the
+   promotion transaction when a GitHub Release publishes, and opens a tracked
+   `publication` issue if the handoff fails.
 4. The deploy job revalidates the same artifact after approval, then records
    journal intent before submitting the Pages write. It uploads the exact site
    bytes, records the provider response, probes the public routes, signs the
