@@ -1,5 +1,5 @@
 {
-  "context": "The w4 cell (Docker Postgres TPC-H SF1, run-official --streams 3, self-managed compose) was wired into the throughput-uat job in #2303 after the last nightly run, so no nightly has executed it yet. Wiring verified by config load, sweep DRY_RUN, and YAML parse only.",
+  "context": "Batch D 2026-09-26: first live nightly (2026-09-25) executed the w4 Postgres cell but it timed out at 20 min with no result JSON (compose pull + SF1 load + 3-stream throughput on shared runner). Fix: raised per_cell_timeout_s/early_stop_after_s to 2400 in uat-throughput-postgresql-nightly.yaml, PR #2384. Verification of a green cell awaits the next nightly run.",
   "description": "Confirm the first scheduled nightly run executes the new Postgres throughput cell green: pg sweep completes and the postgresql stream-count/success assert passes. If it fails, fix wiring or cell (timeout, compose, result glob) rather than the contract.",
   "sessions": [
     {
@@ -18,6 +18,14 @@
       "generation": "6018f8f61a814611bf4e7aac3adea0b6",
       "op": "take",
       "op_id": "1359691ae1f2491cbe6ab18b3fbe9420",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-26T02:44:52Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "635645d8202c4120a83f82b4991105d3",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
     }
   ]
