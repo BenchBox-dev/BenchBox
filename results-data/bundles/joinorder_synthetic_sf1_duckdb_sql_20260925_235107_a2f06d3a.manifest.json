@@ -1,8 +1,0 @@
-{
-  "manifest_version": "1.0",
-  "bundle_file": "joinorder_synthetic_sf1_duckdb_sql_20260925_235107_a2f06d3a.json",
-  "bundle_hash": "20f605a9305d0d3afc9fde66e77cdddc6d45169ca148d58583b58c12998a1244",
-  "result_source": "internal",
-  "submitted_by": "maintainer",
-  "funding": "unspecified"
-}
