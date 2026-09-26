@@ -5530,7 +5530,7 @@
         "exasol-tpc-differential-validation",
         "exasol-throughput-streams"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Run cold and warm TPC-H and TPC-DS SF 1 evaluations on local Exasol Personal"
     },
