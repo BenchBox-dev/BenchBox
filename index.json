@@ -13231,9 +13231,9 @@
     },
     "regenerate-dropped-tuned-corpus-cells": {
       "claim": {
-        "expires_at": "2026-09-27T03:46:56Z",
-        "generation": "f2d7524d2b0d4805a2d2ac667a8e894e",
-        "renewals": 0,
+        "expires_at": "2026-09-27T03:47:11Z",
+        "generation": "9278d247a63c44c984e16cb686a4c6df",
+        "renewals": 1,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
       },
       "needs": [],
