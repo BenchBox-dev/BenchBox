@@ -2,6 +2,7 @@
   "acceptance": [
     "2_v2 removed from Snowflake skip list and compile-checked: either passes or the real engine error is recorded"
   ],
+  "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit 155a2d61d. Removed Snowflake 2_v2 from runtime and validation skip sets. Added Snowflake-dialect SQLGlot parse regression coverage preserving the correlated MIN/GROUP BY shape. Verification: Ruff passed; focused cloud compatibility and validation mirror tests passed (9 tests). No live Snowflake warehouse run was performed.",
   "description": "The translated 2_v2 is plain standard SQL (correlated MIN scalar subquery with GROUP BY) that all three cloud engines should support. Both live runs skipped it before executing so no failure was ever observed; the skip reason may date from an older mistranslation. Unskip on Snowflake first, extend to Databricks/BigQuery if green.",
   "links": [
     "https://github.com/BenchBox-dev/BenchBox/pull/2412"
@@ -22,6 +23,14 @@
       "generation": "43671e0f402942a18bddf8ecac1f06e4",
       "op": "take",
       "op_id": "96fdd545a42d4087a401059cc2587518",
+      "session_id": "cdb421e45ea14139bf11036d5d9e8057"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62",
+      "at": "2026-09-26T20:51:14Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "9e8c8438d28e47609bb9964e2f899b38",
       "session_id": "cdb421e45ea14139bf11036d5d9e8057"
     }
   ]
