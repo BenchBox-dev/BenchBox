@@ -89,6 +89,10 @@ class TPCHavoc(BaseBenchmark):
         """
         return self._impl.generate_data()
 
+    def get_platform_skip_queries(self, platform_name: str) -> list[str]:
+        """Return query IDs that compatibility policy skips for ``platform_name`` (selector or display name)."""
+        return self._impl.get_platform_skip_queries(platform_name)
+
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
         """Get all TPC-Havoc benchmark queries (base TPC-H queries).
 
@@ -108,6 +112,7 @@ class TPCHavoc(BaseBenchmark):
         seed: Optional[int] = None,
         scale_factor: Optional[float] = None,
         dialect: Optional[str] = None,
+        base_dialect: Optional[str] = None,
         **kwargs,
     ) -> str:
         """Get a specific TPC-Havoc benchmark query.
@@ -118,6 +123,7 @@ class TPCHavoc(BaseBenchmark):
             seed: Random number generator seed for parameter generation
             scale_factor: Scale factor for parameter calculations
             dialect: Target SQL dialect
+            base_dialect: Source SQL dialect for translation
             **kwargs: Additional parameters
 
         Returns:
@@ -153,6 +159,8 @@ class TPCHavoc(BaseBenchmark):
             query_id,
             seed=seed,
             scale_factor=scale_factor,
+            dialect=dialect,
+            base_dialect=base_dialect,
             **kwargs,
         )
 

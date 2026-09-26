@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 492
+**Total registered rules:** 535
 
 **Platforms covered:** 35
 
@@ -13,13 +13,13 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
-| bigquery | - | 2 | - | 2 | 1 | - | 5 |
+| bigquery | - | 2 | 25 | 2 | 1 | 2 | 32 |
 | clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
 | clickhouse-cloud | - | - | - | - | - | 23 | 23 |
 | clickhouse-local | 1 | - | - | - | - | 23 | 24 |
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
-| databricks | - | 1 | - | 2 | 1 | - | 4 |
+| databricks | - | 1 | 11 | 2 | 1 | 1 | 16 |
 | datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
@@ -37,7 +37,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | questdb | 1 | - | - | - | 1 | - | 2 |
 | redshift | - | - | - | 2 | 1 | - | 3 |
 | singlestore | - | - | - | - | 4 | - | 4 |
-| snowflake | - | 7 | - | 2 | 1 | - | 10 |
+| snowflake | - | 7 | 2 | 2 | 1 | 2 | 14 |
 | spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
 | starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
@@ -62,9 +62,36 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.bigquery.h2odb.q9_percentile_window_variant` |
 | query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.bigquery.tpcdi.eq7_derived_table_variant` |
+| query_adapter | benchmark=tpchavoc, query=10_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.10_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=11_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.11_v4.qualified_having` |
+| query_adapter | benchmark=tpchavoc, query=11_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.11_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=12_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.12_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=12_v8 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.12_v8.one_row_source` |
+| query_adapter | benchmark=tpchavoc, query=13_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.13_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=13_v8 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.13_v8.one_row_source` |
+| query_adapter | benchmark=tpchavoc, query=14_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.14_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=15_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.15_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=16_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.16_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=17_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.17_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=18_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.18_v4.one_row_source` |
+| query_adapter | benchmark=tpchavoc, query=18_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.18_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=1_v6 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.1_v6.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=2_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.2_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=3_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.3_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=3_v9 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.3_v9.window_null_order` |
+| query_adapter | benchmark=tpchavoc, query=4_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.4_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=5_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.5_v4.qualified_having` |
+| query_adapter | benchmark=tpchavoc, query=5_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.5_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=6_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.6_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=7_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.7_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=7_v8 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.7_v8.one_row_source` |
+| query_adapter | benchmark=tpchavoc, query=8_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.8_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=9_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.bigquery.tpchavoc.9_v7.filtered_aggregate` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.bigquery.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.bigquery.all.convert_to_bigquery_table` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=2_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.tpchavoc.2_v2` |
 
 ### clickhouse
 
@@ -193,9 +220,21 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | query_source | benchmark=tpcdi, query=EQ7 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.databricks.tpcdi.eq7_derived_table_variant` |
+| query_adapter | benchmark=tpchavoc, query=10_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q10_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=12_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q12_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q14_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=16_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q16_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q17_dual_column_alias` |
+| query_adapter | benchmark=tpchavoc, query=1_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q01_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=3_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q03_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q06_group_by_empty_drop` |
+| query_adapter | benchmark=tpchavoc, query=7_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q07_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=8_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q08_scalar_group_by_first` |
+| query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q09_scalar_group_by_first` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.databricks.all.convert_to_delta_table` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.tpchavoc.1_v7` |
 
 ### datafusion
 
@@ -586,9 +625,13 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=vector_search, query=Q4 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.vector_search.q4_variant` |
 | query_source | benchmark=vector_search, query=Q5 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.vector_search.q5_variant` |
 | query_source | benchmark=vector_search, query=Q6 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.snowflake.vector_search.q6_variant` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.snowflake.tpchavoc.14_v2.empty_group` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.snowflake.tpchavoc.6_v2.empty_group` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.snowflake.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.snowflake.write_primitives.pk_not_enforced` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.snowflake.all.optimize_table_definition` |
+| execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.tpchavoc.1_v7` |
+| execution_filter | benchmark=tpchavoc, query=2_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.tpchavoc.2_v2` |
 
 ### spark
 
