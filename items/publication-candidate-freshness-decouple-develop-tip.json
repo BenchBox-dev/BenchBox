@@ -1,0 +1,31 @@
+{
+  "acceptance": [
+    "A candidate built from any commit that is an ancestor of protected develop (within a bounded age or generation window) is accepted by the transaction's pre-approval and post-approval validation; the exact-tip equality check in candidate.py is replaced by an ancestry-plus-bound check with tests, and the published-results pin keeps its current ancestry semantics.",
+    "The freshness rule still rejects a candidate whose develop SHA is not reachable from protected develop, a candidate older than the bound, and a candidate whose parent generation is stale; each rejection has a unit test.",
+    "A published package release (release.yml success on a vX.Y.Z tag) automatically dispatches a candidate build and a promotion transaction that waits for github-pages approval, or opens a tracked notification, so a release cannot silently leave benchbox.dev on the previous version.",
+    "release-guide.md and publication-deployer-soak-and-retirement.md describe the new freshness rule and the release-to-publication handoff.",
+    "The stacked-merge-group visual baseline gap is either fixed (baseline resolution for synthetic merge-group bases) or recorded as an explicit follow-up item with its own acceptance criteria."
+  ],
+  "description": "Site publication was meant to be isolated from the development queue and the release process, but in practice it is gated on both, and the 0.4.1 release was not visible on benchbox.dev almost two days after it was cut.\n\nDefect 1: candidate freshness is bound to the exact develop tip. `scripts/publication/candidate.py:201-202` rejects a candidate whose `develop_sha` differs from the current develop head (\"candidate develop SHA is stale\"). The transaction revalidates after the `github-pages` approval as well. A candidate build takes ~25 minutes and the merge queue lands commits more often than that, so any develop merge between build and write invalidates the pending deploy. On 2026-09-26 transaction run 36207859058 failed this way against candidate run 36206824470 (built ~00:50Z, develop moved before 01:18Z). The 2026-09-25 promotion runs 36135142530 and 36151023593 sat waiting for approval and would have faced the same race.\n\nDefect 2: nothing starts publication after a release. `docs/operations/release-guide.md` states the release flow does not publish benchbox.dev; promotion requires a manual `candidate_only=true` dispatch of `publication-deploy.yml` plus a manual `publication-transaction.yml` dispatch and approval. No automation or reminder links a tagged release to a site promotion, so the last live generation (2026-09-20) predated v0.4.1 (2026-09-24).\n\nSecondary finding: the public-site visual gate cannot pass for a site-changing PR in a stacked merge group. The merge group's base SHA is the preceding group's synthetic head, and baselines exist only for protected develop commits (`results-explorer/scripts/download-public-site-visual-baseline.mjs`), so such a PR passes only when it is alone at the queue front. PR #2369 failed this way at base 8761dfbf (a gh-readonly-queue commit).",
+  "links": [
+    "scripts/publication/candidate.py",
+    ".github/workflows/publication-deploy.yml",
+    ".github/workflows/publication-transaction.yml",
+    ".github/workflows/release.yml",
+    "docs/operations/publication-deployer-soak-and-retirement.md",
+    "docs/operations/release-guide.md",
+    "results-explorer/scripts/download-public-site-visual-baseline.mjs",
+    "https://github.com/BenchBox-dev/BenchBox/actions/runs/36207859058",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2369"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:b633bd03b3142fb0543d5667",
+      "at": "2026-09-26T01:33:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1d79fab4f9044ec4b151dee767f5d2fb",
+      "session_id": "db8788345f0a473b9dda4add1f699a61"
+    }
+  ]
+}

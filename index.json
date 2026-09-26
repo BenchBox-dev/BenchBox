@@ -12025,6 +12025,13 @@
       "status": "dropped",
       "title": "public_result_id is contractually permanent but has no alias/redirect mechanism"
     },
+    "publication-candidate-freshness-decouple-develop-tip": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Decouple site publication from the develop merge queue and trigger it on release"
+    },
     "publication-ledger-reproducible-inputs": {
       "claim": null,
       "needs": [
