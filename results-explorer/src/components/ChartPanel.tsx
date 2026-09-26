@@ -28,6 +28,7 @@ import { CDFChart } from "@/components/CDFChart";
 import { RankTable } from "@/components/RankTable";
 import { SummaryChartOverview } from "@/components/SummaryChartOverview";
 import { fmtGeomean, fmtScore } from "@/utils";
+import { SaveChartView } from "@/components/SaveChartView";
 import { paletteColor } from "@/lib/chartTheme";
 import { RunDateChip } from "@/components/RunAge";
 import {
@@ -426,6 +427,11 @@ function ChartPanelTabs({
               ))}
             </select>
           </div>
+        )}
+        {!chartDatasetEmpty && (
+          <span class="ml-auto">
+            <SaveChartView chartId={activeChart.id} chartTitle={activeChart.title ?? activeChart.shortTitle} />
+          </span>
         )}
       </div>
 
