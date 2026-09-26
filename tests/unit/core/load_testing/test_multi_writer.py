@@ -152,5 +152,7 @@ def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) 
     assert not [t for t in threads if t.is_alive()], "writer/reader threads hung"
     assert not errors, f"concurrent writer/reader errors: {errors}"
     with duckdb.connect(db_path, read_only=True) as con:
-        (rows,) = con.execute("SELECT COUNT(*) FROM t").fetchone()
+        row = con.execute("SELECT COUNT(*) FROM t").fetchone()
+        assert row is not None
+        (rows,) = row
     assert rows == pattern.writer_count * 20
