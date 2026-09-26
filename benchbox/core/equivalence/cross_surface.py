@@ -914,6 +914,99 @@ _CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
     ("Q20", "Q23", "Q28", "Q29", "Q39", "Q40", "Q41", "Q42"), _CLICKBENCH_VACUOUS
 )
 
+_JOINORDER_SYNTHETIC_VACUOUS = (
+    "Synthetic selectivity, not a bug: the query's multi-table conjunction needs coordinated "
+    "real-world literals (specific keywords, notes, countries, ratings, link types) that the "
+    "bounded synthetic cell does not plant on one entity set, so the reference join is empty on "
+    "BOTH surfaces. Golden entities back the highest-traffic conjunctions (34 discriminating); "
+    "this tail stays classified until its literals are planted too. Any query NOT listed here "
+    "that goes vacuous fails the gate."
+)
+_JOINORDER_SYNTHETIC_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
+    (
+        "1a",
+        "1c",
+        "2b",
+        "2c",
+        "3b",
+        "5b",
+        "7a",
+        "7b",
+        "7c",
+        "8a",
+        "8b",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "11a",
+        "11b",
+        "11c",
+        "12b",
+        "13b",
+        "13c",
+        "14a",
+        "14b",
+        "14c",
+        "15a",
+        "15b",
+        "15c",
+        "15d",
+        "17a",
+        "17b",
+        "17c",
+        "17d",
+        "18a",
+        "18b",
+        "18c",
+        "19a",
+        "19b",
+        "19c",
+        "19d",
+        "20a",
+        "20b",
+        "20c",
+        "21a",
+        "21b",
+        "21c",
+        "22a",
+        "22b",
+        "22c",
+        "22d",
+        "23a",
+        "23b",
+        "23c",
+        "24a",
+        "24b",
+        "25a",
+        "25b",
+        "25c",
+        "26a",
+        "26b",
+        "26c",
+        "27a",
+        "27b",
+        "27c",
+        "28a",
+        "28b",
+        "28c",
+        "29a",
+        "29b",
+        "29c",
+        "30a",
+        "30b",
+        "30c",
+        "31a",
+        "31b",
+        "31c",
+        "32a",
+        "33a",
+        "33b",
+        "33c",
+    ),
+    _JOINORDER_SYNTHETIC_VACUOUS,
+)
+
 # H2O-DB bounded-cell scale. Its generator base is the 10M-row small tier, so the
 # shared EQUIVALENCE_SCALE (0.1) would emit ~1M rows; 0.01 gives a ~100k-row cell
 # (comparable to ClickBench's SF=0.1 cell) that is cheap yet keeps every H2O-DB
@@ -1461,6 +1554,7 @@ GATES: dict[str, CrossSurfaceGate] = {
     "joinorder_synthetic": CrossSurfaceGate(
         name="joinorder_synthetic",
         build=build_joinorder_synthetic_duckdb,
+        legitimately_empty=_JOINORDER_SYNTHETIC_LEGITIMATELY_EMPTY,
         surface_independence=SURFACE_INDEPENDENCE_SHARED_SPEC,
         surface_independence_rationale=(
             "Both DataFrame families are generated through shared JoinOrder translation helpers, so the "

@@ -428,8 +428,10 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         "violence",
         "superhero",
         "sequel",
+        "character-name-in-title",
     )
     _GOLDEN_CI_NOTES = ("(writer)", "(voice)", "(producer)")
+    _GOLDEN_CI_NOTES_EXTRA = ("(voice) (uncredited)", "(voice) (uncredited)", "(producer)")
     _SEED_NOTES = ("(producer)", "(producer)", "(co-production)", "(presents)")
     _SEED_MC_NOTES = (
         "(2002) (USA) (theatrical)",
@@ -788,11 +790,19 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         for offset in range(self._GOLDEN_COUNT):
             title_row = [golden_titles[offset], f"Golden Adventure {offset}", None, 1, 2005 + (offset % 6)]
             title_row += [None] * (title_cols - len(title_row))
+            # Golden episodes back the aka_name families (t.episode_nr in [50, 100)).
+            if offset % 3 == 0:
+                title_row[9] = 50 + (offset % 50)
             titles.append(tuple(title_row))
             name_row = [golden_names[offset], "Robert Downey" if offset % 2 == 0 else "Angelina Smith"]
             name_row += [None] * (name_cols - len(name_row))
             names.append(tuple(name_row))
             company_row = [golden_companies[offset], "Warner Films" if offset % 2 == 0 else "Universal Films", "[us]"]
+            # Alternate [us]/[ru] so country-specific families (US and
+            # Russian variants) both join to golden companies.
+            if offset % 4 >= 2:
+                company_row[2] = "[ru]"
+                company_row[1] = "Moscow Films"
             company_row += [None] * (company_cols - len(company_row))
             companies.append(tuple(company_row))
             keyword_row = [golden_keywords[offset], self._GOLDEN_KEYWORDS[offset % len(self._GOLDEN_KEYWORDS)]]
@@ -803,7 +813,7 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             row_list = list(row)
             row_list[1] = golden_names[index % len(golden_names)]
             row_list[2] = golden_titles[index % len(golden_titles)]
-            row_list[4] = self._GOLDEN_CI_NOTES[index % len(self._GOLDEN_CI_NOTES)]
+            row_list[4] = self._GOLDEN_CI_NOTES_EXTRA[index % len(self._GOLDEN_CI_NOTES_EXTRA)]
             row_list[6] = 3 if index % 2 == 0 else 1
             cast_info[index] = tuple(row_list)
         movie_companies = relationship_data["movie_companies"]
@@ -825,6 +835,26 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             row_list[1] = golden_titles[index % len(golden_titles)]
             row_list[3] = "Sweden" if index % 2 == 0 else "Germany"
             movie_info[index] = tuple(row_list)
+        aka_name = relationship_data["aka_name"]
+        for index, row in enumerate(aka_name[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_names[index % len(golden_names)]
+            row_list[2] = "Golden Alias"
+            aka_name[index] = tuple(row_list)
+        complete_cast = relationship_data["complete_cast"]
+        for index, row in enumerate(complete_cast[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_titles[index % len(golden_titles)]
+            row_list[2] = 1
+            row_list[3] = 3
+            complete_cast[index] = tuple(row_list)
+        movie_link = relationship_data["movie_link"]
+        for index, row in enumerate(movie_link[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_titles[index % len(golden_titles)]
+            row_list[2] = golden_titles[(index + 1) % len(golden_titles)]
+            row_list[3] = 1
+            movie_link[index] = tuple(row_list)
 
     def _write_table_data(self, table_name: str, data: list[tuple]) -> PathLike:
         """Write table data to CSV file.
