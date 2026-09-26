@@ -1,7 +1,7 @@
 profile:
   id: tpc-v1
   version: "2026-05-26"
-  description: "Platform-neutral logical tuning profile for TPC-H and TPC-DS checked-in tuned templates."
+  description: "Platform-neutral logical tuning profile for TPC-H, TPC-DS, and SSB checked-in tuned templates."
   benchmarks:
     tpch:
       evidence_source: "benchbox/_binaries/tpc-h/templates/{queries,variants}/"
@@ -409,3 +409,62 @@ profile:
         query_ids: ["10", "18", "35", "64", "69", "84", "91"]
         status: accepted
         rationale: "Customer demographic locality appears in seven TPC-DS templates."
+    ssb:
+      evidence_source: "benchbox/core/tuning/templates/{duckdb,databricks}/ssb_tuned.yaml"
+      candidates:
+      - table: LINEORDER
+        column: LO_ORDERDATE
+        type: INTEGER
+        roles: [temporal_partition, join_locality]
+        query_count: 13
+        query_ids: ["Q1.1", "Q1.2", "Q1.3", "Q2.1", "Q2.2", "Q2.3", "Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Existing fact date partition key in checked SSB tuned templates; join predicate in all 13 queries."
+      - table: LINEORDER
+        column: LO_ORDERKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 0
+        query_ids: []
+        status: existing_baseline
+        rationale: "Existing fact sort/cluster key in checked SSB tuned templates."
+      - table: LINEORDER
+        column: LO_CUSTKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 7
+        query_ids: ["Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Existing fact cluster key in checked Databricks SSB tuned template; join predicate in seven queries."
+      - table: DATE
+        column: D_DATEKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 13
+        query_ids: ["Q1.1", "Q1.2", "Q1.3", "Q2.1", "Q2.2", "Q2.3", "Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Existing date dimension key in checked SSB tuned templates; join predicate in all 13 queries."
+      - table: CUSTOMER
+        column: C_CUSTKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 7
+        query_ids: ["Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Existing customer dimension key in checked SSB tuned templates."
+      - table: SUPPLIER
+        column: S_SUPPKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 10
+        query_ids: ["Q2.1", "Q2.2", "Q2.3", "Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Existing supplier dimension key in checked SSB tuned templates."
+      - table: PART
+        column: P_PARTKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 6
+        query_ids: ["Q2.1", "Q2.2", "Q2.3", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Existing part dimension key in checked SSB tuned templates."

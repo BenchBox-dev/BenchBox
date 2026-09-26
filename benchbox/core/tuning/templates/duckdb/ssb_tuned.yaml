@@ -42,6 +42,9 @@ table_tunings:
     - name: lo_orderkey
       type: INTEGER
       order: 1
+    - name: lo_custkey
+      type: INTEGER
+      order: 2
 
   date:
     table_name: date
