@@ -35,6 +35,20 @@ def test_window_ends_at_the_pin_not_latest_available():
     assert months[-1] == (2023, 12)
 
 
+def test_window_skips_unavailable_bts_archives():
+    months = _months_sequence(410)
+    assert len(months) == 327
+    assert months[0] == (2024, 12)
+    assert months[-1] == (1987, 10)
+    assert not any((1990, 1) <= (year, month) <= (1999, 12) for year, month in months)
+    assert not any((1987, 1) <= (year, month) <= (1987, 9) for year, month in months)
+
+
+def test_downloader_reports_effective_month_count(tmp_path):
+    downloader = FlightDataDownloader(scale_factor=10.0, output_dir=tmp_path)
+    assert downloader.num_months == len(downloader.months) == 327
+
+
 def test_explicit_end_still_overridable():
     assert _months_sequence(1, end_year=2020, end_month=6) == [(2020, 6)]
 

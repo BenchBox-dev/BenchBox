@@ -608,10 +608,25 @@ class DuckDBAdapter(PlatformAdapter):
         # `__init__` and applied as a DuckDB `SET threads` statement; omitting it
         # here silently discards the caller's request, because `__init__` only
         # ever sees this rebuilt config, never the original.
+        # Plan flags ride along too: `show_query_plans` (CLI --show-plans)
+        # controls console plan display, while the capture_* keys control
+        # result-bundle plan capture. Dropping them here silently disables
+        # both even when the caller requested them. Shared PLAN_FORWARD_KEYS
+        # (skipping None so adapter defaults, including int-coerced timeouts,
+        # apply) instead of a bespoke list.
         for key in [
             "thread_limit",
             "max_temp_directory_size",
             "progress_bar",
+        ]:
+            if key in config:
+                adapter_config[key] = config[key]
+        from benchbox.platforms.base.config_utils import PLAN_FORWARD_KEYS
+
+        for key in PLAN_FORWARD_KEYS:
+            if key in config and config[key] is not None:
+                adapter_config[key] = config[key]
+        for key in [
             "tuning_config",
             "tuning_enabled",
             "unified_tuning_configuration",

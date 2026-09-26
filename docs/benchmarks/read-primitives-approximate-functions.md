@@ -91,6 +91,41 @@ value+count pairs. The catalog's `result_contract.capability` is set
 to `approximate_top_k` so the cross-dialect comparator skips strict
 value equality and validates capability + array `type_class` instead.
 
+## Live cloud survey (2026-09-25)
+
+One-shot approx aggregates ran green on Snowflake and Databricks at
+SF=0.01 and SF=0.1 via `benchbox run --platform <snowflake|databricks>
+--benchmark read_primitives --phases load,power` (measurement means,
+4 iterations each):
+
+| Query | Snowflake SF=0.01 | Snowflake SF=0.1 | Databricks SF=0.01 | Databricks SF=0.1 |
+|-------|-------------------|------------------|--------------------|-------------------|
+| `approx_count_distinct_simple` | 458 ms | 242 ms | 441 ms | 456 ms |
+| `approx_count_distinct_groupby` | 743 ms | 232 ms | 502 ms | 334 ms |
+| `approx_quantile_groupby` | 399 ms | 277 ms | 288 ms | 324 ms |
+| `approx_quantiles_array` | 422 ms | 340 ms | 307 ms | 299 ms |
+| `approx_top_k_lineitem` | 564 ms | 257 ms | 327 ms | 378 ms |
+
+SF=0.01 latencies exceed SF=0.1 on both warehouses — warehouse
+warm-up dominates at these data volumes, not the sketch evaluation.
+Result bundles: `read_primitives_sf001_<platform>_sql_<timestamp>_<id>.json`
+(SF=0.01; `sf01` for SF=0.1) flat under `$BENCHBOX_OUTPUT_DIR/results/`. BenchBox SHA `1ba01a8`,
+Snowflake driver 4.7.3, Databricks driver 2026.36.
+
+Not yet surveyed (no credentials in `~/.benchbox/credentials.yaml`
+or no network path from the survey host): ClickHouse Cloud, Firebolt,
+Starburst/Trino, MotherDuck. Redshift credentials exist but the
+cluster timed out from the survey host. BigQuery TPC-H datasets exist
+but are empty (0 rows), and the BigQuery loader rejects the shared
+zstd cache, so BigQuery needs a gzip reload before its survey leg.
+
+Unsurveyed platforms and the reason:
+
+| Platform | Reason |
+|----------|--------|
+| Firebolt | no credentials on survey host |
+| Starburst/Trino | no credentials on survey host |
+
 ## DataFrame platform coverage
 
 Three of the five approximate-aggregate queries run on the BenchBox

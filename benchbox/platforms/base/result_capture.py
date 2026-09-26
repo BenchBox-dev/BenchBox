@@ -711,12 +711,19 @@ class ResultCaptureMixin:
     def display_query_plan_if_enabled(self, connection: Any, query: str, query_id: str) -> None:
         """Display query execution plan if show_query_plans is enabled.
 
+        Suppressed while capture_plans is active: capture already runs EXPLAIN
+        in the isolated post-measurement phase, so displaying here would issue
+        EXPLAIN a second time. Centralized here (rather than at each call
+        site) so new adapters cannot accidentally double-EXPLAIN.
+
         Args:
             connection: Database connection
             query: SQL query text
             query_id: Query identifier
         """
         if not self.show_query_plans:
+            return
+        if self.capture_plans:
             return
 
         try:

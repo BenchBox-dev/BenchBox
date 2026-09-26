@@ -347,6 +347,7 @@ jobs:
       id-token: write
     outputs:
       skipped: ${{ steps.independent.outputs.skipped }}
+      skipped_deployment_id: ${{ steps.capture-deployment.outputs.deployment_id }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
 
@@ -427,6 +428,49 @@ jobs:
         if: steps.independent.outputs.active != 'true'
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
+      - name: Capture this run's skipped deployment record
+        id: capture-deployment
+        if: steps.independent.outputs.skipped == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Bind the follow-on marker to THIS run's record, not merely "a record
+          # for this SHA": duplicate github-pages records per SHA exist (reruns,
+          # concurrent queued runs), so an unscoped newest-first lookup can mark
+          # the wrong record. The github-pages environment pre-created this run's
+          # record when the job started seconds ago; select the newest
+          # release-ref record for this SHA created after this workflow run
+          # started, which only this run's record can satisfy.
+          # Use this run's ISO-8601 start time as the selection boundary so
+          # both operands share a representation (deployment `created_at`
+          # values are ISO-8601 while the push event's `pushed_at` is an
+          # epoch value frozen at the original push, which also breaks
+          # reruns). Querying the Actions API anchors reruns to the current
+          # attempt, not merely the run: full reruns must not reuse a stale
+          # boundary from an earlier attempt.
+          RUN_STARTED=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}" \
+            --jq '.run_started_at // .created_at // empty')
+          if [ -z "${RUN_STARTED:-}" ]; then
+            echo "::warning::Could not determine current run start time; skipping inactive marker."
+            echo "deployment_id=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # NOTE: deployment records carry the bare branch name in `.ref`
+          # ("release", not "refs/heads/release") — verified against live
+          # github-pages records.
+          # NOTE: this gh version has no `--arg` flag, so the boundary is
+          # passed via the environment (`env.SINCE`) inside a single valid
+          # `--jq` argument.
+          export SINCE="$RUN_STARTED"
+          DEPLOYMENT_ID=$(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&sha=${{ github.sha }}&per_page=100" \
+            --jq '[.[] | select(.ref == "release") | select(.created_at >= env.SINCE)] | sort_by(.created_at) | last | .id // empty')
+          if [ -z "${DEPLOYMENT_ID:-}" ]; then
+            echo "::warning::No release-ref github-pages deployment record found for this run; skipping inactive marker."
+          fi
+          echo "deployment_id=$DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+
   # Records the skipped legacy release deployment after the github-pages
   # environment job finalizes. Running inside the deploy job above would let
   # the environment's terminal status overwrite the inactive marker with
@@ -434,7 +478,7 @@ jobs:
   # job intentionally sets no `environment:` key and runs only on the skipped
   # path (independent publication owns Pages).
   record-skipped-deployment:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release' && needs.deploy.outputs.skipped == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/release' && needs.deploy.outputs.skipped == 'true' && needs.deploy.outputs.skipped_deployment_id != ''
     needs: deploy
     runs-on: ubuntu-latest
     permissions:
@@ -445,22 +489,26 @@ jobs:
       - name: Record skipped deployment
         env:
           GH_TOKEN: ${{ github.token }}
+          DEPLOYMENT_ID: ${{ needs.deploy.outputs.skipped_deployment_id }}
         shell: bash
         run: |
           set -euo pipefail
-          # The github-pages environment pre-created a deployment record when the
-          # deploy job started. The independent-publication receipt gated off the
-          # real deploy, so mark that record `inactive` (from outside the
-          # environment job) so deployment history distinguishes "skipped,
-          # independent pipeline owns Pages" from a real deployment.
-          DEPLOYMENT_ID=$(gh api "repos/${{ github.repository }}/deployments?environment=github-pages&sha=${{ github.sha }}&per_page=1" \
-            --jq '.[0].id // empty')
-          if [ -n "${DEPLOYMENT_ID:-}" ]; then
-            gh api --method POST "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
-              -f state="inactive" \
-              -f description="Superseded: independent publication owns Pages; legacy release deployment skipped." \
-              --jq '.state' > /dev/null
-          fi
+          # The github-pages environment pre-created this exact deployment record
+          # (bound by the deploy job via ref + push-time window, not by bare
+          # newest-first lookup, because duplicate records per SHA exist). The
+          # independent-publication receipt gated off the real deploy, so mark
+          # that record `inactive` (from outside the environment job) so
+          # deployment history distinguishes "skipped, independent pipeline
+          # owns Pages" from a real deployment.
+          # auto_inactive=false: the default (true) would additionally mark
+          # every prior successful non-transient, non-production github-pages
+          # deployment inactive — including the live independent-publication
+          # deployment. Only this run's own skipped record may change.
+          gh api --method POST "repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses" \
+            -f state="inactive" \
+            -F auto_inactive=false \
+            -f description="Superseded: independent publication owns Pages; legacy release deployment skipped." \
+            --jq '.state' > /dev/null
           echo "::notice::Legacy release deployment skipped and recorded as inactive; independent publication owns Pages."
 
   # Validate example files and documentation references

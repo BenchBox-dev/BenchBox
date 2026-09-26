@@ -870,6 +870,7 @@ def _build_run_config_from_options(
     requested_phases = options.get("requested_phases")
     if requested_phases:
         run_options["requested_phases"] = list(requested_phases)
+    database_options = _database_platform_options(database_config)
     return RunConfig(
         benchmark=benchmark_config.name,
         query_subset=benchmark_config.queries,
@@ -893,6 +894,17 @@ def _build_run_config_from_options(
         warm_up_iterations=max(0, warmups),
         power_fail_fast=bool(options.get("power_fail_fast", False)),
         capture_plans=benchmark_config.capture_plans,
+        # --show-plans travels in DatabaseConfig.options via the CLI runtime
+        # overrides (direct path) or as a DatabaseConfig extra (interactive
+        # path); both are collected by _database_platform_options. Read from
+        # the merged database options, not BenchmarkConfig, which has no
+        # display-only field by design. Tri-state (mirroring analyze_plans):
+        # absent means the adapter keeps its own value (e.g. from
+        # platform_config or a preconfigured adapter); only an explicit
+        # True/False overrides it.
+        show_query_plans=(
+            bool(database_options.get("show_query_plans")) if "show_query_plans" in database_options else None
+        ),
         analyze_plans=getattr(benchmark_config, "analyze_plans", None),
         strict_plan_capture=benchmark_config.strict_plan_capture,
         normalize_plan_literals=bool(options.get("normalize_plan_literals", False)),

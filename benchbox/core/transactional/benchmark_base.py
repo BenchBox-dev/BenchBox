@@ -19,7 +19,11 @@ from typing import Any, Generic, Optional, TypeVar, Union
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection
 from benchbox.core.operations import OperationExecutor
-from benchbox.core.primitives_benchmark_utils import quote_identifier
+from benchbox.core.primitives_benchmark_utils import (
+    failed_platform_error,
+    quote_identifier_for_dialect,
+    table_exists,
+)
 from benchbox.core.transactional.operations_registry_base import OperationsRegistryBase
 
 ResultT = TypeVar("ResultT")
@@ -61,6 +65,7 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     operations_manager: OperationsRegistryBase[Any]
     data_generator: Any
     tables: dict[str, Path]
+    _setup_dialect: str = "standard"
 
     # ------------------------------------------------------------------
     # Abstract hooks implemented spec-locally
@@ -283,6 +288,16 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
         operation = self.operations_manager.get_operation(operation_id)
 
+        # Seed the quoting dialect before the reuse probe: is_setup()
+        # quotes staging probes through _setup_dialect, which setup() only
+        # copies from platform_key afterwards. On a fresh benchmark object
+        # against an already-initialized cloud database the probe would
+        # otherwise use the default "standard" quoting (double-quoted
+        # source-case names), miss backticked UPPERCASE tables on BigQuery
+        # or quoted-uppercase tables on Snowflake, and rerun setup —
+        # including lock/table DDL a reuse principal may not run.
+        if platform_key:
+            self._setup_dialect = platform_key
         if operation.requires_setup and not self.is_setup(connection):
             self.log_verbose("Staging tables not initialized - running setup() automatically...")
             try:
@@ -371,7 +386,31 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
     def _quote_identifier(self, identifier: str) -> str:
         """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
-        return quote_identifier(identifier)
+        return quote_identifier_for_dialect(identifier, getattr(self, "_setup_dialect", "standard"))
+
+    def _table_exists(self, connection: DatabaseConnection, table_name: str) -> bool:
+        """Check if a table exists in the database.
+
+        Uses a platform-agnostic approach that attempts to query the table
+        with LIMIT 0, which should work across most SQL databases without
+        requiring INFORMATION_SCHEMA access.
+
+        Args:
+            connection: Database connection
+            table_name: Name of table to check (will be quoted for safety)
+
+        Returns:
+            True if table exists, False otherwise
+
+        Note:
+            This method catches exceptions to distinguish between:
+            - Table doesn't exist (expected, returns False)
+            - Other errors (logged, returns False for safety)
+
+        Security:
+            Table name is quoted using _quote_identifier() to prevent SQL injection.
+        """
+        return table_exists(connection, table_name, self.log_verbose, getattr(self, "_setup_dialect", None))
 
     def _drop_legacy_staging_manifests(self, connection: DatabaseConnection) -> None:
         """Remove superseded manifest generations during a rebuild.
@@ -426,8 +465,12 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         for table in source_tables:
             try:
                 quoted = self._quote_identifier(table)
-                result = connection.execute(f"SELECT COUNT(*) FROM {quoted}").fetchone()
-                count = result[0] if result else 0
+                res = connection.execute(f"SELECT COUNT(*) FROM {quoted}")
+                if failed_platform_error(res) is not None:
+                    count = 0
+                else:
+                    result = res.fetchone()
+                    count = result[0] if result else 0
             except Exception:
                 count = 0
             parts.append(f"{table}:{count}")
@@ -446,18 +489,26 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
 
-        connection.execute(
+        res1 = connection.execute(
             f"CREATE TABLE IF NOT EXISTS {quoted_table} ("
             "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
             "source_digest VARCHAR, created_at VARCHAR)"
         )
-        connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        if (err := failed_platform_error(res1)) is not None:
+            raise RuntimeError(f"Failed to create staging manifest table: {err}")
+
+        res2 = connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        if (err := failed_platform_error(res2)) is not None:
+            raise RuntimeError(f"Failed to delete previous staging manifest entry: {err}")
+
         created_at = datetime.now(timezone.utc).isoformat()
-        connection.execute(
+        res3 = connection.execute(
             f"INSERT INTO {quoted_table} (benchmark, scale, spec_version, source_digest, created_at) VALUES "
             f"('{_sql_escape(benchmark_id)}', '{_sql_escape(scale)}', '{_sql_escape(spec_version)}', "
             f"'{_sql_escape(source_digest)}', '{_sql_escape(created_at)}')"
         )
+        if (err := failed_platform_error(res3)) is not None:
+            raise RuntimeError(f"Failed to insert staging manifest entry: {err}")
 
     def _staging_manifest_matches(self, connection: DatabaseConnection, source_tables: list[str]) -> bool:
         """Return True iff a manifest row exists whose benchmark/scale/spec/digest match this run.
@@ -478,7 +529,10 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
                 f"spec_version = '{_sql_escape(spec_version)}' AND "
                 f"source_digest = '{_sql_escape(source_digest)}'"
             )
-            result = connection.execute(query).fetchone()
+            res = connection.execute(query)
+            if failed_platform_error(res) is not None:
+                return False
+            result = res.fetchone()
             return bool(result and result[0])
         except Exception:
             return False

@@ -8,6 +8,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import logging
 import tempfile
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -1748,6 +1749,21 @@ class TestBigQuerySqlGenerationHelpers:
         assert "`test-project.test_dataset.CUSTOMER`" in qualified
         assert "`test-project.test_dataset.ORDERS`" in qualified
 
+    def test_qualify_table_names_handles_merge_into_and_using(self, dependencies_available):
+        adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
+
+        qualified = adapter._qualify_table_names(
+            "MERGE INTO merge_ops_target AS target "
+            "USING (SELECT * FROM orders WHERE o_orderkey BETWEEN 1 AND 10) AS source "
+            "ON target.o_orderkey = source.o_orderkey "
+            "WHEN NOT MATCHED THEN INSERT VALUES (source.o_orderkey)"
+        )
+
+        assert qualified.startswith("MERGE INTO `test-project.test_dataset.MERGE_OPS_TARGET` AS target")
+        assert "FROM `test-project.test_dataset.ORDERS`" in qualified
+        # USING (subquery) and the VALUES list are not table positions.
+        assert "USING (" in qualified
+
     def test_prepare_external_parquet_uris_uploads_local_and_preserves_cloud(self, dependencies_available):
         adapter = BigQueryAdapter(
             project_id="test-project",
@@ -2126,6 +2142,84 @@ class TestConvertToBigqueryTable:
         assert "CLUSTER BY" not in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_ctas_without_pk_returns_promptly_and_qualified(self, mock_bigquery):
+        """CTAS has no PRIMARY KEY: the inline-key scan must not run (it
+        backtracked catastrophically and hung the run pre-submit), and the
+        bare target still gets dataset-qualified."""
+        import time
+
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = (
+            "CREATE TABLE orders_1995 AS\nSELECT *\nFROM orders\n"
+            "WHERE o_orderdate >= DATE '1995-01-01'\n  AND o_orderdate < DATE '1996-01-01'\n"
+        )
+        start = time.perf_counter()
+        result = adapter._convert_to_bigquery_table(sql)
+        assert time.perf_counter() - start < 5
+        assert "CREATE OR REPLACE TABLE `proj.ds.ORDERS_1995` AS" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_table_primary_key_marked_not_enforced(self, mock_bigquery):
+        """Statements carrying a table-level key keep the NOT ENFORCED rewrite."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64, PRIMARY KEY (id))")
+        assert "PRIMARY KEY (id) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_inline_pk_survives_parameterized_types(self, mock_bigquery):
+        """Commas inside DECIMAL(10, 2) must not split the column definition."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE t (id INT, price DECIMAL(10, 2) PRIMARY KEY, col3 STRING)"
+        )
+        assert "PRIMARY KEY (price) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_inline_pk_ignores_parens_in_comments(self, mock_bigquery):
+        """A closing paren inside a comment must not end the column list."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE t (id INT PRIMARY KEY, val INT /* note ) */, name STRING)"
+        )
+        assert "/* note ) */" in result
+        assert result.rstrip().endswith("PRIMARY KEY (id) NOT ENFORCED)")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preprocess_operation_sql_rewrites_bq_gaps(self, mock_bigquery):
+        """CAST AS VARCHAR and quoted INTERVAL literals fail server-side."""
+        from types import SimpleNamespace
+
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        operation = SimpleNamespace(
+            write_sql="SELECT CAST(n AS VARCHAR), o_orderdate + INTERVAL '7' DAY",
+            platform_overrides={},
+        )
+        result = adapter.preprocess_operation_sql("q", operation)
+        assert "CAST(n AS STRING)" in result
+        assert "INTERVAL 7 DAY" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preprocess_operation_sql_respects_overrides(self, mock_bigquery):
+        """A catalog bigquery override is the rewrite input; skip stays a skip."""
+        from types import SimpleNamespace
+
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        over = SimpleNamespace(write_sql="SELECT 1", platform_overrides={"bigquery": "SELECT CAST(x AS VARCHAR)"})
+        assert "CAST(x AS STRING)" in adapter.preprocess_operation_sql("q", over)
+        skipped = SimpleNamespace(write_sql="SELECT 1", platform_overrides={"bigquery": None})
+        assert adapter.preprocess_operation_sql("q", skipped) is None
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_comment_prefixed_create_still_qualified(self, mock_bigquery):
+        """Schema chunks with "--" headers must still get dataset-qualified."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        chunk = "-- Generated staging load tables\nCREATE TABLE orders_stage (id INT64)"
+        result = adapter._convert_to_bigquery_table(chunk)
+        assert result.startswith("-- Generated staging load tables\n")
+        assert "CREATE OR REPLACE TABLE `proj.ds.ORDERS_STAGE`" in result
+        assert "CREATE TABLE orders_stage" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_adds_partitioning_clause(self, mock_bigquery):
         """Adds PARTITION BY DATE(field) when partitioning_field configured."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", partitioning_field="created_at")
@@ -2156,6 +2250,18 @@ class TestConvertToBigqueryTable:
         assert result.count("CLUSTER BY") == 1
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_varchar_mapped_to_string(self, mock_bigquery):
+        """VARCHAR(n) staging columns become BigQuery STRING."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE update_ops_orders (o_orderkey INT64, o_comment VARCHAR(79), flag VARCHAR)"
+        )
+        assert "VARCHAR" not in result
+        assert "o_comment STRING" in result
+        assert "flag STRING" in result
+        assert result.startswith("CREATE OR REPLACE TABLE `p1.d1.UPDATE_OPS_ORDERS`")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_backticked_table_name_qualified(self, mock_bigquery):
         """Table name in backticks is correctly parsed and qualified without double backticks."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
@@ -2182,6 +2288,251 @@ class TestConvertToBigqueryTable:
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64,\n    PRIMARY KEY (id) NOT ENFORCED)")
         assert result.count("NOT ENFORCED") == 1
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists(self, mock_bigquery):
+        """Preserves IF NOT EXISTS semantics and qualifies the target."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE IF NOT EXISTS orders (id INT64)")
+        assert result == "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS` (id INT64)"
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_ctas(self, mock_bigquery):
+        """Preserves IF NOT EXISTS semantics on CTAS and qualifies the target."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = (
+            "CREATE TABLE IF NOT EXISTS orders_1995 AS\nSELECT *\nFROM orders\nWHERE o_orderdate >= DATE '1995-01-01'\n"
+        )
+        result = adapter._convert_to_bigquery_table(sql)
+        assert "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS_1995` AS" in result
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_with_comment_prefix(self, mock_bigquery):
+        """Preserves IF NOT EXISTS on comment-prefixed schema chunks."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        chunk = "-- Generated staging table\nCREATE TABLE IF NOT EXISTS orders_stage (id INT64)"
+        result = adapter._convert_to_bigquery_table(chunk)
+        assert result.startswith("-- Generated staging table\n")
+        assert "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS_STAGE` (id INT64)" in result
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_ctas_with_comment_prefix(self, mock_bigquery):
+        """Preserves IF NOT EXISTS on comment-prefixed CTAS chunks."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        chunk = "-- Generated staging CTAS\nCREATE TABLE IF NOT EXISTS orders_stage AS SELECT 1"
+        result = adapter._convert_to_bigquery_table(chunk)
+        assert result.startswith("-- Generated staging CTAS\n")
+        assert "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS_STAGE` AS SELECT 1" in result
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_preserves_if_not_exists_already_qualified(self, mock_bigquery):
+        """Table name already containing dataset qualification preserves IF NOT EXISTS without double qualification."""
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        result = adapter._convert_to_bigquery_table("CREATE TABLE IF NOT EXISTS `my_ds.orders` (id INT64)")
+        assert result == "CREATE TABLE IF NOT EXISTS `my_ds.ORDERS` (id INT64)"
+        assert "OR REPLACE" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_staging_manifest_ddl_preserves_if_not_exists(self, mock_bigquery):
+        """Staging manifest DDL preserves IF NOT EXISTS and maps VARCHAR to STRING."""
+        adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
+        manifest_ddl = (
+            "CREATE TABLE IF NOT EXISTS benchbox_staging_manifest ("
+            "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
+            "source_digest VARCHAR, created_at VARCHAR)"
+        )
+        result = adapter._convert_to_bigquery_table(manifest_ddl)
+        expected = (
+            "CREATE TABLE IF NOT EXISTS `my-proj.my_ds.BENCHBOX_STAGING_MANIFEST` ("
+            "benchmark STRING, scale STRING, spec_version STRING, "
+            "source_digest STRING, created_at STRING)"
+        )
+        assert result == expected
+        assert "OR REPLACE" not in result
+
+
+@pytest.mark.usefixtures("dependencies_available")
+class TestBigQueryCreateSemanticsStagingAndManifest:
+    """Test that BigQuery DDL conversion preserves staging data and shared provenance manifests.
+
+    Adversarial finding Critical-1: Converting IF NOT EXISTS into CREATE OR REPLACE
+    wipes out populated staging tables during setup reuse, and drops the shared
+    benchbox_staging_manifest table when a second benchmark runs, erasing the first
+    benchmark's provenance row.
+    """
+
+    class _SimulatedBigQueryConnection:
+        """Simulate BigQuery table storage executing statements through _convert_to_bigquery_table."""
+
+        def __init__(self, adapter: BigQueryAdapter):
+            self.adapter = adapter
+            self.tables: dict[str, list[tuple]] = {}
+            self.executed_queries: list[str] = []
+
+        def execute(self, sql: str, parameters: Any = None):
+            import re
+
+            converted = self.adapter._convert_to_bigquery_table(sql)
+            self.executed_queries.append(converted)
+            clean = re.sub(r"/\*.*?\*/|--[^\n]*", "", converted).strip()
+
+            def _target(name: str) -> str:
+                return name.split(".")[-1].strip("`").upper()
+
+            # CREATE OR REPLACE TABLE: drops existing table and resets rows
+            or_replace = re.match(
+                r"^CREATE\s+OR\s+REPLACE\s+TABLE\s+(`?[a-zA-Z0-9_.]+`?)",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if or_replace:
+                self.tables[_target(or_replace.group(1))] = []
+                return self._cursor([])
+
+            # CREATE TABLE IF NOT EXISTS: preserves existing table and rows
+            if_not_exists = re.match(
+                r"^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(`?[a-zA-Z0-9_.]+`?)",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if if_not_exists:
+                table = _target(if_not_exists.group(1))
+                if table not in self.tables:
+                    self.tables[table] = []
+                return self._cursor([])
+
+            # INSERT INTO: parses row values
+            insert = re.match(
+                r"^INSERT\s+INTO\s+(`?[a-zA-Z0-9_.]+`?)\s*(?:\([^)]*\))?\s*VALUES\s*(.*)",
+                clean,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+            if insert:
+                table = _target(insert.group(1))
+                values = tuple(re.findall(r"'([^']*)'", insert.group(2)))
+                if table not in self.tables:
+                    self.tables[table] = []
+                self.tables[table].append(values)
+                return self._cursor([])
+
+            # DELETE FROM: filters out matching benchmark rows
+            delete = re.match(
+                r"^DELETE\s+FROM\s+(`?[a-zA-Z0-9_.]+`?)(?:\s+WHERE\s+(.*))?",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if delete:
+                table = _target(delete.group(1))
+                where = delete.group(2)
+                if table in self.tables and where:
+                    bench_match = re.search(r"benchmark\s*=\s*'([^']*)'", where)
+                    if bench_match:
+                        target_bench = bench_match.group(1)
+                        self.tables[table] = [r for r in self.tables[table] if not (r and r[0] == target_bench)]
+                    else:
+                        self.tables[table] = []
+                return self._cursor([])
+
+            # SELECT COUNT(*):
+            count = re.match(
+                r"^SELECT\s+COUNT\(\*\)\s+FROM\s+(`?[a-zA-Z0-9_.]+`?)(?:\s+WHERE\s+(.*))?",
+                clean,
+                flags=re.IGNORECASE,
+            )
+            if count:
+                table = _target(count.group(1))
+                where = count.group(2)
+                rows = self.tables.get(table, [])
+                if where:
+                    bench_match = re.search(r"benchmark\s*=\s*'([^']*)'", where)
+                    if bench_match:
+                        target_bench = bench_match.group(1)
+                        rows = [r for r in rows if r and r[0] == target_bench]
+                return self._cursor([(len(rows),)])
+
+            return self._cursor([])
+
+        def _cursor(self, rows: list[tuple]):
+            class _Cursor:
+                def __init__(self, data: list[tuple]):
+                    self.data = data
+
+                def fetchone(self):
+                    return self.data[0] if self.data else None
+
+                def fetchall(self):
+                    return self.data
+
+            return _Cursor(rows)
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_reuse_of_populated_staging_tables_keeps_rows(self, mock_bigquery):
+        """Reusing populated staging tables through BigQuery convert path preserves row data."""
+        from benchbox.core.write_primitives.benchmark import get_create_table_sql
+
+        adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_ds")
+        conn = self._SimulatedBigQueryConnection(adapter)
+
+        # Pre-populate staging table
+        target_table = "UPDATE_OPS_ORDERS"
+        initial_rows = [("1", "comment 1"), ("2", "comment 2"), ("3", "comment 3")]
+        conn.tables[target_table] = list(initial_rows)
+
+        # Execute setup DDL with if_not_exists=True as done during reuse
+        create_sql = get_create_table_sql("update_ops_orders", dialect="bigquery", if_not_exists=True)
+        conn.execute(create_sql)
+
+        # Confirm executed query preserved IF NOT EXISTS
+        last_query = conn.executed_queries[-1]
+        assert "CREATE TABLE IF NOT EXISTS `my-project.my_ds.UPDATE_OPS_ORDERS`" in last_query
+        assert "OR REPLACE" not in last_query
+
+        # Rows must be preserved, not wiped
+        assert len(conn.tables[target_table]) == 3
+        assert conn.tables[target_table] == initial_rows
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_shared_manifest_keeps_both_benchmarks_provenance_rows(self, mock_bigquery):
+        """Shared provenance manifest keeps both benchmarks' rows across consecutive setup writes."""
+        from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
+        from benchbox.core.write_primitives.benchmark import WritePrimitivesBenchmark
+
+        adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_ds")
+        conn = self._SimulatedBigQueryConnection(adapter)
+
+        # Seed source tables so _staging_source_digest can calculate digest
+        conn.tables["ORDERS"] = [(1,)]
+        conn.tables["LINEITEM"] = [(1,)]
+        conn.tables["CUSTOMER"] = [(1,)]
+
+        bench1 = TransactionPrimitivesBenchmark(scale_factor=0.01)
+        bench1._setup_dialect = "bigquery"
+        bench2 = WritePrimitivesBenchmark(scale_factor=0.01)
+        bench2._setup_dialect = "bigquery"
+
+        source_tables = ["orders", "lineitem", "customer"]
+
+        # First benchmark writes its staging manifest
+        bench1._write_staging_manifest(conn, source_tables)
+        assert bench1._staging_manifest_matches(conn, source_tables) is True
+
+        manifest_table = "BENCHBOX_STAGING_MANIFEST_V2"
+        assert len(conn.tables[manifest_table]) == 1
+        assert conn.tables[manifest_table][0][0] == "Transaction Primitives"
+
+        # Second benchmark writes its staging manifest on the same database
+        bench2._write_staging_manifest(conn, source_tables)
+        assert bench2._staging_manifest_matches(conn, source_tables) is True
+
+        # CRITICAL: bench1's provenance row must STILL be preserved in the shared manifest
+        assert bench1._staging_manifest_matches(conn, source_tables) is True
+        assert len(conn.tables[manifest_table]) == 2
+        benchmarks_in_manifest = {r[0] for r in conn.tables[manifest_table]}
+        assert benchmarks_in_manifest == {"Transaction Primitives", "Write Primitives"}
 
 
 @pytest.mark.usefixtures("dependencies_available")
@@ -2224,6 +2575,200 @@ class TestQualifyTableNames:
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT * FROM my_custom_table")
         assert result == "SELECT * FROM `p1.d1.MY_CUSTOM_TABLE`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualifies_insert_into_target(self, mock_bigquery):
+        """INSERT INTO targets (not just FROM/JOIN) resolve to created tables."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("INSERT INTO insert_ops_lineitem SELECT * FROM lineitem")
+        assert "INSERT INTO `p1.d1.INSERT_OPS_LINEITEM`" in result
+        assert "FROM `p1.d1.LINEITEM`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualifies_update_and_drop_targets(self, mock_bigquery):
+        """UPDATE and DROP TABLE targets resolve to created tables."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("UPDATE update_ops_orders SET o_comment = 'x'")
+        assert "UPDATE `p1.d1.UPDATE_OPS_ORDERS`" in result
+        result = adapter._qualify_table_names("DROP TABLE IF EXISTS txn_orders")
+        assert "DROP TABLE IF EXISTS `p1.d1.TXN_ORDERS`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualifies_backtick_quoted_names(self, mock_bigquery):
+        """Backtick-quoted setup probes resolve without a default dataset."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT COUNT(*) FROM `ORDERS`")
+        assert result == "SELECT COUNT(*) FROM `p1.d1.ORDERS`"
+        result = adapter._qualify_table_names("SELECT COUNT(*) FROM `orders`")
+        assert result == "SELECT COUNT(*) FROM `p1.d1.ORDERS`"
+        result = adapter._qualify_table_names("INSERT INTO `update_ops_orders` SELECT * FROM `orders`")
+        assert "INSERT INTO `p1.d1.UPDATE_OPS_ORDERS`" in result
+        assert "FROM `p1.d1.ORDERS`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_backtick_columns_not_qualified(self, mock_bigquery):
+        """Backticked column references are left alone; only tables qualify."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT `o_orderkey`, `o_custkey` FROM `orders`")
+        assert "`o_orderkey`" in result
+        assert "`o_custkey`" in result
+        assert "FROM `p1.d1.ORDERS`" in result
+        assert "`p1.d1.O_ORDERKEY`" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_no_fallback_rewrite_when_disallowed(self, mock_bigquery):
+        """Unparseable backtick queries pass through when fallback is off."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        assert adapter._qualify_table_names("", allow_fallback=False) == ""
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_comma_identifiers_outside_from_are_not_tables(self, mock_bigquery):
+        """Projection columns, function args, and INSERT columns keep their names."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names(
+            "SELECT count(*) AS total, customer FROM lineitem JOIN customer ON lineitem.l_custkey = customer.c_custkey"
+        )
+        assert ", customer FROM" in result
+        assert "`p1.d1.CUSTOMER` AS customer" in result
+        result = adapter._qualify_table_names("SELECT coalesce(c_name, customer) FROM customer")
+        assert "coalesce(c_name, customer)" in result
+        result = adapter._qualify_table_names("INSERT INTO customer (c_custkey, customer) VALUES (1, 'v')")
+        assert "(c_custkey, customer)" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_join_predicate_commas_are_not_table_separators(self, mock_bigquery):
+        """Commas inside ON/USING predicates leave function args unchanged."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names(
+            "SELECT customer.c_name FROM customer JOIN lineitem ON COALESCE(lineitem.x, customer) IS NOT NULL"
+        )
+        assert "COALESCE(lineitem.x, customer) IS NOT NULL" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_backtick_and_commented_aliases_are_not_duplicated(self, mock_bigquery):
+        """Existing backtick aliases and aliases past comments suppress synthesis."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT orders.o_orderkey FROM orders `o`")
+        assert result.count("`o`") == 1
+        assert "AS orders" not in result
+        long_comment = "/* " + "x" * 60 + " */"
+        result = adapter._qualify_table_names(f"SELECT o FROM orders {long_comment} o")
+        assert "AS orders" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_view_targets_are_qualified(self, mock_bigquery):
+        """CREATE VIEW and DROP VIEW targets resolve on a dataset-less connection."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("CREATE VIEW orders_view AS SELECT * FROM orders")
+        assert "CREATE VIEW `p1.d1.ORDERS_VIEW` AS" in result
+        result = adapter._qualify_table_names("DROP VIEW IF EXISTS orders_view")
+        assert result == "DROP VIEW IF EXISTS `p1.d1.ORDERS_VIEW`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_materialized_view_targets_are_qualified(self, mock_bigquery):
+        """Materialized views are dataset objects: targets must qualify."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("CREATE MATERIALIZED VIEW mv AS SELECT * FROM orders")
+        assert "CREATE MATERIALIZED VIEW `p1.d1.MV` AS" in result
+        result = adapter._qualify_table_names("DROP MATERIALIZED VIEW IF EXISTS mv")
+        assert result == "DROP MATERIALIZED VIEW IF EXISTS `p1.d1.MV`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_parenthesized_join_tables_are_qualified(self, mock_bigquery):
+        """Tables led by a paren in FROM (... JOIN ...) still qualify."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names(
+            "SELECT * FROM (customer JOIN orders ON customer.c_custkey = 1) JOIN nation ON 1=1"
+        )
+        assert "(`p1.d1.CUSTOMER`" in result
+        assert "SELECT coalesce(a, b)" in adapter._qualify_table_names("SELECT coalesce(a, b) FROM customer")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_keyword_spelled_backtick_aliases_are_not_duplicated(self, mock_bigquery):
+        """Quoted aliases are identifiers even when they spell keywords."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT orders.o_orderkey FROM orders `order` WHERE 1=1")
+        assert result.count("`order`") == 1
+        assert "AS orders" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_subquery_and_mixed_join_commas_qualify(self, mock_bigquery):
+        """Commas after subqueries and explicit JOINs still separate tables."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT * FROM (SELECT 1 FROM lineitem) sub, customer WHERE 1=1")
+        assert ", `p1.d1.CUSTOMER`" in result
+        result = adapter._qualify_table_names(
+            "SELECT * FROM customer JOIN orders ON customer.c_custkey = 1, nation WHERE 1=1"
+        )
+        assert ", `p1.d1.NATION`" in result
+        result = adapter._qualify_table_names("DELETE FROM customer USING orders, lineitem WHERE 1=1")
+        assert ", `p1.d1.LINEITEM`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_later_from_commas_qualify_after_earlier_commas(self, mock_bigquery):
+        """A projection or predicate comma never ends the FROM-list scan."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        result = adapter._qualify_table_names("SELECT a, b FROM customer, orders")
+        assert "FROM `p1.d1.CUSTOMER`, `p1.d1.ORDERS`" in result
+        result = adapter._qualify_table_names("SELECT * FROM customer JOIN lineitem ON COALESCE(a, b) = c, orders")
+        assert "ON COALESCE(a, b) = c, `p1.d1.ORDERS`" in result
+        result = adapter._qualify_table_names(
+            "SELECT customer.c_name FROM customer JOIN lineitem ON COALESCE(lineitem.x, customer) IS NOT NULL, orders"
+        )
+        assert "COALESCE(lineitem.x, customer) IS NOT NULL" in result
+        assert ", `p1.d1.ORDERS`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualifies_multistatement_batch_with_later_statement_table(self, mock_bigquery):
+        """Per-statement qualification qualifies tables appearing only in later statements."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        batch_sql = (
+            "CREATE TABLE stage_1 AS SELECT * FROM source_early;\nINSERT INTO target_late SELECT * FROM source_late;\n"
+        )
+        result = adapter._qualify_table_names(batch_sql)
+        assert "CREATE TABLE `p1.d1.STAGE_1` AS SELECT * FROM `p1.d1.SOURCE_EARLY`" in result
+        assert "INSERT INTO `p1.d1.TARGET_LATE` SELECT * FROM `p1.d1.SOURCE_LATE`" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_withholds_alias_on_insert_target_with_same_named_references(self, mock_bigquery):
+        """INSERT target tables never gain synthesized AS aliases even if same-named references exist."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "INSERT INTO target (c1) SELECT target.c1 FROM source AS target"
+        result = adapter._qualify_table_names(sql)
+        assert result.startswith("INSERT INTO `p1.d1.TARGET` (c1)")
+        assert "INSERT INTO `p1.d1.TARGET` AS target" not in result
+        assert "FROM `p1.d1.SOURCE` AS target" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_withholds_alias_on_create_target_with_same_named_references(self, mock_bigquery):
+        """CREATE TABLE target tables never gain synthesized AS aliases."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "CREATE TABLE target AS SELECT target.c1 FROM source AS target"
+        result = adapter._qualify_table_names(sql)
+        assert result.startswith("CREATE TABLE `p1.d1.TARGET` AS SELECT")
+        assert "CREATE TABLE `p1.d1.TARGET` AS target" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_withholds_alias_on_drop_alter_truncate_targets(self, mock_bigquery):
+        """DROP, ALTER, and TRUNCATE targets never gain synthesized AS aliases."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+
+        drop_sql = "DROP TABLE IF EXISTS target"
+        assert adapter._qualify_table_names(drop_sql) == "DROP TABLE IF EXISTS `p1.d1.TARGET`"
+
+        alter_sql = "ALTER TABLE target ADD COLUMN target_col INT64"
+        assert adapter._qualify_table_names(alter_sql) == "ALTER TABLE `p1.d1.TARGET` ADD COLUMN target_col INT64"
+
+        truncate_sql = "TRUNCATE TABLE target"
+        assert adapter._qualify_table_names(truncate_sql) == "TRUNCATE TABLE `p1.d1.TARGET`"
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_permits_alias_on_update_target_with_same_named_references(self, mock_bigquery):
+        """UPDATE targets gain synthesized AS alias when table.col references exist."""
+        adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
+        sql = "UPDATE target SET target.c = 1"
+        result = adapter._qualify_table_names(sql)
+        assert result == "UPDATE `p1.d1.TARGET` AS target SET target.c = 1"
 
 
 @pytest.mark.usefixtures("dependencies_available")
@@ -2579,7 +3124,7 @@ class TestExecuteQuerySqlTransformation:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_backtick_query_normalizes_case(self, mock_bigquery):
-        """Queries with backticks use _normalize_table_names_case."""
+        """Queries with backticks normalize case and qualify tables."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -2596,9 +3141,38 @@ class TestExecuteQuerySqlTransformation:
         result = adapter.execute_query(mock_conn, "SELECT * FROM `customer`", "q1")
 
         assert result["status"] == "SUCCESS"
-        # Verify the query was uppercase-normalized (backtick path)
+        # Verify the query was uppercase-normalized and qualified: the
+        # query-time connection carries no default dataset, so a bare
+        # backtick name would fail with "must be qualified with a dataset".
         called_sql = mock_conn.query.call_args[0][0]
-        assert "`CUSTOMER`" in called_sql
+        assert "`proj.ds.CUSTOMER`" in called_sql
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_setup_create_uses_uppercase_convention(self, mock_bigquery):
+        """setup() CREATEs are converted: uppercase + qualified like create_schema."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        mock_conn = Mock()
+        mock_job = Mock()
+        mock_job.result.return_value = []
+        mock_job.job_id = "j0"
+        mock_job.total_bytes_processed = 0
+        mock_job.total_bytes_billed = 0
+        mock_job.slot_millis = 0
+        mock_job.created = None
+        mock_job.started = None
+        mock_job.ended = None
+        mock_conn.query.return_value = mock_job
+
+        result = adapter.execute_query(
+            mock_conn,
+            "CREATE TABLE update_ops_orders (o_orderkey INT64)",
+            "setup",
+            validate_row_count=False,
+        )
+
+        assert result["status"] == "SUCCESS"
+        called_sql = mock_conn.query.call_args[0][0]
+        assert "CREATE OR REPLACE TABLE `proj.ds.UPDATE_OPS_ORDERS`" in called_sql
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_non_backtick_query_qualifies_tables(self, mock_bigquery):

@@ -831,29 +831,70 @@ class PlatformAdapter(
             details=platform_info,
         )
 
+    def _apply_run_plan_flags(self, run_config: Mapping[str, Any]) -> dict[str, Any]:
+        """Snapshot run-scoped plan flags, then apply the run's values.
+
+        Returns the snapshot so the caller can restore it in a finally block;
+        adapters are reused across runs and these flags must not leak.
+        `show_query_plans` (--show-plans) is display-only: it stays in
+        run-input provenance and never enters plan-capture metadata.
+
+        Application is atomic: every value is read and coerced into locals
+        before any attribute is assigned, so a bad value raises before
+        partial mutation (the caller then has nothing to restore).
+        """
+        snapshot = {
+            "capture_plans": self.capture_plans,
+            "show_query_plans": self.show_query_plans,
+            "analyze_plans": self.analyze_plans,
+            "strict_plan_capture": self.strict_plan_capture,
+            "normalize_plan_literals": self.normalize_plan_literals,
+            "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
+        }
+        new_capture_plans = bool(run_config["capture_plans"]) if "capture_plans" in run_config else self.capture_plans
+        # show_query_plans is tri-state in RunConfig: only override the
+        # adapter's value when the database option was explicitly set
+        # (non-None); None leaves the adapter default (e.g. from
+        # platform_config or a preconfigured adapter).
+        new_show_query_plans = (
+            bool(run_config["show_query_plans"])
+            if run_config.get("show_query_plans") is not None
+            else self.show_query_plans
+        )
+        # analyze_plans is tri-state in RunConfig: only override the adapter's value
+        # when the first-class flag was set (non-None); None leaves the adapter default.
+        new_analyze_plans = (
+            bool(run_config["analyze_plans"]) if run_config.get("analyze_plans") is not None else self.analyze_plans
+        )
+        new_strict_plan_capture = (
+            bool(run_config["strict_plan_capture"]) if "strict_plan_capture" in run_config else self.strict_plan_capture
+        )
+        new_normalize_plan_literals = (
+            bool(run_config["normalize_plan_literals"])
+            if "normalize_plan_literals" in run_config
+            else self.normalize_plan_literals
+        )
+        # None means unset: fall back to the adapter default instead of
+        # crashing int(None).
+        new_plan_capture_timeout_seconds = (
+            int(run_config["plan_capture_timeout_seconds"])
+            if run_config.get("plan_capture_timeout_seconds") is not None
+            else self.plan_capture_timeout_seconds
+        )
+        self.capture_plans = new_capture_plans
+        self.show_query_plans = new_show_query_plans
+        self.analyze_plans = new_analyze_plans
+        self.strict_plan_capture = new_strict_plan_capture
+        self.normalize_plan_literals = new_normalize_plan_literals
+        self.plan_capture_timeout_seconds = new_plan_capture_timeout_seconds
+        return snapshot
+
     def run_enhanced_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
         """Run complete benchmark with enhanced phase tracking."""
         start_time = mono_time()
         execution_id = str(uuid.uuid4())[:8]
         self._reset_run_scoped_state()
-        plan_capture_config = {
-            "capture_plans": self.capture_plans,
-            "analyze_plans": self.analyze_plans,
-            "strict_plan_capture": self.strict_plan_capture,
-            "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
-        }
-        if "capture_plans" in run_config:
-            self.capture_plans = bool(run_config.get("capture_plans"))
-        # analyze_plans is tri-state in RunConfig: only override the adapter's value
-        # when the first-class flag was set (non-None); None leaves the adapter default.
-        if run_config.get("analyze_plans") is not None:
-            self.analyze_plans = bool(run_config.get("analyze_plans"))
-        if "strict_plan_capture" in run_config:
-            self.strict_plan_capture = bool(run_config.get("strict_plan_capture"))
-        if "normalize_plan_literals" in run_config:
-            self.normalize_plan_literals = bool(run_config.get("normalize_plan_literals"))
-        if "plan_capture_timeout_seconds" in run_config:
-            self.plan_capture_timeout_seconds = int(run_config.get("plan_capture_timeout_seconds"))
+        plan_capture_config = self._apply_run_plan_flags(run_config)
 
         try:
             # Step 1: Data generation phase (handled by run_benchmark_lifecycle before this call)
@@ -1174,8 +1215,10 @@ class PlatformAdapter(
 
         finally:
             self.capture_plans = plan_capture_config["capture_plans"]
+            self.show_query_plans = plan_capture_config["show_query_plans"]
             self.analyze_plans = plan_capture_config["analyze_plans"]
             self.strict_plan_capture = plan_capture_config["strict_plan_capture"]
+            self.normalize_plan_literals = plan_capture_config["normalize_plan_literals"]
             self.plan_capture_timeout_seconds = plan_capture_config["plan_capture_timeout_seconds"]
             if hasattr(self, "connection") and self.connection:
                 self._close_run_connection()
