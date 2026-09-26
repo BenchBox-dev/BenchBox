@@ -107,5 +107,16 @@
         "wid": "w2"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-26T23:59:49Z",
+      "client": "jcode",
+      "generation": "86a5609926c64058a8b33b8c82dfba39",
+      "op": "take",
+      "op_id": "ed79b9e5f8124b55b489992fff433b6c",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }

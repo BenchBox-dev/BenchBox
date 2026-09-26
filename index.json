@@ -17908,10 +17908,15 @@
       "title": "Track-2: statistics-phase reset/persist control, per-table breakdown, and idempotence check"
     },
     "tracker-corpus-repair-inert-scope-and-stale-refs": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T23:59:49Z",
+        "generation": "86a5609926c64058a8b33b8c82dfba39",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Repair the open items whose scope rules or ladder paths lint flags as inert or stale"
     },
     "tracker-cutover-needs-a-write-freeze-not-a-claim-check": {
