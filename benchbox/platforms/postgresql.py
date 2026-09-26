@@ -912,7 +912,8 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         stream_id: int | None = None,
     ) -> dict[str, Any]:
         """Execute a query and optionally capture the structured query plan."""
-        result = super().execute_query(
+        return self.execute_query_with_plan_capture(
+            super().execute_query,
             connection=connection,
             query=query,
             query_id=query_id,
@@ -921,8 +922,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-        self._merge_plan_capture_into_result(result, connection, query, query_id)
-        return result
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
         """Run ANALYZE on a table to update statistics.

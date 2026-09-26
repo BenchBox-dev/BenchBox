@@ -1332,7 +1332,8 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         override delegates to it and then merges plan fields into the result
         (a no-op unless ``capture_plans`` is on and the query succeeded).
         """
-        result = super().execute_query(
+        return self.execute_query_with_plan_capture(
+            super().execute_query,
             connection,
             query,
             query_id,
@@ -1341,8 +1342,6 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-        self._merge_plan_capture_into_result(result, connection, query, query_id)
-        return result
 
     def close_connection(self, connection: Any) -> None:
         """Close Firebolt connection."""
