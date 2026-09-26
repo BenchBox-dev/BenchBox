@@ -13678,9 +13678,9 @@
     },
     "reproduce-postgres-integration-needs-a-live-postgres-inside": {
       "claim": {
-        "expires_at": "2026-09-27T04:36:41Z",
-        "generation": "2b19a83627204dd6b2d985c231f4ed7d",
-        "renewals": 0,
+        "expires_at": "2026-09-27T04:47:52Z",
+        "generation": "83a4583c1236448898d22e09a9c1974a",
+        "renewals": 1,
         "worker": "jcode-batch-c"
       },
       "needs": [],
