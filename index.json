@@ -12936,10 +12936,15 @@
       "title": "Ranking & Aggregation System - Platform Leaderboards & Trends"
     },
     "re-audit-databend-firebolt-starburst-and-clickhouse-cloud-fo": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T04:31:22Z",
+        "generation": "f79a6e5a12194fb3882f7ce72c345191",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Re-audit Databend, Firebolt, Starburst, and ClickHouse Cloud for broader config-ownership standardization after the confirmed fixes land"
     },
     "re-tagging-bundles-in-published-results-branch": {
