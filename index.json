@@ -8546,19 +8546,14 @@
       "title": "JoinOrder canonical data redistribution: review IMDb / Dataverse terms, produce an ADR, reconcile DATA-LICENSE.md"
     },
     "joinorder-replicated-imdb-scale-prototype": {
-      "claim": {
-        "expires_at": "2026-09-27T02:49:32Z",
-        "generation": "65fc9f6c6f1a483aa291072a12675c34",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [
         "joinorder-scale-stress-decision-framework",
         "track2-joinorder-stats-phase",
         "track2-joinorder-stats-phase-controls"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Prototype replicated-IMDB scale-up for JOB scale-stress"
     },
     "joinorder-runtime-row-count-validation": {
