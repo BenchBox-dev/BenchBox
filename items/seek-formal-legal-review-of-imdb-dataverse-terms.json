@@ -5,5 +5,15 @@
       "created_at": "2026-07-19T12:36:13Z",
       "worktree": "main"
     }
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-26T01:35:18Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "4f3b9cf77b4c499da68e8b53450d6aa2",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
 }

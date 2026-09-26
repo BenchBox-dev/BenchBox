@@ -15586,7 +15586,7 @@
     "seek-formal-legal-review-of-imdb-dataverse-terms": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Seek formal legal review of IMDb / Dataverse terms"
     },
