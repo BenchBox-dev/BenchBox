@@ -825,6 +825,11 @@ class SnowflakeAdapter(PlatformAdapter):
         self.log_verbose(f"Starting data loading for benchmark: {benchmark.__class__.__name__}")
         self.log_very_verbose(f"Data directory: {data_dir}")
 
+        # Phase clock starts at load_data entry so the returned duration
+        # covers cursor creation, query-tag/file-format setup, and file
+        # resolution, matching the pre-template behavior.
+        phase_start = mono_time()
+
         cursor = connection.cursor()
 
         try:
@@ -860,6 +865,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 fail_fast=True,
                 success_log=self.log_verbose,
                 summary_log=self.log_verbose,
+                phase_start=phase_start,
             )
             assert per_table_timings is not None
             self.log_operation_complete(

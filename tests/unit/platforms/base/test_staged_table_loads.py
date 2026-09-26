@@ -15,9 +15,10 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -33,6 +34,17 @@ def _adapter() -> MagicMock:
     adapter = MagicMock()
     adapter.logger = logging.getLogger("test-staged-load")
     return adapter
+
+
+@contextmanager
+def _frozen_clock(ticks: list[float]):
+    """Patch both clock namespaces (module import + clock source)."""
+    clock = iter(ticks)
+    with (
+        patch("benchbox.platforms.base.data_loading.mono_time", side_effect=clock),
+        patch("benchbox.utils.clock.mono_time", side_effect=clock),
+    ):
+        yield
 
 
 class TestStagedLoadTemplate:
@@ -207,6 +219,75 @@ class TestStagedLoadTemplate:
         )
         (line,) = adapter.log_verbose.call_args.args
         assert line == "Direct loading data for table: orders"
+
+    def test_post_load_hook_counts_inside_per_table_timing(self):
+        """CTAS-style post-load work is measured as part of the table load."""
+        adapter = _adapter()
+        success_lines: list[str] = []
+
+        def on_table_loaded(table: str, key: str, count: int) -> None:
+            del table, key, count
+
+        # phase clock, per-table start, per-table end, phase end.
+        with _frozen_clock([1000.0, 1001.0, 1002.0, 1003.0]):
+            _, _, timings = run_staged_table_loads(
+                adapter,
+                tables={"orders": [Path("/tmp/o.tbl")]},
+                stat_key=str.upper,
+                filter_files=lambda paths: [Path(p) for p in paths],
+                load_one=lambda table, files: 5,
+                on_table_loaded=on_table_loaded,
+                record_timings=True,
+                fail_fast=True,
+                success_log=success_lines.append,
+            )
+
+        assert timings == {"ORDERS": {"total_ms": 1000.0}}
+        assert "in 1.00s" in success_lines[0]
+
+    def test_caller_phase_start_covers_setup_time(self):
+        """A caller-owned clock keeps setup work inside the phase total."""
+        adapter = _adapter()
+        summary_lines: list[str] = []
+
+        # per-table start, per-table end, phase end; phase starts at
+        # caller setup (990.0), before the loop-entry clock would run.
+        with _frozen_clock([1001.0, 1001.5, 1010.0]):
+            _, total, _ = run_staged_table_loads(
+                adapter,
+                tables={"orders": [Path("/tmp/o.tbl")]},
+                stat_key=str.lower,
+                filter_files=lambda paths: [Path(p) for p in paths],
+                load_one=lambda table, files: 5,
+                record_timings=False,
+                fail_fast=False,
+                summary_log=summary_lines.append,
+                phase_start=990.0,
+            )
+
+        assert total == 20.0
+        assert "in 20.00s" in summary_lines[0]
+
+    def test_phase_total_defaults_to_loop_entry_without_caller_clock(self):
+        """Callers that pass nothing keep the template's loop-entry clock."""
+        adapter = _adapter()
+        summary_lines: list[str] = []
+
+        # phase clock, per-table start, per-table end, phase end.
+        with _frozen_clock([1000.0, 1001.0, 1001.5, 1002.0]):
+            _, total, _ = run_staged_table_loads(
+                adapter,
+                tables={"orders": [Path("/tmp/o.tbl")]},
+                stat_key=str.lower,
+                filter_files=lambda paths: [Path(p) for p in paths],
+                load_one=lambda table, files: 5,
+                record_timings=False,
+                fail_fast=False,
+                summary_log=summary_lines.append,
+            )
+
+        assert total == 2.0
+        assert "in 2.00s" in summary_lines[0]
 
 
 def _fail_with(message: str) -> Any:

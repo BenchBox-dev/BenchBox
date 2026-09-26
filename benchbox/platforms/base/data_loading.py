@@ -2965,6 +2965,7 @@ def run_staged_table_loads(
     success_log: Callable[[str], None] | None = None,
     summary_log: Callable[[str], None] | None = None,
     describe_start: Callable[[str, str], str] | None = None,
+    phase_start: float | None = None,
 ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
     """Drive the shared staged-load orchestration loop for cloud adapters.
 
@@ -2985,7 +2986,9 @@ def run_staged_table_loads(
       (Snowflake full-refresh semantics); otherwise the loop continues.
     - ``record_timings`` returns per-table ``{"total_ms": ...}`` timings or
       ``None`` for adapters that do not report them yet (Redshift).
-    - ``on_table_loaded`` runs caller post-load work such as CTAS sorting.
+    - ``on_table_loaded`` runs caller post-load work such as CTAS sorting
+      inside the measured per-table window, so timings and success lines
+      cover it.
 
     Error reporting always logs the full error text: truncation hid the
     cause class on the adopting call sites with no consumer depending on it.
@@ -3007,13 +3010,18 @@ def run_staged_table_loads(
             ``(table_name, chunk_info)``. Defaults to
             ``"Loading data for table: {table}{chunk}"``; Redshift's direct
             INSERT branch keeps its distinct wording through this hook.
+        phase_start: Caller-owned phase clock captured before caller-side
+            setup (cursor creation, query-tag/file-format setup, file
+            resolution, S3 client creation). Each adapter previously timed
+            from ``load_data`` entry, so the template defaults to its own
+            loop entry only when the caller passes nothing.
 
     Returns:
         Tuple of (table_stats, total_seconds, per_table_timings or None).
     """
     table_stats: dict[str, int] = {}
     per_table_timings: dict[str, Any] = {}
-    start_time = mono_time()
+    start_time = mono_time() if phase_start is None else phase_start
     log_success = success_log if success_log is not None else adapter.logger.info
     log_summary = summary_log if summary_log is not None else adapter.logger.info
     if describe_start is None:
@@ -3039,11 +3047,11 @@ def run_staged_table_loads(
             load_start = mono_time()
             row_count = load_one(table_name, valid_files)
             table_stats[key] = row_count
+            if on_table_loaded is not None:
+                on_table_loaded(table_name, key, row_count)
             load_time = elapsed_seconds(load_start)
             if record_timings:
                 per_table_timings[key] = {"total_ms": load_time * 1000}
-            if on_table_loaded is not None:
-                on_table_loaded(table_name, key, row_count)
             log_success(f"✅ Loaded {row_count:,} rows into {key}{chunk_info} in {load_time:.2f}s")
         except Exception as exc:
             error_message = str(exc) or repr(exc) or type(exc).__name__

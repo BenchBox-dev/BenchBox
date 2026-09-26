@@ -1935,6 +1935,10 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Load data using Redshift COPY command with S3 integration."""
+        # Phase clock starts at load_data entry so the returned duration
+        # covers cursor creation, file resolution, and S3 client creation,
+        # matching the pre-template behavior.
+        phase_start = mono_time()
         cursor = connection.cursor()
 
         try:
@@ -1959,6 +1963,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     load_one=load_via_s3,
                     record_timings=False,
                     fail_fast=False,
+                    phase_start=phase_start,
                 )
 
             else:
@@ -1979,6 +1984,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     record_timings=False,
                     fail_fast=False,
                     describe_start=lambda table_name, chunk_info: f"Direct loading data for table: {table_name}",
+                    phase_start=phase_start,
                 )
 
         except Exception as e:
