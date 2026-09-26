@@ -371,15 +371,82 @@ class TestDatabricksAdapter:
         assert connection == mock_connection
         mock_databricks_sql.connect.assert_called_once()
 
-        # Check catalog was set (schema is set in create_schema(), not here)
+        # Check catalog and schema context were set on the connection itself
+        # (pooled connections never pass through create_schema())
         expected_calls = [
             call("USE CATALOG test_catalog"),
             call("SELECT 1"),  # Connection test
+            call("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema"),
+            call("USE SCHEMA test_schema"),
         ]
         for expected_call in expected_calls:
             mock_cursor.execute.assert_any_call(expected_call.args[0])
 
         # Note: cursor is not closed in create_connection - connection stays open
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_create_connection_skips_create_schema_when_reused(self, mock_databricks_sql):
+        """Reused catalogs/schemas must connect with USE only.
+
+        CREATE SCHEMA IF NOT EXISTS is still authorized when the schema
+        exists, so principals with USE SCHEMA but no catalog-level
+        CREATE SCHEMA would fail every reconnect. USE CATALOG + USE SCHEMA
+        still run on every connection for pooled-connection correctness.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+        )
+
+        with patch.object(adapter, "handle_existing_database"):
+            for reused, expect_create in ((True, False), (False, True)):
+                mock_cursor.reset_mock()
+                adapter.database_was_reused = reused
+                adapter.create_connection()
+
+                executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+                assert "USE CATALOG test_catalog" in executed
+                assert "USE SCHEMA test_schema" in executed
+                assert ("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema" in executed) is expect_create
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_create_connection_defers_context_when_creating_catalog(self, mock_databricks_sql):
+        """Fresh catalog creation must not select the catalog first.
+
+        When create_catalog is set and the database was not reused,
+        create_schema() owns catalog creation: USE CATALOG would fail with
+        CATALOG_NOT_FOUND before it runs, so the connection issues no
+        context statements at all.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+            create_catalog=True,
+        )
+
+        with patch.object(adapter, "handle_existing_database"):
+            adapter.database_was_reused = False
+            adapter.create_connection()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert "USE CATALOG test_catalog" not in executed
+        assert "USE SCHEMA test_schema" not in executed
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_failure(self, mock_databricks_sql):
@@ -643,6 +710,38 @@ class TestDatabricksAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
         mock_cursor.close.assert_called_once()
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_execute_query_splits_multi_statement_batch(self, mock_databricks_sql):
+        """The SQL execution API takes one statement per execute.
+
+        Operation batches (DELETE+INSERT pairs, the 3-statement SCD2 stage
+        batch) run statement-by-statement; the last statement's rows win.
+        """
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.side_effect = [[], [(60,)]]
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+        )
+
+        result = adapter.execute_query(
+            mock_connection,
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10; INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+            "q_multi",
+        )
+
+        assert result["status"] == "SUCCESS"
+        assert result["rows_returned"] == 1
+        executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert executed == [
+            "DELETE FROM t WHERE k BETWEEN 1 AND 10",
+            "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
+        ]
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_accepts_stream_cursor(self, mock_databricks_sql):
@@ -1299,6 +1398,52 @@ class TestConvertToDeltaTable:
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t (a INT) USING DELTA")
         assert result.count("USING DELTA") == 1
+
+    def test_ctas_places_using_delta_before_as_select(self):
+        """CTAS has no column list: USING DELTA precedes AS SELECT.
+
+        Scanning for the column-list close paren lands inside the query
+        (a subquery close paren) or appends at the end, both invalid.
+        """
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM (SELECT 1 AS id) s")
+        assert "USING DELTA" in result
+        assert result.index("USING DELTA") < result.index("AS SELECT")
+        assert ") USING DELTA" not in result
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
+        assert "USING DELTA" in result
+        assert result.index("USING DELTA") < result.index("AS SELECT")
+
+    def test_ctas_tblproperties_precede_as_select(self):
+        """Table clauses must sit before the terminal AS query on CTAS."""
+        adapter = self._make_adapter(delta_auto_optimize=True)
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
+        props_idx = result.index("TBLPROPERTIES")
+        select_idx = result.index("AS SELECT")
+        assert props_idx < select_idx
+        assert "SELECT 1 AS id TBLPROPERTIES" not in result
+
+    def test_ctas_with_join_using_keeps_using_delta(self):
+        """JOIN ... USING (cols) is not a format clause: USING DELTA stays."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM a JOIN b USING (id)")
+        assert "USING DELTA" in result
+        assert "USING (id)" in result
+
+    def test_using_named_columns_do_not_suppress_using_delta(self):
+        """Columns named using_* must not read as a format clause."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t (id INT, using_status STRING)")
+        assert "USING DELTA" in result
+
+    def test_cte_ctas_places_clauses_before_with(self):
+        """CTE-based CTAS anchors clauses before AS WITH, not in the CTE."""
+        adapter = self._make_adapter()
+        result = adapter._convert_to_delta_table("CREATE TABLE t AS WITH cte AS (SELECT 1 AS id) SELECT * FROM cte")
+        using_idx = result.index("USING DELTA")
+        with_idx = result.index("AS WITH")
+        assert using_idx < with_idx
+        assert "(SELECT 1 AS id) USING DELTA" not in result
 
     def test_adds_tblproperties_for_auto_optimize(self):
         adapter = self._make_adapter(delta_auto_optimize=True)
@@ -2071,6 +2216,9 @@ class TestUnityCatalogNaming:
         calls = [c.args[0] for c in cursor.execute.call_args_list]
         assert "CREATE CATALOG IF NOT EXISTS new_catalog" in calls
         assert "CREATE SCHEMA IF NOT EXISTS new_catalog.new_schema" in calls
+        # One-shot creation state clears so later connections take the
+        # normal USE CATALOG / USE SCHEMA path instead of deferring again.
+        assert adapter.create_catalog is False
 
 
 class TestCopyIntoSqlGeneration:

@@ -40,15 +40,99 @@ def quote_identifier(identifier: str) -> str:
     return f'"{escaped}"'
 
 
+#: Dialects whose catalog tables are created in UPPERCASE, so a quoted
+#: identifier must be uppercased to resolve: Snowflake folds unquoted names
+#: to upper (a quoted lowercase name is a different table), and BigQuery is
+#: case-sensitive with adapter-created tables uppercased by convention.
+UPPERCASE_IDENTIFIER_DIALECTS = frozenset({"snowflake", "bigquery"})
+
+
+def quote_identifier_for_dialect(identifier: str, dialect: str | None) -> str:
+    """Quote an identifier with the case and quoting the dialect's catalog uses.
+
+    BigQuery uses backticks: double quotes denote string literals there, so a
+    double-quoted table name is a syntax error, not an identifier. Databricks
+    likewise rejects double-quoted identifiers with PARSE_SYNTAX_ERROR on
+    warehouses without ANSI mode (verified live), so it uses backticks too.
+
+    Args:
+        identifier: Table, column, or schema name (source-case, usually lower)
+        dialect: Platform dialect key (e.g. 'snowflake', 'duckdb'); None or
+            'standard' keeps source case
+    """
+    normalized = (dialect or "standard").lower()
+    if normalized == "bigquery":
+        # Validate first for the same injection guard as quote_identifier.
+        quote_identifier(identifier)
+        return f"`{identifier.upper()}`"
+    if normalized in ("databricks", "starrocks"):
+        quote_identifier(identifier)
+        escaped = identifier.replace("`", "``")
+        return f"`{escaped}`"
+    if normalized in UPPERCASE_IDENTIFIER_DIALECTS:
+        return quote_identifier(identifier.upper())
+    return quote_identifier(identifier)
+
+
+def failed_platform_error(cursor: Any) -> str | None:
+    """Return the adapter-reported error if ``cursor`` wraps a FAILED result.
+
+    Several platform adapters report query failures as a FAILED result
+    payload rather than raising. Reading such a cursor as success corrupts
+    coverage: a failed write looks executed, and a failed validation SELECT
+    materializes placeholder rows that can satisfy vacuous COUNT(*) checks.
+    Callers must fail loud instead. Plain DB-API cursors (embedded engines)
+    carry no ``platform_result`` and always return None here.
+
+    Args:
+        cursor: Cursor (or cursor-like) returned by ``connection.execute``.
+
+    Returns:
+        The adapter-reported error string, or None when the result is not a
+        reported failure.
+    """
+    platform_result = getattr(cursor, "platform_result", None)
+    if isinstance(platform_result, dict) and platform_result.get("status") == "FAILED":
+        return str(platform_result.get("error", "unknown error"))
+    if isinstance(cursor, dict) and cursor.get("status") == "FAILED":
+        return str(cursor.get("error", "unknown error"))
+    return None
+
+
+def fetch_count_probe(connection: DatabaseConnection, sql: str) -> int:
+    """Run a SELECT COUNT(*) probe and return the count.
+
+    Platform adapters report query failures as a FAILED result payload
+    rather than raising, which surfaces here as an empty row set. A failed
+    probe must raise (fail loud) instead of reading as "0 rows", which would
+    misreport a broken query as an empty table.
+    """
+    cursor = connection.execute(sql)
+    if (probe_error := failed_platform_error(cursor)) is not None:
+        raise RuntimeError(f"Count probe failed: {probe_error}")
+    row = cursor.fetchone()
+    return row[0] if row else 0
+
+
 def table_exists(
     connection: DatabaseConnection,
     table_name: str,
     log_verbose: Callable[[str], None],
+    dialect: str | None = None,
 ) -> bool:
     """Check whether a table exists without requiring information schema access."""
     try:
-        quoted_table = quote_identifier(table_name)
-        connection.execute(f"SELECT 1 FROM {quoted_table} LIMIT 0")
+        quoted_table = quote_identifier_for_dialect(table_name, dialect)
+        cursor = connection.execute(f"SELECT 1 FROM {quoted_table} LIMIT 0")
+        if (error := failed_platform_error(cursor)) is not None:
+            error_msg = error.lower()
+            if any(
+                phrase in error_msg
+                for phrase in ["does not exist", "doesn't exist", "no such table", "unknown table", "not found"]
+            ):
+                return False
+            log_verbose(f"Unexpected error checking table '{table_name}': {error}")
+            return False
         return True
     except ValueError as exc:
         log_verbose(f"Invalid table name '{table_name}': {exc}")
