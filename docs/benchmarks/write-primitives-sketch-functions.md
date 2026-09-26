@@ -420,11 +420,18 @@ Top-K only sweeps two values because `lg_max_map_size=6` (64 buckets)
 is too small for TPC-H lineitem's 7 distinct shipmodes — the merged
 sketch would saturate.
 
-Cloud-engine sweep variants are deferred. Each cloud engine has
+The sweep stays DuckDB-only. ClickHouse lacks parameterized accuracy
+knobs for its native sketches, so a ClickHouse "counterpart" would
+compare different algorithms (fixed-precision `uniqHLL12` versus
+`uniqExact`, `quantileBFloat16` versus `quantileExact`) rather than the
+swept parameter — results labeled as `lg_k`, `k`, or `lg_max_map_size`
+effects would actually measure algorithm changes. The sweep ops are
+therefore unsupported on ClickHouse (null platform override, the
+established skip). Remaining cloud engines stay deferred: each has
 different parameter knobs (Snowflake `APPROX_TOP_K` `counters` vs
-DataSketches `lg_max_map_size`, etc.); 6 families × 3 cloud engines is
-out of proportion with the analytical value. DuckDB-only sweep is
-enough to demonstrate the tradeoff; cloud users tune at their end with
+DataSketches `lg_max_map_size`, etc.); 6 families × remaining cloud
+engines is out of proportion with the analytical value. The DuckDB-only
+sweep demonstrates the tradeoff; cloud users tune at their end with
 vendor-specific knobs.
 
 KLL variants are end-to-end verified on the installed datasketches
