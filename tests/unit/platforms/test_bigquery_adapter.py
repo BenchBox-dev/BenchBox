@@ -2198,6 +2198,15 @@ class TestConvertToBigqueryTable:
         assert adapter._extract_unqualified_tables(query) == ["BASE_ONE", "ORDERS"]
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualify_aliases_table_referenced_with_backticked_prefix(self, mock_bigquery):
+        """Translated queries write `lineitem`.`col`; qualifying must keep that name resolvable."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = "SELECT SUM(`l_quantity`) FROM `lineitem`, `part` WHERE `p_partkey` = `lineitem`.`l_partkey`"
+        result = adapter._qualify_single_statement(query)
+        assert "FROM `proj.ds.LINEITEM` AS lineitem," in result
+        assert "`proj.ds.PART` AS" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_extract_unqualified_tables_keeps_self_shadowed_base_table(self, mock_bigquery):
         """A CTE named like the base table it reads still qualifies the base table."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")

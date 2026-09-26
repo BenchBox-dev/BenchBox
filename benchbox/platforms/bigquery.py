@@ -2311,8 +2311,11 @@ class BigQueryAdapter(PlatformAdapter):
             # the original name (proven live: every bare-prefix UPDATE/DELETE
             # failed server-side with Unrecognized name). BigQuery syntax
             # forbids aliases on target tables of INSERT, CREATE, DROP,
-            # TRUNCATE, and ALTER statements.
-            has_refs = re.search(rf"\b{table_name}\s*\.", masked, flags=re.IGNORECASE) is not None
+            # TRUNCATE, and ALTER statements. Translated queries backtick
+            # identifiers, so `lineitem`.`l_partkey` counts as a reference too.
+            has_refs = (
+                re.search(rf"(?<![\w.`])`?{re.escape(table_name)}`?\s*\.", masked, flags=re.IGNORECASE) is not None
+            )
 
             pattern = (
                 rf"(\bFROM\s+|\bJOIN\s+|\bINSERT\s+INTO\s+|\bUPDATE\s+"
