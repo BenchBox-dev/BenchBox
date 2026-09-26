@@ -439,7 +439,7 @@ class DryRunExecutor:
                     return self._extract_tpch_maintenance_operations(benchmark, benchmark_config)
                 elif test_execution_type == "combined":
                     # Combined: standard queries (Q1-Q22) + maintenance operations
-                    queries = self._extract_standard_queries(benchmark)
+                    queries = self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
                     maintenance_ops = self._extract_tpch_maintenance_operations(benchmark, benchmark_config)
                     queries.update(maintenance_ops)
                     return queries
@@ -455,7 +455,7 @@ class DryRunExecutor:
                     return self._extract_tpcds_maintenance_operations(benchmark, benchmark_config)
                 elif test_execution_type == "combined":
                     # Combined: standard queries (Q1-Q99) + maintenance operations
-                    queries = self._extract_standard_queries(benchmark)
+                    queries = self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
                     maintenance_ops = self._extract_tpcds_maintenance_operations(benchmark, benchmark_config)
                     queries.update(maintenance_ops)
                     return queries
@@ -464,7 +464,7 @@ class DryRunExecutor:
                         benchmark, benchmark_config, test_execution_type, platform_adapter
                     )
 
-            return self._extract_standard_queries(benchmark)
+            return self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
 
         except Exception:
             return {}
@@ -477,9 +477,36 @@ class DryRunExecutor:
         platform_adapter=None,
     ) -> dict[str, str]:
         """Return the benchmark's queries for test modes without opening a platform connection."""
-        return self._extract_standard_queries(benchmark)
+        return self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
 
-    def _extract_standard_queries(self, benchmark) -> dict[str, str]:
+    def _extract_standard_queries(
+        self,
+        benchmark,
+        benchmark_config: BenchmarkConfig | None = None,
+        platform_adapter=None,
+    ) -> dict[str, str]:
+        if platform_adapter is not None and hasattr(platform_adapter, "_get_dialect_queries"):
+            benchmark_name = normalize_benchmark_id(benchmark_config.name) if benchmark_config else ""
+            queries = platform_adapter._get_dialect_queries(
+                benchmark,
+                benchmark_slug=benchmark_name,
+                connection=None,
+            )
+            if benchmark_config is not None and hasattr(platform_adapter, "_filter_queries"):
+                options = benchmark_config.options if isinstance(benchmark_config.options, dict) else {}
+                queries = platform_adapter._filter_queries(
+                    queries,
+                    benchmark,
+                    benchmark_name,
+                    {
+                        "query_subset": benchmark_config.queries,
+                        "categories": options.get("categories"),
+                    },
+                )
+            if queries and isinstance(next(iter(queries.keys())), int):
+                return {str(k): v for k, v in queries.items()}
+            return queries
+
         if hasattr(benchmark, "get_queries"):
             queries = benchmark.get_queries()
             if queries:

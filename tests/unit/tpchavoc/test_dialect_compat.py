@@ -6,6 +6,8 @@ import pytest
 import sqlglot
 from sqlglot import exp
 
+from benchbox.core.dryrun import DryRunExecutor
+from benchbox.core.schemas import BenchmarkConfig
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.dialect_compat import (
     CLICKHOUSE_FILTER_VARIANT_IDS,
@@ -14,6 +16,8 @@ from benchbox.core.tpchavoc.dialect_compat import (
     POSTGRES_DUAL_VARIANT_IDS,
     POSTGRES_QUALIFIED_COLUMNS,
 )
+from benchbox.platforms.clickhouse_local import ClickHouseLocalAdapter
+from benchbox.platforms.datafusion import DataFusionAdapter
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
@@ -155,3 +159,48 @@ def test_datafusion_empty_group_rules_cover_both_variants():
         if key[:3] == (Phase.QUERY_ADAPTER, "datafusion", "tpchavoc") and key[3] in DATAFUSION_EMPTY_GROUP_VARIANT_IDS
     }
     assert registered == DATAFUSION_EMPTY_GROUP_VARIANT_IDS
+
+
+@pytest.mark.parametrize(
+    ("adapter", "query_ids", "required_fragments", "forbidden_fragment"),
+    [
+        (
+            DataFusionAdapter(),
+            ["6_v2", "14_v2"],
+            [" HAVING "],
+            "GROUP BY ()",
+        ),
+        (
+            ClickHouseLocalAdapter(),
+            ["1_v6", "12_v7"],
+            ["sumOrNullIf(", "countIf("],
+            " FILTER(",
+        ),
+    ],
+)
+def test_dry_run_uses_production_dialect_rewrites_and_query_subset(
+    adapter,
+    query_ids: list[str],
+    required_fragments: list[str],
+    forbidden_fragment: str,
+):
+    benchmark = TPCHavocBenchmark(scale_factor=0.01)
+    config = BenchmarkConfig(
+        name="tpchavoc",
+        display_name="TPC-Havoc",
+        scale_factor=0.01,
+        queries=query_ids,
+        test_execution_type="power",
+    )
+
+    queries = DryRunExecutor()._extract_queries(
+        benchmark,
+        config,
+        platform_adapter=adapter,
+        execution_mode="sql",
+    )
+
+    assert list(queries) == query_ids
+    rendered = "\n".join(queries.values())
+    assert forbidden_fragment not in rendered
+    assert all(fragment in rendered for fragment in required_fragments)
