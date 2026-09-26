@@ -113,7 +113,14 @@ def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exis
     if_not_exists_clause = " IF NOT EXISTS" if if_not_exists else ""
     sql = f"CREATE TABLE{if_not_exists_clause} {table['name']} (\n"
     sql += ",\n".join(f"  {col}" for col in columns)
-    sql += "\n);"
+    sql += "\n)"
+    if dialect.lower() == "databricks":
+        # Databricks multi-statement transactions only write to Delta tables
+        # with the catalogManaged feature (TRANSACTION_NOT_SUPPORTED.
+        # WRITE_NON_CATALOG_MANAGED_TABLE otherwise). Staging tables are the
+        # only tables these transactions write.
+        sql += " USING DELTA TBLPROPERTIES ('delta.feature.catalogManaged' = 'supported')"
+    sql += ";"
 
     return sql
 

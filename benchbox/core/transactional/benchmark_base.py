@@ -28,6 +28,9 @@ from benchbox.core.transactional.operations_registry_base import OperationsRegis
 
 ResultT = TypeVar("ResultT")
 _POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
+# Dialects whose driver rollback() is a no-op under autocommit, so an explicit
+# SQL ROLLBACK is needed to close a transaction opened by catalog BEGIN SQL.
+_SQL_ROLLBACK_AFTER_ERROR_DIALECTS = frozenset({"databricks"})
 _UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
 _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
     r"SET\s+TRANSACTION\s+ISOLATION\s+LEVEL\s+(?P<level>REPEATABLE\s+READ|SERIALIZABLE|READ\s+COMMITTED)\s*;\s*"
@@ -340,12 +343,25 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         return _SET_THEN_BEGIN_ISOLATION_RE.sub(r"BEGIN TRANSACTION ISOLATION LEVEL \g<level>;", sql)
 
     def _rollback_connection_after_error(self, connection: DatabaseConnection) -> None:
-        """Clear aborted transaction state on drivers that require explicit rollback after errors."""
+        """Clear aborted transaction state after an operation error.
+
+        Catalog operations open transactions with explicit ``BEGIN TRANSACTION``
+        SQL. Under autocommit, a DB-API ``rollback()`` is a no-op on some
+        drivers (Databricks SQL), so a statement that fails between BEGIN and
+        COMMIT leaves the SQL transaction open and every later statement on the
+        session fails. Issue a SQL ROLLBACK as well; engines with no open
+        transaction treat it as a no-op or raise, and either is ignored.
+        """
         try:
             if hasattr(connection, "rollback"):
                 connection.rollback()
         except Exception as exc:
             self.log_verbose(f"Warning: rollback after operation error failed: {exc}")
+        if (getattr(self, "_setup_dialect", None) or "").lower() in _SQL_ROLLBACK_AFTER_ERROR_DIALECTS:
+            try:
+                connection.execute("ROLLBACK")
+            except Exception as exc:
+                self.log_verbose(f"SQL ROLLBACK after operation error was not needed or failed: {exc}")
 
     # ------------------------------------------------------------------
     # Staging provenance manifest

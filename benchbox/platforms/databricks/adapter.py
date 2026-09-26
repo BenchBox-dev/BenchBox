@@ -1077,6 +1077,9 @@ class DatabricksAdapter(PlatformAdapter):
         - ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)`` (Databricks
           VARCHAR requires a length parameter; verified live with
           DATATYPE_MISSING_SIZE on batch inserts)
+        - ``unnest(generate_series(a, b))`` -> ``explode(sequence(a, b))``
+          (Databricks has neither function; verified live with
+          UNRESOLVED_ROUTINE ``unnest``)
         """
         import re
 
@@ -1087,6 +1090,12 @@ class DatabricksAdapter(PlatformAdapter):
                 return None
         else:
             base = operation.write_sql
+        base = re.sub(
+            r"\bunnest\(\s*generate_series\(([^()]*)\)\s*\)",
+            r"explode(sequence(\1))",
+            base,
+            flags=re.IGNORECASE,
+        )
         return re.sub(
             r"\bCAST\(([^()]+?)\s+AS\s+VARCHAR\s*\)",
             r"CAST(\1 AS STRING)",
