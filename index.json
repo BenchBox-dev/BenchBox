@@ -2773,15 +2773,10 @@
       "title": "Finish Delta loading closure for Redshift and BigQuery adapters"
     },
     "cloud-staging-path-cloudstagingpath-databrickspath-construct": {
-      "claim": {
-        "expires_at": "2026-09-27T01:54:37Z",
-        "generation": "1b8d9f62c58f4a188abdb08e4d087a83",
-        "renewals": 0,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Cloud staging path (CloudStagingPath/DatabricksPath) construction-time injection edge cases"
     },
     "cloud-staging-path-rewrap-drops-cloud-target": {
