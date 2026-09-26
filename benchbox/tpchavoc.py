@@ -90,14 +90,7 @@ class TPCHavoc(BaseBenchmark):
         return self._impl.generate_data()
 
     def get_platform_skip_queries(self, platform_name: str) -> list[str]:
-        """Get platform-specific query IDs excluded by compatibility policy.
-
-        Args:
-            platform_name: Platform selector or adapter display name
-
-        Returns:
-            List of query IDs to skip on the given platform
-        """
+        """Return query IDs that compatibility policy skips for ``platform_name`` (selector or display name)."""
         return self._impl.get_platform_skip_queries(platform_name)
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
