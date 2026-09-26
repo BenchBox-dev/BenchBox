@@ -207,7 +207,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
     "datafusion": frozenset(
         [
             "12_v1",
-            "14_v2",
             "14_v8",
             "16_v10",
             "16_v7",
@@ -216,7 +215,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
             "1_v7",
             "4_v10",
             "4_v7",
-            "6_v2",
             "7_v1",
             "8_v1",
             "9_v1",

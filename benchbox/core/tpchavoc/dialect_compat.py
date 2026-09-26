@@ -14,6 +14,7 @@ POSTGRES_QUALIFIED_COLUMNS: dict[str, dict[str, str]] = {
 }
 POSTGRES_DUAL_VARIANT_IDS = frozenset({"17_v4"})
 CLICKHOUSE_FILTER_VARIANT_IDS = frozenset({"1_v6", "12_v7"})
+DATAFUSION_EMPTY_GROUP_VARIANT_IDS = frozenset({"6_v2", "14_v2"})
 _CLOUD_DIALECTS = frozenset({"bigquery", "databricks", "snowflake"})
 _POSTGRES_DIALECTS = frozenset({"postgres", "postgresql"})
 
@@ -25,6 +26,8 @@ def rewrite_dialect_variant(query_id: str, query: str, target_dialect: str) -> s
         return rewrite_cloud_variant(query_id, query, target)
     if target == "clickhouse" and query_id in CLICKHOUSE_FILTER_VARIANT_IDS:
         return _rewrite_clickhouse_filters(query)
+    if target == "datafusion" and query_id in DATAFUSION_EMPTY_GROUP_VARIANT_IDS:
+        return _drop_empty_grouping(query)
     if target in _POSTGRES_DIALECTS:
         if query_id in POSTGRES_ALIAS_VARIANT_IDS:
             query = _inline_postgres_select_aliases(query)
@@ -100,8 +103,21 @@ def _clickhouse_filter_node(node: exp.Expression) -> exp.Expression:
     return exp.Anonymous(this=combinator, expressions=[aggregate.this.copy(), condition])
 
 
+def _drop_empty_grouping(query: str) -> str:
+    """Drop GROUP BY () while retaining global aggregate and HAVING semantics."""
+    tree = sqlglot.parse_one(query, read="postgres")
+    for select in tree.find_all(exp.Select):
+        group = select.args.get("group")
+        if group and len(group.expressions) == 1:
+            only = group.expressions[0]
+            if isinstance(only, exp.Tuple) and not only.expressions:
+                select.set("group", None)
+    return tree.sql(dialect="postgres")
+
+
 __all__ = [
     "CLICKHOUSE_FILTER_VARIANT_IDS",
+    "DATAFUSION_EMPTY_GROUP_VARIANT_IDS",
     "POSTGRES_ALIAS_VARIANT_IDS",
     "POSTGRES_DUAL_VARIANT_IDS",
     "POSTGRES_QUALIFIED_COLUMNS",

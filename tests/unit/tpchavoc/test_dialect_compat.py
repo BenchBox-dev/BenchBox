@@ -8,11 +8,13 @@ from sqlglot import exp
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.dialect_compat import (
     CLICKHOUSE_FILTER_VARIANT_IDS,
+    DATAFUSION_EMPTY_GROUP_VARIANT_IDS,
     POSTGRES_ALIAS_VARIANT_IDS,
     POSTGRES_DUAL_VARIANT_IDS,
     POSTGRES_QUALIFIED_COLUMNS,
 )
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
 
@@ -125,3 +127,28 @@ def test_clickhouse_filter_rules_cover_each_deployment_mode():
             if key[:3] == (Phase.QUERY_ADAPTER, platform, "tpchavoc") and key[3] in CLICKHOUSE_FILTER_VARIANT_IDS
         }
         assert registered == CLICKHOUSE_FILTER_VARIANT_IDS
+
+
+def test_datafusion_empty_group_variants_drop_grouping_and_unskip():
+    benchmark = TPCHavocBenchmark(scale_factor=0.1)
+
+    for query_id in DATAFUSION_EMPTY_GROUP_VARIANT_IDS:
+        query = benchmark.get_query(query_id, dialect="datafusion")
+
+        assert "GROUP BY ()" not in query
+        assert " HAVING " in query
+        assert query_id not in DATAFUSION_TPCHAVOC_SKIPS
+        assert sqlglot.parse_one(query, read="postgres")
+
+
+def test_datafusion_empty_group_rules_cover_both_variants():
+    import benchbox.sql_compat.rules.query_adapter.datafusion_tpchavoc_rewrites  # noqa: F401
+    from benchbox.sql_compat.context import Phase
+    from benchbox.sql_compat.registry import REGISTRY
+
+    registered = {
+        key[3]
+        for key, _ in REGISTRY.all_rules()
+        if key[:3] == (Phase.QUERY_ADAPTER, "datafusion", "tpchavoc") and key[3] in DATAFUSION_EMPTY_GROUP_VARIANT_IDS
+    }
+    assert registered == DATAFUSION_EMPTY_GROUP_VARIANT_IDS
