@@ -19257,9 +19257,9 @@
     },
     "w4-postgres-cell-first-live-nightly": {
       "claim": {
-        "expires_at": "2026-09-27T02:38:21Z",
-        "generation": "6018f8f61a814611bf4e7aac3adea0b6",
-        "renewals": 1,
+        "expires_at": "2026-09-27T02:45:23Z",
+        "generation": "d6f37acaae95453faf656b05b3854626",
+        "renewals": 2,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
       },
       "needs": [],
