@@ -808,3 +808,48 @@ class TestPrestoAdapter:
         assert adapter._extract_table_name("CREATE TABLE orders (id INT)") == "orders"
         assert adapter._extract_table_name("CREATE TABLE IF NOT EXISTS orders (id INT)") == "orders"
         assert adapter._extract_table_name("INSERT INTO orders VALUES (1)") is None
+
+    def test_load_table_data_uses_manifest_dialect_over_suffix(self, presto_stubs, tmp_path):
+        """A manifest-declared comma dialect wins over the .tbl pipe heuristic."""
+        from benchbox.platforms.base.data_loading import DataSource
+
+        adapter = PrestoAdapter(catalog="hive")
+        data_file = tmp_path / "orders.tbl"
+        data_file.write_text("1,Alice\n")
+        data_source = DataSource(
+            source_type="manifest",
+            tables={"orders": data_file},
+            table_metadata={"orders": {"csv_delimiter": ","}},
+        )
+        cursor = Mock()
+        with (
+            patch.object(adapter, "_validate_identifier", return_value=True),
+            patch("benchbox.platforms.presto_trino_adapter_base.load_file_batches") as batches,
+        ):
+            batches.return_value = 1
+            result = adapter._load_table_data(
+                cursor,
+                "orders",
+                data_file,
+                "hive",
+                "default",
+                benchmark=Mock(tables={"orders": data_file}),
+                data_source=data_source,
+            )
+        assert result == (1, 1)
+        assert batches.call_args.kwargs["delimiter"] == ","
+
+    def test_load_table_data_without_context_keeps_heuristic(self, presto_stubs, tmp_path):
+        """Callers without DataSource context fall back to the file heuristic."""
+        adapter = PrestoAdapter(catalog="hive")
+        data_file = tmp_path / "orders.tbl"
+        data_file.write_text("1|Alice\n")
+        cursor = Mock()
+        with (
+            patch.object(adapter, "_validate_identifier", return_value=True),
+            patch("benchbox.platforms.presto_trino_adapter_base.load_file_batches") as batches,
+        ):
+            batches.return_value = 1
+            result = adapter._load_table_data(cursor, "orders", data_file, "hive", "default")
+        assert result == (1, 1)
+        assert batches.call_args.kwargs["delimiter"] is None

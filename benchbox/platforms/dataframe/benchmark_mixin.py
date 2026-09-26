@@ -797,7 +797,12 @@ class BenchmarkExecutionMixin:
         if benchmark_id == "tpch":
             column_names_map.update(get_tpch_column_names())
 
+        # Only a real string attribute counts: getattr on a Mock benchmark
+        # fabricates a child mock for any name, which would otherwise ride
+        # through as the delimiter override and corrupt every CSV load.
         csv_delimiter = getattr(benchmark_instance, "csv_delimiter", None)
+        if not isinstance(csv_delimiter, str):
+            csv_delimiter = None
 
         return column_names_map, csv_delimiter
 
