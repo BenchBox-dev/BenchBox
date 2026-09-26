@@ -155,10 +155,15 @@
       "title": "✅ Add End-to-End CLI Testing"
     },
     "add-fhv-data-support-downloader-queries-tests": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T05:24:54Z",
+        "generation": "a8dcd6dd102241b8966be2942d1e4d90",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Add FHV data support (downloader, queries, tests)"
     },
     "add-file-output-support-to-mcp-chart-generation": {
