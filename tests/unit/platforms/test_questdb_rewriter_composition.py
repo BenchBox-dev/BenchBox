@@ -67,10 +67,9 @@ class TestRewriteComposition:
         assert "JOIN" in result.upper()
 
     def test_interval_fixup_composes_with_join_expansion(self) -> None:
-        # Join expansion runs first through a sqlglot AST round trip, which
-        # normalizes INTERVAL '90' DAY to INTERVAL '90 DAY' — a shape the
-        # interval regex does not match. Pin the documented order effect:
-        # the join is expanded, the interval survives for a later pass.
+        # The comma-JOIN stage runs sqlglot first, which normalizes
+        # INTERVAL '90' DAY to INTERVAL '90 DAY'. The interval stage must
+        # still eliminate it in the same rewrite() pass.
         sql = (
             "SELECT l.l_orderkey FROM lineitem l, orders o "
             "WHERE l.l_orderkey = o.o_orderkey AND o.o_orderdate > "
@@ -78,7 +77,8 @@ class TestRewriteComposition:
         )
         result = rewrite(sql)
         assert "JOIN" in result.upper()
-        assert "INTERVAL" in result.upper()
+        assert "INTERVAL" not in result.upper()
+        assert "dateadd('d', -90," in result
 
     def test_composed_rewrite_is_idempotent(self) -> None:
         sql = (

@@ -83,6 +83,8 @@ class TestBuildStarrocksConfig:
 
         monkeypatch.setenv("STARROCKS_HOST", "cfg-host")
         monkeypatch.setenv("STARROCKS_PORT", "19030")
+        monkeypatch.delenv("STARROCKS_USER", raising=False)
+        monkeypatch.delenv("STARROCKS_HTTP_PORT", raising=False)
         with patch("benchbox.platforms.starrocks.setup.build_database_config") as mock_build:
             mock_build.side_effect = lambda **kwargs: kwargs
             built = _build_starrocks_config("starrocks", {}, {}, SimpleNamespace())
