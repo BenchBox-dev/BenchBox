@@ -1,6 +1,6 @@
 profile:
   id: tpc-v1
-  version: "2026-05-26"
+  version: "2026-09-26"
   description: "Platform-neutral logical tuning profile for TPC-H, TPC-DS, and SSB checked-in tuned templates."
   benchmarks:
     tpch:
@@ -410,7 +410,7 @@ profile:
         status: accepted
         rationale: "Customer demographic locality appears in seven TPC-DS templates."
     ssb:
-      evidence_source: "benchbox/core/tuning/templates/{duckdb,databricks}/ssb_tuned.yaml"
+      evidence_source: "benchbox/core/ssb/queries.py"
       candidates:
       - table: LINEORDER
         column: LO_ORDERDATE
@@ -419,15 +419,15 @@ profile:
         query_count: 13
         query_ids: ["Q1.1", "Q1.2", "Q1.3", "Q2.1", "Q2.2", "Q2.3", "Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
         status: existing_baseline
-        rationale: "Existing fact date partition key in checked SSB tuned templates; join predicate in all 13 queries."
+        rationale: "Fact date partition key; equi-join predicate lo_orderdate = d_datekey in all 13 queries."
       - table: LINEORDER
-        column: LO_ORDERKEY
+        column: LO_SUPPKEY
         type: INTEGER
         roles: [join_locality]
-        query_count: 0
-        query_ids: []
+        query_count: 10
+        query_ids: ["Q2.1", "Q2.2", "Q2.3", "Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
         status: existing_baseline
-        rationale: "Existing fact sort/cluster key in checked SSB tuned templates."
+        rationale: "Fact-side supplier join key; highest-evidence LINEORDER join column."
       - table: LINEORDER
         column: LO_CUSTKEY
         type: INTEGER
@@ -435,7 +435,15 @@ profile:
         query_count: 7
         query_ids: ["Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
         status: existing_baseline
-        rationale: "Existing fact cluster key in checked Databricks SSB tuned template; join predicate in seven queries."
+        rationale: "Fact-side customer join key in seven queries."
+      - table: LINEORDER
+        column: LO_PARTKEY
+        type: INTEGER
+        roles: [join_locality]
+        query_count: 6
+        query_ids: ["Q2.1", "Q2.2", "Q2.3", "Q4.1", "Q4.2", "Q4.3"]
+        status: existing_baseline
+        rationale: "Fact-side part join key in six queries."
       - table: DATE
         column: D_DATEKEY
         type: INTEGER
@@ -443,7 +451,7 @@ profile:
         query_count: 13
         query_ids: ["Q1.1", "Q1.2", "Q1.3", "Q2.1", "Q2.2", "Q2.3", "Q3.1", "Q3.2", "Q3.3", "Q3.4", "Q4.1", "Q4.2", "Q4.3"]
         status: existing_baseline
-        rationale: "Existing date dimension key in checked SSB tuned templates; join predicate in all 13 queries."
+        rationale: "Static 2,556-row dimension key; structural join record, not a physical layout directive."
       - table: CUSTOMER
         column: C_CUSTKEY
         type: INTEGER
