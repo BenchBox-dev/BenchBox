@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addChartView,
   createDashboard,
@@ -120,5 +120,29 @@ describe("dashboard store", () => {
     expect(loadDashboards()).toEqual([]);
     seed([{ version: 1, id: "d", name: "Kept", items: [{ id: "v", name: "V", url: "/results/" }] }]);
     expect(loadDashboards()).toHaveLength(1);
+  });
+
+  it("keeps saved dashboards in memory when storage writes throw", async () => {
+    vi.resetModules();
+    const storage = await import("@/lib/dashboards");
+    const failingStorage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("quota exceeded");
+      },
+      removeItem: () => {},
+      clear: () => {},
+    };
+    Object.defineProperty(window, "localStorage", { configurable: true, value: failingStorage });
+
+    const dashboard = storage.createDashboard("Session board")!;
+    expect(dashboard.name).toBe("Session board");
+    const loaded = storage.loadDashboards();
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0]?.name).toBe("Session board");
+
+    const afterAdd = storage.addChartView(dashboard.id, { name: "Matrix", url: "/results/tpch/#matrix" });
+    expect(afterAdd[0]?.items).toHaveLength(1);
+    expect(storage.loadDashboards()[0]?.items).toHaveLength(1);
   });
 });

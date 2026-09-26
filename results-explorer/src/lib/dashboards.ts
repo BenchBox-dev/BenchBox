@@ -98,25 +98,50 @@ export function parseDashboardsPayload(raw: unknown): Dashboard[] {
   return dashboards;
 }
 
+// Session fallback when localStorage writes fail (unavailable, blocked, or
+// quota-exceeded): the latest snapshot is kept in this module-scoped variable
+// so loadDashboards() keeps returning what the session just saved. It is
+// cleared on the next successful localStorage write and does not survive a
+// page reload. Only used in the browser; server-side writes stay no-ops.
+let memoryDashboards: Dashboard[] | null = null;
+
+function cloneDashboards(dashboards: Dashboard[]): Dashboard[] {
+  return dashboards.map((dashboard) => ({ ...dashboard, items: dashboard.items.map((item) => ({ ...item })) }));
+}
+
 function readStorage(): Dashboard[] {
+  let stored: Dashboard[];
   try {
     if (typeof window === "undefined" || !window.localStorage) return [];
     const raw = window.localStorage.getItem(DASHBOARD_STORAGE_KEY);
-    if (raw === null || raw === "") return [];
-    return parseDashboardsPayload(JSON.parse(raw));
+    if (raw === null || raw === "") stored = [];
+    else stored = parseDashboardsPayload(JSON.parse(raw));
   } catch {
-    return [];
+    stored = [];
   }
+  if (memoryDashboards === null) return stored;
+  // The failed-write snapshot is authoritative for its ids; entries stored by
+  // another tab that the snapshot never saw are preserved alongside it.
+  const memoryIds = new Set(memoryDashboards.map((dashboard) => dashboard.id));
+  return [...cloneDashboards(memoryDashboards), ...stored.filter((dashboard) => !memoryIds.has(dashboard.id))];
 }
 
 function writeStorage(dashboards: Dashboard[]): void {
-  try {
-    if (typeof window === "undefined" || !window.localStorage) return;
-    const payload = dashboards.map((dashboard) => ({ ...dashboard, version: DASHBOARD_MODEL_VERSION }));
-    window.localStorage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // Storage can be unavailable in privacy contexts; dashboards then live
-    // for the session only. Callers re-read through loadDashboards().
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      const payload = dashboards.map((dashboard) => ({ ...dashboard, version: DASHBOARD_MODEL_VERSION }));
+      window.localStorage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(payload));
+      memoryDashboards = null;
+      return;
+    } catch {
+      // Fall through to the session fallback below.
+    }
+  }
+  // Storage is unavailable: keep the snapshot in memory so the session still
+  // sees what it saved. Callers return the mutated model, which now matches
+  // what loadDashboards() reads back until the page reloads.
+  if (typeof window !== "undefined") {
+    memoryDashboards = cloneDashboards(dashboards);
   }
 }
 
