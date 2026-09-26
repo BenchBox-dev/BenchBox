@@ -15597,7 +15597,7 @@
       "needs": [
         "serenedb-local-spike"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Add the experimental SereneDB SQL adapter limited to TPC-H and TPC-DS"
     },
