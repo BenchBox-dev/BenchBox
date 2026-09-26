@@ -892,8 +892,8 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle_file)
 
         assert entry.cost_usd is None
-        assert entry.normalized_cost["cost_status"] == "unavailable"
-        assert entry.normalized_cost["normalized_cost_usd"] is None
+        assert entry.normalized_cost.cost_status == "unavailable"
+        assert entry.normalized_cost.normalized_cost_usd is None
 
     def test_legacy_total_cost_does_not_populate_normalized_alias(self, tmp_path: Path) -> None:
         import copy
@@ -907,7 +907,7 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle)
 
         assert entry.cost_usd is None
-        assert entry.normalized_cost["cost_status"] == "unavailable"
+        assert entry.normalized_cost.cost_status == "unavailable"
 
     @pytest.mark.parametrize(
         ("normalized_cost", "expected_cost_usd"),
@@ -975,8 +975,8 @@ class TestExtendedManifestFields:
 
         assert entry.cost_usd == expected_cost_usd
         assert detail.cost_usd == expected_cost_usd
-        assert entry.normalized_cost == normalized_cost.to_dict()
-        assert detail.normalized_cost == normalized_cost.to_dict()
+        assert entry.normalized_cost == normalized_cost
+        assert detail.normalized_cost == normalized_cost
 
     def test_environment_facets_extracted_from_normalized_contract(self, tmp_path: Path) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -1109,6 +1109,44 @@ class TestExtendedManifestFields:
 
         transformer = BundleTransformer()
         with pytest.raises(ValueError, match="Invalid normalized_cost_usd"):
+            transformer.to_manifest_entry(bundle)
+
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("cost_status", "bogus", "must be one of"),
+            ("cost_model_version", "", "must be a non-empty string"),
+        ],
+    )
+    def test_malformed_normalized_cost_rejected_at_ingest(
+        self,
+        tmp_path: Path,
+        field: str,
+        value: str,
+        message: str,
+    ) -> None:
+        """Structural cost validation lives in the transformer ingest.
+
+        The typed read model cannot carry these values (the ``NormalizedCost``
+        dataclass rejects them at construction), so the bundle is refused
+        before any read model exists.
+        """
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = NormalizedCost(
+            normalized_cost_usd="0.42",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+        ).to_dict()
+        data["normalized_cost"][field] = value
+        bundle = tmp_path / f"malformed_{field}.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match=message):
             transformer.to_manifest_entry(bundle)
 
     def test_test_type_inferred_from_phases(self, tmp_path: Path) -> None:
