@@ -120,6 +120,18 @@ class ParadeDBAdapter(PostgreSQLAdapter):
         ensure_postgres_extension(conn, self.logger, PARADEDB_EXTENSION, "https://github.com/paradedb/paradedb")
         return conn
 
+    def _apply_stream_session_state(self, connection: Any) -> None:
+        """Delegate per-stream session state to the PostgreSQL parent path.
+
+        ``create_connection`` adds only extension verification/creation above
+        the parent implementation - one-time database setup that must NOT be
+        repeated per stream - and no additional session-scoped GUCs, so there
+        is no ParadeDB-specific state to reapply. The explicit delegation
+        (rather than an inherited silent no-op) records that equivalence was
+        checked for this subclass.
+        """
+        super()._apply_stream_session_state(connection)
+
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get ParadeDB platform information."""
         platform_info = super().get_platform_info(connection)

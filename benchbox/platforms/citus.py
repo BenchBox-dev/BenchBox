@@ -138,6 +138,19 @@ class CitusAdapter(PostgreSQLAdapter):
         )
         return conn
 
+    def _apply_stream_session_state(self, connection: Any) -> None:
+        """Delegate per-stream session state to the PostgreSQL parent path.
+
+        ``create_connection`` adds only extension verification/creation above
+        the parent implementation - one-time database setup that must NOT be
+        repeated per stream - and no additional session-scoped GUCs, so there
+        is no Citus-specific state to reapply. Table distribution happens in
+        ``create_schema`` (DDL scope), not per session. The explicit
+        delegation (rather than an inherited silent no-op) records that
+        equivalence was checked for this subclass.
+        """
+        super()._apply_stream_session_state(connection)
+
     def create_schema(self, benchmark, connection: Any) -> float:
         """Create schema, then distribute tables when a column is configured."""
         elapsed = super().create_schema(benchmark, connection)
