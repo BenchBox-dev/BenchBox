@@ -21,17 +21,19 @@ Two classifications do most of the work:
   generated stores, and docs.
 - **`support_status`** answers "is this benchmark or platform a supported
   product?" (`stable`, `beta`, `experimental`, `repo_only`, `deprecated`,
-  `document_only`). It controls the label shown next to a public entry; it
-  never hides one. Hiding is the separate `surface` gate (`public` vs
-  `internal`), and capability flags such as `supports_dataframe` are never
-  inferred from either.
+  `document_only`). For benchmarks it controls the label shown next to a
+  public entry; it never hides one. Hiding is the separate `surface` gate
+  (`public` vs `internal`), and capability flags such as `supports_dataframe`
+  are never inferred from either. (Platform discovery helpers additionally
+  filter `deprecated` and `document_only` platforms unless the caller opts
+  in; see Platform discovery below.)
 
 ## Product surfaces and their code homes
 
 | Surface | Tier | Code |
 |---|---|---|
 | CLI commands and documented options | `beta-public` | `benchbox/cli/commands/`, `docs/reference/cli/` |
-| Python wrapper facades (`benchbox.TPCH(...)`) and `run_with_platform` | `beta-public` | `benchbox/__init__.py`, top-level wrapper modules, `benchbox/base.py` |
+| Python wrapper facades (`benchbox.TPCH(...)`) and `BaseBenchmark.run_with_platform` | `beta-public` | `benchbox/__init__.py`, top-level wrapper modules, `benchbox/base.py` |
 | Runtime loader and registries behind the facades | `internal` | `benchbox/core/benchmark_loader.py`, `benchbox/core/benchmark_registry.py` |
 | Shared run engine below CLI and MCP | `internal` | `benchbox/core/run_service.py` (the `__all__` list is the cross-surface import contract) |
 | MCP tools | `beta-public`, deliberately scoped | `benchbox/mcp/`; every omitted CLI control carries a tier in the `docs/reference/mcp.md` omission ledger |
@@ -41,6 +43,11 @@ Two classifications do most of the work:
 | Semantic chart IDs shared by CLI, MCP, templates, and Explorer | `beta-public` | `benchbox/core/visualization/chart_types.py`, `results-explorer/src/lib/chartRegistry.ts`, `tests/parity/fixtures/chart_ids.json` |
 | `benchbox.experimental` namespace | `experimental` | Ships in the wheel for convenience, outside the supported product surface |
 | `_project/` scripts, audits, TODOs, ADRs | `repo-only` | Contributor tooling, not a user API |
+
+There are currently 22 benchmarks across TPC standards, academic, industry,
+real-world, time-series, primitives, AI/ML, and experimental categories
+(registry-derived; `test_public_benchmark_count_claims_are_registry_derived`
+pins this claim to `list_public_benchmark_ids()`).
 
 ## Execution architecture
 
@@ -95,7 +102,7 @@ run → BenchmarkResults → bundle JSON (beta-public data)
   → validate-submission (deterministic errors, privacy/trust handling)
   → published corpus (results-data/, trust labels + provenance)
     → explorer pipeline (generated DuckDB, summaries, matrix artifacts)
-      → Results Explorer (browser) and user dashboards (browser-local)
+      → Results Explorer (browser) over URL-backed views
 ```
 
 The explorer's secondary navigation and benchmark browser groupings are
@@ -130,16 +137,17 @@ conflating them is the most common extension-point bug:
 - Capability flags (`supports_dataframe`, platform capabilities, dependency
   hints) drive **routing**, never visibility.
 
-Platform discovery instead filters on `support_status`:
-`PlatformRegistry._get_platforms_matching_capability()` and related
-helpers hide `deprecated` and `document_only` entries unless the caller
-opts in.
+Platform discovery instead filters on `support_status`: the public
+`PlatformRegistry.get_sql_platforms()` / `get_dataframe_platforms()` helpers
+hide `deprecated` and `document_only` entries unless the caller passes
+`include_deprecated=True`. (The `benchbox platforms list` CLI annotates every
+registered platform with its status rather than hiding.)
 
 Sources of truth: `benchbox/core/benchmark_registry.py` (benchmarks; the
 per-benchmark rationale and promotion criteria live in
 `docs/benchmarks/support-status.md` and are drift-checked against the
-registry) and `benchbox/core/platform_manifest.py` (platforms, including
-adapter import specs and aliases).
+registry) and `benchbox/core/platform_registry.py` (platforms, reading
+adapter import specs and aliases from `benchbox/core/platform_manifest.py`).
 
 ## Extension points and their contract obligations
 
@@ -153,7 +161,7 @@ carries contract obligations from the map:
   drift-checked criteria in `docs/benchmarks/support-status.md`.
 - A new platform manifest entry wires discovery, capabilities, dependency
   hints, and docs together; aliases need a compatibility note.
-- A new semantic chart ID lands in `chart_types.py` first, then follows to
+- A new semantic chart ID lands in `benchbox/core/visualization/chart_types.py` first, then follows to
   templates, ASCII runtime, Explorer registry, and parity fixtures in the
   same PR; IDs are deprecated, never silently removed.
 - A new `CREATE TABLE` rewrite path in an adapter must satisfy the SQL
