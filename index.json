@@ -9565,10 +9565,15 @@
       "title": "Add visualization tools to MCP server"
     },
     "measure-actual-uncompressed-sizes-at-sf-1-for-all-benchmarks": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T01:12:09Z",
+        "generation": "2b96e8e4eb3540a28fe72fbcaa0578da",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Measure actual uncompressed sizes at SF=1 for all benchmarks"
     },
     "medium-test-timeout-headroom": {
