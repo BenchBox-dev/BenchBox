@@ -17799,6 +17799,13 @@
       "status": "open",
       "title": "Revalidate postgres ambiguous-column tpchavoc skips"
     },
+    "tpchavoc-pg-dual-rewrite": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Revalidate postgres dual-table tpchavoc skip"
+    },
     "tpchavoc-q2-v10-projection-faithfulness": {
       "claim": null,
       "needs": [],
