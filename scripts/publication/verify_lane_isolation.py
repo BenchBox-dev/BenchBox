@@ -139,6 +139,9 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     "scripts/_compose_joinorder_hero.py",
     "scripts/check_dependency_bounds.py",
     "scripts/check_duplicate_code.py",
+    # ClickHouse sketch storage smoke helper: invoked manually/by CI, never
+    # read by lane artifact builds.
+    "scripts/sketch_storage_smoke.sh",
     "tox.ini",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
