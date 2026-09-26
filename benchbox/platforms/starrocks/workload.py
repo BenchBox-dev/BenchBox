@@ -384,6 +384,13 @@ class StarRocksWorkloadMixin:
         for pattern, replacement, case_sensitive in self._TYPE_MAPPINGS:
             flags = 0 if case_sensitive else re.IGNORECASE
             statement = re.sub(pattern, replacement, statement, flags=flags)
+        # TIMESTAMP/TIME stay case-sensitive above so a column literally named
+        # "timestamp" keeps its name. A lowercase occurrence in type position
+        # (right after another identifier, e.g. "ts timestamp") is a type
+        # written in non-conventional case; normalize it. A leading lowercase
+        # "timestamp" is a column name and is left alone.
+        statement = re.sub(r"(\w+\s+)timestamp\b", r"\1DATETIME", statement)
+        statement = re.sub(r"(\w+\s+)time\b", r"\1VARCHAR(10)", statement)
         return statement
 
     def _extract_first_column(self, statement: str) -> str | None:

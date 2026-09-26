@@ -175,10 +175,11 @@ class TestExecuteSchemaStatements:
         notices.assert_called_once()
         assert "t" in notices.call_args[0][0]
 
-    def test_already_exists_without_table_name_skips_recreate(self) -> None:
+    def test_already_exists_without_table_name_reraises(self) -> None:
         cursor = MagicMock()
         cursor.execute.side_effect = RuntimeError("relation already exists")
-        self._run("CREATE TABLE t (x INT)", cursor, extract=lambda s: None)
+        with pytest.raises(RuntimeError, match="already exists"):
+            self._run("CREATE TABLE t (x INT)", cursor, extract=lambda s: None)
         cursor.execute.assert_called_once_with("CREATE TABLE t (x INT)")
         cursor.close.assert_called_once_with()
 

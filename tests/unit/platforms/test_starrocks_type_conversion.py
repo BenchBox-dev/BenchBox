@@ -41,6 +41,11 @@ class TestConvertTypes:
         assert "timestamp BIGINT" in out
         assert "DATETIME" not in out
 
+    def test_lowercase_type_in_type_position_normalized(self, mixin) -> None:
+        out = mixin._convert_types("CREATE TABLE t (ts timestamp)")
+        assert "ts DATETIME" in out
+        assert "timestamp" not in out
+
     def test_bare_varchar_gets_size_but_sized_varchar_kept(self, mixin) -> None:
         assert "VARCHAR(65533)" in mixin._convert_types("CREATE TABLE t (c VARCHAR)")
         assert "VARCHAR(50)" in mixin._convert_types("CREATE TABLE t (c VARCHAR(50))")

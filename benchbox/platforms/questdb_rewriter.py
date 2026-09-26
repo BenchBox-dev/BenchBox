@@ -408,12 +408,15 @@ def _has_comma_join(query: str) -> bool:
 # normalized combined spelling <expr> +/- INTERVAL '<N> DAY|MONTH|YEAR'
 # produced by the comma-JOIN AST round trip. Exactly one unit spelling
 # is required; a bare INTERVAL '<N>' with no unit never matches.
+# The date expression accepts CAST(...), ANSI typed literals
+# (DATE '1998-12-01', which single-table queries carry verbatim since no
+# AST round trip normalizes them), or a bare identifier/column.
 # Capturing groups: (1) date expression, (2) sign, (3) number (split
 # spelling), (4) unit (split spelling), (5) number (combined spelling),
 # (6) unit (combined spelling)
 _INTERVAL_RE = re.compile(
-    # group 1: date expr - either CAST(... AS DATE) or a bare identifier/column
-    r"(CAST\s*\([^)]+\)|[\w.]+)"
+    # group 1: date expr - CAST(...), ANSI DATE 'literal', or bare identifier/column
+    r"(CAST\s*\([^)]+\)|DATE\s*'\d{4}-\d{2}-\d{2}'|[\w.]+)"
     r"\s*([+-])\s*"
     r"INTERVAL\s+(?:'(\d+)'\s*(DAY|MONTH|YEAR)|'(\d+)\s+(DAY|MONTH|YEAR)')",
     re.IGNORECASE,

@@ -34,6 +34,18 @@ class TestRewriteComposition:
         assert "dateadd" in result.lower()
         assert "INTERVAL" not in result.upper()
 
+    def test_ansi_date_literal_interval_becomes_dateadd(self) -> None:
+        sql = "SELECT l_returnflag FROM lineitem WHERE l_shipdate <= date '1998-12-01' - interval '90' day"
+        result = rewrite(sql)
+        assert "dateadd('d', -90," in result
+        assert "INTERVAL" not in result.upper()
+
+    def test_ansi_date_literal_plus_year_and_month(self) -> None:
+        q6 = "SELECT sum(x) FROM lineitem WHERE l_shipdate < date '1994-01-01' + interval '1' year"
+        assert "dateadd('y', 1," in rewrite(q6)
+        q4 = "SELECT o FROM orders WHERE o_orderdate < date '1993-07-01' + interval '3' month"
+        assert "dateadd('M', 3," in rewrite(q4)
+
     def test_substring_from_for_becomes_comma_form(self) -> None:
         sql = "SELECT SUBSTRING(c_phone FROM 1 FOR 2) FROM customer"
         result = rewrite(sql)

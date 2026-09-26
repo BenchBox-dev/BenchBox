@@ -188,6 +188,8 @@ def execute_schema_statements(
                         log_notice(f"Dropping existing table before recreate: {table_name}")
                         cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
                         cursor.execute(statement)
+                    else:
+                        raise
                 else:
                     raise
 

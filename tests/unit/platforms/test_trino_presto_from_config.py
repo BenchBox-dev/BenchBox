@@ -90,7 +90,7 @@ class TestPrestoFromConfig:
                 adapter = PrestoAdapter.from_config(
                     {
                         "host": "presto.example.com",
-                        "port": 8080,
+                        "port": 8085,
                         "catalog": "hive",
                         "username": "analyst",
                         "benchmark": "tpch",
@@ -100,6 +100,7 @@ class TestPrestoFromConfig:
             except ImportError:
                 pytest.skip("Presto drivers not installed")
         assert adapter.host == "presto.example.com"
+        assert adapter.port == 8085
         assert adapter.catalog == "hive"
         assert adapter.username == "analyst"
 

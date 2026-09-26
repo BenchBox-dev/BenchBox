@@ -3,8 +3,8 @@
 Pins the composed _apply_questdb_schema_enhancements output for the two
 time-series tables: symbol mapping on low-cardinality columns, DATE to
 TIMESTAMP mapping, designated timestamp() marker, and PARTITION BY MONTH.
-Unit-level stages are covered elsewhere; these tests pin the shipped DDL
-shape a benchmark run would execute.
+Fixtures use representative column subsets rather than the full shipped
+TPC-H DDL; unit-level stages are covered elsewhere.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
