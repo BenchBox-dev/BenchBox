@@ -66,6 +66,17 @@ def test_sum_paths_skips_manifest(tmp_path):
     assert count == 1
 
 
+def test_sum_paths_skips_transport_archives(tmp_path):
+    mod = _load_script()
+    archive = tmp_path / "joinorder-imdb-2013-v1.tar.zst"
+    archive.write_text("z" * 70)
+    data = tmp_path / "cast_info.parquet"
+    data.write_text("y" * 50)
+    total, count = mod._sum_paths(tmp_path)
+    assert total == 50
+    assert count == 1
+
+
 def test_measure_unknown_benchmark_records_error():
     mod = _load_script()
     record = mod.measure_one("no-such-benchmark")
@@ -86,18 +97,60 @@ def test_calibrated_table_covers_all_measured_benchmarks():
         assert benchmark in text, f"{benchmark} missing from calibrated size table"
 
 
-def test_calibrated_table_values_are_positive():
+def _parse_calibrated_table() -> dict[str, int]:
     table = Path(__file__).resolve().parents[3] / "docs" / "benchmarks" / "sf1-calibrated-sizes.md"
     rows = [line for line in table.read_text().splitlines() if line.startswith("| ") and "Benchmark" not in line]
-    assert len(rows) >= 20
+    parsed: dict[str, int] = {}
     for row in rows:
         cells = [c.strip() for c in row.split("|")]
-        name, byte_cell = cells[1], cells[2]
-        byte_value = int(byte_cell.replace(",", ""))
+        parsed[cells[1]] = int(cells[2].replace(",", ""))
+    return parsed
+
+
+def _load_baseline() -> dict:
+    fixture = Path(__file__).resolve().parent / "sf1_size_baseline.json"
+    return json.loads(fixture.read_text(encoding="utf-8"))
+
+
+def test_calibrated_table_values_are_positive():
+    parsed = _parse_calibrated_table()
+    assert len(parsed) >= 20
+    for name, byte_value in parsed.items():
         if name == "metadata_primitives":
             assert byte_value == 0
         else:
             assert byte_value > 0, f"{name} has non-positive size"
+
+
+def test_calibrated_table_matches_baseline_fixture():
+    """The doc table must reproduce the persisted measurement baseline.
+
+    The baseline fixture holds the byte counts emitted by
+    scripts/measure_sf1_sizes.py; the table is its human-readable mirror.
+    A generator change that shifts SF=1 sizes must update both together,
+    so a drift in either file fails here rather than passing silently.
+    """
+    baseline = _load_baseline()
+    parsed = _parse_calibrated_table()
+    tolerance = baseline["tolerance"]
+    mod = _load_script()
+    documented_without_generation = {"ai_primitives", "metadata_primitives"}
+    for benchmark, expected in baseline["sizes"].items():
+        assert benchmark in mod.all_benchmark_ids(), f"{benchmark}: baseline entry without measurement entry"
+        assert benchmark in parsed, f"{benchmark} missing from calibrated size table"
+        actual = parsed[benchmark]
+        assert actual == pytest.approx(expected, rel=tolerance), (
+            f"{benchmark}: table has {actual}, baseline expects {expected} (tolerance {tolerance})"
+        )
+    for benchmark in set(parsed) - set(baseline["sizes"]) - documented_without_generation:
+        raise AssertionError(f"{benchmark}: table entry without baseline entry")
+
+
+def test_jobs_option_runs_subset():
+    mod = _load_script()
+    assert mod.main(["--benchmark", "no-such-benchmark", "--jobs", "2"]) == 2
+    with pytest.raises(ValueError, match="--jobs must be"):
+        mod.measure_many(["tpch"], jobs=0)
 
 
 def test_size_record_json_shape():
