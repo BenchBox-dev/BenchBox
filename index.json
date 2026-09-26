@@ -1637,10 +1637,15 @@
       "title": "Build static pipeline that transforms result bundles into explorer read models"
     },
     "bulk-loading-for-postgresql-copy-from-program-or-copy-from-s": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T03:54:22Z",
+        "generation": "310dd6de7ebb465c92e49c3eef4412b6",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Bulk loading for PostgreSQL COPY FROM PROGRAM or COPY FROM STDIN multi-file"
     },
     "bulk-s3-gcs-loading-for-clickhouse-cloud-adapter-using-s3-gl": {
