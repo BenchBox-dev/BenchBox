@@ -586,7 +586,7 @@ benchmark_metadata:
     display_name: Vector Search
     description: Vector similarity search benchmark (kNN, ANN, filtered)
     category: AI/ML
-    support_status: beta
+    support_status: stable
     num_queries: 6
     query_description: 6 queries (kNN cosine/L2, filtered, recall@k, ANN, multi-category)
     supports_streams: false

@@ -835,3 +835,20 @@ benchmark_specs:
     requires_tables_object: false
     sf1_row_counts: null
     sf1_power_at_size_range: null
+  vector_search:
+    benchmark_id: vector_search
+    unique_query_ids:
+    - Q1
+    - Q2
+    - Q3
+    - Q4
+    - Q5
+    - Q6
+    min_unique_queries: 0
+    min_success_rate: 1.0
+    high_failure_expected: false
+    requires_tables_object: true
+    sf1_row_counts:
+      vectors: 1000000
+      vector_queries: 100
+    sf1_power_at_size_range: null
