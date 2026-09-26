@@ -142,13 +142,13 @@ separate `surface`/removal decision.
 
 ## Count and Drift Policy
 
-Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **15** lazy facades; **6** eager facades; **2** core-only benchmark IDs. Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
+Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **15** lazy facades; **6** eager facades; **2** core-only benchmark IDs. Benchmark support status: **6** stable, **11** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
 
 Evidence snapshot updated by `benchmark-support-status-and-discovery-policy`:
 
 | Source | Current evidence | Contract implication |
 |---|---|---|
-| `benchbox.core.benchmark_registry` | 23 benchmark metadata entries and 23 loader-resolved IDs; support status counts are stable=5, beta=12, experimental=5, repo_only=1, deprecated=0, document_only=0. | Benchmark count and support claims must derive from registry metadata or avoid exact counts. |
+| `benchbox.core.benchmark_registry` | 23 benchmark metadata entries and 23 loader-resolved IDs; support status counts are stable=6, beta=11, experimental=5, repo_only=1, deprecated=0, document_only=0. | Benchmark count and support claims must derive from registry metadata or avoid exact counts. |
 | `benchbox.core.platform_registry.PlatformRegistry.get_all_platform_metadata()` | 50 platform metadata entries: 46 SQL-capable, 18 DataFrame-capable, 14 dual-mode. | README and platform docs must not carry unqualified hand-maintained platform counts. |
 | `benchbox.core.results.schema_policy` | Current result schema version: `2.2`; runtime/explorer accepted versions: `2.0`, `2.1`, `2.2`; public submission accepts numeric `2.x`. | Result schema version claims must update with the named consumer policy or defer to this policy module. |
 | `README.md` before this TODO | Landing-page bullets claimed 22 benchmarks, 42 SQL platforms, and 9 DataFrame platforms. | Exact counts were stale relative to registry metadata; README now links to this policy instead of being authoritative. |

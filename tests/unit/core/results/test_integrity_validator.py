@@ -6,6 +6,7 @@ import copy
 import glob
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,8 @@ from benchbox.core.results.integrity_validator import (
     validate_directory,
     validate_file,
 )
+from benchbox.core.results.models import BenchmarkResults
+from benchbox.core.results.schema import build_result_payload
 
 pytestmark = [
     pytest.mark.unit,
@@ -453,3 +456,80 @@ class TestIntegrityValidatorSyntheticData:
         report = validate_file(bad_file)
         assert report.overall_status == CheckStatus.FAIL
         assert report.checks[0].name == "file_readable"
+
+
+# ---------------------------------------------------------------------------
+# TestVectorSearchExportIntegrity
+# ---------------------------------------------------------------------------
+
+
+def _make_vector_search_result() -> BenchmarkResults:
+    """Build a complete vector_search run using producer-style Q1-Q6 IDs."""
+    query_results = [
+        {
+            "query_id": f"Q{i}",
+            "execution_time_ms": 100.0 + i * 10,
+            "rows_returned": 10,
+            "status": "SUCCESS",
+            "iteration": 1,
+            "stream_id": 0,
+            "run_type": "measurement",
+        }
+        for i in range(1, 7)
+    ]
+    return BenchmarkResults(
+        benchmark_name="vector_search",
+        platform="duckdb",
+        scale_factor=1.0,
+        execution_id="vector-001",
+        timestamp=datetime(2026, 1, 1),
+        duration_seconds=5.0,
+        total_queries=6,
+        successful_queries=6,
+        failed_queries=0,
+        query_results=query_results,
+        table_statistics={"vectors": 1000000, "vector_queries": 100},
+        execution_metadata={
+            "mode": "standard",
+            "phase_status": {"power_test": {"status": "COMPLETED"}},
+        },
+    )
+
+
+class TestVectorSearchExportIntegrity:
+    """A complete vector_search export must pass the expected-query-IDs check.
+
+    Schema-v2 export normalizes producer IDs Q1-Q6 to 1-6, so the spec must
+    record the normalized form or every complete run reports 0/6 and fails.
+    """
+
+    def test_export_normalizes_query_ids(self) -> None:
+        """Export converts Q1-Q6 producer IDs to normalized 1-6 IDs."""
+        payload = build_result_payload(_make_vector_search_result())
+        assert [q["id"] for q in payload["queries"]] == ["1", "2", "3", "4", "5", "6"]
+
+    def test_complete_export_passes_expected_query_ids(self) -> None:
+        """All six exported queries match the spec set (6/6, no FAIL)."""
+        payload = build_result_payload(_make_vector_search_result())
+        payload["export"] = {"format": "json"}
+        report = ResultIntegrityValidator().validate(payload)
+        check = next(c for c in report.checks if c.name == "expected_query_ids")
+        assert check.status == CheckStatus.PASS
+        assert check.message.startswith("6/6 expected query IDs found")
+        assert report.overall_status == CheckStatus.PASS
+
+    def test_skipped_queries_satisfy_count_math(self) -> None:
+        """A version-gated skip (StarRocks Q2) must not fail count arithmetic."""
+        data = _make_valid_tpch_result()
+        data["summary"]["queries"] = {"total": 6, "passed": 5, "failed": 0, "skipped": 1}
+        report = ResultIntegrityValidator().validate(data)
+        check = next(c for c in report.checks if c.name == "query_count_math")
+        assert check.status == CheckStatus.PASS
+
+    def test_skipped_queries_discounted_from_success_rate(self) -> None:
+        """5/5 billable with 1 compat skip passes a 1.0 floor."""
+        data = _make_valid_tpch_result()
+        data["summary"]["queries"] = {"total": 6, "passed": 5, "failed": 0, "skipped": 1}
+        report = ResultIntegrityValidator().validate(data)
+        check = next(c for c in report.checks if c.name == "success_rate")
+        assert check.status == CheckStatus.PASS

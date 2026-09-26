@@ -51,12 +51,12 @@ BENCHMARK_API_COUNT_MARKER = (
     "Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; "
     "**22** public discovery entries; **21** top-level Python benchmark facades; "
     "**15** lazy facades; **6** eager facades; **2** core-only benchmark IDs. "
-    "Benchmark support status: **5** stable, **12** beta, **5** experimental, **1** repo-only, "
+    "Benchmark support status: **6** stable, **11** beta, **5** experimental, **1** repo-only, "
     "**0** deprecated, **0** document-only."
 )
 BENCHMARK_SUPPORT_STATUS_COUNTS = {
-    "stable": 5,
-    "beta": 12,
+    "stable": 6,
+    "beta": 11,
     "experimental": 5,
     "repo_only": 1,
     "deprecated": 0,
@@ -241,8 +241,8 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
         get_benchmarks_by_support_status("unknown")  # type: ignore[arg-type]
 
     contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
-    assert "Benchmark support status: **5** stable, **12** beta, **5** experimental" in contract_doc
-    assert "support status counts are stable=5, beta=12, experimental=5" in contract_doc
+    assert "Benchmark support status: **6** stable, **11** beta, **5** experimental" in contract_doc
+    assert "support status counts are stable=6, beta=11, experimental=5" in contract_doc
 
 
 def test_external_dataset_stable_promotion_requires_complete_content_pins(tmp_path: Path) -> None:

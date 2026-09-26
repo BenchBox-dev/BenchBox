@@ -264,16 +264,22 @@ class ResultIntegrityValidator:
         total = sq.get("total", 0)
         passed = sq.get("passed", 0)
         failed = sq.get("failed", 0)
-        if passed + failed != total:
+        skipped = sq.get("skipped", 0)
+        if passed + failed + skipped != total:
             _fail(
                 checks,
                 _STRUCTURAL,
                 "query_count_math",
-                f"{passed} passed + {failed} failed != {total} total",
-                {"passed": passed, "failed": failed, "total": total},
+                f"{passed} passed + {failed} failed + {skipped} skipped != {total} total",
+                {"passed": passed, "failed": failed, "skipped": skipped, "total": total},
             )
         else:
-            _pass(checks, _STRUCTURAL, "query_count_math", f"{total} = {passed} passed + {failed} failed")
+            _pass(
+                checks,
+                _STRUCTURAL,
+                "query_count_math",
+                f"{total} = {passed} passed + {failed} failed + {skipped} skipped",
+            )
 
     def _check_timing_non_negative(self, raw: dict[str, Any], checks: list[CheckResult]) -> None:
         timing = raw.get("summary", {}).get("timing", {})
@@ -500,11 +506,19 @@ class ResultIntegrityValidator:
         sq = raw.get("summary", {}).get("queries", {})
         total = sq.get("total", 0)
         passed = sq.get("passed", 0)
+        skipped = sq.get("skipped", 0)
         if total == 0:
             _fail(checks, _BELIEVABILITY, "success_rate", "No queries recorded")
             return
 
-        rate = passed / total
+        # Compatibility-skipped queries (version-gated rules such as the
+        # StarRocks Q2 l2_distance skip) are not failures: discount them
+        # from both sides before applying the spec floor.
+        billable = total - skipped
+        if billable == 0:
+            _pass(checks, _BELIEVABILITY, "success_rate", "All queries skipped by compatibility rules")
+            return
+        rate = passed / billable
         if spec is not None and spec.high_failure_expected:
             _pass(
                 checks,
@@ -521,10 +535,15 @@ class ResultIntegrityValidator:
                 _BELIEVABILITY,
                 "success_rate",
                 f"{rate:.1%} success rate below {floor:.0%} floor",
-                {"rate": rate, "floor": floor, "passed": passed, "total": total},
+                {"rate": rate, "floor": floor, "passed": passed, "total": billable, "skipped": skipped},
             )
         else:
-            _pass(checks, _BELIEVABILITY, "success_rate", f"{rate:.1%} >= {floor:.0%} floor")
+            _pass(
+                checks,
+                _BELIEVABILITY,
+                "success_rate",
+                f"{rate:.1%} >= {floor:.0%} floor ({skipped} skipped)",
+            )
 
     def _check_sf1_row_counts(
         self,
