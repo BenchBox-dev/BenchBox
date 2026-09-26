@@ -5491,10 +5491,15 @@
       "title": "Add the experimental Exasol SQL adapter limited to TPC-H and TPC-DS"
     },
     "exasol-dialect-identifier-policy": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T02:25:47Z",
+        "generation": "aaf1a939b2464932855c5fbcfadd8a42",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Emit unquoted identifiers for the Exasol sqlglot target"
     },
     "exasol-docker-ci-smoke": {
