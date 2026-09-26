@@ -703,28 +703,21 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
             logger.debug("Disabled result cache for benchmarking")
 
     def apply_platform_optimizations(self, config: Any) -> list[str]:
-        """Apply Snowpark platform optimizations: currently none are session-scoped.
+        """Snowpark applies no tuning-derived session settings, so nothing is recorded.
 
         Snowpark deliberately does NOT inherit the Spark "applied via Spark
         config" behavior: there is no Spark session to configure, and none of
-        the unified platform-optimization fields (Z-ordering, auto optimize,
-        clustering strategy, ...) map to Snowflake ALTER SESSION parameters.
-        Warehouse sizing (``warehouse_size``) is persistent account-level
-        infrastructure, not a session setting -- changing it implicitly from
-        a tuning config would mutate shared billable infrastructure, so it
-        stays behind an explicit opt-in that does not exist yet (see the
-        Snowpark tuning-surface follow-up). With nothing tuning-derived to
-        apply, nothing is recorded: the ledger stays empty and the run
-        reports noop rather than a false applied state.
-
-        Args:
-            config: Platform optimization configuration (accepted and ignored;
-                kept for the unified tuning interface).
-
-        Returns:
-            Empty list (no tuning-derived session statements exist).
+        the unified platform-optimization fields map to Snowflake ALTER SESSION
+        parameters. Warehouse sizing (``warehouse_size``) is persistent
+        account-level infrastructure, not a session setting, so it stays behind
+        an explicit opt-in that does not exist yet (see the Snowpark
+        tuning-surface follow-up). The ledger stays empty and the run reports
+        noop rather than a false applied state. The USE_CACHED_RESULT hygiene
+        ALTER in configure_for_benchmark is benchmarking hygiene on every run,
+        not tuning-derived, and must never enter the ledger either.
         """
-        return []
+        logger.debug("Snowpark tuning surface is empty; no session settings applied")
+        return list[str]()
 
     # apply_primary_keys, apply_foreign_keys, and apply_constraint_configuration
     # are inherited from SparkTuningMixin. apply_platform_optimizations is
