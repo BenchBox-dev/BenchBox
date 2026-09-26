@@ -7378,15 +7378,10 @@
       "title": "GCP Dataproc Managed Spark Platform"
     },
     "gcs-azure-object-storage-backends-for-data-path": {
-      "claim": {
-        "expires_at": "2026-09-27T05:04:47Z",
-        "generation": "7b65acd478af47dcbb9f045d1814a48f",
-        "renewals": 0,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "GCS / Azure object storage backends for DATA_PATH"
     },
     "generalize-compat-lint-to-enforce-query-adapter-and-schema-e": {
