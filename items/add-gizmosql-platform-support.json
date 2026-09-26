@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "A lazy-imported GizmoSQL adapter is registered in the platform manifest and public exports without importing the SDK during unrelated BenchBox startup.",
+    "The manifest identifies the platform as experimental and SQL-only, uses the DuckDB SQL family and inheritance, declares an independent connection, and accurately describes client-only feasibility and supported features.",
+    "Connections use the official `adbc-driver-gizmosql` DBAPI, expose actionable configuration and dependency errors, support authentication and TLS settings without embedding credentials, and close connections and cursors reliably.",
+    "Adapter startup checks `GIZMOSQL_VERSION()`, `GIZMOSQL_EDITION()`, `version()`, and `gizmosql_settings()`; it requires the DuckDB backend and rejects SQLite or other unsupported backends with a clear error.",
+    "TPC-H and TPC-DS SQL are rendered with the DuckDB dialect, schema creation succeeds, ordinary query execution works, transactions retain expected ADBC semantics, and platform metadata records GizmoSQL, edition, and DuckDB engine versions.",
+    "Data loading works when the GizmoSQL server cannot access BenchBox client file paths. Load typed tables through bounded Arrow record batches with `adbc_ingest(..., mode=\"append\")`, keeping each batch below the effective gRPC message limit and reporting table-level row counts and failures.",
+    "Query-plan capture handles GizmoSQL `EXPLAIN (FORMAT JSON)` results correctly, including the JSON value being returned in the second result column.",
+    "Optional dependencies install bare `gizmosql` for the managed local test server and standalone `adbc-driver-gizmosql`; do not depend on the `gizmosql[adbc]` extra while it requires PyArrow 25 or newer and BenchBox caps PyArrow below 25.",
+    "Local development and integration tests start a real GizmoSQL Core server through the managed Python server API, require no Enterprise license or external cloud service, and remain isolated from normal unit tests.",
+    "Live integration coverage loads BenchBox-generated TPC-H SF 0.01 data, verifies all eight expected table counts, and executes all 22 DuckDB-dialect TPC-H queries successfully. Add representative TPC-DS coverage or document any bounded-test tradeoff.",
+    "Public CLI behavior is covered: `platforms list`, `platforms status gizmosql`, `check-deps --platform gizmosql`, dry-run, and a non-interactive benchmark run resolve the real adapter rather than falling back to an unsupported-platform DataFrame preview.",
+    "Documentation explains Core versus Enterprise capabilities, clarifies that stable and LTS are release channels rather than editions, documents local Python, Docker, and native deployment choices, and warns that local plaintext mode is development-only.",
+    "Generated platform documentation and compatibility artifacts are refreshed. `make platform-manifest-check`, relevant compatibility documentation checks, focused unit and live integration tests, self-review, and `make pr-preflight` pass."
+  ],
+  "context": "Research and local validation on 2026-09-26 used GizmoSQL Core 1.39.0, adbc-driver-gizmosql 2.0.13, PyArrow 24.0.0, and DuckDB 1.5.5 on macOS arm64. A real managed local server loaded BenchBox-generated TPC-H SF 0.01 data with row counts region=5, nation=25, supplier=100, customer=1500, part=2000, partsupp=8000, orders=15000, and lineitem=60175; all 22 DuckDB-dialect queries returned results. All 99 TPC-DS queries also passed in exploratory validation. The current public CLI reports GizmoSQL as unknown, and dry-run only succeeds by warning that adapter initialization failed, so an end-to-end BenchBox run remains blocked until this item is implemented.",
+  "description": "Add end-to-end SQL benchmark support for GizmoSQL Core using its DuckDB backend and official ADBC driver. The implementation must cover registration, connection management, schema and query execution, remote-safe loading, plan capture, local development, tests, and user documentation as one coherent platform addition.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62",
+      "at": "2026-09-26T22:26:22Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "60bc1a5541934becb64d126edc8553ad",
+      "session_id": "cdb421e45ea14139bf11036d5d9e8057"
+    }
+  ]
+}

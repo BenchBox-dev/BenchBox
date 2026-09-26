@@ -210,6 +210,13 @@
       "status": "done",
       "title": "Add --force datagen auto-detection when base constants change"
     },
+    "add-gizmosql-platform-support": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Add GizmoSQL Core platform support"
+    },
     "add-global-quiet-mode-quiet-q-to-suppress-all-output": {
       "claim": null,
       "needs": [],
