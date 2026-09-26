@@ -2,6 +2,7 @@
   "acceptance": [
     "2_v5 and 17_v2 pass compile-check with qualified references or the ambiguity is confirmed genuine"
   ],
+  "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit 82774ef11. Added targeted PostgreSQL qualification for 2_v5 (partsupp.ps_partkey/ps_supplycost) and 17_v2 (lineitem.l_partkey/l_quantity/l_extendedprice), removed both execution skips, registered family-wide query-adapter rules, updated validation mirrors and generated compatibility docs. Verification: Ruff passed; 5 focused tests passed; compat-docs and DDL drift checks passed. Rendered PostgreSQL SQL is parseable and contains no targeted unqualified references. No local PostgreSQL service was reachable for an engine execution probe.",
   "description": "Postgres reports ambiguous ps_partkey (2_v5) and l_partkey (17_v2) resolution. Qualifying with the table alias should resolve; same probe applies to the LakeSail ambiguous-attribute set.",
   "sessions": [
     {
@@ -19,6 +20,14 @@
       "generation": "10dab8460a134a80abfa94c89ad1442d",
       "op": "take",
       "op_id": "902bb3a55dca472d947773fc02aec5ac",
+      "session_id": "cdb421e45ea14139bf11036d5d9e8057"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62",
+      "at": "2026-09-26T21:07:30Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "4c8e6ed9edd94051a3ed50e6848e330a",
       "session_id": "cdb421e45ea14139bf11036d5d9e8057"
     }
   ]
