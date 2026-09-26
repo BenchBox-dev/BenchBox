@@ -427,6 +427,13 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: make uv-lock-revision-check
 
+      - name: SQLGlot repro retirement check (runs repros on sqlglot upgrade)
+        id: guard-sqlglot-repro-retirement
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: make sqlglot-repro-retirement-check
+
       - name: Stale _project/ reference check
         id: guard-project-references
         continue-on-error: true
