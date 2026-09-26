@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+from decimal import Decimal
 from pathlib import Path
 
 import duckdb
@@ -204,7 +206,7 @@ class TestDuckDBSnapshotBuilder:
                     storage_format="cost-format",
                     storage_tier="s3-standard",
                 ),
-            ).to_dict(),
+            ),
         )
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
@@ -293,19 +295,25 @@ class TestDuckDBSnapshotBuilder:
     @pytest.mark.parametrize(
         ("field", "value", "message"),
         [
-            ("normalized_cost_usd", "NaN", "must be finite"),
             ("cost_status", "bogus", "must be one of"),
             ("cost_model_version", "", "must be a non-empty string"),
         ],
     )
-    def test_malformed_normalized_cost_columns_rejected(
+    def test_malformed_typed_cost_rejected_by_legacy_builder(
         self,
         tmp_path: Path,
         field: str,
         value: str,
         message: str,
     ) -> None:
-        normalized_cost = NormalizedCost(
+        """The legacy ``build()`` entry point re-validates typed-cost structure.
+
+        A hand-built ``NormalizedCost`` bypasses transformer ingest (the
+        dataclass accepts out-of-vocabulary statuses and empty provenance
+        strings), so the builder must reject those rows instead of writing
+        the invalid values into ``results.duckdb``.
+        """
+        cost = NormalizedCost(
             normalized_cost_usd="0.42",
             cost_model_version="2026.05.0",
             cost_model_source="benchbox.core.cost.pricing",
@@ -313,12 +321,39 @@ class TestDuckDBSnapshotBuilder:
             cost_status="normalized",
             billing_unit="instance_hour",
             pricing_region="us-east-1",
-        ).to_dict()
-        normalized_cost[field] = value
-        entry = _make_entry(normalized_cost=normalized_cost)
+        )
+        object.__setattr__(cost, field, value)
+        entry = _make_entry(normalized_cost=cost)
 
         builder = DuckDBSnapshotBuilder()
         with pytest.raises(ValueError, match=message):
+            builder.build([entry], tmp_path / "results.duckdb")
+
+    def test_non_finite_normalized_cost_usd_rejected(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """A hand-built entry carrying non-finite cost still fails the build.
+
+        Finiteness of the numeric payload cannot be checked at ingest time,
+        so it stays a builder-side check alongside the structural validation
+        above.
+        """
+        cost = NormalizedCost(
+            normalized_cost_usd="0.42",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+        )
+        non_finite = copy.copy(cost)
+        object.__setattr__(non_finite, "normalized_cost_usd", Decimal("nan"))
+        entry = _make_entry(normalized_cost=non_finite)
+
+        builder = DuckDBSnapshotBuilder()
+        with pytest.raises(ValueError, match="must be finite"):
             builder.build([entry], tmp_path / "results.duckdb")
 
     def test_results_schema_json_not_emitted(self, tmp_path: Path) -> None:

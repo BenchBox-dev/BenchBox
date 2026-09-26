@@ -159,7 +159,7 @@ class TestToManifestEntry:
 
         assert entry.platform_version == "1.2.0"
         assert detail.phase_durations == {"migration": 2.5}
-        assert detail.environment["os"] == "macOS 15.3.0"
+        assert detail.environment.os == "macOS 15.3.0"
 
 
 class TestToDetailResult:
@@ -190,8 +190,8 @@ class TestToDetailResult:
         rid = transformer.result_id_from_bundle(bundle_file)
         detail = transformer.to_detail_result(bundle_file, rid)
 
-        assert detail.environment.get("os") == "macOS 15.3.0"
-        assert detail.environment.get("arch") == "arm64"
+        assert detail.environment.os == "macOS 15.3.0"
+        assert detail.environment.arch == "arm64"
 
     def test_no_companion_files_by_default(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
@@ -892,8 +892,8 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle_file)
 
         assert entry.cost_usd is None
-        assert entry.normalized_cost["cost_status"] == "unavailable"
-        assert entry.normalized_cost["normalized_cost_usd"] is None
+        assert entry.normalized_cost.cost_status == "unavailable"
+        assert entry.normalized_cost.normalized_cost_usd is None
 
     def test_legacy_total_cost_does_not_populate_normalized_alias(self, tmp_path: Path) -> None:
         import copy
@@ -907,7 +907,7 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle)
 
         assert entry.cost_usd is None
-        assert entry.normalized_cost["cost_status"] == "unavailable"
+        assert entry.normalized_cost.cost_status == "unavailable"
 
     @pytest.mark.parametrize(
         ("normalized_cost", "expected_cost_usd"),
@@ -975,8 +975,8 @@ class TestExtendedManifestFields:
 
         assert entry.cost_usd == expected_cost_usd
         assert detail.cost_usd == expected_cost_usd
-        assert entry.normalized_cost == normalized_cost.to_dict()
-        assert detail.normalized_cost == normalized_cost.to_dict()
+        assert entry.normalized_cost == normalized_cost
+        assert detail.normalized_cost == normalized_cost
 
     def test_environment_facets_extracted_from_normalized_contract(self, tmp_path: Path) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -1091,6 +1091,29 @@ class TestExtendedManifestFields:
         with pytest.raises(ValueError, match="cost_model_version"):
             transformer.to_manifest_entry(bundle)
 
+    def test_explicitly_empty_normalized_cost_rejected(self, tmp_path: Path) -> None:
+        """An explicit ``"normalized_cost": {}`` block is malformed evidence.
+
+        It must reach strict ingest validation (missing provenance fields)
+        rather than degrade to synthetic unavailable metadata as if no cost
+        block had been supplied.
+        """
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = {}
+        bundle = tmp_path / "empty_normalized_cost.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match="cost_model_version"):
+            transformer.to_manifest_entry(bundle)
+
+    def test_absent_normalized_cost_stays_unavailable(self, bundle_file: Path) -> None:
+        """A bundle with no cost block still gets synthetic unavailable metadata."""
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.normalized_cost.cost_status == "unavailable"
+        assert entry.normalized_cost.normalized_cost_usd is None
+
     @pytest.mark.parametrize("value", ["NaN", "Infinity", "-Infinity"])
     def test_non_finite_normalized_cost_rejected(self, tmp_path: Path, value: str) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
@@ -1111,6 +1134,44 @@ class TestExtendedManifestFields:
         with pytest.raises(ValueError, match="Invalid normalized_cost_usd"):
             transformer.to_manifest_entry(bundle)
 
+    @pytest.mark.parametrize(
+        ("field", "value", "message"),
+        [
+            ("cost_status", "bogus", "must be one of"),
+            ("cost_model_version", "", "must be a non-empty string"),
+        ],
+    )
+    def test_malformed_normalized_cost_rejected_at_ingest(
+        self,
+        tmp_path: Path,
+        field: str,
+        value: str,
+        message: str,
+    ) -> None:
+        """Structural cost validation lives in the transformer ingest.
+
+        The typed read model cannot carry these values (the ``NormalizedCost``
+        dataclass rejects them at construction), so the bundle is refused
+        before any read model exists.
+        """
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["normalized_cost"] = NormalizedCost(
+            normalized_cost_usd="0.42",
+            cost_model_version="2026.05.0",
+            cost_model_source="benchbox.core.cost.pricing",
+            cost_scope="compute_only",
+            cost_status="normalized",
+            billing_unit="instance_hour",
+            pricing_region="us-east-1",
+        ).to_dict()
+        data["normalized_cost"][field] = value
+        bundle = tmp_path / f"malformed_{field}.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        with pytest.raises(ValueError, match=message):
+            transformer.to_manifest_entry(bundle)
+
     def test_test_type_inferred_from_phases(self, tmp_path: Path) -> None:
         """test_type falls back to phases block when benchmark.test_type is absent."""
         import copy
@@ -1125,6 +1186,21 @@ class TestExtendedManifestFields:
         entry = transformer.to_manifest_entry(bundle)
 
         assert entry.test_type == "throughput"
+
+    def test_empty_phase_block_does_not_infer_test_type(self, tmp_path: Path) -> None:
+        """A present-but-empty phase block is no evidence the phase ran."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        del data["benchmark"]["test_type"]
+        data["phases"] = {"power_test": {}}
+        bundle = tmp_path / "phases_empty.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.test_type is None
 
     def test_extended_fields_in_detail_result(self, bundle_file: Path) -> None:
         """DetailResult carries the same extended fields as ManifestEntry."""
@@ -1339,18 +1415,18 @@ class TestExecutionModeExtraction:
 
     def test_reads_the_key_path_current_develop_writes(self) -> None:
         bundle = {"platform": {"config": {"execution_mode": "sql"}}}
-        assert transformer_module._execution_mode(bundle) == "sql"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "sql"
 
     def test_reads_legacy_config_mode(self) -> None:
         bundle = {"config": {"mode": "dataframe"}}
-        assert transformer_module._execution_mode(bundle) == "dataframe"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_documented_schema_location_wins(self) -> None:
         bundle = {
             "config": {"execution_mode": "dataframe", "mode": "sql"},
             "platform": {"config": {"execution_mode": "sql"}},
         }
-        assert transformer_module._execution_mode(bundle) == "dataframe"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_execution_mode_field_is_not_consulted(self) -> None:
         """``execution.mode`` says "sql" for 105 DataFrame runs in the corpus.
@@ -1363,21 +1439,29 @@ class TestExecutionModeExtraction:
             "execution": {"mode": "sql"},
             "platform": {"config": {"execution_mode": "dataframe"}},
         }
-        assert transformer_module._execution_mode(bundle) == "dataframe"
+        assert transformer_module._execution_mode(transformer_module._parse_bundle(bundle)) == "dataframe"
 
     def test_unknown_vocabulary_stays_none(self) -> None:
         """An invented mode is worse than an honestly empty facet."""
-        assert transformer_module._execution_mode({"config": {"mode": "balanced"}}) is None
+        assert (
+            transformer_module._execution_mode(transformer_module._parse_bundle({"config": {"mode": "balanced"}}))
+            is None
+        )
 
     def test_missing_everywhere_stays_none(self) -> None:
-        assert transformer_module._execution_mode({}) is None
+        assert transformer_module._execution_mode(transformer_module._parse_bundle({})) is None
 
     def test_case_is_normalized(self) -> None:
-        assert transformer_module._execution_mode({"config": {"mode": "SQL"}}) == "sql"
+        assert (
+            transformer_module._execution_mode(transformer_module._parse_bundle({"config": {"mode": "SQL"}})) == "sql"
+        )
 
     @pytest.mark.parametrize("node", [None, "not-a-dict", 42, []])
     def test_non_dict_nodes_do_not_raise(self, node: object) -> None:
-        assert transformer_module._execution_mode({"config": node, "platform": node}) is None
+        assert (
+            transformer_module._execution_mode(transformer_module._parse_bundle({"config": node, "platform": node}))
+            is None
+        )
 
 
 class TestPublishedCorpusResolvesExecutionMode:
@@ -1399,7 +1483,7 @@ class TestPublishedCorpusResolvesExecutionMode:
                 continue
             total += 1
             data = json.loads(path.read_text(encoding="utf-8"))
-            if transformer_module._execution_mode(data) is None:
+            if transformer_module._execution_mode(transformer_module._parse_bundle(data)) is None:
                 unresolved.append(path.name)
 
         assert total > 0, "no bundles discovered"
@@ -1422,7 +1506,7 @@ class TestPublishedCorpusResolvesExecutionMode:
             else:
                 continue
             data = json.loads(path.read_text(encoding="utf-8"))
-            actual = transformer_module._execution_mode(data)
+            actual = transformer_module._execution_mode(transformer_module._parse_bundle(data))
             if actual != expected:
                 mismatches.append((path.name, expected, actual))
 
@@ -1443,28 +1527,28 @@ class TestClientLinkProducerShape:
         }
         detail = transformer.to_detail_result(bundle_file, rid, data=data)
 
-        assert detail.environment.get("client_region") == "us-east-1"
-        assert detail.environment.get("client_cloud") == "aws"
-        assert detail.environment.get("link_status") == "available"
-        assert detail.environment.get("statement_overhead_min_ms") == pytest.approx(1.42)
-        assert detail.environment.get("statement_overhead_median_ms") == pytest.approx(1.68)
+        assert detail.environment.client_region == "us-east-1"
+        assert detail.environment.client_cloud == "aws"
+        assert detail.environment.link_status == "available"
+        assert detail.environment.statement_overhead_min_ms == pytest.approx(1.42)
+        assert detail.environment.statement_overhead_median_ms == pytest.approx(1.68)
 
     def test_missing_client_link_projects_nulls(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         rid = transformer.result_id_from_bundle(bundle_file)
         detail = transformer.to_detail_result(bundle_file, rid)
 
-        assert detail.environment.get("client_region") is None
-        assert detail.environment.get("link_status") is None
-        assert detail.environment.get("statement_overhead_min_ms") is None
-        assert detail.environment.get("statement_overhead_median_ms") is None
+        assert detail.environment.client_region is None
+        assert detail.environment.link_status is None
+        assert detail.environment.statement_overhead_min_ms is None
+        assert detail.environment.statement_overhead_median_ms is None
 
     def test_remote_host_endpoint_classifies_remote(self) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"]["deployment"] = {"endpoint_class": "remote_host"}
-        assert transformer_module._deployment_class_from_contract(data) == "remote"
+        assert transformer_module._deployment_class_from_contract(transformer_module._parse_bundle(data)) == "remote"
 
     def test_cloud_endpoint_still_classifies_cloud(self) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"]["deployment"] = {"endpoint_class": "cloud_endpoint"}
-        assert transformer_module._deployment_class_from_contract(data) == "cloud"
+        assert transformer_module._deployment_class_from_contract(transformer_module._parse_bundle(data)) == "cloud"
