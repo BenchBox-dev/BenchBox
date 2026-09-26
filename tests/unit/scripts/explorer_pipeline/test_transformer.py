@@ -159,7 +159,7 @@ class TestToManifestEntry:
 
         assert entry.platform_version == "1.2.0"
         assert detail.phase_durations == {"migration": 2.5}
-        assert detail.environment["os"] == "macOS 15.3.0"
+        assert detail.environment.os == "macOS 15.3.0"
 
 
 class TestToDetailResult:
@@ -190,8 +190,8 @@ class TestToDetailResult:
         rid = transformer.result_id_from_bundle(bundle_file)
         detail = transformer.to_detail_result(bundle_file, rid)
 
-        assert detail.environment.get("os") == "macOS 15.3.0"
-        assert detail.environment.get("arch") == "arm64"
+        assert detail.environment.os == "macOS 15.3.0"
+        assert detail.environment.arch == "arm64"
 
     def test_no_companion_files_by_default(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
@@ -1489,21 +1489,21 @@ class TestClientLinkProducerShape:
         }
         detail = transformer.to_detail_result(bundle_file, rid, data=data)
 
-        assert detail.environment.get("client_region") == "us-east-1"
-        assert detail.environment.get("client_cloud") == "aws"
-        assert detail.environment.get("link_status") == "available"
-        assert detail.environment.get("statement_overhead_min_ms") == pytest.approx(1.42)
-        assert detail.environment.get("statement_overhead_median_ms") == pytest.approx(1.68)
+        assert detail.environment.client_region == "us-east-1"
+        assert detail.environment.client_cloud == "aws"
+        assert detail.environment.link_status == "available"
+        assert detail.environment.statement_overhead_min_ms == pytest.approx(1.42)
+        assert detail.environment.statement_overhead_median_ms == pytest.approx(1.68)
 
     def test_missing_client_link_projects_nulls(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         rid = transformer.result_id_from_bundle(bundle_file)
         detail = transformer.to_detail_result(bundle_file, rid)
 
-        assert detail.environment.get("client_region") is None
-        assert detail.environment.get("link_status") is None
-        assert detail.environment.get("statement_overhead_min_ms") is None
-        assert detail.environment.get("statement_overhead_median_ms") is None
+        assert detail.environment.client_region is None
+        assert detail.environment.link_status is None
+        assert detail.environment.statement_overhead_min_ms is None
+        assert detail.environment.statement_overhead_median_ms is None
 
     def test_remote_host_endpoint_classifies_remote(self) -> None:
         data = copy.deepcopy(MINIMAL_BUNDLE)
