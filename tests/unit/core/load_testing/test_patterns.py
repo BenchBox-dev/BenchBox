@@ -397,8 +397,39 @@ class TestMultiWriterPattern:
         assert len(phases) == 2
         assert phases[0].concurrency == 4
         assert phases[0].phase_name == "read-write"
+        assert phases[0].roles == {"writer": 2, "reader": 2}
         assert phases[1].concurrency == 2
         assert phases[1].phase_name == "write-drain"
+        assert phases[1].roles == {"writer": 2}
+
+    def test_phase_role_targets(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        pattern = MultiWriterPattern(writers=2, readers=3, duration_seconds=30, drain_seconds=5)
+        assert pattern.writers_in_phase("read-write") == 2
+        assert pattern.readers_in_phase("read-write") == 3
+        assert pattern.writers_in_phase("write-drain") == 2
+        assert pattern.readers_in_phase("write-drain") == 0
+        with pytest.raises(ValueError, match="unknown"):
+            pattern.writers_in_phase("nope")
+        with pytest.raises(ValueError, match="unknown"):
+            pattern.readers_in_phase("nope")
+
+    def test_drainless_pattern_has_no_drain_roles(self):
+        from benchbox.experimental.load_testing.patterns import MultiWriterPattern
+
+        pattern = MultiWriterPattern(writers=2, readers=2, duration_seconds=30, drain_seconds=0)
+        assert [phase.roles for phase in pattern.get_phases()] == [{"writer": 2, "reader": 2}]
+        with pytest.raises(ValueError, match="absent"):
+            pattern.writers_in_phase("write-drain")
+        with pytest.raises(ValueError, match="absent"):
+            pattern.readers_in_phase("write-drain")
+
+    def test_package_api_exports_multi_writer_pattern(self):
+        import benchbox.experimental.load_testing as load_testing
+
+        assert load_testing.MultiWriterPattern.__name__ == "MultiWriterPattern"
+        assert "MultiWriterPattern" in load_testing.__all__
 
     def test_no_drain_single_phase(self):
         from benchbox.experimental.load_testing.patterns import MultiWriterPattern

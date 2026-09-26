@@ -18,6 +18,11 @@ class WorkloadPhase:
     concurrency: int
     duration_seconds: float
     phase_name: str = ""
+    roles: dict[str, int] | None = None
+    # Optional per-role stream targets for role-aware execution.
+    # Maps a stream role (e.g. "writer") to the desired concurrent stream
+    # count during this phase. When None, the phase is undifferentiated
+    # and executors fill `concurrency` streams with the default workload.
 
 
 class WorkloadPattern(ABC):
@@ -569,6 +574,7 @@ class MultiWriterPattern(WorkloadPattern):
                 concurrency=self._writers + self._readers,
                 duration_seconds=self._duration,
                 phase_name="read-write",
+                roles={"writer": self._writers, "reader": self._readers},
             )
         ]
         if self._drain > 0:
@@ -577,9 +583,44 @@ class MultiWriterPattern(WorkloadPattern):
                     concurrency=self._writers,
                     duration_seconds=self._drain,
                     phase_name="write-drain",
+                    roles={"writer": self._writers},
                 )
             )
         return phases
+
+    def writers_in_phase(self, phase_name: str) -> int:
+        """Return the writer stream target for a phase of this pattern.
+
+        Args:
+            phase_name: Phase to inspect ("read-write" or "write-drain").
+
+        Raises:
+            ValueError: If the phase name is unknown for this pattern.
+        """
+        if phase_name == "read-write":
+            return self._writers
+        if phase_name == "write-drain":
+            if self._drain <= 0:
+                raise ValueError("write-drain phase is absent when drain_seconds is 0")
+            return self._writers
+        raise ValueError(f"unknown MultiWriterPattern phase: {phase_name!r}")
+
+    def readers_in_phase(self, phase_name: str) -> int:
+        """Return the reader stream target for a phase of this pattern.
+
+        Args:
+            phase_name: Phase to inspect ("read-write" or "write-drain").
+
+        Raises:
+            ValueError: If the phase name is unknown for this pattern.
+        """
+        if phase_name == "read-write":
+            return self._readers
+        if phase_name == "write-drain":
+            if self._drain <= 0:
+                raise ValueError("write-drain phase is absent when drain_seconds is 0")
+            return 0
+        raise ValueError(f"unknown MultiWriterPattern phase: {phase_name!r}")
 
     def get_concurrency_at(self, elapsed_seconds: float) -> int:
         if elapsed_seconds < 0:
