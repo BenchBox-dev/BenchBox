@@ -549,7 +549,7 @@ class MultiWriterPattern(WorkloadPattern):
         readers: int,
         duration_seconds: float,
         drain_seconds: float = 5.0,
-    ):
+    ) -> None:
         """Initialize the multi-writer pattern.
 
         Args:

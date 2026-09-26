@@ -117,42 +117,53 @@ def test_undifferentiated_phase_keeps_default_factory(mock_connection_factory: A
 
 
 def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) -> None:
-    pattern = MultiWriterPattern(writers=3, readers=2, duration_seconds=10, drain_seconds=0)
+    pattern = MultiWriterPattern(writers=3, readers=2, duration_seconds=3, drain_seconds=2)
     assert pattern.max_concurrency == 5
 
     db_path = str(tmp_path / "mw.duckdb")
     with duckdb.connect(db_path) as con:
         con.execute("CREATE TABLE t (id INTEGER, v VARCHAR)")
 
-    errors: list[str] = []
+    lock = threading.Lock()
+    next_id = 0
 
-    def writer(n: int) -> None:
+    def writer_factory(index: int) -> tuple[str, str]:
+        nonlocal next_id
+        with lock:
+            row_id = next_id
+            next_id += 1
+        return (f"w{index}", f"INSERT INTO t VALUES ({row_id}, 'w{index}')")
+
+    def reader_factory(index: int) -> tuple[str, str]:
+        return (f"r{index}", "SELECT COUNT(*) FROM t")
+
+    def execute(connection: Any, sql: str) -> tuple[bool, int | None, str | None]:
         try:
-            with duckdb.connect(db_path) as con:
-                for i in range(20):
-                    con.execute(f"INSERT INTO t VALUES ({n * 100 + i}, 'w{n}')")
-        except Exception as exc:  # noqa: BLE001 - collected as test failure below
-            errors.append(f"writer {n}: {exc}")
+            connection.execute(sql)
+            return (True, 1, None)
+        except Exception as exc:  # noqa: BLE001 - surfaced as stream failure
+            return (False, 0, str(exc))
 
-    def reader() -> None:
-        try:
-            with duckdb.connect(db_path) as con:
-                for _ in range(20):
-                    con.execute("SELECT COUNT(*) FROM t").fetchone()
-        except Exception as exc:  # noqa: BLE001 - collected as test failure below
-            errors.append(f"reader: {exc}")
+    config = ConcurrentLoadConfig(
+        query_factory=lambda index: (f"q{index}", "SELECT 1"),
+        connection_factory=lambda: duckdb.connect(db_path),
+        execute_query=execute,
+        pattern=pattern,
+        queries_per_stream=50,
+        collect_resource_metrics=False,
+        role_factories={"writer": writer_factory, "reader": reader_factory},
+    )
+    result = ConcurrentLoadExecutor(config).run()
 
-    threads = [threading.Thread(target=writer, args=(n,)) for n in range(pattern.writer_count)]
-    threads += [threading.Thread(target=reader) for _ in range(pattern.reader_count)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join(timeout=120)
-
-    assert not [t for t in threads if t.is_alive()], "writer/reader threads hung"
-    assert not errors, f"concurrent writer/reader errors: {errors}"
+    assert result.total_streams_succeeded == result.total_streams_executed > 0
+    assert result.total_queries_executed > 0
+    # Queue waits mix no clocks: every recorded wait must be a small
+    # non-negative duration, never a billion-second wall-vs-monotonic gap.
+    for stream in result.streams:
+        for execution in stream.query_executions:
+            assert 0 <= execution.queue_wait_time < 3600
     with duckdb.connect(db_path, read_only=True) as con:
         row = con.execute("SELECT COUNT(*) FROM t").fetchone()
         assert row is not None
         (rows,) = row
-    assert rows == pattern.writer_count * 20
+    assert rows == next_id > 0
