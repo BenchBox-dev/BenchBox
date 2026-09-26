@@ -71,10 +71,12 @@ test.describe("External corpus smoke", () => {
   });
 
   test("@uat-external-corpus renders throughput phase and stream data from mounted bundle", async ({ page }) => {
-    const seed = discoverExternalCorpusSeed();
+    const maybeSeed = discoverThroughputSeed();
     // Only throughput corpora (e.g. the throughput-phase explorer sweep) can
-    // exercise this path; other sweeps keep the generic route coverage above.
-    test.skip(seed.testType !== "throughput", "mounted corpus has no throughput bundle");
+    // exercise this path; other sweeps skip here and keep the generic route
+    // coverage above.
+    test.skip(maybeSeed === null, "mounted corpus has no throughput bundle");
+    const seed: CorpusRouteSeed = maybeSeed as CorpusRouteSeed;
 
     await page.goto(`/results/r/${seed.resultId}`);
     await waitForShell(page);
@@ -92,9 +94,17 @@ test.describe("External corpus smoke", () => {
     // Every per-stream execution in the bundle must reach the page. The
     // "Individual samples" disclosure counts detail.queries, which the
     // pipeline fills from all measurement/warmup execution rows, so a dropped
-    // or misclassified stream changes the count.
-    test.skip(seed.streamValues.length < 2, "throughput bundle records fewer than two streams");
+    // or misclassified stream changes the count. A throughput bundle with
+    // fewer than two recorded streams is a dropped-stream regression, not a
+    // reason to skip.
+    expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
     await expect(page.getByText(`Individual samples (${seed.executionRows})`)).toBeVisible();
+    // Stream identity must survive onto the page: open the samples disclosure
+    // and require at least two recorded stream ids to appear as cell text.
+    await page.getByText(`Individual samples (${seed.executionRows})`).click();
+    for (const stream of seed.streamValues.slice(0, 2)) {
+      await expect(page.getByRole("cell", { name: stream, exact: true }).first()).toBeVisible();
+    }
   });
 });
 
@@ -133,11 +143,46 @@ function discoverExternalCorpusSeed(): CorpusRouteSeed {
     };
     // Prefer a throughput bundle so the throughput-rendering test below has a
     // seed; otherwise keep the first routable bundle for generic coverage.
+    // NOTE: the throughput test uses discoverThroughputSeed() so this
+    // preference only affects the generic route smoke above.
     if (seed.testType === "throughput") return seed;
     first ??= seed;
   }
   if (!first) throw new Error(`external corpus has no routable benchmark/platform bundles: ${bundlesDir}`);
   return first;
+}
+
+/** Dedicated seed for the throughput-rendering test (A3): scans only for a
+ * throughput bundle and never disturbs the generic route smoke's seed
+ * choice. Returns null when no throughput bundle is mounted, letting the
+ * caller skip explicitly. */
+function discoverThroughputSeed(): CorpusRouteSeed | null {
+  const fixtureDir = resolve(
+    process.env.E2E_FIXTURE_DIR ?? join(process.cwd(), "test-fixtures", ".generated", "data"),
+  );
+  const bundlesDir = join(fixtureDir, "bundles");
+  if (!existsSync(bundlesDir)) return null;
+  for (const fileName of readdirSync(bundlesDir).filter((name) => name.endsWith(".json")).sort()) {
+    if (fileName.endsWith(".plans.json")) continue;
+    const bundle = JSON.parse(readFileSync(join(bundlesDir, fileName), "utf8")) as Bundle;
+    if (inferTestType(bundle) !== "throughput") continue;
+    const benchmarkId = bundle.benchmark?.id;
+    const platformName = bundle.platform?.name;
+    if (!benchmarkId || !platformName) continue;
+    const firstQuery = bundle.queries?.find((query) => (query.id ?? query.query_id) && query.status !== "FAILED");
+    return {
+      resultId: basename(fileName, ".json"),
+      benchmarkId,
+      benchmarkName: humanizeBenchmark(benchmarkId),
+      platformId: platformId(platformName),
+      platformName,
+      queryId: firstQuery?.id ?? firstQuery?.query_id,
+      testType: "throughput",
+      streamValues: distinctStreams(bundle.queries),
+      executionRows: countExecutionRows(bundle.queries),
+    };
+  }
+  return null;
 }
 
 function platformId(raw: string): string {
