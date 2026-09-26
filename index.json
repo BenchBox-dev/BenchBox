@@ -706,7 +706,7 @@
     "approx-sketch-cli-selection": {
       "claim": null,
       "needs": [],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Wire sketch-category ops into SQL CLI query selection"
     },
