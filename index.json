@@ -19256,15 +19256,10 @@
       "title": "w4 (Docker Postgres throughput UAT cell) -- see work[].w4 notes.\n"
     },
     "w4-postgres-cell-first-live-nightly": {
-      "claim": {
-        "expires_at": "2026-09-27T02:45:23Z",
-        "generation": "d6f37acaae95453faf656b05b3854626",
-        "renewals": 2,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Throughput UAT: verify Docker Postgres cell on first live nightly run"
     },
     "webkit-smoke-fix-or-demote": {
