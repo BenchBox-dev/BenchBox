@@ -7,9 +7,14 @@ import pytest
 from benchbox.core.joinorder_replicated.replicator import (
     DERIVED_IDENTITY,
     KEY_COLUMNS,
+    LOOKUP_FK_COLUMNS,
+    LOOKUP_TABLES,
+    REPLICATED_TABLES,
+    REQUIRES_REAPPROVAL,
     SOURCE_IDENTITY,
     ReplicatedManifest,
     expected_row_count,
+    expected_table_row_count,
     manifest_hash,
     replica_offset,
     shifted_key,
@@ -64,23 +69,62 @@ def test_key_columns_cover_all_canonical_tables():
 
     manifest_path = Path(__file__).resolve().parents[4] / "benchbox" / "core" / "joinorder" / "data_manifest.toml"
     tables = {t["name"] for t in tomllib.load(manifest_path.open("rb"))["tables"]}
-    keyed = {table for table, _ in KEY_COLUMNS}
+    keyed = {table for table, _ in KEY_COLUMNS} | set(LOOKUP_TABLES)
     assert keyed == tables, f"uncovered: {tables - keyed}"
 
 
-def test_key_columns_are_real_integer_columns():
-    import duckdb
+def test_key_columns_are_integer_columns_per_committed_manifest():
+    import tomllib
+    from pathlib import Path
 
-    base = "/Users/joe/Developer/benchmark_runs/datagen/joinorder_sf1"
-    con = duckdb.connect()
-    missing: list[str] = []
-    for table, column in KEY_COLUMNS:
-        cols = {
-            r[0]: r[1] for r in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{base}/{table}.parquet')").fetchall()
-        }
-        if column not in cols or "INT" not in cols[column].upper():
-            missing.append(f"{table}.{column}")
+    manifest_path = Path(__file__).resolve().parents[4] / "benchbox" / "core" / "joinorder" / "data_manifest.toml"
+    schemas = {t["name"]: t.get("schema", {}) for t in tomllib.load(manifest_path.open("rb"))["tables"]}
+    missing = [
+        f"{table}.{column}"
+        for table, column in KEY_COLUMNS
+        if schemas.get(table, {}).get(column, "").upper() != "INTEGER"
+    ]
     assert not missing, f"non-integer or missing key columns: {missing}"
+
+
+def test_lookup_tables_stay_single_copy():
+    assert set(LOOKUP_TABLES) == {
+        "company_type",
+        "comp_cast_type",
+        "info_type",
+        "kind_type",
+        "link_type",
+        "role_type",
+    }
+    assert set(REPLICATED_TABLES).isdisjoint(LOOKUP_TABLES)
+    for lookup in LOOKUP_TABLES:
+        assert expected_table_row_count(lookup, 4, 3) == 4
+    assert expected_table_row_count("title", 2_528_312, 3) == 2_528_312 * 3
+
+
+def test_lookup_fk_values_never_shift():
+    lookup_pairs = {(table, column) for table, column, _ in LOOKUP_FK_COLUMNS}
+    keyed_pairs = set(KEY_COLUMNS)
+    assert lookup_pairs.isdisjoint(keyed_pairs), f"lookup FKs must not shift: {lookup_pairs & keyed_pairs}"
+    for table, _, _ in LOOKUP_FK_COLUMNS:
+        assert table in REPLICATED_TABLES
+    # Spot-check the contract's headline example: every replica references
+    # the same company_type IDs.
+    assert ("movie_companies", "company_type_id", "company_type") in LOOKUP_FK_COLUMNS
+
+
+def test_prototype_stays_deferred_until_reapproval():
+    import re
+    from pathlib import Path
+
+    assert REQUIRES_REAPPROVAL is True
+    repo_root = Path(__file__).resolve().parents[4]
+    decision = repo_root / "_project" / "decisions" / "joinorder-track2-scaling-direction-2026-07-04.md"
+    assert "must not start unless a future decision re-approves an upward" in decision.read_text(encoding="utf-8")
+    registry = repo_root / "benchbox" / "__init__.py"
+    assert "joinorder_replicated" not in registry.read_text(encoding="utf-8")
+    loader = (repo_root / "benchbox" / "core" / "benchmark_loader.py").read_text(encoding="utf-8")
+    assert not re.search(r'"joinorder_replicated"|\'joinorder_replicated\'', loader)
 
 
 def test_derived_identity_never_claims_canonical():
