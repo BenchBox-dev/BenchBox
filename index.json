@@ -17756,10 +17756,15 @@
       "title": "Probe tpchavoc 2_v2 unskip on Snowflake"
     },
     "tpchavoc-ch-filter-rewrite": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T21:13:32Z",
+        "generation": "0271312412d94935b40e73dee298123d",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a68d56a939b077672bfb199"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Revalidate ClickHouse FILTER-clause tpchavoc skips"
     },
     "tpchavoc-correlated-subquery-self-binding": {
