@@ -331,6 +331,22 @@ class TestStagingManifestHelpers:
         bench._write_staging_manifest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
         assert bench._staging_manifest_matches(loaded_tpch_conn, ["orders", "lineitem", "customer"]) is True
 
+    @pytest.mark.parametrize(
+        ("dialect", "expected"),
+        [
+            ("databricks", "STRING"),
+            ("bigquery", "STRING"),
+            ("snowflake", "VARCHAR"),
+            ("duckdb", "VARCHAR"),
+            ("standard", "VARCHAR"),
+        ],
+    )
+    def test_manifest_text_type_matches_dialect(self, tmp_path: Path, dialect: str, expected: str):
+        """Databricks rejects a bare VARCHAR (verified live) and BigQuery has no VARCHAR."""
+        bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        bench._setup_dialect = dialect
+        assert bench._manifest_text_type() == expected
+
     def test_different_spec_version_does_not_match(self, tmp_path: Path, loaded_tpch_conn):
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         bench._write_staging_manifest(loaded_tpch_conn, ["orders", "lineitem", "customer"])

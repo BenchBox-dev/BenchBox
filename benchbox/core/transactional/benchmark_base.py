@@ -477,6 +477,16 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         payload = "|".join(parts)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    def _manifest_text_type(self) -> str:
+        """Return the unbounded text column type for the staging manifest DDL.
+
+        Databricks SQL rejects ``VARCHAR`` without a length, and BigQuery has
+        no ``VARCHAR`` at all; both spell the type ``STRING``. Other engines
+        accept a bare ``VARCHAR``.
+        """
+        dialect = (getattr(self, "_setup_dialect", None) or "standard").lower()
+        return "STRING" if dialect in ("databricks", "bigquery") else "VARCHAR"
+
     def _write_staging_manifest(self, connection: DatabaseConnection, source_tables: list[str]) -> None:
         """Persist this setup()'s staging provenance so a later is_setup() can require an exact match.
 
@@ -489,10 +499,11 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
 
+        text_type = self._manifest_text_type()
         res1 = connection.execute(
             f"CREATE TABLE IF NOT EXISTS {quoted_table} ("
-            "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
-            "source_digest VARCHAR, created_at VARCHAR)"
+            f"benchmark {text_type}, scale {text_type}, spec_version {text_type}, "
+            f"source_digest {text_type}, created_at {text_type})"
         )
         if (err := failed_platform_error(res1)) is not None:
             raise RuntimeError(f"Failed to create staging manifest table: {err}")
