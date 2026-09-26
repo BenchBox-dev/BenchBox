@@ -41,8 +41,18 @@ def build_variants(
     impl_pairs: Sequence[tuple[VariantImpl, VariantImpl]],
     descriptions: Sequence[str],
     categories: Sequence[QueryCategory],
+    *,
+    expected_row_count: int | None = None,
+    scale_factor_dependent: bool = False,
+    timeout_seconds: float | None = None,
+    skip_platforms: Sequence[str] | None = None,
 ) -> list[DataFrameQuery]:
-    """Build TPC-Havoc DataFrame variants from already-resolved impl pairs."""
+    """Build TPC-Havoc DataFrame variants from already-resolved impl pairs.
+
+    Query metadata (expected row counts, timeouts, skipped platforms) is copied
+    from the canonical query by the caller so rebuilt variants keep the same
+    validation surface as the replay builder they replace.
+    """
     return [
         DataFrameQuery(
             query_id=f"Q{query_number}v{variant}",
@@ -51,6 +61,10 @@ def build_variants(
             categories=list(categories),
             expression_impl=expr_impl,
             pandas_impl=pandas_impl,
+            expected_row_count=expected_row_count,
+            scale_factor_dependent=scale_factor_dependent,
+            timeout_seconds=timeout_seconds,
+            skip_platforms=list(skip_platforms) if skip_platforms else [],
         )
         for variant, (expr_impl, pandas_impl) in enumerate(impl_pairs, start=1)
     ]
