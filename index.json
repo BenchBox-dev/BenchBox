@@ -5582,7 +5582,7 @@
       "needs": [
         "exasol-live-differential-harness"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Make every TPC-H and TPC-DS query match DuckDB on Exasol or register why not"
     },
