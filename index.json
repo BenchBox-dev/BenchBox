@@ -15092,15 +15092,10 @@
       "title": "Rewrite generator tests to use real TPC binary (integration-level)"
     },
     "rewrite-tuning-wizard-tests-to-use-real-unifiedtuningconfigu": {
-      "claim": {
-        "expires_at": "2026-09-27T02:45:49Z",
-        "generation": "4dab148ba87e4875ac4ed1115133cc98",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Rewrite tuning wizard tests to use real UnifiedTuningConfiguration objects"
     },
     "roll-out-core-verbosity-quiet-across-all-benchmarks-v-vv-q": {
