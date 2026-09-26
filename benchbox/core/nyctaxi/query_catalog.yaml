@@ -668,6 +668,67 @@ HVFHV_QUERIES:
       ORDER BY hvfhs_license_num, hour
     params:
       duration_days: 30
+FHV_QUERIES:
+  fhv-base-volume:
+    id: F1
+    name: FHV Trips by Dispatching Base
+    description: Trip volume by dispatching base for non-high-volume FHV bases
+    category: fhv-dispatch
+    sql: |
+      SELECT
+          dispatching_base_num,
+          COUNT(*) as trip_count,
+          AVG(EXTRACT(EPOCH FROM (dropoff_datetime - pickup_datetime)) / 60) as avg_duration_min
+      FROM fhv_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+        AND dropoff_datetime > pickup_datetime
+      GROUP BY dispatching_base_num
+      ORDER BY trip_count DESC
+      LIMIT 25
+    params:
+      duration_days: 90
+  fhv-shared-ride-rate:
+    id: F2
+    name: FHV Shared Ride Rate
+    description: Shared-ride flag rate over time (pre-2020 shared FHV rides)
+    category: fhv-service
+    sql: |
+      SELECT
+          DATE_TRUNC('month', pickup_datetime) as month,
+          COUNT(*) as trip_count,
+          SUM(CASE WHEN sr_flag = 'Y' THEN 1 ELSE 0 END) as shared_trips,
+          ROUND(
+              SUM(CASE WHEN sr_flag = 'Y' THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2
+          ) as shared_pct
+      FROM fhv_trips
+      WHERE pickup_datetime >= '{start_date}'
+        AND pickup_datetime < '{end_date}'
+      GROUP BY DATE_TRUNC('month', pickup_datetime)
+      ORDER BY month
+    params:
+      duration_days: 90
+  fhv-top-zones:
+    id: F3
+    name: FHV Top Pickup Zones
+    description: Most popular FHV pickup zones with dropoff spread
+    category: fhv-geographic
+    sql: |
+      SELECT
+          f.pickup_location_id,
+          z.zone,
+          z.borough,
+          COUNT(*) as trip_count,
+          COUNT(DISTINCT f.dropoff_location_id) as distinct_dropoffs
+      FROM fhv_trips f
+      LEFT JOIN taxi_zones z ON f.pickup_location_id = z.location_id
+      WHERE f.pickup_datetime >= '{start_date}'
+        AND f.pickup_datetime < '{end_date}'
+      GROUP BY f.pickup_location_id, z.zone, z.borough
+      ORDER BY trip_count DESC
+      LIMIT 25
+    params:
+      duration_days: 30
 CROSS_TYPE_QUERIES:
   cross-market-share:
     id: X1

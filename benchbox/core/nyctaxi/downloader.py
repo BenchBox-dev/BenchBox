@@ -29,7 +29,12 @@ import numpy as np
 import yaml
 
 from benchbox.core.data_fetch.errors import ChecksumMismatchError
-from benchbox.core.nyctaxi.schema import get_green_trips_columns, get_hvfhv_trips_columns, get_trips_columns
+from benchbox.core.nyctaxi.schema import (
+    get_fhv_trips_columns,
+    get_green_trips_columns,
+    get_hvfhv_trips_columns,
+    get_trips_columns,
+)
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
@@ -694,4 +699,79 @@ class HVFHVDataDownloader(_TripDataDownloader):
                 ]
             )
 
+        return num_trips
+
+
+class FHVDataDownloader(_TripDataDownloader):
+    """Downloads and processes NYC TLC For-Hire Vehicle (FHV) trip data.
+
+    FHV covers non-high-volume for-hire bases (black cars, liveries, limos).
+    The simplest TLC schema (~1M trips/month) and no fare columns.
+    Source: fhv_tripdata_YYYY-MM.parquet
+    Coverage: 2015-present
+    """
+
+    _TABLE_NAME = "fhv_trips"
+    _OUTPUT_FILENAME = "fhv_trips.csv"
+    _URL_PREFIX = "fhv_tripdata"
+    _LOGGER_NAME = "benchbox.core.nyctaxi.downloader.fhv"
+    _TAXI_LABEL = "FHV"
+    _DOWNLOAD_LOG_LABEL = "FHV"
+    _SKIP_EXISTING_MESSAGE = "FHV trips data already exists, skipping"
+    _COLUMN_PROVIDER = get_fhv_trips_columns
+    _STATS_TAXI_TYPE = "fhv"
+    _COLUMN_ALIASES = {
+        "dispatching_base_num": ("dispatching_base_number", "Dispatching_base_num"),
+        "affiliated_base_number": ("Affiliated_base_number", "affiliated_base_num"),
+        "pickup_datetime": ("pickup_datetime", "Pickup_datetime"),
+        "dropoff_datetime": ("dropOff_datetime", "dropoff_datetime", "Dropoff_datetime"),
+        "pickup_location_id": ("PULocationID", "pulocationid"),
+        "dropoff_location_id": ("DOLocationID", "dolocationid"),
+        "sr_flag": ("SR_Flag", "sr_flag"),
+    }
+    _COLUMN_DEFAULTS = {
+        "dispatching_base_num": "",
+        "affiliated_base_number": "",
+        "pickup_datetime": "",
+        "dropoff_datetime": "",
+        "sr_flag": "N",
+    }
+    _SYNTHETIC_MONTHLY_TRIPS = 1000
+    _SYNTHETIC_MIN_TRIPS = 25
+    _SYNTHETIC_HOURS = (8, 9, 10, 17, 18, 19, 20, 21, 22)
+    _SYNTHETIC_DURATION_OFFSET = 12
+    _SYNTHETIC_DURATION_SCALE = 18.0
+    _SYNTHETIC_DISTANCE_SCALE = 4.0
+
+    def _generate_synthetic_month(self, writer: csv.writer, start_trip_id: int) -> int:
+        """Generate synthetic FHV trip data (dispatched-car patterns).
+
+        FHV trips are pre-arranged dispatches: longer waits and durations
+        than street hails, no metered fare columns. Shared rides are rare
+        (pre-2020 SR flag).
+        """
+        num_trips = max(self._SYNTHETIC_MIN_TRIPS, int(self._SYNTHETIC_MONTHLY_TRIPS * self.sample_rate * 100))
+        all_zones = list(range(1, 263))
+        for i in range(num_trips):
+            trip_id = start_trip_id + i
+            hour = int(self.rng.choice(self._SYNTHETIC_HOURS))
+            minute = int(self.rng.integers(0, 60))
+            day = int(self.rng.integers(1, 29))
+            month = int(self.rng.choice(self.months))
+            pickup_time = datetime(self.year, month, day, hour, minute)
+            duration_min = int(self._SYNTHETIC_DURATION_OFFSET + self.rng.exponential(self._SYNTHETIC_DURATION_SCALE))
+            dropoff_time = pickup_time + timedelta(minutes=duration_min)
+            base_num = f"B{int(self.rng.integers(100000, 999999))}"
+            writer.writerow(
+                [
+                    trip_id,
+                    base_num,
+                    base_num,
+                    pickup_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    dropoff_time.strftime("%Y-%m-%d %H:%M:%S"),
+                    int(self.rng.choice(all_zones)),
+                    int(self.rng.choice(all_zones)),
+                    "Y" if self.rng.random() > 0.95 else "N",
+                ]
+            )
         return num_trips

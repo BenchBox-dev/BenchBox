@@ -22,7 +22,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Union
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
-from benchbox.core.nyctaxi.downloader import GreenTaxiDataDownloader, HVFHVDataDownloader, NYCTaxiDataDownloader
+from benchbox.core.nyctaxi.downloader import (
+    FHVDataDownloader,
+    GreenTaxiDataDownloader,
+    HVFHVDataDownloader,
+    NYCTaxiDataDownloader,
+)
 from benchbox.core.nyctaxi.queries import NYCTaxiQueryManager
 from benchbox.core.nyctaxi.schema import (
     NYC_TAXI_SCHEMA,
@@ -126,7 +131,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
     AVAILABLE_YEARS = list(range(2019, 2026))
 
     # Nested downloaders that must track output_dir reassignment.
-    OUTPUT_DIR_GENERATOR_ATTRS = ("downloader", "green_downloader", "hvfhv_downloader")
+    OUTPUT_DIR_GENERATOR_ATTRS = ("downloader", "green_downloader", "hvfhv_downloader", "fhv_downloader")
 
     def __init__(
         self,
@@ -212,6 +217,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
         # Create optional Green and HVFHV downloaders
         self.green_downloader: GreenTaxiDataDownloader | None = None
         self.hvfhv_downloader: HVFHVDataDownloader | None = None
+        self.fhv_downloader: FHVDataDownloader | None = None
 
         if TaxiType.GREEN in self.taxi_types:
             self.green_downloader = GreenTaxiDataDownloader(
@@ -228,6 +234,19 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
 
         if TaxiType.HVFHV in self.taxi_types:
             self.hvfhv_downloader = HVFHVDataDownloader(
+                scale_factor=scale_factor,
+                output_dir=self.output_dir,
+                year=year,
+                months=months,
+                seed=seed,
+                verbose=verbose,
+                quiet=quiet,
+                force_redownload=force_regenerate,
+                **compression_kwargs,
+            )
+
+        if TaxiType.FHV in self.taxi_types:
+            self.fhv_downloader = FHVDataDownloader(
                 scale_factor=scale_factor,
                 output_dir=self.output_dir,
                 year=year,
@@ -261,6 +280,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
             seed=seed,
             include_green_queries=TaxiType.GREEN in self.taxi_types,
             include_hvfhv_queries=TaxiType.HVFHV in self.taxi_types,
+            include_fhv_queries=TaxiType.FHV in self.taxi_types,
             include_cross_type_queries=(TaxiType.GREEN in self.taxi_types and TaxiType.HVFHV in self.taxi_types),
         )
 
@@ -300,6 +320,12 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
             hvfhv_path = self.hvfhv_downloader.download()
             self.tables["hvfhv_trips"] = hvfhv_path
 
+        # Download FHV if requested
+        if self.fhv_downloader is not None:
+            self.log_verbose("Downloading FHV data...")
+            fhv_path = self.fhv_downloader.download()
+            self.tables["fhv_trips"] = fhv_path
+
         self._write_manifest()
         return list(self.tables.values())
 
@@ -315,6 +341,9 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
 
         if self.hvfhv_downloader is not None:
             row_counts.update(self.hvfhv_downloader.get_download_stats().get("row_counts", {}))
+
+        if self.fhv_downloader is not None:
+            row_counts.update(self.fhv_downloader.get_download_stats().get("row_counts", {}))
 
         manifest = DataGenerationManifest(
             output_dir=self.output_dir,
@@ -334,6 +363,11 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
                     **(
                         {"hvfhv_trips": self.hvfhv_downloader.source_provenance()}
                         if self.hvfhv_downloader is not None
+                        else {}
+                    ),
+                    **(
+                        {"fhv_trips": self.fhv_downloader.source_provenance()}
+                        if self.fhv_downloader is not None
                         else {}
                     ),
                 }
@@ -552,6 +586,8 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
             tables.append("green_trips")
         if TaxiType.HVFHV in self.taxi_types:
             tables.append("hvfhv_trips")
+        if TaxiType.FHV in self.taxi_types:
+            tables.append("fhv_trips")
         return tables
 
     def get_query_info(self, query_id: str) -> dict[str, Any]:
@@ -642,6 +678,8 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
             table_order.append("green_trips")
         if TaxiType.HVFHV in self.taxi_types:
             table_order.append("hvfhv_trips")
+        if TaxiType.FHV in self.taxi_types:
+            table_order.append("fhv_trips")
 
         for table_name in table_order:
             if table_name not in self.tables:
@@ -740,7 +778,7 @@ BenchmarkHookRegistry.register_option_specs(
     BenchmarkOptionSpec(
         name="taxi_types",
         parser=parse_enum_list(TaxiType),
-        help="Taxi data types to load (yellow,green,hvfhv)",
+        help="Taxi data types to load (yellow,green,hvfhv,fhv)",
         aliases=("taxi-types",),
     ),
     BenchmarkOptionSpec(

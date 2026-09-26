@@ -20,9 +20,10 @@ from unittest.mock import patch
 
 import pytest
 
-from benchbox.core.nyctaxi.downloader import GreenTaxiDataDownloader, HVFHVDataDownloader
+from benchbox.core.nyctaxi.downloader import FHVDataDownloader, GreenTaxiDataDownloader, HVFHVDataDownloader
 from benchbox.core.nyctaxi.queries import (
     CROSS_TYPE_QUERIES,
+    FHV_QUERIES,
     GREEN_QUERIES,
     HVFHV_QUERIES,
     QUERIES,
@@ -33,6 +34,7 @@ from benchbox.core.nyctaxi.schema import (
     TABLE_ORDER,
     TaxiType,
     get_create_tables_sql,
+    get_fhv_trips_columns,
     get_green_trips_columns,
     get_hvfhv_trips_columns,
     get_table_columns,
@@ -64,6 +66,7 @@ class TestTaxiTypeEnum:
         assert TaxiType.YELLOW.value == "yellow"
         assert TaxiType.GREEN.value == "green"
         assert TaxiType.HVFHV.value == "hvfhv"
+        assert TaxiType.FHV.value == "fhv"
 
     def test_enum_members_are_distinct(self):
         types = list(TaxiType)
@@ -155,6 +158,7 @@ class TestTableOrder:
     def test_table_order_includes_new_tables(self):
         assert "green_trips" in TABLE_ORDER
         assert "hvfhv_trips" in TABLE_ORDER
+        assert "fhv_trips" in TABLE_ORDER
 
     def test_taxi_zones_first(self):
         assert TABLE_ORDER[0] == "taxi_zones"
@@ -215,6 +219,50 @@ class TestCreateTablesSqlWithTaxiTypes:
         sql = get_create_tables_sql(dialect="duckdb", taxi_types=[TaxiType.YELLOW, TaxiType.HVFHV])
         assert "shared_request_flag" in sql
         assert "shared_match_flag" in sql
+
+
+class TestFHVTripsSchema:
+    def test_schema_includes_fhv_trips(self):
+        assert "fhv_trips" in NYC_TAXI_SCHEMA
+
+    def test_fhv_trips_has_required_columns(self):
+        cols = set(NYC_TAXI_SCHEMA["fhv_trips"]["columns"].keys())
+        for col in (
+            "dispatching_base_num",
+            "affiliated_base_number",
+            "pickup_datetime",
+            "dropoff_datetime",
+            "pickup_location_id",
+            "dropoff_location_id",
+            "sr_flag",
+        ):
+            assert col in cols, f"fhv_trips missing {col}"
+
+    def test_fhv_trips_has_no_fare_columns(self):
+        """FHV is dispatch-only: no metered fare columns."""
+        cols = set(NYC_TAXI_SCHEMA["fhv_trips"]["columns"].keys())
+        assert "fare_amount" not in cols
+        assert "total_amount" not in cols
+        assert "trip_distance" not in cols
+
+    def test_fhv_trips_has_primary_key(self):
+        assert NYC_TAXI_SCHEMA["fhv_trips"]["primary_key"] == ["trip_id"]
+
+    def test_get_fhv_trips_columns_excludes_trip_id(self):
+        cols = get_fhv_trips_columns()
+        assert "trip_id" not in cols
+        assert "dispatching_base_num" in cols
+
+    def test_get_table_columns_works_for_fhv_trips(self):
+        cols = get_table_columns("fhv_trips")
+        assert "sr_flag" in cols
+
+    def test_with_fhv_type(self):
+        sql = get_create_tables_sql(dialect="duckdb", taxi_types=[TaxiType.YELLOW, TaxiType.FHV])
+        assert "CREATE TABLE trips" in sql
+        assert "CREATE TABLE fhv_trips" in sql
+        assert "CREATE TABLE green_trips" not in sql
+        assert "CREATE TABLE hvfhv_trips" not in sql
 
 
 # ============================================================================
@@ -418,6 +466,78 @@ class TestHVFHVQuerySet:
         assert "fare_amount" not in combined_sql
 
 
+class TestFHVDataDownloader:
+    @pytest.fixture
+    def fhv_downloader(self, tmp_path):
+        return FHVDataDownloader(
+            scale_factor=0.01,
+            output_dir=tmp_path,
+            year=2019,
+            months=[1],
+            seed=42,
+        )
+
+    def test_init_sets_correct_attributes(self, fhv_downloader):
+        assert fhv_downloader.scale_factor == 0.01
+        assert fhv_downloader.year == 2019
+        assert fhv_downloader.seed == 42
+
+    def test_download_creates_fhv_trips_csv(self, fhv_downloader, tmp_path):
+        fhv_path = fhv_downloader.download()
+        assert fhv_path.exists()
+        assert fhv_path.name == "fhv_trips.csv"
+
+    def test_generated_csv_has_correct_columns(self, fhv_downloader, tmp_path):
+        fhv_path = fhv_downloader.download()
+        with open(fhv_path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            header = reader.fieldnames
+        expected_cols = ["trip_id"] + get_fhv_trips_columns()
+        assert header == expected_cols
+
+    def test_generated_csv_has_rows(self, fhv_downloader, tmp_path):
+        fhv_path = fhv_downloader.download()
+        with open(fhv_path, encoding="utf-8") as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) > 0
+
+    def test_generated_csv_has_dispatch_base(self, fhv_downloader, tmp_path):
+        fhv_path = fhv_downloader.download()
+        with open(fhv_path, encoding="utf-8") as f:
+            row = next(csv.DictReader(f))
+        assert row["dispatching_base_num"].startswith("B")
+        assert row["sr_flag"] in ("Y", "N")
+
+    def test_download_stats(self, fhv_downloader):
+        stats = fhv_downloader.get_download_stats()
+        assert stats["taxi_type"] == "fhv"
+        assert stats["scale_factor"] == 0.01
+
+
+class TestFHVQuerySet:
+    def test_fhv_queries_exist(self):
+        assert len(FHV_QUERIES) >= 3
+
+    def test_fhv_queries_have_required_fields(self):
+        for qid, qdef in FHV_QUERIES.items():
+            assert "id" in qdef, f"{qid} missing 'id'"
+            assert "name" in qdef, f"{qid} missing 'name'"
+            assert "sql" in qdef, f"{qid} missing 'sql'"
+            assert "category" in qdef, f"{qid} missing 'category'"
+
+    def test_fhv_queries_reference_fhv_trips_table(self):
+        for qid, qdef in FHV_QUERIES.items():
+            assert "fhv_trips" in qdef["sql"], f"{qid} does not reference fhv_trips table"
+
+    def test_fhv_queries_use_dispatch_columns(self):
+        """FHV queries use dispatch/shared columns, never metered fares."""
+        combined_sql = " ".join(q["sql"] for q in FHV_QUERIES.values())
+        assert "dispatching_base_num" in combined_sql
+        assert "sr_flag" in combined_sql
+        assert "fare_amount" not in combined_sql
+        assert "total_amount" not in combined_sql
+
+
 class TestCrossTypeQuerySet:
     def test_cross_type_queries_exist(self):
         assert len(CROSS_TYPE_QUERIES) >= 5
@@ -439,11 +559,12 @@ class TestCrossTypeQuerySet:
             assert "'hvfhv'" in sql, f"{qid} missing 'hvfhv' type label"
 
     def test_ids_are_unique_across_all_query_sets(self):
-        """Query IDs must be unique across QUERIES, GREEN_QUERIES, HVFHV_QUERIES, CROSS_TYPE_QUERIES."""
+        """Query IDs must be unique across QUERIES, GREEN_QUERIES, HVFHV_QUERIES, FHV_QUERIES, CROSS_TYPE_QUERIES."""
         all_ids = (
             [q["id"] for q in QUERIES.values()]
             + [q["id"] for q in GREEN_QUERIES.values()]
             + [q["id"] for q in HVFHV_QUERIES.values()]
+            + [q["id"] for q in FHV_QUERIES.values()]
             + [q["id"] for q in CROSS_TYPE_QUERIES.values()]
         )
         assert len(all_ids) == len(set(all_ids)), "Duplicate query IDs found"
@@ -467,6 +588,10 @@ class TestQueryManagerMultiType:
         qm = NYCTaxiQueryManager(include_hvfhv_queries=True)
         assert qm.get_query_count() == len(QUERIES) + len(HVFHV_QUERIES)
 
+    def test_manager_with_fhv_queries(self):
+        qm = NYCTaxiQueryManager(include_fhv_queries=True)
+        assert qm.get_query_count() == len(QUERIES) + len(FHV_QUERIES)
+
     def test_manager_with_all_query_sets(self):
         qm = NYCTaxiQueryManager(
             include_green_queries=True,
@@ -487,6 +612,17 @@ class TestQueryManagerMultiType:
         sql = qm.get_query("hvfhv-shared-ride-rate")
         assert "hvfhv_trips" in sql
         assert "shared_request_flag" in sql
+
+    def test_fhv_query_can_be_retrieved(self):
+        qm = NYCTaxiQueryManager(include_fhv_queries=True)
+        sql = qm.get_query("fhv-base-volume")
+        assert "fhv_trips" in sql
+        assert "dispatching_base_num" in sql
+
+    def test_fhv_query_not_available_in_default_manager(self):
+        qm = NYCTaxiQueryManager()
+        with pytest.raises(ValueError, match="Unknown query"):
+            qm.get_query("fhv-base-volume")
 
     def test_cross_type_query_can_be_retrieved(self):
         qm = NYCTaxiQueryManager(include_cross_type_queries=True)
