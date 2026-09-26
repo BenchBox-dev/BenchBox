@@ -218,6 +218,11 @@ class ManifestEntry(BaseModel):
     test_type: str | None = None
     validation_status: str | None = None
     failed_query_count: int = 0
+    # Registry-declared product support status for the benchmark
+    # (stable / beta / experimental / deprecated / document_only /
+    # repo_only). None when the benchmark slug is not in the registry.
+    # Display-only; the explorer benchmark browser groups and badges on it.
+    benchmark_support_status: str | None = None
     cost_usd: float | None = None
     normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
     deployment_class: str | None = None

@@ -231,6 +231,7 @@ class DuckDBSnapshotBuilder:
         *_NORMALIZED_COST_COLUMNS,
         *_ENVIRONMENT_FACET_COLUMNS,
         *_LEGACY_COST_DEPLOYMENT_COLUMNS,
+        ("benchmark_support_status", "VARCHAR"),
     ]
 
     def build(self, entries: list[ManifestEntry], output_path: Path) -> None:
@@ -505,7 +506,13 @@ class DuckDBSnapshotBuilder:
                 -- the physical rendering strategy id. NULL when the bundle
                 -- never recorded a logical tuning profile.
                 physical_mechanisms   VARCHAR,
-                physical_rendering_id VARCHAR
+                physical_rendering_id VARCHAR,
+                -- Registry-declared product support status for the benchmark
+                -- (stable / beta / experimental / deprecated / document_only
+                -- / repo_only). NULL when the benchmark slug is not in the
+                -- registry. Display-only: the benchmark browser groups and
+                -- badges on it; never a join/dedup key.
+                benchmark_support_status VARCHAR
             )
         """)
         con.execute("""
@@ -574,6 +581,7 @@ class DuckDBSnapshotBuilder:
                 r.bundle_download_url,
                 r.physical_mechanisms,
                 r.physical_rendering_id,
+                r.benchmark_support_status,
                 e.os,
                 e.arch,
                 e.cpu_count,
@@ -942,6 +950,7 @@ class DuckDBSnapshotBuilder:
                     bundle_download_url,
                     physical_mechanisms,
                     physical_rendering_id,
+                    entry.benchmark_support_status,
                 )
             )
         if rows:
@@ -1300,6 +1309,7 @@ class DuckDBSnapshotBuilder:
             *_normalized_cost_column_values(entry),
             *_environment_facet_column_values(entry),
             *_legacy_cost_deployment_column_values(entry),
+            entry.benchmark_support_status,
         )
 
 
