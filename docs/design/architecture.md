@@ -5,144 +5,175 @@
 ```{tags} contributor, concept
 ```
 
-## Overview
+## Read this first: the contract map
 
-BenchBox is a modular SQL and DataFrame benchmarking framework for OLAP databases. The architecture separates concerns into four layers:
+[Public Contracts and Support Taxonomy](../reference/public-contracts.md) is
+the authority on what BenchBox promises. It classifies every surface by
+compatibility tier (`stable-public`, `beta-public`, `internal`,
+`experimental`, `deprecated`, `generated`, `repo-only`) and names the source
+of truth for each one. This document describes how the code delivers those
+surfaces; when the two disagree, the contract map wins, and changing a
+mapped surface requires updating the map in the same PR.
 
-1. **Benchmarks** - dataset definitions, schemas, queries, and data generation
-2. **Platforms** - database adapters for SQL and DataFrame execution
-3. **Core** - shared infrastructure (runner, results, validation, visualization, etc.)
-4. **CLI** - user-facing commands and execution orchestration
+Two classifications do most of the work:
 
-## Execution Model
+- **Compatibility tier** answers "can I depend on this?" for APIs, CLIs,
+  generated stores, and docs.
+- **`support_status`** answers "is this benchmark or platform a supported
+  product?" (`stable`, `beta`, `experimental`, `repo_only`, `deprecated`,
+  `document_only`). It controls the label shown next to a public entry; it
+  never hides one. Hiding is the separate `surface` gate (`public` vs
+  `internal`), and capability flags such as `supports_dataframe` are never
+  inferred from either.
 
-BenchBox uses a **lifecycle-based** execution model (not Template Method). A benchmark run progresses through phases orchestrated by `run_benchmark_lifecycle()` in `benchbox.core.runner.runner`:
+## Product surfaces and their code homes
 
-```
-generate → load → warmup → power → throughput → maintenance
-```
+| Surface | Tier | Code |
+|---|---|---|
+| CLI commands and documented options | `beta-public` | `benchbox/cli/commands/`, `docs/reference/cli/` |
+| Python wrapper facades (`benchbox.TPCH(...)`) and `run_with_platform` | `beta-public` | `benchbox/__init__.py`, top-level wrapper modules, `benchbox/base.py` |
+| Runtime loader and registries behind the facades | `internal` | `benchbox/core/benchmark_loader.py`, `benchbox/core/benchmark_registry.py` |
+| Shared run engine below CLI and MCP | `internal` | `benchbox/core/run_service.py` (the `__all__` list is the cross-surface import contract) |
+| MCP tools | `beta-public`, deliberately scoped | `benchbox/mcp/`; every omitted CLI control carries a tier in the `docs/reference/mcp.md` omission ledger |
+| Result JSON bundles (schema-versioned product data) | `beta-public` | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py` |
+| Explorer browser store (DuckDB + summaries, built from bundles) | `generated` | `_project/scripts/explorer_pipeline/`; reproducible from source bundles plus pipeline code |
+| Public result submissions and their validation behavior | `beta-public` | `scripts/validate_submission.py`, `docs/reference/hosted-results-contract.md`, `docs/contributing-results.md` |
+| Semantic chart IDs shared by CLI, MCP, templates, and Explorer | `beta-public` | `benchbox/core/visualization/chart_types.py`, `results-explorer/src/lib/chartRegistry.ts`, `tests/parity/fixtures/chart_ids.json` |
+| `benchbox.experimental` namespace | `experimental` | Ships in the wheel for convenience, outside the supported product surface |
+| `_project/` scripts, audits, TODOs, ADRs | `repo-only` | Contributor tooling, not a user API |
 
-### Key Types
+## Execution architecture
 
-| Type | Location | Purpose |
-|------|----------|---------|
-| `LifecyclePhases` | `core.runner.runner` | Controls which phases to run |
-| `BenchmarkResults` | `core.results.models` | Complete run output with phase results |
-| `BenchmarkConfig` | `core.schemas` | Benchmark name, scale, query selection (Pydantic) |
-| `DatabaseConfig` | `core.schemas` | Connection and platform configuration (Pydantic) |
-| `PlatformAdapter` | `platforms.base.adapter` | Abstract base for all SQL platform adapters |
-
-### SQL Execution Path
-
-```
-CLI (run command)
-  → BenchmarkOrchestrator (cli/orchestrator.py)
-    → run_benchmark_lifecycle() (core/runner/runner.py)
-      → PlatformAdapter.execute_query() for each query
-        → BenchmarkResults
-```
-
-The `PlatformAdapter` base class (`benchbox/platforms/base/adapter.py`) provides the interface that all 33 SQL platform adapters implement. Each adapter handles connection management, DDL generation, data loading, and query execution for its target database.
-
-### DataFrame Execution Path
-
-DataFrame benchmarks use the same lifecycle orchestrator entry point as SQL,
-then branch to the DataFrame adapter mixin:
+A run flows through one shared engine, no matter which surface starts it:
 
 ```
-CLI (run command with --platform *-df)
-  → run_benchmark_lifecycle() (core/runner/runner.py)
-    → adapter.run_benchmark()
-      → BenchmarkExecutionMixin.run_benchmark() (platforms/dataframe/benchmark_mixin.py)
-        → ExpressionFamilyAdapter or PandasFamilyAdapter
+CLI (`benchbox run`) or MCP (`run_benchmark`)
+  → benchbox.core.run_service (shared engine, internal)
+    → run_benchmark_lifecycle() (benchbox/core/runner/runner.py)
+      → generate → load → execute (power/throughput test types)
+        → PlatformAdapter hooks per phase
           → BenchmarkResults
 ```
 
-| Type | Location | Purpose |
-|------|----------|---------|
-| `DataFrameContext` | `core.dataframe.context` | Protocol for table access and column references |
-| `BenchmarkExecutionMixin` | `platforms.dataframe.benchmark_mixin` | Production DataFrame lifecycle implementation behind `adapter.run_benchmark()` |
-| `ExpressionFamilyAdapter` | `platforms.dataframe.expression_family` | Base for Polars, PySpark, DataFusion, LakeSail |
-| `PandasFamilyAdapter` | `platforms.dataframe.pandas_family` | Base for Pandas, cuDF, Dask |
+Execution phases are declared in `LifecyclePhases` (`generate`, `load`,
+`execute`, plus opt-in `statistics`), not inherited. Power and throughput
+are test-type executions inside the execute phase, not lifecycle phases.
 
-The **family-based** adapter architecture means adding a new expression-style platform (e.g., Polars-like API) requires only implementing a thin adapter on top of `ExpressionFamilyAdapter`, inheriting query translation, tuning, and execution logic.
+`BaseBenchmark` (`benchbox/base.py`) remains the public wrapper base and the
+benchmark-facing API boundary; it does not own the runtime workflow. Adapter
+instances are serial execution objects: one instance may serve sequential
+runs, concurrent calls on one instance are not supported, and
+`run_benchmark()` resets run-scoped caches at run start.
 
-The deprecated internal compatibility runner `core/runner/dataframe_runner.py`
-has been deleted; the adapter mixin path (`platforms/dataframe/benchmark_mixin.py`)
-is the only production DataFrame lifecycle path.
+### SQL path
 
-## Benchmark Layer
+SQL adapters implement `PlatformAdapter` (`benchbox/platforms/base/adapter.py`):
+connection lifecycle, platform DDL, bulk load, and per-query execution.
+Queries are defined once per benchmark and translated per dialect with
+sqlglot; heavy SDK imports stay lazy until the platform is actually used.
 
-Each benchmark (TPC-H, TPC-DS, SSB, ClickBench, etc.) lives under `benchbox/core/<benchmark_id>/` and provides:
+### DataFrame path
 
-- **Schema** - table definitions and DDL generation via `get_create_tables_sql(dialect, tuning_config)`
-- **Queries** - SQL templates with dialect translation via sqlglot
-- **Data generation** - using official TPC tools (dbgen/dsdgen) or built-in generators
-- **Validation** - expected result counts and answer verification
+DataFrame runs enter the same lifecycle, then branch to
+`BenchmarkExecutionMixin.run_benchmark()`
+(`benchbox/platforms/dataframe/benchmark_mixin.py`), which is the only
+production DataFrame lifecycle path. Adapters group by API family
+(`ExpressionFamilyAdapter` for Polars/PySpark/DataFusion-style APIs,
+`PandasFamilyAdapter` for Pandas/cuDF/Dask-style APIs), so a new
+expression-style platform inherits translation, tuning, and execution.
 
-All benchmarks inherit from `BaseBenchmark` (`benchbox/base.py`). Benchmarks are registered in `benchbox/core/benchmark_registry.py` which maps CLI names (e.g., `tpch`) to class names and metadata.
+## Data architecture: bundles are the product
 
-There are currently 22 benchmarks across TPC standards, academic, industry, real-world, time-series, primitives, AI/ML, and experimental categories.
+The schema-versioned result bundle is the unit everything else consumes:
+CLI output, submission validation, hosted results, the explorer, and
+SQL/DataFrame comparisons all read the same shape, guarded by the schema
+policy. SQL and DataFrame bundles for one benchmark must preserve the
+cross-mode parity invariants.
 
-## Platform Layer
+```
+run → BenchmarkResults → bundle JSON (beta-public data)
+  → validate-submission (deterministic errors, privacy/trust handling)
+  → published corpus (results-data/, trust labels + provenance)
+    → explorer pipeline (generated DuckDB, summaries, matrix artifacts)
+      → Results Explorer (browser) and user dashboards (browser-local)
+```
 
-### SQL Platforms (46 adapters)
+The explorer's secondary navigation, benchmark browser groupings, and
+saveable dashboards are presentation over this pipeline, not new data
+sources: dashboard views persist as URLs because chart selection, sort,
+filters, and anchors already live in explorer URL state.
 
-All SQL adapters inherit from `PlatformAdapter` and implement:
-- `get_connection_from_pool()` / `close_connection()` - connection lifecycle
-- `execute_query()` - query execution with timing
-- `get_create_tables_sql()` - platform-specific DDL
-- `load_data()` - bulk data loading
+### Tuning evidence is honest by construction
 
-Platforms span local engines (DuckDB, SQLite, DataFusion), cloud warehouses (Snowflake, BigQuery, Databricks, Redshift), and specialized systems (ClickHouse, StarRocks, QuestDB, TimescaleDB, etc.).
+Tuning claims follow fail-closed rules end to end. The applied-tuning ledger
+records only statements that actually executed, using a shared vocabulary
+(`PHASE_SESSION` and friends); benchmarking hygiene applied to every run is
+never recorded as tuning, and a run with no tuning-derived statements
+reports `noop`, never a false `applied`. A platform with no
+tuning-derived session surface (Snowpark today) declares that explicitly
+rather than inheriting another platform's capture story. Post-load
+introspection corroborates the ledger before any `applied_verified` state
+is earned, and the explorer renders the recorded verdicts read-only.
 
-### DataFrame Platforms (8 adapters)
+## Discovery architecture: gate, label, capability
 
-DataFrame adapters are organized by API family:
-- **Expression family**: Polars, PySpark, DataFusion, LakeSail
-- **Pandas family**: Pandas, cuDF, Dask
+Three independent registry fields govern how a benchmark or platform
+appears; conflating them is the most common extension-point bug:
 
-## Core Infrastructure
+- `surface` is the **only discovery gate**. `internal` entries stay out of
+  CLI listings, MCP listings, and resources, but remain runnable by
+  explicit ID.
+- `support_status` is the **product-support label** (`Stable`, `Beta`,
+  `Experimental`, …). Public entries are listed with their label; the
+  explorer benchmark browser groups on it.
+- Capability flags (`supports_dataframe`, platform capabilities, dependency
+  hints) drive **routing**, never visibility.
 
-The `benchbox/core/` directory contains 39 subsystems:
+Sources of truth: `benchbox/core/benchmark_registry.py` (benchmarks; the
+per-benchmark rationale and promotion criteria live in
+`docs/benchmarks/support-status.md` and are drift-checked against the
+registry) and `benchbox/core/platform_manifest.py` (platforms, including
+adapter import specs and aliases).
 
-| Subsystem | Purpose |
-|-----------|---------|
-| `runner/` | Benchmark lifecycle orchestration |
-| `results/` | Result models, serialization, aggregation |
-| `validation/` | Answer validation, data verification |
-| `visualization/` | ASCII chart generation and result rendering |
-| `dataframe/` | DataFrame execution context, profiling, tuning |
-| `query_plans/` | Query plan capture and analysis |
-| `tuning/` | Unified tuning configuration system |
-| `data_organization/` | Sorted ingestion, clustering strategies |
-| `comparison/` | Result comparison and regression detection |
-| `cost/` | Cloud cost estimation |
-| `analysis/` | Statistical analysis of benchmark results |
-| `contracts/` | Interface contracts and type validation |
+## Extension points and their contract obligations
 
-## CLI Layer
+Mechanics for adding benchmarks, platforms, and query variants are covered
+in [Custom Benchmarks](../advanced/custom-benchmarks.md) and [Adding New
+Platforms](../development/adding-new-platforms.md). Each addition also
+carries contract obligations from the map:
 
-The CLI (`benchbox/cli/`) uses Click and provides 25+ commands. The main `run` command orchestrates the full benchmark lifecycle through `BenchmarkOrchestrator` (`cli/orchestrator.py`) → `run_benchmark_lifecycle()`.
+- Every registry benchmark and platform entry declares exactly one
+  `support_status`; benchmark entries additionally satisfy the
+  drift-checked criteria in `docs/benchmarks/support-status.md`.
+- A new platform manifest entry wires discovery, capabilities, dependency
+  hints, and docs together; aliases need a compatibility note.
+- A new semantic chart ID lands in `chart_types.py` first, then follows to
+  templates, ASCII runtime, Explorer registry, and parity fixtures in the
+  same PR; IDs are deprecated, never silently removed.
+- A new `CREATE TABLE` rewrite path in an adapter must satisfy the SQL
+  compatibility governance in `benchbox/sql_compat/` (`make
+  compat-docs-check`).
+- Behavior changes to any mapped surface update the contract map (or state
+  why it is unchanged) and land docs/tests in the same PR; removals go
+  through `docs/reference/backward-compatibility.md`.
 
-Key command groups: `run`, `compare`, `visualize`, `report`, `metrics`, `tuning`, `platforms`, `shell`, `datagen`, `setup`.
+## Repository map
 
-## Visualization
+| Path | Purpose | Tier |
+|---|---|---|
+| `benchbox/` | Installable product: benchmarks, platforms, CLI, MCP, results, visualization | `beta-public` surface over `internal` engine |
+| `results-explorer/` | Browser application for published results | Product UI over a `generated` store |
+| `results-data/` | Public result corpus and validation metadata | Published data |
+| `docs/` | User, concept, reference, and contributor documentation | Varies by page; the map governs |
+| `tests/` | Unit, integration, end-to-end, parity, and live suites | Verification gates per map row |
+| `examples/` | Runnable examples, notebooks, tuning files | Illustrative, not contractual |
+| `_project/` | Operations, audits, project tooling, TODO state | `repo-only` |
 
-BenchBox provides ASCII chart visualization via `core/visualization/`:
-- **ASCII charts** (`core/visualization/ascii/`) - 15+ chart types rendered as terminal text (bar, box plot, heatmap, histogram, scatter, CDF, sparkline, etc.)
-- **ResultPlotter** (`core/visualization/result_plotter.py`) - normalizes JSON results and orchestrates chart rendering
-- **Templates** (`core/visualization/templates.py`) - named chart combinations (e.g., `flagship`, `comparison`, `executive_summary`)
+## Related documentation
 
-## MCP Integration
-
-The `benchbox/mcp/` package exposes BenchBox functionality as MCP (Model Context Protocol) tools, enabling AI assistants to discover, run, and analyze benchmarks.
-
-## Key Design Decisions
-
-1. **Lifecycle over Template Method** - execution phases are declared in configuration, not inherited
-2. **Family-based DataFrame adapters** - minimize code duplication across similar platforms
-3. **Official TPC tools** - use dbgen/dsdgen for specification-compliant data generation
-4. **sqlglot translation** - single query definition with automatic dialect translation
-5. **Lazy platform loading** - heavy SDK imports deferred until platform is actually used
-6. **ASCII visualization** - terminal-rendered charts for CI/CD and MCP integration
+- [Public Contracts and Support Taxonomy](../reference/public-contracts.md) — the map itself
+- [Benchmark Support Status Criteria](../benchmarks/support-status.md) — per-benchmark rationale
+- [Backward Compatibility](../reference/backward-compatibility.md) — deprecation and removal paths
+- [MCP Reference](../reference/mcp.md) — scoped surface and omission ledger
+- [One-engine scoped surfaces ADR](development/adr/adr-one-engine-scoped-surfaces.md) — why CLI and MCP share `run_service`
+- [Concepts: Architecture](concepts/architecture.md) — user-facing component tour with examples
