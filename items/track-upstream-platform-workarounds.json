@@ -137,5 +137,16 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "jcode-batch-c",
+      "at": "2026-09-26T04:48:31Z",
+      "client": "jcode",
+      "generation": "10ba5e4da49243e48df62d48db71e9c1",
+      "op": "take",
+      "op_id": "646f7359a617436aa4bc14f58d193b8a",
+      "session_id": "5b5b1959708f4da0b8d75e62f981a358"
+    }
+  ]
 }
