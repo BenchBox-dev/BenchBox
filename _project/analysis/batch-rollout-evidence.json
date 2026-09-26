@@ -38,18 +38,18 @@
   },
   "runtime": {
     "project_command": "uv run --project _project/scripts --locked -- todo-db-mcp",
-    "dependency_metadata_version": "0.8.0",
-    "reported_tool_version": "0.8.0",
+    "dependency_metadata_version": "0.8.1",
+    "reported_tool_version": "0.8.1",
     "schema_version": 3,
     "supported_schema_versions": [1, 2, 3],
     "prepared_receipt_schema": "prepared_work_v1",
-    "tool_count": 14,
+    "tool_count": 15,
     "registered_batch_tools": ["register_batch", "prepare", "bind_batch_pr", "abort_batch"],
-    "tool_names": ["abort_batch", "bind_batch_pr", "create_item", "drop", "finish", "get_instructions", "list_items", "prepare", "register_batch", "release", "renew", "show_item", "take", "update_item"],
+    "tool_names": ["abort_batch", "bind_batch_pr", "create_item", "drop", "finish", "get_instructions", "list_items", "prepare", "register_batch", "release", "renew", "show_item", "take", "takeover", "update_item"],
     "mcp_handshake": {
       "sequence": ["initialize", "notifications/initialized", "tools/list"],
       "protocol_version": "2024-11-05",
-      "server_info": {"name": "todo-db", "version": "0.8.0"},
+      "server_info": {"name": "todo-db", "version": "0.8.1"},
       "result": "pass",
       "state_remote": "local throwaway bare Git remote; no hosted state touched"
     }
@@ -81,9 +81,9 @@
   },
   "verification": {
     "clean_install": "uv sync --project _project/scripts --locked --offline passed",
-    "standalone_metadata": "wheel metadata and entry points identify todo-db 0.8.0",
+    "standalone_metadata": "wheel metadata and entry points identify todo-db 0.8.1",
     "no_sibling_path": "project source and lock paths resolve only under _project/scripts/vendor",
-    "batch_delivery_integration": "full JSON-RPC handshake passed with schema 3 and 14 tools",
+    "batch_delivery_integration": "full JSON-RPC handshake passed with schema 3 and 15 tools",
     "skill_integrity": "make skill-integrity-check passed against the pinned catalog and tracked mirror",
     "active_runtime_blocker": null,
     "hosted_publication": "not performed; local verification is not merge or deployment evidence"
