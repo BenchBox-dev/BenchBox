@@ -5537,7 +5537,7 @@
     "exasol-local-spike": {
       "claim": null,
       "needs": [],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Evaluate Exasol Personal locally and record driver, SQL, and connection-limit facts"
     },
