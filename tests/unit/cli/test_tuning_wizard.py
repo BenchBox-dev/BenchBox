@@ -64,6 +64,8 @@ def test_autofill_defaults_cloud_and_local() -> None:
 
 def test_apply_defaults_to_config() -> None:
     cfg = UnifiedTuningConfiguration()
+    cfg.disable_all_constraints()
+    assert cfg.primary_keys.enabled is False
     out = t._apply_defaults_to_config(cfg, defaults={}, platform="redshift")
     assert out.primary_keys.enabled is True
     # GAP: the wizard records DISTRIBUTION/SORTING through
