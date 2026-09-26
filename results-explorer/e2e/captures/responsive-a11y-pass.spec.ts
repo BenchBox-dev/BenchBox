@@ -26,7 +26,7 @@ const OUT = path.join(
 
 const ROUTES: Array<{ slug: string; url: string }> = [
   { slug: "home", url: "/results/" },
-  { slug: "benchmark-tpch", url: "/results/tpch/?sf=0.01&phase=standard" },
+  { slug: "benchmark-tpch", url: "/results/tpch/?sf=0.01&phase=power" },
   { slug: "platform-duckdb", url: "/results/p/duckdb/" },
   { slug: "compare", url: "/results/compare" },
   { slug: "query", url: "/results/query" },

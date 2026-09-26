@@ -52,8 +52,9 @@ test.describe("direct route parity", () => {
   test("direct route hard-loads benchmark, query, and compare entrypoints", async ({ page }) => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
-    await expect(page).toHaveURL(/\/results\/tpch\/\?phase=standard$/);
+    await expect(page).toHaveURL(/\/results\/tpch\//);
     await waitForDataElement(page, page.getByRole("heading", { name: /^TPC-H Results$/ }));
+    await expect(page.getByRole("table", { name: /tpch SF0\.01 power results/i })).toBeVisible();
 
     await page.goto("/results/query");
     await waitForDataElement(page, page.getByRole("heading", { name: /^Find benchmark runs$/ }));

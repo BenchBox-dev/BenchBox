@@ -148,7 +148,7 @@ test.describe("responsive explorer assertions", () => {
 
   test("benchmark heatmap keeps its header visible during document scroll", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 600 });
-    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForDataLoaded(page, /TPC-H Results/i);
 
     // The route heading above is shell-rendered, so wait on the heatmap
@@ -195,7 +195,7 @@ test.describe("responsive explorer assertions", () => {
   test("scroll affordance follows measured overflow at 1440px", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
 
-    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForDataLoaded(page, /TPC-H Results/i);
     // The query matrix is a collapsed Analysis card by default now.
     await openAnalysisCard(page, "query_heatmap");
