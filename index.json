@@ -17824,15 +17824,10 @@
       "title": "Revalidate postgres ambiguous-column tpchavoc skips"
     },
     "tpchavoc-pg-dual-rewrite": {
-      "claim": {
-        "expires_at": "2026-09-27T21:10:38Z",
-        "generation": "7168b238bf4b45a68a4b5d3db9ed0fae",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a68d56a939b077672bfb199"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Revalidate postgres dual-table tpchavoc skip"
     },
     "tpchavoc-q2-v10-projection-faithfulness": {
