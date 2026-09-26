@@ -78,7 +78,7 @@ platforms_per_cohort = con.execute(
            COALESCE(NULLIF(LOWER(TRIM(test_type)), ''), 'unknown') AS phase,
            COUNT(DISTINCT platform_id)
     FROM results
-    WHERE platform_id IN ('datafusion', 'duckdb', 'pandas', 'polars')
+    WHERE platform_id IN ('cedardb', 'datafusion', 'duckdb', 'pandas', 'polars', 'spark')
     GROUP BY 1, 2, 3
     """
 ).fetchall()

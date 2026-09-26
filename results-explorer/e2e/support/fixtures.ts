@@ -33,9 +33,11 @@ import { expect, type Locator, type Page } from "@playwright/test";
  */
 export type FixtureRole =
   | "awsCloud"
+  | "cedardb"
   | "containerLocal"
   | "datafusion"
   | "datafusionPartial"
+  | "datafusionTuned"
   | "duckdb"
   | "duckdbCommunity"
   | "duckdbSf01"
@@ -45,6 +47,7 @@ export type FixtureRole =
   | "pandasTuned"
   | "pandasVendor"
   | "polars"
+  | "spark"
   | "starSchema"
   | "zeroTiming";
 

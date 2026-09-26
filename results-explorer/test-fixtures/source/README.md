@@ -15,10 +15,16 @@ full rationale.
 
 ## Why these specific bundles
 
-- **TPC-H SF 0.01 across DuckDB / DataFusion / Polars / Pandas** - gives a
-  valid ≥4-platform compare cohort at a single `benchmark × scale_factor`
-  key, which is required for the compare-happy-path and honesty-control
-  tests.
+- **TPC-H SF 0.01 power across DuckDB / DataFusion / Polars / Spark /
+  CedarDB** - gives a valid ≥4-platform compare cohort at a single
+  `benchmark × scale_factor × phase` key, which is required for the
+  compare-happy-path and honesty-control tests. DuckDB, DataFusion, Spark,
+  and CedarDB are byte-for-byte copies of curated `results-data/bundles`
+  power runs (see `provenance/*.source.manifest.json`); Polars is the same
+  lineage rescaled from SF 0.1 to SF 0.01 in the `scale_factor` field only
+  (timings are the original power-run values, noted in its manifest).
+  Pandas stays a `standard`-phase fixture because its source is a `power`
+  run relabelled fixture-only under `synthetic/`.
 - **Star-schema SF 0.01 DuckDB** - provides a second `benchmark` so the
   compare-invalid benchmark-mismatch hard-block test can reference a
   real bundle rather than a synthesised stub.
@@ -38,9 +44,11 @@ The generator also synthesises additive variants from these sources
 - **Trust labels** - `maintainer-run` (verbatim sources),
   `community-submission` (DuckDB under `community/` with a submission
   manifest), and `vendor-supplied` (Pandas under `vendor/`).
-- **Tuned / notuned pairs** - DuckDB and Pandas each have a tuned sibling
-  (`config.tuning_mode="tuned"` plus a `.tuning.json` sidecar) so at least
-  two platforms in the ≥4-platform cohort exercise both modes.
+- **Tuned / notuned pairs** - DuckDB, DataFusion, and Pandas each have a
+  tuned sibling (`config.tuning_mode="tuned"` plus a `.tuning.json`
+  sidecar). DuckDB and DataFusion pair in the power cohort; Pandas pairs
+  in standard. At least two platforms in the ≥4-platform power cohort
+  exercise both modes.
 
 ## Adding new sources
 
