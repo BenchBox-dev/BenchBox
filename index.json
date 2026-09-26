@@ -17805,10 +17805,15 @@
       "title": "Sample TPC-Havoc variant equivalence on a fourth SQL engine (ClickHouse)"
     },
     "tpchavoc-pg-alias-inline": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T20:59:33Z",
+        "generation": "f2e6216e95f24de0b45d86e3bc423ded",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Revalidate postgres HAVING-alias tpchavoc skips by inlining"
     },
     "tpchavoc-pg-ambiguous-cols": {
