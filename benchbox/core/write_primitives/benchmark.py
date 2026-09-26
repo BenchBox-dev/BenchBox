@@ -47,6 +47,7 @@ from benchbox.sql_compat.rules.execution_filter.postgres_write_primitives import
     POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS,
 )
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 _POSTGRES_OPERATION_SKIP_DIALECTS = frozenset({"postgres", "postgresql"})
@@ -245,12 +246,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
         self._version = "2.0"
         self._description = "Write Primitives benchmark - Testing fundamental write operations using TPC-H schema"
 
-        # Setup directories
+        # Setup directories. normalize_output_dir keeps an orchestrator-resolved
+        # CloudStagingPath/DatabricksPath handler intact instead of leaving a
+        # raw cloud URI string for downstream Path(...) calls to stringify.
         if output_dir is None:
             # Reuse the canonical TPC-H datagen directory
             output_dir = get_benchmark_runs_datagen_path("tpch", scale_factor)
 
-        self.output_dir = output_dir
+        self.output_dir = normalize_output_dir(output_dir)
 
         # Initialize components
         self.operations_manager = WriteOperationsManager()

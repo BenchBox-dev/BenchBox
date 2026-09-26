@@ -29,6 +29,7 @@ from benchbox.core.datavault.schema import (
     get_create_all_tables_sql,
     get_table_loading_order,
 )
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 from benchbox.utils.scale_factor import format_scale_factor
 
@@ -121,9 +122,12 @@ class DataVaultBenchmark(TranslatableQueryMixin, BaseBenchmark):
         self.compression_level = compression_level
 
         # Set output_dir from parameter if provided, otherwise use default
-        # (BaseBenchmark doesn't handle output_dir, so we set it explicitly)
+        # (BaseBenchmark doesn't handle output_dir, so we set it explicitly).
+        # normalize_output_dir keeps a CloudStagingPath/DatabricksPath handler
+        # intact; Path(...) on one would stringify it to the local cache and
+        # drop the cloud upload target resolved at construction time.
         if output_dir is not None:
-            self.output_dir = Path(output_dir) if isinstance(output_dir, str) else output_dir
+            self.output_dir = normalize_output_dir(output_dir)
         elif not hasattr(self, "output_dir") or self.output_dir is None:
             # Honor BENCHBOX_OUTPUT_DIR at construction; falls back to
             # Path.cwd()/benchmark_runs/datagen when no override is set.

@@ -58,7 +58,12 @@ class TPCDIConfig:
 
             self.output_dir = get_benchmark_runs_datagen_path("tpcdi", self.scale_factor)
         else:
-            self.output_dir = Path(self.output_dir)
+            # normalize_output_dir keeps a CloudStagingPath/DatabricksPath
+            # handler intact; Path(...) would stringify it to the local cache
+            # and drop the cloud upload target resolved at construction time.
+            from benchbox.utils.cloud_storage import normalize_output_dir
+
+            self.output_dir = normalize_output_dir(self.output_dir)
 
         # Set sensible worker count
         if self.max_workers is None:
