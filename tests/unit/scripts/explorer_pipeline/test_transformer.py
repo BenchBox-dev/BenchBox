@@ -1164,6 +1164,21 @@ class TestExtendedManifestFields:
 
         assert entry.test_type == "throughput"
 
+    def test_empty_phase_block_does_not_infer_test_type(self, tmp_path: Path) -> None:
+        """A present-but-empty phase block is no evidence the phase ran."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        del data["benchmark"]["test_type"]
+        data["phases"] = {"power_test": {}}
+        bundle = tmp_path / "phases_empty.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        entry = transformer.to_manifest_entry(bundle)
+
+        assert entry.test_type is None
+
     def test_extended_fields_in_detail_result(self, bundle_file: Path) -> None:
         """DetailResult carries the same extended fields as ManifestEntry."""
         import math
