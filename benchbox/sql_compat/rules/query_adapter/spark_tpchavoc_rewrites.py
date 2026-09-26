@@ -86,7 +86,7 @@ _REWRITES = [
     ),
 ]
 
-for _platform in ("spark", "velox", "lakesail"):
+for _platform in ("spark", "velox", "lakesail", "databricks"):
     for _qid, _slug, _reason in _REWRITES:
         REGISTRY.register(
             CompatibilityDecision(
