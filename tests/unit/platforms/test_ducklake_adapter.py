@@ -762,7 +762,7 @@ class TestDuckLakeDeploymentModeIsApplied:
             adapter = self._from_config(tmp_path, deployment_mode="postgres_catalog_s3")
 
         assert adapter._data_path_is_cloud is False
-        assert "implies a cloud (s3://) data_path" in caplog.text
+        assert "implies a cloud data_path" in caplog.text
 
     def test_local_mode_with_an_s3_data_path_warns(self, tmp_path, caplog):
         with caplog.at_level(logging.WARNING, logger="benchbox.platforms.ducklake"):
@@ -1258,6 +1258,194 @@ class TestDuckLakeS3Routing:
             data_path="s3://my-bucket/bench/",
         )
         assert adapter._build_s3_secret_sql().startswith("CREATE OR REPLACE SECRET ")
+
+
+class TestDuckLakeGcsAzureBackends:
+    """GCS and Azure DATA_PATH routing, secret SQL, and credential hygiene."""
+
+    def test_gcs_data_path_detected_as_cloud(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="gs://my-bucket/bench/",
+        )
+        assert adapter._data_path_is_cloud is True
+        assert str(adapter.data_path) == "gs://my-bucket/bench/"
+
+    def test_azure_data_path_detected_as_cloud(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="az://my-container/bench/",
+        )
+        assert adapter._data_path_is_cloud is True
+        assert str(adapter.data_path) == "az://my-container/bench/"
+
+    def test_gcs_secret_sql_uses_hmac_keys(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="gs://my-bucket/bench/",
+            gcs_key_id="GOOGEXAMPLE",
+            gcs_secret="topsecret",
+        )
+        sql = adapter._build_gcs_secret_sql()
+        assert "TYPE gcs" in sql
+        assert "KEY_ID 'GOOGEXAMPLE'" in sql
+        assert "SECRET 'topsecret'" in sql
+        assert sql.startswith("CREATE OR REPLACE SECRET ")
+
+    def test_gcs_secret_sql_requires_both_keys(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="gs://my-bucket/bench/",
+            gcs_key_id="GOOGEXAMPLE",
+        )
+        with pytest.raises(ValueError, match="HMAC credentials"):
+            adapter._build_gcs_secret_sql()
+
+    def test_azure_secret_sql_prefers_connection_string(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="az://my-container/bench/",
+            azure_connection_string="DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key",
+            azure_account_name="acct",
+        )
+        sql = adapter._build_azure_secret_sql()
+        assert "TYPE azure" in sql
+        assert "CONNECTION_STRING 'DefaultEndpointsProtocol=https;AccountName=acct;AccountKey=key'" in sql
+        assert sql.startswith("CREATE OR REPLACE SECRET ")
+
+    def test_azure_secret_sql_uses_chain_with_account_name(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="az://my-container/bench/",
+            azure_account_name="myaccount",
+        )
+        sql = adapter._build_azure_secret_sql()
+        assert "PROVIDER credential_chain" in sql
+        assert "ACCOUNT_NAME 'myaccount'" in sql
+
+    def test_azure_secret_sql_requires_some_credential(self, tmp_path):
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="az://my-container/bench/",
+        )
+        with pytest.raises(ValueError, match="requires credentials"):
+            adapter._build_azure_secret_sql()
+
+    def test_cloud_secret_dispatch_selects_extension_per_family(self, tmp_path):
+        s3 = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="s3://my-bucket/bench/",
+        )
+        assert s3._build_cloud_secret_sql()[0] == "httpfs"
+        assert "TYPE s3" in s3._build_cloud_secret_sql()[1]
+
+        gcs = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="gcs://my-bucket/bench/",
+            gcs_key_id="GOOGEXAMPLE",
+            gcs_secret="topsecret",
+        )
+        extension, sql = gcs._build_cloud_secret_sql()
+        assert extension == "httpfs"
+        assert "TYPE gcs" in sql
+
+        azure = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="abfss://my-container/bench/",
+            azure_account_name="myaccount",
+        )
+        extension, sql = azure._build_cloud_secret_sql()
+        assert extension == "azure"
+        assert "TYPE azure" in sql
+
+    def test_gcs_connect_installs_httpfs_and_gcs_secret(self, tmp_path, monkeypatch):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="gs://my-bucket/bench/",
+            gcs_key_id="GOOGEXAMPLE",
+            gcs_secret="topsecret",
+        )
+
+        class _StubSetupConn:
+            def __init__(self):
+                self.executed: list[str] = []
+
+            def execute(self, sql):
+                self.executed.append(sql)
+                if sql.startswith("ATTACH"):
+                    raise RuntimeError("stop-after-attach (test stub)")
+                return self
+
+            def close(self):
+                pass
+
+        stub_conn = _StubSetupConn()
+        monkeypatch.setattr(DuckDBAdapter, "create_connection", lambda self, **_: stub_conn)
+
+        with pytest.raises(RuntimeError, match="Failed to initialize the DuckLake catalog"):
+            adapter.create_connection()
+
+        assert any("INSTALL httpfs" in sql for sql in stub_conn.executed)
+        assert any("TYPE gcs" in sql for sql in stub_conn.executed)
+        assert any(sql.startswith("ATTACH") for sql in stub_conn.executed)
+
+    def test_azure_connect_installs_azure_extension(self, tmp_path, monkeypatch):
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="az://my-container/bench/",
+            azure_account_name="myaccount",
+        )
+
+        class _StubSetupConn:
+            def __init__(self):
+                self.executed: list[str] = []
+
+            def execute(self, sql):
+                self.executed.append(sql)
+                if sql.startswith("ATTACH"):
+                    raise RuntimeError("stop-after-attach (test stub)")
+                return self
+
+            def close(self):
+                pass
+
+        stub_conn = _StubSetupConn()
+        monkeypatch.setattr(DuckDBAdapter, "create_connection", lambda self, **_: stub_conn)
+
+        with pytest.raises(RuntimeError, match="Failed to initialize the DuckLake catalog"):
+            adapter.create_connection()
+
+        assert any("INSTALL azure" in sql for sql in stub_conn.executed)
+        assert any("LOAD azure" in sql for sql in stub_conn.executed)
+        assert any("TYPE azure" in sql for sql in stub_conn.executed)
+
+    def test_new_credential_forms_are_redacted(self):
+        message = (
+            "CREATE OR REPLACE SECRET benchbox_ducklake_gcs (TYPE gcs, KEY_ID 'GOOGEXAMPLE', SECRET 'topsecret') "
+            "CREATE OR REPLACE SECRET benchbox_ducklake_azure (TYPE azure, "
+            "CONNECTION_STRING 'DefaultEndpointsProtocol=https;AccountKey=key')"
+        )
+        redacted = _redact_secrets(message)
+        assert "GOOGEXAMPLE" not in redacted
+        assert "topsecret" not in redacted
+        assert "AccountKey=key" not in redacted
+
+    def test_new_credentials_scrubbed_from_result_metadata(self, tmp_path):
+        metadata = TestDuckLakeResultMetadataRecordsBacking()._metadata(
+            tmp_path,
+            data_path="gs://bucket/x",
+            gcs_key_id="GOOG-sentinel",
+            gcs_secret="shh-sentinel",
+            azure_connection_string="conn-sentinel",
+            azure_account_name="acct-sentinel",
+        )
+        blob = json.dumps(metadata, default=str)
+        for sentinel in ("GOOG-sentinel", "shh-sentinel", "conn-sentinel", "acct-sentinel"):
+            assert sentinel not in blob, f"{sentinel} leaked into exported result metadata"
 
 
 class TestDuckLakeResultMetadataRecordsBacking:

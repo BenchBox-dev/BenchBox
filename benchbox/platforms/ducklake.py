@@ -11,8 +11,9 @@ DuckDB's execution engine and SQL dialect unchanged:
 
 Catalog metadata backend is selected via the ``catalog`` platform option
 (``duckdb`` default, ``sqlite``, or ``postgres``); DATA_PATH may be a local
-directory or an ``s3://`` URI. See ``create_connection()`` for the per-backend
-ATTACH string construction and the S3 secret setup.
+directory or a cloud URI (``s3://``, ``gs://``/``gcs://``,
+``az://``/``azure://``/``abfss://``). See ``create_connection()`` for the
+per-backend ATTACH string construction and the cloud secret setup.
 
 For the ``postgres`` catalog backend, the target PostgreSQL DATABASE must
 already exist - this adapter does not run ``CREATE DATABASE``.
@@ -50,13 +51,26 @@ _VALID_CATALOGS: tuple[str, ...] = ("duckdb", "sqlite", "postgres")
 # Stable, idempotent secret name so reconnects/CREATE OR REPLACE don't
 # accumulate anonymous secrets.
 _S3_SECRET_NAME = "benchbox_ducklake_s3"
+_GCS_SECRET_NAME = "benchbox_ducklake_gcs"
+_AZURE_SECRET_NAME = "benchbox_ducklake_azure"
 _RUN_IDENTITY_TABLE = "__benchbox_run_identity"
 
 # Connection credentials that must never reach exported result metadata.
 # get_platform_info() already omits these, but the normalized metadata is also
 # built from the unfiltered constructor config, where only pg_password happens
 # to match the shared secret-key matcher - pg_user does not.
-_CREDENTIAL_CONFIG_KEYS = frozenset({"pg_user", "pg_password", "s3_key_id", "s3_secret"})
+_CREDENTIAL_CONFIG_KEYS = frozenset(
+    {
+        "pg_user",
+        "pg_password",
+        "s3_key_id",
+        "s3_secret",
+        "gcs_key_id",
+        "gcs_secret",
+        "azure_connection_string",
+        "azure_account_name",
+    }
+)
 
 _REDACTED = "****"
 
@@ -71,6 +85,9 @@ _PASSWORD_COMPONENT_RE = re.compile(r"(password\s*=\s*).*?(?=\s+port\s*=|$)", fl
 # Matches the `SECRET '<value>'` clause of CREATE SECRET; the secret NAME is an
 # unquoted identifier, so only the quoted key material is caught here.
 _S3_SECRET_CLAUSE_RE = re.compile(r"(\bSECRET\s+)'(?:[^']|'')*'", flags=re.IGNORECASE)
+# Same backstop for the other secret key clauses this adapter emits:
+# `KEY_ID '...'` (S3/GCS explicit keys) and `CONNECTION_STRING '...'` (Azure).
+_SECRET_KEY_CLAUSE_RE = re.compile(r"(\b(?:KEY_ID|CONNECTION_STRING)\s+)'(?:[^']|'')*'", flags=re.IGNORECASE)
 
 
 def _redact_secrets(message: str, *secrets: str | None) -> str:
@@ -81,8 +98,9 @@ def _redact_secrets(message: str, *secrets: str | None) -> str:
     1. Exact replacement of every secret value we hold, in each encoding this
        adapter can emit it in - raw, libpq-quoted, and libpq-quoted-then-SQL-
        escaped (the form that reaches DuckDB inside the ATTACH literal).
-    2. Pattern redaction of `password=...` / `SECRET '...'` for anything the
-       driver re-encoded on its way back out.
+    2. Pattern redaction of `password=...` / `SECRET '...'` / `KEY_ID '...'`
+       / `CONNECTION_STRING '...'` for anything the driver re-encoded on
+       its way back out.
     """
     redacted: str = message
     encodings: set[str] = set()
@@ -97,7 +115,8 @@ def _redact_secrets(message: str, *secrets: str | None) -> str:
     for encoding in longest_first:
         redacted = redacted.replace(encoding, _REDACTED)
     redacted = _PASSWORD_COMPONENT_RE.sub(rf"\1{_REDACTED}", redacted)
-    return _S3_SECRET_CLAUSE_RE.sub(rf"\1{_REDACTED}", redacted)
+    redacted = _S3_SECRET_CLAUSE_RE.sub(rf"\1{_REDACTED}", redacted)
+    return _SECRET_KEY_CLAUSE_RE.sub(rf"\1{_REDACTED}", redacted)
 
 
 # Deployment modes are a naming of the two independent axes (catalog backend x
@@ -143,7 +162,7 @@ def _resolve_catalog_with_deployment_mode(deployment_mode: Any, catalog: Any) ->
 def _warn_if_deployment_mode_contradicts_storage(deployment_mode: Any, data_path: Any) -> None:
     """Warn when *deployment_mode* names a storage axis the data_path does not match.
 
-    Unlike the catalog axis this cannot be defaulted: an ``s3://`` mode needs a
+    Unlike the catalog axis this cannot be defaulted: a cloud mode needs a
     bucket, and inventing one would be worse than saying nothing. So the
     mismatch is reported and the supplied ``data_path`` is used as-is.
     """
@@ -155,7 +174,7 @@ def _warn_if_deployment_mode_contradicts_storage(deployment_mode: Any, data_path
         return
     actual_is_cloud = is_cloud_path(str(data_path))
     if actual_is_cloud is not mode_is_cloud:
-        expected = "a cloud (s3://) data_path" if mode_is_cloud else "a local data_path"
+        expected = "a cloud data_path" if mode_is_cloud else "a local data_path"
         logger.warning(
             "DuckLake deployment mode %r implies %s, but data_path=%s was given; using it as-is. "
             "Pass a matching --platform-option data_path to run the deployment you selected.",
@@ -317,7 +336,7 @@ class DuckLakeAdapter(DuckDBAdapter):
                 "--ducklake-data-path",
                 dest="ducklake_data_path",
                 type=str,
-                help="Path to the DuckLake Parquet data directory (local path or s3:// URI)",
+                help="Path to the DuckLake Parquet data directory (local path or cloud URI: s3://, gs://, az://)",
             )
             ducklake_group.add_argument(
                 "--ducklake-catalog",
@@ -327,7 +346,8 @@ class DuckLakeAdapter(DuckDBAdapter):
                 help="DuckLake catalog backend: duckdb, sqlite, or postgres (default: duckdb). "
                 "The --platform-option catalog=... form is the primary interface; PostgreSQL "
                 "catalog connection params (pg_host/pg_port/pg_database/pg_user/pg_password) and "
-                "S3 credentials (s3_key_id/s3_secret/s3_region) are only available via "
+                "cloud credentials (s3_key_id/s3_secret/s3_region, gcs_key_id/gcs_secret, "
+                "azure_connection_string/azure_account_name) are only available via "
                 "--platform-option.",
             )
         except argparse.ArgumentError as exc:
@@ -472,7 +492,15 @@ class DuckLakeAdapter(DuckDBAdapter):
             if value is not None:
                 adapter_config[key] = value
 
-        for key in ("s3_key_id", "s3_secret", "s3_region"):
+        for key in (
+            "s3_key_id",
+            "s3_secret",
+            "s3_region",
+            "gcs_key_id",
+            "gcs_secret",
+            "azure_connection_string",
+            "azure_account_name",
+        ):
             value = _resolve_option(key)
             if value is not None:
                 adapter_config[key] = value
@@ -564,6 +592,18 @@ class DuckLakeAdapter(DuckDBAdapter):
         self.s3_secret = config.get("s3_secret")
         self.s3_region = config.get("s3_region")
 
+        # GCS DATA_PATH credentials: HMAC key pair for gs:// URIs. Unlike S3
+        # there is no ambient credential chain in DuckDB's gcs secret type,
+        # so both are required before a GCS secret is created.
+        self.gcs_key_id = config.get("gcs_key_id")
+        self.gcs_secret = config.get("gcs_secret")
+
+        # Azure DATA_PATH credentials for az://, azure://, and abfss:// URIs:
+        # either a full connection string, or an account name for ambient
+        # credential_chain auth. A connection string wins when both are set.
+        self.azure_connection_string = config.get("azure_connection_string")
+        self.azure_account_name = config.get("azure_account_name")
+
     @staticmethod
     def _validate_catalog(catalog: Any) -> str:
         """Validate and normalize the ``catalog`` platform option.
@@ -641,6 +681,72 @@ class DuckLakeAdapter(DuckDBAdapter):
                 parts.append(f"REGION '{escape_sql_string_literal(self.s3_region)}'")
             return f"CREATE OR REPLACE SECRET {_S3_SECRET_NAME} (TYPE s3, {', '.join(parts)})"
         return f"CREATE OR REPLACE SECRET {_S3_SECRET_NAME} (TYPE s3, PROVIDER credential_chain)"
+
+    def _build_gcs_secret_sql(self) -> str:
+        """Build the ``CREATE OR REPLACE SECRET`` statement for GCS DATA_PATH access.
+
+        DuckDB reads GCS through the S3 API using HMAC interoperability keys,
+        so both ``gcs_key_id`` and ``gcs_secret`` are required: unlike S3
+        there is no ambient credential chain for the gcs secret type, and a
+        half-formed secret would fail confusingly at ATTACH time instead of
+        here with an actionable message. ``CREATE OR REPLACE`` keeps this
+        idempotent across reconnects.
+        """
+        if not (self.gcs_key_id and self.gcs_secret):
+            raise ValueError(
+                "DuckLake GCS DATA_PATH requires HMAC credentials: pass both "
+                "--platform-option gcs_key_id=<hmac-access-id> and "
+                "--platform-option gcs_secret=<hmac-secret> (Google Cloud "
+                "Storage interoperability keys, not service-account keys)."
+            )
+        return (
+            f"CREATE OR REPLACE SECRET {_GCS_SECRET_NAME} (TYPE gcs, "
+            f"KEY_ID '{escape_sql_string_literal(self.gcs_key_id)}', "
+            f"SECRET '{escape_sql_string_literal(self.gcs_secret)}')"
+        )
+
+    def _build_azure_secret_sql(self) -> str:
+        """Build the ``CREATE OR REPLACE SECRET`` statement for Azure DATA_PATH access.
+
+        A connection string is self-contained and wins when both forms are
+        set; otherwise an account name drives ambient ``credential_chain``
+        auth (Azure CLI, managed identity, environment). With neither, fail
+        here with an actionable message instead of at ATTACH time.
+        ``CREATE OR REPLACE`` keeps this idempotent across reconnects.
+        """
+        if self.azure_connection_string:
+            return (
+                f"CREATE OR REPLACE SECRET {_AZURE_SECRET_NAME} (TYPE azure, "
+                f"CONNECTION_STRING '{escape_sql_string_literal(self.azure_connection_string)}')"
+            )
+        if self.azure_account_name:
+            return (
+                f"CREATE OR REPLACE SECRET {_AZURE_SECRET_NAME} (TYPE azure, "
+                f"PROVIDER credential_chain, "
+                f"ACCOUNT_NAME '{escape_sql_string_literal(self.azure_account_name)}')"
+            )
+        raise ValueError(
+            "DuckLake Azure DATA_PATH requires credentials: pass either "
+            "--platform-option azure_connection_string=<connection-string> or "
+            "--platform-option azure_account_name=<account> (ambient credential_chain auth)."
+        )
+
+    def _build_cloud_secret_sql(self) -> tuple[str, str]:
+        """Build the secret setup for this DATA_PATH's provider family.
+
+        Returns the (extension, secret_sql) pair: S3 and GCS ride on
+        ``httpfs`` with their own secret types; Azure needs the ``azure``
+        extension. Dispatches on the provider family so a new alias spelling
+        cannot be recognised by the classifier yet miss its secret.
+        """
+        from benchbox.utils.cloud_storage import cloud_provider_family
+
+        family = cloud_provider_family(str(self.data_path))
+        if family == "gcp":
+            return "httpfs", self._build_gcs_secret_sql()
+        if family == "azure":
+            return "azure", self._build_azure_secret_sql()
+        return "httpfs", self._build_s3_secret_sql()
 
     def get_target_dialect(self) -> str:
         """Get the SQL dialect for query translation.
@@ -1004,9 +1110,7 @@ class DuckLakeAdapter(DuckDBAdapter):
         if data_path_is_cloud:
             cloud_info = get_cloud_path_info(str(self.data_path))
             self.log_verbose(
-                f"DuckLake DATA_PATH is a cloud path: {cloud_info['provider']} bucket "
-                f"'{cloud_info['bucket']}' (credential_chain provider unless s3_key_id/"
-                f"s3_secret were supplied)"
+                f"DuckLake DATA_PATH is a cloud path: {cloud_info['provider']} bucket '{cloud_info['bucket']}'"
             )
         escaped_data_path = escape_sql_string_literal(str(self.data_path))
 
@@ -1029,29 +1133,35 @@ class DuckLakeAdapter(DuckDBAdapter):
                     "CREATE DATABASE)"
                 )
 
-            # Cloud DATA_PATH: httpfs + an S3 secret, created BEFORE ATTACH so
-            # the ATTACH's initial catalog/DATA_PATH validation can already
-            # reach the bucket. Local runs never touch this branch, so no S3
-            # credentials are required for the default/local path.
+            # Cloud DATA_PATH: storage extension + a provider secret, created
+            # BEFORE ATTACH so the ATTACH's initial catalog/DATA_PATH
+            # validation can already reach the bucket. Local runs never touch
+            # this branch, so no credentials are required for the
+            # default/local path.
             if data_path_is_cloud:
-                setup_conn.execute("INSTALL httpfs")
-                setup_conn.execute("LOAD httpfs")
+                storage_extension, secret_sql = self._build_cloud_secret_sql()
+                setup_conn.execute(f"INSTALL {storage_extension}")
+                setup_conn.execute(f"LOAD {storage_extension}")
                 try:
-                    setup_conn.execute(self._build_s3_secret_sql())
+                    setup_conn.execute(secret_sql)
                 except Exception as secret_exc:
                     # Redact: never let explicit key/secret material reach an
                     # exception message or log line.
-                    using_explicit_creds = bool(self.s3_key_id and self.s3_secret)
+                    using_explicit_creds = bool(
+                        (self.s3_key_id and self.s3_secret)
+                        or (self.gcs_key_id and self.gcs_secret)
+                        or self.azure_connection_string
+                    )
                     raise RuntimeError(
-                        "Failed to create the DuckDB S3 secret for DuckLake DATA_PATH "
-                        f"(provider={'explicit key/secret' if using_explicit_creds else 'credential_chain'}). "
+                        "Failed to create the DuckDB cloud secret for DuckLake DATA_PATH "
+                        f"(provider={'explicit key/secret' if using_explicit_creds else 'ambient credentials'}). "
                         f"Underlying error type: {type(secret_exc).__name__}."
                         + (
                             ""
                             if using_explicit_creds
-                            # credential_chain mode holds no explicit key material,
+                            # Ambient-credential mode holds no explicit key material,
                             # but the error text still passes through the redactor
-                            # so ambient credentials echoed by httpfs cannot ride
+                            # so ambient credentials echoed by the extension cannot ride
                             # out on this branch either.
                             else f" Underlying error: {_redact_secrets(str(secret_exc))}"
                         )
@@ -1082,8 +1192,23 @@ class DuckLakeAdapter(DuckDBAdapter):
             # so it is suppressed whenever this adapter holds secret material;
             # runs without credentials (duckdb/sqlite catalogs, credential_chain
             # S3) keep the full chain for debuggability.
-            holds_secret_material = bool(self.pg_password or self.s3_secret or self.s3_key_id)
-            underlying = _redact_secrets(str(e), self.pg_password, self.s3_secret, self.s3_key_id)
+            holds_secret_material = bool(
+                self.pg_password
+                or self.s3_secret
+                or self.s3_key_id
+                or self.gcs_secret
+                or self.gcs_key_id
+                or self.azure_connection_string
+            )
+            underlying = _redact_secrets(
+                str(e),
+                self.pg_password,
+                self.s3_secret,
+                self.s3_key_id,
+                self.gcs_secret,
+                self.gcs_key_id,
+                self.azure_connection_string,
+            )
             raise RuntimeError(
                 "Failed to initialize the DuckLake catalog (INSTALL/LOAD/ATTACH "
                 f"'ducklake' extension, catalog={self.catalog}). DuckLake requires "
