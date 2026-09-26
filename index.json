@@ -17729,6 +17729,13 @@
       "status": "done",
       "title": "Fix exported Throughput@Size: driver formula omits the queries-per-stream factor (22x/99x understated)"
     },
+    "tpchavoc-1v7-array-rewrite": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Write per-engine rewrites for tpchavoc 1_v7 array aggregation"
+    },
     "tpchavoc-2v2-unskip-probe": {
       "claim": null,
       "needs": [],
