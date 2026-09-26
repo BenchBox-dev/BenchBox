@@ -13668,15 +13668,10 @@
       "title": "✅ Replace Merge Benchmark with Write Primitives"
     },
     "replace-q16-q18-result-replay-with-structural": {
-      "claim": {
-        "expires_at": "2026-09-27T03:37:20Z",
-        "generation": "9297dec7500c4fdaa3a7fac49b99706d",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "TPC-Havoc DataFrame: replace Q16-Q18 result-replay variants with structural rewrites"
     },
     "replace-q16-q22-result-replay-variants-with-deeper-hand-writ": {
