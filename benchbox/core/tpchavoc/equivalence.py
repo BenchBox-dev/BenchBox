@@ -228,6 +228,7 @@ def find_divergences(
     *,
     query_ids: list[int] | None = None,
     translate_variant: Callable[[str], str] | None = None,
+    variant_query: Callable[[int, int], str] | None = None,
     skip_variants: Collection[str] | None = None,
     execute_transform: Callable[[str], str] | None = None,
     char_padding_columns: Mapping[int, Collection[int]] | None = None,
@@ -258,6 +259,10 @@ def find_divergences(
         query_ids: Subset of query ids to check; defaults to all implemented.
         translate_variant: Optional callable rendering a variant's SQL into the
             target engine's dialect. Defaults to identity (DuckDB-native).
+        variant_query: Optional callable returning an already-rendered variant
+            for a query and variant id. This takes precedence over
+            ``translate_variant`` and lets the sample reuse query-id-aware
+            production rewrites.
         skip_variants: Variant keys ("<query>_v<variant>") to exclude from the
             sweep entirely - e.g. POSTGRES_TPCHAVOC_SKIPS, which the engine
             cannot execute. Excluded variants are neither run nor counted as
@@ -329,9 +334,11 @@ def find_divergences(
             if f"{query_id}_v{variant_id}" in excluded:
                 continue
             try:
-                variant_sql = transform_for_engine(
-                    render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
-                )
+                if variant_query is None:
+                    rendered = render_variant(strip_top_n(benchmark.get_query(f"{query_id}_v{variant_id}")))
+                else:
+                    rendered = strip_top_n(variant_query(query_id, variant_id))
+                variant_sql = transform_for_engine(rendered)
                 variant_rows = normalize(connection.execute(variant_sql).fetchall())
                 benchmark.validate_variant_equivalence(query_id, variant_id, original, variant_rows)
             except ValidationError as exc:
@@ -621,6 +628,9 @@ def _dialect_sample_divergences(
         lambda q: tpch.get_query(q, dialect=target_dialect),
         query_ids=query_ids,
         translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", target_dialect),
+        variant_query=lambda query_id, variant_id: tpchavoc.get_query(
+            f"{query_id}_v{variant_id}", dialect=target_dialect
+        ),
         skip_variants=set(skip_variants),
         **sweep_kwargs,
     )
@@ -787,6 +797,9 @@ def find_datafusion_divergences(
         _canonical_sql,
         query_ids=query_ids,
         translate_variant=lambda sql: tpchavoc.translate_query_text(sql, "netezza", DATAFUSION_TARGET_DIALECT),
+        variant_query=lambda query_id, variant_id: tpchavoc.get_query(
+            f"{query_id}_v{variant_id}", dialect=DATAFUSION_TARGET_DIALECT
+        ),
         skip_variants=set(DATAFUSION_TPCHAVOC_SKIPS),
     )
 
