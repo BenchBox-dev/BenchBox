@@ -808,10 +808,13 @@ def _test_type(bundle: BundleDocument) -> str | None:
     if bundle.benchmark.test_type:
         return bundle.benchmark.test_type
     # A present-but-empty phase block carries no evidence the phase ran;
-    # truthiness on the dumped block matches the historical raw-mapping check.
-    if bundle.phases.get("power_test") is not None and bool(bundle.phases["power_test"].model_dump()):
+    # truthiness on the unset-excluded dump matches the historical
+    # raw-mapping check.
+    power_phase = bundle.phases.get("power_test")
+    if power_phase is not None and bool(power_phase.model_dump(exclude_unset=True)):
         return "power"
-    if bundle.phases.get("throughput_test") is not None and bool(bundle.phases["throughput_test"].model_dump()):
+    throughput_phase = bundle.phases.get("throughput_test")
+    if throughput_phase is not None and bool(throughput_phase.model_dump(exclude_unset=True)):
         return "throughput"
     return None
 
@@ -1019,9 +1022,12 @@ def _has_normalized_environment_contract(bundle: BundleDocument) -> bool:
     """Return true when the bundle carries normalized environment/platform facets."""
     environment = bundle.environment
     platform = bundle.platform
-    # Presence (not content): an explicitly empty mapping still counts as a
-    # contract block, matching the historical isinstance check. Equality
-    # against a fresh default detects exactly that.
+    # Content-based presence: a block counts when it carries at least one
+    # key. This deliberately narrows the historical isinstance check, under
+    # which an explicitly empty mapping (``"deployment": {}``) counted as a
+    # contract block and routed facet extraction away from the legacy cost
+    # fallback. An empty mapping carries no facets, so treating it as absent
+    # is the more correct routing; no corpus bundle hits the old branch.
     runtime_present = environment.platform_runtime != BundlePlatformRuntime()
     container_present = environment.container != BundleContainerBlock()
     platform_present = any(
