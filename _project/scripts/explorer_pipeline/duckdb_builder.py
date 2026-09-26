@@ -66,33 +66,6 @@ _LEGACY_COST_DEPLOYMENT_COLUMNS = [
     ("storage_tier", "VARCHAR"),
 ]
 
-_NORMALIZED_COST_KEYS = frozenset(
-    {
-        "normalized_cost_usd",
-        "cost_model_version",
-        "cost_model_source",
-        "cost_scope",
-        "cost_status",
-        "billing_unit",
-        "pricing_region",
-        "deployment",
-    }
-)
-_DEPLOYMENT_KEYS = frozenset(
-    {
-        "cloud_provider",
-        "cloud_region",
-        "instance_type",
-        "warehouse_size",
-        "node_count",
-        "cluster_size",
-        "storage_format",
-        "storage_tier",
-    }
-)
-_COST_SCOPES = frozenset({"compute_only", "compute_plus_storage"})
-_COST_STATUSES = frozenset({"normalized", "not_applicable_local", "unavailable"})
-
 # If this module grows further, consider splitting DDL (_create_schema,
 # _create_views) from the ten _populate_* helpers into sibling modules
 # ``duckdb_schema.py`` and ``duckdb_populate.py``. Kept cohesive for now so the
@@ -108,44 +81,23 @@ def _finite_float_or_none(entry: ManifestEntry, key: str, value: Any) -> float |
     return parsed
 
 
-def _required_cost_string(entry: ManifestEntry, cost: dict[str, Any], key: str) -> str:
-    value = cost[key]
-    if not isinstance(value, str) or not value:
-        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be a non-empty string")
-    return value
-
-
-def _required_cost_choice(entry: ManifestEntry, cost: dict[str, Any], key: str, choices: frozenset[str]) -> str:
-    value = _required_cost_string(entry, cost, key)
-    if value not in choices:
-        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be one of {sorted(choices)}; got {value!r}")
-    return value
-
-
 def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
-    """Flatten entry.normalized_cost metadata into the DuckDB column contract."""
+    """Flatten entry.normalized_cost metadata into the DuckDB column contract.
+
+    The cost is a validated ``NormalizedCost`` by construction (strict
+    validation lives in the transformer ingest); only finiteness of the
+    numeric payload is re-checked here because a hand-built entry can still
+    carry a non-finite Decimal.
+    """
     cost = entry.normalized_cost
-    missing = _NORMALIZED_COST_KEYS - cost.keys()
-    if missing:
-        raise ValueError(f"{entry.result_id}: normalized_cost missing required keys {sorted(missing)}")
-
-    deployment = cost["deployment"]
-    if not isinstance(deployment, dict):
-        raise ValueError(f"{entry.result_id}: normalized_cost.deployment must be a dict")
-    deployment_missing = _DEPLOYMENT_KEYS - deployment.keys()
-    if deployment_missing:
-        raise ValueError(
-            f"{entry.result_id}: normalized_cost.deployment missing required keys {sorted(deployment_missing)}"
-        )
-
     return (
-        _finite_float_or_none(entry, "normalized_cost_usd", cost["normalized_cost_usd"]),
-        _required_cost_string(entry, cost, "cost_model_version"),
-        _required_cost_string(entry, cost, "cost_model_source"),
-        _required_cost_choice(entry, cost, "cost_scope", _COST_SCOPES),
-        _required_cost_choice(entry, cost, "cost_status", _COST_STATUSES),
-        _required_cost_string(entry, cost, "billing_unit"),
-        _required_cost_string(entry, cost, "pricing_region"),
+        _finite_float_or_none(entry, "normalized_cost_usd", cost.normalized_cost_usd),
+        cost.cost_model_version,
+        cost.cost_model_source,
+        cost.cost_scope,
+        cost.cost_status,
+        cost.billing_unit,
+        cost.pricing_region,
     )
 
 
@@ -162,14 +114,13 @@ def _environment_facet_column_values(entry: ManifestEntry) -> tuple:
 
 def _legacy_cost_deployment_column_values(entry: ManifestEntry) -> tuple:
     """Keep legacy cost-deployment shape columns for existing cost/chart surfaces."""
-    cost = entry.normalized_cost
-    deployment = cost["deployment"]
+    deployment = entry.normalized_cost.deployment
     return (
-        deployment["instance_type"],
-        deployment["warehouse_size"],
-        deployment["node_count"],
-        deployment["cluster_size"],
-        deployment["storage_tier"],
+        deployment.instance_type,
+        deployment.warehouse_size,
+        deployment.node_count,
+        deployment.cluster_size,
+        deployment.storage_tier,
     )
 
 

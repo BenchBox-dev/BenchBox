@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 from benchbox.core.cost.models import NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
@@ -23,6 +23,11 @@ _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 
 def unavailable_normalized_cost_payload() -> dict[str, Any]:
     """Return the explicit normalized-cost unavailable payload for old bundles."""
+    return _unavailable_normalized_cost().to_dict()
+
+
+def _unavailable_normalized_cost() -> NormalizedCost:
+    """Return explicit normalized-cost-unavailable metadata for old bundles."""
     return NormalizedCost(
         normalized_cost_usd=None,
         cost_model_version=PRICING_VERSION,
@@ -31,7 +36,7 @@ def unavailable_normalized_cost_payload() -> dict[str, Any]:
         cost_status="unavailable",
         billing_unit="unknown",
         pricing_region="unknown",
-    ).to_dict()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -220,7 +225,7 @@ class ManifestEntry(BaseModel):
     validation_status: str | None = None
     failed_query_count: int = 0
     cost_usd: float | None = None
-    normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
+    normalized_cost: NormalizedCost = Field(default_factory=_unavailable_normalized_cost)
     deployment_class: str | None = None
     cloud_provider: str | None = None
     cloud_region: str | None = None
@@ -228,6 +233,13 @@ class ManifestEntry(BaseModel):
     storage_format: str | None = None
     compliance_class: str | None = None
     basis_availability: BasisAvailability | None = None
+
+    @field_serializer("normalized_cost")
+    def _serialize_normalized_cost(self, cost: NormalizedCost) -> dict[str, Any]:
+        # The serialized read model keeps the legacy cost payload shape
+        # (including the deprecated cost_usd alias); the typed dataclass is
+        # the in-memory working shape only.
+        return cost.to_dict()
 
     @model_validator(mode="after")
     def _default_logical_query_count(self) -> ManifestEntry:
@@ -472,7 +484,7 @@ class DetailResult(BaseModel):
     validation_status: str | None = None
     failed_query_count: int = 0
     cost_usd: float | None = None
-    normalized_cost: dict[str, Any] = Field(default_factory=unavailable_normalized_cost_payload)
+    normalized_cost: NormalizedCost = Field(default_factory=_unavailable_normalized_cost)
     compliance_class: str | None = None
     # Phase durations in seconds (None for pre-pipeline rows).
     phase_durations: dict[str, float] | None = None
@@ -494,6 +506,11 @@ class DetailResult(BaseModel):
     physical_mechanisms: list[str] | None = None
     physical_rendering_id: str | None = None
     basis_availability: BasisAvailability | None = None
+
+    @field_serializer("normalized_cost")
+    def _serialize_normalized_cost(self, cost: NormalizedCost) -> dict[str, Any]:
+        # Same legacy cost payload shape as ManifestEntry (see above).
+        return cost.to_dict()
 
 
 # ---------------------------------------------------------------------------

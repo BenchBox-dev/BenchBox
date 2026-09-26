@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+from decimal import Decimal
 from pathlib import Path
 
 import duckdb
@@ -204,7 +206,7 @@ class TestDuckDBSnapshotBuilder:
                     storage_format="cost-format",
                     storage_tier="s3-standard",
                 ),
-            ).to_dict(),
+            ),
         )
         builder = DuckDBSnapshotBuilder()
         out = tmp_path / "results.duckdb"
@@ -290,22 +292,18 @@ class TestDuckDBSnapshotBuilder:
         )
         assert all(value is None for value in row[7:])
 
-    @pytest.mark.parametrize(
-        ("field", "value", "message"),
-        [
-            ("normalized_cost_usd", "NaN", "must be finite"),
-            ("cost_status", "bogus", "must be one of"),
-            ("cost_model_version", "", "must be a non-empty string"),
-        ],
-    )
-    def test_malformed_normalized_cost_columns_rejected(
+    def test_non_finite_normalized_cost_usd_rejected(
         self,
         tmp_path: Path,
-        field: str,
-        value: str,
-        message: str,
     ) -> None:
-        normalized_cost = NormalizedCost(
+        """A hand-built entry carrying non-finite cost still fails the build.
+
+        Structural validation (required strings, scope/status vocabulary)
+        lives in the transformer ingest that produces the typed model; the
+        builder only re-checks finiteness of the numeric payload, which is
+        still reachable when a cost object bypasses dataclass validation.
+        """
+        cost = NormalizedCost(
             normalized_cost_usd="0.42",
             cost_model_version="2026.05.0",
             cost_model_source="benchbox.core.cost.pricing",
@@ -313,12 +311,13 @@ class TestDuckDBSnapshotBuilder:
             cost_status="normalized",
             billing_unit="instance_hour",
             pricing_region="us-east-1",
-        ).to_dict()
-        normalized_cost[field] = value
-        entry = _make_entry(normalized_cost=normalized_cost)
+        )
+        non_finite = copy.copy(cost)
+        object.__setattr__(non_finite, "normalized_cost_usd", Decimal("nan"))
+        entry = _make_entry(normalized_cost=non_finite)
 
         builder = DuckDBSnapshotBuilder()
-        with pytest.raises(ValueError, match=message):
+        with pytest.raises(ValueError, match="must be finite"):
             builder.build([entry], tmp_path / "results.duckdb")
 
     def test_results_schema_json_not_emitted(self, tmp_path: Path) -> None:
