@@ -11,7 +11,7 @@ meta_description: "BenchBox v0.4.1 adds four lakehouse table pairings, stricter 
 ---
 # BenchBox v0.4.1: more lakehouse pairings, stricter results
 
-**TL;DR**: BenchBox v0.4.1 can benchmark four more lakehouse table pairings: Delta on ClickHouse, Iceberg on BigQuery and Redshift Spectrum, and Hudi on Databricks. Result submissions now need every query and an official TPC-H run, and cost estimates say "unavailable" instead of guessing. Before you upgrade: Python 3.11, pandas 3, and DuckDB 1.5 are now minimums, and Modin support is gone.
+**TL;DR**: BenchBox v0.4.1 can benchmark four more lakehouse table pairings: Delta on ClickHouse, Iceberg on BigQuery and Redshift Spectrum, and Hudi on Databricks. Result submissions now need every query and an official TPC-H run, and cost reports say "unavailable" instead of guessing. Python 3.11, pandas 3, and DuckDB 1.5 are now minimums, and Modin support is gone.
 
 ---
 
@@ -19,7 +19,11 @@ meta_description: "BenchBox v0.4.1 adds four lakehouse table pairings, stricter 
 
 BenchBox v0.4.1 was released on **September 24, 2026**.
 
-This is a point release, but it touches more of a typical run than the version number suggests. Three changes stand out. More warehouses and engines can read open table formats. Published results have stricter rules. Cost reports stop filling gaps with estimates. The release also raises dependency floors, so read [Before you upgrade](#before-you-upgrade) first.
+The headline change is lakehouse coverage. Delta Lake, Apache Iceberg, and Apache Hudi tables can now be benchmarked on four more engines, and external-table mode reaches four more Spark services. The matrix above shows where each format runs today, with the new pairings in orange.
+
+The second change is stricter rules for published results. Submissions must be complete, official runs, and the Results Explorer gains views for comparing releases and previewing your own results before you submit them.
+
+The third is cost reporting that no longer guesses. When BenchBox lacks a price, size, or region, it now says the cost is unavailable. The release also raises several dependency floors, so check [Changed behavior to be aware of](#changed-behavior-to-be-aware-of) before you upgrade.
 
 ## At a glance
 
@@ -27,75 +31,63 @@ This is a point release, but it touches more of a typical run than the version n
 | --- | --- | --- |
 | Lakehouse tables | Delta on ClickHouse, Iceberg on BigQuery and Redshift Spectrum, Hudi on Databricks | Benchmark the same table format on more engines |
 | External tables | `--table-mode external` on Athena Spark, EMR Serverless, Dataproc Serverless, and Glue | Query staged files without loading them first |
-| Table maintenance | Optimize and vacuum for Delta and Hudi, vacuum for Iceberg | Measure a table after compaction, not only after the first load |
-| Result submissions | Official TPC-H only; every query required; warnings for implausible timings | Published results are complete runs |
+| Result submissions | Official TPC-H only, every query required, warnings for implausible timings | Published results are complete runs |
 | Cost reporting | Unknown prices, sizes, or regions report cost as unavailable | No invented dollar figures |
 | Results Explorer | Browse by engine version, compare runs to a baseline, preview before submitting | Easier to see what changed between releases |
-| Throughput | `benchbox run --streams N`; timed-out queries finish before the next phase | Control concurrency and keep phases separate |
 | Requirements | Python 3.11+, pandas 3, DuckDB 1.5-1.x, DataFusion 54+; Modin removed | Check your environment before upgrading |
 
 ## Lakehouse tables on more engines
 
-Lakehouse table formats such as Delta Lake, Apache Iceberg, and Apache Hudi add a transaction log and table metadata on top of Parquet files. The same table can then be read by several engines. BenchBox already covered many of these pairings, mostly through Spark and the local query engines. v0.4.1 adds four more, shown in orange in the matrix above:
+Lakehouse table formats add a transaction log and table metadata on top of Parquet files, so several engines can read the same table. BenchBox already covered many of these pairings, mostly through Spark and the local query engines. v0.4.1 fills in four gaps on the warehouse and query-engine side.
 
-- **Delta on ClickHouse.** ClickHouse reads Delta tables natively through its `DeltaLake` table engine and `deltaLake` table functions. Object-storage URLs use the engine. Local paths use `deltaLakeLocal` when the server has it registered. If a local server lacks native Delta reads, BenchBox falls back to exporting a Parquet snapshot. Remote tables with no native reader fail with a clear error instead.
-- **Iceberg on BigQuery.** BigQuery external mode now accepts Iceberg table directories as well as Parquet and Delta. It reads them as BigLake tables, so it needs a `biglake_connection` platform option.
-- **Iceberg on Redshift Spectrum.** Spectrum reads Iceberg only through the AWS Glue Data Catalog. BenchBox registers the uploaded table in Glue, replacing any earlier registration, and queries it through the external schema.
-- **Hudi on Databricks.** Set `table_format=hudi` and BenchBox creates tables with `USING HUDI` and the record-key properties you pass. So far this pairing is validated by unit tests only, not on a live workspace. Your Databricks runtime must already support Hudi, and BenchBox does not install the Hudi libraries.
+ClickHouse now reads Delta tables natively through its `DeltaLake` table engine and `deltaLake` table functions, with no Parquet conversion step. Object-storage URLs use the engine, and local paths use `deltaLakeLocal` when the server has it registered. If a local server lacks native Delta reads, BenchBox falls back to exporting a Parquet snapshot. A remote table with no native reader fails with a clear error rather than a snapshot that cannot run.
 
-External-table mode (`--table-mode external`), which queries staged files without loading them into native tables, now also works on Athena Spark, EMR Serverless, Dataproc Serverless, and AWS Glue.
+BigQuery and Redshift Spectrum both gained Iceberg in external-table mode. BigQuery reads Iceberg directories as BigLake tables, so it needs a `biglake_connection` platform option. Spectrum reads Iceberg only through the AWS Glue Data Catalog, so BenchBox registers each uploaded table in Glue, replacing any earlier registration, and queries it through the external schema.
 
-The matrix separates support from maturity. Some pairings read through external tables rather than native ones. DuckDB's Iceberg support is still experimental. The Apache Spark column also covers Dataproc Serverless. Before you plan a comparison, check the platform guide for the pairing you need.
+Databricks can now create Hudi tables. Set `table_format=hudi` and BenchBox emits `USING HUDI` DDL with the record-key properties you pass. This pairing is validated by unit tests only so far, not on a live workspace. Your Databricks runtime must already support Hudi, because BenchBox does not install the Hudi libraries.
 
-Table maintenance is now part of the workflow. Delta and Hudi tables support optimize and vacuum, and Iceberg tables support vacuum. Small files left behind by a load change scan performance, so a benchmark after compaction measures a different table than one taken straight after loading.
+External-table mode (`--table-mode external`) queries staged files without loading them into native tables. It now works on Athena Spark, EMR Serverless, Dataproc Serverless, and AWS Glue as well.
+
+Pairings in the matrix differ in maturity. Some read through external tables rather than native ones, and DuckDB's Iceberg support is still experimental. Check the platform guide before you plan a comparison.
+
+Table maintenance is now part of the workflow too. Delta and Hudi tables support optimize and vacuum, and Iceberg tables support vacuum. A load can leave many small files behind, so a benchmark taken after compaction measures a different table than one taken straight after loading.
 
 ## Stricter rules for published results
 
-Earlier releases already rejected unofficial TPC-DS runs for submission. v0.4.1 applies the same rule to TPC-H. A submission must now include every query in the benchmark, so a partial run cannot appear next to complete ones. BenchBox also warns when timings look implausible. The warning does not block the submission. It flags the result for a person to review.
+Earlier releases already rejected unofficial TPC-DS runs for submission. v0.4.1 applies the same rule to TPC-H. A submission must also include every query in the benchmark, so a partial run cannot sit next to complete ones in the corpus. BenchBox now warns when timings look implausible. The warning does not block a submission, but it flags the result for a person to review.
 
-The Results Explorer at [benchbox.dev/results/](https://benchbox.dev/results/) gained three views that help with release-to-release questions. You can browse results by engine version, compare several runs against one baseline, and preview your own results before you submit them.
+The [Results Explorer](https://benchbox.dev/results/) gained three views that help with release-to-release questions. You can browse results by engine version, compare several runs against one baseline, and preview your own results before you submit them.
 
 ## Cost reports without guesses
 
-When BenchBox does not know a price, a warehouse size, or a region, it now reports the cost as unavailable. Earlier releases could fill that gap with an estimate. A blank field is less convenient, but it cannot be mistaken for a measured number. Prices now come from vendor price lists. Snowflake cost uses run time and warehouse size.
+Earlier releases could fill a missing price, warehouse size, or region with an estimate. v0.4.1 reports the cost as unavailable instead. A blank field is less convenient, but nobody can mistake it for a measured number. Prices now come from vendor price lists, and Snowflake cost reflects run time and warehouse size.
 
-Result files also record more context. They store the tuning you requested next to the tuning BenchBox applied, the client's cloud region, and each table's load time when the loader captures per-table timings.
+Result files also record more context: the tuning you requested next to the tuning BenchBox applied, the client's cloud region, and each table's load time when the loader captures per-table timings.
 
 ## Other notable changes
 
-- **Throughput concurrency.** `benchbox run --streams N` sets how many query streams a throughput test runs at once. BenchBox now waits for timed-out queries to stop before starting the next phase. If the throughput phase fails, `benchbox run` leaves Throughput@Size out of the result.
-- **Repeatable downloaded datasets.** NYC Taxi and FlightData download a fixed set of files, so every run starts from the same source window.
-- **More DataFrame queries.** TPC-DS One Big Table has 17 DataFrame queries, up from 3.
-- **DuckDB 2.0 preview.** BenchBox can read query plans from the DuckDB 2.0 preview. Stable DuckDB 1.x remains the default.
-- **Cloud fixes.** ClickBench, TPC-DS, TPC-DI, and FlightData now load and run on BigQuery, Snowflake, and Databricks. Several Spark issues are fixed, including TPC-Havoc queries that Spark rejected.
-- **Correctness fixes.** DataFrame queries for Data Vault and FlightData now return the same results as SQL, and results record the real CPU model. Command-line benchmark options are no longer dropped, and result export works on Windows.
+`benchbox run --streams N` sets how many query streams a throughput test runs at once. BenchBox now waits for timed-out queries to stop before the next phase starts, and if the throughput phase fails, `benchbox run` leaves Throughput@Size out of the result.
 
-## Before you upgrade
+NYC Taxi and FlightData now download a fixed set of files, so every run starts from the same source window. TPC-DS One Big Table has 17 DataFrame queries, up from 3. BenchBox can also read query plans from the DuckDB 2.0 preview, while stable DuckDB 1.x remains the default.
 
-| Previous use | v0.4.1 action |
-| --- | --- |
-| Python 3.10 | Upgrade to Python 3.11 or later |
-| pandas 2 with `pandas-df` or `dask-df` | Upgrade to pandas 3 and `dask[distributed]>=2025.1.0`; with pandas 2, both platforms report unavailable |
-| DuckDB below 1.5 | Use DuckDB 1.5 or later, below 2.0 |
-| DataFusion below 54 | Use DataFusion 54 or later |
-| `databricks-connect` 19 | Pin `databricks-connect` below 19 |
-| `--platform modin` or `modin-df` | Use `pandas-df` or `dask-df` |
-| `PowerRunExecutor` or `ConcurrentQueryExecutor` | See `docs/advanced/power-run-concurrent-queries.md` for replacements |
-| Submitting a non-official or partial TPC-H run | Run the official TPC-H workload with every query |
+On the fix side, ClickBench, TPC-DS, TPC-DI, and FlightData now load and run on BigQuery, Snowflake, and Databricks, and TPC-Havoc queries that Spark rejected now run. DataFrame queries for Data Vault and FlightData return the same results as SQL, and results record the real CPU model.
 
-Python 3.10 reaches end of life in October 2026. We plan to require Python 3.12 after Python 3.11 reaches end of life in October 2027.
+## Changed behavior to be aware of
+
+- **Python 3.11 or later is required.** Python 3.10 reaches end of life in October 2026. We plan to require Python 3.12 after Python 3.11 reaches end of life in October 2027.
+- **DataFrame platforms need pandas 3.** With pandas 2, BenchBox reports `pandas-df` and Dask as unavailable. Dask also needs `dask[distributed]>=2025.1.0`.
+- **Newer engine drivers.** DuckDB must be at least 1.5 and below 2.0, DataFusion 54 or later, and `databricks-connect` below 19.
+- **Modin is no longer supported.** Use `pandas-df` or `dask-df` instead of the `modin` and `modin-df` platforms and extras.
+- **`PowerRunExecutor` and `ConcurrentQueryExecutor` are removed.** See `docs/advanced/power-run-concurrent-queries.md` for replacements.
+- **Unofficial or partial TPC-H runs can no longer be submitted.** Rerun the official workload with every query before submitting.
 
 ## Try it yourself
-
-After upgrading to v0.4.1:
-
-1. Confirm the installed version:
 
 ```bash
 benchbox --version
 ```
 
-2. Run a smoke benchmark with a Delta table on DuckDB:
+Run a Delta table on DuckDB:
 
 ```bash
 uv add "benchbox[duckdb,table-formats]"
@@ -103,7 +95,7 @@ uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
   --table-format delta
 ```
 
-3. Preview an Iceberg external-table run on BigQuery without running any queries:
+Preview an Iceberg external-table run on BigQuery without executing any queries:
 
 ```bash
 uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 \
@@ -112,16 +104,14 @@ uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 \
   --dry-run ./preview
 ```
 
-4. Run a throughput test with four concurrent streams:
+Run a throughput test with four concurrent streams:
 
 ```bash
 uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
   --phases power,throughput --streams 4
 ```
 
-5. Browse results by engine version at [benchbox.dev/results/](https://benchbox.dev/results/).
-
-If a pairing in the matrix does not behave as described, or you would like one we have not covered, [start a discussion](https://github.com/BenchBox-dev/BenchBox/discussions).
+Then browse results by engine version in the [Results Explorer](https://benchbox.dev/results/). If a pairing in the matrix does not behave as described, or you would like one we have not covered, [start a discussion](https://github.com/BenchBox-dev/BenchBox/discussions).
 
 ---
 
