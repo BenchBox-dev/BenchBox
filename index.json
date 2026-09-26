@@ -17749,10 +17749,15 @@
       "title": "Write per-engine rewrites for tpchavoc 1_v7 array aggregation"
     },
     "tpchavoc-2v2-unskip-probe": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T20:45:28Z",
+        "generation": "43671e0f402942a18bddf8ecac1f06e4",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Probe tpchavoc 2_v2 unskip on Snowflake"
     },
     "tpchavoc-ch-filter-rewrite": {
