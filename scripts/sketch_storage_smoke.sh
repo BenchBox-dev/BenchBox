@@ -371,12 +371,12 @@ else
     CREATE TABLE sketch_ops_topk_lgmm10
     (
       shard_id Int32,
-      topk_sketch AggregateFunction(topK(1024), String)
+      topk_sketch AggregateFunction(topK(10), String)
     ) ENGINE = MergeTree() ORDER BY shard_id;
     INSERT INTO sketch_ops_topk_lgmm10
-    SELECT toInt32(l_orderkey % 8), topKState(1024)(l_shipmode)
+    SELECT toInt32(l_orderkey % 8), topKState(10)(l_shipmode)
     FROM lineitem GROUP BY l_orderkey % 8;
-    SELECT 'clickhouse-local', 'sketch_query_topk_combine_lgmm10', length(toString(topKMergeState(1024)(topk_sketch)))
+    SELECT 'clickhouse-local', 'sketch_query_topk_combine_lgmm10', length(toString(topKMergeState(10)(topk_sketch)))
     FROM sketch_ops_topk_lgmm10;
   " >>"${OUT}"
 fi
