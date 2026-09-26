@@ -1,5 +1,5 @@
 {
-  "context": "Blocked until retained Throughput@Size observations exist: nightly runners are ephemeral and no run retains summary.tpc_metrics.throughput_at_size, so no defensible spread exists yet (the item's own data-first rule forbids premature numbers). The nightly assert now reports each observed value via ::notice:: for accumulation. Unblocks when N green DuckDB TPC-H SF1 observations are retained and X/N are signed off.",
+  "context": "Batch D investigation 2026-09-26: only 4 retained green DuckDB TPC-H SF1 throughput observations exist (2026-08-11/12/22, values 154k-349k, wide spread, 5+ weeks stale, local runs not nightly). No nightly has retained throughput_at_size yet. Per the item's own data-first rule, setting THROUGHPUT_FLOOR_MEDIAN now would manufacture false failures. Blocked on nightly baseline accumulation.",
   "description": "Set the numeric Throughput@Size floor: configure THROUGHPUT_FLOOR_MEDIAN and sign off THROUGHPUT_FLOOR_MAX_DROP_FRACTION (default 20%) from the retained rolling-median spread of green DuckDB TPC-H SF1 runs. Wiring, observe-only default, and policy docs merged in #2302 (plus hardening in #2309).",
   "sessions": [
     {
@@ -9,6 +9,14 @@
       "generation": "163cc24b77e74959b65b22da0a2cd86a",
       "op": "take",
       "op_id": "196fb85c809843b592711d9c8fc82ee4",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-26T02:24:27Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "f9e5c4777c04488b89e97222f8c897ae",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
     }
   ]
