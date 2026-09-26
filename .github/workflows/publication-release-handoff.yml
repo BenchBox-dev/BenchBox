@@ -1,0 +1,113 @@
+name: Publication Release Handoff
+
+# After a package release publishes, start a site publication candidate and
+# its promotion transaction so a release cannot silently leave benchbox.dev
+# on the previous version. This workflow never writes Pages itself: it only
+# dispatches the candidate builder and the transaction workflow (which waits
+# for the github-pages approval), and opens a tracked fallback issue when
+# any step fails.
+"on":
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to hand off (for example v0.4.2)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  handoff:
+    name: Dispatch publication candidate and promotion for release
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    permissions:
+      contents: read
+      actions: write
+      issues: write
+    steps:
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${RELEASE_TAG:-$INPUT_TAG}"
+          printf '%s' "$TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$' || {
+            echo "::error::release handoff requires a vX.Y.Z tag, got: $TAG"
+            exit 1
+          }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          date -u +%Y-%m-%dT%H:%M:%SZ > handoff-start.txt
+          echo "start=$(cat handoff-start.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch publication candidate build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run "Publication Control Plane Deployment" \
+            --ref develop --field candidate_only=true
+
+      - name: Wait for candidate bundle and dispatch promotion
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          START_ISO: ${{ steps.tag.outputs.start }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          DEADLINE=$(( $(date -u +%s) + 7200 ))
+          RUN_ID=""
+          while [ "$(date -u +%s)" -lt "$DEADLINE" ]; do
+            RUN_ID=$(gh run list --workflow "publication-deploy.yml" --branch develop \
+              --event workflow_dispatch --limit 10 \
+              --json databaseId,status,conclusion,createdAt,headBranch \
+              --jq "[.[] | select(.headBranch == \"develop\" and .status == \"completed\" and .conclusion == \"success\" and .createdAt >= \"$START_ISO\")] | first | .databaseId // empty")
+            if [ -n "$RUN_ID" ]; then
+              break
+            fi
+            sleep 120
+          done
+          test -n "$RUN_ID" || {
+            echo "::error::no successful candidate build appeared within 120 minutes"
+            exit 1
+          }
+          ARTIFACT_ID=$(gh api "repos/$REPO/actions/runs/$RUN_ID/artifacts" \
+            --jq "[.artifacts[] | select(.name == \"publication-candidate-$RUN_ID\" and .expired == false)] | first | .id // empty")
+          test -n "$ARTIFACT_ID" || {
+            echo "::error::candidate run $RUN_ID has no publication-candidate bundle artifact"
+            exit 1
+          }
+          gh workflow run "Publication Transactions" --ref develop \
+            --field kind=promotion --field candidate_artifact_id="$ARTIFACT_ID"
+          {
+            echo "## Publication handoff for $TAG"
+            echo ""
+            echo "Candidate run: $RUN_ID (artifact $ARTIFACT_ID)."
+            echo "The promotion transaction is dispatched and waits for the github-pages approval."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open tracked fallback issue when handoff fails
+        if: failure() && steps.tag.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh issue create \
+            --title "Publication handoff failed for $TAG" \
+            --label "publication" \
+            --body "The automatic publication handoff failed for release $TAG (run ${{ github.run_id }}).
+          Promote the site manually: dispatch \`Publication Control Plane Deployment\` from \`develop\` with
+          \`candidate_only=true\`, then run the promotion transaction from
+          \`docs/operations/publication-deployer-soak-and-retirement.md\`."
