@@ -86,8 +86,11 @@ _PASSWORD_COMPONENT_RE = re.compile(r"(password\s*=\s*).*?(?=\s+port\s*=|$)", fl
 # unquoted identifier, so only the quoted key material is caught here.
 _S3_SECRET_CLAUSE_RE = re.compile(r"(\bSECRET\s+)'(?:[^']|'')*'", flags=re.IGNORECASE)
 # Same backstop for the other secret key clauses this adapter emits:
-# `KEY_ID '...'` (S3/GCS explicit keys) and `CONNECTION_STRING '...'` (Azure).
-_SECRET_KEY_CLAUSE_RE = re.compile(r"(\b(?:KEY_ID|CONNECTION_STRING)\s+)'(?:[^']|'')*'", flags=re.IGNORECASE)
+# `KEY_ID '...'` (S3/GCS explicit keys), `CONNECTION_STRING '...'` (Azure
+# connection string), and `ACCOUNT_NAME '...'` (Azure credential_chain).
+_SECRET_KEY_CLAUSE_RE = re.compile(
+    r"(\b(?:KEY_ID|CONNECTION_STRING|ACCOUNT_NAME)\s+)'(?:[^']|'')*'", flags=re.IGNORECASE
+)
 
 
 def _redact_secrets(message: str, *secrets: str | None) -> str:
@@ -99,8 +102,8 @@ def _redact_secrets(message: str, *secrets: str | None) -> str:
        adapter can emit it in - raw, libpq-quoted, and libpq-quoted-then-SQL-
        escaped (the form that reaches DuckDB inside the ATTACH literal).
     2. Pattern redaction of `password=...` / `SECRET '...'` / `KEY_ID '...'`
-       / `CONNECTION_STRING '...'` for anything the driver re-encoded on
-       its way back out.
+       / `CONNECTION_STRING '...'` / `ACCOUNT_NAME '...'` for anything the
+       driver re-encoded on its way back out.
     """
     redacted: str = message
     encodings: set[str] = set()
@@ -1151,6 +1154,7 @@ class DuckLakeAdapter(DuckDBAdapter):
                         (self.s3_key_id and self.s3_secret)
                         or (self.gcs_key_id and self.gcs_secret)
                         or self.azure_connection_string
+                        or self.azure_account_name
                     )
                     raise RuntimeError(
                         "Failed to create the DuckDB cloud secret for DuckLake DATA_PATH "
@@ -1163,7 +1167,7 @@ class DuckLakeAdapter(DuckDBAdapter):
                             # but the error text still passes through the redactor
                             # so ambient credentials echoed by the extension cannot ride
                             # out on this branch either.
-                            else f" Underlying error: {_redact_secrets(str(secret_exc))}"
+                            else f" Underlying error: {_redact_secrets(str(secret_exc), self.azure_account_name)}"
                         )
                     ) from None
 
@@ -1199,6 +1203,7 @@ class DuckLakeAdapter(DuckDBAdapter):
                 or self.gcs_secret
                 or self.gcs_key_id
                 or self.azure_connection_string
+                or self.azure_account_name
             )
             underlying = _redact_secrets(
                 str(e),
@@ -1208,6 +1213,7 @@ class DuckLakeAdapter(DuckDBAdapter):
                 self.gcs_secret,
                 self.gcs_key_id,
                 self.azure_connection_string,
+                self.azure_account_name,
             )
             raise RuntimeError(
                 "Failed to initialize the DuckLake catalog (INSTALL/LOAD/ATTACH "

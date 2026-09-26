@@ -1427,12 +1427,68 @@ class TestDuckLakeGcsAzureBackends:
         message = (
             "CREATE OR REPLACE SECRET benchbox_ducklake_gcs (TYPE gcs, KEY_ID 'GOOGEXAMPLE', SECRET 'topsecret') "
             "CREATE OR REPLACE SECRET benchbox_ducklake_azure (TYPE azure, "
-            "CONNECTION_STRING 'DefaultEndpointsProtocol=https;AccountKey=key')"
+            "CONNECTION_STRING 'DefaultEndpointsProtocol=https;AccountKey=key') "
+            "CREATE OR REPLACE SECRET benchbox_ducklake_azure (TYPE azure, "
+            "PROVIDER credential_chain, ACCOUNT_NAME 'myaccount')"
         )
         redacted = _redact_secrets(message)
         assert "GOOGEXAMPLE" not in redacted
         assert "topsecret" not in redacted
         assert "AccountKey=key" not in redacted
+        assert "myaccount" not in redacted
+
+    def test_azure_secret_failure_never_leaks_account_name(self, tmp_path, monkeypatch):
+        # Regression: the credential_chain secret CREATE echoes ACCOUNT_NAME
+        # back through the driver error, and the inner redactor was called
+        # without the account name while the outer cause-suppression flag
+        # ignored it too - so the name reached the raised exception.
+        from benchbox.platforms.duckdb import DuckDBAdapter
+
+        adapter = DuckLakeAdapter(
+            metadata_path=str(tmp_path / "catalog.ducklake"),
+            data_path="az://my-container/bench/",
+            azure_account_name="myaccount",
+        )
+
+        class _StubSetupConn:
+            def execute(self, sql):
+                if sql.startswith("CREATE OR REPLACE SECRET"):
+                    raise RuntimeError(f"Catalog Error: {sql}")
+                return self
+
+            def close(self):
+                pass
+
+        monkeypatch.setattr(DuckDBAdapter, "create_connection", lambda self, **_: _StubSetupConn())
+
+        with pytest.raises(RuntimeError) as excinfo:
+            adapter.create_connection()
+
+        message = str(excinfo.value)
+        assert "myaccount" not in message
+        # Explicit credential material takes the provider-only branch: the
+        # driver text never rides out, and the chained cause is suppressed.
+        assert "explicit key/secret" in message
+        assert excinfo.value.__cause__ is None
+
+    def test_azure_attach_failure_never_leaks_account_name(self, tmp_path, monkeypatch):
+        # Same leak through the outer ATTACH-failure handler: the account name
+        # is classified credential material, so it must be redacted from the
+        # message and must suppress the chained cause.
+        adapter = TestDuckLakeCredentialRedaction()._failing_adapter(
+            tmp_path,
+            monkeypatch,
+            lambda sql: f"HTTP Error: could not list container for ACCOUNT_NAME 'myaccount': {sql}",
+            data_path="az://my-container/bench/",
+            azure_account_name="myaccount",
+        )
+
+        with pytest.raises(RuntimeError) as excinfo:
+            adapter.create_connection()
+
+        message = str(excinfo.value)
+        assert "myaccount" not in message
+        assert excinfo.value.__cause__ is None
 
     def test_new_credentials_scrubbed_from_result_metadata(self, tmp_path):
         metadata = TestDuckLakeResultMetadataRecordsBacking()._metadata(
