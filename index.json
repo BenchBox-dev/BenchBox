@@ -15624,7 +15624,7 @@
       "needs": [
         "serenedb-adapter-core"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Add opt-in live SereneDB tests that compare TPC answers with DuckDB"
     },
