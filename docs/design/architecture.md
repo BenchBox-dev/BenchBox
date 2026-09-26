@@ -98,10 +98,10 @@ run → BenchmarkResults → bundle JSON (beta-public data)
       → Results Explorer (browser) and user dashboards (browser-local)
 ```
 
-The explorer's secondary navigation, benchmark browser groupings, and
-saveable dashboards are presentation over this pipeline, not new data
-sources: dashboard views persist as URLs because chart selection, sort,
-filters, and anchors already live in explorer URL state.
+The explorer's secondary navigation and benchmark browser groupings are
+presentation over this pipeline, not new data sources: chart selection,
+facets, filters, and anchors already live in explorer URL state, so those
+views are shareable as URLs.
 
 ### Tuning evidence is honest by construction
 
@@ -117,17 +117,23 @@ is earned, and the explorer renders the recorded verdicts read-only.
 
 ## Discovery architecture: gate, label, capability
 
-Three independent registry fields govern how a benchmark or platform
-appears; conflating them is the most common extension-point bug:
+Three independent registry fields govern how a benchmark appears;
+conflating them is the most common extension-point bug:
 
-- `surface` is the **only discovery gate**. `internal` entries stay out of
-  CLI listings, MCP listings, and resources, but remain runnable by
-  explicit ID.
+- `surface` is the **only benchmark discovery gate**. `internal`
+  benchmarks stay out of CLI listings, MCP listings, and resources, but
+  remain runnable by explicit ID. Platform entries have no `surface`
+  field.
 - `support_status` is the **product-support label** (`Stable`, `Beta`,
-  `Experimental`, …). Public entries are listed with their label; the
+  `Experimental`, …). Public benchmarks are listed with their label; the
   explorer benchmark browser groups on it.
 - Capability flags (`supports_dataframe`, platform capabilities, dependency
   hints) drive **routing**, never visibility.
+
+Platform discovery instead filters on `support_status`:
+`PlatformRegistry._get_platforms_matching_capability()` and related
+helpers hide `deprecated` and `document_only` entries unless the caller
+opts in.
 
 Sources of truth: `benchbox/core/benchmark_registry.py` (benchmarks; the
 per-benchmark rationale and promotion criteria live in
