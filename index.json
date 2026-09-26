@@ -9566,9 +9566,9 @@
     },
     "measure-actual-uncompressed-sizes-at-sf-1-for-all-benchmarks": {
       "claim": {
-        "expires_at": "2026-09-27T01:14:34Z",
-        "generation": "a2867e1b56204ded8ea4292bfa6f304c",
-        "renewals": 1,
+        "expires_at": "2026-09-27T01:17:12Z",
+        "generation": "64042c94baeb4bfe93589d0008c4b19a",
+        "renewals": 2,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
       },
       "needs": [],
