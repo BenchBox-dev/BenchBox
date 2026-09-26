@@ -692,13 +692,43 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         self._benchmark_type = benchmark_type.lower()
         logger.info(f"Configuring Snowpark Connect for {benchmark_type} benchmark")
 
-        # Disable result cache for accurate benchmarking
+        # Disable result cache for accurate benchmarking. This is benchmarking
+        # hygiene applied to every run, not tuning-derived, so it must never
+        # enter the applied-tuning ledger (recording it would falsely report
+        # baseline runs as applied_unverified). It runs on the raw session
+        # handle, and RecordingConnection only intercepts execute/cursor
+        # paths anyway, so a .sql() call cannot be captured either way.
         if self._session:
             self._session.sql("ALTER SESSION SET USE_CACHED_RESULT = FALSE").collect()
             logger.debug("Disabled result cache for benchmarking")
 
-    # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
-    # and apply_constraint_configuration are inherited from SparkTuningMixin
+    def apply_platform_optimizations(self, config: Any) -> list[str]:
+        """Apply Snowpark platform optimizations: currently none are session-scoped.
+
+        Snowpark deliberately does NOT inherit the Spark "applied via Spark
+        config" behavior: there is no Spark session to configure, and none of
+        the unified platform-optimization fields (Z-ordering, auto optimize,
+        clustering strategy, ...) map to Snowflake ALTER SESSION parameters.
+        Warehouse sizing (``warehouse_size``) is persistent account-level
+        infrastructure, not a session setting -- changing it implicitly from
+        a tuning config would mutate shared billable infrastructure, so it
+        stays behind an explicit opt-in that does not exist yet (see the
+        Snowpark tuning-surface follow-up). With nothing tuning-derived to
+        apply, nothing is recorded: the ledger stays empty and the run
+        reports noop rather than a false applied state.
+
+        Args:
+            config: Platform optimization configuration (accepted and ignored;
+                kept for the unified tuning interface).
+
+        Returns:
+            Empty list (no tuning-derived session statements exist).
+        """
+        return []
+
+    # apply_primary_keys, apply_foreign_keys, and apply_constraint_configuration
+    # are inherited from SparkTuningMixin. apply_platform_optimizations is
+    # overridden above: Snowpark has no Spark session config to apply.
 
     def get_target_dialect(self) -> str:
         """Return the target SQL dialect for Snowpark Connect.
