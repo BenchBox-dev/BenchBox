@@ -17803,13 +17803,18 @@
       "title": "JoinOrder Track-2 DataFrame coverage for canonical 113 queries"
     },
     "track2-joinorder-scaling-strategy": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T02:46:12Z",
+        "generation": "65fad8adee074478ad462da093cdc498",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [
         "track2-joinorder-stats-phase",
         "track2-joinorder-stats-phase-controls"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Track-2: select and implement the JOB scaling strategy"
     },
     "track2-joinorder-stats-phase": {
