@@ -9986,9 +9986,9 @@
     },
     "migrate-adapters-not-listed-in-this-todo-that-already-use-da": {
       "claim": {
-        "expires_at": "2026-09-27T03:35:23Z",
-        "generation": "5172ae8c7b0b4ca09f86bad4a2011bc3",
-        "renewals": 0,
+        "expires_at": "2026-09-27T03:35:32Z",
+        "generation": "d9257cef3a2c4e06b8a73419e5c1eeb8",
+        "renewals": 1,
         "worker": "jcode-batch-c"
       },
       "needs": [],

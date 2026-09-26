@@ -15,6 +15,15 @@
       "op": "take",
       "op_id": "af122a48318448aab4dbdba221688ee5",
       "session_id": "5b5b1959708f4da0b8d75e62f981a358"
+    },
+    {
+      "actor": "jcode-batch-c",
+      "at": "2026-09-26T03:35:32Z",
+      "client": "jcode",
+      "generation": "d9257cef3a2c4e06b8a73419e5c1eeb8",
+      "op": "take",
+      "op_id": "b56e50f49ec74994bc10f1b70e529866",
+      "session_id": "5b5b1959708f4da0b8d75e62f981a358"
     }
   ]
 }
