@@ -17791,15 +17791,10 @@
       "title": "Close the DuckDB TPC-Havoc gate's vacuity/staleness gaps its sibling engine builders and the cross-surface gate already guard against"
     },
     "tpchavoc-empty-tuple-probe": {
-      "claim": {
-        "expires_at": "2026-09-27T21:16:55Z",
-        "generation": "d9e03ec732d64abeacf1a6c3bb37f5e8",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a68d56a939b077672bfb199"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Probe DataFusion empty-tuple tpchavoc skips on current version"
     },
     "tpchavoc-fourth-engine-equivalence-sampling": {
