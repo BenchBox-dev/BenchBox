@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -969,15 +970,20 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             s3_client_kwargs["region_name"] = self.s3_region
         s3_client = boto3.client("s3", **s3_client_kwargs)
         s3_bucket, s3_prefix = self._parse_s3_url(self.s3_staging_url)
+        # Isolate this load under a unique prefix so the bulk glob INSERT
+        # reads exactly the files uploaded by this invocation. Reusing the
+        # bare table prefix would also match stale objects from earlier runs
+        # (e.g. obsolete shards after rerunning with fewer files).
+        s3_load_token = uuid.uuid4().hex[:12]
 
         def upload_to_s3(file_path: Path, table_name_lower: str, file_name: str) -> str:
-            s3_key = f"{s3_prefix}{table_name_lower}/{file_name}"
+            s3_key = f"{s3_prefix}{table_name_lower}/{s3_load_token}/{file_name}"
             s3_url = f"s3://{s3_bucket}/{s3_key}"
             s3_client.upload_file(str(file_path), s3_bucket, s3_key)
             return s3_url
 
         def s3_glob_url(table_name_lower: str) -> str:
-            return f"s3://{s3_bucket}/{s3_prefix}{table_name_lower}/*"
+            return f"s3://{s3_bucket}/{s3_prefix}{table_name_lower}/{s3_load_token}/*"
 
         return self._load_data_via_object_storage(
             benchmark,
@@ -1015,16 +1021,19 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         gcs_client = gcs_storage.Client()
         gcs_bucket_name, gcs_prefix = self._parse_gcs_url(self.gcs_staging_url)
         gcs_bucket_obj = gcs_client.bucket(gcs_bucket_name)
+        # Same run isolation as the S3 path: the bulk glob INSERT must read
+        # only this invocation's files, never stale objects under the table prefix.
+        gcs_load_token = uuid.uuid4().hex[:12]
 
         def upload_to_gcs(file_path: Path, table_name_lower: str, file_name: str) -> str:
-            blob_name = f"{gcs_prefix}{table_name_lower}/{file_name}"
+            blob_name = f"{gcs_prefix}{table_name_lower}/{gcs_load_token}/{file_name}"
             blob = gcs_bucket_obj.blob(blob_name)
             blob.upload_from_filename(str(file_path))
             # ClickHouse gcs() requires https:// URL, not gs://
             return f"https://storage.googleapis.com/{gcs_bucket_name}/{blob_name}"
 
         def gcs_glob_url(table_name_lower: str) -> str:
-            return f"https://storage.googleapis.com/{gcs_bucket_name}/{gcs_prefix}{table_name_lower}/*"
+            return f"https://storage.googleapis.com/{gcs_bucket_name}/{gcs_prefix}{table_name_lower}/{gcs_load_token}/*"
 
         return self._load_data_via_object_storage(
             benchmark,

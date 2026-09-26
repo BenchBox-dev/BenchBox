@@ -6,6 +6,7 @@ import argparse
 import importlib.util
 import logging
 import os
+import re
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -612,11 +613,44 @@ def test_load_data_via_s3_uses_single_glob_insert_for_many_files(tmp_path: Path)
     assert table_stats == {"lineitem": 3}
     assert metadata["loading_method"] == "s3_staging"
     assert mock_s3_client.upload_file.call_count == 2
+    uploaded_keys = [c.args[2] for c in mock_s3_client.upload_file.call_args_list]
+    tokens = {key.split("/")[2] for key in uploaded_keys}
+    assert len(tokens) == 1, "both uploads of one load must share a single per-load prefix"
+    token = tokens.pop()
+    assert re.fullmatch(r"[0-9a-f]{12}", token)
     inserts = [c.args[0] for c in connection.execute.call_args_list if "INSERT INTO" in c.args[0]]
     assert len(inserts) == 1
-    assert "s3('s3://bucket/staging/lineitem/*'" in inserts[0]
+    assert f"s3('s3://bucket/staging/lineitem/{token}/*'" in inserts[0]
     counts = [c.args[0] for c in connection.execute.call_args_list if "COUNT(*)" in c.args[0]]
     assert len(counts) == 1
+
+
+def test_load_data_via_s3_glob_tokens_differ_between_loads(tmp_path: Path) -> None:
+    """A rerun must glob a fresh prefix so stale objects from earlier runs are never read."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    first = tmp_path / "lineitem_0.csv"
+    first.write_text("col1\n1\n")
+    second = tmp_path / "lineitem_1.csv"
+    second.write_text("col1\n2\n")
+
+    mock_s3_client = MagicMock()
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = mock_s3_client
+
+    globs: list[str] = []
+    for data_file in (first, second):
+        benchmark = MagicMock()
+        benchmark.tables = {"lineitem": [str(data_file)]}
+        connection = MagicMock()
+        connection.execute.return_value = [(1,)]
+        with patch.dict("sys.modules", {"boto3": mock_boto3}):
+            adapter._load_data_via_s3(benchmark, connection, tmp_path)
+        inserts = [c.args[0] for c in connection.execute.call_args_list if "INSERT INTO" in c.args[0]]
+        assert len(inserts) == 1
+        globs.append(inserts[0])
+
+    assert globs[0] != globs[1], "each load must ingest through its own unique prefix"
 
 
 def test_load_data_via_s3_falls_back_per_file_on_glob_syntax(tmp_path: Path) -> None:
@@ -669,9 +703,14 @@ def test_load_data_via_gcs_uses_single_glob_insert(tmp_path: Path) -> None:
     assert table_stats == {"orders": 2}
     assert metadata["loading_method"] == "gcs_staging"
     assert mock_gcs_bucket.blob.call_count == 2
+    blob_names = [c.args[0] for c in mock_gcs_bucket.blob.call_args_list]
+    tokens = {name.split("/")[2] for name in blob_names}
+    assert len(tokens) == 1, "both uploads of one load must share a single per-load prefix"
+    token = tokens.pop()
+    assert re.fullmatch(r"[0-9a-f]{12}", token)
     inserts = [c.args[0] for c in connection.execute.call_args_list if "INSERT INTO" in c.args[0]]
     assert len(inserts) == 1
-    assert "gcs('https://storage.googleapis.com/bucket/staging/orders/*'" in inserts[0]
+    assert f"gcs('https://storage.googleapis.com/bucket/staging/orders/{token}/*'" in inserts[0]
 
 
 # ---- GCS staging data loading tests ----
