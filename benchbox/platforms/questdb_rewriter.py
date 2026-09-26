@@ -100,6 +100,12 @@ Pattern (regex-safe, lexically consistent):
     Output: dateadd('<unit>', [+-]N, <date_expr>)
     Units:  DAY → 'd', MONTH → 'M', YEAR → 'y'
 
+The comma-JOIN stage runs first through a SQLGlot AST round trip, which
+normalizes the interval literal to the combined spelling
+``INTERVAL '<N> <UNIT>'`` (e.g. ``INTERVAL '90 DAY'``).  The regex below
+matches both spellings so a single rewrite() pass eliminates the
+INTERVAL before the query reaches QuestDB.
+
 Affected TPC-H queries: Q1, Q4, Q6, Q17 (at minimum).
 
 ──────────────────────────────────────────────────────────────────────────────
@@ -398,13 +404,21 @@ def _has_comma_join(query: str) -> bool:
 # Rule 2 - INTERVAL arithmetic → dateadd()
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Matches: <expr> +/- INTERVAL '<N>' DAY|MONTH|YEAR
-# Capturing groups: (1) date expression, (2) sign, (3) number, (4) unit
+# Matches: <expr> +/- INTERVAL '<N>' DAY|MONTH|YEAR, plus the SQLGlot-
+# normalized combined spelling <expr> +/- INTERVAL '<N> DAY|MONTH|YEAR'
+# produced by the comma-JOIN AST round trip. Exactly one unit spelling
+# is required; a bare INTERVAL '<N>' with no unit never matches.
+# The date expression accepts CAST(...), ANSI typed literals
+# (DATE '1998-12-01', which single-table queries carry verbatim since no
+# AST round trip normalizes them), or a bare identifier/column.
+# Capturing groups: (1) date expression, (2) sign, (3) number (split
+# spelling), (4) unit (split spelling), (5) number (combined spelling),
+# (6) unit (combined spelling)
 _INTERVAL_RE = re.compile(
-    # group 1: date expr - either CAST(... AS DATE) or a bare identifier/column
-    r"(CAST\s*\([^)]+\)|[\w.]+)"
+    # group 1: date expr - CAST(...), ANSI DATE 'literal', or bare identifier/column
+    r"(CAST\s*\([^)]+\)|DATE\s*'\d{4}-\d{2}-\d{2}'|[\w.]+)"
     r"\s*([+-])\s*"
-    r"INTERVAL\s+'(\d+)'\s+(DAY|MONTH|YEAR)",
+    r"INTERVAL\s+(?:'(\d+)'\s*(DAY|MONTH|YEAR)|'(\d+)\s+(DAY|MONTH|YEAR)')",
     re.IGNORECASE,
 )
 
@@ -417,8 +431,9 @@ def _rewrite_interval_arithmetic(query: str) -> str:
     def _replace(m: re.Match) -> str:
         date_expr = m.group(1).strip()
         sign = m.group(2)
-        n = int(m.group(3))
-        unit = _INTERVAL_UNIT_MAP[m.group(4).upper()]
+        n = int(m.group(3) or m.group(5))
+        unit_word = (m.group(4) or m.group(6) or "").upper()
+        unit = _INTERVAL_UNIT_MAP[unit_word]
         offset = -n if sign == "-" else n
         return f"dateadd('{unit}', {offset}, {date_expr})"
 
