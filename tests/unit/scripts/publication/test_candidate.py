@@ -324,3 +324,49 @@ def test_develop_freshness_rejects_malformed_or_unknown_sha(tmp_path: Path) -> N
 
 def test_develop_max_behind_default_is_bounded() -> None:
     assert DEFAULT_DEVELOP_MAX_BEHIND_COMMITS > 0
+
+
+def _bundle_with_parent(tmp_path: Path) -> tuple[Path, dict, dict, dict]:
+    """Generation-2 bundle bound to a durable parent."""
+    root, artifact_metadata, run_metadata, manifest = _bundle(tmp_path)
+    manifest = dict(manifest)
+    manifest["generation"] = 2
+    manifest["parent_sha"] = "e" * 40
+    manifest["parent_generation"] = 1
+    manifest["manifest_digest"] = manifest_digest(manifest)
+    (root / "desired-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    metadata = json.loads((root / "candidate.json").read_text(encoding="utf-8"))
+    metadata["manifest_digest"] = manifest["manifest_digest"]
+    (root / "candidate.json").write_text(json.dumps(metadata), encoding="utf-8")
+    return root, artifact_metadata, run_metadata, manifest
+
+
+def test_candidate_rejects_stale_parent_generation(tmp_path: Path) -> None:
+    root, artifact_metadata, run_metadata, manifest = _bundle_with_parent(tmp_path)
+    with pytest.raises(CandidateValidationError, match="parent"):
+        validate_candidate_directory(
+            root,
+            artifact_id=456,
+            artifact_metadata=artifact_metadata,
+            run_metadata=run_metadata,
+            expected_develop_sha=manifest["develop_sha"],
+            expected_generation=2,
+            expected_parent_sha="e" * 40,
+            expected_parent_generation=2,
+        )
+
+
+def test_candidate_accepts_matching_parent_binding(tmp_path: Path) -> None:
+    root, artifact_metadata, run_metadata, manifest = _bundle_with_parent(tmp_path)
+    summary = validate_candidate_directory(
+        root,
+        artifact_id=456,
+        artifact_metadata=artifact_metadata,
+        run_metadata=run_metadata,
+        expected_develop_sha=manifest["develop_sha"],
+        expected_generation=2,
+        expected_parent_sha="e" * 40,
+        expected_parent_generation=1,
+    )
+    assert summary.expected_parent_sha == "e" * 40
+    assert summary.expected_parent_generation == 1
