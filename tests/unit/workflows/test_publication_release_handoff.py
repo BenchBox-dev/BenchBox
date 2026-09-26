@@ -50,8 +50,10 @@ def test_handoff_opens_tracked_issue_on_failure() -> None:
     )
     assert fallback is not None
     assert "failure()" in str(fallback.get("if", ""))
-    assert "gh issue create" in fallback.get("run", "")
-    assert "--label" in fallback.get("run", "")
+    fallback_run = fallback.get("run", "")
+    assert "gh label create publication" in fallback_run
+    assert "gh issue create" in fallback_run
+    assert "--label" in fallback_run
 
 
 def test_handoff_never_writes_pages() -> None:
