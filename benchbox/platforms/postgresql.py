@@ -259,6 +259,68 @@ def _build_postgres_connection_kwargs(config: dict[str, Any], *, default_port: i
     return result
 
 
+def ensure_postgres_extension(
+    conn: Any,
+    logger: Any,
+    extension: str,
+    install_url: str,
+    *,
+    cascade: bool = False,
+) -> str:
+    """Verify a PostgreSQL extension is installed, creating it when absent.
+
+    Shared verify-or-create dance for PG-extension adapters (ParadeDB,
+    Citus): check ``pg_extension``, attempt ``CREATE EXTENSION IF NOT
+    EXISTS``, then re-check. Raises ``RuntimeError`` with install guidance
+    when the extension is still missing, so every adapter reports the same
+    actionable error instead of drifting copies.
+
+    Args:
+        conn: Open database connection.
+        logger: Adapter logger for version reporting.
+        extension: Extension name as registered in ``pg_extension``.
+        install_url: Project URL for the install guidance in the error.
+        cascade: Pass ``CASCADE`` to CREATE EXTENSION (needed by citus).
+
+    Returns:
+        Installed extension version string.
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT extversion FROM pg_extension WHERE extname = '{extension}'")
+        result = cursor.fetchone()
+        if result:
+            logger.info(f"{extension} extension version: {result[0]}")
+            conn.commit()
+            return str(result[0])
+
+        logger.info(f"{extension} extension not found, attempting to create...")
+        cascade_sql = " CASCADE" if cascade else ""
+        cursor.execute(f"CREATE EXTENSION IF NOT EXISTS {extension}{cascade_sql}")
+        conn.commit()
+        cursor.execute(f"SELECT extversion FROM pg_extension WHERE extname = '{extension}'")
+        result = cursor.fetchone()
+        if result:
+            logger.info(f"Created {extension} extension version: {result[0]}")
+            conn.commit()
+            return str(result[0])
+
+        raise RuntimeError(
+            f"{extension} extension is not available on this PostgreSQL server. "
+            f"Install it ({install_url}) or use the 'postgresql' platform instead."
+        )
+    except RuntimeError:
+        cursor.close()
+        raise
+    except Exception as e:
+        logger.error(f"Failed to configure {extension} extension: {e}")
+        cursor.close()
+        raise RuntimeError(f"{extension} configuration failed: {e}") from e
+    finally:
+        if not cursor.closed:
+            cursor.close()
+
+
 class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     """PostgreSQL platform adapter with COPY-based data loading.
 

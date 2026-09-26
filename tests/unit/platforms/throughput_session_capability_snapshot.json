@@ -35,6 +35,15 @@
     "key": "cedardb",
     "status": "resolved"
   },
+  "citus": {
+    "adapter": "benchbox.platforms.citus.CitusAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "citus",
+    "status": "resolved"
+  },
   "clickhouse": {
     "adapter": "benchbox.platforms.clickhouse.adapter.ClickHouseAdapter",
     "capability": "unsupported",
@@ -231,6 +240,15 @@
     "declared": true,
     "gate": "reject",
     "key": "motherduck",
+    "status": "resolved"
+  },
+  "paradedb": {
+    "adapter": "benchbox.platforms.paradedb.ParadeDBAdapter",
+    "capability": "independent_connection",
+    "declaration_site": "benchbox.core.platform_manifest",
+    "declared": true,
+    "gate": "pass",
+    "key": "paradedb",
     "status": "resolved"
   },
   "pg-duckdb": {

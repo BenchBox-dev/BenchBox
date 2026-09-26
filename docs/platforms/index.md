@@ -75,6 +75,8 @@ These platforms are included in the base BenchBox installation with no additiona
 
 - [pg_duckdb](pg_duckdb.md) - DuckDB-powered Postgres extension for vectorized OLAP
 - [pg_mooncake](pg_mooncake.md) - Columnar storage for Postgres with Iceberg and Delta Lake support
+- [paradedb](paradedb.md) - Hybrid search and analytics Postgres extension (BM25 via pg_analytics)
+- [citus](citus.md) - Distributed Postgres extension with sharded tables
 
 ### Self-Hosted OLAP Databases
 
@@ -215,6 +217,8 @@ clickhouse-migration
 postgresql
 pg_duckdb
 pg_mooncake
+paradedb
+citus
 presto
 trino
 snowflake

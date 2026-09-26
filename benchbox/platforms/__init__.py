@@ -75,6 +75,8 @@ PostgreSQLAdapter|.postgresql
 TimescaleDBAdapter|.timescaledb
 PgDuckDBAdapter|.pg_duckdb
 PgMooncakeAdapter|.pg_mooncake
+ParadeDBAdapter|.paradedb
+CitusAdapter|.citus
 CedarDBAdapter|.cedardb
 QuestDBAdapter|.questdb
 DatabricksAdapter|.databricks
@@ -721,6 +723,31 @@ pg-mooncake|effective_cache_size|PostgreSQL effective_cache_size planner hint|{'
 pg-mooncake|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_gather setting|{'parser': 'int', 'default': 2}
 pg-mooncake|storage_mode|Storage backend: local (disk) or s3 (object storage)|{'choices': ('local', 's3'), 'default': 'local'}
 pg-mooncake|mooncake_bucket|S3/GCS bucket URL for columnstore data (required when storage_mode=s3)|{}
+paradedb|host|PostgreSQL server hostname (with pg_analytics installed)|{'default': 'localhost'}
+paradedb|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
+paradedb|database|PostgreSQL database name (auto-generated if not specified)|{}
+paradedb|username|PostgreSQL username|{'default': 'postgres'}
+paradedb|password|PostgreSQL password|{}
+paradedb|schema|PostgreSQL schema name|{'default': 'public'}
+paradedb|admin_database|Database used for CREATE/DROP DATABASE operations|{'default': 'postgres'}
+paradedb|sslmode|PostgreSQL SSL mode|{'default': 'prefer'}
+paradedb|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+paradedb|maintenance_work_mem|PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX|{'default': '512MB'}
+paradedb|effective_cache_size|PostgreSQL effective_cache_size planner hint|{'default': '1GB'}
+paradedb|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_gather setting|{'parser': 'int', 'default': 2}
+citus|host|Citus coordinator hostname (with citus extension installed)|{'default': 'localhost'}
+citus|port|Citus coordinator port|{'parser': 'int', 'default': 5432}
+citus|database|PostgreSQL database name (auto-generated if not specified)|{}
+citus|username|PostgreSQL username|{'default': 'postgres'}
+citus|password|PostgreSQL password|{}
+citus|schema|PostgreSQL schema name|{'default': 'public'}
+citus|admin_database|Database used for CREATE/DROP DATABASE operations|{'default': 'postgres'}
+citus|sslmode|PostgreSQL SSL mode|{'default': 'prefer'}
+citus|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+citus|maintenance_work_mem|PostgreSQL maintenance_work_mem for VACUUM/CREATE INDEX|{'default': '512MB'}
+citus|effective_cache_size|PostgreSQL effective_cache_size planner hint|{'default': '1GB'}
+citus|max_parallel_workers_per_gather|PostgreSQL max_parallel_workers_per_gather setting|{'parser': 'int', 'default': 2}
+citus|distribution_column|Distribute every benchmark table on this column (unset keeps coordinator-local tables)|{}
 questdb|host|QuestDB server hostname|{'default': 'localhost'}
 questdb|pg_port|QuestDB PostgreSQL wire protocol port|{'default': '8812'}
 questdb|http_port|QuestDB REST API HTTP port (BenchBox Docker uses 19000; native default is 9000)|{'default': '9000'}
@@ -916,6 +943,10 @@ velox|lakehouse_jars|Comma-separated connector jars for delta/iceberg/hudi reads
     PlatformHookRegistry.register_config_builder(
         "pg-mooncake", _make_lazy_config_builder(".pg_mooncake", "_build_pg_mooncake_config")
     )
+    PlatformHookRegistry.register_config_builder(
+        "paradedb", _make_lazy_config_builder(".paradedb", "_build_paradedb_config")
+    )
+    PlatformHookRegistry.register_config_builder("citus", _make_lazy_config_builder(".citus", "_build_citus_config"))
     PlatformHookRegistry.register_config_builder(
         "questdb", _make_lazy_config_builder(".questdb", "_build_questdb_config")
     )

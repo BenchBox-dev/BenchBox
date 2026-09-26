@@ -858,6 +858,13 @@ ignore_rules = [
     # contract. Thin same-shape delegations are intentional API surface.
     { function_names = ["window_lag", "window_lead", "window_ntile", "window_percent_rank", "window_cume_dist"], path_contains = ["benchbox/platforms/dataframe/pyspark_df.py"] },
 
+    # Throughput-sweep-mandated stream-session parity hooks: PG-extension
+    # adapters whose create_connection adds only one-time extension setup
+    # must carry an explicit delegating _apply_stream_session_state override
+    # proving per-stream parity (see test_throughput_session_capability_sweep
+    # rule R3). The bodies are intentionally identical delegations.
+    { function_names = ["_apply_stream_session_state"], path_contains = ["benchbox/platforms/paradedb.py", "benchbox/platforms/citus.py"] },
+
     # G3,G10: DataFrame platform adapter thin wrappers (col/lit/from_pandas/detect_format/read_*)
     # G29: extend with get_row_count and pandas_family.py
     { function_names = ["_detect_format", "get_dataframe_operations", "from_pandas", "lit", "read_parquet", "to_datetime", "read_csv", "concat", "get_row_count"], path_contains = [
