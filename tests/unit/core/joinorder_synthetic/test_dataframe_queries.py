@@ -18,11 +18,11 @@ pytestmark = [
 class TestQueryRegistration:
     """Tests for query registration and metadata."""
 
-    def test_all_13_queries_registered(self):
+    def test_all_113_queries_registered(self):
         from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
         registry = get_dataframe_queries()
-        assert len(registry) == 13
+        assert len(registry) == 113
 
     def test_registry_returns_consistent_object(self):
         from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
@@ -65,7 +65,7 @@ class TestQueryRegistration:
 
         bm = JoinOrderSyntheticBenchmark(scale_factor=1.0)
         registry = bm.get_dataframe_queries()
-        assert len(registry) == 13
+        assert len(registry) == 113
 
 
 class TestPandasImplExecute:

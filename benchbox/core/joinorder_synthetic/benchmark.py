@@ -315,10 +315,10 @@ class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         """Get DataFrame query implementations for JoinOrder.
 
         Returns the QueryRegistry containing DataFrame implementations of all
-        13 JoinOrder queries for both expression-family and pandas-family platforms.
+        113 JoinOrder queries for both expression-family and pandas-family platforms.
 
         Returns:
-            QueryRegistry with all 13 JoinOrder DataFrame queries
+            QueryRegistry with all 113 JoinOrder DataFrame queries
         """
         from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 

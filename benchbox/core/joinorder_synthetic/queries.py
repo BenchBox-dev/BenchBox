@@ -15,6 +15,15 @@ from pathlib import Path
 
 from benchbox.utils.printing import emit
 
+try:
+    from benchbox.core.joinorder.queries import (
+        CANONICAL_JOINORDER_QUERIES,
+        JoinOrderQueryManager as _CanonicalQueryManager,
+    )
+except ImportError:
+    CANONICAL_JOINORDER_QUERIES = {}
+    _CanonicalQueryManager = None  # type: ignore[assignment]
+
 
 class JoinOrderQueryManager:
     """Manager for Join Order Benchmark queries."""
@@ -439,6 +448,12 @@ WHERE cn.country_code = '[us]'
     def get_query(self, query_id: str) -> str:
         """Get a Join Order Benchmark query by ID.
 
+        The 13 historical smoke-test queries are embedded verbatim below.
+        Every other canonical JOB id delegates to the canonical query text,
+        so the synthetic surface covers the full 113-query set while the
+        DataFrame translator (shared with the canonical surface) stays the
+        single translation implementation.
+
         Args:
             query_id: Query identifier (e.g., '1a', '2b', etc.)
 
@@ -448,19 +463,34 @@ WHERE cn.country_code = '[us]'
         Raises:
             ValueError: If query_id is invalid
         """
-        if query_id not in self._queries:
-            available = ", ".join(sorted(self._queries.keys()))
-            raise ValueError(f"Invalid query ID: {query_id}. Available: {available}")
-
-        return self._queries[query_id]
+        if query_id in self._queries:
+            return self._queries[query_id]
+        if _CanonicalQueryManager is not None:
+            try:
+                # Canonical manager applies portable-alias normalization
+                # (e.g. 15a-d `at` -> `at1` for DuckDB), so delegate through
+                # it rather than the raw query dict.
+                return _CanonicalQueryManager().get_query(query_id)
+            except ValueError:
+                pass
+        available = ", ".join(sorted(set(self._queries) | set(CANONICAL_JOINORDER_QUERIES)))
+        raise ValueError(f"Invalid query ID: {query_id}. Available: {available}")
 
     def get_all_queries(self) -> dict[str, str]:
         """Get all Join Order Benchmark queries.
 
+        Merges the 13 embedded smoke-test queries with the remaining
+        canonical JOB queries, covering the full 113-query set.
+
         Returns:
             Dictionary mapping query IDs to SQL text
         """
-        return self._queries.copy()
+        if _CanonicalQueryManager is not None:
+            merged = _CanonicalQueryManager().get_all_queries()
+        else:
+            merged = dict(CANONICAL_JOINORDER_QUERIES)
+        merged.update(self._queries)
+        return merged
 
     def get_query_ids(self) -> list[str]:
         """Get list of all query IDs.
@@ -468,7 +498,7 @@ WHERE cn.country_code = '[us]'
         Returns:
             List of query IDs in sorted order
         """
-        return sorted(self._queries.keys())
+        return sorted(self.get_all_queries().keys())
 
     def get_query_count(self) -> int:
         """Get total number of queries.
@@ -476,7 +506,7 @@ WHERE cn.country_code = '[us]'
         Returns:
             Number of queries available
         """
-        return len(self._queries)
+        return len(self.get_all_queries())
 
     def get_queries_by_complexity(self) -> dict[str, list[str]]:
         """Categorize queries by complexity based on table count.

@@ -251,6 +251,21 @@ for _query_id in _QUERY_IDS:
     globals()[f"q{_query_id}_expression_impl"] = _make_expression_impl(_query_id)
     globals()[f"q{_query_id}_pandas_impl"] = _make_pandas_impl(_query_id)
 
+# Extended JOB coverage: every remaining canonical query id gets generated
+# DataFrame impls through the same restricted translator, so the synthetic
+# surface covers the full 113-query set. SQL text for these ids comes from
+# the canonical JOB queries via JoinOrderQueryManager.get_query.
+try:
+    from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES as _CANONICAL_IDS
+
+    _EXTENDED_QUERY_IDS = tuple(qid for qid in _CANONICAL_IDS if qid not in _QUERY_IDS)
+except ImportError:
+    _EXTENDED_QUERY_IDS = ()
+
+for _query_id in _EXTENDED_QUERY_IDS:
+    globals()[f"q{_query_id}_expression_impl"] = _make_expression_impl(_query_id)
+    globals()[f"q{_query_id}_pandas_impl"] = _make_pandas_impl(_query_id)
+
 
 JOINORDER_DATAFRAME_QUERIES = QueryRegistry("JoinOrder DataFrame")
 
@@ -289,6 +304,18 @@ _QUERIES = [
     )
     for query_id, query_name, description, category_codes in reader(_QUERY_METADATA.splitlines(), delimiter="|")
 ]
+
+_QUERIES.extend(
+    DataFrameQuery(
+        query_id=query_id,
+        query_name=f"JOB {query_id}",
+        description=f"Canonical JOB query {query_id}; generated synthetic DataFrame translation.",
+        categories=[QueryCategory.MULTI_JOIN, QueryCategory.AGGREGATE, QueryCategory.FILTER],
+        expression_impl=globals()[f"q{query_id}_expression_impl"],
+        pandas_impl=globals()[f"q{query_id}_pandas_impl"],
+    )
+    for query_id in _EXTENDED_QUERY_IDS
+)
 
 for _query in _QUERIES:
     JOINORDER_DATAFRAME_QUERIES.register(_query)
