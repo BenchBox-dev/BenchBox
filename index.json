@@ -17750,6 +17750,13 @@
       "status": "open",
       "title": "Probe tpchavoc 2_v2 unskip on Snowflake"
     },
+    "tpchavoc-ch-filter-rewrite": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Revalidate ClickHouse FILTER-clause tpchavoc skips"
+    },
     "tpchavoc-correlated-subquery-self-binding": {
       "claim": null,
       "needs": [],
