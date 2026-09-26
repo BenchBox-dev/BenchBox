@@ -696,7 +696,7 @@ pg-duckdb|postgres_scan_threads|Threads for parallel PostgreSQL table scanning (
 pg-duckdb|compare_native|Run native DuckDB comparison for matched queries|{'parser': 'parse_bool', 'default': False}
 pg-duckdb|duckdb_db_path|Path to the DuckDB database file pg_duckdb attaches|{}
 ducklake|metadata_path|DuckLake catalog metadata file path (.ducklake)|{}
-ducklake|data_path|DuckLake Parquet data directory (local path or s3:// URI)|{}
+ducklake|data_path|DuckLake Parquet data directory (local path or cloud URI: s3://, gs://, az://)|{}
 ducklake|deployment_mode|DuckLake deployment mode: local, local_catalog_s3, postgres_catalog, or postgres_catalog_s3|{'choices': ('local', 'local_catalog_s3', 'postgres_catalog', 'postgres_catalog_s3')}
 ducklake|catalog|DuckLake catalog backend: duckdb, sqlite, or postgres|{'choices': ('duckdb', 'sqlite', 'postgres'), 'default': 'duckdb'}
 ducklake|pg_host|PostgreSQL hostname for the postgres catalog backend|{'default': 'localhost'}
@@ -707,6 +707,10 @@ ducklake|pg_password|PostgreSQL password for the postgres catalog backend|{}
 ducklake|s3_key_id|AWS access key ID for S3 DATA_PATH (omit to use the credential_chain provider)|{}
 ducklake|s3_secret|AWS secret access key for S3 DATA_PATH|{}
 ducklake|s3_region|AWS region for S3 DATA_PATH|{}
+ducklake|gcs_key_id|GCS HMAC access ID for gs:// DATA_PATH (both HMAC keys required)|{}
+ducklake|gcs_secret|GCS HMAC secret for gs:// DATA_PATH (both HMAC keys required)|{}
+ducklake|azure_connection_string|Azure connection string for az:// DATA_PATH (wins over account-name auth)|{}
+ducklake|azure_account_name|Azure storage account name for az:// DATA_PATH ambient credential_chain auth|{}
 pg-mooncake|host|PostgreSQL server hostname (with pg_mooncake installed)|{'default': 'localhost'}
 pg-mooncake|port|PostgreSQL server port|{'parser': 'int', 'default': 5432}
 pg-mooncake|database|PostgreSQL database name (auto-generated if not specified)|{}
