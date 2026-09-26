@@ -15,7 +15,6 @@ POSTGRES_TPCHAVOC_SKIPS: dict[str, str] = {
     "10_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
     "11_v9": "PostgreSQL-family engines reject this window expression in WHERE.",
     "13_v9": "PostgreSQL-family engines reject aggregate expressions inside window definitions.",
-    "17_v4": "PostgreSQL-family engines do not provide Oracle's `dual` table.",
 }
 
 _POSTGRES_TPCHAVOC_PLATFORMS = ("pg-duckdb", "pg-mooncake", "timescaledb")

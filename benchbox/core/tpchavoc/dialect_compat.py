@@ -12,6 +12,7 @@ POSTGRES_QUALIFIED_COLUMNS: dict[str, dict[str, str]] = {
     "2_v5": {"ps_partkey": "partsupp", "ps_supplycost": "partsupp"},
     "17_v2": {"l_partkey": "lineitem", "l_quantity": "lineitem", "l_extendedprice": "lineitem"},
 }
+POSTGRES_DUAL_VARIANT_IDS = frozenset({"17_v4"})
 _CLOUD_DIALECTS = frozenset({"bigquery", "databricks", "snowflake"})
 _POSTGRES_DIALECTS = frozenset({"postgres", "postgresql"})
 
@@ -26,6 +27,8 @@ def rewrite_dialect_variant(query_id: str, query: str, target_dialect: str) -> s
             query = _inline_postgres_select_aliases(query)
         if columns := POSTGRES_QUALIFIED_COLUMNS.get(query_id):
             query = _qualify_postgres_columns(query, columns)
+        if query_id in POSTGRES_DUAL_VARIANT_IDS:
+            query = _rewrite_postgres_dual(query)
     return query
 
 
@@ -61,4 +64,23 @@ def _qualify_postgres_columns(query: str, columns: dict[str, str]) -> str:
     return tree.sql(dialect="postgres")
 
 
-__all__ = ["POSTGRES_ALIAS_VARIANT_IDS", "POSTGRES_QUALIFIED_COLUMNS", "rewrite_dialect_variant"]
+def _rewrite_postgres_dual(query: str) -> str:
+    """Replace the generated one-row SELECT source with an explicit VALUES relation."""
+    tree = sqlglot.parse_one(query, read="postgres")
+    replacement = sqlglot.parse_one("SELECT * FROM (VALUES (1)) AS dual(dual_col)", read="postgres").args["from_"].this
+    for subquery in tree.find_all(exp.Subquery):
+        inner = subquery.this
+        if subquery.alias != "dual" or not isinstance(inner, exp.Select) or len(inner.expressions) != 1:
+            continue
+        expression = inner.expressions[0]
+        if isinstance(expression, exp.Literal) and expression.this == "1" and not expression.is_string:
+            subquery.replace(replacement.copy())
+    return tree.sql(dialect="postgres")
+
+
+__all__ = [
+    "POSTGRES_ALIAS_VARIANT_IDS",
+    "POSTGRES_DUAL_VARIANT_IDS",
+    "POSTGRES_QUALIFIED_COLUMNS",
+    "rewrite_dialect_variant",
+]

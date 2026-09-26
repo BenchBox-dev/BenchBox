@@ -6,7 +6,11 @@ import sqlglot
 from sqlglot import exp
 
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
-from benchbox.core.tpchavoc.dialect_compat import POSTGRES_ALIAS_VARIANT_IDS, POSTGRES_QUALIFIED_COLUMNS
+from benchbox.core.tpchavoc.dialect_compat import (
+    POSTGRES_ALIAS_VARIANT_IDS,
+    POSTGRES_DUAL_VARIANT_IDS,
+    POSTGRES_QUALIFIED_COLUMNS,
+)
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
 
 
@@ -50,8 +54,14 @@ def test_postgres_alias_rules_cover_each_family_platform():
             for key, _ in REGISTRY.all_rules()
             if key[:3] == (Phase.QUERY_ADAPTER, platform, "tpchavoc") and key[3] in POSTGRES_QUALIFIED_COLUMNS
         }
+        dual_rules = {
+            key[3]
+            for key, _ in REGISTRY.all_rules()
+            if key[:3] == (Phase.QUERY_ADAPTER, platform, "tpchavoc") and key[3] in POSTGRES_DUAL_VARIANT_IDS
+        }
         assert alias_rules == POSTGRES_ALIAS_VARIANT_IDS
         assert qualified_rules == set(POSTGRES_QUALIFIED_COLUMNS)
+        assert dual_rules == POSTGRES_DUAL_VARIANT_IDS
 
 
 def test_postgres_ambiguous_columns_are_qualified():
@@ -65,6 +75,15 @@ def test_postgres_ambiguous_columns_are_qualified():
         assert not {column.name for column in tree.find_all(exp.Column) if not column.table and column.name in expected}
         for column_name, table in expected.items():
             assert any(column.name == column_name and column.table == table for column in tree.find_all(exp.Column))
+
+
+def test_postgres_dual_variant_uses_values_source():
+    query = TPCHavocBenchmark(scale_factor=0.1).get_query("17_v4", dialect="postgres")
+
+    assert "17_v4" not in POSTGRES_TPCHAVOC_SKIPS
+    assert "(VALUES (1)) AS dual(dual_col)" in query
+    assert "FROM (SELECT 1) AS dual" not in query
+    assert sqlglot.parse_one(query, read="postgres")
 
 
 def test_postgres_alias_rewrite_preserves_order_by_aliases():
