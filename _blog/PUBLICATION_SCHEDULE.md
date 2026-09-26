@@ -38,6 +38,7 @@
 | Series                  | Posts                                                                                                             | Status      | Notes                              |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------- | ---------------------------------- |
 | Building BenchBox       | How the Results Explorer qualifies comparisons                                                                    | Full draft  | Post 17; publication withheld      |
+| Building BenchBox       | BenchBox v0.4.1: more lakehouse pairings, stricter results                                                        | Full draft  | Post 18; hero image `v041_lakehouse_matrix.png` still to add |
 | Free Trial Benchmarking | 10 posts (Snowflake, Databricks, BigQuery, MotherDuck, Redshift, Starburst, ClickHouse, Fabric, Firebolt, Athena) | Full drafts | Time-sensitive; trial terms change |
 | Cloud Cost Controls     | 6 posts (AWS, GCP, Snowflake, Databricks, Azure, Free Tier)                                                       | Full drafts |                                    |
 

@@ -44,6 +44,7 @@
 | 15  | BenchBox v0.4.0: new org, DuckLake, and result provenance | PUBLISHED | Org move, provenance labels on the existing Results Explorer preview, DuckLake beta, and a throughput correction that needs a rerun |
 | 16  | Introducing the BenchBox Results Explorer | DRAFTED | Why shared results need context, Geekbench and LLM leaderboard inspiration, the result trust model, a walkthrough built on DuckDB TPC-H SF 10 releases, and the pull-request contribution path |
 | 17  | How the Results Explorer qualifies comparisons | DRAFTED | Publication withheld; the Explorer separates display, comparison, and ranking, suppresses unsupported winner claims, and keeps missing evidence visible |
+| 18  | BenchBox v0.4.1: more lakehouse pairings, stricter results | DRAFTED | Four new lakehouse table pairings, stricter result submissions, cost reported as unavailable instead of guessed, and raised dependency floors |
 
 ---
 
