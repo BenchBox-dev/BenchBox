@@ -57,7 +57,7 @@ describe("local result import", () => {
   it("matches the publication transform for the canonical browser fixture", async () => {
     const fixturePath = resolve(
       import.meta.dirname,
-      "../../../test-fixtures/source/bundles/tpch-duckdb-sf0.01-20260403-7fe93365.json",
+      "../../../test-fixtures/source/bundles/tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     );
     const preview = await parseLocalResultText(readFileSync(fixturePath, "utf8"), "fixture.json");
 
@@ -66,10 +66,10 @@ describe("local result import", () => {
       scale_factor: 0.01,
       platform: "DuckDB",
       platform_id: "duckdb",
-      driver_version: "1.4.3",
-      run_date: "2026-04-03",
-      total_duration_s: 2.815,
-      power_score: 3184.897098661065,
+      driver_version: "1.3.2",
+      run_date: "2026-08-26",
+      total_duration_s: 1.732,
+      power_score: 5160.696919237429,
       logical_query_count: 22,
       valid_query_count: 22,
       missing_query_count: 0,
@@ -79,11 +79,11 @@ describe("local result import", () => {
       execution_mode: "sql",
       validation_status: "passed",
     });
-    expect(preview.detail.geomean_ms).toBeCloseTo(11.516422021051456);
-    expect(preview.detail.display_geomean_ms).toBeCloseTo(11.335852721901425);
+    expect(preview.detail.geomean_ms).toBeCloseTo(6.880299087204791);
+    expect(preview.detail.display_geomean_ms).toBeCloseTo(6.890330341766069);
     expect(preview.detail.display_timings.find((timing) => timing.query_id === "14")).toMatchObject({
-      display_ms: 12,
-      sample_count: 4,
+      display_ms: 6.3,
+      sample_count: 3,
     });
     expect(preview.detail.display_timings).toHaveLength(22);
     expect(preview.detail.queries).toHaveLength(88);

@@ -45,7 +45,7 @@ const genDataDir = join(genRoot, "data");
 
 const FIXTURE_PROFILE = process.env.E2E_FIXTURE_PROFILE ?? "default";
 const LARGE_CORPUS_ADDITIONAL_RESULTS = 280;
-const LARGE_CORPUS_RUN_ID_PREFIX = "9c0925d1-large-corpus-";
+const LARGE_CORPUS_RUN_ID_PREFIX = "8a57a5a8-large-corpus-";
 const PANDAS_SOURCE_BUNDLE = "tpch-pandas-sf0.01-20260826-8bde2222.json";
 const PANDAS_STANDARD_FIXTURE_RUN_ID = "8bde2222-fixture-standard";
 
@@ -57,8 +57,33 @@ const SOURCE_BINDINGS = [
     fixtureBundle: PANDAS_SOURCE_BUNDLE,
     manifest: "tpch-pandas-sf0.01-20260826-8bde2222.source.manifest.json",
   },
+  {
+    fixtureBundle: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
+    manifest: "tpch-duckdb-sf0.01-20260826-8a57a5a8.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-datafusion-sf0.01-20260826-e8a7d048.json",
+    manifest: "tpch-datafusion-sf0.01-20260826-e8a7d048.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-polars-sf0.01-20260824-51ccc406.json",
+    manifest: "tpch-polars-sf0.01-20260824-51ccc406.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-spark-sf0.01-20260826-2fd3b12b.json",
+    manifest: "tpch-spark-sf0.01-20260826-2fd3b12b.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-cedardb-sf0.01-20260825-cf0d9e4d.json",
+    manifest: "tpch-cedardb-sf0.01-20260825-cf0d9e4d.source.manifest.json",
+  },
 ];
-const SYNTHETIC_CANONICAL_SOURCES = new Set(SOURCE_BINDINGS.map(({ fixtureBundle }) => fixtureBundle));
+// Manifest verification (SOURCE_BINDINGS) is decoupled from copy exclusion:
+// every verbatim power-cohort source is hash-checked AND copied, while the
+// Pandas power source stays excluded because the corpus carries only its
+// synthetic standard-phase derivative (a verbatim copy would add a sixth
+// power-cohort platform and break hardcoded e2e counts).
+const SYNTHETIC_CANONICAL_SOURCES = new Set([PANDAS_SOURCE_BUNDLE]);
 
 if (!new Set(["default", "large"]).has(FIXTURE_PROFILE)) {
   throw new Error(`unsupported E2E_FIXTURE_PROFILE=${FIXTURE_PROFILE}; expected default or large`);
@@ -128,13 +153,13 @@ const VARIANTS = [
     // assert on. Community + employer-funded is a deliberate pairing: it proves
     // the two axes are independent, since every other fixture leaves funding at
     // the `unspecified` producer default and therefore renders no chip.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "community",
-    derived: "tpch-duckdb-sf0.01-20260403-community.json",
+    derived: "tpch-duckdb-sf0.01-20260826-community.json",
     sidecars: {
       "submission-manifest.json": {
         version: "1",
-        bundle: "tpch-duckdb-sf0.01-20260403-community.json",
+        bundle: "tpch-duckdb-sf0.01-20260826-community.json",
         submitted_at: "2026-04-18T00:00:00Z",
         contributor: "browser-functional-test-fixture",
         note:
@@ -162,11 +187,11 @@ const VARIANTS = [
     // uses this to exercise the sidecar fetch-error path on ResultDetail.
     // A per-variant subdirectory keeps the tuning sidecar scoped to this
     // one bundle.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "tuned",
-    derived: "tpch-duckdb-sf0.01-20260403-tuned.json",
+    derived: "tpch-duckdb-sf0.01-20260826-tuned.json",
     sidecars: {
-      "tpch-duckdb-sf0.01-20260403-tuned.tuning.json": {
+      "tpch-duckdb-sf0.01-20260826-tuned.tuning.json": {
         tuning_mode: "tuned",
         memory_limit: "4GB",
         threads: 4,
@@ -223,12 +248,40 @@ const VARIANTS = [
     },
   },
   {
+    // Power-phase tuned sibling for the genuine Polars source: the
+    // verifier needs >=2 tuned pairs in the >=4-platform power cohort
+    // (DuckDB plus one more), and every tuned row must derive from a
+    // real run with a synthetic-only tuning sidecar, never from a
+    // byte-cloned baseline wearing a tuned label.
+    source: "tpch-polars-sf0.01-20260824-51ccc406.json",
+    subdir: "tuned-polars",
+    derived: "tpch-polars-sf0.01-20260824-tuned.json",
+    sidecars: {
+      "tpch-polars-sf0.01-20260824-tuned.tuning.json": {
+        tuning_mode: "tuned",
+        memory_limit: "4GB",
+        threads: 4,
+        notes:
+          "Synthetic tuning config produced by the browser-test fixture " +
+          "generator. Do not treat as a real contribution.",
+      },
+    },
+    mutate: (bundle) => {
+      const mutated = structuredClone(bundle);
+      mutated.config = { ...(mutated.config ?? {}), tuning_mode: "tuned" };
+      if (mutated.run) {
+        mutated.run.id = `${mutated.run.id ?? "run"}-tuned`;
+      }
+      return mutated;
+    },
+  },
+  {
     // Scale-factor variant: same TPC-H DuckDB bundle rewritten to SF 0.1.
     // The compare-scale-mismatch failure test pairs this with an SF 0.01
     // bundle to exercise the hard-block path that jsdom cannot reach.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "sf01",
-    derived: "tpch-duckdb-sf0.1-20260403-scale.json",
+    derived: "tpch-duckdb-sf0.1-20260826-scale.json",
     mutate: (bundle) => {
       const mutated = structuredClone(bundle);
       if (mutated.benchmark) {
@@ -246,9 +299,9 @@ const VARIANTS = [
     // this to exercise Compare's normalized-speedup "Comparable only"
     // default with a real browser corpus row that has at least one hidden
     // partial query.
-    source: "tpch-datafusion-sf0.01-20260403-c0d4f3d9.json",
+    source: "tpch-datafusion-sf0.01-20260826-e8a7d048.json",
     subdir: "partial-query",
-    derived: "tpch-datafusion-partial-sf0.01-20260403-query-gap.json",
+    derived: "tpch-datafusion-partial-sf0.01-20260826-query-gap.json",
     mutate: (bundle) => {
       const mutated = omitMeasurementQuery(bundle, "22");
       mutated.platform = {
@@ -266,9 +319,9 @@ const VARIANTS = [
     // This additive browser-only variant never changes the checked-in source
     // corpus or public results. A distinct platform name keeps it out of
     // exact-row-count assertions for the canonical DuckDB platform.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "zero-timing",
-    derived: "tpch-fixture-zero-timing-sf0.01-20260403.json",
+    derived: "tpch-fixture-zero-timing-sf0.01-20260826.json",
     mutate: (bundle) => {
       const mutated = structuredClone(bundle);
       mutated.run = {
@@ -305,13 +358,13 @@ const VARIANTS = [
     // Synthetic AWS managed-cloud variant: fixture-only coverage for the
     // environment facets flattened into the browser snapshot. This never
     // touches the public corpus.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "environment/aws-cloud",
-    derived: "tpch-fixture-aws-sf0.01-20260403-environment.json",
+    derived: "tpch-fixture-aws-sf0.01-20260826-environment.json",
     sidecars: {
       "submission-manifest.json": {
         version: "1",
-        bundle: "tpch-fixture-aws-sf0.01-20260403-environment.json",
+        bundle: "tpch-fixture-aws-sf0.01-20260826-environment.json",
         submitted_at: "2026-05-03T00:00:00Z",
         contributor: "browser-functional-test-fixture",
         note:
@@ -352,13 +405,13 @@ const VARIANTS = [
   {
     // Synthetic GCP serverless variant: exercises a second cloud provider,
     // region, and compute-shape source path.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "environment/gcp-serverless",
-    derived: "tpch-fixture-gcp-sf0.01-20260403-environment.json",
+    derived: "tpch-fixture-gcp-sf0.01-20260826-environment.json",
     sidecars: {
       "submission-manifest.json": {
         version: "1",
-        bundle: "tpch-fixture-gcp-sf0.01-20260403-environment.json",
+        bundle: "tpch-fixture-gcp-sf0.01-20260826-environment.json",
         submitted_at: "2026-05-03T00:00:00Z",
         contributor: "browser-functional-test-fixture",
         note:
@@ -400,9 +453,9 @@ const VARIANTS = [
     // Synthetic provisioned-local/container-source variant: this remains
     // `deployment_class=local` under the current flattened contract while
     // carrying normalized runtime metadata for future runtime facets.
-    source: "tpch-duckdb-sf0.01-20260403-7fe93365.json",
+    source: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
     subdir: "environment/container-local",
-    derived: "tpch-fixture-container-sf0.01-20260403-environment.json",
+    derived: "tpch-fixture-container-sf0.01-20260826-environment.json",
     mutate: (bundle) =>
       withEnvironmentFacetVariant(bundle, {
         runSuffix: "env-container-local",
@@ -652,7 +705,7 @@ const writeVariants = () => {
 const writeLargeCorpusVariants = () => {
   if (FIXTURE_PROFILE !== "large") return;
 
-  const sourceName = "tpch-duckdb-sf0.01-20260403-7fe93365.json";
+  const sourceName = "tpch-duckdb-sf0.01-20260826-8a57a5a8.json";
   const source = JSON.parse(readFileSync(join(sourceBundlesDir, sourceName), "utf8"));
   const targetDir = join(genBundlesDir, "large-corpus");
   mkdirSync(targetDir, { recursive: true });
@@ -705,21 +758,24 @@ const runPipeline = (contract) => {
  * canonical id does not weaken the test, it inverts it.
  */
 const FIXTURE_ROLES = {
-  "9c0925d1": "duckdb",
-  "9c0925d1-tuned": "duckdbTuned",
-  "9c0925d1-community": "duckdbCommunity",
-  "9c0925d1-sf01": "duckdbSf01",
-  "9c0925d1-env-aws-cloud": "awsCloud",
-  "9c0925d1-env-container-local": "containerLocal",
-  "9c0925d1-env-gcp-serverless": "gcpServerless",
-  "9c0925d1-zero-timing": "zeroTiming",
+  "8a57a5a8": "duckdb",
+  "8a57a5a8-tuned": "duckdbTuned",
+  "8a57a5a8-community": "duckdbCommunity",
+  "8a57a5a8-sf01": "duckdbSf01",
+  "8a57a5a8-env-aws-cloud": "awsCloud",
+  "8a57a5a8-env-container-local": "containerLocal",
+  "8a57a5a8-env-gcp-serverless": "gcpServerless",
+  "8a57a5a8-zero-timing": "zeroTiming",
   [PANDAS_STANDARD_FIXTURE_RUN_ID]: "pandas",
   [`${PANDAS_STANDARD_FIXTURE_RUN_ID}-vendor`]: "pandasVendor",
   [`${PANDAS_STANDARD_FIXTURE_RUN_ID}-tuned`]: "pandasTuned",
-  c235e698: "datafusion",
-  "c235e698-partial-query": "datafusionPartial",
+  e8a7d048: "datafusion",
+  "2fd3b12b": "spark",
+  cf0d9e4d: "cedardb",
+  "e8a7d048-partial-query": "datafusionPartial",
   d4ec318a: "starSchema",
-  e744512d: "polars",
+  "51ccc406": "polars",
+  "51ccc406-tuned": "polarsTuned",
 };
 
 /**

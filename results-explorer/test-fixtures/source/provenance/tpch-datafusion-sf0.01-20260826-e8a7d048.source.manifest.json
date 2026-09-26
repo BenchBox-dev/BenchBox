@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "fixture_bundle": "tpch-datafusion-sf0.01-20260826-e8a7d048.json",
+  "source_bundle": "results-data/bundles/tpch_sf001_datafusion_sql_20260826_110608_e8a7d048.json",
+  "bundle_hash": "a876fa0f677b4c9d1b23ad8f7c1430fe837943e2781cdcbabd175b455665a821",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

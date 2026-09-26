@@ -38,7 +38,7 @@ async function platformCellLabels(rows: Locator, columnIndex: number): Promise<s
 
 test.describe("Index sortable headers", () => {
   test("benchmark section deep links survive loading and sibling navigation", async ({ page }) => {
-    for (const target of ["?view=list&sf=0.01&phase=standard", "?sf=0.01&phase=standard#benchmark-section-list"]) {
+    for (const target of ["?view=list&sf=0.01&phase=power", "?sf=0.01&phase=power#benchmark-section-list"]) {
       await page.goto(`/results/tpch/${target}`);
       await waitForDataLoaded(page, /TPC-H Results/);
       const list = page.locator("#benchmark-section-list");
@@ -77,13 +77,13 @@ test.describe("Index sortable headers", () => {
   });
 
   test("BenchmarkIndex matrix headers update aria-sort and row order", async ({ page }) => {
-    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 
     // The query matrix is a collapsed Analysis card by default now.
     await openAnalysisCard(page, "query_heatmap");
-    const table = page.getByRole("table", { name: /tpch SF0\.01 standard results/i });
+    const table = page.getByRole("table", { name: /tpch SF0\.01 power results/i });
     // The heading is shell-rendered; gate on real rows in the table under test
     // before reading row order.
     await waitForResultRows(page, table, 3);
@@ -108,7 +108,7 @@ test.describe("Index sortable headers", () => {
     // exclusive states behind a toggle - List needs no click to reveal it,
     // so scope to its section rather than "the first table" (Matrix's grid
     // now precedes it in document order).
-    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 

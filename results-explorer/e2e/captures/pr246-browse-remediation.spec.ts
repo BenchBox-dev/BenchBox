@@ -34,17 +34,17 @@ const STANDARD_WIDTHS = [390, 768, 1280, 1600];
 const ROUTES: CaptureRoute[] = [
   ...STANDARD_WIDTHS.map((width) => ({
     filename: `benchmark-tpch-${width}.png`,
-    url: "/results/tpch/?sf=0.01&phase=standard",
+    url: "/results/tpch/?sf=0.01&phase=power",
     width,
   })),
   {
     filename: "benchmark-tpch-list-1280.png",
-    url: "/results/tpch/?sf=0.01&phase=standard&view=list",
+    url: "/results/tpch/?sf=0.01&phase=power&view=list",
     width: 1280,
   },
   {
     filename: "benchmark-tpch-high-contrast-1280.png",
-    url: "/results/tpch/?sf=0.01&phase=standard",
+    url: "/results/tpch/?sf=0.01&phase=power",
     width: 1280,
     highContrast: true,
   },

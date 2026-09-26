@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "fixture_bundle": "tpch-cedardb-sf0.01-20260825-cf0d9e4d.json",
+  "source_bundle": "results-data/bundles/tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
+  "bundle_hash": "f8172dc4758cc18959e3e94a8f55e6de2351145e604c9098616de3cdf37a1f4d",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
