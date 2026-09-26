@@ -98,7 +98,7 @@ uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
 Preview an Iceberg external-table run on BigQuery without executing any queries:
 
 ```bash
-uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 \
+uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 --phases power \
   --table-mode external --table-format iceberg \
   --platform-option biglake_connection=<project.region.connection> \
   --dry-run ./preview
