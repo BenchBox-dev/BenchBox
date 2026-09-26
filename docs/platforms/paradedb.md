@@ -32,10 +32,10 @@ benchbox run --platform paradedb --benchmark tpch --scale 1.0 \
 
 ### Python Dependencies
 
-ParadeDB uses the same Python driver as PostgreSQL:
+ParadeDB uses the same Python driver as PostgreSQL (psycopg v3):
 
 ```bash
-uv add psycopg2-binary
+pip install "benchbox[postgresql]"
 ```
 
 ### Server Requirements

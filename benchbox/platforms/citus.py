@@ -181,34 +181,107 @@ class CitusAdapter(PostgreSQLAdapter):
             return list(tables.keys())
         return []
 
+    def _validated_distribution_column(self) -> str:
+        """Return the configured distribution column after identifier validation."""
+        column = self.distribution_column
+        assert column is not None
+        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", column):
+            raise ValueError(f"Invalid Citus distribution column {column!r}: must be a plain SQL identifier.")
+        return column
+
+    @staticmethod
+    def _table_has_column(cursor: Any, table_name: str, column: str) -> bool:
+        """Check column presence explicitly instead of inferring it from a failed DDL."""
+        cursor.execute(
+            "SELECT 1 FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = %s AND column_name = %s",
+            (table_name, column),
+        )
+        return cursor.fetchone() is not None
+
+    @staticmethod
+    def _distributed_column(cursor: Any, table_name: str) -> str | None:
+        """Return the column a table is distributed on, or None when undistributed."""
+        cursor.execute("SELECT partkey FROM pg_dist_partition WHERE logicalrelid = %s::regclass", (table_name,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        return row[0] or None
+
+    def _distribute_single_table(self, cursor: Any, connection: Any, table_name: str, column: str) -> None:
+        """Distribute one table and commit immediately.
+
+        Each successful distribution commits on its own so a later skipped
+        or failed table can never roll back an earlier success back to
+        coordinator-local.
+        """
+        quoted_table = '"' + table_name.replace('"', '""') + '"'
+        cursor.execute(f"SELECT create_distributed_table('{quoted_table}', '{column}')")
+        connection.commit()
+        self.logger.info(f"Distributed Citus table {table_name} on column {column}")
+
     def _distribute_benchmark_tables(self, benchmark: Any, connection: Any) -> None:
         """Distribute every benchmark table on the configured column.
 
         Runs after the inherited schema creation so COPY loading fans out to
         workers. Tables lacking the column are left coordinator-local with a
         warning rather than failing the run: dimension tables rarely carry
-        the fact-table distribution key.
+        the fact-table distribution key. Operational distribution failures
+        propagate so the run aborts instead of benchmarking an unintended
+        coordinator-local topology.
         """
-        assert self.distribution_column is not None
-        column = self.distribution_column
-        if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", column):
-            raise ValueError(f"Invalid Citus distribution column {column!r}: must be a plain SQL identifier.")
+        column = self._validated_distribution_column()
         cursor = connection.cursor()
         try:
             for table_name in self._benchmark_table_names(benchmark):
-                quoted_table = '"' + table_name.replace('"', '""') + '"'
-                try:
-                    cursor.execute(f"SELECT create_distributed_table('{quoted_table}', '{column}')")
-                    self.logger.info(f"Distributed Citus table {table_name} on column {column}")
-                except Exception as e:
-                    connection.rollback()
+                if not self._table_has_column(cursor, table_name, column):
                     self.logger.warning(
-                        f"Table {table_name} left coordinator-local (create_distributed_table on {column} failed: {e})"
+                        f"Table {table_name} lacks distribution column {column}; left coordinator-local"
                     )
                     continue
-            connection.commit()
+                self._distribute_single_table(cursor, connection, table_name, column)
         finally:
             cursor.close()
+
+    def _ensure_distribution_on_reused_database(self, benchmark: Any, connection: Any) -> None:
+        """Verify or apply the requested distribution on a reused database.
+
+        The reuse lifecycle skips schema creation, so distribution requested
+        for this run would otherwise silently not happen. Tables already
+        distributed on the requested column are verified and kept; tables
+        distributed on a different column reject the run (benchmarking them
+        would measure a different topology than requested); undistributed
+        tables carrying the column are distributed now.
+        """
+        column = self._validated_distribution_column()
+        cursor = connection.cursor()
+        try:
+            for table_name in self._benchmark_table_names(benchmark):
+                existing = self._distributed_column(cursor, table_name)
+                if existing == column:
+                    self.logger.info(f"Citus table {table_name} already distributed on column {column}")
+                    continue
+                if existing is not None:
+                    raise RuntimeError(
+                        f"Citus table {table_name} is already distributed on {existing!r}, "
+                        f"but distribution_column={column!r} was requested; recreate the database "
+                        "or rerun with the matching column."
+                    )
+                if not self._table_has_column(cursor, table_name, column):
+                    self.logger.warning(
+                        f"Table {table_name} lacks distribution column {column}; left coordinator-local"
+                    )
+                    continue
+                self._distribute_single_table(cursor, connection, table_name, column)
+        finally:
+            cursor.close()
+
+    def _setup_reused_database_phases(self, benchmark: Any, connection: Any) -> tuple:
+        """Run the reuse phases, then verify or apply the requested distribution."""
+        phases = super()._setup_reused_database_phases(benchmark, connection)
+        if self.distribution_column:
+            self._ensure_distribution_on_reused_database(benchmark, connection)
+        return phases
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Citus platform information."""

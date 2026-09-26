@@ -159,22 +159,116 @@ class TestCitusAdapter:
             adapter._distribute_benchmark_tables(Mock(), Mock())
 
     def test_tables_missing_column_stay_local(self, citus_stubs):
-        """Tables that fail distribution warn instead of failing the run."""
+        """Tables lacking the column warn and stay local; earlier successes keep their commit."""
         adapter = CitusAdapter(distribution_column="l_orderkey")
 
         benchmark = Mock()
-        benchmark._get_active_tables.return_value = ["nation"]
+        benchmark._get_active_tables.return_value = ["lineitem", "nation"]
 
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.closed = False
-        mock_cursor.execute.side_effect = RuntimeError("column does not exist")
+        # Column present for lineitem, absent for nation.
+        mock_cursor.fetchone.side_effect = [(1,), None]
         mock_conn.cursor.return_value = mock_cursor
 
         adapter._distribute_benchmark_tables(benchmark, mock_conn)
 
-        mock_conn.rollback.assert_called()
+        distributed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert any("create_distributed_table" in sql and "lineitem" in sql for sql in distributed)
+        assert not any("create_distributed_table" in sql and "nation" in sql for sql in distributed)
+        mock_conn.rollback.assert_not_called()
         mock_conn.commit.assert_called_once_with()
+
+    def test_operational_distribution_failure_aborts_run(self, citus_stubs):
+        """A failed create_distributed_table propagates instead of reading as a skipped column."""
+        adapter = CitusAdapter(distribution_column="l_orderkey")
+
+        benchmark = Mock()
+        benchmark._get_active_tables.return_value = ["lineitem"]
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.closed = False
+        mock_cursor.fetchone.return_value = (1,)
+        mock_cursor.execute.side_effect = [None, RuntimeError("worker unavailable")]
+        mock_conn.cursor.return_value = mock_cursor
+
+        with pytest.raises(RuntimeError, match="worker unavailable"):
+            adapter._distribute_benchmark_tables(benchmark, mock_conn)
+
+        mock_conn.rollback.assert_not_called()
+
+    def test_reused_database_applies_missing_distribution(self, citus_stubs):
+        """Reuse verifies state: undistributed tables with the column are distributed now."""
+        from benchbox.platforms.base.result_capture import ResultCaptureMixin
+
+        adapter = CitusAdapter(distribution_column="l_orderkey")
+
+        benchmark = Mock()
+        benchmark._get_active_tables.return_value = ["lineitem"]
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.closed = False
+        # pg_dist_partition: no row (undistributed); information_schema: column present.
+        mock_cursor.fetchone.side_effect = [None, (1,)]
+        mock_conn.cursor.return_value = mock_cursor
+
+        with patch.object(ResultCaptureMixin, "_setup_reused_database_phases", return_value=("phases",)) as mock_super:
+            phases = adapter._setup_reused_database_phases(benchmark, mock_conn)
+
+        assert phases == ("phases",)
+        mock_super.assert_called_once_with(benchmark, mock_conn)
+        distributed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert any("create_distributed_table" in sql and "lineitem" in sql for sql in distributed)
+
+    def test_reused_database_keeps_matching_distribution(self, citus_stubs):
+        """Tables already distributed on the requested column issue no DDL."""
+        adapter = CitusAdapter(distribution_column="l_orderkey")
+
+        benchmark = Mock()
+        benchmark._get_active_tables.return_value = ["lineitem"]
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.closed = False
+        mock_cursor.fetchone.return_value = ("l_orderkey",)
+        mock_conn.cursor.return_value = mock_cursor
+
+        adapter._ensure_distribution_on_reused_database(benchmark, mock_conn)
+
+        distributed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert not any("create_distributed_table" in sql for sql in distributed)
+        mock_conn.commit.assert_not_called()
+
+    def test_reused_database_rejects_conflicting_distribution(self, citus_stubs):
+        """Tables distributed on another column reject the run instead of benchmarking silently."""
+        adapter = CitusAdapter(distribution_column="l_orderkey")
+
+        benchmark = Mock()
+        benchmark._get_active_tables.return_value = ["lineitem"]
+
+        mock_conn = Mock()
+        mock_cursor = Mock()
+        mock_cursor.closed = False
+        mock_cursor.fetchone.return_value = ("o_orderkey",)
+        mock_conn.cursor.return_value = mock_cursor
+
+        with pytest.raises(RuntimeError, match="already distributed"):
+            adapter._ensure_distribution_on_reused_database(benchmark, mock_conn)
+
+    def test_reused_database_skips_distribution_when_unconfigured(self, citus_stubs):
+        """Without a distribution column the reuse path adds no verification."""
+        from benchbox.platforms.base.result_capture import ResultCaptureMixin
+
+        adapter = CitusAdapter()
+
+        with patch.object(ResultCaptureMixin, "_setup_reused_database_phases", return_value=("phases",)):
+            with patch.object(CitusAdapter, "_ensure_distribution_on_reused_database") as mock_ensure:
+                adapter._setup_reused_database_phases(Mock(), Mock())
+
+        mock_ensure.assert_not_called()
 
     def test_platform_info_reports_version_and_column(self, citus_stubs):
         """get_platform_info should include the citus version and column."""

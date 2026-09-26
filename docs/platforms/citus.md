@@ -34,10 +34,10 @@ benchbox run --platform citus --benchmark tpch --scale 1.0 \
 
 ### Python Dependencies
 
-Citus uses the same Python driver as PostgreSQL:
+Citus uses the same Python driver as PostgreSQL (psycopg v3):
 
 ```bash
-uv add psycopg2-binary
+pip install "benchbox[postgresql]"
 ```
 
 ### Server Requirements
