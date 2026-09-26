@@ -104,6 +104,7 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
+          gh label create publication --description "Site publication pipeline" 2>/dev/null || true
           gh issue create \
             --title "Publication handoff failed for $TAG" \
             --label "publication" \
