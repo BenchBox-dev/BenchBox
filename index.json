@@ -13677,10 +13677,15 @@
       "title": "Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites"
     },
     "reproduce-postgres-integration-needs-a-live-postgres-inside": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T04:36:41Z",
+        "generation": "2b19a83627204dd6b2d985c231f4ed7d",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Reproduce postgres-integration (needs a live Postgres) inside container"
     },
     "require-operator-salt-for-community-publish": {
