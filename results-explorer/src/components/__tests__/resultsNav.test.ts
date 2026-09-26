@@ -16,12 +16,17 @@ describe("activeResultsNavSection", () => {
     ["/results/platforms", "platforms"],
     ["/results/platforms/", "platforms"],
     ["/results/p/duckdb/", "platforms"],
+    ["/results/p/clickhouse/", "platforms"],
+    ["/results/p/duckdb", "platforms"],
+    ["/results/local/res_123", null],
     ["/results/compare", "compare"],
     ["/results/compare/", "compare"],
+    ["/results/compare/?a=1&b=2", "compare"],
     ["/results/query", "query"],
     ["/results/query/", "query"],
+    ["/results/query/?benchmark=tpch", "query"],
   ])("resolves %s to the %s section", (path, expectedId) => {
-    expect(activeResultsNavSection(path)?.id).toBe(expectedId);
+    expect(activeResultsNavSection(path)?.id ?? null).toBe(expectedId);
   });
 
   it.each([
