@@ -11,15 +11,15 @@ meta_description: "BenchBox v0.4.1 adds four lakehouse table pairings, stricter 
 ---
 # BenchBox v0.4.1: more lakehouse pairings, stricter results
 
-**TL;DR**: BenchBox v0.4.1 can benchmark four more lakehouse table pairings: Delta on ClickHouse, Iceberg on BigQuery and Redshift Spectrum, and Hudi on Databricks. Result submissions now need every query and an official TPC-H run, and cost reports say "unavailable" instead of guessing. Python 3.11, pandas 3, and DuckDB 1.5 are now minimums, and Modin support is gone.
+**TL;DR**: BenchBox v0.4.1 can benchmark Delta tables on ClickHouse and Iceberg tables on BigQuery and Redshift Spectrum, and it can create Hudi tables on Databricks. Result submissions now need every query and an official TPC-H run, and cost reports say "unavailable" instead of guessing. Python 3.11, pandas 3, and DuckDB 1.5 are now minimums, and Modin support is gone.
 
 ---
 
-![BenchBox 0.4.1 support matrix for lakehouse tables. Rows are Delta, Iceberg, and Hudi. Columns are grouped into cloud warehouses (BigQuery, Redshift Spectrum, Databricks, Snowflake, ClickHouse Cloud), query engines (ClickHouse, DuckDB, DataFusion, Trino/Presto), and Spark (Apache Spark, Athena Spark, Onehouse Quanton). Four cells are marked new in 0.4.1: Delta on ClickHouse, Iceberg on BigQuery, Iceberg on Redshift Spectrum, and Hudi on Databricks.](../images/v041_lakehouse_matrix.png)
+![BenchBox 0.4.1 lakehouse support matrix. Delta: BigQuery, Redshift Spectrum, Databricks, Snowflake, ClickHouse (new), DuckDB, DataFusion, Trino/Presto, Apache Spark, Athena Spark, and Onehouse Quanton. Iceberg: BigQuery (new), Redshift Spectrum (new), Snowflake, ClickHouse Cloud, DuckDB, DataFusion, Trino/Presto, Apache Spark, Athena Spark, and Onehouse Quanton. Hudi: Databricks (new), Apache Spark, and Onehouse Quanton. The Apache Spark column also covers EMR Serverless and Dataproc; the Athena Spark column also covers Synapse Spark and Fabric Spark.](../images/v041_lakehouse_matrix.png)
 
 BenchBox v0.4.1 was released on **September 24, 2026**.
 
-The headline change is lakehouse coverage. Delta Lake, Apache Iceberg, and Apache Hudi tables can now be benchmarked on four more engines, and external-table mode reaches four more Spark services. The matrix above shows where each format runs today, with the new pairings in orange.
+The headline change is lakehouse coverage. BenchBox can now benchmark Delta Lake and Apache Iceberg tables on three more engines and create Apache Hudi tables on Databricks, and external-table mode reaches four more Spark services. The matrix above shows where each format runs today, with the new pairings in orange.
 
 The second change is stricter rules for published results. Submissions must be complete, official runs, and the Results Explorer gains views for comparing releases and previewing your own results before you submit them.
 
@@ -29,7 +29,7 @@ The third is cost reporting that no longer guesses. When BenchBox lacks a price,
 
 | Area | What changed in v0.4.1 | Why it matters |
 | --- | --- | --- |
-| Lakehouse tables | Delta on ClickHouse, Iceberg on BigQuery and Redshift Spectrum, Hudi on Databricks | Benchmark the same table format on more engines |
+| Lakehouse tables | Delta on ClickHouse, Iceberg on BigQuery and Redshift Spectrum, Hudi table creation on Databricks | Benchmark the same table format on more engines |
 | External tables | `--table-mode external` on Athena Spark, EMR Serverless, Dataproc Serverless, and Glue | Query staged files without loading them first |
 | Result submissions | Official TPC-H only, every query required, warnings for implausible timings | Published results are complete runs |
 | Cost reporting | Unknown prices, sizes, or regions report cost as unavailable | No invented dollar figures |
@@ -44,7 +44,7 @@ ClickHouse now reads Delta tables natively through its `DeltaLake` table engine 
 
 BigQuery and Redshift Spectrum both gained Iceberg in external-table mode. BigQuery reads Iceberg directories as BigLake tables, so it needs a `biglake_connection` platform option. Spectrum reads Iceberg only through the AWS Glue Data Catalog, so BenchBox registers each uploaded table in Glue, replacing any earlier registration, and queries it through the external schema.
 
-Databricks can now create Hudi tables. Set `table_format=hudi` and BenchBox emits `USING HUDI` DDL with the record-key properties you pass. This pairing is validated by unit tests only so far, not on a live workspace. Your Databricks runtime must already support Hudi, because BenchBox does not install the Hudi libraries.
+Databricks support for Hudi is narrower than the other three. Set `table_format=hudi` and BenchBox creates the schema with `USING HUDI` DDL and the record-key properties you pass. BenchBox's managed loader uses `COPY INTO`, which writes only Delta tables, so it stops with an error for Hudi. Load the data through a Hudi-aware Spark job first. Delta-only maintenance such as `OPTIMIZE` is recorded as skipped for these tables. So far the DDL is validated by unit tests only, not on a live workspace. Your Databricks runtime must already support Hudi, because BenchBox does not install the Hudi libraries.
 
 External-table mode (`--table-mode external`) queries staged files without loading them into native tables. It now works on Athena Spark, EMR Serverless, Dataproc Serverless, and AWS Glue as well.
 
@@ -87,12 +87,12 @@ On the fix side, ClickBench, TPC-DS, TPC-DI, and FlightData now load and run on 
 benchbox --version
 ```
 
-Run a Delta table on DuckDB:
+Query a Delta table directly from DuckDB. Without `--table-mode external`, DuckDB loads the Delta data into its own tables instead:
 
 ```bash
 uv add "benchbox[duckdb,table-formats]"
 uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
-  --table-format delta
+  --table-mode external --table-format delta
 ```
 
 Preview an Iceberg external-table run on BigQuery without executing any queries:
@@ -100,7 +100,7 @@ Preview an Iceberg external-table run on BigQuery without executing any queries:
 ```bash
 uv run -- benchbox run --platform bigquery --benchmark tpch --scale 0.01 --phases power \
   --table-mode external --table-format iceberg \
-  --platform-option biglake_connection=<project.region.connection> \
+  --platform-option biglake_connection=YOUR_PROJECT.US.YOUR_CONNECTION \
   --dry-run ./preview
 ```
 
