@@ -29,8 +29,10 @@ if TYPE_CHECKING:
 class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     """Synthetic Join Order Benchmark implementation.
 
-    This internal surface is for fast schema and loader smoke tests only.
-    It is not a cardinality-estimation substitute for canonical JOB.
+    This internal surface runs the canonical 113-query JOB surface,
+    verbatim, over fast uniformly-random synthetic data with golden
+    entities planted so conjunctive filters match. It is not a
+    cardinality-estimation substitute for canonical JOB.
     """
 
     # CSV dialect for resolve_csv_dialect path (b) — used when manifest metadata is absent
@@ -315,10 +317,10 @@ class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         """Get DataFrame query implementations for JoinOrder.
 
         Returns the QueryRegistry containing DataFrame implementations of all
-        13 JoinOrder queries for both expression-family and pandas-family platforms.
+        113 JoinOrder queries for both expression-family and pandas-family platforms.
 
         Returns:
-            QueryRegistry with all 13 JoinOrder DataFrame queries
+            QueryRegistry with all 113 JoinOrder DataFrame queries
         """
         from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 

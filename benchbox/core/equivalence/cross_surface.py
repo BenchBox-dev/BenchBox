@@ -516,7 +516,14 @@ def find_cross_surface_divergences(
     def reference_rows(query_id: Any) -> list[tuple[Any, ...]]:
         rows = fetch_reference_rows(connection, reference_sql(query_id))
         if reference_row_counts is not None:
-            reference_row_counts[query_id] = len(rows)
+            # Scalar-aggregation queries (SELECT MIN(...) with no GROUP BY)
+            # collapse an empty join to one all-NULL row, which len() == 1
+            # misreads as discriminating. Treat all-NULL single rows as
+            # 0-row vacuous so None == None can never pass as coverage.
+            if len(rows) == 1 and all(value is None for value in rows[0]):
+                reference_row_counts[query_id] = 0
+            else:
+                reference_row_counts[query_id] = len(rows)
         return rows
 
     def candidate_cells(

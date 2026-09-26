@@ -1,7 +1,8 @@
 """Synthetic JoinOrder DataFrame queries for Expression and Pandas families.
 
-Implements the 13 historical JoinOrder smoke-test queries through a restricted
-JOB SQL-to-DataFrame translator.
+Implements the 113 canonical JoinOrder queries through a restricted
+JOB SQL-to-DataFrame translator sharing the canonical deterministic
+join planner.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -27,6 +28,7 @@ from benchbox.core.joinorder.dataframe_queries import (
     _flatten_and,
     _is_join_equality,
     _join_key,
+    _plan_join_sequence,
     _prefixed_pandas_frame,
     _qualified,
     _select_min_columns,
@@ -37,18 +39,36 @@ from benchbox.core.joinorder_synthetic.queries import JoinOrderQueryManager
 if TYPE_CHECKING:
     import pandas as pd
 
-_QUERY_MANAGER = JoinOrderQueryManager()
+_QUERY_MANAGERS: dict[str | None, JoinOrderQueryManager] = {}
+
+
+def _manager_for(queries_dir: str | None) -> JoinOrderQueryManager:
+    """One cached query manager per queries_dir (F4).
+
+    A module-global singleton silently runs different queries than a
+    benchmark instance configured with a custom queries_dir. Cache per
+    directory so the DataFrame surface always reads what the SQL surface
+    reads.
+    """
+    if queries_dir not in _QUERY_MANAGERS:
+        _QUERY_MANAGERS[queries_dir] = JoinOrderQueryManager(queries_dir)
+    return _QUERY_MANAGERS[queries_dir]
+
+
+_QUERY_MANAGER = _manager_for(None)
 _PARENTHESIZED_LIKE_PATTERN = re.compile(r"(NOT\s+LIKE|LIKE)\s+'%\(([^%()]+)\)%'", re.IGNORECASE)
 _Q6A_ACTOR_NAME_PATTERN = re.compile(r"n\.name\s+LIKE\s+'%Downey%Robert%'", re.IGNORECASE)
 
 
-def _query_sql(query_id: str) -> str:
+def _query_sql(query_id: str, queries_dir: str | None = None) -> str:
     sql = _PARENTHESIZED_LIKE_PATTERN.sub(
-        lambda match: f"{match.group(1)} '%{match.group(2)}%'", _QUERY_MANAGER.get_query(query_id)
+        lambda match: f"{match.group(1)} '%{match.group(2)}%'", _manager_for(queries_dir).get_query(query_id)
     )
-    if query_id == "6a":
-        sql = _Q6A_ACTOR_NAME_PATTERN.sub("n.name LIKE '%Downey%' AND n.name LIKE '%Robert%'", sql)
-    return sql
+    # Canonical JOB spells the actor predicate as LIKE '%Downey%Robert%',
+    # which only matches "Downey ... Robert" order. Real names ("Robert
+    # Downey Jr.") need both orders; apply to every query carrying the
+    # pattern, not just 6a.
+    return _Q6A_ACTOR_NAME_PATTERN.sub("n.name LIKE '%Downey%' AND n.name LIKE '%Robert%'", sql)
 
 
 def _join_predicates(tree: exp.Select) -> tuple[list[tuple[str, str]], list[exp.Expression], list[exp.Expression]]:
@@ -85,8 +105,8 @@ def _prefixed_expression_frame(
     return frame
 
 
-def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) -> Any:
-    tree = parse_one(_query_sql(query_id), read="duckdb")
+def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str, queries_dir: str | None = None) -> Any:
+    tree = parse_one(_query_sql(query_id, queries_dir), read="duckdb")
     tables, predicates, join_predicates = _join_predicates(tree)
     join_key_columns: dict[str, list[tuple[str, int]]] = {alias: [] for alias, _table in tables}
     for index, predicate in enumerate(join_predicates):
@@ -114,39 +134,18 @@ def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) ->
         for alias, table_name in tables
     }
 
-    joined_aliases = {tables[0][0]}
     result = frames[tables[0][0]]
-    remaining_aliases = {alias for alias, _table in tables[1:]}
     used_join_predicates: set[int] = set()
-
-    while remaining_aliases:
-        for predicate_index, predicate in enumerate(join_predicates):
-            left_alias, left_column = _column_ref(predicate.this)
-            right_alias, right_column = _column_ref(predicate.expression)
-            if left_alias in joined_aliases and right_alias in remaining_aliases:
-                result = result.join(
-                    frames[right_alias],
-                    left_on=_join_key(left_alias, left_column, predicate_index),
-                    right_on=_join_key(right_alias, right_column, predicate_index),
-                )
-                joined_aliases.add(right_alias)
-                remaining_aliases.remove(right_alias)
-                used_join_predicates.add(id(predicate))
-                break
-            if right_alias in joined_aliases and left_alias in remaining_aliases:
-                result = result.join(
-                    frames[left_alias],
-                    left_on=_join_key(right_alias, right_column, predicate_index),
-                    right_on=_join_key(left_alias, left_column, predicate_index),
-                )
-                joined_aliases.add(left_alias)
-                remaining_aliases.remove(left_alias)
-                used_join_predicates.add(id(predicate))
-                break
-        else:
-            alias = remaining_aliases.pop()
-            result = result.join(frames[alias], how="cross")
-            joined_aliases.add(alias)
+    for step in _plan_join_sequence(tables, join_predicates):
+        if step.predicate_index < 0:
+            result = result.join(frames[step.new_alias], how="cross")
+            continue
+        result = result.join(
+            frames[step.new_alias],
+            left_on=_join_key(step.existing_alias, step.existing_column, step.predicate_index),
+            right_on=_join_key(step.new_alias, step.new_column, step.predicate_index),
+        )
+        used_join_predicates.add(id(join_predicates[step.predicate_index]))
 
     for predicate in predicates:
         if id(predicate) not in used_join_predicates:
@@ -160,10 +159,12 @@ def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str) ->
     )
 
 
-def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.DataFrame:
+def _execute_joinorder_pandas_query(
+    ctx: DataFrameContext, query_id: str, queries_dir: str | None = None
+) -> pd.DataFrame:
     import pandas as pd
 
-    tree = parse_one(_query_sql(query_id), read="duckdb")
+    tree = parse_one(_query_sql(query_id, queries_dir), read="duckdb")
     tables, predicates, join_predicates = _join_predicates(tree)
     local_predicates = {
         alias: [
@@ -177,41 +178,19 @@ def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.
         alias: _prefixed_pandas_frame(ctx, table_name, alias, local_predicates[alias]) for alias, table_name in tables
     }
 
-    joined_aliases = {tables[0][0]}
     result = frames[tables[0][0]]
-    remaining_aliases = {alias for alias, _table in tables[1:]}
     used_join_predicates: set[int] = set()
-
-    while remaining_aliases:
-        for predicate in join_predicates:
-            left_alias, left_column = _column_ref(predicate.this)
-            right_alias, right_column = _column_ref(predicate.expression)
-            if left_alias in joined_aliases and right_alias in remaining_aliases:
-                result = result.merge(
-                    frames[right_alias],
-                    left_on=_qualified(left_alias, left_column),
-                    right_on=_qualified(right_alias, right_column),
-                    how="inner",
-                )
-                joined_aliases.add(right_alias)
-                remaining_aliases.remove(right_alias)
-                used_join_predicates.add(id(predicate))
-                break
-            if right_alias in joined_aliases and left_alias in remaining_aliases:
-                result = result.merge(
-                    frames[left_alias],
-                    left_on=_qualified(right_alias, right_column),
-                    right_on=_qualified(left_alias, left_column),
-                    how="inner",
-                )
-                joined_aliases.add(left_alias)
-                remaining_aliases.remove(left_alias)
-                used_join_predicates.add(id(predicate))
-                break
-        else:
-            alias = remaining_aliases.pop()
-            result = result.merge(frames[alias], how="cross")
-            joined_aliases.add(alias)
+    for step in _plan_join_sequence(tables, join_predicates):
+        if step.predicate_index < 0:
+            result = result.merge(frames[step.new_alias], how="cross")
+            continue
+        result = result.merge(
+            frames[step.new_alias],
+            left_on=_qualified(step.existing_alias, step.existing_column),
+            right_on=_qualified(step.new_alias, step.new_column),
+            how="inner",
+        )
+        used_join_predicates.add(id(join_predicates[step.predicate_index]))
 
     for predicate in predicates:
         if id(predicate) not in used_join_predicates:
@@ -227,29 +206,50 @@ def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.
     )
 
 
-def _make_expression_impl(query_id: str) -> Any:
+def _make_expression_impl(query_id: str, queries_dir: str | None = None) -> Any:
     def _impl(ctx: DataFrameContext) -> Any:
-        return _execute_joinorder_expression_query(ctx, query_id)
+        return _execute_joinorder_expression_query(ctx, query_id, queries_dir)
 
     _impl.__name__ = f"q{query_id}_expression_impl"
     _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder DataFrame translation."
     return _impl
 
 
-def _make_pandas_impl(query_id: str) -> Any:
+def _make_pandas_impl(query_id: str, queries_dir: str | None = None) -> Any:
     def _impl(ctx: DataFrameContext) -> Any:
-        return _execute_joinorder_pandas_query(ctx, query_id)
+        return _execute_joinorder_pandas_query(ctx, query_id, queries_dir)
 
     _impl.__name__ = f"q{query_id}_pandas_impl"
     _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder pandas translation."
     return _impl
 
 
-_QUERY_IDS = ("1a", "1b", "2a", "3a", "4a", "5a", "6a", "7a", "8a", "9a", "10a", "11a", "12a")
+# Impls register here (keyed by "q<id>_<family>_impl") instead of mutating
+# module globals (F7), so the registry build is statically typed and the
+# generated names stay resolvable. See __getattr__ for name-based access.
+_IMPLS: dict[str, Any] = {}
 
-for _query_id in _QUERY_IDS:
-    globals()[f"q{_query_id}_expression_impl"] = _make_expression_impl(_query_id)
-    globals()[f"q{_query_id}_pandas_impl"] = _make_pandas_impl(_query_id)
+
+def __getattr__(name: str) -> Any:
+    """Resolve factory-built impl names from the registry (PEP 562)."""
+    if name in _IMPLS:
+        return _IMPLS[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# All 113 canonical ids get generated DataFrame impls through the
+# restricted translator. SQL text comes from the canonical JOB queries
+# via the cached JoinOrderQueryManager.
+try:
+    from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES as _CANONICAL_IDS
+
+    _ALL_QUERY_IDS = tuple(_CANONICAL_IDS)
+except ImportError:
+    _ALL_QUERY_IDS = ()
+
+for _query_id in _ALL_QUERY_IDS:
+    _IMPLS[f"q{_query_id}_expression_impl"] = _make_expression_impl(_query_id)
+    _IMPLS[f"q{_query_id}_pandas_impl"] = _make_pandas_impl(_query_id)
 
 
 JOINORDER_DATAFRAME_QUERIES = QueryRegistry("JoinOrder DataFrame")
@@ -272,9 +272,9 @@ _QUERY_METADATA = """\
 7a|Biography Movies with Person Criteria|Biography movies with specific person criteria (8 tables)|MJ,AG,FI
 8a|Japanese Dubbed Movies|Japanese dubbed movies by specific actress criteria (7 tables)|MJ,AG,FI
 9a|American Voice Actress Movies|American voice actress movies (8 tables)|MJ,AG,FI
-10a|American Producer Movies|Movies with American producers after 1990 (7 tables)|MJ,AG,FI
+10a|Russian Actor Movies|Movies with Russian actors after 2005 (7 tables)|MJ,AG,FI
 11a|Non-Polish Sequel Movies with Follow Links|Sequel movies from Film/Warner companies with follow links (9 tables)|MJ,AG,FI
-12a|Drama/Horror US Movies with High Ratings|US drama/horror movies with high ratings using double info_type join (8 tables)|MJ,AG,FI
+12a|US Movies with High Ratings|US movies with high ratings using double info_type join (8 tables)|MJ,AG,FI
 """
 
 
@@ -284,11 +284,36 @@ _QUERIES = [
         query_name=query_name,
         description=description,
         categories=[_CATEGORY_CODES[code] for code in category_codes.split(",")],
-        expression_impl=globals()[f"q{query_id}_expression_impl"],
-        pandas_impl=globals()[f"q{query_id}_pandas_impl"],
+        expression_impl=_IMPLS[f"q{query_id}_expression_impl"],
+        pandas_impl=_IMPLS[f"q{query_id}_pandas_impl"],
     )
     for query_id, query_name, description, category_codes in reader(_QUERY_METADATA.splitlines(), delimiter="|")
 ]
+
+
+def _categories_for(query_id: str, query_sql: str) -> list[QueryCategory]:
+    """Classify a canonical query by joined-table count (F8).
+
+    BenchBox convention: plain JOIN below 6 tables, MULTI_JOIN at 6+.
+    Every JOB query aggregates and filters.
+    """
+    tables = len(re.findall(r"\b(?:FROM|JOIN)\b", query_sql, flags=re.IGNORECASE))
+    join_category = QueryCategory.MULTI_JOIN if tables >= 6 else QueryCategory.JOIN
+    return [join_category, QueryCategory.AGGREGATE, QueryCategory.FILTER]
+
+
+_QUERIES.extend(
+    DataFrameQuery(
+        query_id=query_id,
+        query_name=f"JOB {query_id}",
+        description=f"Canonical JOB query {query_id}; generated synthetic DataFrame translation.",
+        categories=_categories_for(query_id, _manager_for(None).get_query(query_id)),
+        expression_impl=_IMPLS[f"q{query_id}_expression_impl"],
+        pandas_impl=_IMPLS[f"q{query_id}_pandas_impl"],
+    )
+    for query_id in _ALL_QUERY_IDS
+    if query_id not in {query.query_id for query in _QUERIES}
+)
 
 for _query in _QUERIES:
     JOINORDER_DATAFRAME_QUERIES.register(_query)

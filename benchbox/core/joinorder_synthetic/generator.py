@@ -153,6 +153,7 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
             # Write all data to files
             all_data = {**lookup_data, **dimension_data, **relationship_data}
+            self._plant_golden_entities(dimension_data, relationship_data)
 
             for table_name, data in all_data.items():
                 file_path = self._write_table_data(table_name, data)
@@ -382,8 +383,15 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             word2 = random.choice(movie_words)
 
             title = f"{prefix} {word1} {word2}".strip()
-            kind_id = random.randint(1, 7)
-            production_year = random.randint(1950, 2023) if random.random() > 0.1 else None
+            if random.random() < 0.30:
+                # Seed years inside the canonical JOB windows (1990-2010
+                # family filters) and movie kind so year/kind predicates
+                # match instead of scattering over 1950-2023.
+                kind_id = random.choice([1, 1, 1, 2])
+                production_year = random.randint(self._SEED_YEAR_LOW - 15, self._SEED_YEAR_HIGH)
+            else:
+                kind_id = random.randint(1, 7)
+                production_year = random.randint(1950, 2023) if random.random() > 0.1 else None
 
             titles.append(
                 (
@@ -403,6 +411,36 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             )
 
         return titles
+
+    # Canonical JOB predicate seeds: values the real JOB queries filter
+    # on. A fixed share of rows carries these so multi-table conjunctive
+    # filters match and the cross-surface gate compares real rows instead
+    # of vacuous all-NULL scalars. random.seed(42) is set in
+    # _generate_data_local, so placement is deterministic.
+    _SEED_COMPANIES = ("Warner Bros", "Warner Films", "Universal Films")
+    _SEED_COUNTRIES = ("[us]", "[us]", "[ru]", "[pl]")
+    _SEED_NAMES = ("Robert Downey", "Downey Robert", "Angelina Smith")
+    _SEED_KEYWORDS_EXTRA = ("marvel-cinematic-universe", "sequel")
+    _GOLDEN_KEYWORDS = (
+        "marvel-cinematic-universe",
+        "murder",
+        "blood",
+        "violence",
+        "superhero",
+        "sequel",
+    )
+    _GOLDEN_CI_NOTES = ("(writer)", "(voice)", "(producer)")
+    _SEED_NOTES = ("(producer)", "(producer)", "(co-production)", "(presents)")
+    _SEED_MC_NOTES = (
+        "(2002) (USA) (theatrical)",
+        "(2005) (worldwide) (theatrical)",
+        "(USA) (VHS)",
+        "(Japan) (Blu-ray)",
+        "(France) (theatrical)",
+    )
+    _SEED_MI_INFO = ("Sweden", "Germany", "Norwegian", "USA")
+    _SEED_ROLES = ("producer", "producer", "actor")
+    _SEED_YEAR_LOW, _SEED_YEAR_HIGH = 2005, 2010
 
     def _generate_names(self, count: int) -> list[tuple]:
         """Generate name data."""
@@ -433,9 +471,12 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         ]
 
         for i in range(1, count + 1):
-            first = random.choice(first_names)
-            last = random.choice(last_names)
-            name = f"{first} {last}"
+            if random.random() < 0.08:
+                name = random.choice(self._SEED_NAMES)
+            else:
+                first = random.choice(first_names)
+                last = random.choice(last_names)
+                name = f"{first} {last}"
             gender = random.choice(["m", "f"]) if random.random() > 0.1 else None
 
             names.append((i, name, None, None, gender, None, None, None, None))
@@ -477,10 +518,14 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         ]
 
         for i in range(1, count + 1):
-            name_part = random.choice(company_names)
-            type_part = random.choice(company_types)
-            name = f"{name_part} {type_part}"
-            country = random.choice(countries)
+            if random.random() < 0.10:
+                name = random.choice(self._SEED_COMPANIES)
+                country = random.choice(self._SEED_COUNTRIES)
+            else:
+                name_part = random.choice(company_names)
+                type_part = random.choice(company_types)
+                name = f"{name_part} {type_part}"
+                country = random.choice(countries)
 
             companies.append((i, name, country, None, None, None, None))
 
@@ -517,6 +562,8 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
         for i in range(1, count + 1):
             keyword = keyword_list[i - 1] if i <= len(keyword_list) else f"keyword_{i}"
+            if random.random() < 0.10:
+                keyword = random.choice(self._SEED_KEYWORDS_EXTRA)
 
             keywords.append((i, keyword, None))
 
@@ -549,8 +596,16 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             person_id = random.randint(1, max_name_id)
             movie_id = random.randint(1, max_title_id)
             person_role_id = random.randint(1, max_char_id) if random.random() > 0.3 else None
-            role_id = random.randint(1, 12)
-            note = None
+            if random.random() < 0.15:
+                # Canonical queries filter rt.role in (producer, actor):
+                # role_id 3 = producer, 1 = actor in the lookup table.
+                role_id = random.choice([3, 3, 1])
+            else:
+                role_id = random.randint(1, 12)
+            if random.random() < 0.12:
+                note = random.choice(self._SEED_NOTES)
+            else:
+                note = None
             nr_order = random.randint(1, 20) if random.random() > 0.5 else None
 
             cast_info.append((i, person_id, movie_id, person_role_id, note, nr_order, role_id))
@@ -565,7 +620,10 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             movie_id = random.randint(1, max_title_id)
             company_id = random.randint(1, max_company_id)
             company_type_id = random.randint(1, 4)
-            note = None
+            if random.random() < 0.12:
+                note = random.choice(self._SEED_MC_NOTES)
+            else:
+                note = None
 
             movie_companies.append((i, movie_id, company_id, company_type_id, note))
 
@@ -586,7 +644,10 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             movie_id = random.randint(1, max_title_id)
             info_type_id = random.randint(1, 24)
 
-            info = random.choice(info_values[info_type_id]) if info_type_id in info_values else f"info_{i}"
+            if random.random() < 0.15:
+                info = random.choice(self._SEED_MI_INFO)
+            else:
+                info = random.choice(info_values[info_type_id]) if info_type_id in info_values else f"info_{i}"
 
             movie_info.append((i, movie_id, info_type_id, info, None))
 
@@ -690,6 +751,80 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             production_year = random.randint(1950, 2023) if random.random() > 0.1 else None
             aka_title.append((i, movie_id, title, None, kind_id, production_year, None, None, None, None, None, None))
         return aka_title
+
+    _GOLDEN_COUNT = 60
+
+    def _plant_golden_entities(
+        self,
+        dimension_data: dict[str, list[tuple]],
+        relationship_data: dict[str, list[tuple]],
+    ) -> None:
+        """Overwrite leading rows with coordinated golden entities.
+
+        Independent per-table seeding leaves conjunctive multi-table
+        filters empty: each predicate matches ~10%, so a 6-table join
+        matches ~1e-6 of the cartesian product. Golden entities share one
+        coordinated key set (golden movie/company/person/keyword ids) so
+        the canonical JOB conjunctions join to real rows and the gate
+        discriminates instead of comparing all-NULL scalars. Deterministic
+        under the random.seed(42) set in _generate_data_local.
+        """
+        titles = dimension_data["title"]
+        names = dimension_data["name"]
+        companies = dimension_data["company_name"]
+        keywords = dimension_data["keyword"]
+        title_cols = len(titles[0]) if titles else 0
+        name_cols = len(names[0]) if names else 0
+        company_cols = len(companies[0]) if companies else 0
+        keyword_cols = len(keywords[0]) if keywords else 0
+        next_title = max(row[0] for row in titles) + 1 if titles else 1
+        next_name = max(row[0] for row in names) + 1 if names else 1
+        next_company = max(row[0] for row in companies) + 1 if companies else 1
+        next_keyword = max(row[0] for row in keywords) + 1 if keywords else 1
+        golden_titles = list(range(next_title, next_title + self._GOLDEN_COUNT))
+        golden_names = list(range(next_name, next_name + self._GOLDEN_COUNT))
+        golden_companies = list(range(next_company, next_company + self._GOLDEN_COUNT))
+        golden_keywords = list(range(next_keyword, next_keyword + self._GOLDEN_COUNT))
+        for offset in range(self._GOLDEN_COUNT):
+            title_row = [golden_titles[offset], f"Golden Adventure {offset}", None, 1, 2005 + (offset % 6)]
+            title_row += [None] * (title_cols - len(title_row))
+            titles.append(tuple(title_row))
+            name_row = [golden_names[offset], "Robert Downey" if offset % 2 == 0 else "Angelina Smith"]
+            name_row += [None] * (name_cols - len(name_row))
+            names.append(tuple(name_row))
+            company_row = [golden_companies[offset], "Warner Films" if offset % 2 == 0 else "Universal Films", "[us]"]
+            company_row += [None] * (company_cols - len(company_row))
+            companies.append(tuple(company_row))
+            keyword_row = [golden_keywords[offset], self._GOLDEN_KEYWORDS[offset % len(self._GOLDEN_KEYWORDS)]]
+            keyword_row += [None] * (keyword_cols - len(keyword_row))
+            keywords.append(tuple(keyword_row))
+        cast_info = relationship_data["cast_info"]
+        for index, row in enumerate(cast_info[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_names[index % len(golden_names)]
+            row_list[2] = golden_titles[index % len(golden_titles)]
+            row_list[4] = self._GOLDEN_CI_NOTES[index % len(self._GOLDEN_CI_NOTES)]
+            row_list[6] = 3 if index % 2 == 0 else 1
+            cast_info[index] = tuple(row_list)
+        movie_companies = relationship_data["movie_companies"]
+        for index, row in enumerate(movie_companies[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_titles[index % len(golden_titles)]
+            row_list[2] = golden_companies[index % len(golden_companies)]
+            row_list[4] = "(2005) (USA) (theatrical)"
+            movie_companies[index] = tuple(row_list)
+        movie_keyword = relationship_data["movie_keyword"]
+        for index, row in enumerate(movie_keyword[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_titles[index % len(golden_titles)]
+            row_list[2] = golden_keywords[index % len(golden_keywords)]
+            movie_keyword[index] = tuple(row_list)
+        movie_info = relationship_data["movie_info"]
+        for index, row in enumerate(movie_info[: self._GOLDEN_COUNT]):
+            row_list = list(row)
+            row_list[1] = golden_titles[index % len(golden_titles)]
+            row_list[3] = "Sweden" if index % 2 == 0 else "Germany"
+            movie_info[index] = tuple(row_list)
 
     def _write_table_data(self, table_name: str, data: list[tuple]) -> PathLike:
         """Write table data to CSV file.
