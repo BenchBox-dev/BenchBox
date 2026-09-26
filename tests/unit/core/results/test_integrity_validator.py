@@ -517,3 +517,19 @@ class TestVectorSearchExportIntegrity:
         assert check.status == CheckStatus.PASS
         assert check.message.startswith("6/6 expected query IDs found")
         assert report.overall_status == CheckStatus.PASS
+
+    def test_skipped_queries_satisfy_count_math(self) -> None:
+        """A version-gated skip (StarRocks Q2) must not fail count arithmetic."""
+        data = _make_valid_tpch_result()
+        data["summary"]["queries"] = {"total": 6, "passed": 5, "failed": 0, "skipped": 1}
+        report = ResultIntegrityValidator().validate(data)
+        check = next(c for c in report.checks if c.name == "query_count_math")
+        assert check.status == CheckStatus.PASS
+
+    def test_skipped_queries_discounted_from_success_rate(self) -> None:
+        """5/5 billable with 1 compat skip passes a 1.0 floor."""
+        data = _make_valid_tpch_result()
+        data["summary"]["queries"] = {"total": 6, "passed": 5, "failed": 0, "skipped": 1}
+        report = ResultIntegrityValidator().validate(data)
+        check = next(c for c in report.checks if c.name == "success_rate")
+        assert check.status == CheckStatus.PASS
