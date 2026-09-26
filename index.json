@@ -11741,9 +11741,9 @@
     },
     "promote-vector-search-beta-stable-once-it-has-a-benchmarkspe": {
       "claim": {
-        "expires_at": "2026-09-27T03:20:20Z",
-        "generation": "2fed46601f6c42828943cda322439d0f",
-        "renewals": 0,
+        "expires_at": "2026-09-27T03:20:32Z",
+        "generation": "fc04a43fac0f4470997f3189a4ce88c7",
+        "renewals": 1,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
       },
       "needs": [],
