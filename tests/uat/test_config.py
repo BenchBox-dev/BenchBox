@@ -826,3 +826,6 @@ def test_throughput_explorer_smoke_config_covers_throughput_phase():
     assert cfg.scales.rungs == (1.0,)
     assert "package" in cfg.phases
     assert "explorer_smoke" in cfg.phases
+    # Same-day reruns must not overwrite each other's artifacts: execute.py
+    # only applies collision suffixing when the template contains {time}.
+    assert "{time}" in cfg.output.logs_dir_template

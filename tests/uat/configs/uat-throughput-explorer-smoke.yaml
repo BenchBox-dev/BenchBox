@@ -70,5 +70,8 @@ report:
 
 output:
   benchmark_runs_dir_template: "~/Developer/benchmark_runs"
-  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_throughput_explorer_smoke_{date}"
+  # {time} keeps same-day reruns in separate log dirs: execute.py only
+  # applies collision suffixing when the template contains {time}, so a
+  # date-only template would overwrite the previous run's artifacts.
+  logs_dir_template: "~/Developer/benchmark_runs/logs/uat_throughput_explorer_smoke_{date}_{time}"
   submissions_dir_template: "~/Developer/benchmark_runs/submissions/{name}"
