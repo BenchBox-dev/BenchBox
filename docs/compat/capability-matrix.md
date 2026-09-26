@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 492
+**Total registered rules:** 494
 
 **Platforms covered:** 35
 
@@ -14,7 +14,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
 | bigquery | - | 2 | - | 2 | 1 | - | 5 |
-| clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
+| clickhouse | - | 19 | 3 | 4 | 1 | - | 27 |
 | clickhouse-cloud | - | - | - | - | - | 23 | 23 |
 | clickhouse-local | 1 | - | - | - | - | 23 | 24 |
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
@@ -40,7 +40,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | snowflake | - | 7 | - | 2 | 1 | - | 10 |
 | spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
-| starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
+| starrocks | - | 15 | 1 | 2 | 1 | - | 19 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
 | timescaledb | 3 | - | - | - | - | 19 | 22 |
@@ -73,6 +73,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=coffeeshop, query=SA4 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.sa4_cross_join_variant` |
 | query_source | benchmark=coffeeshop, query=TM1 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.tm1_todatetime_variant` |
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.clickhouse.h2odb.q9_quantile_variant` |
+| query_source | benchmark=nyctaxi, query=fhv-base-volume | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.fhv_base_volume_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.rush_hour_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trip_duration_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trips_by_dow_todayofweek_variant` |
@@ -626,6 +627,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.starrocks.h2odb.q9_percentile_approx_variant` |
+| query_source | benchmark=nyctaxi, query=fhv-base-volume | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.fhv_base_volume_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.rush_hour_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.trip_duration_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.trips_by_dow_dayofweek_variant` |
