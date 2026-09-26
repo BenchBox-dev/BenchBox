@@ -152,8 +152,8 @@ KNOWN_DIVERGENCES: dict[str, str] = {}
 # excluded via POSTGRES_TPCHAVOC_SKIPS, never marked equivalent.
 #
 # Empty: the Postgres sample (SF=0.1, both canonical and variants translated to
-# the postgres dialect through the same seam) found zero divergences over the
-# 203 executable variants - the translation layer is faithful and no variant is
+# the postgres dialect through the same seam) found zero divergences across all
+# executable variants. The translation layer is faithful and no variant is
 # silently wrong on PostgreSQL while green on DuckDB.
 POSTGRES_KNOWN_DIVERGENCES: dict[str, str] = {}
 
@@ -165,8 +165,8 @@ POSTGRES_KNOWN_DIVERGENCES: dict[str, str] = {}
 #
 # Empty: the DataFusion sample (SF=0.1, both canonical and variants translated to
 # the datafusion dialect - which the seam normalizes to postgres - through the
-# same path) found zero *result* divergences over the 206 executable variants.
-# DataFusion's gaps are confined to which variants it can plan at all (the 14
+# same path) found zero *result* divergences over every executable variant.
+# DataFusion's gaps are confined to which variants it can plan at all (the
 # DATAFUSION_TPCHAVOC_SKIPS), a DIFFERENT gap profile from PostgreSQL's; on the
 # variants it does execute the translation layer is just as faithful. Three
 # engines now agree: translation divergence is systematic-zero, not engine-specific.
