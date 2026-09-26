@@ -82,15 +82,19 @@ class _PostgresCopySink:
         self.closed = True
 
 
-def _write_parquet_to_copy(data_file: Path, copy: Any) -> None:
-    """Stream a Parquet file as CSV directly into PostgreSQL COPY."""
+def _write_parquet_to_copy(data_file: Path, copy: Any, *, include_header: bool = True) -> None:
+    """Stream a Parquet file as CSV directly into PostgreSQL COPY.
+
+    ``include_header`` is False when the file continues an already-open
+    multi-file COPY session whose header row was written by the first file.
+    """
     try:
         import pyarrow.csv as arrow_csv
         import pyarrow.parquet as pq
     except ImportError as exc:  # pragma: no cover - pyarrow is a project dependency
         raise RuntimeError("pyarrow is required to load Parquet files into PostgreSQL-family adapters") from exc
 
-    write_options = arrow_csv.WriteOptions(include_header=True, quoting_style="all_valid")
+    write_options = arrow_csv.WriteOptions(include_header=include_header, quoting_style="all_valid")
     parquet_file = pq.ParquetFile(data_file)
     with arrow_csv.CSVWriter(_PostgresCopySink(copy), parquet_file.schema_arrow, write_options=write_options) as writer:
         for batch in parquet_file.iter_batches():
@@ -684,6 +688,56 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
         """
         return stmt
 
+    @staticmethod
+    def _group_files_into_copy_sessions(
+        data_source: Any,
+        table_name: str,
+        data_files: list[Path],
+        benchmark: Any,
+    ) -> list[tuple[CsvDialect, bool, list[tuple[Path, bool]]]]:
+        """Partition one table's files into single-session COPY groups.
+
+        ``COPY ... FROM STDIN`` accepts a continuous byte stream, so every
+        file sharing a dialect can stream through one COPY session instead of
+        paying per-file statement setup. Files group by (parquet-vs-text,
+        delimiter, null marker, header, quote, force_csv); each group yields
+        its dialect, force_csv flag, and (file, strip_trailing_delim) pairs
+        in original order. Header rows after the first file in a group are
+        skipped by the streamer so concatenated headers never become data.
+        """
+        groups: dict[tuple[Any, ...], tuple[CsvDialect, bool, list[tuple[Path, bool]]]] = {}
+        order: list[tuple[Any, ...]] = []
+        for data_file in data_files:
+            extension = get_data_extension(data_file)
+            if extension == ".parquet":
+                dialect = CsvDialect(
+                    delimiter=",",
+                    has_header=True,
+                    null_marker="",
+                    normalize_booleans=False,
+                    quote='"',
+                )
+                key: tuple[Any, ...] = ("parquet",)
+                force_csv = True
+                strip_trailing = False
+            else:
+                dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
+                force_csv = extension == ".csv" and dialect.has_header
+                key = (
+                    "text",
+                    dialect.delimiter,
+                    dialect.null_marker,
+                    dialect.has_header,
+                    dialect.quote,
+                    force_csv,
+                )
+                strip_trailing = extension == ".tbl"
+            if key not in groups:
+                groups[key] = (dialect, force_csv, [])
+                order.append(key)
+            groups[key][2].append((data_file, strip_trailing))
+        return [groups[key] for key in order]
+
     def load_data(
         self,
         benchmark,
@@ -731,38 +785,31 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
             )
 
             load_failed = False
-            for data_file in data_files:
-                extension = get_data_extension(data_file)
-                if extension == ".parquet":
-                    dialect = CsvDialect(
-                        delimiter=",",
-                        has_header=True,
-                        null_marker="",
-                        normalize_booleans=False,
-                        quote='"',
-                    )
-                    force_csv = True
-                else:
-                    dialect = resolve_csv_dialect(data_source, table_name, data_file, benchmark)
-                    force_csv = extension == ".csv" and dialect.has_header
-
+            sessions = self._group_files_into_copy_sessions(data_source, table_name, data_files, benchmark)
+            for dialect, force_csv, session_files in sessions:
+                is_parquet = bool(session_files) and get_data_extension(session_files[0][0]) == ".parquet"
                 try:
                     copy_sql = _postgres_copy_sql(qualified_table, dialect, force_csv=force_csv)
                     with cursor.copy(copy_sql) as copy:
-                        if extension == ".parquet":
-                            _write_parquet_to_copy(data_file, copy)
-                        else:
-                            with prepare_local_load_file(
-                                data_file,
-                                dialect=dialect,
-                                strip_trailing_delim=extension == ".tbl",
-                            ) as load_path:
-                                with open(load_path, encoding="utf-8") as f:
-                                    while chunk := f.read(65536):
-                                        copy.write(chunk)
+                        for index, (data_file, strip_trailing) in enumerate(session_files):
+                            skip_header = dialect.has_header and index > 0
+                            if is_parquet:
+                                _write_parquet_to_copy(data_file, copy, include_header=not skip_header)
+                            else:
+                                with prepare_local_load_file(
+                                    data_file,
+                                    dialect=dialect,
+                                    strip_trailing_delim=strip_trailing,
+                                ) as load_path:
+                                    with open(load_path, encoding="utf-8") as f:
+                                        if skip_header:
+                                            f.readline()
+                                        while chunk := f.read(65536):
+                                            copy.write(chunk)
                     connection.commit()
                 except Exception as e:
-                    self.logger.error(f"Failed to load {table_name_lower} chunk {data_file.name}: {e}")
+                    failed_names = ", ".join(data_file.name for data_file, _ in session_files)
+                    self.logger.error(f"Failed to load {table_name_lower} chunk {failed_names}: {e}")
                     connection.rollback()
                     load_failed = True
                     break

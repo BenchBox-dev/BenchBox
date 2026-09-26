@@ -629,13 +629,13 @@ class TestPostgreSQLDataLoading:
         assert stats["catalog_page"] == 1
         assert any(call.args[0].endswith("|||||\n") for call in copy_cm.write.call_args_list)
 
-    def test_load_data_accepts_list_of_chunks(self, postgres_stubs, tmp_path):
-        """Multi-chunk tables (list[Path]) must load every chunk without a TypeError."""
+    def test_load_data_streams_chunks_through_one_copy_session(self, postgres_stubs, tmp_path):
+        """Same-dialect chunks share one COPY session instead of one COPY per file."""
         mock_conn = Mock()
         mock_cursor = MagicMock()
-        mock_cursor.fetchone.return_value = (6,)
+        mock_cursor.fetchone.return_value = (6,)  # Row count
         mock_conn.cursor.return_value = mock_cursor
-        self._install_copy_context(mock_cursor)
+        copy_cm = self._install_copy_context(mock_cursor)
 
         chunk_a = tmp_path / "lineitem_0.csv"
         chunk_b = tmp_path / "lineitem_1.csv"
@@ -649,6 +649,63 @@ class TestPostgreSQLDataLoading:
         stats, _, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
 
         assert stats["lineitem"] == 6
+        assert mock_cursor.copy.call_count == 1
+        written = "".join(call.args[0] for call in copy_cm.write.call_args_list)
+        assert "1,alice" in written
+        assert "6,frank" in written
+        mock_conn.commit.assert_called_once_with()
+
+    def test_load_data_skips_repeat_headers_in_shared_session(self, postgres_stubs, tmp_path):
+        """Only the first file's header row enters a shared COPY session."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (2,)
+        mock_conn.cursor.return_value = mock_cursor
+        copy_cm = self._install_copy_context(mock_cursor)
+
+        chunk_a = tmp_path / "trips_0.csv"
+        chunk_b = tmp_path / "trips_1.csv"
+        chunk_a.write_text("id,name\n1,alice\n")
+        chunk_b.write_text("id,name\n2,bob\n")
+
+        fake_ds = DataSource(
+            source_type="manifest_v2",
+            tables={"trips": [chunk_a, chunk_b]},
+            table_metadata={"trips": {"csv_delimiter": ",", "csv_has_header": True}},
+        )
+
+        adapter = PostgreSQLAdapter(schema="public")
+        with patch("benchbox.platforms.postgresql.DataSourceResolver") as mock_resolver_cls:
+            mock_resolver_cls.return_value.resolve.return_value = fake_ds
+            stats, _, _ = adapter.load_data(Mock(), mock_conn, tmp_path)
+
+        assert stats["trips"] == 2
+        assert mock_cursor.copy.call_count == 1
+        written = "".join(call.args[0] for call in copy_cm.write.call_args_list)
+        assert written.count("id,name") == 1
+        assert "1,alice" in written
+        assert "2,bob" in written
+
+    def test_load_data_splits_sessions_on_dialect_change(self, postgres_stubs, tmp_path):
+        """Files with different delimiters stream through separate COPY sessions."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (2,)
+        mock_conn.cursor.return_value = mock_cursor
+        self._install_copy_context(mock_cursor)
+
+        pipe_file = tmp_path / "events.tbl"
+        csv_file = tmp_path / "events.csv"
+        pipe_file.write_text("1|alice|\n")
+        csv_file.write_text("2,bob\n")
+
+        class Benchmark:
+            tables = {"events": [pipe_file, csv_file]}
+
+        adapter = PostgreSQLAdapter(schema="public")
+        stats, _, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
+
+        assert stats["events"] == 2
         assert mock_cursor.copy.call_count == 2
 
     def test_load_data_skips_invalid_identifier(self, postgres_stubs, tmp_path):
