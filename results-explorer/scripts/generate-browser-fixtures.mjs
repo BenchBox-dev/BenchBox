@@ -57,8 +57,33 @@ const SOURCE_BINDINGS = [
     fixtureBundle: PANDAS_SOURCE_BUNDLE,
     manifest: "tpch-pandas-sf0.01-20260826-8bde2222.source.manifest.json",
   },
+  {
+    fixtureBundle: "tpch-duckdb-sf0.01-20260826-8a57a5a8.json",
+    manifest: "tpch-duckdb-sf0.01-20260826-8a57a5a8.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-datafusion-sf0.01-20260826-e8a7d048.json",
+    manifest: "tpch-datafusion-sf0.01-20260826-e8a7d048.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-polars-sf0.01-20260824-51ccc406.json",
+    manifest: "tpch-polars-sf0.01-20260824-51ccc406.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-spark-sf0.01-20260826-2fd3b12b.json",
+    manifest: "tpch-spark-sf0.01-20260826-2fd3b12b.source.manifest.json",
+  },
+  {
+    fixtureBundle: "tpch-cedardb-sf0.01-20260825-cf0d9e4d.json",
+    manifest: "tpch-cedardb-sf0.01-20260825-cf0d9e4d.source.manifest.json",
+  },
 ];
-const SYNTHETIC_CANONICAL_SOURCES = new Set(SOURCE_BINDINGS.map(({ fixtureBundle }) => fixtureBundle));
+// Manifest verification (SOURCE_BINDINGS) is decoupled from copy exclusion:
+// every verbatim power-cohort source is hash-checked AND copied, while the
+// Pandas power source stays excluded because the corpus carries only its
+// synthetic standard-phase derivative (a verbatim copy would add a sixth
+// power-cohort platform and break hardcoded e2e counts).
+const SYNTHETIC_CANONICAL_SOURCES = new Set([PANDAS_SOURCE_BUNDLE]);
 
 if (!new Set(["default", "large"]).has(FIXTURE_PROFILE)) {
   throw new Error(`unsupported E2E_FIXTURE_PROFILE=${FIXTURE_PROFILE}; expected default or large`);
@@ -223,14 +248,16 @@ const VARIANTS = [
     },
   },
   {
-    // Third tuned/notuned pair: DataFusion mirror in the power phase.
-    // The curated power cohort (duckdb/datafusion/polars/spark/cedardb)
-    // needs ≥2 tuned pairs in-phase; the Pandas pair lives in standard.
-    source: "tpch-datafusion-sf0.01-20260826-e8a7d048.json",
-    subdir: "tuned-datafusion",
-    derived: "tpch-datafusion-sf0.01-20260826-tuned.json",
+    // Power-phase tuned sibling for the genuine Polars source: the
+    // verifier needs >=2 tuned pairs in the >=4-platform power cohort
+    // (DuckDB plus one more), and every tuned row must derive from a
+    // real run with a synthetic-only tuning sidecar, never from a
+    // byte-cloned baseline wearing a tuned label.
+    source: "tpch-polars-sf0.01-20260824-51ccc406.json",
+    subdir: "tuned-polars",
+    derived: "tpch-polars-sf0.01-20260824-tuned.json",
     sidecars: {
-      "tpch-datafusion-sf0.01-20260826-tuned.tuning.json": {
+      "tpch-polars-sf0.01-20260824-tuned.tuning.json": {
         tuning_mode: "tuned",
         memory_limit: "4GB",
         threads: 4,
@@ -743,12 +770,12 @@ const FIXTURE_ROLES = {
   [`${PANDAS_STANDARD_FIXTURE_RUN_ID}-vendor`]: "pandasVendor",
   [`${PANDAS_STANDARD_FIXTURE_RUN_ID}-tuned`]: "pandasTuned",
   e8a7d048: "datafusion",
-  "e8a7d048-tuned": "datafusionTuned",
   "2fd3b12b": "spark",
   cf0d9e4d: "cedardb",
   "e8a7d048-partial-query": "datafusionPartial",
   d4ec318a: "starSchema",
-  "f659fcbf-sf001": "polars",
+  "51ccc406": "polars",
+  "51ccc406-tuned": "polarsTuned",
 };
 
 /**

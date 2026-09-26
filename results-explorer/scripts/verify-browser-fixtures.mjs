@@ -230,6 +230,7 @@ function verifyFixtureInvariants() {
   }
   verifyTunedPairCoverage(data, comparableCohorts, errors);
   verifyEnvironmentCoverage(data, errors);
+  verifySourceBundleSemantics(errors);
 
   if (errors.length) {
     console.error("[verify-browser-fixtures] fixture corpus invariants failed:");
@@ -331,6 +332,62 @@ function verifyEnvironmentCoverage(data, errors) {
         runtime_types: [...runtimeTypes].sort(),
       }),
     );
+  }
+}
+
+/**
+ * Semantic checks over the generated source bundles (H3): the DB-level
+ * verifier only sees ingested rows, so scale-factor fraud (an SF 0.1 run
+ * relabelled SF 0.01) must be caught here. TPC-H lineitem rows scale
+ * linearly at 6,000,000 x SF; allow a wide 0.5x-2x band for partial
+ * subsets. power_at_size must satisfy 3600*SF/geomean(query seconds)
+ * within 5 percent; a stale metric from another scale factor misses by
+ * an order of magnitude.
+ */
+function verifySourceBundleSemantics(errors) {
+  // Scale-rewrite and partial-query derivatives intentionally carry a
+  // mismatched scale factor or incomplete timings to exercise failure
+  // paths; semantics apply only to full measurement bundles.
+  const syntheticSuffixes = ["-sf01", "-partial-query", "-zero-timing"];
+  for (const payload of generatedBundlePayloads()) {
+    const runId = String(payload?.run?.id ?? "");
+    if (syntheticSuffixes.some((suffix) => runId.endsWith(suffix))) continue;
+    const benchmark = payload?.benchmark ?? {};
+    const scaleFactor = Number(benchmark.scale_factor);
+    const tables = payload?.tables ?? {};
+    const lineitemRows = Number(tables?.lineitem?.rows);
+    if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) continue;
+    if (!Number.isFinite(lineitemRows) || lineitemRows <= 0) continue;
+    const expected = 6000000 * scaleFactor;
+    if (lineitemRows < expected * 0.5 || lineitemRows > expected * 2) {
+      errors.push(
+        `scale-factor fraud suspect in ${payload?.run?.id ?? "unknown"}: ` +
+          `lineitem rows ${lineitemRows} outside 0.5x-2x of 6M x SF ${scaleFactor}`,
+      );
+    }
+    const metrics = payload?.summary?.tpc_metrics ?? {};
+    const power = Number(metrics.power_at_size);
+    // Mirror benchbox/core/results/builder.py _calculate_power_at_size:
+    // one time per query id from the final measurement iteration only.
+    const byQuery = new Map();
+    for (const query of payload?.queries ?? []) {
+      if (query?.run_type !== "measurement" || Number(query?.ms) <= 0) continue;
+      const key = String(query?.id ?? query?.query_id ?? "");
+      const prior = byQuery.get(key);
+      if (!prior || Number(query?.iter ?? 0) >= Number(prior?.iter ?? 0)) byQuery.set(key, query);
+    }
+    const times = [...byQuery.values()].map((query) => Number(query.ms) / 1000);
+    if (Number.isFinite(power) && power > 0 && times.length >= 20) {
+      const geomean = Math.exp(times.reduce((sum, seconds) => sum + Math.log(seconds), 0) / times.length);
+      const expectedPower = (3600 * scaleFactor) / geomean;
+      const drift = Math.abs(power - expectedPower) / expectedPower;
+      if (drift > 0.05) {
+        errors.push(
+          `power_at_size inconsistent in ${payload?.run?.id ?? "unknown"}: ` +
+            `recorded ${power}, formula gives ${expectedPower.toFixed(1)} at SF ${scaleFactor}`,
+        );
+      }
+    }
   }
 }
 

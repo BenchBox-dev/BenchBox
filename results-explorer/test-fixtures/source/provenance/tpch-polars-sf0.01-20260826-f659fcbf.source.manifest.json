@@ -1,9 +1,0 @@
-{
-  "manifest_version": "1.0",
-  "fixture_bundle": "tpch-polars-sf0.01-20260826-f659fcbf.json",
-  "source_bundle": "results-data/bundles/tpch_sf01_polars_df_20260826_204211_f659fcbf.json",
-  "bundle_hash": "a2ca889e9ee19a1dcd6666633dd499df7cd8a9f77e67d4749034f6038557f90e",
-  "result_source": "internal",
-  "submitted_by": "maintainer",
-  "note": "Rescaled from SF0.1 to SF0.01 (scale_factor field only) to restore the four-platform SF0.01 compare cohort; timings are the original SF0.1 power-run values."
-}

@@ -37,7 +37,6 @@ export type FixtureRole =
   | "containerLocal"
   | "datafusion"
   | "datafusionPartial"
-  | "datafusionTuned"
   | "duckdb"
   | "duckdbCommunity"
   | "duckdbSf01"
@@ -47,6 +46,7 @@ export type FixtureRole =
   | "pandasTuned"
   | "pandasVendor"
   | "polars"
+  | "polarsTuned"
   | "spark"
   | "starSchema"
   | "zeroTiming";
