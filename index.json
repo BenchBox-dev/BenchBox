@@ -5573,7 +5573,7 @@
       "needs": [
         "exasol-adapter-core"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Support Exasol throughput streams within the licensed connection cap"
     },
