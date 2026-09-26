@@ -2139,6 +2139,16 @@ class BigQueryAdapter(PlatformAdapter):
             flags=re.IGNORECASE,
         )
 
+        # Foreign keys follow the same rule, and BigQuery also requires the
+        # referenced table to be dataset-qualified ("Table ... must be
+        # qualified with a dataset"). Data Vault links reference their hubs.
+        work = re.sub(
+            r"REFERENCES\s+(`?[a-zA-Z0-9_.]+`?)\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
+            lambda m: f"REFERENCES {self._qualify_table_target(m.group(1))} ({m.group(2)}) NOT ENFORCED",
+            work,
+            flags=re.IGNORECASE,
+        )
+
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in work.upper() and self.partitioning_field:
             work += f" PARTITION BY DATE({self.partitioning_field})"
@@ -2234,12 +2244,21 @@ class BigQueryAdapter(PlatformAdapter):
             # with the same spelling inside the CTE's own body is still the
             # base table. Walk each CTE body first so shadowed base tables
             # are collected, then skip only the shadowing outer references.
+            # A body may also reference a sibling CTE defined earlier in the
+            # same WITH clause; that name is a CTE, not a base table.
             for cte in tree.find_all(exp.CTE):
+                earlier_ctes = set()
+                with_clause = cte.parent
+                if isinstance(with_clause, exp.With):
+                    for sibling in with_clause.expressions:
+                        if sibling is cte:
+                            break
+                        earlier_ctes.add((sibling.alias_or_name or "").upper())
                 for table in cte.this.find_all(exp.Table):
                     if table.db or table.catalog:
                         continue
                     name = (table.name or "").upper()
-                    if name and name not in tables:
+                    if name and name not in tables and name not in earlier_ctes:
                         tables.append(name)
             for table in tree.find_all(exp.Table):
                 if table.db or table.catalog:
