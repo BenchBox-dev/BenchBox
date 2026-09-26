@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "HAVING/WHERE-alias variants unskipped where the inlined form passes compile-check on PG-DuckDB"
+  ],
+  "description": "Postgres rejects select-list aliases in HAVING/WHERE (3_v7, 4_v7, 5_v7, 7_v7, 9_v7, 10_v7, 11_v7) but inlining the underlying aggregate expression is semantics-preserving. One rewrite pattern covers seven skips.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0",
+      "at": "2026-09-26T19:31:38Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "21d3ac4bab3d4cb58a371641322eb93e",
+      "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    }
+  ]
+}

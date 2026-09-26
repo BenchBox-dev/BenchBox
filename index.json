@@ -17778,6 +17778,13 @@
       "status": "done",
       "title": "Sample TPC-Havoc variant equivalence on a fourth SQL engine (ClickHouse)"
     },
+    "tpchavoc-pg-alias-inline": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Revalidate postgres HAVING-alias tpchavoc skips by inlining"
+    },
     "tpchavoc-q2-v10-projection-faithfulness": {
       "claim": null,
       "needs": [],
