@@ -2,6 +2,7 @@
   "acceptance": [
     "1_v6 and 12_v7 pass compile-check in countIf/SUM-CASE form on ClickHouse local"
   ],
+  "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit 2b73874cb. Rewrote ClickHouse 1_v6 and 12_v7 aggregate FILTER clauses to native countIf plus null-preserving sumOrNullIf/avgOrNullIf combinators, removed both execution skips, registered rules for local/server/cloud modes, updated validation mirrors and generated compatibility docs. Verification: Ruff passed; 8 focused tests passed; compat-docs and DDL drift checks passed. Full rewritten queries executed successfully on chDB 26.1 local fixtures; 1_v6 returned aggregate results and 12_v7 returned SHIP,1,0.",
   "description": "ClickHouse rejects the DuckDB FILTER clause on aggregates (1_v6, 12_v7). Rewrite COUNT/SUM FILTER as countIf or SUM(CASE WHEN), both native to ClickHouse.",
   "sessions": [
     {
@@ -19,6 +20,14 @@
       "generation": "0271312412d94935b40e73dee298123d",
       "op": "take",
       "op_id": "a1accaaecbad42fb978d5016ab28bff5",
+      "session_id": "3735819a26174704ada936b231dbf66c"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a68d56a939b077672bfb199",
+      "at": "2026-09-26T21:16:03Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "01aceb45125a4ccc8f62404bddf8c2c9",
       "session_id": "3735819a26174704ada936b231dbf66c"
     }
   ]
