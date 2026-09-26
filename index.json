@@ -15640,7 +15640,7 @@
     "serenedb-local-spike": {
       "claim": null,
       "needs": [],
-      "priority": "high",
+      "priority": "low",
       "status": "open",
       "title": "Evaluate SereneDB locally under Mocker and record driver, DDL, load, and SQL facts"
     },
