@@ -13410,15 +13410,10 @@
       "title": "Relocate benchmark_hooks/platform_hooks registries out of benchbox.cli to fix core/platforms->cli layering inversion"
     },
     "remaining-cloud-platform-adapters-firebolt-questdb-trino-etc": {
-      "claim": {
-        "expires_at": "2026-09-27T08:02:08Z",
-        "generation": "d5a2e958942f4f9a88d76acf2faed893",
-        "renewals": 0,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remaining cloud platform adapters (firebolt, questdb, trino, etc.)"
     },
     "remediate-ci-required-gate-integrity": {
