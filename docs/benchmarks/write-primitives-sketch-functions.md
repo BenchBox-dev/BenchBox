@@ -398,7 +398,7 @@ ClickHouse and vice versa). Live observations from clickhouse-local
 4314 bytes, topK merged state 317 bytes — all inside the bounds in
 `operations.yaml`.
 
-## Parameter sweeps (DuckDB-first, ClickHouse counterparts)
+## Parameter sweeps (DuckDB-only)
 
 The default headline ops use one parameter value per sketch family
 (Theta lg_k≈12, KLL k=200, frequent-items lg_max_map_size=8). Real
@@ -420,18 +420,18 @@ Top-K only sweeps two values because `lg_max_map_size=6` (64 buckets)
 is too small for TPC-H lineitem's 7 distinct shipmodes — the merged
 sketch would saturate.
 
-ClickHouse runs native counterparts for the same six sweep points
-(lgk10 to uniqHLL12, lgk14 to uniqExact, k100 to quantileBFloat16,
-k1000 to quantileExact, lgmm8 to topK(8), lgmm10 to topK(10)).
-ClickHouse lacks parameterized accuracy knobs for its native sketches,
-so the counterparts are the nearest native shape at each end of the
-tradeoff (loose versus exact) rather than the same parameter value;
-each sweep description names its counterpart. Remaining cloud engines
-stay deferred: each has different parameter knobs (Snowflake
-`APPROX_TOP_K` `counters` vs DataSketches `lg_max_map_size`, etc.);
-6 families × remaining cloud engines is out of proportion with the
-analytical value. DuckDB-first sweep plus ClickHouse counterparts
-demonstrate the tradeoff; other cloud users tune at their end with
+The sweep stays DuckDB-only. ClickHouse lacks parameterized accuracy
+knobs for its native sketches, so a ClickHouse "counterpart" would
+compare different algorithms (fixed-precision `uniqHLL12` versus
+`uniqExact`, `quantileBFloat16` versus `quantileExact`) rather than the
+swept parameter — results labeled as `lg_k`, `k`, or `lg_max_map_size`
+effects would actually measure algorithm changes. The sweep ops are
+therefore unsupported on ClickHouse (null platform override, the
+established skip). Remaining cloud engines stay deferred: each has
+different parameter knobs (Snowflake `APPROX_TOP_K` `counters` vs
+DataSketches `lg_max_map_size`, etc.); 6 families × remaining cloud
+engines is out of proportion with the analytical value. The DuckDB-only
+sweep demonstrates the tradeoff; cloud users tune at their end with
 vendor-specific knobs.
 
 KLL variants are end-to-end verified on the installed datasketches
