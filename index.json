@@ -720,7 +720,7 @@
     "approx-survey-remaining-legs": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Approx survey remaining legs: BigQuery reload, Redshift reachability, 4 uncredentialed platforms"
     },
