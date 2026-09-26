@@ -753,30 +753,30 @@ class DuckDBSnapshotBuilder:
             detail = details_map.get(entry.result_id)
             if detail is None:
                 continue
-            env = detail.environment or {}
-            raw_cpu_model = env.get("cpu_model")
+            env = detail.environment
+            raw_cpu_model = env.cpu_model
             if isinstance(raw_cpu_model, str):
                 raw_cpu_model = raw_cpu_model.strip() or None
-            cpu_family = env.get("cpu_family") or normalize_cpu_family(raw_cpu_model)
+            cpu_family = env.cpu_family or normalize_cpu_family(raw_cpu_model)
             if not raw_cpu_model:
                 raw_cpu_model = None
                 cpu_family = None
             env_rows.append(
                 (
                     entry.result_id,
-                    env.get("os"),
-                    env.get("arch"),
-                    env.get("cpu_count"),
-                    env.get("memory_gb"),
-                    env.get("python"),
+                    env.os,
+                    env.arch,
+                    env.cpu_count,
+                    env.memory_gb,
+                    env.python,
                     raw_cpu_model,
                     cpu_family,
-                    env.get("cpu_identity_provenance"),
-                    env.get("client_region"),
-                    env.get("client_cloud"),
-                    env.get("statement_overhead_min_ms"),
-                    env.get("statement_overhead_median_ms"),
-                    env.get("link_status"),
+                    env.cpu_identity_provenance,
+                    env.client_region,
+                    env.client_cloud,
+                    env.statement_overhead_min_ms,
+                    env.statement_overhead_median_ms,
+                    env.link_status,
                 )
             )
 

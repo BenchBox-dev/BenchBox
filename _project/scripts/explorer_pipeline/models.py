@@ -403,6 +403,34 @@ def _comparison_exclusion_reason(
     return None
 
 
+class ExplorerEnvironment(BaseModel):
+    """Execution-environment block on a DetailResult.
+
+    Verbatim passthrough fields (``os``, ``arch``, ``cpu_count``,
+    ``memory_gb``, ``python``, ``cpu_identity_provenance``) keep the bundle's
+    raw values untouched -- legacy bundles vary, so these stay
+    variant-typed by design. Derived fields (CPU identity, client-link
+    projection) carry real types because the transformer computes them.
+    Anything else the bundle recorded rides along as extras.
+    """
+
+    model_config = ConfigDict(extra="allow")
+
+    os: Any = None
+    arch: Any = None
+    cpu_count: Any = None
+    memory_gb: Any = None
+    python: Any = None
+    cpu_model: str | None = None
+    cpu_family: str | None = None
+    cpu_identity_provenance: Any = None
+    client_region: str | None = None
+    client_cloud: str | None = None
+    link_status: str | None = None
+    statement_overhead_min_ms: float | None = None
+    statement_overhead_median_ms: float | None = None
+
+
 class DetailResult(BaseModel):
     """Full detail for a single result, used to populate DuckDB detail tables."""
 
@@ -425,7 +453,7 @@ class DetailResult(BaseModel):
     display_exclusion_reason: str | None = None
     comparison_exclusion_reason: str | None = None
     ranking_exclusion_reason: str | None = None
-    environment: dict[str, Any]
+    environment: ExplorerEnvironment
     queries: list[QueryTiming]
     display_timings: list[QueryDisplayTiming] = []
     has_plans: bool
@@ -511,6 +539,13 @@ class DetailResult(BaseModel):
     def _serialize_normalized_cost(self, cost: NormalizedCost) -> dict[str, Any]:
         # Same legacy cost payload shape as ManifestEntry (see above).
         return cost.to_dict()
+
+    @field_serializer("environment")
+    def _serialize_environment(self, env: ExplorerEnvironment) -> dict[str, Any]:
+        # Only keys the bundle actually provided: exclude_unset reproduces
+        # the historical verbatim-copy key set instead of adding None for
+        # every declared field the bundle never recorded.
+        return env.model_dump(mode="json", exclude_unset=True)
 
 
 # ---------------------------------------------------------------------------
@@ -1150,6 +1185,7 @@ __all__ = [
     "BundleTuningBlock",
     "CANONICAL_BENCHMARK_ALIASES",
     "DetailResult",
+    "ExplorerEnvironment",
     "ManifestEntry",
     "PercentileStats",
     "PlatformRow",

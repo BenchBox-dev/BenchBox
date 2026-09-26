@@ -26,6 +26,7 @@ from _project.scripts.explorer_pipeline.models import (
     BundlePlatformRuntime,
     BundleTuningBlock,
     DetailResult,
+    ExplorerEnvironment,
     ManifestEntry,
     PercentileStats,
     QueryDisplayTiming,
@@ -1383,33 +1384,33 @@ def _to_finite_float_or_none(value: Any) -> float | None:
         return None
 
 
-def _detail_environment(bundle: BundleDocument) -> dict[str, Any]:
-    """Build the detail environment mapping from the typed environment block.
+def _detail_environment(bundle: BundleDocument) -> ExplorerEnvironment:
+    """Build the detail environment model from the typed environment block.
 
     Starts from the bundle's own environment keys verbatim, then normalizes
     the CPU identity and projects the producer ``client_link`` shape
     (``benchbox/platforms/base/adapter.py``) into flat derived fields.
     """
     env = bundle.environment
-    environment: dict[str, Any] = dict(env.model_extra or {})
+    provided = dict(env.model_extra or {})
     for key in ("os", "arch", "cpu_count", "memory_gb", "python", "cpu_model", "cpu_identity_provenance"):
         if key in env.model_fields_set:
-            environment[key] = getattr(env, key)
+            provided[key] = getattr(env, key)
     # Nested contract blocks travel verbatim: exclude_unset reproduces the raw
     # mapping exactly (declared fields were only defaults otherwise), so the
     # environment copy keeps keys the typed projections never read.
     for key in ("platform_runtime", "container", "client_link"):
         if key in env.model_fields_set:
-            environment[key] = getattr(env, key).model_dump(exclude_unset=True)
+            provided[key] = getattr(env, key).model_dump(exclude_unset=True)
     if "environment" in bundle.model_fields_set:
         raw_cpu = env.cpu_model
         cleaned_cpu = raw_cpu.strip() if isinstance(raw_cpu, str) else None
         if cleaned_cpu:
-            environment["cpu_model"] = cleaned_cpu
-            environment["cpu_family"] = normalize_cpu_family(cleaned_cpu)
+            provided["cpu_model"] = cleaned_cpu
+            provided["cpu_family"] = normalize_cpu_family(cleaned_cpu)
         else:
-            environment["cpu_model"] = None
-            environment["cpu_family"] = None
+            provided["cpu_model"] = None
+            provided["cpu_family"] = None
 
     # Producer shape (benchbox/platforms/base/adapter.py): the bundle
     # carries client_link:{collection_status, client_region,
@@ -1418,12 +1419,12 @@ def _detail_environment(bundle: BundleDocument) -> dict[str, Any]:
     # producer and silently projected NULLs.
     link = env.client_link
     overhead = link.statement_overhead_ms
-    environment["client_region"] = _string_or_none(link.client_region)
-    environment["client_cloud"] = _string_or_none(link.client_cloud)
-    environment["link_status"] = _string_or_none(link.collection_status)
-    environment["statement_overhead_min_ms"] = _to_finite_float_or_none(overhead.min)
-    environment["statement_overhead_median_ms"] = _to_finite_float_or_none(overhead.median)
-    return environment
+    provided["client_region"] = _string_or_none(link.client_region)
+    provided["client_cloud"] = _string_or_none(link.client_cloud)
+    provided["link_status"] = _string_or_none(link.collection_status)
+    provided["statement_overhead_min_ms"] = _to_finite_float_or_none(overhead.min)
+    provided["statement_overhead_median_ms"] = _to_finite_float_or_none(overhead.median)
+    return ExplorerEnvironment(**provided)
 
 
 class BundleTransformer:
