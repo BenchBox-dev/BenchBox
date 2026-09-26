@@ -989,7 +989,8 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
         Kept outside the execution path so a strict_plan_capture PlanCaptureError
         propagates rather than being mislabeled as a failed query.
         """
-        result = super().execute_query(
+        return self.execute_query_with_plan_capture(
+            super().execute_query,
             connection,
             query,
             query_id,
@@ -998,8 +999,6 @@ class DorisAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, PlatformAdapte
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-        self._merge_plan_capture_into_result(result, connection, query, query_id)
-        return result
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
         """Get Doris platform information."""

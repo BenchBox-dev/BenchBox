@@ -695,7 +695,12 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         stream_id: int | None = None,
     ) -> dict[str, Any]:
         """Execute the query and capture its plan on success when enabled."""
-        result = super().execute_query(
+        # Plan capture routes through the shared chokepoint: for phase-eligible
+        # engines (the default) it records the executed query for the isolated
+        # post-measurement phase instead of running EXPLAIN inline; otherwise it
+        # captures inline. SUCCESS-guarded inside the chokepoint.
+        return self.execute_query_with_plan_capture(
+            super().execute_query,
             connection=connection,
             query=query,
             query_id=query_id,
@@ -704,12 +709,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             validate_row_count=validate_row_count,
             stream_id=stream_id,
         )
-        # Plan capture routes through the shared chokepoint: for phase-eligible
-        # engines (the default) it records the executed query for the isolated
-        # post-measurement phase instead of running EXPLAIN inline; otherwise it
-        # captures inline. SUCCESS-guarded inside the chokepoint.
-        self._merge_plan_capture_into_result(result, connection, query, query_id)
-        return result
 
     def close_connection(self, connection: Any) -> None:
         """Close connection."""
