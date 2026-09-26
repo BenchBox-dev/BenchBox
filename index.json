@@ -19012,15 +19012,10 @@
       "title": "Upgrade pandas to 3.x after modin compat and Python 3.10 gates clear"
     },
     "use-benchmark-support-status-to-redesign-the-explorer-benchm": {
-      "claim": {
-        "expires_at": "2026-09-27T02:14:25Z",
-        "generation": "224f04fa0fb244fc8c177e581dab31be",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Use benchmark support status to redesign the explorer benchmark browser"
     },
     "user-saveable-chart-configurations-dashboards": {
