@@ -16985,7 +16985,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Throughput UAT gate: activate numeric Throughput@Size floor from baseline"
     },
     "throughput-independent-sessions-per-stream": {
