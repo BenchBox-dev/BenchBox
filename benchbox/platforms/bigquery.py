@@ -2142,12 +2142,41 @@ class BigQueryAdapter(PlatformAdapter):
         # Foreign keys follow the same rule, and BigQuery also requires the
         # referenced table to be dataset-qualified ("Table ... must be
         # qualified with a dataset"). Data Vault links reference their hubs.
-        work = re.sub(
+        # The match runs against a literal/comment-masked copy (the mask is
+        # length-preserving, so spans align) and splices replacements into the
+        # original: an unmasked regex would also rewrite REFERENCES text inside
+        # string defaults such as DEFAULT 'REFERENCES parent(id)', silently
+        # changing stored values.
+        references_pattern = re.compile(
             r"REFERENCES\s+(`?[a-zA-Z0-9_.]+`?)\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
-            lambda m: f"REFERENCES {self._qualify_table_target(m.group(1))} ({m.group(2)}) NOT ENFORCED",
-            work,
             flags=re.IGNORECASE,
         )
+        masked_work = re.sub(
+            r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/",
+            lambda match: " " * len(match.group(0)),
+            work,
+            flags=re.DOTALL,
+        )
+        pieces: list[str] = []
+        cursor = 0
+        for match in references_pattern.finditer(masked_work):
+            # Groups are sliced from the ORIGINAL statement at the masked
+            # match spans: group text itself may cover a masked region (e.g. a
+            # string literal inside the column list), and the masked copy holds
+            # blanks there.
+            original_match = work[match.start() : match.end()]
+            inner = re.match(
+                r"REFERENCES\s+(`?[a-zA-Z0-9_.]+`?)\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
+                original_match,
+                flags=re.IGNORECASE,
+            )
+            if inner is None:  # Mask boundary artifact; leave untouched.
+                continue
+            pieces.append(work[cursor : match.start()])
+            pieces.append(f"REFERENCES {self._qualify_table_target(inner.group(1))} ({inner.group(2)}) NOT ENFORCED")
+            cursor = match.end()
+        pieces.append(work[cursor:])
+        work = "".join(pieces)
 
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in work.upper() and self.partitioning_field:

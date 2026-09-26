@@ -2187,6 +2187,15 @@ class TestConvertToBigqueryTable:
         assert "REFERENCES `proj.ds.P` (a) NOT ENFORCED" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_rewrite_ignores_string_literals(self, mock_bigquery):
+        """REFERENCES text inside a string default is data, not a constraint."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = "CREATE TABLE t (note STRING DEFAULT 'REFERENCES parent(id)', a INT64, FOREIGN KEY (a) REFERENCES p (a))"
+        result = adapter._convert_to_bigquery_table(sql)
+        assert "DEFAULT 'REFERENCES parent(id)'" in result
+        assert "REFERENCES `proj.ds.P` (a) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_extract_unqualified_tables_skips_earlier_sibling_ctes(self, mock_bigquery):
         """A CTE body that reads an earlier CTE must not qualify that name as a base table."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
