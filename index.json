@@ -6520,15 +6520,10 @@
       "title": "Extend the five-axis code review rubric with six missing branches"
     },
     "extending-the-logical-profile-beyond-tpc-h-and-tpc-ds": {
-      "claim": {
-        "expires_at": "2026-09-27T02:54:54Z",
-        "generation": "fab2cefe93b94493b5cb940681006c54",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Extending the logical profile beyond TPC-H and TPC-DS"
     },
     "external-contributor-submission-dry-run": {
