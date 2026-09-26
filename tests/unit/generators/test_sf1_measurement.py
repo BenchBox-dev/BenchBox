@@ -166,6 +166,7 @@ def test_jobs_option_runs_subset():
         mod.measure_many(["tpch"], jobs=0)
 
 
+@pytest.mark.slow
 def test_measure_one_runs_a_lightweight_generator_end_to_end():
     """measure_one executes a real generator and counts only its outputs."""
     mod = _load_script()
@@ -226,6 +227,7 @@ def test_synthetic_fallback_aborts_measurement():
         mod._reject_synthetic_fallback(_Benchmark(), "NYCTaxiBenchmark")
 
 
+@pytest.mark.slow
 def test_tpchavoc_aliases_tpch_without_regeneration(monkeypatch):
     mod = _load_script()
     calls: list[str] = []
