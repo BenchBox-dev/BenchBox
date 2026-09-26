@@ -26,6 +26,7 @@ from benchbox.core.tsbs_devops.schema import (
     TSBS_DEVOPS_SCHEMA,
     get_create_tables_sql,
 )
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.compression_mixin import extract_compression_kwargs
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
@@ -111,8 +112,13 @@ class TSBSDevOpsBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseB
         # Resolve through the shared helper so BENCHBOX_OUTPUT_DIR is honored at
         # construction time (canonical tsbs_devops_sf<N> datagen name); falls
         # back to Path.cwd()/benchmark_runs/datagen when no override is set.
+        # normalize_output_dir keeps a CloudStagingPath/DatabricksPath handler
+        # intact; Path(...) would stringify it to the local cache and drop the
+        # cloud upload target the orchestrator resolved at construction time.
         resolved_output_dir = (
-            Path(output_dir) if output_dir else get_benchmark_runs_datagen_path("tsbs_devops", scale_factor)
+            normalize_output_dir(output_dir)
+            if output_dir
+            else get_benchmark_runs_datagen_path("tsbs_devops", scale_factor)
         )
         super().__init__(
             scale_factor=scale_factor,

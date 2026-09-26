@@ -132,6 +132,16 @@ class TestBenchmarkConstructorsPreserveHandlers:
         generator = TSBSDevOpsDataGenerator(scale_factor=0.01, output_dir=staging)
         assert generator.output_dir is staging
 
+    def test_tsbs_devops_benchmark(self):
+        """TSBSDevOpsBenchmark keeps the handler on both itself and its generator."""
+        from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
+
+        staging = self._staging()
+        benchmark = TSBSDevOpsBenchmark(scale_factor=1.0, output_dir=staging)
+        assert benchmark.output_dir is staging
+        assert benchmark.data_generator.output_dir is staging
+        assert benchmark.data_generator.output_dir.cloud_target == staging.cloud_target
+
     def test_databricks_target_survives_construction(self):
         """The Databricks target must reach the adapter, not just the type."""
         from benchbox.core.datavault.benchmark import DataVaultBenchmark
