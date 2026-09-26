@@ -845,7 +845,7 @@ class TestPackagedTemplatesParity:
     # get_tuning_template_paths auto-discovers, and are therefore expected to
     # have a packaged counterpart for every such file (see
     # test_every_auto_discoverable_examples_template_is_packaged below).
-    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks")
+    AUTO_DISCOVERY_PLATFORMS = ("duckdb", "databricks", "snowflake")
 
     # (platform, filename) pairs that textually match the `*_tuned.yaml` glob
     # but are deliberately NOT packaged, each with a reason so future
@@ -875,8 +875,8 @@ class TestPackagedTemplatesParity:
         platform_dirs = [p for p in TEMPLATES_ROOT.iterdir() if p.is_dir()]
         assert platform_dirs
         platform_names = {p.name for p in platform_dirs}
-        # duckdb/databricks are the platforms whose auto-discovery naming
-        # (<benchmark>_tuned.yaml) is packaged today.
+        # duckdb/databricks/snowflake are the platforms whose auto-discovery
+        # naming (<benchmark>_tuned.yaml) is packaged today.
         assert "duckdb" in platform_names
 
     def test_every_packaged_template_matches_its_examples_source(self):
@@ -908,7 +908,7 @@ class TestPackagedTemplatesParity:
 
     def test_every_auto_discoverable_examples_template_is_packaged(self):
         """Source -> packaged direction (bidirectional guard): every
-        examples/tunings/{duckdb,databricks}/*_tuned.yaml file that matches
+        examples/tunings/{duckdb,databricks,snowflake}/*_tuned.yaml file that matches
         the get_tuning_template_paths auto-discovery naming must have a
         byte-identical packaged counterpart, unless explicitly excluded
         above. Without this direction, a NEW auto-discoverable template

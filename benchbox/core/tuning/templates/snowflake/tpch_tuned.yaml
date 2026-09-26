@@ -1,0 +1,107 @@
+# Snowflake TPCH Tuned Configuration
+# Generated from the logical tuning profile (benchbox/core/tuning/profiles/tpc.yaml)
+# by scripts/generate_cloud_tpc_templates.py. Do not hand-edit: re-run the
+# generator after changing the profile. Provides platform-native tuning for
+# TPCH benchmark workloads.
+
+primary_keys:
+  enabled: true
+  enforce_uniqueness: true
+  nullable: false
+
+foreign_keys:
+  enabled: true
+  enforce_referential_integrity: true
+  on_delete_action: CASCADE
+  on_update_action: RESTRICT
+
+unique_constraints:
+  enabled: true
+  ignore_nulls: false
+
+check_constraints:
+  enabled: true
+  enforce_on_insert: true
+  enforce_on_update: true
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  CUSTOMER:
+    table_name: CUSTOMER
+    clustering:
+    - name: C_CUSTKEY
+      type: INTEGER
+      order: 1
+    - name: C_NATIONKEY
+      type: INTEGER
+      order: 2
+
+  LINEITEM:
+    table_name: LINEITEM
+    clustering:
+    - name: L_SHIPDATE
+      type: DATE
+      order: 1
+    - name: L_ORDERKEY
+      type: INTEGER
+      order: 2
+    - name: L_PARTKEY
+      type: INTEGER
+      order: 3
+    - name: L_SUPPKEY
+      type: INTEGER
+      order: 4
+
+  ORDERS:
+    table_name: ORDERS
+    clustering:
+    - name: O_ORDERDATE
+      type: DATE
+      order: 1
+    - name: O_ORDERKEY
+      type: INTEGER
+      order: 2
+    - name: O_CUSTKEY
+      type: INTEGER
+      order: 3
+
+  PART:
+    table_name: PART
+    clustering:
+    - name: P_PARTKEY
+      type: INTEGER
+      order: 1
+    - name: P_TYPE
+      type: VARCHAR
+      order: 2
+    - name: P_SIZE
+      type: INTEGER
+      order: 3
+
+  PARTSUPP:
+    table_name: PARTSUPP
+    clustering:
+    - name: PS_PARTKEY
+      type: INTEGER
+      order: 1
+    - name: PS_SUPPKEY
+      type: INTEGER
+      order: 2
+
+  SUPPLIER:
+    table_name: SUPPLIER
+    clustering:
+    - name: S_SUPPKEY
+      type: INTEGER
+      order: 1
+    - name: S_NATIONKEY
+      type: INTEGER
+      order: 2
