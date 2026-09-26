@@ -838,12 +838,12 @@ benchmark_specs:
   vector_search:
     benchmark_id: vector_search
     unique_query_ids:
-    - Q1
-    - Q2
-    - Q3
-    - Q4
-    - Q5
-    - Q6
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
     min_unique_queries: 0
     min_success_rate: 1.0
     high_failure_expected: false
