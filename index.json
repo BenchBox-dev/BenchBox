@@ -8944,10 +8944,15 @@
       "title": "Unblock lxml PYSEC-2026-87 fix once redshift-connector relaxes its lxml pin"
     },
     "maintainer-review-g4-uncertain-deferrals": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T03:27:15Z",
+        "generation": "c80ca74e312f4d8db7c4f45815482345",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Maintainer review of 27 G4 UNCERTAIN deferrals"
     },
     "make-benchmark-query-tests-hermetic": {
