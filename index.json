@@ -15633,7 +15633,7 @@
       "needs": [
         "serenedb-tpc-differential-validation"
       ],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Run SereneDB TPC-H and TPC-DS SF 1 functional evaluation under Mocker"
     },
