@@ -19019,10 +19019,15 @@
       "title": "Use benchmark support status to redesign the explorer benchmark browser"
     },
     "user-saveable-chart-configurations-dashboards": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T02:35:21Z",
+        "generation": "bd7af49153424ad3902fa4f973f837b2",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "User-saveable chart configurations / dashboards"
     },
     "uv-lock-guard-missing-from-ci": {
