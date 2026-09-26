@@ -655,6 +655,31 @@ class TestPostgreSQLDataLoading:
         assert "6,frank" in written
         mock_conn.commit.assert_called_once_with()
 
+    def test_load_data_preserves_record_boundary_without_trailing_newline(self, postgres_stubs, tmp_path):
+        """A chunk missing its final newline must not merge with the next chunk's first row."""
+        mock_conn = Mock()
+        mock_cursor = MagicMock()
+        mock_cursor.fetchone.return_value = (4,)  # Row count
+        mock_conn.cursor.return_value = mock_cursor
+        copy_cm = self._install_copy_context(mock_cursor)
+
+        chunk_a = tmp_path / "lineitem_0.csv"
+        chunk_b = tmp_path / "lineitem_1.csv"
+        chunk_a.write_text("1,alice\n2,bob")  # No trailing newline
+        chunk_b.write_text("3,charlie\n4,dave\n")
+
+        class Benchmark:
+            tables = {"lineitem": [chunk_a, chunk_b]}
+
+        adapter = PostgreSQLAdapter(schema="public")
+        stats, _, _ = adapter.load_data(Benchmark(), mock_conn, tmp_path)
+
+        assert stats["lineitem"] == 4
+        assert mock_cursor.copy.call_count == 1
+        written = "".join(call.args[0] for call in copy_cm.write.call_args_list)
+        assert "2,bob\n3,charlie" in written
+        assert "2,bob3,charlie" not in written
+
     def test_load_data_skips_repeat_headers_in_shared_session(self, postgres_stubs, tmp_path):
         """Only the first file's header row enters a shared COPY session."""
         mock_conn = Mock()

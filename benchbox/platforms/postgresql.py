@@ -791,6 +791,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                 try:
                     copy_sql = _postgres_copy_sql(qualified_table, dialect, force_csv=force_csv)
                     with cursor.copy(copy_sql) as copy:
+                        last_file_index = len(session_files) - 1
                         for index, (data_file, strip_trailing) in enumerate(session_files):
                             skip_header = dialect.has_header and index > 0
                             if is_parquet:
@@ -804,8 +805,18 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
                                     with open(load_path, encoding="utf-8") as f:
                                         if skip_header:
                                             f.readline()
+                                        wrote_any = False
+                                        ends_with_newline = True
                                         while chunk := f.read(65536):
                                             copy.write(chunk)
+                                            wrote_any = True
+                                            ends_with_newline = chunk.endswith("\n")
+                                        if wrote_any and index < last_file_index and not ends_with_newline:
+                                            # A chunk without a trailing newline would otherwise
+                                            # merge its last record with the next file's first
+                                            # row in the continuous COPY stream; EOF only acts
+                                            # as a record boundary at the end of the session.
+                                            copy.write("\n")
                     connection.commit()
                 except Exception as e:
                     failed_names = ", ".join(data_file.name for data_file, _ in session_files)
