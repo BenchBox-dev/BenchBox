@@ -2511,9 +2511,9 @@
     },
     "clickhouse-native-sketch-variants-using-state-merge-combinat": {
       "claim": {
-        "expires_at": "2026-09-27T07:31:34Z",
-        "generation": "d4544ca937af486681b95cb85b3c33de",
-        "renewals": 1,
+        "expires_at": "2026-09-27T08:01:12Z",
+        "generation": "9c25b56ed4344ccca45b00945492a2e4",
+        "renewals": 2,
         "worker": "jcode-batch-c"
       },
       "needs": [],
