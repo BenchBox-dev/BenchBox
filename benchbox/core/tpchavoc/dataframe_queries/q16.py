@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from benchbox.core.dataframe.compat import _to_list
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.tpch.dataframe_queries import (
     get_query as get_tpch_query,
@@ -25,11 +26,11 @@ VariantImpl = Callable[[DataFrameContext], Any]
 _DESCRIPTIONS = [
     "Baseline: direct delegation to TPC-H Q16 implementation",
     "Anti-join alternatives: complaint keys via distinct before the anti-join",
-    "Common pushdown: part predicates applied before the partsupp join",
+    "Semi-join pruning: partsupp semi-filtered to filtered part keys before the join",
     "Part-side prefilter: brand/type/size filter on part before the join",
     "Column prune: select only needed columns before the join",
     "Per-predicate branches: one filtered branch per size, concatenated after",
-    "Chained style: maximum method chaining, no named intermediates",
+    "Late filtering: part predicates applied after the partsupp join instead of before",
     "Complaint-first ordering: anti-join before the part filter",
     "Two-stage aggregation: distinct group-supplier pairs counted before the final sort",
     "Group-first ordering: group keys projected before aggregation",
@@ -81,8 +82,13 @@ def _make_q16_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 3:
+            # Semi-join pruning: partsupp is first reduced to the rows whose
+            # part key survives the part filter, via a distinct-key semi-join,
+            # before the main part/partsupp join runs.
             filtered = part.filter(_q16_expr_parts(col, lit, params))
-            joined = filtered.join(partsupp, left_on="p_partkey", right_on="ps_partkey")
+            part_keys = filtered.select("p_partkey").distinct()
+            pruned = partsupp.join(part_keys, left_on="ps_partkey", right_on="p_partkey", how="semi")
+            joined = filtered.join(pruned, left_on="p_partkey", right_on="ps_partkey")
             return _q16_expr_aggregate(
                 joined.join(_q16_expr_complaint_keys(ctx, col), left_on="ps_suppkey", right_on="s_suppkey", how="anti"),
                 col,
@@ -126,13 +132,15 @@ def _make_q16_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 7:
-            return (
-                part.filter(_q16_expr_parts(col, lit, params))
-                .join(partsupp, left_on="p_partkey", right_on="ps_partkey")
-                .join(_q16_expr_complaint_keys(ctx, col), left_on="ps_suppkey", right_on="s_suppkey", how="anti")
-                .group_by(*_GROUP_KEYS)
-                .agg(col("ps_suppkey").n_unique().alias("supplier_cnt"))
-                .sort(_SORT_KEYS, descending=_SORT_DESC)
+            # Late filtering: part and partsupp join unfiltered, and the
+            # brand/type/size predicates run on the joined rows instead of on
+            # part before the join, swapping the canonical filter order.
+            joined = part.join(partsupp, left_on="p_partkey", right_on="ps_partkey").filter(
+                _q16_expr_parts(col, lit, params)
+            )
+            return _q16_expr_aggregate(
+                joined.join(_q16_expr_complaint_keys(ctx, col), left_on="ps_suppkey", right_on="s_suppkey", how="anti"),
+                col,
             )
 
         if variant == 8:
@@ -210,8 +218,11 @@ def _make_q16_pandas_impl(variant: int) -> VariantImpl:
             return _q16_pandas_aggregate(joined[~joined["ps_suppkey"].isin(_to_list(complaint_keys))])
 
         if variant == 3:
+            # Semi-join pruning mirror: partsupp reduced to surviving part keys first.
             filtered = part[_q16_pandas_parts_mask(part, params)]
-            joined = filtered.merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
+            part_keys = _to_list(filtered[["p_partkey"]].drop_duplicates()["p_partkey"])
+            pruned = partsupp[partsupp["ps_partkey"].isin(part_keys)]
+            joined = filtered.merge(pruned, left_on="p_partkey", right_on="ps_partkey")
             complaint_keys = _q16_pandas_complaint_keys(supplier)
             return _q16_pandas_aggregate(joined[~joined["ps_suppkey"].isin(_to_list(complaint_keys))])
 
@@ -247,12 +258,11 @@ def _make_q16_pandas_impl(variant: int) -> VariantImpl:
             return _q16_pandas_aggregate(joined[~joined["ps_suppkey"].isin(_to_list(complaint_keys))])
 
         if variant == 7:
-            joined = (
-                part[_q16_pandas_parts_mask(part, params)]
-                .merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
-                .pipe(lambda frame: frame[~frame["ps_suppkey"].isin(_to_list(_q16_pandas_complaint_keys(supplier)))])
-            )
-            return _q16_pandas_aggregate(joined)
+            # Late filtering mirror: join first, filter the joined rows after.
+            joined = part.merge(partsupp, left_on="p_partkey", right_on="ps_partkey")
+            filtered = joined[_q16_pandas_parts_mask(joined, params)]
+            complaint_keys = _q16_pandas_complaint_keys(supplier)
+            return _q16_pandas_aggregate(filtered[~filtered["ps_suppkey"].isin(_to_list(complaint_keys))])
 
         if variant == 8:
             complaint_keys = _q16_pandas_complaint_keys(supplier)
@@ -285,10 +295,6 @@ def _make_q16_pandas_impl(variant: int) -> VariantImpl:
     impl.__name__ = f"q16_v{variant}_pandas_impl"
     impl.__qualname__ = impl.__name__
     return impl
-
-
-def _to_list(values: Any) -> list:
-    return values.compute().tolist() if hasattr(values, "compute") else list(values)
 
 
 _Q16_BASE = get_tpch_query("Q16")

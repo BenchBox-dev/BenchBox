@@ -25,13 +25,13 @@ VariantImpl = Callable[[DataFrameContext], Any]
 _DESCRIPTIONS = [
     "Baseline: direct delegation to TPC-H Q17 implementation",
     "Average materialization: precompute per-part average table before the join",
-    "Semi-join ordering: filter parts before joining lineitem",
+    "Late average join: lineitem joined before the per-part average table",
     "Part-side prefilter: brand/container predicates applied before the join",
     "Column prune: select only needed columns before the join",
-    "Per-part branches: quantity-band branches joined and filtered independently, summed after",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Alternative formula: commuted revenue over 7.0 divisor",
-    "Materialized revenue: with_columns revenue before the final sum",
+    "Size-band branches: part-size bands joined and filtered independently, summed after",
+    "Anti-null reformulation: left-join the average table with an is-null exclusion",
+    "Commuted formula: per-row revenue divided by 7.0 before the final sum",
+    "Revenue materialization: with_columns revenue before the final sum",
     "Threshold-first ordering: quantity filter applied before the average join",
 ]
 
@@ -40,11 +40,12 @@ def _q17_expr_avg(col: Any, lit: Any) -> Any:
     return (col("l_quantity").mean() * lit(0.2)).alias("avg_qty")
 
 
-# Q17v6 splits lineitem into disjoint quantity bands before the part join so
-# each branch performs its own join work. The split only needs to partition
-# the domain; the threshold filter after the concat preserves semantics for
-# any constant. 25.0 is the midpoint of the TPC-H quantity domain [1, 50].
-_Q17_BAND_SPLIT = 25.0
+# Q17v6 splits the filtered parts into disjoint part-size bands before the
+# lineitem join so each branch performs its own join work. Sizes are drawn
+# from the TPC-H domain [1, 50]; the midpoint split keeps both branches
+# non-empty, and the per-part threshold filter after the concat preserves
+# semantics for any partition of the parts.
+_Q17_SIZE_SPLIT = 25
 
 
 def _make_q17_expression_impl(variant: int) -> VariantImpl:
@@ -71,10 +72,14 @@ def _make_q17_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 3:
-            filtered_parts = part.filter(part_filter)
+            # Late average join: part and lineitem join first, and the
+            # per-part average table joins after the big join instead of
+            # before it, reversing the canonical join order.
             avg_table = lineitem.group_by("l_partkey").agg(_q17_expr_avg(col, lit))
-            joined = filtered_parts.join(lineitem, left_on="p_partkey", right_on="l_partkey").join(
-                avg_table, left_on="p_partkey", right_on="l_partkey"
+            joined = (
+                part.filter(part_filter)
+                .join(lineitem, left_on="p_partkey", right_on="l_partkey")
+                .join(avg_table, left_on="p_partkey", right_on="l_partkey")
             )
             return joined.filter(col("l_quantity") < col("avg_qty")).select(
                 (col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly")
@@ -104,30 +109,39 @@ def _make_q17_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 6:
+            # Size-band branches: the filtered parts are partitioned by size
+            # and each band joins lineitem and the average table on its own;
+            # the per-part threshold filter after the concat keeps semantics.
             filtered_parts = part.filter(part_filter)
             avg_table = lineitem.group_by("l_partkey").agg(_q17_expr_avg(col, lit))
 
             def _branch(band: Any) -> Any:
-                return filtered_parts.join(band, left_on="p_partkey", right_on="l_partkey").join(
+                return band.join(lineitem, left_on="p_partkey", right_on="l_partkey").join(
                     avg_table, left_on="p_partkey", right_on="l_partkey"
                 )
 
-            low_band = lineitem.filter(col("l_quantity") < lit(_Q17_BAND_SPLIT))
-            high_band = lineitem.filter(col("l_quantity") >= lit(_Q17_BAND_SPLIT))
+            small_band = filtered_parts.filter(col("p_size") <= lit(_Q17_SIZE_SPLIT))
+            large_band = filtered_parts.filter(col("p_size") > lit(_Q17_SIZE_SPLIT))
             return (
-                ctx.concat([_branch(low_band), _branch(high_band)])
+                ctx.concat([_branch(small_band), _branch(large_band)])
                 .filter(col("l_quantity") < col("avg_qty"))
                 .select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
             )
 
         if variant == 7:
+            # Anti-null reformulation: the average table is left-joined and
+            # rows missing an average are excluded via is-null instead of the
+            # canonical inner join (every lineitem part key has an average, so
+            # the exclusion removes nothing but changes the join operator).
             avg_table = lineitem.group_by("l_partkey").agg(_q17_expr_avg(col, lit))
-            return (
+            joined = (
                 part.filter(part_filter)
                 .join(lineitem, left_on="p_partkey", right_on="l_partkey")
-                .join(avg_table, left_on="p_partkey", right_on="l_partkey")
-                .filter(col("l_quantity") < col("avg_qty"))
-                .select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
+                .join(avg_table, left_on="p_partkey", right_on="l_partkey", how="left")
+                .filter(col("avg_qty").is_not_null())
+            )
+            return joined.filter(col("l_quantity") < col("avg_qty")).select(
+                (col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly")
             )
 
         if variant == 8:
@@ -201,10 +215,12 @@ def _make_q17_pandas_impl(variant: int) -> VariantImpl:
             return _q17_pandas_sum(joined[joined["l_quantity"] < joined["avg_qty"]])
 
         if variant == 3:
-            filtered_parts = part[mask]
+            # Late average join mirror: part/lineitem merge before the average merge.
             avg_table = _q17_pandas_avg(lineitem)
-            joined = filtered_parts.merge(lineitem, left_on="p_partkey", right_on="l_partkey").merge(
-                avg_table, on="l_partkey"
+            joined = (
+                part[mask]
+                .merge(lineitem, left_on="p_partkey", right_on="l_partkey")
+                .merge(avg_table, left_on="p_partkey", right_on="l_partkey")
             )
             return _q17_pandas_sum(joined[joined["l_quantity"] < joined["avg_qty"]])
 
@@ -227,33 +243,47 @@ def _make_q17_pandas_impl(variant: int) -> VariantImpl:
             return _q17_pandas_sum(joined[joined["l_quantity"] < joined["avg_qty"]])
 
         if variant == 6:
+            # Size-band branches mirror: filtered parts split by size, each
+            # band merged with lineitem and the average table independently.
             avg_table = _q17_pandas_avg(lineitem)
             filtered_parts = part[mask]
 
             def _branch(band: Any) -> Any:
-                return filtered_parts.merge(band, left_on="p_partkey", right_on="l_partkey").merge(
-                    avg_table, on="l_partkey"
+                return band.merge(lineitem, left_on="p_partkey", right_on="l_partkey").merge(
+                    avg_table, left_on="p_partkey", right_on="l_partkey"
                 )
 
-            low_band = lineitem[lineitem["l_quantity"] < _Q17_BAND_SPLIT]
-            high_band = lineitem[lineitem["l_quantity"] >= _Q17_BAND_SPLIT]
-            merged = ctx.concat([_branch(low_band), _branch(high_band)])
+            small_band = filtered_parts[filtered_parts["p_size"] <= _Q17_SIZE_SPLIT]
+            large_band = filtered_parts[filtered_parts["p_size"] > _Q17_SIZE_SPLIT]
+            merged = ctx.concat([_branch(small_band), _branch(large_band)])
             return _q17_pandas_sum(merged[merged["l_quantity"] < merged["avg_qty"]])
 
         if variant == 7:
+            # Anti-null reformulation mirror: left merge plus notna filter.
             avg_table = _q17_pandas_avg(lineitem)
             joined = (
-                part[mask].merge(lineitem, left_on="p_partkey", right_on="l_partkey").merge(avg_table, on="l_partkey")
+                part[mask]
+                .merge(lineitem, left_on="p_partkey", right_on="l_partkey")
+                .merge(avg_table, left_on="p_partkey", right_on="l_partkey", how="left")
             )
+            joined = joined[joined["avg_qty"].notna()]
             return _q17_pandas_sum(joined[joined["l_quantity"] < joined["avg_qty"]])
 
         if variant == 8:
+            # Commuted formula: divide each row's extended price by 7.0 first,
+            # then sum, instead of summing first and dividing once.
+            import pandas as pd
+
             avg_table = _q17_pandas_avg(lineitem)
             joined = (
-                part[mask].merge(lineitem, left_on="p_partkey", right_on="l_partkey").merge(avg_table, on="l_partkey")
+                part[mask]
+                .merge(lineitem, left_on="p_partkey", right_on="l_partkey")
+                .merge(avg_table, left_on="p_partkey", right_on="l_partkey")
             )
             filtered = joined[joined["l_quantity"] < joined["avg_qty"]]
-            return _q17_pandas_sum(filtered)
+            value = (filtered["l_extendedprice"] / 7.0).sum()
+            value = value.compute() if hasattr(value, "compute") else value
+            return pd.DataFrame({"avg_yearly": [value]})
 
         if variant == 9:
             avg_table = _q17_pandas_avg(lineitem)

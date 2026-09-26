@@ -12,6 +12,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from benchbox.core.dataframe.compat import _to_list
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.tpch.dataframe_queries import (
     get_query as get_tpch_query,
@@ -25,14 +26,14 @@ VariantImpl = Callable[[DataFrameContext], Any]
 
 _DESCRIPTIONS = [
     "Baseline: direct delegation to TPC-H Q18 implementation",
-    "Large-order materialization: precompute qualifying order keys before the join",
-    "Semi-join ordering: customer/orders joined before the large-order filter",
-    "Order-side prefilter: threshold predicate pushed before the aggregate",
+    "Distinct-key join: deduplicated large-order keys inner-joined instead of a semi-join",
+    "Late filtering: lineitem joined before the large-order semi-filter",
+    "Order-key prefilter: lineitem semi-pruned to qualifying keys before the quantity aggregate",
     "Column prune: select only needed columns before the joins",
-    "Per-threshold branches: split quantity bands, concatenated after",
-    "Chained style: maximum method chaining, no named intermediates",
-    "Alternative aggregation: sum before the top-100 sort with limit pushdown",
-    "Materialized join: with_columns order total before grouping",
+    "Nation-band branches: large orders split by customer nation range, joined per branch, concatenated after",
+    "Marker reformulation: left-join large-order keys with a null-marker exclusion instead of a semi-join",
+    "Deferred enrichment: per-order quantity sums aggregated before joining customer and order columns",
+    "Top-100 pushdown: qualifying orders ranked by total price before the lineitem join",
     "Filter-first ordering: large-order keys applied before customer join",
 ]
 
@@ -73,30 +74,44 @@ def _make_q18_expression_impl(variant: int) -> VariantImpl:
         lineitem = ctx.get_table("lineitem")
 
         if variant == 2:
-            large_orders = _q18_expr_large_orders(lineitem, col, lit, threshold)
+            # Distinct-key join: the large-order keys are deduplicated and
+            # joined as an inner join instead of the canonical semi-join.
+            # The aggregate emits one row per order key, so distinct() only
+            # changes the join operator, not the row set.
+            large_orders = _q18_expr_large_orders(lineitem, col, lit, threshold).distinct()
             joined = (
                 customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-                .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
+                .join(large_orders, left_on="o_orderkey", right_on="l_orderkey")
                 .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
             )
             return _q18_expr_aggregate(joined, col)
 
         if variant == 3:
-            base = customer.join(orders, left_on="c_custkey", right_on="o_custkey")
+            # Late filtering: lineitem is joined to customer/orders first and
+            # the large-order semi-filter runs after the big join instead of
+            # before it, reversing the canonical filter order.
             large_orders = _q18_expr_large_orders(lineitem, col, lit, threshold)
-            joined = base.join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi").join(
+            joined = customer.join(orders, left_on="c_custkey", right_on="o_custkey").join(
                 lineitem, left_on="o_orderkey", right_on="l_orderkey"
             )
-            return _q18_expr_aggregate(joined, col)
+            return _q18_expr_aggregate(
+                joined.join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi"), col
+            )
 
         if variant == 4:
-            large_orders = (
-                lineitem.filter(col("l_quantity") > lit(0))
-                .group_by("l_orderkey")
-                .agg(col("l_quantity").sum().alias("total_qty"))
-                .filter(col("total_qty") > lit(threshold))
+            # Order-key prefilter: lineitem is first semi-pruned to the rows
+            # of orders whose line count could reach the threshold (at least
+            # two lines), so the quantity aggregate scans the reduced set.
+            # The count gate is implied by the threshold (no single line can
+            # exceed 50 units), hence a real pruning semi-join.
+            multi_line_keys = (
+                lineitem.group_by("l_orderkey")
+                .agg(col("l_orderkey").count().alias("line_cnt"))
+                .filter(col("line_cnt") > lit(1))
                 .select("l_orderkey")
             )
+            pruned = lineitem.join(multi_line_keys, left_on="l_orderkey", right_on="l_orderkey", how="semi")
+            large_orders = _q18_expr_large_orders(pruned, col, lit, threshold)
             joined = (
                 customer.join(orders, left_on="c_custkey", right_on="o_custkey")
                 .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
@@ -117,63 +132,81 @@ def _make_q18_expression_impl(variant: int) -> VariantImpl:
             return _q18_expr_aggregate(joined, col)
 
         if variant == 6:
-            lower = (
+            # Nation-band branches: large orders are partitioned by the
+            # customer's nation key range before the customer/orders/lineitem
+            # joins, so each branch joins a disjoint key set and the concat
+            # restores the full set. Both bands are non-empty on TPC-H data
+            # (large orders span the nation domain).
+            order_totals = (
                 lineitem.group_by("l_orderkey")
                 .agg(col("l_quantity").sum().alias("total_qty"))
-                .filter((col("total_qty") > lit(threshold)) & (col("total_qty") <= lit(threshold * 2)))
+                .filter(col("total_qty") > lit(threshold))
                 .select("l_orderkey")
             )
-            upper = (
-                lineitem.group_by("l_orderkey")
-                .agg(col("l_quantity").sum().alias("total_qty"))
-                .filter(col("total_qty") > lit(threshold * 2))
-                .select("l_orderkey")
-            )
-            large_orders = ctx.concat([lower, upper]).distinct()
-            joined = (
-                customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-                .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
-                .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-            )
-            return _q18_expr_aggregate(joined, col)
+
+            def _nation_branch(nation_gate: Any) -> Any:
+                base = customer.filter(nation_gate).join(orders, left_on="c_custkey", right_on="o_custkey")
+                large = base.join(order_totals, left_on="o_orderkey", right_on="l_orderkey", how="semi")
+                return large.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+
+            low_band = _nation_branch(col("c_nationkey") < lit(12))
+            high_band = _nation_branch(col("c_nationkey") >= lit(12))
+            return _q18_expr_aggregate(ctx.concat([low_band, high_band]), col)
 
         if variant == 7:
-            large_orders = _q18_expr_large_orders(lineitem, col, lit, threshold)
-            return (
-                customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-                .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
-                .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-                .group_by(*_GROUP_KEYS)
-                .agg(col("l_quantity").sum().alias("sum_qty"))
-                .sort(_SORT_KEYS, descending=_SORT_DESC)
-                .limit(100)
+            # Marker reformulation: the large-order keys carry a constant
+            # marker through a left join, and rows with a null marker are
+            # excluded instead of the canonical semi-join.
+            large_orders = (
+                lineitem.group_by("l_orderkey")
+                .agg(col("l_quantity").sum().alias("total_qty"))
+                .filter(col("total_qty") > lit(threshold))
+                .select("l_orderkey")
+                .with_columns(lit(1).alias("is_large"))
             )
+            keyed = (
+                customer.join(orders, left_on="c_custkey", right_on="o_custkey")
+                .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="left")
+                .filter(col("is_large").is_not_null())
+                .drop("is_large")
+            )
+            return _q18_expr_aggregate(keyed.join(lineitem, left_on="o_orderkey", right_on="l_orderkey"), col)
 
         if variant == 8:
+            # Deferred enrichment: the per-order quantity sums are aggregated
+            # from lineitem first, then customer and order columns are joined
+            # onto the pre-aggregated rows instead of grouping the full join.
             large_orders = _q18_expr_large_orders(lineitem, col, lit, threshold)
-            joined = (
-                customer.join(orders, left_on="c_custkey", right_on="o_custkey")
-                .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
-                .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+            order_sums = (
+                lineitem.group_by("l_orderkey")
+                .agg(col("l_quantity").sum().alias("sum_qty"))
+                .join(large_orders, left_on="l_orderkey", right_on="l_orderkey", how="semi")
+            )
+            joined = customer.join(orders, left_on="c_custkey", right_on="o_custkey").join(
+                order_sums, left_on="o_orderkey", right_on="l_orderkey"
             )
             return (
                 joined.group_by(*_GROUP_KEYS)
-                .agg(col("l_quantity").sum().alias("sum_qty"))
+                .agg(col("sum_qty").first().alias("sum_qty"))
                 .sort(_SORT_KEYS, descending=_SORT_DESC)
                 .limit(100)
             )
 
         if variant == 9:
+            # Top-100 pushdown: qualifying orders are ranked by total price
+            # before the lineitem join, so the join only fans out the orders
+            # that can appear in the final top-100.
             large_orders = _q18_expr_large_orders(lineitem, col, lit, threshold)
-            joined = (
+            ranked = (
                 customer.join(orders, left_on="c_custkey", right_on="o_custkey")
                 .join(large_orders, left_on="o_orderkey", right_on="l_orderkey", how="semi")
-                .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-                .with_columns(col("l_quantity").alias("qty"))
+                .sort(_SORT_KEYS, descending=_SORT_DESC)
+                .limit(100)
             )
+            joined = ranked.join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
             return (
                 joined.group_by(*_GROUP_KEYS)
-                .agg(col("qty").sum().alias("sum_qty"))
+                .agg(col("l_quantity").sum().alias("sum_qty"))
                 .sort(_SORT_KEYS, descending=_SORT_DESC)
                 .limit(100)
             )
@@ -216,21 +249,35 @@ def _make_q18_pandas_impl(variant: int) -> VariantImpl:
         threshold = params["quantity_threshold"]
 
         if variant == 2:
-            large_orders = _q18_pandas_large_orders(lineitem, threshold)
+            # Distinct-key join mirror: deduplicated keys, inner merge.
+            import pandas as pd
+
+            order_qty = lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
+            large_orders = _to_list(
+                order_qty[order_qty["total_qty"] > threshold].drop_duplicates("l_orderkey")["l_orderkey"]
+            )
             joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-            joined = joined[joined["o_orderkey"].isin(large_orders)]
+            joined = joined.merge(
+                pd.DataFrame({"l_orderkey": large_orders}),
+                left_on="o_orderkey",
+                right_on="l_orderkey",
+            )
             return _q18_pandas_aggregate(joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
 
         if variant == 3:
-            base = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
+            # Late filtering mirror: lineitem merged before the large-order filter.
             large_orders = _q18_pandas_large_orders(lineitem, threshold)
-            joined = base[base["o_orderkey"].isin(large_orders)]
-            return _q18_pandas_aggregate(joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
+            joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey").merge(
+                lineitem, left_on="o_orderkey", right_on="l_orderkey"
+            )
+            return _q18_pandas_aggregate(joined[joined["o_orderkey"].isin(large_orders)])
 
         if variant == 4:
-            positive = lineitem[lineitem["l_quantity"] > 0]
-            order_qty = positive.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-            large_orders = _to_list(order_qty[order_qty["total_qty"] > threshold]["l_orderkey"])
+            # Order-key prefilter mirror: multi-line orders only.
+            line_counts = lineitem.groupby("l_orderkey", as_index=False).agg(line_cnt=("l_orderkey", "count"))
+            multi_line = _to_list(line_counts[line_counts["line_cnt"] > 1]["l_orderkey"])
+            pruned = lineitem[lineitem["l_orderkey"].isin(multi_line)]
+            large_orders = _q18_pandas_large_orders(pruned, threshold)
             joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
             joined = joined[joined["o_orderkey"].isin(large_orders)]
             return _q18_pandas_aggregate(joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
@@ -245,46 +292,58 @@ def _make_q18_pandas_impl(variant: int) -> VariantImpl:
             return _q18_pandas_aggregate(joined.merge(lineitem_cols, left_on="o_orderkey", right_on="l_orderkey"))
 
         if variant == 6:
+            # Nation-band branches mirror: large-order keys per nation range,
+            # joined per branch through customer/orders, concatenated after.
             order_qty = lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
-            lower = _to_list(
-                order_qty[(order_qty["total_qty"] > threshold) & (order_qty["total_qty"] <= threshold * 2)][
-                    "l_orderkey"
+            large_set = set(_to_list(order_qty[order_qty["total_qty"] > threshold]["l_orderkey"]))
+            cust_orders = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
+
+            def _nation_frame(gate: Any) -> Any:
+                band = cust_orders[gate(cust_orders)]
+                band = band[band["o_orderkey"].isin(large_set)]
+                return band.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
+
+            merged = ctx.concat(
+                [
+                    _nation_frame(lambda frame: frame["c_nationkey"] < 12),
+                    _nation_frame(lambda frame: frame["c_nationkey"] >= 12),
                 ]
             )
-            upper = _to_list(order_qty[order_qty["total_qty"] > threshold * 2]["l_orderkey"])
-            large_orders = list(dict.fromkeys(lower + upper))
-            joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-            joined = joined[joined["o_orderkey"].isin(large_orders)]
-            return _q18_pandas_aggregate(joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
-
-        if variant == 7:
-            large_orders = _q18_pandas_large_orders(lineitem, threshold)
-            return _q18_pandas_aggregate(
-                customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-                .pipe(lambda f: f[f["o_orderkey"].isin(large_orders)])
-                .merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-            )
-
-        if variant == 8:
-            large_orders = _q18_pandas_large_orders(lineitem, threshold)
-            joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-            joined = joined[joined["o_orderkey"].isin(large_orders)]
-            merged = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
             return _q18_pandas_aggregate(merged)
 
-        if variant == 9:
+        if variant == 7:
+            # Marker reformulation mirror: left merge plus null-marker filter.
+            order_qty = lineitem.groupby("l_orderkey", as_index=False).agg(total_qty=("l_quantity", "sum"))
+            keys = order_qty[order_qty["total_qty"] > threshold][["l_orderkey"]].copy()
+            keys["is_large"] = 1
+            joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey").merge(
+                keys, left_on="o_orderkey", right_on="l_orderkey", how="left"
+            )
+            joined = joined[joined["is_large"].notna()].drop(columns=["is_large", "l_orderkey"])
+            return _q18_pandas_aggregate(joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
+
+        if variant == 8:
+            # Deferred enrichment mirror: per-order sums first, then enrich.
             large_orders = _q18_pandas_large_orders(lineitem, threshold)
-            joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-            joined = joined[joined["o_orderkey"].isin(large_orders)]
-            merged = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey").copy()
-            merged["qty"] = merged["l_quantity"]
-            grouped = (
-                merged.groupby(["c_name", "c_custkey", "o_orderkey", "o_orderdate", "o_totalprice"], as_index=False)
-                .agg(sum_qty=("qty", "sum"))
+            order_sums = lineitem.groupby("l_orderkey", as_index=False).agg(sum_qty=("l_quantity", "sum"))
+            order_sums = order_sums[order_sums["l_orderkey"].isin(large_orders)]
+            joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey").merge(
+                order_sums, left_on="o_orderkey", right_on="l_orderkey"
+            )
+            return (
+                joined.groupby(["c_name", "c_custkey", "o_orderkey", "o_orderdate", "o_totalprice"], as_index=False)
+                .agg(sum_qty=("sum_qty", "first"))
                 .sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True])
                 .head(100)
             )
-            return grouped
+
+        if variant == 9:
+            # Top-100 pushdown mirror: rank qualifying orders before fanning out.
+            large_orders = _q18_pandas_large_orders(lineitem, threshold)
+            ranked = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
+            ranked = ranked[ranked["o_orderkey"].isin(large_orders)]
+            ranked = ranked.sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True]).head(100)
+            return _q18_pandas_aggregate(ranked.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
 
         large_orders = _q18_pandas_large_orders(lineitem, threshold)
         filtered_orders = orders[orders["o_orderkey"].isin(large_orders)]
@@ -294,10 +353,6 @@ def _make_q18_pandas_impl(variant: int) -> VariantImpl:
     impl.__name__ = f"q18_v{variant}_pandas_impl"
     impl.__qualname__ = impl.__name__
     return impl
-
-
-def _to_list(values: Any) -> list:
-    return values.compute().tolist() if hasattr(values, "compute") else list(values)
 
 
 _Q18_BASE = get_tpch_query("Q18")
