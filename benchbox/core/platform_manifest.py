@@ -1637,6 +1637,116 @@ _PLATFORM_MANIFEST_JSON = """[
     "support_status": "experimental"
   },
   {
+    "key": "paradedb",
+    "aliases": [],
+    "adapter": {
+      "module": "benchbox.platforms.paradedb",
+      "class_name": "ParadeDBAdapter",
+      "registration_order": 47,
+      "stream_connection_capability": "independent_connection"
+    },
+    "display_name": "paradedb",
+    "description": "Hybrid search + analytics PostgreSQL • BM25 via pg_analytics",
+    "category": "olap",
+    "libraries": [
+      {
+        "name": "psycopg",
+        "required": true
+      }
+    ],
+    "requirements": [
+      "psycopg[binary]>=3.1"
+    ],
+    "installation_command": "uv add 'psycopg[binary]'",
+    "adoption": "emerging",
+    "supports": [
+      "olap",
+      "analytics"
+    ],
+    "driver_package": "psycopg",
+    "notes": "PostgreSQL extension adding Elasticsearch-compatible BM25 search and analytics over heap tables. Requires pg_analytics on server. No known extension conflicts.",
+    "capabilities": {
+      "supports_sql": true,
+      "supports_dataframe": false,
+      "default_mode": "sql",
+      "platform_family": "paradedb",
+      "default_deployment": "self-hosted",
+      "deployment_modes": {
+        "self-hosted": {
+          "mode": "self-hosted",
+          "display_name": "ParadeDB Self-Hosted",
+          "description": "Self-hosted PostgreSQL with pg_analytics extension",
+          "requires_credentials": true,
+          "requires_cloud_storage": false,
+          "requires_network": true,
+          "default_for_platform": true,
+          "dependencies": [
+            "psycopg[binary]"
+          ],
+          "auth_methods": [
+            "password"
+          ]
+        }
+      }
+    },
+    "support_status": "experimental"
+  },
+  {
+    "key": "citus",
+    "aliases": [],
+    "adapter": {
+      "module": "benchbox.platforms.citus",
+      "class_name": "CitusAdapter",
+      "registration_order": 48,
+      "stream_connection_capability": "independent_connection"
+    },
+    "display_name": "citus",
+    "description": "Distributed PostgreSQL • Sharded tables via citus",
+    "category": "olap",
+    "libraries": [
+      {
+        "name": "psycopg",
+        "required": true
+      }
+    ],
+    "requirements": [
+      "psycopg[binary]>=3.1"
+    ],
+    "installation_command": "uv add 'psycopg[binary]'",
+    "adoption": "emerging",
+    "supports": [
+      "olap",
+      "analytics"
+    ],
+    "driver_package": "psycopg",
+    "notes": "PostgreSQL extension distributing tables across coordinator and workers. Requires citus on server. Tables stay coordinator-local unless distribution_column is set. No known extension conflicts.",
+    "capabilities": {
+      "supports_sql": true,
+      "supports_dataframe": false,
+      "default_mode": "sql",
+      "platform_family": "citus",
+      "default_deployment": "self-hosted",
+      "deployment_modes": {
+        "self-hosted": {
+          "mode": "self-hosted",
+          "display_name": "Citus Self-Hosted",
+          "description": "Self-hosted Citus coordinator with citus extension",
+          "requires_credentials": true,
+          "requires_cloud_storage": false,
+          "requires_network": true,
+          "default_for_platform": true,
+          "dependencies": [
+            "psycopg[binary]"
+          ],
+          "auth_methods": [
+            "password"
+          ]
+        }
+      }
+    },
+    "support_status": "experimental"
+  },
+  {
     "key": "synapse",
     "aliases": [
       {
