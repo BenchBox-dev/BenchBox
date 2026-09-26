@@ -216,7 +216,10 @@ jobs:
       github.event_name == 'merge_group'
     needs: [visual-inputs, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Merge-queue followers may wait up to PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS
+    # for the group ahead to publish their exact-base baseline. Keep build time
+    # plus this job inside the 60-minute merge-queue check timeout.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -243,6 +246,21 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: results-explorer
 
+      - name: Capture public site
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_PHASE: capture
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
+        run: npm run test:e2e:public-site
+        working-directory: results-explorer
+
+      # A merge-queue follower's base is the head of the group ahead of it. That
+      # group publishes a candidate baseline for its exact head once its own
+      # comparison passes, so followers wait for it rather than failing on the
+      # first lookup. Pull requests compare against a landed develop commit and
+      # keep the short retry.
       - name: Download exact base visual baseline
         id: baseline
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
@@ -251,17 +269,20 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
           PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+          PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS: ${{ github.event_name == 'merge_group' && '1800' || '0' }}
         run: node scripts/download-public-site-visual-baseline.mjs
         working-directory: results-explorer
 
-      - name: Capture and compare public site
+      - name: Compare public site with exact base
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:
           E2E_PAGES_SHAPED: "1"
           E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_PHASE: compare
           PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
-          PUBLIC_SITE_VISUAL_BASELINE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && format('{0}/public-site-visual-baseline', runner.temp) || '' }}
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
-          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '1' || '0' }}
+          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
           APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
@@ -278,6 +299,18 @@ jobs:
           name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
           path: ${{ runner.temp }}/public-site-visual-current
           retention-days: 30
+
+      # Runs only after this group's exact-base comparison passed. The capture
+      # is of `merge_group.head_sha`, the exact tree the next queue group merges
+      # onto, and the download script trusts it only from a merge_group run of
+      # this workflow on this repository's develop queue branch.
+      - name: Upload merge-queue candidate visual baseline
+        if: github.event_name == 'merge_group'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
+          path: ${{ runner.temp }}/public-site-visual-current
+          retention-days: 7
 
       - name: Upload visual diagnostics
         if: failure()
