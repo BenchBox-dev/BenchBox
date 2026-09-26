@@ -52,6 +52,10 @@ jobs:
         if: hashFiles('_project/scripts/uat_loc_table.py') != ''
         run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
 
+      - name: Stale _project/ reference check
+        if: hashFiles('_project/scripts/check_project_references.py') != ''
+        run: uv run -- python _project/scripts/check_project_references.py
+
       - name: Compatibility docs drift check
         run: make compat-docs-check
 
