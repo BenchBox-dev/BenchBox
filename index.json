@@ -17019,15 +17019,10 @@
       "title": "Throughput-phase corpus expansion"
     },
     "throughput-phase-coverage": {
-      "claim": {
-        "expires_at": "2026-09-27T02:26:15Z",
-        "generation": "f26638c431c9460f867e3a52542349f4",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Throughput phase coverage"
     },
     "throughput-pregenerate-query-streams": {
