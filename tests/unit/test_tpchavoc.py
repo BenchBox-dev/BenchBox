@@ -17,6 +17,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
 from benchbox.tpchavoc import TPCHavoc
 
 pytestmark = [
@@ -119,6 +120,50 @@ class TestGetQuery:
         """Test get_query validates seed type."""
         with pytest.raises(TypeError, match="seed must be an integer"):
             havoc.get_query(1, seed="invalid")
+
+    def test_get_query_forwards_dialect(self, havoc):
+        """Test get_query forwards dialect and base_dialect to implementation."""
+        havoc._impl.get_query.return_value = "SELECT"
+
+        havoc.get_query(1, dialect="bigquery", base_dialect="netezza")
+
+        havoc._impl.get_query.assert_called_once_with(
+            1, seed=None, scale_factor=None, dialect="bigquery", base_dialect="netezza"
+        )
+
+    def test_get_query_dialect_defaults_to_none(self, havoc):
+        """Test get_query forwards None dialects without breaking existing callers."""
+        havoc._impl.get_query.return_value = "SELECT"
+
+        havoc.get_query(1)
+
+        havoc._impl.get_query.assert_called_once_with(1, seed=None, scale_factor=None, dialect=None, base_dialect=None)
+
+
+class TestGetPlatformSkipQueries:
+    """Tests for get_platform_skip_queries delegation."""
+
+    @pytest.fixture
+    def havoc(self, tmp_path):
+        """Create a TPCHavoc instance for testing."""
+        with patch("benchbox.tpchavoc.TPCHavocBenchmark"):
+            return TPCHavoc(scale_factor=1.0, output_dir=tmp_path)
+
+    def test_delegates_to_impl(self, havoc):
+        """Test platform skips delegate to the implementation."""
+        havoc._impl.get_platform_skip_queries.return_value = ["1_v6"]
+
+        result = havoc.get_platform_skip_queries("bigquery")
+
+        assert result == ["1_v6"]
+        havoc._impl.get_platform_skip_queries.assert_called_once_with("bigquery")
+
+    def test_cloud_and_unknown_platforms_through_facade(self, tmp_path):
+        """Test the facade exposes real cloud skips and [] for unknown platforms."""
+        havoc = TPCHavoc(scale_factor=0.1, output_dir=tmp_path)
+
+        assert set(havoc.get_platform_skip_queries("bigquery")) == set(CLOUD_TPCHAVOC_SKIPS["bigquery"])
+        assert havoc.get_platform_skip_queries("unknown-platform") == []
 
 
 class TestGetQueryVariant:
