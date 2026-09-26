@@ -195,6 +195,27 @@ def _platform_version(data: dict) -> str:
     return str(value) if value and value != "unknown" else "unknown"
 
 
+def _bundle_phase(data: dict) -> str:
+    """Resolve a bundle's benchmark phase with transformer parity.
+
+    Mirrors ``_project/scripts/explorer_pipeline/transformer.py``: an
+    explicit ``benchmark.test_type`` wins, otherwise the ``phases`` object
+    decides between power and throughput. ``or`` (not ``dict.get``
+    defaults) so an explicit ``null`` can never poison downstream
+    sorting with ``None``.
+    """
+    benchmark = data.get("benchmark") or {}
+    declared = benchmark.get("test_type") or ""
+    if declared:
+        return str(declared)
+    phases = data.get("phases") or {}
+    if phases.get("power_test"):
+        return "power"
+    if phases.get("throughput_test"):
+        return "throughput"
+    return "unknown"
+
+
 def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
     """Extract inventory metadata from a bundle file."""
     try:
@@ -214,7 +235,7 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
         "platform": platform.get("name", "unknown"),
         "platform_version": _platform_version(data),
         "scale_factor": benchmark.get("scale_factor", 0),
-        "phase": benchmark.get("test_type", "unknown"),
+        "phase": _bundle_phase(data),
         "timestamp": run.get("timestamp"),
         "query_count": _query_count(data),
         "trust_label": _bundle_trust_label(bundle_path, bundles_dir),
@@ -252,16 +273,20 @@ def generate_inventory(bundles_dir: Path) -> dict:
     )
 
     cohorts: dict[str, list[str]] = {}
-    cohort_members: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
+    cohort_members: defaultdict[tuple[str, str, str], set[str]] = defaultdict(set)
     for entry in entries:
-        key = (entry["benchmark"], str(entry["scale_factor"]))
+        key = (entry["benchmark"], str(entry["scale_factor"]), str(entry.get("phase", "unknown")))
         identity = entry["platform"]
         if entry["platform_version"] != "unknown":
             identity = f"{identity} v{entry['platform_version']}"
         cohort_members[key].add(identity)
 
-    for (benchmark, scale_factor), platforms in sorted(cohort_members.items()):
-        cohorts[f"{benchmark}@sf{scale_factor}"] = sorted(platforms)
+    for (benchmark, scale_factor, phase), platforms in sorted(cohort_members.items()):
+        # Phase-suffixed throughput cohorts keep multi-stream throughput runs
+        # out of single-stream power cohorts, which share (benchmark, sf)
+        # keys downstream. Power-phase cohorts keep the legacy bare key.
+        suffix = "" if phase in ("power", "unknown") else f"#{phase}"
+        cohorts[f"{benchmark}@sf{scale_factor}{suffix}"] = sorted(platforms)
 
     by_benchmark = Counter(entry["benchmark"] for entry in entries)
     by_platform = Counter(entry["platform"] for entry in entries)

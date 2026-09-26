@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-26T11:12:34.498167+00:00",
+  "generated_at": "2026-09-26T11:59:39.459979+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -3727,12 +3727,14 @@
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2",
-      "DuckDB v1.5.5",
       "DuckLake v1.3.2",
       "Polars v1.40.0",
       "PySpark v4.1.1",
       "SQLite v3.53.1",
       "Spark v4.1.1"
+    ],
+    "tpch@sf1.0#throughput": [
+      "DuckDB v1.5.5"
     ],
     "tpch@sf10.0": [
       "DuckDB v1.0.0",

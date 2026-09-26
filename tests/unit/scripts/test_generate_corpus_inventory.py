@@ -333,3 +333,31 @@ class TestMain:
         assert phases["power.json"] == "power"
         assert phases["throughput.json"] == "throughput"
         assert inventory["summary"]["by_phase"] == {"power": 1, "throughput": 1}
+
+    def test_phase_handles_null_test_type_and_phases_object(self, tmp_path: Path) -> None:
+        null_tt = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        null_tt["benchmark"]["test_type"] = None
+        (tmp_path / "null.json").write_text(json.dumps(null_tt), encoding="utf-8")
+        via_phases = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        via_phases["phases"] = {"throughput_test": {"streams": 3}}
+        (tmp_path / "viaphases.json").write_text(json.dumps(via_phases), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases["null.json"] == "unknown"
+        assert phases["viaphases.json"] == "throughput"
+        assert inventory["summary"]["by_phase"] == {"throughput": 1, "unknown": 1}
+
+    def test_throughput_runs_do_not_pollute_power_cohorts(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        power["benchmark"]["test_type"] = "power"
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        tp["benchmark"]["test_type"] = "throughput"
+        (tmp_path / "throughput.json").write_text(json.dumps(tp), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["cohorts"]["tpch@sf1.0"] == ["DuckDB v1.0.0"]
+        assert inventory["cohorts"]["tpch@sf1.0#throughput"] == ["DuckDB v1.0.0"]
