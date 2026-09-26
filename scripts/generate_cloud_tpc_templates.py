@@ -11,7 +11,7 @@ Platform rules honored here (mirroring the mappers, not reimplementing them):
 - BigQuery: at most 4 clustering columns per table; partitioning first.
 - Redshift: single DISTKEY per table (first distribution candidate);
   remaining locality roles become compound sortkey entries.
-- Snowflake: everything the mapper accepts becomes clustering.
+- Snowflake: at most 4 clustering columns per table so the adapter resumes automatic reclustering.
 
 Only platforms whose mapped tuning types reach the physical layout at
 execution time are generated here. BigQuery partitioning/clustering and
@@ -191,13 +191,13 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("pass --write and/or --check")
 
     root = Path(args.output_root)
-    if not args.write:
+    if not root.is_absolute():
         root = CHECKOUT_ROOT / args.output_root
     failures: list[str] = []
     for platform in PLATFORMS:
         for benchmark in BENCHMARKS:
             expected = render_template(platform, benchmark)
-            path = template_path(root if args.write else CHECKOUT_ROOT / args.output_root, platform, benchmark)
+            path = template_path(root, platform, benchmark)
             if args.check and (not path.is_file() or path.read_text(encoding="utf-8") != expected):
                 failures.append(str(path))
             if args.write:

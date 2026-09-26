@@ -65,6 +65,7 @@ class CandidateTemplateMapping:
     candidate: WorkloadTuningCandidate
     platform_mapping: PlatformTuningMapping
     mapped_tuning_types: tuple[str, ...]
+    capped_tuning_types: tuple[str, ...] = ()
 
     @property
     def candidate_key(self) -> str:
@@ -73,6 +74,11 @@ class CandidateTemplateMapping:
     @property
     def mapped(self) -> bool:
         return self.platform_mapping.decision == MAPPED and not self.missing_tuning_types
+
+    @property
+    def capped(self) -> bool:
+        """Whether the candidate was excluded by a platform column cap, not by omission."""
+        return bool(self.capped_tuning_types)
 
     @property
     def missing_tuning_types(self) -> tuple[str, ...]:
@@ -86,6 +92,7 @@ class CandidateTemplateMapping:
             "logical_roles": list(self.candidate.roles),
             "decision": self.platform_mapping.decision,
             "mapped_tuning_types": list(self.mapped_tuning_types),
+            "capped_tuning_types": list(self.capped_tuning_types),
             "physical_mechanisms": list(self.platform_mapping.physical_mechanisms),
             "reason": self.platform_mapping.reason,
         }
@@ -119,6 +126,11 @@ class TuningProfileValidationResult:
         return sum(1 for mapping in self.mappings if mapping.mapped)
 
     @property
+    def capped_count(self) -> int:
+        """Candidates excluded by a platform column cap rather than omission."""
+        return sum(1 for mapping in self.mappings if mapping.capped)
+
+    @property
     def unsupported_count(self) -> int:
         return sum(1 for mapping in self.mappings if mapping.platform_mapping.decision == UNSUPPORTED)
 
@@ -140,7 +152,7 @@ class TuningProfileValidationResult:
     def unmapped_logical_candidates(self) -> tuple[dict[str, Any], ...]:
         unmapped: list[dict[str, Any]] = []
         for mapping in self.mappings:
-            if mapping.mapped:
+            if mapping.mapped or mapping.capped:
                 continue
             entry = {
                 "candidate": mapping.candidate_key,
@@ -163,6 +175,7 @@ class TuningProfileValidationResult:
                 "accepted_count": self.accepted_count,
                 "required_count": self.required_count,
                 "mapped_count": self.mapped_count,
+                "capped_count": self.capped_count,
                 "unsupported_count": self.unsupported_count,
                 "waived_count": self.waived_count,
                 "unmapped_count": len(self.unmapped_logical_candidates),
@@ -252,10 +265,34 @@ def validate_tuning_template(
                 candidate=candidate,
                 platform_mapping=platform_mapping,
                 mapped_tuning_types=mapped_tuning_types,
+                capped_tuning_types=tuple(capped_types),
             )
         )
 
         missing_tuning_types = tuple(t for t in mappings[-1].missing_tuning_types if t not in capped_types)
+        # Upper-bound enforcement honors the mapping's cap scope: Redshift's
+        # single-key limit governs DISTKEY alone, so its unbounded compound
+        # SORTKEY lists must never trip this check.
+        cap_scope = platform_mapping.capped_tuning_types
+        if cap_scope is None:
+            cap_scope = platform_mapping.tuning_types
+        if platform_mapping.max_columns is not None:
+            for tuning_type in cap_scope:
+                configured = template_columns.get(candidate.table, {}).get(tuning_type, set())
+                if len(configured) > platform_mapping.max_columns:
+                    issues.append(
+                        TuningProfileValidationIssue(
+                            severity=ERROR,
+                            candidate_key=candidate_key(candidate),
+                            message=(
+                                f"template configures {len(configured)} {tuning_type} columns on "
+                                f"{candidate.table} but {platform_key} allows at most "
+                                f"{platform_mapping.max_columns}"
+                            ),
+                            decision=platform_mapping.decision,
+                            reason=platform_mapping.reason,
+                        )
+                    )
         unrendered_tuning_types = tuple(
             t for t in mappings[-1].mapped_tuning_types if t not in rendering_verified_types
         )

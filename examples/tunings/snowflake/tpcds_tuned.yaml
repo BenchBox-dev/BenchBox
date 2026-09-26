@@ -111,9 +111,6 @@ table_tunings:
     - name: SR_STORE_SK
       type: INTEGER
       order: 4
-    - name: SR_TICKET_NUMBER
-      type: INTEGER
-      order: 5
 
   STORE_SALES:
     table_name: STORE_SALES
@@ -130,12 +127,6 @@ table_tunings:
     - name: SS_STORE_SK
       type: INTEGER
       order: 4
-    - name: SS_PROMO_SK
-      type: INTEGER
-      order: 5
-    - name: SS_TICKET_NUMBER
-      type: INTEGER
-      order: 6
 
   WEB_RETURNS:
     table_name: WEB_RETURNS
@@ -162,6 +153,3 @@ table_tunings:
     - name: WS_WEB_SITE_SK
       type: INTEGER
       order: 4
-    - name: WS_SHIP_MODE_SK
-      type: INTEGER
-      order: 5

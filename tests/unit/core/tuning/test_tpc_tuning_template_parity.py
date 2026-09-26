@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from benchbox.cli.config import ConfigManager
 from benchbox.core.results.models import BenchmarkResults
@@ -25,6 +28,7 @@ pytestmark = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
+CHECKOUT_ROOT = REPO_ROOT
 TUNING_ROOT = REPO_ROOT / "examples" / "tunings"
 
 
@@ -307,9 +311,36 @@ def test_cloud_tpc_tuned_templates_certify_against_logical_profile(platform: str
     )
 
     assert result.is_valid, [issue.to_dict() for issue in result.issues]
-    assert result.mapped_count == result.required_count
+    # Columns beyond a platform cap report as capped, not missing: mapped +
+    # capped covers every required candidate.
+    assert result.mapped_count + result.capped_count == result.required_count
     assert result.unsupported_count == 0
     assert result.waived_count == 0
+
+
+def test_generated_cloud_templates_match_checked_in_files() -> None:
+    """The generator and the certified Snowflake templates must not drift.
+
+    Runs ``generate_cloud_tpc_templates.py --check`` so a hand edit to the
+    profile or a template fails CI until the generator is re-run.
+    """
+    script = CHECKOUT_ROOT / "scripts" / "generate_cloud_tpc_templates.py"
+    completed = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        capture_output=True,
+        text=True,
+        cwd=CHECKOUT_ROOT,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_snowflake_templates_carry_at_most_four_clustering_columns() -> None:
+    """Snowflake fact tables stay within the adapter's RESUME RECLUSTER limit."""
+    for benchmark_id in ("tpch", "tpcds"):
+        payload = yaml.safe_load((TUNING_ROOT / "snowflake" / f"{benchmark_id}_tuned.yaml").read_text(encoding="utf-8"))
+        for table, block in payload.get("table_tunings", {}).items():
+            clustering = block.get("clustering", []) or []
+            assert len(clustering) <= 4, f"snowflake/{benchmark_id} {table}: {len(clustering)} clustering columns"
 
 
 def test_bigquery_and_redshift_templates_stay_out_of_the_certified_set() -> None:
