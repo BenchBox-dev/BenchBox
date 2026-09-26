@@ -217,8 +217,14 @@ PY
 
 CLICKHOUSE_PROBE_OP_IDS=(
   "sketch_query_theta_union_merge"
+  "sketch_query_theta_union_merge_lgk10"
+  "sketch_query_theta_union_merge_lgk14"
   "sketch_query_kll_quantiles_merge"
+  "sketch_query_kll_quantiles_merge_k100"
+  "sketch_query_kll_quantiles_merge_k1000"
   "sketch_query_topk_combine"
+  "sketch_query_topk_combine_lgmm8"
+  "sketch_query_topk_combine_lgmm10"
 )
 
 CLICKHOUSE_LOCAL_BIN="${CLICKHOUSE_LOCAL_BIN:-}"
@@ -263,6 +269,32 @@ else
     SELECT 'clickhouse-local', 'sketch_query_theta_union_merge', length(toString(uniqMergeState(user_sketch)))
     FROM sketch_ops_daily_users;
 
+    DROP TABLE IF EXISTS sketch_ops_daily_users_lgk10;
+    CREATE TABLE sketch_ops_daily_users_lgk10
+    (
+      activity_date Date,
+      region String,
+      user_sketch AggregateFunction(uniqHLL12, UInt64)
+    ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+    INSERT INTO sketch_ops_daily_users_lgk10
+    SELECT l_shipdate, l_returnflag, uniqHLL12State(l_orderkey)
+    FROM lineitem GROUP BY l_shipdate, l_returnflag;
+    SELECT 'clickhouse-local', 'sketch_query_theta_union_merge_lgk10', length(toString(uniqHLL12MergeState(user_sketch)))
+    FROM sketch_ops_daily_users_lgk10;
+
+    DROP TABLE IF EXISTS sketch_ops_daily_users_lgk14;
+    CREATE TABLE sketch_ops_daily_users_lgk14
+    (
+      activity_date Date,
+      region String,
+      user_sketch AggregateFunction(uniqExact, UInt64)
+    ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+    INSERT INTO sketch_ops_daily_users_lgk14
+    SELECT l_shipdate, l_returnflag, uniqExactState(l_orderkey)
+    FROM lineitem GROUP BY l_shipdate, l_returnflag;
+    SELECT 'clickhouse-local', 'sketch_query_theta_union_merge_lgk14', length(toString(uniqExactMergeState(user_sketch)))
+    FROM sketch_ops_daily_users_lgk14;
+
     DROP TABLE IF EXISTS sketch_ops_kll_partitions;
     CREATE TABLE sketch_ops_kll_partitions
     (
@@ -276,6 +308,32 @@ else
     SELECT 'clickhouse-local', 'sketch_query_kll_quantiles_merge', length(toString(quantileTDigestMergeState(0.5)(price_sketch)))
     FROM sketch_ops_kll_partitions;
 
+    DROP TABLE IF EXISTS sketch_ops_kll_partitions_k100;
+    CREATE TABLE sketch_ops_kll_partitions_k100
+    (
+      activity_date Date,
+      region String,
+      price_sketch AggregateFunction(quantileBFloat16, Float64)
+    ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+    INSERT INTO sketch_ops_kll_partitions_k100
+    SELECT l_shipdate, l_returnflag, quantileBFloat16State(l_extendedprice)
+    FROM lineitem GROUP BY l_shipdate, l_returnflag;
+    SELECT 'clickhouse-local', 'sketch_query_kll_quantiles_merge_k100', length(toString(quantileBFloat16MergeState(price_sketch)))
+    FROM sketch_ops_kll_partitions_k100;
+
+    DROP TABLE IF EXISTS sketch_ops_kll_partitions_k1000;
+    CREATE TABLE sketch_ops_kll_partitions_k1000
+    (
+      activity_date Date,
+      region String,
+      price_sketch AggregateFunction(quantileExact, Float64)
+    ) ENGINE = MergeTree() ORDER BY (activity_date, region);
+    INSERT INTO sketch_ops_kll_partitions_k1000
+    SELECT l_shipdate, l_returnflag, quantileExactState(l_extendedprice)
+    FROM lineitem GROUP BY l_shipdate, l_returnflag;
+    SELECT 'clickhouse-local', 'sketch_query_kll_quantiles_merge_k1000', length(toString(quantileExactMergeState(price_sketch)))
+    FROM sketch_ops_kll_partitions_k1000;
+
     DROP TABLE IF EXISTS sketch_ops_topk;
     CREATE TABLE sketch_ops_topk
     (
@@ -287,5 +345,29 @@ else
     FROM lineitem GROUP BY l_orderkey % 8;
     SELECT 'clickhouse-local', 'sketch_query_topk_combine', length(toString(topKMergeState(8)(topk_sketch)))
     FROM sketch_ops_topk;
+
+    DROP TABLE IF EXISTS sketch_ops_topk_lgmm8;
+    CREATE TABLE sketch_ops_topk_lgmm8
+    (
+      shard_id Int32,
+      topk_sketch AggregateFunction(topK(8), String)
+    ) ENGINE = MergeTree() ORDER BY shard_id;
+    INSERT INTO sketch_ops_topk_lgmm8
+    SELECT toInt32(l_orderkey % 8), topKState(8)(l_shipmode)
+    FROM lineitem GROUP BY l_orderkey % 8;
+    SELECT 'clickhouse-local', 'sketch_query_topk_combine_lgmm8', length(toString(topKMergeState(8)(topk_sketch)))
+    FROM sketch_ops_topk_lgmm8;
+
+    DROP TABLE IF EXISTS sketch_ops_topk_lgmm10;
+    CREATE TABLE sketch_ops_topk_lgmm10
+    (
+      shard_id Int32,
+      topk_sketch AggregateFunction(topK(1024), String)
+    ) ENGINE = MergeTree() ORDER BY shard_id;
+    INSERT INTO sketch_ops_topk_lgmm10
+    SELECT toInt32(l_orderkey % 8), topKState(1024)(l_shipmode)
+    FROM lineitem GROUP BY l_orderkey % 8;
+    SELECT 'clickhouse-local', 'sketch_query_topk_combine_lgmm10', length(toString(topKMergeState(1024)(topk_sketch)))
+    FROM sketch_ops_topk_lgmm10;
   " >>"${OUT}"
 fi
