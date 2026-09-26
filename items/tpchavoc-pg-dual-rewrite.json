@@ -2,6 +2,7 @@
   "acceptance": [
     "17_v4 passes compile-check against VALUES or a PG system relation, or the gap is confirmed"
   ],
+  "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit 57418f46b. Rewrote PostgreSQL 17_v4's generated dual-style one-row source to `(VALUES (1)) AS dual(dual_col)`, removed the execution skip, registered family-wide query-adapter rules, updated validation mirrors and generated compatibility docs. Verification: Ruff passed; 6 focused tests passed; compat-docs and DDL drift checks passed; the rewritten SQL parses as PostgreSQL. No local PostgreSQL service was reachable for an engine execution probe.",
   "description": "17_v4 uses Oracle dual table which Postgres lacks. Rewrite against a VALUES clause or PG system relation.",
   "sessions": [
     {
@@ -19,6 +20,14 @@
       "generation": "7168b238bf4b45a68a4b5d3db9ed0fae",
       "op": "take",
       "op_id": "c940cc6160324fe5b40fa094d13e3952",
+      "session_id": "3735819a26174704ada936b231dbf66c"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a68d56a939b077672bfb199",
+      "at": "2026-09-26T21:12:57Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "83b5049a70e54f718171e81ce936309a",
       "session_id": "3735819a26174704ada936b231dbf66c"
     }
   ]
