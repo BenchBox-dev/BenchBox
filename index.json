@@ -692,7 +692,7 @@
     "approx-databricks-topk-drift": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Fix Databricks Top-K sketch override signature drift"
     },
