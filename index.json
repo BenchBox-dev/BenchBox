@@ -10839,10 +10839,15 @@
       "title": "Performance Regression Detection System"
     },
     "pg-analytics-paradedb-and-citus-extension-support": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T05:59:49Z",
+        "generation": "bb997563c1714d8abed5e7ef6459ddc9",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "pg_analytics (ParadeDB) and Citus extension support"
     },
     "pg-duckdb-native-comparison": {
