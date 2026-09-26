@@ -713,7 +713,7 @@
     "approx-snowflake-datasketches-scope": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "Scope Snowflake DATASKETCHES sketch overrides to account capability"
     },
