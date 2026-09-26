@@ -5,5 +5,16 @@
       "created_at": "2026-07-19T12:36:17Z",
       "worktree": "main"
     }
-  }
+  },
+  "sessions": [
+    {
+      "actor": "jcode-batch-c",
+      "at": "2026-09-26T08:02:08Z",
+      "client": "jcode",
+      "generation": "d5a2e958942f4f9a88d76acf2faed893",
+      "op": "take",
+      "op_id": "7f2052c443634638a3d414be74f7fe63",
+      "session_id": "5b5b1959708f4da0b8d75e62f981a358"
+    }
+  ]
 }
