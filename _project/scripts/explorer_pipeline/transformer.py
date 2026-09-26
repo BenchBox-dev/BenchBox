@@ -874,12 +874,19 @@ def _unavailable_normalized_cost() -> NormalizedCost:
 
 
 def _raw_normalized_cost_block(bundle: BundleDocument) -> dict[str, Any] | None:
-    """Find a normalized cost block in current or near-future bundle shapes."""
-    if bundle.normalized_cost:
+    """Find a normalized cost block in current or near-future bundle shapes.
+
+    Presence is keyed on the field being set, not on the mapping being
+    non-empty: an explicitly empty ``"normalized_cost": {}`` block is
+    malformed submitted cost evidence and must reach strict validation
+    (which rejects it for missing provenance fields) rather than degrade
+    to synthetic unavailable metadata.
+    """
+    if bundle.normalized_cost is not None:
         return bundle.normalized_cost
 
     cost = bundle.cost
-    if not cost:
+    if cost is None:
         return None
 
     for key in ("normalized_cost", "normalized"):

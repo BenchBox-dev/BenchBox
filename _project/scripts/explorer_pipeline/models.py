@@ -1138,8 +1138,8 @@ class BundleDocument(_BundleBlock):
     queries: list[BundleQueryRow] = Field(default_factory=list)
     environment: BundleEnvironmentBlock = Field(default_factory=BundleEnvironmentBlock)
     provenance: BundleProvenanceBlock = Field(default_factory=BundleProvenanceBlock)
-    cost: dict[str, Any] = Field(default_factory=dict)
-    normalized_cost: dict[str, Any] = Field(default_factory=dict)
+    cost: dict[str, Any] | None = Field(default=None)
+    normalized_cost: dict[str, Any] | None = Field(default=None)
 
     @field_validator("phases", mode="before")
     @classmethod
@@ -1161,10 +1161,15 @@ class BundleDocument(_BundleBlock):
     @classmethod
     def _coerce_cost_block(cls, value: Any) -> Any:
         # Cost blocks stay raw mappings: ``_normalized_cost_from_block`` owns
-        # their strict validation and error messages.
+        # their strict validation and error messages. ``None`` (absent or
+        # explicit null) stays ``None`` so absence is distinguishable from an
+        # explicitly empty mapping, which must fail strict validation rather
+        # than degrade to synthetic unavailable metadata.
+        if value is None:
+            return None
         if isinstance(value, Mapping):
             return dict(value)
-        return {}
+        return None
 
 
 __all__ = [

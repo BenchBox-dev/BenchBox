@@ -66,6 +66,9 @@ _LEGACY_COST_DEPLOYMENT_COLUMNS = [
     ("storage_tier", "VARCHAR"),
 ]
 
+_COST_SCOPES = frozenset({"compute_only", "compute_plus_storage"})
+_COST_STATUSES = frozenset({"normalized", "not_applicable_local", "unavailable"})
+
 # If this module grows further, consider splitting DDL (_create_schema,
 # _create_views) from the ten _populate_* helpers into sibling modules
 # ``duckdb_schema.py`` and ``duckdb_populate.py``. Kept cohesive for now so the
@@ -81,23 +84,40 @@ def _finite_float_or_none(entry: ManifestEntry, key: str, value: Any) -> float |
     return parsed
 
 
+def _required_cost_string(entry: ManifestEntry, value: Any, key: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be a non-empty string")
+    return value
+
+
+def _required_cost_choice(entry: ManifestEntry, value: Any, key: str, choices: frozenset[str]) -> str:
+    checked = _required_cost_string(entry, value, key)
+    if checked not in choices:
+        raise ValueError(f"{entry.result_id}: normalized_cost.{key} must be one of {sorted(choices)}; got {value!r}")
+    return checked
+
+
 def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
     """Flatten entry.normalized_cost metadata into the DuckDB column contract.
 
-    The cost is a validated ``NormalizedCost`` by construction (strict
-    validation lives in the transformer ingest); only finiteness of the
-    numeric payload is re-checked here because a hand-built entry can still
-    carry a non-finite Decimal.
+    Structural validation (required provenance strings, scope/status
+    vocabulary) runs here as well as in the transformer ingest because the
+    legacy ``build()`` entry point accepts hand-built entries whose
+    ``NormalizedCost`` dataclass instance bypassed that validation: the
+    dataclass accepts out-of-vocabulary statuses and empty provenance
+    strings, and ``ManifestEntry`` carries an already-created instance
+    without revalidation. Only finiteness of the numeric payload cannot be
+    checked at ingest time.
     """
     cost = entry.normalized_cost
     return (
         _finite_float_or_none(entry, "normalized_cost_usd", cost.normalized_cost_usd),
-        cost.cost_model_version,
-        cost.cost_model_source,
-        cost.cost_scope,
-        cost.cost_status,
-        cost.billing_unit,
-        cost.pricing_region,
+        _required_cost_string(entry, cost.cost_model_version, "cost_model_version"),
+        _required_cost_string(entry, cost.cost_model_source, "cost_model_source"),
+        _required_cost_choice(entry, cost.cost_scope, "cost_scope", _COST_SCOPES),
+        _required_cost_choice(entry, cost.cost_status, "cost_status", _COST_STATUSES),
+        _required_cost_string(entry, cost.billing_unit, "billing_unit"),
+        _required_cost_string(entry, cost.pricing_region, "pricing_region"),
     )
 
 
