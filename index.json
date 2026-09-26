@@ -17012,15 +17012,10 @@
       "title": "Contain timed-out throughput work before later phases or resource reuse"
     },
     "throughput-phase-corpus-expansion": {
-      "claim": {
-        "expires_at": "2026-09-27T02:33:10Z",
-        "generation": "b5e559815e8f43da8851aa057df07902",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Throughput-phase corpus expansion"
     },
     "throughput-phase-coverage": {
