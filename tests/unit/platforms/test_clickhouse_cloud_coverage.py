@@ -587,6 +587,93 @@ def test_load_data_via_s3_uploads_and_ingests(tmp_path: Path) -> None:
     assert any("s3(" in str(c) for c in execute_calls)
 
 
+def test_load_data_via_s3_uses_single_glob_insert_for_many_files(tmp_path: Path) -> None:
+    """Sharded tables upload every file, then ingest once through an s3() glob."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    chunk_a = tmp_path / "lineitem_0.csv"
+    chunk_b = tmp_path / "lineitem_1.csv"
+    chunk_a.write_text("col1,col2\n1,a\n")
+    chunk_b.write_text("col1,col2\n2,b\n")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"lineitem": [str(chunk_a), str(chunk_b)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(3,)]
+
+    mock_s3_client = MagicMock()
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = mock_s3_client
+
+    with patch.dict("sys.modules", {"boto3": mock_boto3}):
+        table_stats, _, metadata = adapter._load_data_via_s3(benchmark, connection, tmp_path)
+
+    assert table_stats == {"lineitem": 3}
+    assert metadata["loading_method"] == "s3_staging"
+    assert mock_s3_client.upload_file.call_count == 2
+    inserts = [c.args[0] for c in connection.execute.call_args_list if "INSERT INTO" in c.args[0]]
+    assert len(inserts) == 1
+    assert "s3('s3://bucket/staging/lineitem/*'" in inserts[0]
+    counts = [c.args[0] for c in connection.execute.call_args_list if "COUNT(*)" in c.args[0]]
+    assert len(counts) == 1
+
+
+def test_load_data_via_s3_falls_back_per_file_on_glob_syntax(tmp_path: Path) -> None:
+    """A glob metacharacter in a staged name keeps the per-file loop."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", s3_staging_url="s3://bucket/staging/")
+
+    odd_file = tmp_path / "line*item.csv"
+    odd_file.write_text("col1\n1\n")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"lineitem": [str(odd_file)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(1,)]
+
+    mock_s3_client = MagicMock()
+    mock_boto3 = MagicMock()
+    mock_boto3.client.return_value = mock_s3_client
+
+    with patch.dict("sys.modules", {"boto3": mock_boto3}):
+        table_stats, _, _ = adapter._load_data_via_s3(benchmark, connection, tmp_path)
+
+    assert table_stats == {"lineitem": 1}
+    inserts = [c.args[0] for c in connection.execute.call_args_list if "INSERT INTO" in c.args[0]]
+    assert len(inserts) == 1
+    assert "line*item.csv" in inserts[0]
+    assert "*" not in inserts[0].split("s3('", 1)[1].split("'", 1)[0].replace("line*item.csv", "")
+
+
+def test_load_data_via_gcs_uses_single_glob_insert(tmp_path: Path) -> None:
+    """GCS tables ingest once through a gcs() glob after uploading all files."""
+    adapter = ClickHouseCloudAdapter(host="h", password="p", gcs_staging_url="gs://bucket/staging/")
+
+    chunk_a = tmp_path / "orders_0.csv"
+    chunk_b = tmp_path / "orders_1.csv"
+    chunk_a.write_text("col1\n1\n")
+    chunk_b.write_text("col1\n2\n")
+
+    benchmark = MagicMock()
+    benchmark.tables = {"orders": [str(chunk_a), str(chunk_b)]}
+
+    connection = MagicMock()
+    connection.execute.return_value = [(2,)]
+
+    _, mock_gcs_bucket, _, _, sys_modules = _make_gcs_mocks()
+
+    with patch.dict("sys.modules", sys_modules):
+        table_stats, _, metadata = adapter._load_data_via_gcs(benchmark, connection, tmp_path)
+
+    assert table_stats == {"orders": 2}
+    assert metadata["loading_method"] == "gcs_staging"
+    assert mock_gcs_bucket.blob.call_count == 2
+    inserts = [c.args[0] for c in connection.execute.call_args_list if "INSERT INTO" in c.args[0]]
+    assert len(inserts) == 1
+    assert "gcs('https://storage.googleapis.com/bucket/staging/orders/*'" in inserts[0]
+
+
 # ---- GCS staging data loading tests ----
 
 
