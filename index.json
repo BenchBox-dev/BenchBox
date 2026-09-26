@@ -7310,6 +7310,13 @@
       "status": "done",
       "title": "FlightData DataFrame queries hardcode a 2018 date window the generated data never covers"
     },
+    "flightdata-source-status-and-alternatives": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Research FlightData BTS source availability and evaluate alternative sources"
+    },
     "follow-up-visualization-template-chart-integration": {
       "claim": null,
       "needs": [],

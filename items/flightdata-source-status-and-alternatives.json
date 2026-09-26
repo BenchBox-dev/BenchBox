@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Current availability of every month 1987-01..2024-12 is re-probed and recorded per candidate source, with the probe method and date",
+    "At least three alternative sources are evaluated for coverage, licence, provenance, checksum stability, and schema parity",
+    "A recommendation covers both the data source and the FlightData scale-factor policy (including SF10 and SF100)",
+    "The recommendation states how existing SF1/SF5/SF10 results and the source contract (`source_contract_id`, `PINNED_SOURCE_SHA256`) are affected",
+    "Follow-up implementation work is listed; no tracked code changes are made in this item"
+  ],
+  "context": "Background evidence: `_months_sequence` in `benchbox/core/flightdata/downloader.py` backfills across unavailable months; ADR `docs/development/adr/adr-flightdata-month-source-policy.md` (real-only runs stop on unavailable archives at SF>=0.1). #2368 added the unavailable-month skip. Offline check on develop 7e12e08c5: SF1 = 41 months (2021-08..2024-12), SF5 = 205 months (2007-12..2024-12), SF10 = 327 of 410 requested. Old SF10 BigQuery log: `~/Developer/benchmark_runs/logs/live-cloud-matrix-20260923/flightdata_sf10_bigquery_*.log` (1999-12 and earlier returned 404 and were filled with synthetic data). Related open item: live cloud NYC Taxi and Flight Data publication. Interim policy in the cloud-corpus runs handoff: run FlightData on cloud at SF1 and SF5, hold SF10.",
+  "description": "FlightData downloads monthly BTS On-Time Performance PREZIP archives. `benchbox/core/flightdata/downloader_specs.yaml` marks 1987-01..1987-09 and 1990-01..1999-12 unavailable (HTTP 404 when probed). Only 327 of 456 months in 1987-2024 can be downloaded. SF10 requests 410 months, so `_months_sequence` silently backfills across the 1990s gap and returns a non-contiguous window of about SF8 (1987-10..2024-12). SF100 in `benchmark_registry.yaml` cannot be reached. Two SF10 cloud bundles (BigQuery 2026-09-20 with 111 synthetic months, Snowflake 2026-09-23 built before the unavailable-month spec) are not publishable.\n\nResearch questions:\n1. Status of the BTS source: is the 1990s gap permanent, a moved URL, or a different product (for example the TranStats download form, the `Reporting_Carrier_On_Time_Performance_1987_present` table, or the newer Marketing Carrier dataset)? Re-probe current URLs and document which months exist per source.\n2. Alternatives that cover 1987-2024 with the same schema or a mappable one: BTS TranStats form-based download, the ASA Data Expo 2009 airline dataset (1987-2008), Kaggle or Hugging Face mirrors, public cloud datasets (BigQuery public data, AWS Open Data), and archive.org snapshots. Assess licence, provenance, checksum stability, schema parity with `bts_field_names`, and long-term availability for each.\n3. Scale-definition options if no complete source exists: cap `scale_options` at the contiguous window (about SF6, 2000-01..2024-12), fail loudly when requested months cannot be supplied, or redefine SF by row count.\n\nOutput: a short decision record with a recommended source and scale policy, plus the follow-up implementation item(s). No code changes in this item.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396",
+      "at": "2026-09-26T21:22:01Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "120b5e59408444c99213444b2ab1b141",
+      "session_id": "c1e61be617094a0c855156fb176d5c08"
+    }
+  ]
+}
