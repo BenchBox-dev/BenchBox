@@ -21,7 +21,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Container, Iterable, Mapping
+from collections.abc import Collection, Container, Iterable, Mapping
 from dataclasses import KW_ONLY, dataclass, field
 from fractions import Fraction
 from typing import Any
@@ -133,7 +133,7 @@ def keep_title_id(title_id: int, fraction: Fraction) -> bool:
 
 
 def close_title_set_over_episode_parents(
-    kept_title_ids: Container[int],
+    kept_title_ids: Collection[int],
     episode_parents: Mapping[int, int | None],
 ) -> set[int]:
     """Expand a kept title set over ``episode_of_id`` parents.
