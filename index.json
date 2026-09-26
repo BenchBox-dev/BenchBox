@@ -15067,9 +15067,9 @@
     },
     "rewrite-explorer-transformer-to-use-typed-models-throughout": {
       "claim": {
-        "expires_at": "2026-09-27T01:15:27Z",
-        "generation": "075f635730ce41c1a42a6ad6e40a80c1",
-        "renewals": 0,
+        "expires_at": "2026-09-27T01:15:37Z",
+        "generation": "a52a1c3d082c4815b74585827f48c607",
+        "renewals": 1,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
       },
       "needs": [],
