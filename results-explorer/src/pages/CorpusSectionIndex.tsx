@@ -125,8 +125,9 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
               {formatCount(entries.length, `published ${singular}`)}
             </p>
             <label class="flex items-center gap-2 text-sm font-medium text-[var(--bb-data-fg-primary)]">
-              Sort {kind}
+              Sort {kind} within each group
               <select
+                aria-label={`Sort ${kind}`}
                 value={sort}
                 class="rounded-md border border-[var(--bb-data-border-strong)] bg-[var(--bb-surface-data)] px-3 py-2 text-sm text-[var(--bb-data-fg-primary)]"
                 onChange={(event) => setSort(event.currentTarget.value as SectionSort)}
@@ -151,10 +152,14 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
                     return (
                       <li key={entry.id}>
                         <div class="group block h-full rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] p-4 no-underline shadow-sm transition-colors hover:border-[var(--bb-accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring)]">
-                          <h3 class="flex items-center gap-2 text-base font-semibold text-[var(--bb-data-fg-primary)] group-hover:text-[var(--bb-accent)]">
+                          <h3 class="text-base font-semibold text-[var(--bb-data-fg-primary)] group-hover:text-[var(--bb-accent)]">
                             <a href={entry.href}>{entry.label}</a>
-                            {isBenchmarks ? <BenchmarkSupportBadge status={entry.supportStatus} /> : null}
                           </h3>
+                          {isBenchmarks && entry.supportStatus !== null ? (
+                            <div class="mt-1">
+                              <BenchmarkSupportBadge status={entry.supportStatus} />
+                            </div>
+                          ) : null}
                           <p class="mt-1.5 text-sm text-[var(--bb-data-fg-muted)]">
                             {formatCount(entry.resultCount, "run")} ·{" "}
                             {formatCount(entry.coverageCount, isBenchmarks ? "platform" : "benchmark")}
@@ -186,6 +191,13 @@ function buildEntries(rows: ResultRow[], kind: SectionKind): SectionEntry[] {
     const existing = grouped.get(id);
     if (existing) {
       existing.rows.push(row);
+      // Rows for one benchmark can carry mixed statuses (a legacy run with
+      // NULL alongside newer runs with a registry status). A later non-null
+      // status wins over an earlier null so the card groups and badges on
+      // the known status instead of falling back to Other.
+      if (existing.supportStatus === null && supportStatus !== null) {
+        existing.supportStatus = supportStatus;
+      }
     } else {
       grouped.set(id, { label, supportStatus, rows: [row] });
     }

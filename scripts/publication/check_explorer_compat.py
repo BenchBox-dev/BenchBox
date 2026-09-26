@@ -366,6 +366,13 @@ REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
     ],
 }
 
+REQUIRED_VIEW_COLUMNS_V12: dict[str, list[str]] = {
+    "result_detail_metrics": [
+        *REQUIRED_VIEW_COLUMNS_V11["result_detail_metrics"],
+        "benchmark_support_status",
+    ],
+}
+
 
 def get_table_columns_for_version(version: int) -> dict[str, dict[str, str]]:
     """Return the expected table column map for a given read-model version."""
@@ -616,8 +623,9 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     # Views that exist must also expose the columns the frontend selects by
     # name; a view that drops one fails at read time despite passing the
     # table and view-existence checks above.
+    view_column_requirements = REQUIRED_VIEW_COLUMNS_V12 if version_to_check >= 12 else REQUIRED_VIEW_COLUMNS_V11
     if version_to_check >= 11:
-        for view, required_cols in REQUIRED_VIEW_COLUMNS_V11.items():
+        for view, required_cols in view_column_requirements.items():
             if view not in existing_views:
                 continue
             view_col_rows = con.execute(
