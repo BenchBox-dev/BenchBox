@@ -17786,15 +17786,10 @@
       "title": "Wire a bounded result-equivalence gate for TPC-Havoc variants and burn down the divergences it surfaces"
     },
     "track-upstream-platform-workarounds": {
-      "claim": {
-        "expires_at": "2026-09-27T04:48:31Z",
-        "generation": "10ba5e4da49243e48df62d48db71e9c1",
-        "renewals": 0,
-        "worker": "jcode-batch-c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Track ClickHouse-local platform workarounds upstream so they can be removed"
     },
     "track2-joinorder-dataframe-coverage": {
