@@ -52,6 +52,7 @@ class PlatformTuningMapping:
     decision: str = MAPPED
     reason: str = ""
     max_columns: int | None = None
+    capped_tuning_types: tuple[str, ...] | None = None
     physical_rendering_id: str | None = None
 
     @property
@@ -220,6 +221,7 @@ def _map_redshift(roles: set[str]) -> PlatformTuningMapping:
                     "SORTKEY decisions; DISTKEY remains single-key limited."
                 ),
                 max_columns=1,
+                capped_tuning_types=(DISTRIBUTION,),
             )
         return PlatformTuningMapping(
             platform="redshift",
@@ -227,6 +229,7 @@ def _map_redshift(roles: set[str]) -> PlatformTuningMapping:
             physical_mechanisms=(DISTRIBUTION,),
             reason="Distribution candidates map to Redshift DISTKEY decisions with single-key limitations.",
             max_columns=1,
+            capped_tuning_types=(DISTRIBUTION,),
         )
     if roles & ({TEMPORAL_PARTITION} | LOCALITY_ROLES):
         return PlatformTuningMapping(

@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from benchbox.core.results.builder import normalize_benchmark_id
+from benchbox.core.tuning.capability_registry import get_capability
+from benchbox.core.tuning.interface import TuningType
 from benchbox.core.tuning.platform_capabilities import (
     CLUSTERING,
     DATABRICKS_LIQUID_AUTO_RENDERING,
@@ -183,6 +185,7 @@ def validate_tuning_template(
     platform_key = platform.lower().replace("_", "-")
     template_columns = extract_template_columns(tuning_config)
     physical_rendering_id = resolve_physical_rendering_id(platform_key, tuning_config)
+    rendering_verified_types = _rendering_verified_tuning_types(platform_key, tuning_config)
     candidates = profile.candidates(benchmark_key)
     accepted_count = sum(1 for candidate in candidates if candidate.status == ACCEPTED)
     dropped_candidates = tuple(candidate for candidate in candidates if candidate.status == DROPPED_LOW_EVIDENCE)
@@ -219,13 +222,25 @@ def validate_tuning_template(
             for tuning_type in platform_mapping.tuning_types
             if candidate.column in template_columns.get(candidate.table, {}).get(tuning_type, set())
         )
-        # Platforms with a per-table column cap (BigQuery clustering ≤ 4)
-        # cannot carry every mapped candidate. The template holds the first
-        # N profile-order candidates per table and tuning type; overflow
-        # candidates are reported as capped, not missing.
+        # Platforms with a per-table column cap (BigQuery clustering <= 4,
+        # Redshift DISTKEY <= 1) cannot carry every mapped candidate. The
+        # template holds the first N profile-order candidates per table and
+        # tuning type; overflow candidates are reported as capped, not
+        # missing. A cap applies only to the tuning types named in the
+        # mapping's capped_tuning_types (Redshift's single-key limit governs
+        # DISTKEY alone; its compound SORTKEY list is unbounded), defaulting
+        # to every mapped tuning type when the mapping names none.
         capped_types: list[str] = []
         if platform_mapping.max_columns is not None:
+            capped_scope = platform_mapping.capped_tuning_types
+            if capped_scope is None:
+                capped_scope = platform_mapping.tuning_types
             for tuning_type in platform_mapping.tuning_types:
+                if tuning_type not in capped_scope:
+                    if tuning_type in mapped_tuning_types:
+                        slot = (candidate.table, tuning_type)
+                        capped_slots[slot] = capped_slots.get(slot, 0) + 1
+                    continue
                 slot = (candidate.table, tuning_type)
                 used = capped_slots.get(slot, 0)
                 if used >= platform_mapping.max_columns and tuning_type not in mapped_tuning_types:
@@ -241,7 +256,24 @@ def validate_tuning_template(
         )
 
         missing_tuning_types = tuple(t for t in mappings[-1].missing_tuning_types if t not in capped_types)
-        if platform_mapping.decision == MAPPED and missing_tuning_types:
+        unrendered_tuning_types = tuple(
+            t for t in mappings[-1].mapped_tuning_types if t not in rendering_verified_types
+        )
+        if unrendered_tuning_types:
+            unrendered = ", ".join(unrendered_tuning_types)
+            issues.append(
+                TuningProfileValidationIssue(
+                    severity=ERROR,
+                    candidate_key=candidate_key(candidate),
+                    message=(
+                        f"template maps {unrendered} with no executed rendering on {platform_key}; "
+                        "certification requires the configured columns to reach the physical layout"
+                    ),
+                    decision=platform_mapping.decision,
+                    reason=platform_mapping.reason,
+                )
+            )
+        elif platform_mapping.decision == MAPPED and missing_tuning_types:
             expected = ", ".join(missing_tuning_types) or "a mapped tuning type"
             issues.append(
                 TuningProfileValidationIssue(
@@ -353,6 +385,41 @@ def candidate_key(candidate: WorkloadTuningCandidate) -> str:
 
 def _normalize_profile_benchmark(benchmark: str) -> str:
     return normalize_benchmark_id(benchmark).replace("-", "_")
+
+
+def _rendering_verified_tuning_types(platform: str, tuning_config: Any) -> frozenset[str]:
+    """Return the tuning types with an executed (non-preview) rendering path.
+
+    Logical candidates are only certified when their mapped template columns
+    reach the physical layout at execution time. The capability registry
+    records which tuning types render for real and which exist only as
+    dry-run preview or inspect-and-log hooks. This gate applies to the
+    platforms whose tuned templates are generated from the logical profile
+    (BigQuery, Redshift, Snowflake); the longer-standing DuckDB and
+    Databricks templates keep their existing membership-based certification.
+
+    - BigQuery partitioning/clustering are preview-only: the adapter's
+      post-load hook only inspects the table and logs a recreation hint.
+    - Redshift distribution is preview-only: the adapter only logs the
+      mismatch because changing keys requires table recreation.
+    - Redshift sorting renders only when sorted ingestion is enabled; the
+      generated cloud templates leave it off, so it is unverified here.
+    - Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY,
+      and partitioning folds into that same statement when no clustering
+      columns are configured.
+    """
+    if platform not in {"bigquery", "redshift", "snowflake"}:
+        return frozenset(TUNING_TYPES)
+    verified: set[str] = set()
+    for tuning_type in TUNING_TYPES:
+        capability = get_capability(platform, TuningType(tuning_type))
+        if capability is None or capability.rendered_via == "none":
+            continue
+        if platform == "redshift" and tuning_type == SORTING:
+            if _get_value(_get_value(tuning_config, "platform_optimizations"), "sorted_ingestion_mode") != "force":
+                continue
+        verified.add(tuning_type)
+    return frozenset(verified)
 
 
 def _candidate_present(template_columns: dict[str, dict[str, set[str]]], candidate: WorkloadTuningCandidate) -> bool:
