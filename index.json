@@ -7418,10 +7418,15 @@
       "title": "Generalize Databricks TPC tuning columns into a reusable platform-neutral tuning base"
     },
     "generate-and-certify-bigquery-redshift-and-snowflake-tpc-tun": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T03:07:01Z",
+        "generation": "e230d4a9aa464254965314bb1b138e82",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Generate and certify BigQuery, Redshift, and Snowflake TPC tuned templates from the logical profile"
     },
     "generate-seed-corpus-for-results-explorer": {
