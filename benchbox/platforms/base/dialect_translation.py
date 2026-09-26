@@ -64,6 +64,7 @@ class DialectTranslationMixin:
             return sql
 
         from benchbox.utils.dialect_utils import (
+            NO_IDENTIFY_DIALECTS,
             SQLTranslationError,
             SqlTranslationOutcome,
             _fingerprint_sql,
@@ -84,7 +85,8 @@ class DialectTranslationMixin:
         try:
             import sqlglot
 
-            should_identify = tgt not in ("clickhouse", "postgres", "snowflake")
+            # Targets in NO_IDENTIFY_DIALECTS skip quoting (shared constant).
+            should_identify = tgt not in NO_IDENTIFY_DIALECTS
 
             translated_statements = sqlglot.transpile(sql, read=src, write=tgt, identify=should_identify)
 
