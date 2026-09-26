@@ -92,6 +92,37 @@ def test_trip_duration_clickhouse_uses_datediff():
 
 
 # ---------------------------------------------------------------------------
+# fhv-base-volume (FHV-enabled benchmark)
+# ---------------------------------------------------------------------------
+
+
+def _fhv_bench():
+    from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
+    from benchbox.core.nyctaxi.schema import TaxiType
+
+    return NYCTaxiBenchmark(taxi_types=[TaxiType.YELLOW, TaxiType.FHV])
+
+
+def test_fhv_base_volume_clickhouse_uses_datediff():
+    q = _fhv_bench().get_queries(dialect="clickhouse")["fhv-base-volume"]
+    assert "dateDiff('second'" in q, f"Expected dateDiff('second', ...), got:\n{q}"
+    assert "EXTRACT" not in q.upper(), f"Must not use EXTRACT for ClickHouse, got:\n{q}"
+    assert "fhv_trips" in q, f"Must query fhv_trips, got:\n{q}"
+
+
+def test_fhv_base_volume_starrocks_uses_timestampdiff():
+    q = _fhv_bench().get_queries(dialect="starrocks")["fhv-base-volume"]
+    assert "TIMESTAMPDIFF(SECOND" in q, f"Expected TIMESTAMPDIFF(SECOND, ...), got:\n{q}"
+    assert "EXTRACT" not in q.upper(), f"Must not use EXTRACT for StarRocks, got:\n{q}"
+    assert "fhv_trips" in q, f"Must query fhv_trips, got:\n{q}"
+
+
+def test_fhv_base_volume_base_retains_extract():
+    q = _fhv_bench().get_queries()["fhv-base-volume"]
+    assert "EXTRACT" in q.upper(), f"Base query must use EXTRACT(EPOCH …), got:\n{q}"
+
+
+# ---------------------------------------------------------------------------
 # Other queries unaffected
 # ---------------------------------------------------------------------------
 

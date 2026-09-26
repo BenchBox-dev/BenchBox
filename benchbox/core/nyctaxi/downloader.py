@@ -344,20 +344,33 @@ class _TripDataDownloader(CompressionMixin, VerbosityMixin):
             return int(value)
         return value
 
+    @staticmethod
+    def _normalize_sr_flag(value: Any) -> str:
+        """Map TLC's numeric shared-ride flag to the stored Y/N convention.
+
+        Real TLC FHV Parquet encodes SR_Flag as 1 (shared) or null; the
+        synthetic generator emits Y/N directly. Both normalize to Y/N so the
+        fhv-shared-ride-rate query counts remote and synthetic data alike.
+        """
+        if value is None:
+            return "N"
+        if isinstance(value, float) and value != value:  # NaN
+            return "N"
+        text = str(value).strip().lower()
+        return "Y" if text in ("1", "1.0", "y", "yes", "true") else "N"
+
     def _map_row_to_schema(self, row, trip_id: int) -> list:
         columns = type(self)._COLUMN_PROVIDER()
-        return [
-            trip_id,
-            *[
-                self._clean_csv_value(
-                    self._get_col(
-                        row, self._COLUMN_ALIASES.get(column, (column,)), self._COLUMN_DEFAULTS.get(column, 0)
-                    ),
-                    self._COLUMN_DEFAULTS.get(column, 0),
-                )
-                for column in columns
-            ],
-        ]
+        mapped = [trip_id]
+        for column in columns:
+            value = self._clean_csv_value(
+                self._get_col(row, self._COLUMN_ALIASES.get(column, (column,)), self._COLUMN_DEFAULTS.get(column, 0)),
+                self._COLUMN_DEFAULTS.get(column, 0),
+            )
+            if column == "sr_flag":
+                value = self._normalize_sr_flag(value)
+            mapped.append(value)
+        return mapped
 
     def _generate_synthetic_month(self, writer: csv.writer, start_trip_id: int) -> int:
         num_trips = max(self._SYNTHETIC_MIN_TRIPS, int(self._SYNTHETIC_MONTHLY_TRIPS * self.sample_rate * 100))
@@ -721,12 +734,12 @@ class FHVDataDownloader(_TripDataDownloader):
     _COLUMN_PROVIDER = get_fhv_trips_columns
     _STATS_TAXI_TYPE = "fhv"
     _COLUMN_ALIASES = {
-        "dispatching_base_num": ("dispatching_base_number", "Dispatching_base_num"),
+        "dispatching_base_num": ("dispatching_base_num", "dispatching_base_number", "Dispatching_base_num"),
         "affiliated_base_number": ("Affiliated_base_number", "affiliated_base_num"),
         "pickup_datetime": ("pickup_datetime", "Pickup_datetime"),
         "dropoff_datetime": ("dropOff_datetime", "dropoff_datetime", "Dropoff_datetime"),
-        "pickup_location_id": ("PULocationID", "pulocationid"),
-        "dropoff_location_id": ("DOLocationID", "dolocationid"),
+        "pickup_location_id": ("PUlocationID", "PULocationID", "pulocationid"),
+        "dropoff_location_id": ("DOlocationID", "DOLocationID", "dolocationid"),
         "sr_flag": ("SR_Flag", "sr_flag"),
     }
     _COLUMN_DEFAULTS = {

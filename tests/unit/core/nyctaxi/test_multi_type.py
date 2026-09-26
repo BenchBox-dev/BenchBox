@@ -508,6 +508,38 @@ class TestFHVDataDownloader:
         assert row["dispatching_base_num"].startswith("B")
         assert row["sr_flag"] in ("Y", "N")
 
+    def test_row_mapping_accepts_exact_tlc_spellings(self, fhv_downloader):
+        """Real TLC Parquet field names map instead of falling to defaults."""
+        row = {
+            "dispatching_base_num": "B01234",
+            "Affiliated_base_number": "B01234",
+            "pickup_datetime": "2019-01-01 08:00:00",
+            "dropOff_datetime": "2019-01-01 08:20:00",
+            "PUlocationID": 161,
+            "DOlocationID": 162,
+            "SR_Flag": None,
+        }
+        mapped = fhv_downloader._map_row_to_schema(row, 1)
+        assert mapped[1] == "B01234"
+        assert mapped[5] == 161
+        assert mapped[6] == 162
+        assert mapped[7] == "N"
+
+    def test_row_mapping_normalizes_numeric_shared_flag(self, fhv_downloader):
+        """TLC's numeric SR_Flag (1/null) normalizes to the stored Y/N."""
+        base = {
+            "dispatching_base_num": "B01234",
+            "Affiliated_base_number": "B01234",
+            "pickup_datetime": "2019-01-01 08:00:00",
+            "dropOff_datetime": "2019-01-01 08:20:00",
+            "PUlocationID": 161,
+            "DOlocationID": 162,
+        }
+        assert fhv_downloader._map_row_to_schema({**base, "SR_Flag": 1}, 1)[7] == "Y"
+        assert fhv_downloader._map_row_to_schema({**base, "SR_Flag": 1.0}, 1)[7] == "Y"
+        assert fhv_downloader._map_row_to_schema({**base, "SR_Flag": "Y"}, 1)[7] == "Y"
+        assert fhv_downloader._map_row_to_schema({**base, "SR_Flag": "N"}, 1)[7] == "N"
+
     def test_download_stats(self, fhv_downloader):
         stats = fhv_downloader.get_download_stats()
         assert stats["taxi_type"] == "fhv"
