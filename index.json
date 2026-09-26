@@ -5520,7 +5520,7 @@
       "needs": [
         "exasol-adapter-core"
       ],
-      "priority": "medium-high",
+      "priority": "low",
       "status": "open",
       "title": "Add opt-in live Exasol tests that compare TPC answers with DuckDB"
     },
