@@ -3162,10 +3162,15 @@
       "title": "Consolidate file format detection to handle compressed and sharded files"
     },
     "consolidate-firebolt-presto-trino-execute-query-implementati": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-27T03:04:27Z",
+        "generation": "b5240a8e99a24811811a4040bbd96230",
+        "renewals": 0,
+        "worker": "jcode-batch-c"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Consolidate Firebolt/Presto/Trino execute_query implementations"
     },
     "consolidate-linting-tools": {
