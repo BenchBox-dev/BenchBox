@@ -7,6 +7,7 @@ import {
   BenchmarkSupportBadge,
   benchmarkSupportGroupLabel,
   benchmarkSupportRank,
+  isBenchmarkSupportStatus,
 } from "@/lib/benchmarkSupport";
 import { listResults, type ResultRow } from "@/lib/duckdbQueries";
 import { formatCount } from "@/lib/copyFormatters";
@@ -218,7 +219,11 @@ function groupEntries(entries: SectionEntry[], kind: SectionKind): EntryGroup[] 
   }
   const byStatus = new Map<string, SectionEntry[]>();
   for (const entry of entries) {
-    const key = entry.supportStatus ?? "";
+    // Forward-compatible snapshots can carry statuses this UI never declared.
+    // Every unrecognized status shares the "other" key so they render as one
+    // "Other benchmarks" section, matching the benchmarkSupportGroupLabel
+    // fallback contract instead of one section per unknown value.
+    const key = isBenchmarkSupportStatus(entry.supportStatus) ? entry.supportStatus : "";
     const group = byStatus.get(key);
     if (group) {
       group.push(entry);

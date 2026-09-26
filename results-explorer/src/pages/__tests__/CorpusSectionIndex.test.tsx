@@ -228,6 +228,45 @@ describe("corpus section indexes", () => {
     expect(within(list).getAllByRole("link")).toHaveLength(3);
   });
 
+  it("benchmarks coalesce unrecognized and missing statuses into one Other section", async () => {
+    vi.mocked(listResults).mockResolvedValue([
+      resultRow({
+        result_id: "duckdb-future-a",
+        benchmark: "future_a",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-20T12:00:00Z",
+        benchmark_support_status: "ga",
+      }),
+      resultRow({
+        result_id: "duckdb-future-b",
+        benchmark: "future_b",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-21T12:00:00Z",
+        benchmark_support_status: "preview",
+      }),
+      resultRow({
+        result_id: "duckdb-custom",
+        benchmark: "custom-internal",
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        run_date: "2026-08-22T12:00:00Z",
+        benchmark_support_status: null,
+      }),
+    ]);
+
+    render(<BenchmarksIndex />);
+
+    const list = await screen.findByTestId("benchmarks-index-list");
+    // Two future statuses plus a null status share one group key, so the
+    // fallback contract yields exactly one "Other benchmarks" section.
+    const headings = within(list).getAllByRole("heading", { level: 2 });
+    expect(headings.map((heading) => heading.textContent)).toEqual(["Other benchmarks"]);
+    expect(within(list).getAllByRole("link")).toHaveLength(3);
+    expect(within(list).queryByTestId(/support-badge-/)).toBeNull();
+  });
+
   it("platforms render one ungrouped list without badges", async () => {
     vi.mocked(listResults).mockResolvedValue(ROWS);
 
