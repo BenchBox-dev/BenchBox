@@ -29,7 +29,8 @@
 # of 2 happen to match?".
 #
 # `per_cell_timeout_s`/`early_stop_after_s` are 2400 (40 min), not the
-# 1200 of the DuckDB cell: the 2026-09-25 nightly showed the Postgres cell
+# 900 (15 min) of the DuckDB cell: the 2026-09-25 nightly showed the
+# Postgres cell
 # (compose pull + SF1 load + 3-stream throughput on a shared runner) still
 # running at the 20-minute kill with no result JSON. The job-level
 # `timeout-minutes: 80` still bounds the whole lane.
