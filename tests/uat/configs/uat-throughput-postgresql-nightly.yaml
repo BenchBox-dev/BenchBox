@@ -32,7 +32,7 @@
 # 1200 of the DuckDB cell: the 2026-09-25 nightly showed the Postgres cell
 # (compose pull + SF1 load + 3-stream throughput on a shared runner) still
 # running at the 20-minute kill with no result JSON. The job-level
-# `timeout-minutes: 60` still bounds the whole lane.
+# `timeout-minutes: 80` still bounds the whole lane.
 #
 # Not run in the PR fast lane: invoke via `make uat-sweep
 # CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml` from a
