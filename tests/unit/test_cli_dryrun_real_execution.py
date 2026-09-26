@@ -147,9 +147,16 @@ class TestDryRunExecutorPlatformIntegration:
         benchmark_config = Mock(name=benchmark_name, scale_factor=0.01, test_execution_type="power")
         benchmark_config.name = benchmark_name
         adapter = Mock()
+        adapter._get_dialect_queries.return_value = {1: "SELECT 1"}
+        adapter._filter_queries.return_value = {1: "SELECT 1"}
         adapter.create_connection.side_effect = AssertionError("query extraction opened a platform connection")
 
         assert executor._extract_queries(benchmark, benchmark_config, adapter) == {"1": "SELECT 1"}
+        adapter._get_dialect_queries.assert_called_once_with(
+            benchmark,
+            benchmark_slug=benchmark_name,
+            connection=None,
+        )
         adapter.create_connection.assert_not_called()
         adapter.enable_dry_run.assert_not_called()
 
@@ -163,7 +170,8 @@ class TestDryRunExecutorPlatformIntegration:
 
         # Create mock platform adapter
         mock_adapter = Mock()
-        mock_adapter.translate_sql.return_value = "SELECT 1 /* translated */"
+        mock_adapter._get_dialect_queries.return_value = {"1": "SELECT 1 /* translated */"}
+        mock_adapter._filter_queries.return_value = {"1": "SELECT 1 /* translated */"}
 
         # Create mock benchmark config
         benchmark_config = Mock()
@@ -172,8 +180,12 @@ class TestDryRunExecutorPlatformIntegration:
 
         result = executor._extract_queries(mock_benchmark, benchmark_config, mock_adapter)
 
-        # Should return standard queries without translation (fallback mode)
-        assert result == {"1": "SELECT 1"}
+        assert result == {"1": "SELECT 1 /* translated */"}
+        mock_adapter._get_dialect_queries.assert_called_once_with(
+            mock_benchmark,
+            benchmark_slug="tpcds",
+            connection=None,
+        )
 
     def test_extract_queries_standard_without_platform_adapter(self):
         """Test standard query extraction without platform adapter."""
