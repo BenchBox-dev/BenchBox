@@ -15058,9 +15058,9 @@
     },
     "rework-results-secondary-navigation-information-architecture": {
       "claim": {
-        "expires_at": "2026-09-27T02:07:20Z",
-        "generation": "5420b1781b7541a2b65c4706877602fd",
-        "renewals": 2,
+        "expires_at": "2026-09-27T02:07:44Z",
+        "generation": "6be413fb3b424b55b9439ccd39a3cc9d",
+        "renewals": 3,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
       },
       "needs": [],
