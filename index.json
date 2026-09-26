@@ -10257,15 +10257,10 @@
       "title": "Move polars, clickhouse-connect, and psycopg2-binary out of core dependencies into optional extras"
     },
     "multi-client-concurrent-writer-benchmark-scenarios-the-multi": {
-      "claim": {
-        "expires_at": "2026-09-27T03:53:34Z",
-        "generation": "2967214e169949cca40e123969c5f8c1",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:2da7905b664c7b8f8cc14ff0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Multi-client / concurrent-writer benchmark scenarios (the 'multiplayer DuckDB' story)"
     },
     "multi-region-performance-testing": {
