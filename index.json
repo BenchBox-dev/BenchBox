@@ -699,7 +699,7 @@
     "approx-loader-and-override-gaps": {
       "claim": null,
       "needs": [],
-      "priority": "medium",
+      "priority": "low",
       "status": "open",
       "title": "BigQuery power-only compression gate plus CPC/REQ sketch override gaps"
     },
