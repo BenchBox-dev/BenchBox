@@ -2,6 +2,7 @@
   "acceptance": [
     "6_v2 and 14_v2 either pass on current DataFusion or the parser gap is confirmed still present"
   ],
+  "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit c280a53d4. DataFusion 54 still rejects GROUP BY () with `Empty tuple not supported yet`, so 6_v2 and 14_v2 now drop only the empty grouping while retaining global aggregate and HAVING semantics. Removed both DataFusion execution skips, registered query-adapter rules, updated validation mirrors and generated compatibility docs. Verification: Ruff passed; 24 focused tests passed; compat-docs and DDL drift checks passed. Both full rewritten queries executed successfully on DataFusion 54 local Arrow fixtures, returning revenue=6 and promo_revenue=100.",
   "description": "DataFusion and LakeSail skip 6_v2/14_v2 over generated empty-tuple subquery syntax the parser once rejected. Probe once against the current DataFusion version; unskip if green.",
   "sessions": [
     {
@@ -19,6 +20,14 @@
       "generation": "d9e03ec732d64abeacf1a6c3bb37f5e8",
       "op": "take",
       "op_id": "2b1cdd6ce41f4369883239c47cb9de78",
+      "session_id": "3735819a26174704ada936b231dbf66c"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:9a68d56a939b077672bfb199",
+      "at": "2026-09-26T21:19:24Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "1282cc4b9f1f44558c21fb00416de795",
       "session_id": "3735819a26174704ada936b231dbf66c"
     }
   ]
