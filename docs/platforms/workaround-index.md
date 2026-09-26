@@ -17,7 +17,10 @@ release notes a matching fix so the workaround does not linger past its need.
   column, for example `read_primitives.array_of_struct` returning
   `Array(Tuple(...))`. The crash also corrupts the on-disk `.chdb` directory
   (`recursive_mutex lock failed`), so later benchmarks fail at session init
-  with Code 722 / Code 36 BAD_ARGUMENTS.
+  with Code 722 / Code 36 BAD_ARGUMENTS. Observed 2026-04-29 on the
+  then-current lock (chdb 4.1.6 / chdb-core 26.1.0, macOS ARM local stress
+  run) — the same versions still locked today, so the range includes the
+  current lock until the fuller path is re-verified.
 - **Workaround**: `ClickHouseLocalClient.execute()` in
   `benchbox/platforms/clickhouse/client.py` fetches `format="ArrowStream"`
   and decodes via pyarrow IPC in `_arrow_to_dataframe` (marked
@@ -26,11 +29,18 @@ release notes a matching fix so the workaround does not linger past its need.
   per-row CSV parsing.
 - **Upstream**: [chdb](https://github.com/chdb-io/chdb) issue tracker; the
   `DataFrame` fetch path must survive Tuple-typed columns without aborting.
-  Filing that issue is the remaining w1 step: link the new issue URL from the
-  `TODO(chdb-tuple-dataframe)` marker when it exists.
+  Owner: the maintainer files that issue and links the new issue URL from
+  the `TODO(chdb-tuple-dataframe)` marker when it exists.
 - **Verify**: run the `read_primitives` array-of-struct workload against a
   `format="DataFrame"` fetch on Tuple output; removal is safe when it returns
   rows instead of aborting, with no `.chdb` corruption on repeat runs.
+  Narrowing so far (2026-09-26, locked chdb 4.1.6 / chdb-core 26.1.0):
+  a bare `Tuple` select, a Decimal-bearing tuple, and the exact
+  `array_of_struct` ClickHouse variant shape over small tables all return
+  rows via `format="DataFrame"` on macOS ARM, and the reviewer verified the
+  catalog query on Linux. The April crash therefore needs the fuller
+  benchmark path to reproduce; do not retire the workaround on the minimal
+  repro alone.
 
 ## ClickHouse DDL via DuckDB dialect plus rewrite
 
