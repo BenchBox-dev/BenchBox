@@ -1638,9 +1638,9 @@
     },
     "bulk-loading-for-postgresql-copy-from-program-or-copy-from-s": {
       "claim": {
-        "expires_at": "2026-09-27T03:54:22Z",
-        "generation": "310dd6de7ebb465c92e49c3eef4412b6",
-        "renewals": 0,
+        "expires_at": "2026-09-27T03:54:54Z",
+        "generation": "f2132db59a6449a490ead3900cec3f6a",
+        "renewals": 1,
         "worker": "jcode-batch-c"
       },
       "needs": [],
