@@ -1646,6 +1646,7 @@ class TestSubmissionDeterministicGates:
         from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
         from benchbox.core.tpchavoc.variant_sets import VARIANT_REGISTRY
         from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+        from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
         from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
         from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
         from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
@@ -1663,6 +1664,9 @@ class TestSubmissionDeterministicGates:
             "datafusion": frozenset(DATAFUSION_TPCHAVOC_SKIPS),
             "lakesail": frozenset(LAKESAIL_TPCHAVOC_SKIPS),
             "postgres": frozenset(POSTGRES_TPCHAVOC_SKIPS),
+            "snowflake": frozenset(CLOUD_TPCHAVOC_SKIPS["snowflake"]),
+            "databricks": frozenset(CLOUD_TPCHAVOC_SKIPS["databricks"]),
+            "bigquery": frozenset(CLOUD_TPCHAVOC_SKIPS["bigquery"]),
         } == TPCHAVOC_DOCUMENTED_SKIPS
         benchmark = object.__new__(TPCHavocBenchmark)
         for platform in (
@@ -1673,6 +1677,9 @@ class TestSubmissionDeterministicGates:
             "PG-DuckDB",
             "TimescaleDB",
             "DuckDB",
+            "Snowflake",
+            "Databricks",
+            "BigQuery",
         ):
             assert _tpchavoc_documented_skips(platform) == frozenset(benchmark.get_platform_skip_queries(platform))
 
