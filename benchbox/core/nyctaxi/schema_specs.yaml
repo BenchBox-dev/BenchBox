@@ -257,11 +257,50 @@ schema:
     - pickup_location_id
     - dropoff_location_id
     - hvfhs_license_num
+  fhv_trips:
+    description: NYC For-Hire Vehicle trips (non-high-volume bases) - simplest
+      TLC schema, ~1M trips/month
+    columns:
+      trip_id:
+        type: BIGINT
+        description: Unique trip identifier
+      dispatching_base_num:
+        type: VARCHAR(8)
+        description: TLC base license number that dispatched the trip
+      affiliated_base_number:
+        type: VARCHAR(8)
+        description: Base affiliated with the vehicle
+      pickup_datetime:
+        type: TIMESTAMP
+        description: Pickup timestamp
+      dropoff_datetime:
+        type: TIMESTAMP
+        description: Dropoff timestamp
+      pickup_location_id:
+        type: INTEGER
+        description: TLC Taxi Zone for pickup
+      dropoff_location_id:
+        type: INTEGER
+        description: TLC Taxi Zone for dropoff
+      sr_flag:
+        type: VARCHAR(1)
+        description: Shared-ride flag (Y/N, pre-2020 shared rides)
+    primary_key:
+    - trip_id
+    partition_by: pickup_datetime
+    order_by:
+    - pickup_datetime
+    - pickup_location_id
+    indexes:
+    - pickup_datetime
+    - pickup_location_id
+    - dropoff_location_id
 table_order:
 - taxi_zones
 - trips
 - green_trips
 - hvfhv_trips
+- fhv_trips
 rate_codes:
   1: Standard rate
   2: JFK
