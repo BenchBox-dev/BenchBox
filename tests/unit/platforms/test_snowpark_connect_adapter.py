@@ -663,6 +663,77 @@ class TestSnowparkConnectAdapterTuning:
         # Should disable result cache
         mock_session.sql.assert_called_with("ALTER SESSION SET USE_CACHED_RESULT = FALSE")
 
+    def test_configure_for_benchmark_hygiene_never_reaches_ledger(self, mock_snowpark):
+        """Benchmarking hygiene must not masquerade as applied tuning.
+
+        USE_CACHED_RESULT=FALSE runs on every benchmark run, tuned or not;
+        recording it would falsely report baseline runs as applied. With a
+        real ledger attached, the statement still leaves no trace.
+        """
+        from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+        )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+
+        mock_session = MagicMock()
+        mock_session.sql.return_value.collect.return_value = None
+        adapter._session = mock_session
+
+        adapter.configure_for_benchmark(mock_session, "tpch")
+
+        mock_session.sql.assert_called_with("ALTER SESSION SET USE_CACHED_RESULT = FALSE")
+        assert adapter._applied_tuning_ledger.is_empty()
+
+    def test_apply_platform_optimizations_records_nothing(self, mock_snowpark):
+        """Snowpark has no tuning-derived session surface: nothing applies.
+
+        An empty platform config records no statements and no dropped
+        intents, and the run stays honestly noop."""
+        from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+        from benchbox.core.tuning.interface import UnifiedTuningConfiguration
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+        )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+
+        config = UnifiedTuningConfiguration()
+        config.enable_all_constraints()
+        assert adapter.apply_platform_optimizations(config.platform_optimizations) == []
+        assert adapter._applied_tuning_ledger.is_empty()
+
+    def test_apply_platform_optimizations_records_dropped_intents(self, mock_snowpark):
+        """Requested optimizations are surfaced as dropped, never applied.
+
+        A Z-ordering request cannot map to a Snowflake session setting, so
+        it lands in the ledger's dropped intents with a reason instead of
+        silently vanishing or falsely reporting applied."""
+        from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
+        from benchbox.core.tuning.interface import TuningType, UnifiedTuningConfiguration
+        from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
+
+        adapter = SnowparkConnectAdapter(
+            account="xy12345.us-east-1",
+            user="test_user",
+            password="test_password",
+        )
+        adapter._applied_tuning_ledger = AppliedTuningLedger()
+
+        config = UnifiedTuningConfiguration()
+        config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["l_orderkey"])
+        assert adapter.apply_platform_optimizations(config.platform_optimizations) == []
+        assert adapter._applied_tuning_ledger.statements == []
+        dropped = adapter._applied_tuning_ledger.dropped
+        assert any("z_ordering_enabled" in intent.intent for intent in dropped)
+
 
 class TestSnowparkConnectAdapterConnectionParams:
     """Tests for connection parameter building."""
