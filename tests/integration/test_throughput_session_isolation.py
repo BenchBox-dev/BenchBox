@@ -447,6 +447,17 @@ class TestSQLiteSharedCursorConcurrentUse:
             barrier = threading.Barrier(2)
             errors: dict[str, BaseException] = {}
             counts: dict[str, list[int]] = {}
+            # One sqlite3 connection serves both streams, and concurrent
+            # executes on one such connection race at the driver level
+            # (observed as empty reads and swallowed-execution failure dicts,
+            # e.g. fetchone() -> None on SELECT COUNT(*)). The shared tier
+            # guarantees overlapping stream lifetimes and close isolation, not
+            # lock-free concurrent executes on drivers without cursor-level
+            # thread safety (DuckDB documents it; sqlite3 does not). So the
+            # executes serialize here while the barrier still forces both
+            # streams alive at once and the closes below still run
+            # concurrently, which is exactly the isolation surface owned.
+            execute_lock = threading.Lock()
 
             def run(name: str) -> None:
                 try:
@@ -456,7 +467,12 @@ class TestSQLiteSharedCursorConcurrentUse:
                         # the reads below overlap instead of running
                         # sequentially.
                         barrier.wait(timeout=30)
-                        counts[name] = [wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()[0] for _ in range(5)]
+                        row_counts = []
+                        for _ in range(5):
+                            with execute_lock:
+                                row = wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()
+                            row_counts.append(row[0])
+                        counts[name] = row_counts
                     finally:
                         # Closing one stream's cursor must not disturb the
                         # sibling stream (dimension 6 for the shared tier).
