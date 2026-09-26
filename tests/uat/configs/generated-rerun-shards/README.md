@@ -16,3 +16,12 @@ Do not add new generated shards to the top-level `tests/uat/configs/` directory;
 emit them here (or to an ignored scratch path) so they cannot masquerade as
 reusable templates. Ephemeral per-run resume state is `resume.json` under the
 run's log dir — not a config file and not stored here.
+
+## Retention
+
+Shards expire 180 days after the sweep date in their filename stem
+(`scripts/check_rerun_shard_retention.py`, enforced in `make ci-lint`).
+When this check fails, archive the expired shards with the printed
+`mkdir -p` + `git mv` command into `_project/_archive/` and leave this
+directory empty until the next sweep emits shards. An empty directory is a
+valid state; the corpus guard tolerates it.
