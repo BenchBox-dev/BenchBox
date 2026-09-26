@@ -15052,15 +15052,10 @@
       "title": "Revisit extras naming / topology (e.g. `dataframe-pandas` vs `pandas` aliases)"
     },
     "rework-results-secondary-navigation-information-architecture": {
-      "claim": {
-        "expires_at": "2026-09-27T02:07:44Z",
-        "generation": "6be413fb3b424b55b9439ccd39a3cc9d",
-        "renewals": 3,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:c5b81ba1a96e2a563a96c396"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Rework Results secondary navigation information architecture"
     },
     "rewrite-architecture-md-around-the-new-contract-map": {
