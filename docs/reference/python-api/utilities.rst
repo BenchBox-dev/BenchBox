@@ -330,8 +330,10 @@ Handle custom or proprietary database dialects:
         """Handle custom database dialects with fallback strategies."""
 
         # Map custom dialects to closest SQLGlot-supported dialect.
-        # Exasol ships its own sqlglot dialect, so it needs no fallback entry.
+        # Exasol ships its own sqlglot dialect: the identity entry keeps
+        # the generic fallback branch below from defaulting it to postgres.
         CUSTOM_DIALECT_MAP = {
+            "exasol": "exasol",         # Native sqlglot dialect, no fallback
             "vertica": "postgres",      # Vertica uses PostgreSQL syntax
             "greenplum": "postgres",    # Greenplum is PostgreSQL-based
             "yellowbrick": "postgres",   # Yellowbrick uses PostgreSQL syntax

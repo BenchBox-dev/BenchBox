@@ -90,10 +90,17 @@ class TestExasolIdentifierPolicy:
         assert '"' not in host.translate_sql("SELECT l_orderkey FROM lineitem", source_dialect="postgres")
         assert '"year"' in host.translate_sql("SELECT d_year AS year FROM dates", source_dialect="postgres")
 
+    _UNCHANGED_TARGET_EXPECTATIONS = {
+        "duckdb": 'SELECT "l_orderkey" FROM "lineitem"',
+        "postgres": "SELECT l_orderkey FROM lineitem",
+        "snowflake": "SELECT l_orderkey FROM lineitem",
+        "clickhouse": "SELECT l_orderkey FROM lineitem",
+        "sqlite": 'SELECT "l_orderkey" FROM "lineitem"',
+        "trino": 'SELECT "l_orderkey" FROM "lineitem"',
+    }
+
     @pytest.mark.parametrize("target", ["duckdb", "postgres", "snowflake", "clickhouse", "sqlite", "trino"])
     def test_other_targets_are_unchanged(self, target):
         """G1: only the exasol target may change behavior."""
         query = "SELECT l_orderkey FROM lineitem"
-        before = translate_sql_query(query, target_dialect=target)
-        assert before
-        assert translate_sql_query(query, target_dialect=target) == before
+        assert translate_sql_query(query, target_dialect=target) == self._UNCHANGED_TARGET_EXPECTATIONS[target]
