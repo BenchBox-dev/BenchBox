@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-26T11:14:14.340016+00:00",
+  "generated_at": "2026-09-27T14:06:31.783315+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -653,6 +653,19 @@
       "bundle_sha256": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81"
     },
     {
+      "file": "datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-27T10:05:30.313826",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "01ac92413a4d434b6a5ca293da43c59bc7f36871bb9d944ac93bc777db00c83e"
+    },
+    {
       "file": "datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
       "benchmark": "datavault",
       "benchmark_name": "Data Vault",
@@ -703,6 +716,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "b8ac5ca886fcc63df6c6f956a9494e91aa1c4cabfb79db3bd1722f2ab73b5c8d"
+    },
+    {
+      "file": "datavault_sf001_databricks_sql_20260926_180335_d2571791.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-26T18:03:35.327668",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "010cd801703e1bb50e2bd7a1a776012af69cc2ad6d5002b80d765331ce1958bb"
     },
     {
       "file": "datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
@@ -1158,6 +1184,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "4f7bae8e9dd4881d9ff3b6f28fc6bce26745e5f834b20246b47f5d26a2378cdf"
+    },
+    {
+      "file": "metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json",
+      "benchmark": "metadata_primitives",
+      "benchmark_name": "Metadata Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.34.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-26T18:44:59.335948",
+      "query_count": 180,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "076e423d748ec2a53c5c057aefe200b804725bd125fcfad296c2fd8d4105c496"
     },
     {
       "file": "nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
@@ -2278,6 +2317,19 @@
       "bundle_sha256": "4d34fab2ee7d5b20e0bfabb233323e0604c6ae8c4ff51843c8b71517aabc8baa"
     },
     {
+      "file": "tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-26T19:09:57.064350",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3556c48667c4ec8e988294d8ec069e287330e6da759a135a7a7cd34968e3822c"
+    },
+    {
       "file": "tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
       "benchmark": "tpcds_obt",
       "benchmark_name": "TPC-DS One Big Table",
@@ -3173,6 +3225,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
+    },
+    {
+      "file": "transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-26T19:02:22.306404",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "63762010fbbb1a9408cf9d9082cb7c6155dd98150334ac9786f813183c119e78"
     }
   ],
   "cohorts": {
@@ -3241,8 +3306,10 @@
       "SQLite v3.53.1"
     ],
     "datavault@sf0.01": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2"
     ],
     "datavault@sf0.1": [
@@ -3295,6 +3362,9 @@
       "DuckDB v1.3.2",
       "Polars v1.40.0",
       "SQLite v3.53.1"
+    ],
+    "metadata_primitives@sf1.0": [
+      "Snowflake v10.34.101"
     ],
     "nyctaxi@sf0.01": [
       "ClickHouse Local",
@@ -3398,6 +3468,7 @@
     "tpcds_obt@sf1.0": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2"
     ],
     "tpch@sf0.01": [
@@ -3477,33 +3548,40 @@
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
+    ],
+    "transaction_primitives@sf0.01": [
+      "Databricks v2026.36"
     ]
   },
   "summary": {
-    "total_bundles": 244,
+    "total_bundles": 249,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
       "coffeeshop": 17,
-      "datavault": 6,
+      "datavault": 8,
       "flightdata": 9,
       "h2odb": 18,
       "joinorder": 6,
+      "metadata_primitives": 1,
       "nyctaxi": 9,
       "read_primitives": 12,
       "ssb": 32,
       "tpcdi": 9,
       "tpcds": 22,
-      "tpcds_obt": 3,
+      "tpcds_obt": 4,
       "tpch": 44,
       "tpch_skew": 15,
-      "tpchavoc": 9
+      "tpchavoc": 9,
+      "transaction_primitives": 1
     },
     "by_platform": {
+      "BigQuery": 1,
       "CedarDB": 1,
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
       "DataFusion": 45,
+      "Databricks": 3,
       "DuckDB": 80,
       "DuckLake": 1,
       "LakeSail": 1,
@@ -3511,14 +3589,15 @@
       "Polars": 28,
       "PySpark": 2,
       "SQLite": 23,
+      "Snowflake": 1,
       "Spark": 6,
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 244
+      "maintainer-run": 249
     },
     "by_funding": {
-      "unspecified": 244
+      "unspecified": 249
     }
   }
 }
