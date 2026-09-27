@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-27T16:04:27.666319+00:00",
+  "generated_at": "2026-09-27T19:10:57.699093+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -755,6 +755,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "e32c1ffc997c38d4bb23b2ca5996b466270e429408dfa9c57ec716fb602ea963"
+    },
+    {
+      "file": "flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-27T15:08:59.865093",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "ed2dd0baaf3b8035da8dc6d8c0674a480c2a38adf2c0634296a6512f406f480b"
     },
     {
       "file": "flightdata_sf001_clickhouse_local_sql_20260826_172222_5f3f4c89.json",

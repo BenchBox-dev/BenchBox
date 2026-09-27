@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-27T16:04:32.381182+00:00",
+  "generated_at": "2026-09-27T19:10:41.226768+00:00",
   "source": "f02f42f3b75d1674f18b1d4686c37729d26426f9",
   "source_ref": "origin/published-results",
-  "source_resolved_at": "2026-09-27T16:04:32.381182+00:00",
+  "source_resolved_at": "2026-09-27T19:10:41.226768+00:00",
   "source_resolved_from": "origin/published-results",
   "main_source": "working-tree",
   "bidirectional": false,
@@ -93,6 +93,7 @@
     "results-data/bundles/flightdata_sf01_clickhouse_local_sql_20260826_172228_49be64a3.json",
     "results-data/bundles/flightdata_sf01_datafusion_sql_20260826_170238_db37a951.json",
     "results-data/bundles/flightdata_sf01_duckdb_sql_20260826_163357_76fda453.json",
+    "results-data/bundles/flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json",
     "results-data/bundles/flightdata_sf1_clickhouse_local_sql_20260826_172315_1fe46258.json",
     "results-data/bundles/flightdata_sf1_datafusion_sql_20260826_170316_28183319.json",
     "results-data/bundles/flightdata_sf1_duckdb_sql_20260826_163423_fd3b42c4.json",
@@ -346,6 +347,7 @@
     "results-data/bundles/flightdata_sf01_clickhouse_local_sql_20260826_172228_49be64a3.json": "accepted",
     "results-data/bundles/flightdata_sf01_datafusion_sql_20260826_170238_db37a951.json": "accepted",
     "results-data/bundles/flightdata_sf01_duckdb_sql_20260826_163357_76fda453.json": "accepted",
+    "results-data/bundles/flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json": "legacy_overlay",
     "results-data/bundles/flightdata_sf1_clickhouse_local_sql_20260826_172315_1fe46258.json": "accepted",
     "results-data/bundles/flightdata_sf1_datafusion_sql_20260826_170316_28183319.json": "accepted",
     "results-data/bundles/flightdata_sf1_duckdb_sql_20260826_163423_fd3b42c4.json": "accepted",
@@ -599,6 +601,7 @@
     "results-data/bundles/flightdata_sf01_clickhouse_local_sql_20260826_172228_49be64a3.json": "0da04befdcb2f98779ac3ab44fbe70a19df8de58e0b633372853bb46229822dc",
     "results-data/bundles/flightdata_sf01_datafusion_sql_20260826_170238_db37a951.json": "113a89d3e68671fb14e1328d5ca3eb16807f3a1c6c43f872afe187459733fcba",
     "results-data/bundles/flightdata_sf01_duckdb_sql_20260826_163357_76fda453.json": "c78882bd2555819b50432d679fbe619b1074497b5c1c33f811ac4519a1a0083b",
+    "results-data/bundles/flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json": "ed2dd0baaf3b8035da8dc6d8c0674a480c2a38adf2c0634296a6512f406f480b",
     "results-data/bundles/flightdata_sf1_clickhouse_local_sql_20260826_172315_1fe46258.json": "0f2274c87030e4b813bbfadd245c3dea8a7b79d2ad4e01edae87d8154aaf37d1",
     "results-data/bundles/flightdata_sf1_datafusion_sql_20260826_170316_28183319.json": "fc114a6f3ae438a2ae7e38567aa3ab89119a6d9b95978fbac92544e33e0a43c0",
     "results-data/bundles/flightdata_sf1_duckdb_sql_20260826_163423_fd3b42c4.json": "3eaae9d678c3b705077c1a87ac9ae23994200563be35ef8bcd5ff83ee38654d8",
@@ -770,11 +773,12 @@
   "legacy_overlay": [
     "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
     "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json",
+    "results-data/bundles/flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json",
     "results-data/bundles/metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json",
     "results-data/bundles/nyctaxi_sf10_bigquery_sql_20260927_120407_fec02550.json",
     "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json",
     "results-data/bundles/tpch_skew_sf10_bigquery_sql_20260927_104923_b3fc1da6.json",
     "results-data/bundles/transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json"
   ],
-  "count": 251
+  "count": 252
 }
