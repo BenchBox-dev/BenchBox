@@ -111,6 +111,7 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     expect(comparable.length).toBeGreaterThanOrEqual(5);
     for (let i = 0; i < 4; i++) {
       const cb = comparable[i];
+      if (!cb) throw new Error(`expected comparable checkbox at index ${i}`);
       await expect(cb).toBeEnabled();
       await cb.scrollIntoViewIfNeeded();
       await cb.check();
@@ -119,6 +120,7 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
 
     // Fifth comparable checkbox must be disabled at cap with aria-describedby pointing to reason.
     const fifth = comparable[4];
+    if (!fifth) throw new Error("expected fifth comparable checkbox for cap assertion");
     await expect(fifth).toBeDisabled();
     const describedBy = await fifth.getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();
