@@ -9,7 +9,11 @@ from __future__ import annotations
 
 import pytest
 
-from benchbox.core.transaction_primitives.schema import STAGING_TABLES, get_create_table_sql
+from benchbox.core.transaction_primitives.schema import (
+    STAGING_TABLES,
+    _requires_catalog_managed_staging,
+    get_create_table_sql,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -30,6 +34,14 @@ def test_other_dialects_keep_plain_create_table(dialect: str):
     assert "TBLPROPERTIES" not in sql
     assert "USING DELTA" not in sql
     assert sql.rstrip().endswith(");")
+
+
+def test_catalog_managed_gate_follows_registry_rule():
+    """Emission is governed by the DDL_OPTIMIZE rule, not a bare dialect branch."""
+    assert _requires_catalog_managed_staging("databricks") is True
+    assert _requires_catalog_managed_staging("DATABRICKS") is True
+    for dialect in ("standard", "duckdb", "snowflake", "bigquery", "postgres"):
+        assert _requires_catalog_managed_staging(dialect) is False
 
 
 def test_databricks_skips_savepoint_and_isolation_operations(tmp_path):

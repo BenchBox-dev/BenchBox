@@ -384,21 +384,33 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     #: write_primitives sharing one physical database do not clobber each
     #: other's row.
     #:
-    #: The ``_v2`` generation is load-bearing, not cosmetic. The first release
-    #: of this manifest wrote a row unconditionally at the end of ``setup()``,
-    #: including on the path that skipped repopulation because the staging
-    #: tables were already non-empty. Those rows are *internally consistent* --
-    #: correct scale, correct spec version, and a digest of the live source
-    #: tables -- while the staging data they describe is stale. Reusing the
-    #: original table name would therefore match them, ``is_setup()`` would
-    #: short-circuit, and every database that generation already mis-certified
-    #: would stay silently wrong forever. A new name makes them unmatchable, so
-    #: those databases take the missing-manifest path and rebuild once.
-    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v2"
+    #: The ``_v3`` generation is load-bearing, not cosmetic, as was the
+    #: ``_v2`` bump before it. The first release of this manifest wrote a row
+    #: unconditionally at the end of ``setup()``, including on the path that
+    #: skipped repopulation because the staging tables were already non-empty.
+    #: Those rows are *internally consistent* -- correct scale, correct spec
+    #: version, and a digest of the live source tables -- while the staging
+    #: data they describe is stale; the ``_v2`` name made them unmatchable so
+    #: those databases rebuilt once. The ``_v2`` generation in turn can certify
+    #: staging tables created before the Databricks catalogManaged DDL
+    #: requirement: again internally consistent rows describing plain
+    #: (non-catalog-managed) Delta tables that Databricks multi-statement
+    #: transactions cannot write
+    #: (TRANSACTION_NOT_SUPPORTED.WRITE_NON_CATALOG_MANAGED_TABLE). Reusing the
+    #: ``_v2`` name would therefore match them, ``is_setup()`` would
+    #: short-circuit, ``CREATE TABLE IF NOT EXISTS`` would leave the legacy
+    #: tables in place, and every affected database would keep failing its
+    #: transaction operations. A new name makes them unmatchable, so those
+    #: databases take the missing-manifest path and rebuild once with the
+    #: catalogManaged DDL.
+    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v3"
 
-    #: Superseded manifest table, dropped on rebuild so a database does not
+    #: Superseded manifest tables, dropped on rebuild so a database does not
     #: carry a stale generation's rows around indefinitely. Never read.
-    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = ("benchbox_staging_manifest",)
+    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = (
+        "benchbox_staging_manifest_v2",
+        "benchbox_staging_manifest",
+    )
 
     def _quote_identifier(self, identifier: str) -> str:
         """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""

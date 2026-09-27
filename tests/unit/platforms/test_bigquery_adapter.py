@@ -2520,7 +2520,7 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
         bench1._write_staging_manifest(conn, source_tables)
         assert bench1._staging_manifest_matches(conn, source_tables) is True
 
-        manifest_table = "BENCHBOX_STAGING_MANIFEST_V2"
+        manifest_table = bench1._STAGING_MANIFEST_TABLE.upper()
         assert len(conn.tables[manifest_table]) == 1
         assert conn.tables[manifest_table][0][0] == "Transaction Primitives"
 
