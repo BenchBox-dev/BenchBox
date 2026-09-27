@@ -2139,6 +2139,45 @@ class BigQueryAdapter(PlatformAdapter):
             flags=re.IGNORECASE,
         )
 
+        # Foreign keys follow the same rule, and BigQuery also requires the
+        # referenced table to be dataset-qualified ("Table ... must be
+        # qualified with a dataset"). Data Vault links reference their hubs.
+        # The match runs against a literal/comment-masked copy (the mask is
+        # length-preserving, so spans align) and splices replacements into the
+        # original: an unmasked regex would also rewrite REFERENCES text inside
+        # string defaults such as DEFAULT 'REFERENCES parent(id)', silently
+        # changing stored values.
+        references_pattern = re.compile(
+            r"REFERENCES\s+(`?[a-zA-Z0-9_.]+`?)\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
+            flags=re.IGNORECASE,
+        )
+        masked_work = re.sub(
+            r"'(?:[^'\\]|\\.|'')*'|\"(?:[^\"\\]|\\.|\"\")*\"|--[^\n]*|/\*.*?\*/",
+            lambda match: " " * len(match.group(0)),
+            work,
+            flags=re.DOTALL,
+        )
+        pieces: list[str] = []
+        cursor = 0
+        for match in references_pattern.finditer(masked_work):
+            # Groups are sliced from the ORIGINAL statement at the masked
+            # match spans: group text itself may cover a masked region (e.g. a
+            # string literal inside the column list), and the masked copy holds
+            # blanks there.
+            original_match = work[match.start() : match.end()]
+            inner = re.match(
+                r"REFERENCES\s+(`?[a-zA-Z0-9_.]+`?)\s*\(([^()]*)\)(?!\s*NOT\s+ENFORCED)",
+                original_match,
+                flags=re.IGNORECASE,
+            )
+            if inner is None:  # Mask boundary artifact; leave untouched.
+                continue
+            pieces.append(work[cursor : match.start()])
+            pieces.append(f"REFERENCES {self._qualify_table_target(inner.group(1))} ({inner.group(2)}) NOT ENFORCED")
+            cursor = match.end()
+        pieces.append(work[cursor:])
+        work = "".join(pieces)
+
         # Include partitioning and clustering if configured
         if "PARTITION BY" not in work.upper() and self.partitioning_field:
             work += f" PARTITION BY DATE({self.partitioning_field})"
@@ -2234,12 +2273,21 @@ class BigQueryAdapter(PlatformAdapter):
             # with the same spelling inside the CTE's own body is still the
             # base table. Walk each CTE body first so shadowed base tables
             # are collected, then skip only the shadowing outer references.
+            # A body may also reference a sibling CTE defined earlier in the
+            # same WITH clause; that name is a CTE, not a base table.
             for cte in tree.find_all(exp.CTE):
+                earlier_ctes = set()
+                with_clause = cte.parent
+                if isinstance(with_clause, exp.With):
+                    for sibling in with_clause.expressions:
+                        if sibling is cte:
+                            break
+                        earlier_ctes.add((sibling.alias_or_name or "").upper())
                 for table in cte.this.find_all(exp.Table):
                     if table.db or table.catalog:
                         continue
                     name = (table.name or "").upper()
-                    if name and name not in tables:
+                    if name and name not in tables and name not in earlier_ctes:
                         tables.append(name)
             for table in tree.find_all(exp.Table):
                 if table.db or table.catalog:
@@ -2292,8 +2340,11 @@ class BigQueryAdapter(PlatformAdapter):
             # the original name (proven live: every bare-prefix UPDATE/DELETE
             # failed server-side with Unrecognized name). BigQuery syntax
             # forbids aliases on target tables of INSERT, CREATE, DROP,
-            # TRUNCATE, and ALTER statements.
-            has_refs = re.search(rf"\b{table_name}\s*\.", masked, flags=re.IGNORECASE) is not None
+            # TRUNCATE, and ALTER statements. Translated queries backtick
+            # identifiers, so `lineitem`.`l_partkey` counts as a reference too.
+            has_refs = (
+                re.search(rf"(?<![\w.`])`?{re.escape(table_name)}`?\s*\.", masked, flags=re.IGNORECASE) is not None
+            )
 
             pattern = (
                 rf"(\bFROM\s+|\bJOIN\s+|\bINSERT\s+INTO\s+|\bUPDATE\s+"
