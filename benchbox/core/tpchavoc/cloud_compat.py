@@ -71,8 +71,15 @@ def rewrite_cloud_variant(query_id: str, query: str, target_dialect: str) -> str
 
 
 def _rewrite_array_aggregation(query: str, target_dialect: str) -> str:
-    """Render q1_v7's collected arrays with functions native to each cloud engine."""
-    if target_dialect not in {"bigquery", "databricks", "snowflake"}:
+    """Render q1_v7's collected arrays with functions native to each cloud engine.
+
+    The Snowflake leg is intentionally unimplemented: Snowflake SQL has no
+    lambda-based array REDUCE, so emitting REDUCE would fail live compilation
+    (a sqlglot parse check cannot catch that engine-side limit). Snowflake
+    input falls through unchanged and stays skipped until a native reduction
+    is proven.
+    """
+    if target_dialect not in {"bigquery", "databricks"}:
         return query
 
     tree = sqlglot.parse_one(query, read=target_dialect)
@@ -91,9 +98,7 @@ def _rewrite_array_aggregation(query: str, target_dialect: str) -> str:
 def _ordered_array(value: exp.Expression, target_dialect: str) -> exp.Expression:
     """Collect values in lineitem key order so separately reduced arrays stay aligned."""
     rendered = value.sql(dialect=target_dialect)
-    if target_dialect == "snowflake":
-        expression = f"ARRAY_AGG({rendered}) WITHIN GROUP (ORDER BY l_orderkey, l_linenumber)"
-    elif target_dialect == "databricks":
+    if target_dialect == "databricks":
         expression = (
             "TRANSFORM(SORT_ARRAY(COLLECT_LIST(NAMED_STRUCT("
             f"'orderkey', l_orderkey, 'linenumber', l_linenumber, 'value', {rendered}))), row -> row.value)"
@@ -105,21 +110,7 @@ def _ordered_array(value: exp.Expression, target_dialect: str) -> exp.Expression
 
 def _array_projection_sql(target_dialect: str) -> tuple[str, ...]:
     if target_dialect == "snowflake":
-        zero = "CAST(0 AS NUMBER(38, 12))"
-
-        def reduce_array(expression: str) -> str:
-            return f"REDUCE({expression}, {zero}, (acc, x) -> acc + x)"
-
-        sum_qty = reduce_array("quantities")
-        sum_price = reduce_array("prices")
-        sum_disc_price = reduce_array(
-            "TRANSFORM(ARRAY_GENERATE_RANGE(0, ARRAY_SIZE(prices)), i -> prices[i] * (1 - discounts[i]))"
-        )
-        sum_charge = reduce_array(
-            "TRANSFORM(ARRAY_GENERATE_RANGE(0, ARRAY_SIZE(prices)), "
-            "i -> prices[i] * (1 - discounts[i]) * (1 + taxes[i]))"
-        )
-        size = "ARRAY_SIZE"
+        raise NotImplementedError("No native Snowflake array reduction is proven; 1_v7 stays skipped on Snowflake.")
     elif target_dialect == "databricks":
         zero = "CAST(0 AS DOUBLE)"
 

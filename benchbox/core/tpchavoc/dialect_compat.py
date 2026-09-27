@@ -99,7 +99,10 @@ def _clickhouse_filter_node(node: exp.Expression) -> exp.Expression:
         return exp.Anonymous(this="countIf", expressions=[condition])
     combinator = {exp.Sum: "sumOrNullIf", exp.Avg: "avgOrNullIf"}.get(type(aggregate))
     if combinator is None:
-        return node
+        raise NotImplementedError(
+            f"ClickHouse FILTER rewrite handles only COUNT(*), SUM, and AVG; got {type(aggregate).__name__}. "
+            "Extend the combinator map before scoping this variant."
+        )
     return exp.Anonymous(this=combinator, expressions=[aggregate.this.copy(), condition])
 
 

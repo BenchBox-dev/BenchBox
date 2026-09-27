@@ -122,6 +122,17 @@ def test_clickhouse_filtered_aggregates_use_native_combinators():
     assert q12.count("countIf(") == 2
 
 
+def test_clickhouse_filter_rewrite_rejects_unhandled_aggregate_shapes():
+    from benchbox.core.tpchavoc.dialect_compat import _rewrite_clickhouse_filters
+
+    # Only COUNT(*), SUM, and AVG have ClickHouse combinator mappings. Any
+    # other FILTER shape (COUNT(column), MIN, MAX, ...) must fail loudly so a
+    # future scope extension cannot silently ship an unrewritten FILTER.
+    for aggregate in ("COUNT(l_orderkey)", "MIN(l_orderkey)", "MAX(l_orderkey)"):
+        with pytest.raises(NotImplementedError, match="ClickHouse FILTER rewrite handles only"):
+            _rewrite_clickhouse_filters(f"SELECT {aggregate} FILTER (WHERE l_orderkey > 0) FROM lineitem")
+
+
 def test_clickhouse_filter_rules_cover_each_deployment_mode():
     import benchbox.sql_compat.rules.query_adapter.clickhouse_tpchavoc_rewrites  # noqa: F401
     from benchbox.sql_compat.context import Phase

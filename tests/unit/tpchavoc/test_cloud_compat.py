@@ -53,20 +53,21 @@ def test_q1_v7_native_array_rewrite_parses_but_stays_skipped_until_live_compile(
     benchmark = TPCHavocBenchmark(scale_factor=0.1)
     queries = {dialect: benchmark.get_query("1_v7", dialect=dialect) for dialect in CLOUD_TPCHAVOC_SKIPS}
 
-    # The native-array rewrite exists and parses per dialect, but a parse
-    # check cannot catch engine-side limits (see Snowflake 2_v2 002031), so
-    # the 1_v7 skip stays in both sets until the rewrite compiles live on
-    # each cloud engine.
+    # The BigQuery/Databricks native-array rewrite exists and parses, but a
+    # parse check cannot catch engine-side limits (see Snowflake 2_v2 002031),
+    # so the 1_v7 skip stays in both sets until the rewrite compiles live on
+    # each cloud engine. The Snowflake leg is unimplemented (no native array
+    # REDUCE exists), so Snowflake input falls through unchanged.
     for dialect, query in queries.items():
         assert "1_v7" in CLOUD_TPCHAVOC_SKIPS[dialect]
         assert sqlglot.parse_one(query, read=dialect)
-        assert "LIST_SUM" not in query.upper()
-        assert "LIST_ZIP" not in query.upper()
+    for dialect in ("bigquery", "databricks"):
+        assert "LIST_SUM" not in queries[dialect].upper()
+        assert "LIST_ZIP" not in queries[dialect].upper()
 
-    assert "ARRAY_AGG(" in queries["snowflake"]
-    assert "WITHIN GROUP (ORDER BY l_orderkey, l_linenumber)" in queries["snowflake"]
-    assert "REDUCE(" in queries["snowflake"]
-    assert "TRANSFORM(" in queries["snowflake"]
+    # Snowflake has no proven native array reduction: the query must fall
+    # through unchanged (no REDUCE, no rewritten projections).
+    assert "REDUCE(" not in queries["snowflake"]
     assert "ARRAY_AGG(" in queries["bigquery"]
     assert "ORDER BY l_orderkey, l_linenumber" in queries["bigquery"]
     assert "FROM UNNEST(" in queries["bigquery"]
@@ -143,7 +144,6 @@ def test_registry_describes_runtime_rewrites():
         for platform in ("bigquery", "snowflake", "databricks")
     }
     assert registered["bigquery"] == BIGQUERY_FILTER_IDS | {
-        "1_v7",
         "7_v8",
         "12_v8",
         "13_v8",
@@ -152,5 +152,5 @@ def test_registry_describes_runtime_rewrites():
         "11_v4",
         "3_v9",
     }
-    assert registered["snowflake"] == {"1_v7", "6_v2", "14_v2"}
-    assert len(registered["databricks"]) == 12
+    assert registered["snowflake"] == {"6_v2", "14_v2"}
+    assert len(registered["databricks"]) == 11
