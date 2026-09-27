@@ -478,6 +478,44 @@ class TestSQLiteSharedCursorConcurrentUse:
         finally:
             shared_connection.close()
 
+    def test_identical_concurrent_reads_never_share_a_prepared_statement(self, tmp_path) -> None:
+        """Streams issuing the SAME SQL must not share sqlite3's cached statement.
+
+        With the default per-connection statement cache, concurrent cursors
+        running identical SQL receive one prepared statement, so one stream's
+        execute resets the other's result set and it reads a wrong or missing
+        row. Many rounds make the race near-certain without the fix.
+        """
+        adapter = SQLiteAdapter(database_path=str(tmp_path / "shared.db"))
+        shared_connection = adapter.create_connection()
+        try:
+            shared_connection.execute("CREATE TABLE probe (value INTEGER)")
+            shared_connection.executemany("INSERT INTO probe VALUES (?)", [(value,) for value in range(10)])
+            shared_connection.commit()
+
+            wrong: list[Any] = []
+
+            def run() -> None:
+                for _ in range(2000):
+                    cursor = adapter.new_stream_connection(shared_connection)
+                    try:
+                        cursor.execute("SELECT COUNT(*) FROM probe")
+                        rows = cursor.fetchall()
+                    finally:
+                        cursor.close()
+                    if rows != [(10,)]:
+                        wrong.append(rows)
+
+            threads = [threading.Thread(target=run) for _ in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=120)
+
+            assert not wrong, f"{len(wrong)} shared-cursor reads saw another stream's statement state: {wrong[:3]}"
+        finally:
+            shared_connection.close()
+
 
 class TestMySQLWireIndependentConnections:
     """Doris + SingleStore via MySqlWireLifecycleMixin (INDEPENDENT_CONNECTION).

@@ -397,8 +397,19 @@ class SQLiteAdapter(PlatformAdapter):
         # the adapted real value using its native numeric representation.
         sqlite3.register_adapter(Decimal, float)
 
-        # Create connection
-        conn = sqlite3.connect(db_path, timeout=self.timeout, check_same_thread=self.check_same_thread)
+        # Create connection. Throughput streams run on cursors of this one
+        # connection (SHARED_CURSOR), and sqlite3's per-connection statement
+        # cache hands the same prepared statement to concurrent cursors running
+        # identical SQL, so one stream's execute resets another's result set
+        # and it reads wrong or missing rows. Disabling the cache gives every
+        # cursor its own statement; the re-prepare cost is negligible next to
+        # benchmark query execution.
+        conn = sqlite3.connect(
+            db_path,
+            timeout=self.timeout,
+            check_same_thread=self.check_same_thread,
+            cached_statements=0,
+        )
 
         _register_sqlite_compatibility_functions(conn)
 
