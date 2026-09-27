@@ -339,6 +339,31 @@ class TestQ16Q18StructuralShapes:
         assert result.height == 4, f"Q18v4 must keep all four orders at threshold 30, got {result.height}"
         assert_frame_equal(result, base)
 
+    def test_q18v4_threshold_gate_skips_prune_for_small_thresholds_pandas(self, q18_context, monkeypatch) -> None:
+        """Q18v4 pandas must not prune single-line orders when the threshold allows them.
+
+        Mirrors the expression-family gate test on the pandas backend: at
+        threshold 30 the single-line order 1 (total 100) qualifies, so the
+        line-count prune must be skipped and v4 must match v1 exactly.
+        """
+        pytest.importorskip("pandas")
+        from pandas.testing import assert_frame_equal as assert_pandas_equal
+
+        import benchbox.core.tpch.dataframe_queries as tpch_queries
+        import benchbox.core.tpchavoc.dataframe_queries.q18 as q18_module
+        from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
+
+        monkeypatch.setattr(q18_module, "get_tpch_parameters", lambda _n: {"quantity_threshold": 30})
+        monkeypatch.setattr(tpch_queries, "get_tpch_parameters", lambda _n: {"quantity_threshold": 30})
+        pandas_ctx = PandasDataFrameAdapter().create_context()
+        for table in ("customer", "orders", "lineitem"):
+            frame = _collect_frame(q18_context.get_table(table))
+            pandas_ctx.register_table(table, frame.to_pandas())
+        base = _collect_pandas(get_query("Q18v1").pandas_impl(pandas_ctx)).reset_index(drop=True)
+        result = _collect_pandas(get_query("Q18v4").pandas_impl(pandas_ctx)).reset_index(drop=True)
+        assert len(result) == 4, f"Q18v4 pandas must keep all four orders at threshold 30, got {len(result)}"
+        assert_pandas_equal(result, base, check_dtype=False)
+
     def test_q18v6_bands_are_disjoint_nonempty_and_cover_large_orders(self, q18_context) -> None:
         """Q18v6 must split large orders into disjoint, non-empty nation bands that union exactly."""
         seen: list[list[int]] = []
