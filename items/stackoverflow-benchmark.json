@@ -1,4 +1,5 @@
 {
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.",
   "description": "Implement a Stack Overflow benchmark using the publicly available Stack Exchange\ndata dumps. This benchmark provides a realistic multi-table OLAP workload based\non one of the world's largest Q&A platforms, featuring rich analytical patterns\nincluding tag analysis, reputation systems, and temporal trends.\n\nStack Overflow is an excellent benchmark dataset because:\n- Real-world data with natural distributions (highly skewed, long-tail)\n- Multi-table schema with diverse join patterns\n- Large scale: 630M+ rows across 7 tables, ~150-200 GB\n- Rich analytical patterns: tags, reputation, temporal, text search\n- Publicly accessible via multiple sources (BigQuery, ClickHouse, dumps)\n\nUse cases covered:\n- Tag popularity and co-occurrence analysis\n- User reputation progression and engagement metrics\n- Question/answer quality metrics\n- Temporal trends and seasonal patterns\n- Multi-table aggregations with complex joins\n",
   "legacy": {
     "anti_patterns": [
@@ -258,5 +259,15 @@
         "wid": "w9"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:06:46Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "3101def0edf4459bac13e881c039e44d",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
