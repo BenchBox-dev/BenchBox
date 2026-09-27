@@ -7661,6 +7661,15 @@
       "status": "open",
       "title": "Databricks adapter gateway label + PAT-only guardrail"
     },
+    "gw-docs-uat-closeout": {
+      "claim": null,
+      "needs": [
+        "gw-tests-gates"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Gateway docs, UAT runbook, G3 gate, PR close-out"
+    },
     "gw-greybeam-lifecycle": {
       "claim": null,
       "needs": [

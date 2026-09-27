@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "docs/platforms/snowflake-gateways.md: setup, Enterprise caveat, options table, PAT-only note, TLS/OCSP, key-pair mandate, PrivateLink, exposure warning, quiescence runbook, log-join, TCO worksheet, semantic gaps, no-rewrite stance",
+    "snowflake.md + databricks.md pointers only; README/matrix untouched; no new manifest keys",
+    "TCO inputs opaque + cost-not-comparable banner rule",
+    "Write-only UAT runbook (SF 0.01, caps, evidence checklist); not executed; G3 recorded"
+  ],
+  "context": "Plan v2 E/G/H/J. Depends on gw-tests-gates. Close-out: code-skill review, pr-preflight, pr-open to develop.",
+  "description": "Gateway docs (snowflake-gateways.md + pointers), cost/TCO rules, write-only live-UAT runbook, G3 gate record, and PR close-out.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:21:20Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "78ec10f0459047bbbfb487bdd954e51f",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}
