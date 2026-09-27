@@ -15,6 +15,7 @@ class TaxiType(Enum):
     YELLOW = "yellow"
     GREEN = "green"
     HVFHV = "hvfhv"
+    FHV = "fhv"
 
 
 def _load_schema_specs() -> dict[str, Any]:
@@ -57,6 +58,8 @@ def get_create_tables_sql(
                 tables_to_create.append("green_trips")
             elif taxi_type == TaxiType.HVFHV:
                 tables_to_create.append("hvfhv_trips")
+            elif taxi_type == TaxiType.FHV:
+                tables_to_create.append("fhv_trips")
 
     statements = []
     for table_name in TABLE_ORDER:
@@ -183,5 +186,12 @@ def get_green_trips_columns() -> list[str]:
 def get_hvfhv_trips_columns() -> list[str]:
     """Get column names for the hvfhv_trips table (excluding auto-generated trip_id)."""
     columns = list(NYC_TAXI_SCHEMA["hvfhv_trips"]["columns"].keys())
+    columns.remove("trip_id")
+    return columns
+
+
+def get_fhv_trips_columns() -> list[str]:
+    """Get column names for the fhv_trips table (excluding auto-generated trip_id)."""
+    columns = list(NYC_TAXI_SCHEMA["fhv_trips"]["columns"].keys())
     columns.remove("trip_id")
     return columns
