@@ -158,9 +158,9 @@ class TestGetSchema:
 
     def test_get_schema_has_all_tables(self):
         """Schema should include all tables when all taxi types are active."""
-        bm = NYCTaxiBenchmark(taxi_types=[TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV])
+        bm = NYCTaxiBenchmark(taxi_types=[TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV, TaxiType.FHV])
         schema = bm.get_schema()
-        required = {"trips", "taxi_zones", "green_trips", "hvfhv_trips"}
+        required = {"trips", "taxi_zones", "green_trips", "hvfhv_trips", "fhv_trips"}
         assert required.issubset(set(schema.keys()))
 
 
