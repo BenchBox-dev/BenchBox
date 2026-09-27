@@ -251,14 +251,14 @@ coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
 # Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (datavault remains staged) and run in the blocking correctness-gate (pr.yml);
+# In GATES and run in the blocking correctness-gate (pr.yml);
 # exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
 # classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
 
 # Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
-# cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
+# cell. In GATES and run in the blocking correctness-gate
 # (pr.yml); exits non-zero on any unclassified divergence (see
 # _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
