@@ -41,6 +41,34 @@ def test_handoff_dispatches_candidate_then_promotion() -> None:
     assert "github-pages approval" in run_text
 
 
+def test_handoff_observes_promotion_conclusion() -> None:
+    """The job must wait on the promotion run, not finish green at dispatch."""
+    wf = _load()
+    steps = wf["jobs"]["handoff"]["steps"]
+    run_text = "\n".join(str(step.get("run", "")) for step in steps)
+
+    assert "Observe promotion conclusion" in [s.get("name", "") for s in steps]
+    assert "did not conclude within" in run_text
+    assert "concluded $RESULT" in run_text
+
+
+def test_handoff_correlates_dispatch_by_run_url() -> None:
+    """Timestamp-only selection can promote an unrelated deploy; keep the URL."""
+    wf = _load()
+    steps = wf["jobs"]["handoff"]["steps"]
+    run_text = "\n".join(str(step.get("run", "")) for step in steps)
+
+    assert "dispatch_url" in run_text
+    assert "CANDIDATE_RUN_ID" in run_text
+
+
+def test_handoff_deadline_uses_monotonic_clock() -> None:
+    """Wall-clock steps must not open the fallback early or extend the wait."""
+    text = HANDOFF_PATH.read_text(encoding="utf-8")
+    assert "$SECONDS" in text
+    assert "DEADLINE=$(( $(date -u +%s)" not in text
+
+
 def test_handoff_opens_tracked_issue_on_failure() -> None:
     wf = _load()
     steps = wf["jobs"]["handoff"]["steps"]

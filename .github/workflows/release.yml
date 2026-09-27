@@ -238,6 +238,14 @@ jobs:
           else
             gh release create "$tag" dist/* --title "$title" --notes-file release-notes.md
           fi
+          # Releases created with GITHUB_TOKEN do not trigger the
+          # publication-release-handoff listener (GitHub suppresses
+          # workflow runs from that token), so dispatch the handoff
+          # explicitly. The listener remains as a backstop for
+          # manually created releases.
+          gh workflow run "Publication Release Handoff" --ref develop --field tag="$tag" || {
+            echo "::warning::publication handoff dispatch failed for $tag; the release listener covers manual retries"
+          }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
