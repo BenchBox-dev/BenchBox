@@ -16,7 +16,7 @@ class StateContractError(ValueError):
 
 EXPECTED_REMOTE = "https://github.com/BenchBox-dev/BenchBox.git"
 EXPECTED_BRANCH = "todo-state"
-EXPECTED_VERSION = "0.8.0"
+EXPECTED_VERSION = "0.8.1"
 EXPECTED_WHEEL = f"todo_db-{EXPECTED_VERSION}-py3-none-any.whl"
 
 

@@ -203,6 +203,9 @@ and the inventory regenerated:
 | tpcdi | SF 0.01, SF 0.1, SF 1.0 | — |
 | tpcds_obt | SF 1.0 | — |
 | tpchavoc | SF 0.01, SF 0.1, SF 1.0 | — |
+| vector_search | — (see deferral) | DEFERRED 2026-09-26: single DuckDB tuned-fallback SF 0.01 run (applied_unverified) withheld from promotion, never committed to the seed corpus — each committed cohort needs >=3 comparison identities per results-data/validate_corpus.py. Restore only with two more genuine validation-passed platform runs (ClickHouse Local and StarRocks per the dropped-cell list; DataFusion has no vector_search query path). SF 0.1, SF 1.0 — deferred, no tuned path run yet |
+| joinorder_synthetic | — (see deferral) | DEFERRED 2026-09-26: single DuckDB tuned-fallback SF 1.0 run (applied_unverified) withheld from promotion, never committed — the internal surface has no inventory exclusion in scripts/generate_corpus_inventory.py or results-data/validate_corpus.py, so both consumers count it as a one-identity cohort and the depth gate fails. Restore only with two more genuine validation-passed platform runs, or implement the exclusion consistently first. |
+| ai_primitives | — (see waiver) | WAIVED 2026-09-26: DuckDB tuned path enables FK enforcement that breaks ai_primitives load order (bulk-load constraint violations on customer/lineitem/nation/orders/partsupp/supplier); notuning succeeds. Tuned regen blocked on the benchmark's load-order defect, not on tuning. |
 | metadata_primitives | — (see deferral) | DuckDB + DataFusion validation-passed locally; ClickHouse Local incompatible (ACL privileges); SQLite fresh run 2026-09-04 failed all 51 queries |
 | write_primitives | — (see deferral) | Only DuckDB validation-passed locally; DataFusion SF 0.01 failed missing write-ops tables; ClickHouse Local SF 0.01 failed schema NOT NULL; SQLite/Spark/Polars remain partial |
 | star_schema | not applicable | Alias of `ssb`; do not duplicate |

@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 535
+**Total registered rules:** 545
 
 **Platforms covered:** 35
 
@@ -14,12 +14,12 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
 | bigquery | - | 2 | 25 | 2 | 1 | 2 | 32 |
-| clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
+| clickhouse | - | 19 | 3 | 4 | 1 | - | 27 |
 | clickhouse-cloud | - | - | - | - | - | 23 | 23 |
 | clickhouse-local | 1 | - | - | - | - | 23 | 24 |
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
-| databricks | - | 1 | 11 | 2 | 1 | 1 | 16 |
+| databricks | - | 1 | 11 | 2 | 2 | 8 | 24 |
 | datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
@@ -40,7 +40,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | snowflake | - | 7 | 2 | 2 | 1 | 2 | 14 |
 | spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
-| starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
+| starrocks | - | 15 | 1 | 2 | 1 | - | 19 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
 | timescaledb | 3 | - | - | - | - | 19 | 22 |
@@ -100,6 +100,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=coffeeshop, query=SA4 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.sa4_cross_join_variant` |
 | query_source | benchmark=coffeeshop, query=TM1 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.tm1_todatetime_variant` |
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.clickhouse.h2odb.q9_quantile_variant` |
+| query_source | benchmark=nyctaxi, query=fhv-base-volume | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.fhv_base_volume_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.rush_hour_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trip_duration_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trips_by_dow_todayofweek_variant` |
@@ -233,8 +234,16 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q09_scalar_group_by_first` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.write_primitives.pk_not_enforced` |
+| ddl_optimize | benchmark=transaction_primitives | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `ddl_optimize.databricks.transaction_primitives.txn_staging_catalog_managed` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.databricks.all.convert_to_delta_table` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.tpchavoc.1_v7` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_create_temp_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_create_temp_table` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_savepoint_nested` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_truncate_in_transaction | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_truncate_in_transaction` |
 
 ### datafusion
 
@@ -669,6 +678,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.starrocks.h2odb.q9_percentile_approx_variant` |
+| query_source | benchmark=nyctaxi, query=fhv-base-volume | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.fhv_base_volume_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.rush_hour_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.trip_duration_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.trips_by_dow_dayofweek_variant` |
