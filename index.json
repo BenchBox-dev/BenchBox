@@ -7645,6 +7645,15 @@
       "status": "done",
       "title": "Confirm the guards-fix skill-sync containment on the machine with the real CLI"
     },
+    "gw-cache-discipline": {
+      "claim": null,
+      "needs": [
+        "gw-metadata-guards"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Gateway cache discipline + honest unverified reporting"
+    },
     "gw-databricks": {
       "claim": null,
       "needs": [],
