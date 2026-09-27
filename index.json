@@ -4832,6 +4832,15 @@
       "status": "open",
       "title": "Stage nyctaxi, tsbs_devops, tpch_skew cross-surface builders"
     },
+    "df-parity-staged-tpch-tpcds": {
+      "claim": null,
+      "needs": [
+        "df-parity-id-mapping-builders"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Stage TPC-H and TPC-DS gates, budget TPC-DS CI subset"
+    },
     "df-suffix-platform-options-unreachable": {
       "claim": null,
       "needs": [],

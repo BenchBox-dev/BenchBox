@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "tpch staged gate at fixed stream 0 with empty-or-classified baseline and zero unclassified vacuous cells",
+    "tpcds staged run measured: wall time for full 99 plus a proposed 10-15 query discriminating subset with per-query discrimination evidence",
+    "Blocking CI decision recorded: subset list with owner sign-off (implementer proposes, reviewer approves); any excluded query classified with reason",
+    "Full-99 run placed staged plus scheduled or non-blocking path with measured runtime"
+  ],
+  "context": "Adversarial findings: the 25-minute correctness-gate job already runs 12 sequential targets; a full 99-query TPC-DS gate (300 executions across 3 backends plus dsdgen) breaches it, so blocking CI is capped at 10-15 discriminating queries. Honest oracle semantics: cross-surface gates prove transcription equivalence against DuckDB SQL references at EQUIVALENCE_SCALE, not ground-truth correctness; TPC-H SQL stays pinned to stored expected results at SF1. Full review: /Users/joe/.jcode/scratch/agy_review.txt findings 3, 6, 9. Depends on df-parity-id-mapping-builders for the Q-prefix maps.",
+  "description": "Wire staged TPC-H (fixed stream 0) and TPC-DS gates, measure TPC-DS wall time, and fix the blocking-vs-scheduled split. Update the cross_surface.py module docstring to state the oracle composition honestly (transcription verification, scale boundaries, shared-spec limits). Guardrails: no change to validate_dataframe_query_results refusal logic; no unowned subsetting; classified exclusions only with reasons; staged only, promotion happens in the next item.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:35:14Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "b1eda8d21f5e457595c2c308d57fa581",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
