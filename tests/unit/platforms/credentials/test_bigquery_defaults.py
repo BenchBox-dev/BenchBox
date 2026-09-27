@@ -20,12 +20,20 @@ pytestmark = [
 class TestBigQueryCredentialDefaults:
     """Test BigQuery credential setup shows existing values as defaults."""
 
+    # NOTE: Confirm is patched through the module under test
+    # (``...bigquery.Confirm.ask``), not via ``rich.prompt.Confirm.ask``. Both
+    # resolve to the same attribute today, but the module-resolved target keeps
+    # working if another test file on the same xdist worker replaces the global
+    # ``rich.prompt.Confirm`` without cleanup: the global patch would then mock a
+    # stale object while production code calls the real prompt (seen as
+    # ``call_count == 0`` in full-suite CI while every smaller scope passes).
+
     @patch("benchbox.platforms.credentials.bigquery._prompt_default_output_location")
     @patch("benchbox.platforms.credentials.bigquery.validate_bigquery_credentials")
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_shows_existing_values_as_defaults(
         self,
         mock_confirm,
@@ -81,7 +89,7 @@ class TestBigQueryCredentialDefaults:
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_works_with_no_existing_credentials(
         self,
         mock_confirm,
@@ -131,7 +139,7 @@ class TestBigQueryCredentialDefaults:
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_partial_existing_credentials(
         self,
         mock_confirm,
@@ -189,7 +197,7 @@ class TestBigQueryCredentialDefaults:
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_auto_detection_bypasses_existing_defaults(
         self,
         mock_confirm,
@@ -242,7 +250,7 @@ class TestBigQueryCredentialDefaults:
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_skips_auto_detection_when_credentials_exist(
         self,
         mock_confirm,
@@ -297,7 +305,7 @@ class TestBigQueryCredentialDefaults:
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_offers_auto_detection_when_no_credentials_exist(
         self,
         mock_confirm,
@@ -345,7 +353,7 @@ class TestBigQueryCredentialDefaults:
     @patch("benchbox.platforms.credentials.bigquery.Path")
     @patch("builtins.open", new_callable=mock_open, read_data='{"type": "service_account"}')
     @patch("benchbox.platforms.credentials.bigquery.prompt_with_default")
-    @patch("rich.prompt.Confirm.ask")
+    @patch("benchbox.platforms.credentials.bigquery.Confirm.ask")
     def test_storage_bucket_shows_existing_value(
         self,
         mock_confirm,
