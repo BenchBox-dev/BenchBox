@@ -2166,6 +2166,63 @@ class TestConvertToBigqueryTable:
         assert "PRIMARY KEY (id) NOT ENFORCED" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_reference_qualified_and_not_enforced(self, mock_bigquery):
+        """BigQuery rejects an unqualified REFERENCES target and enforced foreign keys."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE `link_nation_region` (`hk_nation` STRING(64) NOT NULL, `hk_region` STRING(64) NOT NULL, "
+            "PRIMARY KEY (`hk_nation`), FOREIGN KEY (`hk_nation`) REFERENCES `hub_nation` (`hk_nation`), "
+            "FOREIGN KEY (`hk_region`) REFERENCES hub_region (`hk_region`))"
+        )
+        assert "REFERENCES `proj.ds.HUB_NATION` (`hk_nation`) NOT ENFORCED" in result
+        assert "REFERENCES `proj.ds.HUB_REGION` (`hk_region`) NOT ENFORCED" in result
+        assert "`hub_nation`" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_already_not_enforced_is_unchanged(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = "CREATE TABLE t (a INT64, FOREIGN KEY (a) REFERENCES `proj.ds.P` (a) NOT ENFORCED)"
+        result = adapter._convert_to_bigquery_table(sql)
+        assert result.count("NOT ENFORCED") == 1
+        assert "REFERENCES `proj.ds.P` (a) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_rewrite_ignores_string_literals(self, mock_bigquery):
+        """REFERENCES text inside a string default is data, not a constraint."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = "CREATE TABLE t (note STRING DEFAULT 'REFERENCES parent(id)', a INT64, FOREIGN KEY (a) REFERENCES p (a))"
+        result = adapter._convert_to_bigquery_table(sql)
+        assert "DEFAULT 'REFERENCES parent(id)'" in result
+        assert "REFERENCES `proj.ds.P` (a) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_extract_unqualified_tables_skips_earlier_sibling_ctes(self, mock_bigquery):
+        """A CTE body that reads an earlier CTE must not qualify that name as a base table."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = (
+            "WITH first_cte AS (SELECT a FROM base_one), "
+            "second_cte AS (SELECT f.a FROM orders o JOIN first_cte f ON o.a = f.a) "
+            "SELECT * FROM second_cte"
+        )
+        assert adapter._extract_unqualified_tables(query) == ["BASE_ONE", "ORDERS"]
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualify_aliases_table_referenced_with_backticked_prefix(self, mock_bigquery):
+        """Translated queries write `lineitem`.`col`; qualifying must keep that name resolvable."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = "SELECT SUM(`l_quantity`) FROM `lineitem`, `part` WHERE `p_partkey` = `lineitem`.`l_partkey`"
+        result = adapter._qualify_single_statement(query)
+        assert "FROM `proj.ds.LINEITEM` AS lineitem," in result
+        assert "`proj.ds.PART` AS" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_extract_unqualified_tables_keeps_self_shadowed_base_table(self, mock_bigquery):
+        """A CTE named like the base table it reads still qualifies the base table."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = "WITH orders AS (SELECT * FROM orders WHERE a > 1) SELECT * FROM orders"
+        assert adapter._extract_unqualified_tables(query) == ["ORDERS"]
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_inline_pk_survives_parameterized_types(self, mock_bigquery):
         """Commas inside DECIMAL(10, 2) must not split the column definition."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
