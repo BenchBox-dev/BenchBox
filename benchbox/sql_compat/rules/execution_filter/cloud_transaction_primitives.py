@@ -14,12 +14,6 @@ _TEMP_TABLE = (
     "so a TEMP TABLE created in one statement is invisible to the next."
 )
 
-# NOTE: transaction_create_temp_table is intentionally NOT skipped. The
-# adapter submits the whole translated script in one connection.query call
-# (bigquery.py execute_query), where a script-scoped temporary table stays
-# visible to later statements, and batch qualification keeps temp-table
-# references unqualified. The operation runs; only the SAVEPOINT and
-# isolation operations above are genuine engine gaps.
 _OPERATIONS = {
     "transaction_savepoint_nested": _SAVEPOINT,
     "transaction_savepoint_deep_nesting": _SAVEPOINT,
@@ -28,7 +22,9 @@ _OPERATIONS = {
     "transaction_isolation_serializable": _ISOLATION,
 }
 
-_BIGQUERY_ONLY_OPERATIONS: dict[str, str] = {}
+_BIGQUERY_ONLY_OPERATIONS = {
+    "transaction_create_temp_table": _TEMP_TABLE,
+}
 
 SNOWFLAKE_TRANSACTION_PRIMITIVES_OPERATION_SKIPS = {
     query_id: reason.format(engine="Snowflake") for query_id, reason in _OPERATIONS.items()
