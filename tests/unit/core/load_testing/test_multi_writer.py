@@ -145,30 +145,41 @@ def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) 
             return (False, 0, str(exc))
 
     # One database instance, one cursor per stream: DuckDB's documented
-    # multi-threaded pattern. Per-stream duckdb.connect(path) races the
-    # process-wide instance cache when one stream closes the last handle while
-    # another opens, failing with "Unique file handle conflict" under CPU
-    # contention; that is a DuckDB client constraint, not executor behavior.
-    anchor = duckdb.connect(db_path)
-    config = ConcurrentLoadConfig(
-        query_factory=lambda index: (f"q{index}", "SELECT 1"),
-        connection_factory=anchor.cursor,
-        execute_query=execute,
-        pattern=pattern,
-        queries_per_stream=50,
-        collect_resource_metrics=False,
-        role_factories={"writer": writer_factory, "reader": reader_factory},
-    )
-    try:
+    # multi-threaded pattern
+    # (https://duckdb.org/docs/stable/guides/python/multiple_threads,
+    # duckdb 1.5.5). The prior per-stream duckdb.connect(path) failed in CI
+    # with "Unique file handle conflict" when streams opened and closed the
+    # same file concurrently. A cursor from the one anchored connection cannot
+    # hit that open/close race; cursors are independent handles whose close
+    # never closes the anchor, and run() joins every stream before anchor
+    # teardown, so no stream outlives the connection.
+    #
+    # This is the one supported exception to ConcurrentLoadConfig's
+    # independent-connection contract: DuckDB documents connection-plus-cursors
+    # as its thread-safe unit, and _execute_stream closes only its cursor.
+    with duckdb.connect(db_path) as anchor:
+        config = ConcurrentLoadConfig(
+            query_factory=lambda index: (f"q{index}", "SELECT 1"),
+            connection_factory=anchor.cursor,
+            execute_query=execute,
+            pattern=pattern,
+            queries_per_stream=50,
+            collect_resource_metrics=False,
+            role_factories={"writer": writer_factory, "reader": reader_factory},
+        )
         result = ConcurrentLoadExecutor(config).run()
-    finally:
-        anchor.close()
 
-    failures = [stream.error for stream in result.streams if stream.error]
+    failures = [(stream.stream_id, stream.error) for stream in result.streams if stream.error]
     assert not failures, failures
 
     assert result.total_streams_succeeded == result.total_streams_executed > 0
-    assert result.total_queries_executed > 0
+    assert result.total_queries_failed == 0, [
+        (execution.query_id, execution.error)
+        for stream in result.streams
+        for execution in stream.query_executions
+        if not execution.success
+    ]
+    assert result.total_queries_succeeded == result.total_queries_executed > 0
     # Queue waits mix no clocks: every recorded wait must be a small
     # non-negative duration, never a billion-second wall-vs-monotonic gap.
     for stream in result.streams:
