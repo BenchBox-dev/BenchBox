@@ -1,5 +1,5 @@
 {
-  "context": "Implement this as a derived archive builder in its own module\n(`benchbox/core/joinorder_replicated/`), not by teaching canonical\nJoinOrderGenerator to synthesize larger data. The module separation\nenforces the canonical/derived boundary at the file-system level —\nagents working on canonical joinorder cannot accidentally touch\nreplicated logic and vice versa.\n\nKeep the implementation deterministic and manifest-driven. Use the\ncanonical oracle artifacts (foundation TODO's\n`_project/joinorder/reference_cardinalities.json`) to prove expected\nquery/cardinality scaling before interpreting engine performance.\n\nResult-bundle tagging: registered as `joinorder_replicated` in\nbenchmark_registry.py with `surface: internal` (matching the\njoinorder_synthetic precedent — derived/research workloads stay\nhidden from the public explorer until promoted explicitly).\n",
+  "context": "Implement this as a derived archive builder in its own module\n(`benchbox/core/joinorder_replicated/`), not by teaching canonical\nJoinOrderGenerator to synthesize larger data. The module separation\nenforces the canonical/derived boundary at the file-system level —\nagents working on canonical joinorder cannot accidentally touch\nreplicated logic and vice versa.\n\nKeep the implementation deterministic and manifest-driven. Use the\ncanonical oracle artifacts (foundation TODO's\n`_project/joinorder/reference_cardinalities.json`) to prove expected\nquery/cardinality scaling before interpreting engine performance.\n\nResult-bundle tagging: registered as `joinorder_replicated` in\nbenchmark_registry.py with `surface: internal` (matching the\njoinorder_synthetic precedent — derived/research workloads stay\nhidden from the public explorer until promoted explicitly).\n\nLADDER CORRECTION 2026-09-27 (tracker-corpus-repair sweep): two legacy verifications invoke _project/scripts/todo_cli.py, deleted in the G5 cutover; those commands cannot run. Modern equivalents are the todo-db CLI and MCP tracker tools. Legacy verification text is preserved as history.",
   "description": "Prototype the lowest-risk derived scale-up mode for JOB: offset-replicating\nthe canonical IMDB tables by integer scale factor while preserving predicate\nvalues and consistently offsetting primary and foreign keys.\n\nThis is an infrastructure and measurement baseline for future job_scale_stress\nwork. It is not intended to model \"IMDb got 10x larger\" perfectly and must be\nlabeled as replicated_imdb, not canonical_imdb.\n",
   "legacy": {
     "anti_patterns": [
@@ -461,6 +461,14 @@
       "op": "finish",
       "op_id": "8dca3050f21e4f47882e48d878f473ef",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:10:34Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "7421c50dcc004be48ed71753d9ac1503",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
     }
   ]
 }
