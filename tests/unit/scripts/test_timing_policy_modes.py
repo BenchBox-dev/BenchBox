@@ -404,9 +404,32 @@ def _write_event(path: Path, payload: dict) -> None:
     path.write_text(__import__("json").dumps(payload), encoding="utf-8")
 
 
+def test_merge_group_payload_is_not_misclassified_as_pull_request(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    event_file = tmp_path / "event.json"
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+    _write_event(event_file, {"action": "checks_requested", "merge_group": {"head_sha": "abc123"}})
+
+    assert mod._github_event_name() == "merge_group"
+    assert mod._ceiling_grace_from_event("150") == 150
+
+
+def test_runner_event_name_takes_precedence_over_event_payload(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "merge_group")
+    event_file = tmp_path / "event.json"
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
+    _write_event(event_file, {"action": "checks_requested"})
+
+    assert mod._github_event_name() == "merge_group"
+    assert mod._ceiling_grace_from_event("150") == 150
+
+
 def test_ceiling_grace_honored_only_on_merge_group(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("10077/10077 tests collected"))
     event_file = tmp_path / "event.json"
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
@@ -418,6 +441,7 @@ def test_ceiling_grace_honored_only_on_merge_group(
 def test_ceiling_grace_flag_rejected_on_other_events(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
     event_file = tmp_path / "event.json"
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_file))
     _write_event(event_file, {"event_name": "pull_request"})
@@ -443,7 +467,7 @@ def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
     lint_steps = pr["jobs"]["code-lint"]["steps"]
     timing = next(s for s in lint_steps if s.get("id") == "guard-timing-policy")
     # No environment variable may smuggle the grace in: the committed command
-    # line carries the flag and the script gates it on the runner event file.
+    # carries the flag and the script gates it on runner event identity.
     assert "FAST_LANE_CEILING_GRACE" not in (timing.get("env") or {})
     assert "--ceiling-grace 150" in timing["run"]
     delta = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-delta")

@@ -94,12 +94,18 @@ MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD
 
 
 def _github_event_name() -> str | None:
-    """Read the triggering event from the runner-provided event file.
+    """Read the triggering event from runner-provided event identity.
 
-    GITHUB_EVENT_PATH is written by the runner from the triggering event, not
-    from the PR's workflow file, so a PR cannot self-grant grace by editing
-    its own copy of pr.yml.
+    ``GITHUB_EVENT_NAME`` is set by the runner and cannot be supplied by the
+    pull request workflow. Prefer it because merge_group payloads expose an
+    action and merge-group metadata, but do not include an ``event_name``
+    field. The event file remains the fallback for local tests and runners that
+    do not export the name directly.
     """
+    runner_event = os.environ.get("GITHUB_EVENT_NAME", "").strip()
+    if runner_event:
+        return runner_event
+
     event_path = os.environ.get("GITHUB_EVENT_PATH", "").strip()
     if not event_path:
         return None
@@ -111,6 +117,8 @@ def _github_event_name() -> str | None:
     event = payload.get("event_name") or payload.get("event")
     if isinstance(event, str) and event.strip():
         return event.strip()
+    if "merge_group" in payload:
+        return "merge_group"
     action = payload.get("action")
     if isinstance(action, str) and action.strip():
         return "pull_request"
@@ -418,7 +426,7 @@ def main() -> int:
         help=(
             "Composition grace in tests above the fast-lane ceiling that warns instead of failing "
             f"(merge_group lane only; 0-{MAX_CEILING_GRACE}). The lane is derived inside "
-            "the script from the unforgeable GitHub event file, never the environment."
+            "the script from runner-provided event identity, never a workflow-controlled grace value."
         ),
     )
     lane_group = parser.add_mutually_exclusive_group()
