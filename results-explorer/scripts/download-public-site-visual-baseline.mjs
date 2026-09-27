@@ -20,8 +20,11 @@ const candidateShas = (process.env.PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES ?? "")
 // Optional bounded wait for a leader group or develop push to publish the base.
 const waitSeconds = Number(process.env.PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS ?? "0");
 
-if (!token || !repository || !baseSha || !output) {
-  throw new Error("GITHUB_TOKEN, GITHUB_REPOSITORY, PUBLIC_SITE_VISUAL_BASE_SHA, and PUBLIC_SITE_VISUAL_BASELINE are required");
+if (!/^[0-9a-f]{40}$/.test(baseSha ?? "")) {
+  throw new Error("PUBLIC_SITE_VISUAL_BASE_SHA must be a 40-character lowercase SHA");
+}
+if (!token || !repository || !output) {
+  throw new Error("GITHUB_TOKEN, GITHUB_REPOSITORY, and PUBLIC_SITE_VISUAL_BASELINE are required");
 }
 if (!Number.isFinite(waitSeconds) || waitSeconds < 0) {
   throw new Error("PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS must be a non-negative number");

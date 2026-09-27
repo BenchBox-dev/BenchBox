@@ -3,6 +3,7 @@ export const MERGE_QUEUE_BRANCH_PREFIX: string;
 export const ARTIFACT_PAGE_SIZE: number;
 export const LEGACY_BASELINE_NAME: string;
 export const MAX_BASELINE_SHAS: number;
+export const MAX_ARTIFACT_PAGES: number;
 
 export type BaselineSource = "develop" | "merge-queue";
 

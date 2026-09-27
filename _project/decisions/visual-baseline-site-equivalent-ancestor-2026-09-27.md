@@ -56,3 +56,16 @@ never used, which keeps the earlier rejection of general ancestor resolution.
 - Make skipped leaders republish a baseline: needs a capture on every leader,
   which is the rebuild cost the skip exists to avoid.
 - Make `merge_group` visual comparison advisory: drops the landed-tree guarantee.
+
+## Review follow-ups (same day)
+
+- Added `uv.lock` to the site-input list (results-explorer's lockfile was
+  already covered): a dependency-only change re-renders the site, so it breaks
+  ancestor equivalence and must require its own comparison.
+- Require completed `success` runs and the producing repository for both
+  producers.
+- Cover all 26 candidate SHAs, cap artifact pagination, list named artifacts
+  in one batch, and prefer any landed develop baseline over any speculative
+  queue capture.
+- The compare step now requires a well-formed baseline SHA, so a missing or
+  stale download cannot compare pixels alone.

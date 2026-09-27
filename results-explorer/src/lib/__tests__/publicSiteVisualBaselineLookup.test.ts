@@ -22,6 +22,8 @@ function developRun(overrides: Run = {}): Run {
     head_branch: "develop",
     head_sha: BASE,
     path: ".github/workflows/docs.yml",
+    status: "completed",
+    conclusion: "success",
     repository: { full_name: REPO },
     head_repository: { full_name: REPO },
     ...overrides,
@@ -85,6 +87,9 @@ describe("trustedBaselineSource", () => {
     ["other workflow", queueRun({ path: ".github/workflows/test.yml" })],
     ["other workflow on develop", developRun({ path: ".github/workflows/other.yml" })],
     ["push to another branch", developRun({ head_branch: "release" })],
+    ["in-progress queue run", queueRun({ status: "in_progress", conclusion: null })],
+    ["failed develop run", developRun({ conclusion: "failure" })],
+    ["develop run from another repository", developRun({ repository: { full_name: "someone/BenchBox" } })],
   ])("rejects %s", (_label, run) => {
     expect(trustedBaselineSource(run, context)).toBeUndefined();
   });
@@ -154,7 +159,22 @@ describe("findTrustedBaseline with site-equivalent ancestors", () => {
     expect(found).toMatchObject({ source: "merge-queue", baselineSha: BASE, artifact: { id: 1 } });
   });
 
-  it("binds a queue candidate to its own SHA, not the requested base", async () => {
+  it("prefers a landed develop baseline over an ancestor queue candidate", async () => {
+    const { github } = fakeGithub(
+      [
+        { id: 7, name: `public-site-visual-baseline-${ANCESTOR}`, runId: 70, headSha: ANCESTOR },
+        { id: 8, name: `public-site-visual-baseline-${FAR}`, runId: 80, headSha: FAR },
+      ],
+      {
+        70: queueRun({ head_sha: ANCESTOR, head_branch: `gh-readonly-queue/develop/pr-2351-${ANCESTOR}` }),
+        80: developRun({ head_sha: FAR }),
+      },
+    );
+    const found = await findTrustedBaseline({ github, repository: REPO, baseSha: BASE, candidateShas: [ANCESTOR, FAR] });
+    expect(found).toMatchObject({ source: "develop", baselineSha: FAR, artifact: { id: 8 } });
+  });
+
+  it("uses an ancestor queue candidate when nothing landed exists", async () => {
     const { github } = fakeGithub(
       [{ id: 7, name: `public-site-visual-baseline-${ANCESTOR}`, runId: 70, headSha: ANCESTOR }],
       { 70: queueRun({ head_sha: ANCESTOR }) },
@@ -174,11 +194,12 @@ describe("findTrustedBaseline with site-equivalent ancestors", () => {
 
 describe("baselineShaOrder", () => {
   it("puts the base first, drops malformed and duplicate SHAs, and bounds the list", () => {
-    const many = Array.from({ length: 20 }, (_, i) => i.toString(16).padStart(40, "a"));
+    const many = Array.from({ length: 40 }, (_, i) => i.toString(16).padStart(40, "a"));
     const order = baselineShaOrder(BASE, [BASE, "not-a-sha", ...many]);
     expect(order[0]).toBe(BASE);
     expect(order).not.toContain("not-a-sha");
     expect(new Set(order).size).toBe(order.length);
+    // Covers every SHA the classifier can emit (base plus 25 ancestors).
     expect(order.length).toBe(MAX_BASELINE_SHAS);
   });
 });

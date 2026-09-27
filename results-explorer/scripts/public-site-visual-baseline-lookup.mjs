@@ -18,8 +18,10 @@
  * order that has a trusted artifact wins.
  *
  * Artifact names alone are untrusted because pull_request runs can upload any
- * name, so every candidate is checked against its producing run. Protected
- * develop artifacts are preferred over queue candidates for the same SHA.
+ * name, so every candidate is checked against its producing run. For the same
+ * SHA a protected develop artifact wins; across SHAs every landed develop
+ * baseline wins over any merge-queue candidate, because a queue capture is a
+ * speculative tree that may never land.
  */
 
 export const DOCS_WORKFLOW_PATH = ".github/workflows/docs.yml";
@@ -27,7 +29,9 @@ export const MERGE_QUEUE_BRANCH_PREFIX = "gh-readonly-queue/develop/";
 export const ARTIFACT_PAGE_SIZE = 100;
 export const LEGACY_BASELINE_NAME = "public-site-visual-baseline";
 // Bounds GitHub API use per lookup pass while several queue groups poll.
-export const MAX_BASELINE_SHAS = 10;
+// Must cover every SHA the classifier can emit (base plus 25 ancestors).
+export const MAX_BASELINE_SHAS = 26;
+export const MAX_ARTIFACT_PAGES = 5;
 
 /**
  * Classify the run that uploaded a baseline; returns "develop", "merge-queue", or undefined.
@@ -38,9 +42,20 @@ export const MAX_BASELINE_SHAS = 10;
  * manifest's `source_sha` bind those artifacts instead. A merge-queue run
  * has no recovery mode, so it must have run on exactly the requested SHA.
  */
+/**
+ * Runs must have completed successfully. An in-progress or failed run's
+ * artifact was never certified by a passing comparison, so trusting it would
+ * let an uncertified tree certify a merge. Completed-then-cancelled runs are
+ * also rejected: only success means the comparison passed.
+ */
 export function trustedBaselineSource(run, { repository, baseSha }) {
   if (!run || run.path !== DOCS_WORKFLOW_PATH) return undefined;
-  if (run.head_branch === "develop" && (run.event === "push" || run.event === "workflow_dispatch")) {
+  if (run.status !== "completed" || run.conclusion !== "success") return undefined;
+  if (
+    run.head_branch === "develop" &&
+    (run.event === "push" || run.event === "workflow_dispatch") &&
+    run.repository?.full_name === repository
+  ) {
     return "develop";
   }
   if (
@@ -73,7 +88,7 @@ export function baselineShaOrder(baseSha, candidateShas = []) {
 
 async function listValidArtifacts(github, repository, name) {
   const validArtifacts = [];
-  for (let page = 1; ; page += 1) {
+  for (let page = 1; page <= MAX_ARTIFACT_PAGES; page += 1) {
     const data = await github(
       `/repos/${repository}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=${ARTIFACT_PAGE_SIZE}&page=${page}`,
     );
@@ -109,12 +124,20 @@ export async function findTrustedBaseline({ github, repository, baseSha, candida
   const shas = baselineShaOrder(baseSha, candidateShas);
   // The legacy unsuffixed name is listed once and matched to SHAs by run head.
   const legacy = await listValidArtifacts(github, repository, LEGACY_BASELINE_NAME);
-  for (const sha of shas) {
-    const named = await listValidArtifacts(github, repository, `public-site-visual-baseline-${sha}`);
-    const found = await trustedFromCandidates(github, repository, sha, [...named, ...legacy]);
-    if (found) return found;
+  const namedBySha = await Promise.all(
+    shas.map((sha) => listValidArtifacts(github, repository, `public-site-visual-baseline-${sha}`)),
+  );
+  let queueCandidate;
+  for (const [index, sha] of shas.entries()) {
+    const found = await trustedFromCandidates(github, repository, sha, [...namedBySha[index], ...legacy]);
+    // A trusted merge-queue candidate for the exact base wins at once. For an
+    // ancestor, a queue capture of a speculative head is not a landed tree, so
+    // keep walking in case a landed develop baseline exists further down.
+    if (!found) continue;
+    if (found.source === "develop" || sha === baseSha) return found;
+    if (!queueCandidate) queueCandidate = found;
   }
-  return undefined;
+  return queueCandidate;
 }
 
 /**

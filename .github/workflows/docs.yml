@@ -82,13 +82,16 @@ jobs:
           }
           # Preserve every former pull_request path-filter input. A change to
           # this list must explain which rendered dependency is being removed.
+          # The build runs uv sync and npm ci, so the lockfiles pin the
+          # rendered output as much as any source file. uv.lock and
+          # results-explorer/package-lock.json must stay in this list.
           SITE_PATHS=(
             benchbox/ docs/ examples/ landing/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
             results-data/ results-explorer/ scripts/
-            .github/workflows/docs.yml Makefile README.md pyproject.toml
+            .github/workflows/docs.yml Makefile README.md pyproject.toml uv.lock
           )
           CHANGED_PATHS=$(git diff --name-only "$BASE_SHA"...HEAD -- "${SITE_PATHS[@]}")
           if [ -z "$CHANGED_PATHS" ]; then
@@ -281,7 +284,7 @@ jobs:
       # bounded queue wait only matters when the group ahead did change site
       # inputs; both groups build concurrently, so its candidate usually lands
       # within minutes of this capture. Pull requests keep the short retry only.
-      - name: Download exact base visual baseline
+      - name: Download visual baseline for base or site-equivalent ancestor
         id: baseline
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:

@@ -53,13 +53,19 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     visual = _workflow()["jobs"]["public-site-visual-regression"]
     steps = visual["steps"]
     names = [step.get("name") for step in steps]
-    download = next(step for step in steps if step.get("name") == "Download exact base visual baseline")
+    download = next(
+        step for step in steps if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
+    )
     capture = next(step for step in steps if step.get("name") == "Capture public site")
     run = next(step for step in steps if step.get("name") == "Compare public site with exact base")
 
     # Capture before waiting so a follower's own tree is ready when the base appears.
-    assert names.index("Capture public site") < names.index("Download exact base visual baseline")
-    assert names.index("Download exact base visual baseline") < names.index("Compare public site with exact base")
+    assert names.index("Capture public site") < names.index(
+        "Download visual baseline for base or site-equivalent ancestor"
+    )
+    assert names.index("Download visual baseline for base or site-equivalent ancestor") < names.index(
+        "Compare public site with exact base"
+    )
     assert capture["env"]["PUBLIC_SITE_VISUAL_PHASE"] == "capture"
     assert "if" not in capture
     assert run["env"]["PUBLIC_SITE_VISUAL_PHASE"] == "compare"
@@ -83,7 +89,11 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
 
 def test_merge_queue_followers_wait_briefly_within_the_queue_timeout() -> None:
     visual = _workflow()["jobs"]["public-site-visual-regression"]
-    download = next(step for step in visual["steps"] if step.get("name") == "Download exact base visual baseline")
+    download = next(
+        step
+        for step in visual["steps"]
+        if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
+    )
     wait = download["env"]["PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS"]
     assert wait == "${{ github.event_name == 'merge_group' && '600' || '0' }}"
     # The wait holds a runner, so it must leave room for capture and compare
@@ -98,7 +108,9 @@ def test_download_accepts_site_equivalent_ancestors_and_compare_binds_the_used_s
         "${{ steps.paths.outputs.baseline_candidates }}"
     )
     steps = workflow["jobs"]["public-site-visual-regression"]["steps"]
-    download = next(step for step in steps if step.get("name") == "Download exact base visual baseline")
+    download = next(
+        step for step in steps if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
+    )
     compare = next(step for step in steps if step.get("name") == "Compare public site with exact base")
     assert download["id"] == "baseline"
     assert download["env"]["PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES"] == (
@@ -173,6 +185,7 @@ def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     assert "bootstrap=true" not in script_source
     assert "manifest.source_sha !== baselineSha" in script_source
     assert "baseline_sha=${baselineSha}" in script_source
+    assert "/^[0-9a-f]{40}$/" in script_source
     assert "waitForTrustedBaseline" in script_source
     lookup_source = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
         encoding="utf-8"
