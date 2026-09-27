@@ -15,10 +15,10 @@ pytestmark = [pytest.mark.integration, pytest.mark.fast]
 ROOT = Path(__file__).resolve().parents[3]
 CATALOG_REV = "67ab679ded13f2ab47151a3bd7d1e41855357202"
 SOURCE_REV = "aaad6c97632f0a36341cb670c9e1a7fe0b3a860b"
-TODO_DB_VERSION = "0.8.0"
+TODO_DB_VERSION = "0.8.1"
 SCRIPTS_PROJECT = ROOT / "_project/scripts"
 WHEEL = SCRIPTS_PROJECT / f"vendor/todo_db-{TODO_DB_VERSION}-py3-none-any.whl"
-WHEEL_SHA256 = "dbff075e1f48614b2409adda116b96de9a0dec06bf0496a8d272c1db3e2563da"
+WHEEL_SHA256 = "cbeff5257efc05e2f7155d4b4dcdb5eeb8b9aa4b45c60d4a2c0a00d24fdd50a1"
 REQUIRED_BATCH_TOOLS = {"register_batch", "prepare", "bind_batch_pr", "abort_batch"}
 
 
@@ -155,7 +155,7 @@ def test_installed_runtime_handshake_exposes_registered_batch_tools(tmp_path: Pa
         listed = _rpc(proc, "tools/list", {}, request_id=2)
         tools = listed["result"]["tools"]
         names = {tool["name"] for tool in tools}
-        assert len(tools) == 14
+        assert len(tools) == 15
         assert names >= REQUIRED_BATCH_TOOLS
     finally:
         proc.terminate()
@@ -167,6 +167,6 @@ def test_rollout_evidence_records_active_runtime_capability() -> None:
     runtime = evidence["runtime"]
     assert runtime["dependency_metadata_version"] == TODO_DB_VERSION
     assert runtime["schema_version"] == 3
-    assert runtime["tool_count"] == 14
+    assert runtime["tool_count"] == 15
     assert set(runtime["registered_batch_tools"]) == REQUIRED_BATCH_TOOLS
     assert evidence["verification"]["active_runtime_blocker"] is None
