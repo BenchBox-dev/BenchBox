@@ -131,10 +131,40 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "results-data/bundles/tpch/duckdb/sf1.json",
         "results-data/bundles/tpch/duckdb/sf1.plans.json",
         "results-data/corpus-inventory.json",
+        # A sibling directory that merely starts with a gated prefix is not
+        # gated: prefixes are directory prefixes ending in "/".
+        "publicationx",
+        "publicationx/notes.md",
+        "scripts/publicationx/check.py",
+        "benchbox/core/equivalencex",
+        "benchbox/core/equivalencex/helpers.py",
+        "benchbox/core/query_plans/parsersx/spark.py",
+        "benchbox/core/expected_resultsx/loader.py",
     ],
 )
 def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
     assert soundness.is_soundness_path(path) is False
+
+
+def test_soundness_prefixes_are_directory_prefixes() -> None:
+    """SOUNDNESS_PREFIXES must hold directory prefixes only.
+
+    An exact-file entry here would over-match siblings that merely start
+    with it, while CODEOWNERS matches the exact path: the mirror claim
+    would silently break. Exact files belong in SOUNDNESS_FILES.
+    """
+    assert soundness.surface_invariant_violations() == []
+
+
+def test_soundness_files_glob_duality_stays_pinned() -> None:
+    """The override glob is a CODEOWNERS mirror spelling, not a matcher.
+
+    Exact membership can never match it; the override regex is the operative
+    gate. Both spellings must cover the same artifact shape.
+    """
+    assert soundness.OVERRIDE_FILES_GLOB in soundness.SOUNDNESS_FILES
+    assert soundness.is_soundness_path("results-data/bundles/tpch/duckdb/sf1.override.json") is True
+    assert soundness.is_soundness_path("results-data/bundles/x.override.json.bak") is False
 
 
 def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
