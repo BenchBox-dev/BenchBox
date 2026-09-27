@@ -1,12 +1,12 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-25T17:35:48.546462+00:00",
-  "source": "eaf4202bd9aed302a68f40d8b6945731fee1437d",
+  "generated_at": "2026-09-27T14:32:28.396662+00:00",
+  "source": "f02f42f3b75d1674f18b1d4686c37729d26426f9",
   "source_ref": "origin/published-results",
-  "source_resolved_at": "2026-09-20T02:20:51.172075+00:00",
+  "source_resolved_at": "2026-09-27T14:32:28.396662+00:00",
   "source_resolved_from": "origin/published-results",
   "main_source": "working-tree",
-  "bidirectional": true,
+  "bidirectional": false,
   "union": [
     "results-data/bundles/amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
     "results-data/bundles/amplab_sf001_datafusion_sql_20260826_111320_d8167419.json",
@@ -51,7 +51,9 @@
     "results-data/bundles/coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json",
     "results-data/bundles/coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json",
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json",
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
+    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
     "results-data/bundles/datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json",
@@ -118,6 +120,7 @@
     "results-data/bundles/joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.json",
     "results-data/bundles/joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json",
     "results-data/bundles/joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json",
+    "results-data/bundles/metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json",
     "results-data/bundles/nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
     "results-data/bundles/nyctaxi_sf001_datafusion_sql_20260826_170209_a82f9269.json",
     "results-data/bundles/nyctaxi_sf001_duckdb_sql_20260826_163341_b51bee79.json",
@@ -176,6 +179,7 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json",
+    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json",
@@ -251,7 +255,8 @@
     "results-data/bundles/tpchavoc_sf01_duckdb_sql_20260826_163204_98d64133.json",
     "results-data/bundles/tpchavoc_sf1_clickhouse_local_sql_20260826_172129_4f695fe1.json",
     "results-data/bundles/tpchavoc_sf1_datafusion_sql_20260825_174039_28733b91.json",
-    "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json"
+    "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json",
+    "results-data/bundles/transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json"
   ],
   "dispositions": {
     "results-data/bundles/amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json": "accepted",
@@ -297,7 +302,9 @@
     "results-data/bundles/coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json": "accepted",
     "results-data/bundles/coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json": "accepted",
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json": "accepted",
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json": "legacy_overlay",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json": "accepted",
+    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json": "legacy_overlay",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json": "accepted",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json": "accepted",
     "results-data/bundles/datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json": "accepted",
@@ -364,6 +371,7 @@
     "results-data/bundles/joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.json": "accepted",
     "results-data/bundles/joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json": "accepted",
     "results-data/bundles/joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json": "accepted",
+    "results-data/bundles/metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json": "legacy_overlay",
     "results-data/bundles/nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json": "accepted",
     "results-data/bundles/nyctaxi_sf001_datafusion_sql_20260826_170209_a82f9269.json": "accepted",
     "results-data/bundles/nyctaxi_sf001_duckdb_sql_20260826_163341_b51bee79.json": "accepted",
@@ -422,6 +430,7 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json": "accepted",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json": "accepted",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json": "accepted",
+    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json": "legacy_overlay",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json": "accepted",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json": "accepted",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json": "accepted",
@@ -497,7 +506,8 @@
     "results-data/bundles/tpchavoc_sf01_duckdb_sql_20260826_163204_98d64133.json": "accepted",
     "results-data/bundles/tpchavoc_sf1_clickhouse_local_sql_20260826_172129_4f695fe1.json": "accepted",
     "results-data/bundles/tpchavoc_sf1_datafusion_sql_20260825_174039_28733b91.json": "accepted",
-    "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json": "accepted"
+    "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json": "accepted",
+    "results-data/bundles/transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json": "legacy_overlay"
   },
   "digests": {
     "results-data/bundles/amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json": "1614b57d05f94cdca881700a04b2522fd5c9a198dd6b9fce7ab9dd21a7ca940f",
@@ -543,7 +553,9 @@
     "results-data/bundles/coffeeshop_sf1_duckdb_sql_20260826_110251_51016466.json": "d62e8498e2a4461222c54896def7bc42af5c00df29869952d399951727905756",
     "results-data/bundles/coffeeshop_sf1_polars_df_20260826_205707_d4bce0e2.json": "de640bc2f645a1acf922745af64d3f443c0e94c3cba01026284ad11c306852a6",
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81",
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json": "01ac92413a4d434b6a5ca293da43c59bc7f36871bb9d944ac93bc777db00c83e",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json": "262f235e9acfea7d431c57affeff6b1ca8132c972061c5de455bbe51275e5fe5",
+    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json": "010cd801703e1bb50e2bd7a1a776012af69cc2ad6d5002b80d765331ce1958bb",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json": "2ea72f0a8164e756b36bba0023129779242b9ddd049dd99c09fc4fd90075f2ec",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json": "3a3892389747b7b38285d4afb0ff96f0d68b3f92225e4ddebb891e6f63f6751a",
     "results-data/bundles/datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json": "14bd9a74c372b8475bad2e630f5e12ea9a8761bf0f500a53f934ad751b3b603f",
@@ -610,6 +622,7 @@
     "results-data/bundles/joinorder_sf1_duckdb_sql_20260829_214636_56cf7846.json": "23a50a5f90ddcbc8e5c23b46c6ccd0641c3c6c4274b6c4d8ae8531fca0cc229a",
     "results-data/bundles/joinorder_sf1_polars_df_20260826_205647_3a63a4cb.json": "80ca7028c80888f47a3e4d0f9ff451d6360963c7c6a933ea64ac182c7cbca3b2",
     "results-data/bundles/joinorder_sf1_sqlite_sql_20260826_182543_788c3eb2.json": "4f7bae8e9dd4881d9ff3b6f28fc6bce26745e5f834b20246b47f5d26a2378cdf",
+    "results-data/bundles/metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json": "076e423d748ec2a53c5c057aefe200b804725bd125fcfad296c2fd8d4105c496",
     "results-data/bundles/nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json": "42f96fa25d6398b9a80b88d61cc83cc075caf2f4b63f630b58aa0c18b9e51dcc",
     "results-data/bundles/nyctaxi_sf001_datafusion_sql_20260826_170209_a82f9269.json": "61e267ecd745218dc66d66ffef8e38f4854a998bf34f27fed4072c0462c2a534",
     "results-data/bundles/nyctaxi_sf001_duckdb_sql_20260826_163341_b51bee79.json": "37094bd4728a6bca9c1d1c6ebb2a588fb17fc204669e81f4aa796041bdc3c22e",
@@ -668,6 +681,7 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json": "e7ccec583a82ac6c876ce8b57aabc9bed5014efe4f32385f4a0c6edeaaf0904e",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json": "06b7cf914e17f3e59ea97f42a4a0726e0019d4d5b5b2c1b3e6dac74a85c40cf9",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json": "895bbece3b93e7e2048454ba742f0564afa4a07c93c78bcab43ebcd01ce5a87c",
+    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json": "3556c48667c4ec8e988294d8ec069e287330e6da759a135a7a7cd34968e3822c",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json": "4d34fab2ee7d5b20e0bfabb233323e0604c6ae8c4ff51843c8b71517aabc8baa",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json": "224c18b9fc693297fcfee359bc96c134446ce4ca3172eeec1f2bc4ea8d65ca48",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json": "cc8c667977efdea05b713c2a120b44cb5b5713055c85efb853f3b2ae0211de29",
@@ -743,9 +757,16 @@
     "results-data/bundles/tpchavoc_sf01_duckdb_sql_20260826_163204_98d64133.json": "03a653f9d112ef455535443f9e1d705105d6b09b4e029cbeef164a5cf8778067",
     "results-data/bundles/tpchavoc_sf1_clickhouse_local_sql_20260826_172129_4f695fe1.json": "41f91bda92064b483c9a6a259384369c669df1fd56486498bb6e9b1fc9525cc1",
     "results-data/bundles/tpchavoc_sf1_datafusion_sql_20260825_174039_28733b91.json": "2dd6fca15f82568597bd6eed6b5acbedb61681835470d30b51a70ef6642460d9",
-    "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
+    "results-data/bundles/tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5",
+    "results-data/bundles/transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json": "63762010fbbb1a9408cf9d9082cb7c6155dd98150334ac9786f813183c119e78"
   },
   "published_only": [],
-  "legacy_overlay": [],
-  "count": 244
+  "legacy_overlay": [
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
+    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json",
+    "results-data/bundles/metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json",
+    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json",
+    "results-data/bundles/transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json"
+  ],
+  "count": 249
 }
