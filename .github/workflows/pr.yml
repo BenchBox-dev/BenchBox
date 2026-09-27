@@ -499,7 +499,12 @@ jobs:
         # pr.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
         # written by the runner. The delta guard below stays pull_request-only,
         # so a composed overage cannot slip through it either.
-        run: uv run -- python _project/scripts/timing_policy_check.py --strict --ceiling-grace 150
+        run: |
+          args=(--strict)
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            args+=(--ceiling-grace 150)
+          fi
+          uv run -- python _project/scripts/timing_policy_check.py "${args[@]}"
 
       - name: Restore fast-lane develop baseline count
         # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
