@@ -80,6 +80,49 @@ uv run -- python -m pytest -m "docker_integration" --tb=short -v
 uv run -- python -m pytest -m "live_postgresql" --tb=short -v
 ```
 
+## Apple Container Without Docker Desktop
+
+On Apple-silicon macOS without Docker Desktop, the same stacks run through
+`mocker` (a Docker-compatible CLI over the Apple `container` runtime).
+`CONTAINER_ENGINE=mocker` swaps only the compose driver; the compose files
+stay unmodified. This is local-dev only and must not run in CI. Verified
+2026-09-26 against the `postgres-integration` CI job's two steps:
+
+```bash
+# 1. Start PostgreSQL through the sanctioned pipeline
+CONTAINER_ENGINE=mocker make test-docker-up-postgresql
+
+# 2. Run the CI live-integration step verbatim, including its anti-skip
+# guard: without pipefail/tee/grep, an all-skipped run (service
+# unreachable after up --wait) exits 0 and silently renders as green.
+set -o pipefail
+uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
+  -m "live_postgresql" --tb=short -v -p no:cacheprovider \
+  | tee /tmp/pg_live_output.txt
+if ! grep -Eq '[0-9]+ passed' /tmp/pg_live_output.txt; then
+  echo "PostgreSQL live integration tests produced no passing tests (all skipped or none collected); refusing to report a silent pass."
+  exit 1
+fi
+
+# 3. Run the CI TPC-Havoc equivalence sample verbatim, with the same guard
+PGHOST=localhost PGPORT=5432 PGUSER=benchbox PGPASSWORD=benchbox \
+  PGDATABASE=benchbox_test uv run -- python -m pytest \
+  tests/integration/platforms/test_tpchavoc_postgres_equivalence.py \
+  -m "live_postgresql" -n 0 --tb=short -v -p no:cacheprovider \
+  | tee /tmp/pg_tpchavoc_output.txt
+if ! grep -Eq '[0-9]+ passed' /tmp/pg_tpchavoc_output.txt; then
+  echo "TPC-Havoc PostgreSQL variant-equivalence sample produced no passing tests (all skipped or none collected); refusing to report a silent pass."
+  exit 1
+fi
+
+# 4. Stop when done
+CONTAINER_ENGINE=mocker make test-docker-down-postgresql
+```
+
+Result on that run: 8 live integration tests passed, 2 equivalence tests
+passed, matching the CI job's pass criteria (at least one passing test per
+step, so the sample cannot silently render as green).
+
 ## Pytest Markers
 
 | Marker | Description |
