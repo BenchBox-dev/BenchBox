@@ -545,8 +545,22 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         ddl = schema.get_obt_table(self.dimension_mode).get_create_table_sql()
         target = dialect.lower() if dialect else "duckdb"
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
-            source_ddl = translate_sql_query(
-                source_ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
+            # Translate statement-by-statement: sqlglot.transpile returns only
+            # the first element for multi-statement input, which would drop
+            # 24 of the 25 source tables (datavault follows the same pattern).
+            source_statements = [stmt.strip() for stmt in source_ddl.split(";") if stmt.strip()]
+            source_ddl = (
+                ";\n\n".join(
+                    translate_sql_query(
+                        stmt,
+                        target_dialect=target,
+                        source_dialect="standard",
+                        identify=True,
+                        scope="schema_ddl",
+                    )
+                    for stmt in source_statements
+                )
+                + ";"
             )
             ddl = translate_sql_query(
                 ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
