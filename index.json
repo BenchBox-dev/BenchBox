@@ -4800,6 +4800,13 @@
       "status": "dropped",
       "title": "develop is red: agent instruction bytes 16088 exceed the 16000 budget, blocking all commits"
     },
+    "df-parity-id-mapping-builders": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Builder-local SQL-to-DataFrame ID maps plus mapping unit test"
+    },
     "df-suffix-platform-options-unreachable": {
       "claim": null,
       "needs": [],
