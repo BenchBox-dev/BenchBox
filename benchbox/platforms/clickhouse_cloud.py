@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -49,6 +50,18 @@ if TYPE_CHECKING:
 
 def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
     return {str(key): value for key, value in payload.items() if value not in (None, "", {}, [], ())}
+
+
+def _names_contain_glob_syntax(names: list[str]) -> bool:
+    """Return True when any staged name could change a glob's meaning.
+
+    A ``*`` in a table or file name would widen the table-prefix glob beyond
+    its own files (or match nothing the uploader wrote); ``?[{`` have the
+    same effect on ClickHouse's glob matcher. Callers fall back to the
+    per-file loop for such tables so the glob path never silently loads the
+    wrong files.
+    """
+    return any(char in name for name in names for char in ("*", "?", "{", "["))
 
 
 class ClickHouseCloudAdapter(ClickHouseAdapter):
@@ -755,6 +768,54 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         data_source = resolve_adapter_data_source(self, benchmark, data_dir)
         return {table: [Path(p) for p in paths] for table, paths in data_source.tables.items()}
 
+    def _ingest_staged_glob(
+        self,
+        connection: Any,
+        kind: str,
+        sql_fn: str,
+        safe_key: str,
+        safe_secret: str,
+        table_name_lower: str,
+        valid_files: list[Path],
+        upload_fn: Any,
+        glob_url_fn: Any,
+    ) -> int:
+        """Upload every file, then ingest the table with one glob INSERT.
+
+        Each staged file parses independently under ``CSVWithNames``, so one
+        header row per file is expected and correct: unlike byte-stream
+        concatenation, no header skipping is needed. Returns the post-ingest
+        row count for the table.
+        """
+        for file_path in valid_files:
+            upload_start = mono_time()
+            self.log_verbose(f"Uploading {file_path.name} to {kind.upper()} staging")
+            upload_fn(file_path, table_name_lower, file_path.name)
+            upload_time = elapsed_seconds(upload_start)
+            self.log_verbose(f"Uploaded {file_path.name} in {upload_time:.2f}s")
+
+        glob_url = glob_url_fn(table_name_lower)
+        ingest_sql = (
+            f"INSERT INTO {table_name_lower} "
+            f"SELECT * FROM {sql_fn}("
+            f"'{glob_url}', "
+            f"'{safe_key}', "
+            f"'{safe_secret}', "
+            f"'CSVWithNames'"
+            f")"
+        )
+
+        ingest_start = mono_time()
+        connection.execute(ingest_sql)
+        ingest_time = elapsed_seconds(ingest_start)
+
+        count_result = connection.execute(f"SELECT COUNT(*) FROM {table_name_lower}")
+        total_rows_loaded = count_result[0][0] if count_result and count_result[0] else 0
+        self.log_verbose(
+            f"Ingested {len(valid_files)} file(s) via {kind.upper()} glob in {ingest_time:.2f}s",
+        )
+        return total_rows_loaded
+
     def _load_data_via_object_storage(
         self,
         benchmark,
@@ -766,6 +827,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         sql_fn: str,
         creds: tuple[str, str],
         upload_fn: Any,
+        glob_url_fn: Any | None = None,
         extra_metadata: dict[str, Any] | None = None,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
         """Shared core for S3 and GCS staging loads.
@@ -777,6 +839,11 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             creds: (key, secret) pair, already SQL-quote-escaped.
             upload_fn: Callable ``(file_path, table_name_lower, file_name) -> sql_url``.
                        Uploads the file and returns the URL to embed in the SQL statement.
+            glob_url_fn: Optional callable ``(table_name_lower) -> glob_url`` covering
+                         every file staged under that table's prefix. When present
+                         (and no staged name carries glob metacharacters), all of
+                         the table's files upload first and a single INSERT reads
+                         them through one glob instead of one INSERT per file.
             extra_metadata: Additional keys to merge into the returned loading_metadata dict.
         """
         start_time = mono_time()
@@ -805,30 +872,45 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                     table_name_lower = table_name.lower()
                     total_rows_loaded = 0
 
-                    for file_path in valid_files:
-                        upload_start = mono_time()
-                        self.log_verbose(f"Uploading {file_path.name} to {kind.upper()} staging")
-                        sql_url = upload_fn(file_path, table_name_lower, file_path.name)
-                        upload_time = elapsed_seconds(upload_start)
-                        self.log_verbose(f"Uploaded {file_path.name} in {upload_time:.2f}s")
-
-                        ingest_sql = (
-                            f"INSERT INTO {table_name_lower} "
-                            f"SELECT * FROM {sql_fn}("
-                            f"'{sql_url}', "
-                            f"'{safe_key}', "
-                            f"'{safe_secret}', "
-                            f"'CSVWithNames'"
-                            f")"
+                    if glob_url_fn is not None and not _names_contain_glob_syntax(
+                        [table_name_lower, *(file_path.name for file_path in valid_files)]
+                    ):
+                        total_rows_loaded = self._ingest_staged_glob(
+                            connection,
+                            kind,
+                            sql_fn,
+                            safe_key,
+                            safe_secret,
+                            table_name_lower,
+                            valid_files,
+                            upload_fn,
+                            glob_url_fn,
                         )
+                    else:
+                        for file_path in valid_files:
+                            upload_start = mono_time()
+                            self.log_verbose(f"Uploading {file_path.name} to {kind.upper()} staging")
+                            sql_url = upload_fn(file_path, table_name_lower, file_path.name)
+                            upload_time = elapsed_seconds(upload_start)
+                            self.log_verbose(f"Uploaded {file_path.name} in {upload_time:.2f}s")
 
-                        ingest_start = mono_time()
-                        connection.execute(ingest_sql)
-                        ingest_time = elapsed_seconds(ingest_start)
+                            ingest_sql = (
+                                f"INSERT INTO {table_name_lower} "
+                                f"SELECT * FROM {sql_fn}("
+                                f"'{sql_url}', "
+                                f"'{safe_key}', "
+                                f"'{safe_secret}', "
+                                f"'CSVWithNames'"
+                                f")"
+                            )
 
-                        count_result = connection.execute(f"SELECT COUNT(*) FROM {table_name_lower}")
-                        total_rows_loaded = count_result[0][0] if count_result and count_result[0] else 0
-                        self.log_verbose(f"Ingested from {file_path.name} via {kind.upper()} in {ingest_time:.2f}s")
+                            ingest_start = mono_time()
+                            connection.execute(ingest_sql)
+                            ingest_time = elapsed_seconds(ingest_start)
+
+                            count_result = connection.execute(f"SELECT COUNT(*) FROM {table_name_lower}")
+                            total_rows_loaded = count_result[0][0] if count_result and count_result[0] else 0
+                            self.log_verbose(f"Ingested from {file_path.name} via {kind.upper()} in {ingest_time:.2f}s")
 
                     table_stats[table_name_lower] = total_rows_loaded
 
@@ -888,12 +970,20 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             s3_client_kwargs["region_name"] = self.s3_region
         s3_client = boto3.client("s3", **s3_client_kwargs)
         s3_bucket, s3_prefix = self._parse_s3_url(self.s3_staging_url)
+        # Isolate this load under a unique prefix so the bulk glob INSERT
+        # reads exactly the files uploaded by this invocation. Reusing the
+        # bare table prefix would also match stale objects from earlier runs
+        # (e.g. obsolete shards after rerunning with fewer files).
+        s3_load_token = uuid.uuid4().hex[:12]
 
         def upload_to_s3(file_path: Path, table_name_lower: str, file_name: str) -> str:
-            s3_key = f"{s3_prefix}{table_name_lower}/{file_name}"
+            s3_key = f"{s3_prefix}{table_name_lower}/{s3_load_token}/{file_name}"
             s3_url = f"s3://{s3_bucket}/{s3_key}"
             s3_client.upload_file(str(file_path), s3_bucket, s3_key)
             return s3_url
+
+        def s3_glob_url(table_name_lower: str) -> str:
+            return f"s3://{s3_bucket}/{s3_prefix}{table_name_lower}/{s3_load_token}/*"
 
         return self._load_data_via_object_storage(
             benchmark,
@@ -904,6 +994,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             sql_fn="s3",
             creds=(aws_key_id.replace("'", "''"), aws_secret_key.replace("'", "''")),
             upload_fn=upload_to_s3,
+            glob_url_fn=s3_glob_url,
             extra_metadata={"s3_region": getattr(self, "s3_region", None)},
         )
 
@@ -930,13 +1021,19 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
         gcs_client = gcs_storage.Client()
         gcs_bucket_name, gcs_prefix = self._parse_gcs_url(self.gcs_staging_url)
         gcs_bucket_obj = gcs_client.bucket(gcs_bucket_name)
+        # Same run isolation as the S3 path: the bulk glob INSERT must read
+        # only this invocation's files, never stale objects under the table prefix.
+        gcs_load_token = uuid.uuid4().hex[:12]
 
         def upload_to_gcs(file_path: Path, table_name_lower: str, file_name: str) -> str:
-            blob_name = f"{gcs_prefix}{table_name_lower}/{file_name}"
+            blob_name = f"{gcs_prefix}{table_name_lower}/{gcs_load_token}/{file_name}"
             blob = gcs_bucket_obj.blob(blob_name)
             blob.upload_from_filename(str(file_path))
             # ClickHouse gcs() requires https:// URL, not gs://
             return f"https://storage.googleapis.com/{gcs_bucket_name}/{blob_name}"
+
+        def gcs_glob_url(table_name_lower: str) -> str:
+            return f"https://storage.googleapis.com/{gcs_bucket_name}/{gcs_prefix}{table_name_lower}/{gcs_load_token}/*"
 
         return self._load_data_via_object_storage(
             benchmark,
@@ -947,6 +1044,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             sql_fn="gcs",
             creds=(gcs_hmac_key.replace("'", "''"), gcs_hmac_secret.replace("'", "''")),
             upload_fn=upload_to_gcs,
+            glob_url_fn=gcs_glob_url,
         )
 
     @staticmethod
