@@ -4807,6 +4807,13 @@
       "status": "open",
       "title": "Builder-local SQL-to-DataFrame ID maps plus mapping unit test"
     },
+    "df-parity-read-primitives-counts": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Reconcile read_primitives query counts and fix registry metadata"
+    },
     "df-suffix-platform-options-unreachable": {
       "claim": null,
       "needs": [],

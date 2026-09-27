@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Runtime SQL count, runtime DF count, gate-compared count, and excluded IDs are reconciled in one written accounting per benchmark",
+    "benchbox/core/benchmark_registry.yaml num_queries for read_primitives reflects the runtime truth, not 136",
+    "Mapping test from df-parity-id-mapping-builders passes for read_primitives with every surplus row classified",
+    "Makefile read-primitives comment states exact accounting (gateable, excluded fulltext/JSON, any legitimate splits)"
+  ],
+  "context": "Adversarial finding: the 152-vs-136 surplus was stale metadata. Runtime get_queries() returns more than 136 and the enforced gate already compares 148 with 4 classified DuckDB-unsupported exclusions. No 16-row burn-down exists. Full review: /Users/joe/.jcode/scratch/agy_review.txt finding 4.",
+  "description": "Replace the surplus burn-down with count reconciliation. Diff runtime ReadPrimitivesBenchmark.get_queries() against the DF registry and the 148-cell gate; classify every row (gateable, classified exclusion, legitimate split, or drift to fix). Update the stale num_queries integer in benchmark_registry.yaml and the Makefile comment with exact accounting. Guardrails: do not remove or renumber any query to make counts match; drift rows get fixed, not hidden; changes confined to metadata, comments, and any genuine drift fix.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:34:14Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "4d5e46e4b927453186754d9195cf925c",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
