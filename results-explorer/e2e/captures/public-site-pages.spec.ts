@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { expect, test } from "@playwright/test";
+import { type Browser, expect, test } from "@playwright/test";
 
 import {
   compareVisualManifests,
@@ -19,6 +19,14 @@ const BASELINE = process.env.PUBLIC_SITE_VISUAL_BASELINE
   ? path.resolve(process.env.PUBLIC_SITE_VISUAL_BASELINE)
   : undefined;
 const REQUIRE_BASELINE = process.env.PUBLIC_SITE_VISUAL_REQUIRE_BASELINE === "1";
+// "capture" writes the manifest only; "compare" reads a manifest written by an
+// earlier capture. The split lets a merge-queue follower capture its own tree
+// while the leader group is still publishing the follower's exact-base
+// baseline. Unset runs both in one pass.
+const PHASE = process.env.PUBLIC_SITE_VISUAL_PHASE ?? "";
+if (!["", "capture", "compare"].includes(PHASE)) {
+  throw new Error(`PUBLIC_SITE_VISUAL_PHASE must be capture, compare, or unset; got ${PHASE}`);
+}
 const SOURCE_SHA = process.env.PUBLIC_SITE_VISUAL_SOURCE_SHA ?? "unknown";
 // Match the protected baseline's UTC capture day so relative run ages do not
 // make an otherwise unchanged screenshot expire every midnight.
@@ -56,7 +64,9 @@ test.describe.configure({ mode: "serial", timeout: 240_000 });
 // of the Explorer-only blocking command unless that site is explicitly mounted.
 test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires E2E_PAGES_SHAPED and E2E_SITE_DIR");
 
-test("captures the public route and viewport matrix", async ({ browser }) => {
+type CapturedManifest = VisualManifest & { browser: string; source_sha: string; viewports: readonly number[] };
+
+async function captureManifest(browser: Browser): Promise<CapturedManifest> {
   await mkdir(OUTPUT, { recursive: true });
   const captures: VisualCapture[] = [];
 
@@ -111,7 +121,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     }
   }
 
-  const manifest = {
+  const manifest: CapturedManifest = {
     browser: "chromium",
     capture_profile: PUBLIC_SITE_CAPTURE_PROFILE,
     captures,
@@ -119,6 +129,17 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     viewports: VIEWPORTS,
   };
   await writeFile(MANIFEST, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  return manifest;
+}
+
+test("captures the public route and viewport matrix", async ({ browser }) => {
+  const manifest =
+    PHASE === "compare"
+      ? (JSON.parse(await readFile(MANIFEST, "utf8")) as CapturedManifest)
+      : await captureManifest(browser);
+  // A compare-only pass must judge the capture of this run's tree, not a stale file.
+  expect(manifest.source_sha, "captured manifest source SHA").toBe(SOURCE_SHA);
+  if (PHASE === "capture") return;
 
   if (!REQUIRE_BASELINE) {
     expect(REQUIRE_BASELINE, "PUBLIC_SITE_VISUAL_BASELINE is required for comparison").toBe(false);

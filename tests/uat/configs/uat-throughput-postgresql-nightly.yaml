@@ -28,6 +28,13 @@
 # independent PostgreSQL connections?" rather than "did the floor's default
 # of 2 happen to match?".
 #
+# `per_cell_timeout_s`/`early_stop_after_s` are 2400 (40 min), not the
+# 900 (15 min) of the DuckDB cell: the 2026-09-25 nightly showed the
+# Postgres cell
+# (compose pull + SF1 load + 3-stream throughput on a shared runner) still
+# running at the 20-minute kill with no result JSON. The job-level
+# `timeout-minutes: 80` still bounds the whole lane.
+#
 # Not run in the PR fast lane: invoke via `make uat-sweep
 # CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml` from a
 # nightly workflow, after bringing up the Postgres compose stack (`make
@@ -58,8 +65,8 @@ scales:
   rungs: [1]
 
 execute:
-  per_cell_timeout_s: 1200
-  early_stop_after_s: 1200
+  per_cell_timeout_s: 2400
+  early_stop_after_s: 2400
   early_stop_on_failure: false
   phases_arg: "load,throughput"
   skip_unreachable: true
