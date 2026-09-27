@@ -1,5 +1,5 @@
 {
-  "context": "One PR, mechanical deletions, no logic changes. Verify the CI path-filter change doesn't orphan other classifier rules. CLAUDE.md/AGENTS.md edits follow docs-brevity style. After merge, run the export workflow manually once to confirm the committed snapshot is unchanged in shape.",
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rules on _project/scripts/todo_db.py and _project/scripts/todo_findings.py are inert, neither file exists in the tree. The deny on _project/scripts/validate_blind_spot.py is live and stays. Scope rules are create-time-only and cannot be edited; on any re-create, drop the two inert denies.",
   "description": "Single demolition PR after the phase-5 freeze cycle completes and all gates hold. Deletes the tracked _project/blind-spots/*.md records and retires every machinery surface the adversarial review's M6 inventoried: sweep_blind_spots.py + its tests, Makefile blind-spots-{list,report,sweep} targets (Makefile:2077-2085, .PHONY :1290, help :2397-2400), the .gitignore:169 un-ignore line for _project/blind-spots/, path-filters.yml safe-content (:10) and content-guard (:42) entries, and the CLAUDE.md pre-approved 'make blind-spots-*' commands + blind-spot capture-path bindings. KEEPS: validate_blind_spot.py (retargeted in phase 1 as the draft validator), the /blind-spot command (rewritten in phase 1), and README.md content relocated to docs/development/ as the findings-domain doc. Git HISTORY IS UNTOUCHED — the 61 commits and record contents remain readable in history per the phase-0 owner decision; rewriting history is a separate destructive action requiring separate authorization. HARD ENTRY GATES: (a) one full planning cycle elapsed since the freeze; (b) at least one finding was surfaced via the standard flow (ready/stats banner -> candidates) and triaged during that cycle — the requirement-2 proof; (c) phase-2 export pinning test and phase-3 non-claimability suite still green on develop.",
   "legacy": {
     "anti_patterns": [
@@ -252,6 +252,14 @@
       "op": "release",
       "op_id": "8f232d4bf2704221b49491294621222d",
       "session_id": "4c438242a6c148c49ad631cb1689e55f"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:07:36Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "f8b985a98f434bf28db567d7d7378dd5",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
     }
   ]
 }
