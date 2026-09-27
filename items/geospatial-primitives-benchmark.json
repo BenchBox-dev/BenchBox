@@ -1,4 +1,5 @@
 {
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.",
   "description": "Create a new Geospatial Primitives benchmark to test cross-platform spatial SQL\nfunctions. This benchmark covers ST_* functions, GEOGRAPHY/GEOMETRY types, and\nspatial operations that are increasingly important for location-based analytics.\n\nThis differs from the specialized-geospatial TODO (PostGIS integration) by:\n- Focusing on OLAP platforms with native geospatial support (Snowflake, BigQuery, DuckDB)\n- Testing SQL-level primitives, not a new adapter\n- Using synthetic/generated geospatial data, not requiring PostGIS\n\nUse cases covered:\n- Distance calculations (point-to-point, point-to-polygon)\n- Spatial predicates (contains, intersects, within)\n- Geometry transformations (buffer, simplify, union)\n- Spatial aggregations (convex hull, clustering)\n- Geospatial joins\n",
   "legacy": {
     "anti_patterns": [
@@ -329,5 +330,15 @@
         "wid": "w9"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:04:26Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "2cf36375ec3641a280fa8618e11d7136",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
