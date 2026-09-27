@@ -1,4 +1,5 @@
 {
+  "context": "LADDER CORRECTION 2026-09-27 (tracker-corpus-repair sweep): one legacy verification invokes _project/scripts/todo_cli.py and validate_todo.py, both deleted in the G5 cutover; that command cannot run. Modern equivalents are the todo-db CLI (todo-db list/show/validate) and the MCP tracker tools. Legacy verification text is preserved as history.",
   "description": "`_project/DONE/README.md` documents the canonical placement convention:\n`DONE/{worktree}/{lifecycle-phase}/{slug}.yaml`, preserving the `planning/`\nor `active/` subdirectory from the source TODO tree.\n\nAt least one file violates this convention as of 2026-06-08:\n\n- `DONE/main/benchmark-runs-output-root-propagation.yaml` — placed flat\n  under `DONE/main/` with no lifecycle subdirectory. Per the README it\n  should be `DONE/main/planning/benchmark-runs-output-root-propagation.yaml`.\n\n`todo-sweep-completed-items-from-open-tree` needs the convention to be\nconsistently enforced before it can reliably move items. `todo_cli.py` may\nalso miscount items if some live outside the documented path structure.\n\nAudit the DONE tree for all flat-placed items, normalize them to the\ndocumented convention, and confirm `todo_cli.py` still resolves them\ncorrectly after the move.\n",
   "legacy": {
     "item_meta": {
@@ -105,5 +106,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:08:42Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "3ae04afb60a64c57b211bbe274758744",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
