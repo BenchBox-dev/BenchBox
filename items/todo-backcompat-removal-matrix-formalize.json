@@ -1,4 +1,5 @@
 {
+  "context": "REFERENCE NOTE 2026-09-27 (tracker-corpus-repair sweep): the description's todo_cli.py / validate_todo.py mentions are historical prose about the v2 file-tree system, preserved as history; both scripts were deleted in the G5 cutover. No live verification command references them on this item. Modern equivalents are the todo-db CLI and MCP tracker tools.",
   "description": "`_project/TODO/main/active/remove-alpha-backward-compatibility-surface-removal-matrix.md`\nis a Markdown file with 88 tracked backward-compatibility removal entries\nacross 35 modules. It lives in the `active/` lifecycle directory, implying\nit is in-progress work, but it is not a YAML file and is therefore invisible\nto todo_cli.py, validate_todo.py, and the index system.\n\nAs a result:\n- It has no priority, owner, status, or work breakdown tracked by tooling\n- Its 88 entries cannot be queried, filtered, or linked via deps.needs\n- It won't appear in `make pr-preflight` validation sweeps after\n  todo-add-todo-validation-to-pr-preflight lands\n\nOne of three outcomes is needed:\n1. Convert to a YAML TODO with work units for each module cluster\n2. Keep as .md but add a YAML companion TODO that tracks the sweep work\n   and explicitly cites the .md as its scope document\n3. Explicitly move it out of the TODO tree (e.g. into _project/docs/ or\n   a tracking issue) with a note that it is managed outside the TODO system\n",
   "legacy": {
     "item_meta": {
@@ -89,5 +90,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:11:06Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "e7b872eb3b92443680b1698e50c516a3",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
