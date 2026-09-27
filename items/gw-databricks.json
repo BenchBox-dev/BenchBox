@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "gateway label (native/espresso/custom) accepted, stored, and forwarded through from_config (extend hardcoded key loop) and --gateway CLI arg, registered in _OPTION_SPEC_ROWS",
+    "gateway!=native with DATABRICKS_CLIENT_ID/CLIENT_SECRET/CONFIG_PROFILE in env raises ConfigurationError directing to PAT; PAT path passes server_hostname through unchanged",
+    "Databricks gateway docs: espressocomputing server_hostname + unchanged http_path, PAT-only caveat",
+    "No live-vendor calls in tests; mock tokens only"
+  ],
+  "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items B1-B3. Sources: benchbox/platforms/databricks/adapter.py (__init__ ~L269, add_cli_arguments ~L483, from_config ~L497 key loop). server_hostname override channel already exists; this item is label plumbing + OAuth guardrail + docs. Guardrails: worktree policy, never git add -A, no credentials in git, userinfo sanitization before logging.",
+  "description": "Add gateway label plumbing to DatabricksAdapter per plan v2 B1-B3: forward gateway through from_config key loop, add --gateway CLI arg and option-spec row, enforce PAT-only guardrail via OAuth env-var detection, document Espresso server_hostname usage.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:17:27Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "d2af1071373043f7acc484288969e105",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}

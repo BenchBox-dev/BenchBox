@@ -7645,6 +7645,13 @@
       "status": "done",
       "title": "Confirm the guards-fix skill-sync containment on the machine with the real CLI"
     },
+    "gw-databricks": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Databricks adapter gateway label + PAT-only guardrail"
+    },
     "gw-snowflake-conn": {
       "claim": null,
       "needs": [],
