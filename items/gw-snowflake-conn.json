@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "SnowflakeAdapter.__init__ accepts gateway (native/espresso/greybeam/custom), gateway_host, gateway_port, gateway_protocol=https, gateway_ca_bundle, gateway_ocsp_fail_open=None, allow_insecure_gateway=False",
+    "gateway!=native requires gateway_host; allow_insecure_gateway or http-on-non-loopback requires BENCHBOX_ALLOW_INSECURE_GATEWAY=1 plus loud warning; ocsp forwarded only when not None; missing CA bundle file raises",
+    "Gateway mapping centralized in _get_connection_params so create_connection AND _create_admin_connection route via gateway; account always passed; insecure maps to insecure_mode; CA bundle via scoped REQUESTS_CA_BUNDLE; userinfo stripped from hosts",
+    "CLI args + from_config fields + _OPTION_SPEC_ROWS entries in benchbox/platforms/__init__.py (not platform_defaults.py); test_advertised_platform_options passes",
+    "No live-vendor calls in tests; mock tokens only"
+  ],
+  "context": "Plan: /Users/joe/.jcode/scratch/espresso-greybeam-plan-v2.md items A1-A5. Sources: benchbox/platforms/snowflake.py (_get_connection_params ~L511, _create_admin_connection ~L521, create_connection ~L600, add_cli_arguments ~L180, from_config ~L217); specs table benchbox/platforms/__init__.py _OPTION_SPEC_ROWS ~L623. Guardrails: linked worktree off develop (make worktree-create + agent-write-preflight), never git add -A, no credentials in git, never name anything proxy_host. Decision gate G1 depends on this item.",
+  "description": "Add gateway-endpoint override to SnowflakeAdapter per plan v2 A1-A5: config params and validation, centralized gateway mapping in _get_connection_params covering benchmark and admin paths, CLI args, from_config fields, and option-spec registration in benchbox/platforms/__init__._OPTION_SPEC_ROWS.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:17:19Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "59e0f0dc9f174bc2a87e904b20f034d0",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}

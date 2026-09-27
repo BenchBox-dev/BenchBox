@@ -7645,6 +7645,13 @@
       "status": "done",
       "title": "Confirm the guards-fix skill-sync containment on the machine with the real CLI"
     },
+    "gw-snowflake-conn": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Snowflake adapter gateway-endpoint override (conn, CLI, option specs)"
+    },
     "harden-auto-merge-on-open-stranding": {
       "claim": null,
       "needs": [],
