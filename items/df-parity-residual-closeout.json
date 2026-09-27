@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Makefile datavault comment no longer claims staged status; module docstring agrees",
+    "Scope-boundary statement committed: cross-surface gates cover static QueryRegistry benchmarks; write/metadata/transaction primitives and tpcdi route to the w2 fallback oracle; ai_primitives and vector_search stay supports_dataframe false",
+    "Release-branch posture explicitly recorded: release PRs rely on develop-time squash-merge enforcement, or the cross-surface suite is added to test.yml by separate approved change",
+    "Plan states gates as transcription and regression verification against DuckDB SQL references with shared-author and scale limits disclosed"
+  ],
+  "context": "Adversarial findings: datavault runs in pr.yml while the Makefile comment says staged; operation-pipeline benchmarks (write/metadata/transaction/tpcdi) have no DF query surface and belong to the documented w2 fallback oracle; release PRs currently skip all cross-surface gates silently. Full review: /Users/joe/.jcode/scratch/agy_review.txt findings 10, 11 plus verdict item 4. No dependencies; fold into the nearest gate PR if convenient but track separately so it is not dropped.",
+  "description": "Close the residual items: fix the datavault staged wording, commit the scope-boundary statement, record the release-branch CI posture decision, and ensure honest oracle semantics are stated wherever the gates are described. Guardrails: decision, not silent omission, on release coverage; no scope creep into building the fallback oracle itself.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:36:16Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "2aeb3c24c9b14996949664ecf6344468",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

@@ -4840,6 +4840,13 @@
       "status": "open",
       "title": "Reconcile read_primitives query counts and fix registry metadata"
     },
+    "df-parity-residual-closeout": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Close datavault wording, scope, release-posture residuals"
+    },
     "df-parity-staged-builders-small": {
       "claim": null,
       "needs": [
