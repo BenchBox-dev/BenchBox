@@ -7659,6 +7659,15 @@
       "status": "open",
       "title": "Snowflake adapter gateway-endpoint override (conn, CLI, option specs)"
     },
+    "gw-snowflake-querytag": {
+      "claim": null,
+      "needs": [
+        "gw-snowflake-conn"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Symmetric gateway query-tag helper (execute + stats lookup)"
+    },
     "harden-auto-merge-on-open-stranding": {
       "claim": null,
       "needs": [],

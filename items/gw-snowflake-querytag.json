@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "_format_query_tag(query_id) used symmetrically in execute path (ALTER SESSION) and get_query_execution_stats (QUERY_HISTORY lookup); native runs keep exact legacy tag",
+    "Unit test proves stats retrieval works under a gateway tag; legacy native tag behavior unchanged",
+    "Run-level suffix scheme documented for vendor log-join"
+  ],
+  "context": "Plan v2 A6. Failure mode it fixes: gateway suffix in session tag without lockstep stats-lookup change returns zero QUERY_HISTORY rows, silently nulling execution_time_ms/compilation/bytes/credits for all gateway queries. Depends on gw-snowflake-conn. Guardrails: worktree policy, never git add -A, no credentials.",
+  "description": "Add SnowflakeAdapter._format_query_tag(query_id) used in BOTH execute_query_with_retry and get_query_execution_stats so gateway run suffixes stay consistent; native tag format unchanged; unit test for gateway-tag stats retrieval.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:18:48Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "6f81d91e8e9c4e2b87ef3a04b07fa999",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}
