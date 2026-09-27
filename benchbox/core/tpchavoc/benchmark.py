@@ -18,9 +18,11 @@ from pathlib import Path
 from typing import Any, Union
 
 from benchbox.core.tpch.benchmark import TPCHBenchmark
+from benchbox.core.tpchavoc.cloud_compat import rewrite_cloud_variant
 from benchbox.core.tpchavoc.queries import TPCHavocQueryManager
 from benchbox.core.tpchavoc.validation import ResultValidator, ValidationReport
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
 from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
@@ -139,7 +141,17 @@ class TPCHavocBenchmark(TPCHBenchmark):
             return list(CLICKHOUSE_TPCHAVOC_SKIPS)
         if platform in {"pg-duckdb", "pg-mooncake", "timescaledb"}:
             return list(POSTGRES_TPCHAVOC_SKIPS)
+        if platform in CLOUD_TPCHAVOC_SKIPS:
+            return list(CLOUD_TPCHAVOC_SKIPS[platform])
         return []
+
+    def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
+        """Return variants with cloud rewrites after the shared SQL translation."""
+        queries = super().get_queries(dialect=dialect, base_dialect=base_dialect)
+        target = (dialect or "").lower()
+        if target not in {"bigquery", "snowflake", "databricks"}:
+            return queries
+        return {query_id: rewrite_cloud_variant(query_id, query, target) for query_id, query in queries.items()}
 
     def get_query(
         self,
@@ -147,6 +159,8 @@ class TPCHavocBenchmark(TPCHBenchmark):
         *,
         seed: int | None = None,
         scale_factor: float | None = None,
+        dialect: str | None = None,
+        base_dialect: str | None = None,
         **kwargs,
     ) -> str:
         """Get TPC-Havoc query by ID.
@@ -167,12 +181,17 @@ class TPCHavocBenchmark(TPCHBenchmark):
             ValueError: If the query_id format is invalid
             TypeError: If parameters have wrong types
         """
-        return self.query_manager.get_query(
+        query = self.query_manager.get_query(
             query_id,
             seed=seed,
             scale_factor=scale_factor or self.scale_factor,
             **kwargs,
         )
+        if dialect is None:
+            return query
+        target = dialect.lower()
+        translated = self.translate_query_text(query, (base_dialect or "netezza").lower(), target)
+        return rewrite_cloud_variant(str(query_id), translated, target)
 
     def get_query_variant(self, query_id: int, variant_id: int, params: dict[str, Any] | None = None) -> str:
         """Get a specific TPC-Havoc query variant.

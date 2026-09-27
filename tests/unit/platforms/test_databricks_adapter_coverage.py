@@ -3641,6 +3641,16 @@ class TestPreprocessOperationSql:
 
         assert result == "SELECT CAST(n AS STRING)"
 
+    def test_unnest_generate_series_rewritten_to_explode_sequence(self):
+        """Databricks has neither unnest nor generate_series (UNRESOLVED_ROUTINE live)."""
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op", _make_operation("SELECT n FROM (SELECT unnest(generate_series(1, 100)) AS n) t")
+        )
+
+        assert result == "SELECT n FROM (SELECT explode(sequence(1, 100)) AS n) t"
+
     def test_skip_override_returns_none(self):
         adapter = _make_adapter()
 
