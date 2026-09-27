@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 357
+**Total rules:** 364
 
 **Platforms with rules:** 22
 
@@ -109,6 +109,13 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 | support | scope | phase | reason | rule_id |
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Databricks SQL has array aggregation but not DuckDB's LIST_SUM and LIST_ZIP functions used here. | `execution_filter.databricks.tpchavoc.1_v7` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_create_temp_table | execution_filter | Databricks SQL rejects CREATE TEMPORARY TABLE ... IF NOT EXISTS, and temporary views are not allowed inside a transaction (TRANSACTION_NOT_SUPPORTED.COMMAND). | `execution_filter.databricks.transaction_primitives.transaction_create_temp_table` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | Databricks SQL rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.databricks.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | Databricks SQL rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.databricks.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | Databricks SQL rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.databricks.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | Databricks SQL multi-statement transactions do not support SAVEPOINT. | `execution_filter.databricks.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | Databricks SQL multi-statement transactions do not support SAVEPOINT. | `execution_filter.databricks.transaction_primitives.transaction_savepoint_nested` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_truncate_in_transaction | execution_filter | Databricks SQL does not allow TRUNCATE TABLE inside a transaction (TRANSACTION_NOT_SUPPORTED.COMMAND). | `execution_filter.databricks.transaction_primitives.transaction_truncate_in_transaction` |
 
 ### datafusion
 

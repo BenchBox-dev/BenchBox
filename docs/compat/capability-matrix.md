@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 537
+**Total registered rules:** 545
 
 **Platforms covered:** 35
 
@@ -19,7 +19,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | clickhouse-local | 1 | - | - | - | - | 23 | 24 |
 | clickhouse-server | - | - | - | - | - | 23 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
-| databricks | - | 1 | 11 | 2 | 1 | 1 | 16 |
+| databricks | - | 1 | 11 | 2 | 2 | 8 | 24 |
 | datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
@@ -234,8 +234,16 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q09_scalar_group_by_first` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.write_primitives.pk_not_enforced` |
+| ddl_optimize | benchmark=transaction_primitives | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `ddl_optimize.databricks.transaction_primitives.txn_staging_catalog_managed` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.databricks.all.convert_to_delta_table` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.tpchavoc.1_v7` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_create_temp_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_create_temp_table` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_savepoint_nested` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_truncate_in_transaction | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_truncate_in_transaction` |
 
 ### datafusion
 
