@@ -880,7 +880,10 @@ jobs:
     # cell managing its own compose stack
     # (see tests/uat/configs/uat-throughput-postgresql-nightly.yaml).
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Cell budgets: DuckDB 900s + Postgres 2400s = 55 min worst case, plus
+    # ~25 min headroom for checkout, deps, integration tests, Docker
+    # startup/cleanup, and both assert steps.
+    timeout-minutes: 80
     env:
       # Throughput@Size floor activation: repository configuration variables
       # flow into the DuckDB assert step below. Unset vars evaluate to empty,
