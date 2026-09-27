@@ -144,16 +144,28 @@ def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) 
         except Exception as exc:  # noqa: BLE001 - surfaced as stream failure
             return (False, 0, str(exc))
 
+    # One database instance, one cursor per stream: DuckDB's documented
+    # multi-threaded pattern. Per-stream duckdb.connect(path) races the
+    # process-wide instance cache when one stream closes the last handle while
+    # another opens, failing with "Unique file handle conflict" under CPU
+    # contention; that is a DuckDB client constraint, not executor behavior.
+    anchor = duckdb.connect(db_path)
     config = ConcurrentLoadConfig(
         query_factory=lambda index: (f"q{index}", "SELECT 1"),
-        connection_factory=lambda: duckdb.connect(db_path),
+        connection_factory=anchor.cursor,
         execute_query=execute,
         pattern=pattern,
         queries_per_stream=50,
         collect_resource_metrics=False,
         role_factories={"writer": writer_factory, "reader": reader_factory},
     )
-    result = ConcurrentLoadExecutor(config).run()
+    try:
+        result = ConcurrentLoadExecutor(config).run()
+    finally:
+        anchor.close()
+
+    failures = [stream.error for stream in result.streams if stream.error]
+    assert not failures, failures
 
     assert result.total_streams_succeeded == result.total_streams_executed > 0
     assert result.total_queries_executed > 0
