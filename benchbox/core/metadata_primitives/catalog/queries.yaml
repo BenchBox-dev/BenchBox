@@ -184,7 +184,7 @@ queries:
   description: EXPLAIN plan for a simple query
   sql: "EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;\n"
   variants:
-    snowflake: "EXPLAIN SELECT * FROM information_schema.tables LIMIT 10;\n"
+    snowflake: "SELECT * FROM information_schema.tables LIMIT 10;\n"
     bigquery: "SELECT * FROM INFORMATION_SCHEMA.TABLES LIMIT 10;\n"
     clickhouse: "EXPLAIN SELECT * FROM system.tables LIMIT 10;\n"
 - id: query_explain_join
@@ -192,6 +192,7 @@ queries:
   description: EXPLAIN plan for a join query
   sql: "EXPLAIN\nSELECT t.table_name, c.column_name\nFROM information_schema.tables t\nJOIN information_schema.columns c\n  ON t.table_name = c.table_name\n  AND t.table_schema = c.table_schema\nWHERE t.table_schema NOT IN ('information_schema', 'pg_catalog')\nLIMIT 100;\n"
   variants:
+    snowflake: "SELECT t.table_name, c.column_name\nFROM information_schema.tables t\nJOIN information_schema.columns c\n  ON t.table_name = c.table_name\n  AND t.table_schema = c.table_schema\nWHERE t.table_schema NOT IN ('INFORMATION_SCHEMA')\nLIMIT 100;\n"
     clickhouse: "EXPLAIN\nSELECT t.name AS table_name, c.name AS column_name\nFROM system.tables t\nJOIN system.columns c ON t.name = c.table AND t.database = c.database\nWHERE t.database NOT IN ('system', 'INFORMATION_SCHEMA')\nLIMIT 100;\n"
     bigquery: "SELECT t.table_name, c.column_name\nFROM INFORMATION_SCHEMA.TABLES t\nJOIN INFORMATION_SCHEMA.COLUMNS c\n  ON t.table_name = c.table_name\n  AND t.table_schema = c.table_schema\nLIMIT 100;\n"
 - id: query_explain_aggregate
@@ -199,6 +200,7 @@ queries:
   description: EXPLAIN plan for an aggregate query
   sql: "EXPLAIN\nSELECT\n    table_schema,\n    COUNT(*) AS table_count,\n    SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables\nFROM information_schema.tables\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\nGROUP BY table_schema;\n"
   variants:
+    snowflake: "SELECT\n    table_schema,\n    COUNT(*) AS table_count,\n    SUM(CASE WHEN table_type = 'BASE TABLE' THEN 1 ELSE 0 END) AS base_tables\nFROM information_schema.tables\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\nGROUP BY table_schema;\n"
     clickhouse: "EXPLAIN\nSELECT\n    database AS table_schema,\n    COUNT(*) AS table_count,\n    countIf(engine != 'View') AS base_tables\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nGROUP BY database;\n"
     bigquery: "SELECT\n    table_schema,\n    COUNT(*) AS table_count,\n    COUNTIF(table_type = 'BASE TABLE') AS base_tables\nFROM INFORMATION_SCHEMA.TABLES\nGROUP BY table_schema;\n"
 - id: query_list_constraints
@@ -361,6 +363,7 @@ queries:
   - bigquery
   - datafusion
   variants:
+    snowflake: "SELECT\n    table_name,\n    constraint_name,\n    constraint_type,\n    '' AS column_name\nFROM information_schema.table_constraints\nWHERE table_name ILIKE 'benchbox_fk_%'\n  AND constraint_type = 'FOREIGN KEY'\nORDER BY table_name, constraint_name;\n"
     duckdb: "SELECT\n    table_name,\n    constraint_text AS constraint_name,\n    constraint_type,\n    '' AS column_name\nFROM duckdb_constraints()\nWHERE table_name LIKE 'benchbox_fk_%'\n  AND constraint_type = 'FOREIGN KEY'\nORDER BY table_name;\n"
 - id: constraint_pk_list
   category: constraint
@@ -371,6 +374,7 @@ queries:
   - bigquery
   - datafusion
   variants:
+    snowflake: "SELECT\n    table_name,\n    constraint_name,\n    '' AS column_name\nFROM information_schema.table_constraints\nWHERE table_name ILIKE 'benchbox_%'\n  AND constraint_type = 'PRIMARY KEY'\nORDER BY table_name, constraint_name;\n"
     duckdb: "SELECT\n    table_name,\n    constraint_text AS constraint_name,\n    '' AS column_name\nFROM duckdb_constraints()\nWHERE table_name LIKE 'benchbox_%'\n  AND constraint_type = 'PRIMARY KEY'\nORDER BY table_name;\n"
 - id: constraint_referential_integrity
   category: constraint
@@ -382,6 +386,8 @@ queries:
   - duckdb
   - starrocks
   - datafusion
+  variants:
+    snowflake: "SELECT\n    tc.table_name AS child_table,\n    rc.unique_constraint_name,\n    ptc.table_name AS parent_table,\n    '' AS fk_column\nFROM information_schema.table_constraints tc\nJOIN information_schema.referential_constraints rc\n  ON tc.constraint_name = rc.constraint_name\n  AND tc.table_schema = rc.constraint_schema\nJOIN information_schema.table_constraints ptc\n  ON rc.unique_constraint_name = ptc.constraint_name\n  AND rc.unique_constraint_schema = ptc.table_schema\nWHERE tc.table_name ILIKE 'benchbox_fk_%'\nORDER BY child_table;\n"
 - id: constraint_summary
   category: constraint
   description: Summary of constraint types in benchmark tables

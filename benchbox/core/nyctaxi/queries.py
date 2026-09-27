@@ -28,6 +28,7 @@ _CATALOG = load_static_query_catalog(__package__)
 QUERIES: dict[str, dict[str, Any]] = _CATALOG["QUERIES"]
 GREEN_QUERIES: dict[str, dict[str, Any]] = _CATALOG["GREEN_QUERIES"]
 HVFHV_QUERIES: dict[str, dict[str, Any]] = _CATALOG["HVFHV_QUERIES"]
+FHV_QUERIES: dict[str, dict[str, Any]] = _CATALOG["FHV_QUERIES"]
 CROSS_TYPE_QUERIES: dict[str, dict[str, Any]] = _CATALOG["CROSS_TYPE_QUERIES"]
 
 
@@ -46,6 +47,7 @@ class NYCTaxiQueryManager:
         seed: Optional[int] = None,
         include_green_queries: bool = False,
         include_hvfhv_queries: bool = False,
+        include_fhv_queries: bool = False,
         include_cross_type_queries: bool = False,
     ) -> None:
         """Initialize query manager.
@@ -56,6 +58,7 @@ class NYCTaxiQueryManager:
             seed: Random seed for parameter generation
             include_green_queries: Include Green Taxi-specific queries
             include_hvfhv_queries: Include HVFHV-specific queries
+            include_fhv_queries: Include FHV-specific queries
             include_cross_type_queries: Include cross-type comparison queries
         """
         self.start_date = start_date or datetime(2019, 1, 1)
@@ -71,6 +74,8 @@ class NYCTaxiQueryManager:
             self._active_queries.update(GREEN_QUERIES)
         if include_hvfhv_queries:
             self._active_queries.update(HVFHV_QUERIES)
+        if include_fhv_queries:
+            self._active_queries.update(FHV_QUERIES)
         if include_cross_type_queries:
             self._active_queries.update(CROSS_TYPE_QUERIES)
 
