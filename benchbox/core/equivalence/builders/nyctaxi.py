@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import csv
+import re
+from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duckdb_cell
 
@@ -57,10 +58,34 @@ def _force_offline_synthesis(downloader: NYCTaxiDataDownloader) -> None:
     ``TAXI_ZONES_DATA``), so only the trips path needs forcing.
     """
 
-    def _synthetic_only(self: NYCTaxiDataDownloader, url: str, writer: csv.writer, start_trip_id: int) -> int:
+    def _synthetic_only(self: NYCTaxiDataDownloader, url: str, writer: Any, start_trip_id: int) -> int:
         return self._generate_synthetic_month(writer, start_trip_id)
 
     downloader._process_parquet_file = _synthetic_only.__get__(downloader)  # type: ignore[method-assign]
+
+
+# Fixed query seed so SQL windows are deterministic across gate runs. The
+# query manager draws random date offsets and zone picks per query; without a
+# seed the SQL and DF surfaces can never share a window.
+NYCTAXI_GATE_SEED = 42
+
+
+def _extract_sql_windows(sql_queries: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Parse each rendered SQL query's date window and zone into DF overrides."""
+    overrides: dict[str, dict[str, Any]] = {}
+    for sql_id, sql in sql_queries.items():
+        df_id = NYCTAXI_SQL_TO_DF_IDS[sql_id]
+        dates = re.findall(r"'(\d{4}-\d{2}-\d{2})(?: \d{2}:\d{2}:\d{2})?'", sql)
+        params: dict[str, Any] = {}
+        if len(dates) >= 2:
+            params["start_date"] = datetime.fromisoformat(dates[0])
+            params["end_date"] = datetime.fromisoformat(dates[1])
+        zone = re.search(r"pickup_location_id = (\d+)", sql)
+        if zone:
+            params["zone_id"] = int(zone.group(1))
+        if params:
+            overrides[df_id] = params
+    return overrides
 
 
 def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
@@ -69,9 +94,10 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
 
     from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
     from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
+    from benchbox.core.nyctaxi.dataframe_queries.parameters import set_parameter_overrides
 
     output_dir = Path(output_dir)
-    benchmark = NYCTaxiBenchmark(scale_factor=scale_factor, output_dir=output_dir)
+    benchmark = NYCTaxiBenchmark(scale_factor=scale_factor, output_dir=output_dir, seed=NYCTAXI_GATE_SEED)
     _force_offline_synthesis(benchmark.downloader)
 
     def _forbidden_urlretrieve(*args: object, **kwargs: object) -> object:
@@ -87,6 +113,8 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
 
     connection = _load_duckdb_cell(benchmark, output_dir, ["taxi_zones", "trips"], label="NYC Taxi")
     sql_queries = benchmark.get_queries()
+    # Align the DF surface with the seeded SQL windows before wiring queries.
+    set_parameter_overrides(_extract_sql_windows(sql_queries))
     queries = NYCTAXI_DATAFRAME_QUERIES
     return CrossSurfaceData(
         connection=connection,
