@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "tests/unit/platforms/test_snowflake_gateway.py covers: defaults, host-required, insecure+http env gates, account+host connect mapping, ocsp/CA handling, userinfo strip, symmetric tags, metadata block, tpc_compliant false, is_native_run, cost suppression, probe degradation, greybeam+load raise, maintenance fail-fast",
+    "tests/unit/platforms/databricks/test_databricks_gateway.py covers: label forwarding, OAuth-env raise, PAT passthrough, cost suppression",
+    "Mock fixtures bind 127.0.0.1:0 only; handshake routing, tag preservation, receipt parsing, probe fallback asserted",
+    "test_advertised_platform_options passes; platform-manifest-check + compat-docs-check pass with zero manifest-key changes; registry-count test added; no manifest edits needed",
+    "Zero live cloud calls in the suite; mock tokens only"
+  ],
+  "context": "Plan v2 I1-I6. Depends on gw-snowflake-conn, gw-databricks, gw-snowflake-querytag, gw-metadata-guards, gw-cache-discipline, gw-greybeam-lifecycle. Decision gates G1 (mock-gateway connection behavior) and G2 (checks pass, no new keys) are evaluated by this item. Guardrails: loopback-only mocks, ephemeral ports.",
+  "description": "CI-safe mock-only gateway test suite for both adapters plus drift/manifest verification: new test files, loopback-bound fixtures, advertised-options/manifest/compat checks green with no manifest-key changes. Gates G1 and G2.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:19:52Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "0b31c2dc54a446b6b4a0db6db5883acd",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}

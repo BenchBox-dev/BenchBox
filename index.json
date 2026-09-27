@@ -7697,6 +7697,20 @@
       "status": "open",
       "title": "Symmetric gateway query-tag helper (execute + stats lookup)"
     },
+    "gw-tests-gates": {
+      "claim": null,
+      "needs": [
+        "gw-cache-discipline",
+        "gw-databricks",
+        "gw-greybeam-lifecycle",
+        "gw-metadata-guards",
+        "gw-snowflake-conn",
+        "gw-snowflake-querytag"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Gateway test suite + G1/G2 verification gates"
+    },
     "harden-auto-merge-on-open-stranding": {
       "claim": null,
       "needs": [],
