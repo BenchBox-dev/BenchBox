@@ -834,6 +834,16 @@ ignore_rules = [
     # consolidated in the helper; residual similarity is adapter arity, not logic.
     { function_names = ["find_postgres_divergences", "find_clickhouse_divergences"], path_contains = ["benchbox/core/tpchavoc/equivalence.py"] },
 
+    # Cross-surface gate builders - thin per-benchmark delegations over
+    # _assemble_simple_duckdb_cell that must remain distinct public names for
+    # gate wiring. Shared assembly lives in the helper; residual similarity
+    # is benchmark binding arity, not logic.
+    { function_names = ["build_tpcds_duckdb", "build_tpch_duckdb", "build_tpch_skew_duckdb"], path_contains = [
+        "benchbox/core/equivalence/builders/tpcds.py",
+        "benchbox/core/equivalence/builders/tpch.py",
+        "benchbox/core/equivalence/builders/tpch_skew.py",
+    ] },
+
     # --- Boilerplate ignore rules added 2026-02-21 (groups G1-G28 from duplicate-check triage) ---
 
     # G8,G9,G11,G22: Protocol/ABC abstract method stubs across dataframe type hierarchy
