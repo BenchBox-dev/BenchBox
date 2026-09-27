@@ -1259,40 +1259,250 @@ class UnifiedTuningConfiguration:
         """Disable foreign key constraints."""
         self.foreign_keys.enabled = False
 
-    def enable_platform_optimization(self, optimization_type: TuningType, **kwargs) -> None:
+    # Table-layout tuning types recorded through table_tunings entries.
+    # The wizard confirms these choices per platform (Snowflake clustering,
+    # BigQuery partitioning/clustering, Redshift distribution/sort keys,
+    # DuckDB and ClickHouse partitioning/sorting) but historically routed them
+    # through this method, which only stored platform-optimization flags and
+    # silently dropped them. Callers may pass explicit `columns` (a list of
+    # TuningColumn, or of names that resolve to UNKNOWN-typed columns) to
+    # record a real table entry; without columns the choice is still
+    # recorded as an enabled type via a benchmark-aware default entry built
+    # from the packaged tuned templates, so a confirmed choice is never
+    # silently lost.
+    _TABLE_LAYOUT_TYPES = frozenset(
+        {
+            TuningType.PARTITIONING,
+            TuningType.CLUSTERING,
+            TuningType.DISTRIBUTION,
+            TuningType.SORTING,
+        }
+    )
+
+    def enable_platform_optimization(
+        self,
+        optimization_type: TuningType,
+        benchmark: str = "tpch",
+        columns: Optional[list[Any]] = None,
+        table_name: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Enable a specific platform optimization.
+
+        Table-layout types (partitioning, clustering, distribution, sorting)
+        are recorded as entries in ``table_tunings`` so the choice persists
+        in ``to_dict()`` and ``get_enabled_tuning_types()``. When ``columns``
+        are given they are used verbatim (TuningColumn objects) or resolved
+        from plain names with ``UNKNOWN`` type; otherwise a benchmark-aware
+        default entry is built from the packaged tuned template for
+        ``benchmark`` (falling back to the TPC-H layout).
 
         Args:
             optimization_type: The type of optimization to enable
+            benchmark: Benchmark name used to resolve default table layouts
+            columns: Optional TuningColumn list (or plain column names)
+            table_name: Optional table to attach the layout to
             **kwargs: Additional configuration parameters
         """
+        if optimization_type in self._TABLE_LAYOUT_TYPES:
+            self._enable_table_layout(optimization_type, benchmark=benchmark, columns=columns, table_name=table_name)
+            return
+        # `columns` is an explicit named parameter (used by the table-layout
+        # path above); platform optimizations historically read it from
+        # kwargs, so honor both spellings here.
+        column_values = columns if columns is not None else kwargs.get("columns")
         if optimization_type == TuningType.Z_ORDERING:
             self.platform_optimizations.z_ordering_enabled = True
             self.platform_optimizations.databricks_clustering_strategy = "z_order"
-            if "columns" in kwargs:
-                self.platform_optimizations.z_ordering_columns = kwargs["columns"]
+            if column_values is not None:
+                self.platform_optimizations.z_ordering_columns = column_values
         elif optimization_type == TuningType.LIQUID_CLUSTERING:
             self.platform_optimizations.liquid_clustering_enabled = True
             self.platform_optimizations.databricks_clustering_strategy = "liquid_clustering"
-            if "columns" in kwargs:
-                self.platform_optimizations.liquid_clustering_columns = kwargs["columns"]
+            if column_values is not None:
+                self.platform_optimizations.liquid_clustering_columns = column_values
         elif optimization_type == TuningType.AUTO_OPTIMIZE:
             self.platform_optimizations.auto_optimize_enabled = True
         elif optimization_type == TuningType.AUTO_COMPACT:
             self.platform_optimizations.auto_compact_enabled = True
         elif optimization_type == TuningType.BLOOM_FILTERS:
             self.platform_optimizations.bloom_filters_enabled = True
-            if "columns" in kwargs:
-                self.platform_optimizations.bloom_filter_columns = kwargs["columns"]
+            if column_values is not None:
+                self.platform_optimizations.bloom_filter_columns = column_values
         elif optimization_type == TuningType.MATERIALIZED_VIEWS:
             self.platform_optimizations.materialized_views_enabled = True
+
+    def _enable_table_layout(
+        self,
+        layout_type: TuningType,
+        benchmark: str = "tpch",
+        columns: Optional[list[Any]] = None,
+        table_name: Optional[str] = None,
+    ) -> None:
+        """Record a table-layout choice as a ``table_tunings`` entry.
+
+        Explicit ``columns`` (TuningColumn objects, ``{"name": ...}`` dicts,
+        or plain names resolved with ``UNKNOWN`` type) attach to ``table_name``
+        (or the benchmark default table). Without columns, the default layout
+        for ``benchmark`` is applied from the packaged tuned template,
+        falling back to the TPC-H layout. Existing entries merge: the new
+        layout type overwrites that slot on the target table while other
+        slots are preserved.
+        """
+        slot = layout_type.value
+        resolved_columns = self._resolve_layout_columns(columns)
+        target_table, defaults = self._default_layout_entry(layout_type, benchmark, table_name)
+        entry_columns = resolved_columns if resolved_columns else defaults
+        if not entry_columns:
+            # No benchmark template carries this layout slot (e.g. TPC-H has no
+            # clustering/distribution entry): record the confirmed choice with a
+            # benchmark-default column so the type persists instead of dropping.
+            entry_columns = self._fallback_layout_columns(benchmark, target_table)
+        existing = self.table_tunings.get(target_table)
+        if existing is not None:
+            setattr(existing, slot, list(entry_columns))
+            return
+        kwargs: dict[str, Any] = {"table_name": target_table, slot: list(entry_columns)}
+        self.table_tunings[target_table] = TableTuning(**kwargs)
+
+    @staticmethod
+    def _resolve_layout_columns(columns: Optional[list[Any]]) -> list[TuningColumn]:
+        """Normalize caller-supplied layout columns to TuningColumn objects."""
+        if not columns:
+            return []
+        resolved: list[TuningColumn] = []
+        for position, column in enumerate(columns, start=1):
+            if isinstance(column, TuningColumn):
+                resolved.append(column)
+            elif isinstance(column, dict):
+                payload = dict(column)
+                payload.setdefault("order", position)
+                payload.setdefault("type", "UNKNOWN")
+                resolved.append(TuningColumn.from_dict(payload))
+            else:
+                resolved.append(TuningColumn(name=str(column), type="UNKNOWN", order=position))
+        return resolved
+
+    @staticmethod
+    def _read_template_table_tunings(benchmark: str) -> dict[str, Any]:
+        """Load the packaged duckdb tuned template's table tunings for a benchmark."""
+        from benchbox.core.tuning.packaged_templates import packaged_template_path
+
+        template = packaged_template_path("duckdb", benchmark.lower())
+        if not template.exists():
+            return {}
+        try:
+            import yaml
+        except ImportError:
+            return {}
+        try:
+            payload = yaml.safe_load(template.read_text(encoding="utf-8")) or {}
+        except (OSError, yaml.YAMLError):
+            return {}
+        table_tunings = payload.get("table_tunings") or {}
+        return dict(table_tunings) if isinstance(table_tunings, dict) else {}
+
+    @staticmethod
+    def _first_template_column(entry: Any) -> list[TuningColumn]:
+        """First layout column of a template table entry, reordered to 1."""
+        if isinstance(entry, dict):
+            for slot in ("partitioning", "clustering", "distribution", "sorting"):
+                raw = entry.get(slot) or []
+                if isinstance(raw, list) and raw:
+                    first = dict(raw[0])
+                    first["order"] = 1
+                    return [TuningColumn.from_dict(first)]
+        return []
+
+    @staticmethod
+    def _default_layout_entry(
+        layout_type: TuningType,
+        benchmark: str,
+        table_name: Optional[str],
+    ) -> tuple[str, list[TuningColumn]]:
+        """Resolve the default table and columns for a layout type.
+
+        Prefers the packaged tuned template for ``benchmark`` so wizard
+        defaults match shipped template columns; unknown benchmarks fall back
+        to the TPC-H layout. Both the slot lookup and the target table stay
+        inside one benchmark template per pass: the TPC-H pass only runs when
+        the requested benchmark has no usable entry at all, so a TPC-DS
+        clustering choice lands on STORE_SALES, never LINEITEM.
+        """
+        for candidate in (benchmark.lower(), "tpch"):
+            table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(candidate)
+            if not table_tunings:
+                continue
+            ordered_tables = sorted(table_tunings)
+            if table_name is not None:
+                match = next(
+                    (name for name in ordered_tables if name.lower() == table_name.lower()),
+                    None,
+                )
+                names = [match] if match is not None else [table_name]
+            else:
+                names = ordered_tables
+            for name in names:
+                entry = table_tunings.get(name)
+                raw_columns: list[dict[str, Any]] = []
+                if isinstance(entry, dict):
+                    raw_entry = entry.get(layout_type.value) or []
+                    raw_columns = list(raw_entry) if isinstance(raw_entry, list) else []
+                if raw_columns:
+                    return name, [TuningColumn.from_dict(col) for col in raw_columns]
+            if table_name is not None:
+                return table_name, []
+            # No table in this benchmark carries the slot: fall back to this
+            # same benchmark's own first table so the choice persists without
+            # borrowing another benchmark's schema. An empty entry falls
+            # through to the TPC-H pass so unknown benchmarks still resolve.
+            fallback_table = ordered_tables[0]
+            fallback_columns = UnifiedTuningConfiguration._first_template_column(table_tunings.get(fallback_table))
+            if fallback_columns:
+                return fallback_table, fallback_columns
+        fallback_table = table_name or "LINEITEM"
+        return fallback_table, []
+
+    @staticmethod
+    def _fallback_layout_columns(benchmark: str, table_name: str) -> list[TuningColumn]:
+        """Default column for a layout slot with no template coverage.
+
+        Reuses the same benchmark template's entry for the target table when
+        one exists (e.g. TPC-H LINEITEM partitioning on L_SHIPDATE backs a
+        clustering/distribution fallback); otherwise falls back to a generic
+        key column. Never borrows columns from another benchmark's template.
+        """
+        table_tunings = UnifiedTuningConfiguration._read_template_table_tunings(benchmark)
+        if not table_tunings and benchmark.lower() != "tpch":
+            table_tunings = UnifiedTuningConfiguration._read_template_table_tunings("tpch")
+        match = next(
+            (name for name in table_tunings if name.lower() == table_name.lower()),
+            None,
+        )
+        entry = table_tunings.get(match) if match is not None else None
+        fallback_columns = UnifiedTuningConfiguration._first_template_column(entry)
+        if fallback_columns:
+            return fallback_columns
+        column_name = f"{table_name.lower()}_key" if table_name else "id"
+        return [TuningColumn(name=column_name, type="UNKNOWN", order=1)]
 
     def disable_platform_optimization(self, optimization_type: TuningType) -> None:
         """Disable a specific platform optimization.
 
+        Table-layout types clear their ``table_tunings`` slot across all
+        tables, dropping tables left with no tuning at all.
+
         Args:
             optimization_type: The type of optimization to disable
         """
+        if optimization_type in self._TABLE_LAYOUT_TYPES:
+            slot = optimization_type.value
+            for table_name in list(self.table_tunings):
+                entry = self.table_tunings[table_name]
+                setattr(entry, slot, None)
+                if not entry.has_any_tuning():
+                    del self.table_tunings[table_name]
+            return
         if optimization_type == TuningType.Z_ORDERING:
             self.platform_optimizations.z_ordering_enabled = False
             self.platform_optimizations.z_ordering_columns = []
