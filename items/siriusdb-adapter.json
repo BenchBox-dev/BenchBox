@@ -1,4 +1,5 @@
 {
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.",
   "description": "Add support for SiriusDB, a GPU-native SQL engine that accelerates analytical queries\nby offloading execution to graphics processors via DuckDB integration.\n\nSiriusDB is notable for:\n- 10x faster than DuckDB, 60x faster than ClickHouse at same hardware cost\n- Integrates with DuckDB via Substrait query format\n- Built on NVIDIA CUDA-X libraries (cuDF)\n- Plug-and-play with CPU fallback when GPU unavailable\n- Ideal for TPC benchmark acceleration\n\nReference: https://www.sirius-db.com, https://github.com/sirius-db/sirius\n",
   "legacy": {
     "anti_patterns": [
@@ -293,5 +294,15 @@
         "wid": "w9"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:06:21Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "d2a11111996648a0847b2b4a1f218203",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
