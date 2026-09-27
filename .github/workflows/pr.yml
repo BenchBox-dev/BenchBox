@@ -492,6 +492,12 @@ jobs:
       - name: Timing policy (wall-clock allowlist)
         id: guard-timing-policy
         continue-on-error: true
+        env:
+          # A merge group composes independently green PRs, so an overage of
+          # up to one PR's delta limit warns instead of ejecting the group.
+          # Pull requests keep the strict ceiling. See
+          # docs/operations/fast-lane-budget.md.
+          FAST_LANE_CEILING_GRACE: ${{ github.event_name == 'merge_group' && '150' || '' }}
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
       - name: Restore fast-lane develop baseline count

@@ -349,3 +349,49 @@ def test_delta_check_names_the_collect_failure_not_a_missing_baseline(
     assert "DELTA_CHECK_ENVIRONMENT_ERROR" in err
     assert "could not run pytest --collect-only" in err
     assert "no develop baseline available" not in err
+
+
+# ------------------------------------------------------------------ #
+# Composition grace (merge queue and develop post-merge)              #
+# ------------------------------------------------------------------ #
+def test_ceiling_grace_unset_keeps_the_strict_ceiling(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(mod.CEILING_GRACE_ENV, raising=False)
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("10001/10001 tests collected"))
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), {"enabled": True, "max_fast_tests": 10000})
+    assert violations == ["fast lane count 10001 exceeds limit 10000"]
+
+
+def test_ceiling_grace_warns_on_a_composed_overage_within_grace(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    monkeypatch.setenv(mod.CEILING_GRACE_ENV, "150")
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("10077/10077 tests collected"))
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), {"enabled": True, "max_fast_tests": 10000})
+    out = capsys.readouterr().out
+    assert violations == []
+    assert "FAST_LANE_WARNING: composed tree collects 10077, 77 over the 10000 ceiling" in out
+
+
+def test_ceiling_grace_still_fails_beyond_grace(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(mod.CEILING_GRACE_ENV, "150")
+    monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("10151/10151 tests collected"))
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), {"enabled": True, "max_fast_tests": 10000})
+    assert violations == ["fast lane count 10151 exceeds limit 10000"]
+
+
+@pytest.mark.parametrize("value", ["-1", "151", "lots"])
+def test_ceiling_grace_rejects_out_of_range_values(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv(mod.CEILING_GRACE_ENV, value)
+    with pytest.raises(ValueError, match=mod.CEILING_GRACE_ENV):
+        mod._ceiling_grace()
+
+
+def test_ceiling_grace_is_scoped_to_queue_and_post_merge_lanes() -> None:
+    import yaml
+
+    pr = yaml.safe_load((_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    step = next(s for s in pr["jobs"]["code-lint"]["steps"] if s.get("id") == "guard-timing-policy")
+    assert step["env"][mod.CEILING_GRACE_ENV] == "${{ github.event_name == 'merge_group' && '150' || '' }}"
+    post = yaml.safe_load((_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8"))
+    lint = next(s for s in post["jobs"]["lint"]["steps"] if s.get("name") == "Run CI lint mirror")
+    assert lint["env"][mod.CEILING_GRACE_ENV] == str(mod.MAX_CEILING_GRACE)

@@ -80,6 +80,29 @@ FAST_LANE_DELTA_WARN_THRESHOLD = 75
 
 CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
+# Composition grace (merge queue and develop post-merge only). Independently
+# green PRs can compose over the ceiling in one merge group; ejecting the group
+# blames PRs that each fit, and re-queueing repeats the failure until someone
+# bumps the ceiling. Those lanes set FAST_LANE_CEILING_GRACE so an overage no
+# larger than one PR's delta limit warns instead of failing. The pull_request
+# lane leaves it unset, so a PR whose own merge ref crosses still fails there,
+# and the nightly ratchet files the bump issue once headroom is negative.
+CEILING_GRACE_ENV = "FAST_LANE_CEILING_GRACE"
+MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD
+
+
+def _ceiling_grace() -> int:
+    raw = os.environ.get(CEILING_GRACE_ENV, "").strip()
+    if not raw:
+        return 0
+    try:
+        grace = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{CEILING_GRACE_ENV} must be an integer, got {raw!r}") from exc
+    if not 0 <= grace <= MAX_CEILING_GRACE:
+        raise ValueError(f"{CEILING_GRACE_ENV} must be between 0 and {MAX_CEILING_GRACE}, got {grace}")
+    return grace
+
 
 def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
     env = dict(os.environ)
@@ -198,8 +221,15 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
     if fast_count is None:
         raise _collect_environment_error("fast", rc, fast_output)
     print(f"Fast lane tests collected: {fast_count}")
-    if fast_count > max_fast_tests:
+    grace = _ceiling_grace()
+    if fast_count > max_fast_tests + grace:
         violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests}")
+    elif fast_count > max_fast_tests:
+        print(
+            f"FAST_LANE_WARNING: composed tree collects {fast_count}, "
+            f"{fast_count - max_fast_tests} over the {max_fast_tests} ceiling but within the "
+            f"{grace}-test composition grace - bump per {CEILING_LOG_PATH} conventions (+500 quantum)"
+        )
     else:
         headroom = max_fast_tests - fast_count
         if headroom < FAST_LANE_HEADROOM_WARNING_THRESHOLD:

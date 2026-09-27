@@ -76,6 +76,11 @@ jobs:
         run: uv sync --group dev
 
       - name: Run CI lint mirror
+        env:
+          # Develop receives the same composed trees the merge queue accepted
+          # under its composition grace; failing here would open reverts
+          # against PRs that each fit. See docs/operations/fast-lane-budget.md.
+          FAST_LANE_CEILING_GRACE: "150"
         run: make ci-lint
 
       - name: Persist fast-lane count for PR-lane delta guard

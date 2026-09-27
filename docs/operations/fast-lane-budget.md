@@ -113,6 +113,16 @@ pointer string.
   (`guard-timing-policy`, blocking):** the absolute ceiling backstop
   tripped. Bump per the convention above; this is the hard stop, not a
   suggestion.
+- **`FAST_LANE_WARNING: composed tree collects N, K over the M ceiling but
+  within the G-test composition grace` (merge queue and develop post-merge,
+  advisory):** independently green PRs composed over the ceiling. Those two
+  lanes set `FAST_LANE_CEILING_GRACE=150` (one PR's delta limit), so an
+  overage of up to 150 warns instead of ejecting a group of PRs that each fit
+  or opening reverts against them on develop. The `pull_request` lane stays
+  strict, so the next PR whose own merge ref crosses the ceiling still fails
+  there, and the nightly ratchet issue fires on the negative headroom. Bump
+  per the convention above. An overage beyond the grace is still a
+  `FAST_LANE_VIOLATION` in every lane.
 - **`FAST_LANE_DELTA_WARNING` (`guard-fast-lane-delta`, non-blocking):**
   this PR alone adds more than 75 fast tests over develop's current
   baseline. Consider whether the new coverage needs sub-second fast-lane
