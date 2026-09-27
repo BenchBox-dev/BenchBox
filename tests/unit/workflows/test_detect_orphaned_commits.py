@@ -162,3 +162,14 @@ class TestMergedHeadForBranch:
             ],
         )
         assert mod.merged_head_for_branch("o", "r", "b", "tok") == "b" * 40
+
+
+def test_push_trigger_skips_only_merge_queue_branches() -> None:
+    import yaml
+
+    workflow_path = Path(__file__).resolve().parents[3] / ".github" / "workflows" / "orphaned-commit-detector.yml"
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    push = workflow[True]["push"]
+    # Feature-branch pushes are where orphans are created, so only the
+    # queue's own branches are excluded.
+    assert push == {"branches-ignore": ["gh-readonly-queue/**"]}

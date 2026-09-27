@@ -74,8 +74,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-    env:
-      EVIDENCE_DIR: ${{ runner.temp }}/publication-evidence
     steps:
       - name: Checkout repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -91,8 +89,12 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      # The runner context is unavailable in job-level env, so the evidence
+      # directory is exported here for every later step.
       - name: Prepare diagnostic report directory
-        run: mkdir -p diagnostic-reports
+        run: |
+          mkdir -p diagnostic-reports
+          echo "EVIDENCE_DIR=$RUNNER_TEMP/publication-evidence" >> "$GITHUB_ENV"
 
       - name: Run 4-way reconciliation and drift checks
         id: reconciliation
