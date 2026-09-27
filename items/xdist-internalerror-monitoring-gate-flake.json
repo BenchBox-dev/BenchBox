@@ -1,5 +1,5 @@
 {
-  "context": "Do not chase on one occurrence. On recurrence, correlate the runs: same node, same worker index, same concurrency? The monitoring import gate manipulates module import state, a plausible source of a worker-level crash under parallel import. Capturing the worker's stderr is the first useful step.",
+  "context": "Batch 2026-09-27: no recurrence in ~2 months. Last 50 develop-branch CI runs all green; suspect file passes serially (5/5) and the full monitoring module passes 3x under xdist -n 5 (151/151 each). Per item context (do not chase one occurrence), nothing to fix. If INTERNALERROR on this node recurs, reopen with the new run id.",
   "description": "One occurrence, PR #1358 run 30565190866 (2026-07-30): the fast-lane job died with 'INTERNALERROR> assert not crashitem' naming tests/unit/monitoring/test_monitoring_import_gate.py::TestRunnerMonitoringGate::test_no_monitor_created_when_monitoring_unavailable on WorkerController gw1. That is an xdist worker DEATH, not an assertion failure, so it takes the whole job down instead of reporting one failing test. Verified NOT caused by that PR: the node passed 3/3 locally with -n 0, the full tests/unit/monitoring module passed (152 tests), the PR touched nothing under monitoring, and the job passed on re-run. Logged so a second occurrence has something to attach to - the sibling item xdist-worker-crash-on-utils-runner-cli-subset is already done, so this class recurs. (Supersedes dropped xdist-internalerror-monitoring-import-gate, which had no scope rules.)",
   "legacy": {
     "item_meta": {
@@ -68,6 +68,14 @@
       "generation": "061773894547418eba38cd5cf59b9f76",
       "op": "take",
       "op_id": "2bc43838dbce4f93a7b903bca5ffaee2",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:19:11Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "fb863a9a72894a499f7fd104246cba88",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
     }
   ]
