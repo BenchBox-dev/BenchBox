@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "greybeam + load/generate phases raises ConfigurationError unless --allow-greybeam-inline-load with BENCHBOX_I_UNDERSTAND_GREYBEAM_LOAD=1 (documented as invalid data)",
+    "TPC-H RF1/RF2 and TPC-DS maintenance streams under greybeam fail fast by default (auto-skip only with loud warning + maintenance_skipped:true)",
+    "Quiescence runbook in gateway doc: row-count parity, lag threshold, abort criteria"
+  ],
+  "context": "Plan v2 F1-F3. Runtime enforcement, not doc-only: doc-only lets an operator fire queries at an empty Iceberg replica. Depends on gw-snowflake-conn. Guardrails: escape hatch double-gated (flag + env).",
+  "description": "Runtime Greybeam lifecycle guardrails: block inline load/generate phases and maintenance streams via ConfigurationError/fail-fast with double-gated escape hatch, plus CDC quiescence runbook.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:19:33Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "2cfbee86e8f34e58b62590b2ee210e97",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}

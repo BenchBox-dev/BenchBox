@@ -7661,6 +7661,15 @@
       "status": "open",
       "title": "Databricks adapter gateway label + PAT-only guardrail"
     },
+    "gw-greybeam-lifecycle": {
+      "claim": null,
+      "needs": [
+        "gw-snowflake-conn"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Greybeam CDC lifecycle runtime guardrails"
+    },
     "gw-metadata-guards": {
       "claim": null,
       "needs": [
