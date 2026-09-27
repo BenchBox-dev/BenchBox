@@ -1,4 +1,5 @@
 {
+  "context": "LADDER CORRECTION 2026-09-27 (tracker-corpus-repair sweep): one legacy verification invokes validate_todo.py, deleted in the G5 cutover; that command cannot run. The description's validate_todo.py references are historical prose about the v2 system, preserved as history. Modern equivalent is the todo-db CLI (todo-db validate) and the MCP tracker tools.",
   "description": "During the 2026-06-08 TODO prioritization pass, 6 priority fields were edited\nand committed without running validate_todo.py first. The PR gate already\nhandles this: pr-content-guard runs validate_todo.py on each changed TODO path\nwhen the diff routes to the content-only CI path. So PR merges are protected.\n\nThe gap is at commit time: an author can commit an invalid YAML locally (before\npushing or opening a PR) and only discover the error in CI. Adding a pre-commit\nhook closes this gap by failing the commit immediately.\n\nSeparately, the current pr-content-guard validates only changed files. A mass\nedit outside a PR (e.g. a direct push to a feature branch) could introduce\ninvalid YAML in unreviewed files. Belt-and-suspenders: add a validate --all\nstep to pr-preflight for the content-only code path as well.\n",
   "legacy": {
     "item_meta": {
@@ -114,5 +115,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:10:51Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "5c64df0f8dd84d3f8833796def1c1bcf",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
