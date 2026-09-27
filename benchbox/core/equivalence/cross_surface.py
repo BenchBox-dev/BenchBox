@@ -1412,6 +1412,9 @@ _FLIGHTDATA_SCALE = 0.01
 _DATAVAULT_SCALE = 0.01
 _NYCTAXI_SCALE = 0.01
 _TSBS_DEVOPS_SCALE = 0.01
+_TPCH_SCALE = 0.01
+_TPCDS_SCALE = 0.01
+_TPCH_SKEW_SCALE = 0.01
 
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(
@@ -1591,50 +1594,11 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_TSBS_DEVOPS_SCALE,
     ),
-}
-
-# Staged gates: a load-faithful builder is wired and runnable in report mode,
-# but the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
-# counts a staged gate as a registered oracle under an explicit staged (NOT
-# CI-enforced) label, so staged status is visible there without implying CI
-# enforcement.
-# The next gateable benchmarks (nyctaxi,
-# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
-_TPCH_SCALE = 0.01
-_TPCDS_SCALE = 0.01
-_TPCH_SKEW_SCALE = 0.01
-
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q22"), unseeded-vs-unseeded at SF=0.01.
-    "tpch": CrossSurfaceGate(
-        name="tpch",
-        build=build_tpch_duckdb,
-        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
-        surface_independence_rationale=(
-            "TPC-H expression and pandas DataFrame implementations are separately handwritten for each query."
-        ),
-        scale_factor=_TPCH_SCALE,
-    ),
-    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q99"). Full-99 CI cost is measured by this
-    # item; the blocking subset decision lands with the promotion item.
-    "tpcds": CrossSurfaceGate(
-        name="tpcds",
-        build=build_tpcds_duckdb,
-        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
-        surface_independence_rationale=(
-            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
-        ),
-        scale_factor=_TPCDS_SCALE,
-    ),
     # TPC-H Skew: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q22"), the same convention as amplab and
-    # datavault. Bounded cell at the shared small scale. Q8 is legitimately
-    # empty: the skewed generator emits no part rows with p_type
-    # 'ECONOMY ANODIZED STEEL' at any probed scale (0.01/0.05/0.1), so the
-    # reference itself returns 0 rows independent of either surface.
+    # mechanical Q prefix ("Q1".."Q22"). Promoted from STAGED_GATES with an
+    # empty divergence baseline: all compared cells match; Q8 is classified
+    # legitimately empty (skewed generator emits no 'ECONOMY ANODIZED STEEL'
+    # rows at any probed scale). Deterministic seed 42.
     "tpch_skew": CrossSurfaceGate(
         name="tpch_skew",
         build=build_tpch_skew_duckdb,
@@ -1646,6 +1610,43 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
             "TPC-H Skew expression and pandas DataFrame implementations are separately handwritten for each query."
         ),
         scale_factor=_TPCH_SKEW_SCALE,
+    ),
+    # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q22"), unseeded-vs-unseeded at SF=0.01.
+    # Promoted from STAGED_GATES with an empty divergence baseline: all 44
+    # cells compare equal.
+    "tpch": CrossSurfaceGate(
+        name="tpch",
+        build=build_tpch_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-H expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCH_SCALE,
+    ),
+}
+
+# Staged gates: a load-faithful builder is wired and runnable in report mode,
+# but the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
+# counts a staged gate as a registered oracle under an explicit staged (NOT
+# CI-enforced) label, so staged status is visible there without implying CI
+# enforcement.
+# The next gateable benchmarks (nyctaxi,
+# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q99"). Full-99 CI cost is measured by this
+    # item; the blocking subset decision lands with the promotion item.
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
     ),
 }
 
