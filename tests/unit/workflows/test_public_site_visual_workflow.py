@@ -81,14 +81,74 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     assert not any(step.get("name") == "Determine baseline mode" for step in steps)
 
 
-def test_merge_queue_followers_wait_for_the_exact_base_within_the_queue_timeout() -> None:
+def test_merge_queue_followers_wait_briefly_within_the_queue_timeout() -> None:
     visual = _workflow()["jobs"]["public-site-visual-regression"]
     download = next(step for step in visual["steps"] if step.get("name") == "Download exact base visual baseline")
     wait = download["env"]["PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS"]
-    assert wait == "${{ github.event_name == 'merge_group' && '1800' || '0' }}"
-    # Waiting 30 minutes plus capture and compare must fit the job timeout, and
-    # build plus this job must fit the 60-minute merge-queue check timeout.
-    assert 1800 / 60 + 10 <= visual["timeout-minutes"] <= 45
+    assert wait == "${{ github.event_name == 'merge_group' && '600' || '0' }}"
+    # The wait holds a runner, so it must leave room for capture and compare
+    # inside the job timeout, and build (about 15 minutes) plus this job must
+    # leave runner-queueing slack inside the 60-minute merge-queue timeout.
+    assert 600 / 60 + 10 <= visual["timeout-minutes"] <= 30
+
+
+def test_download_accepts_site_equivalent_ancestors_and_compare_binds_the_used_sha() -> None:
+    workflow = _workflow()
+    assert workflow["jobs"]["visual-inputs"]["outputs"]["baseline_candidates"] == (
+        "${{ steps.paths.outputs.baseline_candidates }}"
+    )
+    steps = workflow["jobs"]["public-site-visual-regression"]["steps"]
+    download = next(step for step in steps if step.get("name") == "Download exact base visual baseline")
+    compare = next(step for step in steps if step.get("name") == "Compare public site with exact base")
+    assert download["id"] == "baseline"
+    assert download["env"]["PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES"] == (
+        "${{ needs.visual-inputs.outputs.baseline_candidates }}"
+    )
+    # The compare step checks the downloaded manifest against the SHA the
+    # lookup actually used, which the download step publishes.
+    assert compare["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ steps.baseline.outputs.baseline_sha }}"
+
+
+def _commit(repo: Path, path: str, content: str, message: str) -> str:
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    for args in (
+        ["add", path],
+        ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", message],
+    ):
+        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    _commit(tmp_path, "docs/index.md", "v1\n", "root")
+    site_change = _commit(tmp_path, "docs/index.md", "v2\n", "site change")
+    quiet_one = _commit(tmp_path, "tests/a.py", "a\n", "non-site change")
+    base = _commit(tmp_path, "tests/b.py", "b\n", "another non-site change")
+    head = _commit(tmp_path, "tests/c.py", "c\n", "group head")
+
+    classifier = _workflow()["jobs"]["visual-inputs"]["steps"][1]["run"]
+    output = tmp_path / "github-output"
+    env = dict(os.environ)
+    env.update(
+        EVENT_NAME="merge_group",
+        PR_BASE_SHA="",
+        GROUP_BASE_SHA=base,
+        RECOVERY_SOURCE_SHA="",
+        CURRENT_SHA=head,
+        CURRENT_REF="refs/heads/gh-readonly-queue/develop/pr-1",
+        GITHUB_OUTPUT=str(output),
+    )
+    result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    lines = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    # The base, then non-site ancestors, then the last commit that changed a
+    # site input (identical site inputs from that commit onward); nothing older.
+    assert lines["baseline_candidates"].split() == [base, quiet_one, site_change]
 
 
 def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> None:
@@ -111,7 +171,8 @@ def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
 
     assert script.is_file()
     assert "bootstrap=true" not in script_source
-    assert "manifest.source_sha !== baseSha" in script_source
+    assert "manifest.source_sha !== baselineSha" in script_source
+    assert "baseline_sha=${baselineSha}" in script_source
     assert "waitForTrustedBaseline" in script_source
     lookup_source = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
         encoding="utf-8"

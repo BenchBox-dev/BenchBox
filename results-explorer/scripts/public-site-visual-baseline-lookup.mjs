@@ -1,5 +1,5 @@
 /**
- * Locate the visual baseline captured from exactly one base SHA.
+ * Locate the visual baseline for one base SHA.
  *
  * Two producers are trusted, and both capture the exact tree named by the SHA:
  *
@@ -11,14 +11,23 @@
  *   `merge_group.base_sha` is the leader group's head, and the follower can only
  *   merge on top of that head, so the candidate is the exact tree it lands on.
  *
+ * Callers may pass site-equivalent SHAs after the base: first-parent ancestors
+ * whose public-site inputs are byte-identical to the base (computed by the
+ * workflow classifier). They render the same site, so their baseline is the
+ * base's baseline. The exact base is always tried first, and the first SHA in
+ * order that has a trusted artifact wins.
+ *
  * Artifact names alone are untrusted because pull_request runs can upload any
  * name, so every candidate is checked against its producing run. Protected
- * develop artifacts are preferred when both producers exist.
+ * develop artifacts are preferred over queue candidates for the same SHA.
  */
 
 export const DOCS_WORKFLOW_PATH = ".github/workflows/docs.yml";
 export const MERGE_QUEUE_BRANCH_PREFIX = "gh-readonly-queue/develop/";
 export const ARTIFACT_PAGE_SIZE = 100;
+export const LEGACY_BASELINE_NAME = "public-site-visual-baseline";
+// Bounds GitHub API use per lookup pass while several queue groups poll.
+export const MAX_BASELINE_SHAS = 10;
 
 /**
  * Classify the run that uploaded a baseline; returns "develop", "merge-queue", or undefined.
@@ -48,7 +57,18 @@ export function trustedBaselineSource(run, { repository, baseSha }) {
 }
 
 export function baselineNames(baseSha) {
-  return [`public-site-visual-baseline-${baseSha}`, "public-site-visual-baseline"];
+  return [`public-site-visual-baseline-${baseSha}`, LEGACY_BASELINE_NAME];
+}
+
+/** Normalize the ordered SHA list: exact base first, unique, well-formed, bounded. */
+export function baselineShaOrder(baseSha, candidateShas = []) {
+  const ordered = [];
+  for (const sha of [baseSha, ...candidateShas]) {
+    if (typeof sha !== "string" || !/^[0-9a-f]{40}$/.test(sha) || ordered.includes(sha)) continue;
+    ordered.push(sha);
+    if (ordered.length >= MAX_BASELINE_SHAS) break;
+  }
+  return ordered;
 }
 
 async function listValidArtifacts(github, repository, name) {
@@ -66,22 +86,35 @@ async function listValidArtifacts(github, repository, name) {
   return validArtifacts;
 }
 
-/** One lookup pass. Returns `{ artifact, source }` or undefined; API errors propagate. */
-export async function findTrustedBaseline({ github, repository, baseSha }) {
-  const candidates = (
-    await Promise.all(baselineNames(baseSha).map((name) => listValidArtifacts(github, repository, name)))
-  ).flat();
+async function trustedFromCandidates(github, repository, sha, candidates) {
   let queueCandidate;
   for (const candidate of candidates) {
     const runId = candidate.workflow_run?.id;
     if (!Number.isInteger(runId)) continue;
-    if (candidate.name === "public-site-visual-baseline" && candidate.workflow_run.head_sha !== baseSha) continue;
+    if (candidate.name === LEGACY_BASELINE_NAME && candidate.workflow_run.head_sha !== sha) continue;
     const run = await github(`/repos/${repository}/actions/runs/${runId}`);
-    const source = trustedBaselineSource(run, { repository, baseSha });
-    if (source === "develop") return { artifact: candidate, source };
-    if (source === "merge-queue" && !queueCandidate) queueCandidate = { artifact: candidate, source };
+    const source = trustedBaselineSource(run, { repository, baseSha: sha });
+    if (source === "develop") return { artifact: candidate, source, baselineSha: sha };
+    if (source === "merge-queue" && !queueCandidate) queueCandidate = { artifact: candidate, source, baselineSha: sha };
   }
   return queueCandidate;
+}
+
+/**
+ * One lookup pass. Returns `{ artifact, source, baselineSha }` or undefined; API errors propagate.
+ *
+ * `candidateShas` are site-equivalent ancestors of `baseSha`, nearest first.
+ */
+export async function findTrustedBaseline({ github, repository, baseSha, candidateShas = [] }) {
+  const shas = baselineShaOrder(baseSha, candidateShas);
+  // The legacy unsuffixed name is listed once and matched to SHAs by run head.
+  const legacy = await listValidArtifacts(github, repository, LEGACY_BASELINE_NAME);
+  for (const sha of shas) {
+    const named = await listValidArtifacts(github, repository, `public-site-visual-baseline-${sha}`);
+    const found = await trustedFromCandidates(github, repository, sha, [...named, ...legacy]);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 /**
@@ -97,6 +130,7 @@ export async function waitForTrustedBaseline({
   github,
   repository,
   baseSha,
+  candidateShas = [],
   waitMs = 0,
   minAttempts = 6,
   delayMs = 2_000,
@@ -111,7 +145,7 @@ export async function waitForTrustedBaseline({
   for (;;) {
     attempts += 1;
     try {
-      const found = await findTrustedBaseline({ github, repository, baseSha });
+      const found = await findTrustedBaseline({ github, repository, baseSha, candidateShas });
       lastLookupError = undefined;
       if (found) return { ...found, attempts };
     } catch (error) {
@@ -128,5 +162,5 @@ export async function waitForTrustedBaseline({
       cause: lastLookupError,
     });
   }
-  return { artifact: undefined, source: undefined, attempts };
+  return { artifact: undefined, source: undefined, baselineSha: undefined, attempts };
 }
