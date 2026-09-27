@@ -90,8 +90,10 @@ jobs:
         run: uv sync --group dev
 
       # The runner context is unavailable in job-level env, so the evidence
-      # directory is exported here for every later step.
+      # directory is exported here for every later step. This runs even when
+      # dependency installation failed, matching the always() consumers below.
       - name: Prepare diagnostic report directory
+        if: always()
         run: |
           mkdir -p diagnostic-reports
           echo "EVIDENCE_DIR=$RUNNER_TEMP/publication-evidence" >> "$GITHUB_ENV"
