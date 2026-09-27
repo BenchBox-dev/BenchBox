@@ -29,7 +29,13 @@ from ..utils.cloud_storage import get_cloud_path_info, snowflake_stage_mode_erro
 from ..utils.dependencies import check_platform_dependencies, get_dependency_error_message
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.config_utils import make_registered_platform_config_builder
-from .base.data_loading import NO_BENCHMARK, DataSource, resolve_adapter_data_source, resolve_csv_dialect
+from .base.data_loading import (
+    NO_BENCHMARK,
+    DataSource,
+    resolve_adapter_data_source,
+    resolve_csv_dialect,
+    run_staged_table_loads,
+)
 from .base.runtime_metadata import build_default_normalized_result_metadata
 from .base.tuning import make_informational_constraint_applier
 from .presto_trino_utils import normalize_existing_files
@@ -819,10 +825,10 @@ class SnowflakeAdapter(PlatformAdapter):
         self.log_verbose(f"Starting data loading for benchmark: {benchmark.__class__.__name__}")
         self.log_very_verbose(f"Data directory: {data_dir}")
 
-        start_time = mono_time()
-        table_stats = {}
-        per_table_timings: dict[str, Any] = {}
-        total_time = 0.0
+        # Phase clock starts at load_data entry so the returned duration
+        # covers cursor creation, query-tag/file-format setup, and file
+        # resolution, matching the pre-template behavior.
+        phase_start = mono_time()
 
         cursor = connection.cursor()
 
@@ -834,50 +840,36 @@ class SnowflakeAdapter(PlatformAdapter):
             self._create_load_file_formats(cursor)
             data_source = self._resolve_data_files(benchmark, data_dir)
 
-            # Load data for each table (handle multi-chunk files)
-            for table_name, file_paths in data_source.tables.items():
-                valid_files = self._normalize_existing_files(file_paths)
+            def load_one(table_name: str, valid_files: list[Path]) -> int:
+                return self._load_table_from_stage(
+                    cursor, table_name, table_name.upper(), valid_files, data_source, benchmark
+                )
 
-                if not valid_files:
-                    self.logger.warning(f"Skipping {table_name} - no valid data files")
-                    table_stats[table_name.upper()] = 0
-                    per_table_timings[table_name.upper()] = {"total_ms": 0}
-                    continue
+            def on_table_loaded(table_name: str, table_name_upper: str, row_count: int) -> None:
+                del row_count
+                effective_tuning = self.get_effective_tuning_configuration()
+                if effective_tuning is not None:
+                    self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
 
-                chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
-                self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
-
-                try:
-                    load_start = mono_time()
-                    table_name_upper = table_name.upper()
-                    actual_count = self._load_table_from_stage(
-                        cursor, table_name, table_name_upper, valid_files, data_source, benchmark
-                    )
-                    table_stats[table_name_upper] = actual_count
-
-                    effective_tuning = self.get_effective_tuning_configuration()
-                    if effective_tuning is not None:
-                        self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
-
-                    load_time = elapsed_seconds(load_start)
-                    per_table_timings[table_name_upper] = {"total_ms": load_time * 1000}
-                    self.log_verbose(
-                        f"✅ Loaded {actual_count:,} rows into {table_name_upper}{chunk_info} in {load_time:.2f}s"
-                    )
-
-                except Exception as e:
-                    self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
-                    table_stats[table_name.upper()] = 0
-                    per_table_timings[table_name.upper()] = {"total_ms": 0}
-                    # Fail fast: loads are full refreshes, so a failed table
-                    # must abort the run instead of benchmarking a wiped table.
-                    raise
-
-            total_time = elapsed_seconds(start_time)
-            total_rows = sum(table_stats.values())
-            self.log_verbose(f"✅ Loaded {total_rows:,} total rows in {total_time:.2f}s")
+            # Fail fast: loads are full refreshes, so a failed table must
+            # abort the run instead of benchmarking a wiped table.
+            # Success and summary lines stay verbose-gated as before.
+            table_stats, total_time, per_table_timings = run_staged_table_loads(
+                self,
+                tables=data_source.tables,
+                stat_key=str.upper,
+                filter_files=self._normalize_existing_files,
+                load_one=load_one,
+                on_table_loaded=on_table_loaded,
+                record_timings=True,
+                fail_fast=True,
+                success_log=self.log_verbose,
+                summary_log=self.log_verbose,
+                phase_start=phase_start,
+            )
+            assert per_table_timings is not None
             self.log_operation_complete(
-                "Snowflake data loading", details=f"Loaded {total_rows:,} rows in {total_time:.2f}s"
+                "Snowflake data loading", details=f"Loaded {sum(table_stats.values()):,} rows in {total_time:.2f}s"
             )
 
         except Exception as e:
