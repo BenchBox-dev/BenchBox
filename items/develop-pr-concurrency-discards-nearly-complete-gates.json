@@ -1,5 +1,5 @@
 {
-  "context": "Quantify the waste before proposing a change. From Actions run history on develop PRs, count runs cancelled by concurrency and sum the compute discarded, splitting exact two-parent refreshes from ordinary feature pushes -- only the former is arguably safe to let finish. Compare that against the runner cost of letting superseded runs complete. Report to _project/audits/ and stop. Do not edit any workflow, the ruleset, or the certification classifier as part of this measurement. Treat cancel-in-progress as correct for ordinary pushes unless the numbers say otherwise.",
+  "context": "Quantify the waste before proposing a change. From Actions run history on develop PRs, count runs cancelled by concurrency and sum the compute discarded, splitting exact two-parent refreshes from ordinary feature pushes -- only the former is arguably safe to let finish. Compare that against the runner cost of letting superseded runs complete. Report to _project/audits/ and stop. Do not edit any workflow, the ruleset, or the certification classifier as part of this measurement. Treat cancel-in-progress as correct for ordinary pushes unless the numbers say otherwise.\n\nSCOPE NOTE 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify path_glob 'GitHub repository settings and rulesets' is a prose annotation, not a path, and matches nothing. Its intent (do not edit repo settings/rulesets) is already captured above; on any re-create, move it into the description and keep only path globs in scope.",
   "description": ".github/workflows/pr.yml:8-10 sets concurrency group develop-pr-${{ github.ref }} with cancel-in-progress: true. Every synchronize on a develop PR cancels the in-flight required gate and restarts it on the new head. results-explorer-browser.yml:32-34 and develop-refresh-shadow.yml:15 do the same.\n\nCombined with strict_required_status_checks_policy: true on ruleset 15611785, this is the loop that burns CI on develop PRs:\n\n1. A PR is green but BEHIND because another PR merged (p50 interarrival 27.5 min per the audit, against a medium-test wall of roughly 20-31 min).\n2. The blessed absorb path, make pr-refresh (Makefile:1474-1481: git merge --no-edit origin/develop && make pr-open), creates a new head SHA.\n3. cancel-in-progress kills the run that was minutes from finishing.\n4. The full required gate restarts from zero on the merge commit.\n5. If another develop merge lands during that gate, return to step 1.\n\nSo the perceived symptom -- \"CI keeps re-running on PRs that are not head of branch\" -- is not extra runs on stale heads. It is the repeated destruction of nearly-complete runs, which is the opposite of what a merge queue would do.\n\nMEASURE BEFORE CHANGING ANYTHING. cancel-in-progress is a defensible default: it stops runners burning on superseded SHAs, and a plain feature push genuinely invalidates the prior run. The question is narrower -- whether an exact two-parent refresh, where the feature tree is unchanged and only the base moved, should be allowed to let its predecessor finish. That overlaps the certification machinery in scripts/pr_refresh_certification.py, which is observational by contract.\n\nObserved 2026-08-20: PR 1788 took 222 minutes wall to merge (16:54:44Z to 20:36:28Z) with medium-test at 21m53s; PR 1787, a two-line _project/config change, took 116 minutes with medium-test at 22m6s. Neither was a large change.\n\nRelated: exact-refresh-eligibility-penalises-staying-current. Both concern the same loop and should be read together. Nothing here reopens strict-base-refresh-06 (done, SHADOW_ONLY) or the dropped 07a/07b.\n\n2026-09-07 reconciliation: preserve w0-w2 as historical evidence, but their final-head-only aggregate and small superseded-run sample do not prove whole-lifecycle cancellation cost. Native queue already existed during session 01a07292 while forced local refreshes continued, so queue activation alone has not eliminated churn. Add the pending evidence correction below. Implementation belongs to native-queue-local-landing; this item stays observational and does not change cancel-in-progress.",
   "legacy": {
     "item_deps": [
@@ -126,5 +126,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:12:36Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "b8d383f85bae4b8cbdad55448e4b73d5",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
