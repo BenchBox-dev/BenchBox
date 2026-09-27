@@ -92,6 +92,19 @@ STARROCKS_TRIP_DURATION_SQL = """\
             GROUP BY FLOOR(TIMESTAMPDIFF(SECOND, pickup_datetime, dropoff_datetime) / 60 / 5) * 5
             ORDER BY duration_bucket_min"""
 
+STARROCKS_FHV_BASE_VOLUME_SQL = """\
+            SELECT
+                dispatching_base_num,
+                COUNT(*) as trip_count,
+                AVG(TIMESTAMPDIFF(SECOND, pickup_datetime, dropoff_datetime) / 60) as avg_duration_min
+            FROM fhv_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+              AND dropoff_datetime > pickup_datetime
+            GROUP BY dispatching_base_num
+            ORDER BY trip_count DESC
+            LIMIT 25"""
+
 # ---------------------------------------------------------------------------
 # ClickHouse variants
 #   EXTRACT(HOUR FROM ts)              → toHour(ts)
@@ -162,6 +175,19 @@ CLICKHOUSE_TRIP_DURATION_SQL = """\
               AND dateDiff('second', pickup_datetime, dropoff_datetime) BETWEEN 60 AND 7200
             GROUP BY FLOOR(dateDiff('second', pickup_datetime, dropoff_datetime) / 60 / 5) * 5
             ORDER BY duration_bucket_min"""
+
+CLICKHOUSE_FHV_BASE_VOLUME_SQL = """\
+            SELECT
+                dispatching_base_num,
+                COUNT(*) as trip_count,
+                AVG(dateDiff('second', pickup_datetime, dropoff_datetime) / 60) as avg_duration_min
+            FROM fhv_trips
+            WHERE pickup_datetime >= '{start_date}'
+              AND pickup_datetime < '{end_date}'
+              AND dropoff_datetime > pickup_datetime
+            GROUP BY dispatching_base_num
+            ORDER BY trip_count DESC
+            LIMIT 25"""
 
 # ---------------------------------------------------------------------------
 # StarRocks rule registrations
@@ -257,6 +283,24 @@ REGISTRY.register(
     query_id="trip-duration-analysis",
 )
 
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="query_source.starrocks.nyctaxi.fhv_base_volume_timestampdiff_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=SelectVariantPayload(
+            variant_key="starrocks",
+            variant_sql=STARROCKS_FHV_BASE_VOLUME_SQL,
+        ),
+        reason="StarRocks lacks EXTRACT(EPOCH FROM interval); replace with TIMESTAMPDIFF(SECOND, ...)",
+    ),
+    _P,
+    "starrocks",
+    benchmark=_B,
+    query_id="fhv-base-volume",
+)
+
 # ---------------------------------------------------------------------------
 # ClickHouse rule registrations
 # ---------------------------------------------------------------------------
@@ -313,4 +357,22 @@ REGISTRY.register(
     "clickhouse",
     benchmark=_B,
     query_id="rush-hour-analysis",
+)
+
+REGISTRY.register(
+    CompatibilityDecision(
+        rule_id="query_source.clickhouse.nyctaxi.fhv_base_volume_datediff_variant",
+        action=CompatAction.SELECT_VARIANT,
+        support_level=SupportLevel.REWRITTEN,
+        failure_mode=FailureMode.UNSUPPORTED_FEATURE,
+        payload=SelectVariantPayload(
+            variant_key="clickhouse",
+            variant_sql=CLICKHOUSE_FHV_BASE_VOLUME_SQL,
+        ),
+        reason="ClickHouse lacks EXTRACT(EPOCH FROM interval); replace with dateDiff('second', ...)",
+    ),
+    _P,
+    "clickhouse",
+    benchmark=_B,
+    query_id="fhv-base-volume",
 )
