@@ -49,12 +49,16 @@ def test_filtered_aggregate_rewrite_preserves_null_and_distinct_semantics():
     assert duckdb.sql(executable).fetchall() == expected
 
 
-def test_q1_v7_uses_native_array_reductions_on_cloud_engines():
+def test_q1_v7_native_array_rewrite_parses_but_stays_skipped_until_live_compile():
     benchmark = TPCHavocBenchmark(scale_factor=0.1)
     queries = {dialect: benchmark.get_query("1_v7", dialect=dialect) for dialect in CLOUD_TPCHAVOC_SKIPS}
 
+    # The native-array rewrite exists and parses per dialect, but a parse
+    # check cannot catch engine-side limits (see Snowflake 2_v2 002031), so
+    # the 1_v7 skip stays in both sets until the rewrite compiles live on
+    # each cloud engine.
     for dialect, query in queries.items():
-        assert "1_v7" not in CLOUD_TPCHAVOC_SKIPS[dialect]
+        assert "1_v7" in CLOUD_TPCHAVOC_SKIPS[dialect]
         assert sqlglot.parse_one(query, read=dialect)
         assert "LIST_SUM" not in query.upper()
         assert "LIST_ZIP" not in query.upper()
@@ -74,11 +78,15 @@ def test_q1_v7_uses_native_array_reductions_on_cloud_engines():
     assert "ZIP_WITH(" in queries["databricks"]
 
 
-def test_snowflake_2_v2_is_unskipped_and_parseable():
+def test_snowflake_2_v2_stays_skipped_until_live_compile_passes():
     benchmark = TPCHavocBenchmark(scale_factor=0.1)
     query = benchmark.get_query("2_v2", dialect="snowflake")
 
-    assert "2_v2" not in CLOUD_TPCHAVOC_SKIPS["snowflake"]
+    # Live Snowflake compilation rejects the correlated scalar subquery
+    # (002031/42601, verified 2026-09-26); a sqlglot parse check cannot catch
+    # that engine-side limit, so the skip stays in both the runtime and
+    # validator sets until a rewrite compiles live on Snowflake.
+    assert "2_v2" in CLOUD_TPCHAVOC_SKIPS["snowflake"]
     assert sqlglot.parse_one(query, read="snowflake")
     assert "SELECT MIN(ps_supplycost)" in query
     assert "GROUP BY ps_partkey" in query

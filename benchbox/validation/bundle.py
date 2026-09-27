@@ -292,10 +292,20 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
             "9_v9",
         ]
     ),
-    "snowflake": frozenset(),
-    "databricks": frozenset(),
+    "snowflake": frozenset(
+        [
+            "1_v7",
+            "2_v2",
+        ]
+    ),
+    "databricks": frozenset(
+        [
+            "1_v7",
+        ]
+    ),
     "bigquery": frozenset(
         [
+            "1_v7",
             "2_v2",
         ]
     ),
