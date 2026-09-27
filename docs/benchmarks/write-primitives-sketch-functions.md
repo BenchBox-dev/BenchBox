@@ -77,6 +77,74 @@ serialization, which is comparable algorithmically but **not**
 binary-compatible. ClickHouse-native variants are deferred to a follow-up
 to keep this benchmark scoped to the cross-engine portability story.
 
+## Live cloud survey (2026-09-25)
+
+The 22 SQL sketch ops ran against Snowflake (account `ZY50805`,
+warehouse `COMPUTE_WH`) and Databricks (Serverless Starter warehouse)
+at SF=0.1 (600,572 LINEITEM rows) and SF=1.0 (6,001,215 rows), using
+each op's catalog `platform_overrides` SQL timed per statement. The
+sketch ops are currently unreachable via `benchbox run --queries`
+(`get_queries()` excludes category `sketch` from the SQL path), so
+the survey drove catalog SQL directly; wiring sketch selection into
+the CLI is a tracked follow-up.
+
+| Op | Snowflake SF=0.1 | Snowflake SF=1.0 | Databricks SF=0.1 | Databricks SF=1.0 |
+|----|------------------|------------------|-------------------|-------------------|
+| `sketch_ddl_create_persistent_table` | pass (502 ms) | pass (625 ms) | pass (1.8 s) | pass (2.1 s) |
+| `sketch_insert_theta_per_partition` | FAIL — unknown `DATASKETCHES_THETA_ACCUMULATE` | FAIL (same) | pass (insert 3.2 s) | pass (insert 10.3 s) |
+| `sketch_insert_kll_per_partition` | FAIL — unknown `DATASKETCHES_KLL_ACCUMULATE` | FAIL (same) | pass (insert 1.6 s) | pass (insert 2.2 s) |
+| `sketch_insert_topk_per_shard` | FAIL — `APPROX_TOP_K_ACCUMULATE` returns OBJECT, column is BINARY | FAIL (same) | FAIL — executed two-arg `approx_top_k_accumulate(l_shipmode, 10000)` (datatype mismatch); the catalog override is one-arg `approx_top_k_accumulate(l_shipmode)` and was not exercised — re-run pending | FAIL (same) |
+| ★ `sketch_query_theta_union_merge` | FAIL (theta accumulate unknown) | FAIL (same) | pass (merge 0.7 s at SF=0.1; 1.2 s at SF=1.0; merge fan-in unchanged — see note) | pass |
+| ★ `sketch_query_kll_quantiles_merge` | FAIL (KLL accumulate unknown) | FAIL (same) | pass (merge 0.5 s at SF=0.1; 0.6 s at SF=1.0; merge fan-in unchanged — see note) | pass |
+| ★ `sketch_query_topk_combine` | FAIL (accumulate type mismatch) | FAIL (same) | FAIL (same unexercised-override cause as insert; re-run pending) | FAIL (same) |
+| `sketch_drop_persistent_table` | pass (933 ms) | pass (750 ms) | pass (2.4 s) | pass (2.4 s) |
+| `sketch_cpc_*` (4 ops), `sketch_req_*` (4 ops), `sketch_*_lgk*` (2), `sketch_*_k100/k1000` (2), `sketch_*_lgmm*` (2) | SKIP — explicit `snowflake: null` override (unsupported; never executed) | SKIP (same) | SKIP — explicit `databricks: null` override (unsupported; never executed) | SKIP (same) |
+
+Score: Snowflake 2/8 attempted, Databricks 6/8 attempted (identical at
+both scale factors). The remaining 14 CPC/REQ/sweep ops carry explicit
+`null` platform overrides and are skipped as unsupported before any SQL
+runs (null-override skip in `benchmark.py`); they are excluded from the
+scores rather than counted as failures.
+Raw per-statement timings: `$BENCHBOX_OUTPUT_DIR/logs/approx-survey-20260925-1136/{snowflake,databricks}-sketch-{sf01,sf1}.jsonl`.
+
+Unsurveyed platforms and the reason:
+
+| Platform | Reason |
+|----------|--------|
+| Firebolt | no credentials on survey host |
+| Starburst/Trino | no credentials on survey host |
+
+What this corrects in the matrix above:
+
+- Snowflake Theta/KLL rows assume `DATASKETCHES_*` functions exist.
+  On the surveyed account they do not — Snowflake's DataSketches
+  functions require an extension/account feature that is not enabled
+  here. Until the catalog gains a fallback or the docs scope the
+  requirement, treat Snowflake Theta/KLL sketch persistence as
+  **unverified**, not supported.
+- Databricks Theta and KLL persist + merge + requery all pass with
+  native `theta_sketch_*` / `kll_sketch_*` functions. Merge times were
+  0.7 s at SF=0.1 vs 1.2 s at SF=1.0 (Theta) and 0.5 s vs 0.6 s (KLL),
+  but Theta/KLL partition by `l_shipdate, l_returnflag`, so scaling
+  SF=0.1 to SF=1.0 grows rows within groups while the merge fan-in
+  (partition count) stays roughly fixed. These numbers do not
+  demonstrate sub-linear scaling with 10x merge input; a fan-in-varying
+  run (more persisted partitions) is needed before claiming the
+  O(1)-ish merge story.
+- Databricks Top-K: the reported two-arg
+  `approx_top_k_accumulate(l_shipmode, 10000)` failure did not execute
+  the catalog override (one-arg `approx_top_k_accumulate(l_shipmode)`),
+  so it cannot establish catalog drift. Re-run the exact override before
+  recording this as a catalog failure; do not fix the catalog based on
+  this run alone.
+- CPC/REQ/lgk/k100/lgmm ops carry explicit `null` overrides for both
+  Snowflake and Databricks, so the runner reports them as
+  skipped-unsupported and never executes SQL. They are out of scope for
+  this survey; extending overrides is a follow-up.
+- Firebolt and Starburst/Trino remain unsurveyed (no credentials on
+  the survey host). Their rows belong in the matrix above once the
+  remaining-legs follow-up runs them.
+
 ### Redshift HLL-only ceiling
 
 Redshift's approximate-aggregate surface is fundamentally HLL-only —
