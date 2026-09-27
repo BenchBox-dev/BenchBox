@@ -88,6 +88,10 @@ def _build_table_ddl_entry(tuning_clauses: Any) -> dict[str, Any]:
     }
 
 
+class DryRunQueryExtractionError(RuntimeError):
+    """Raised when adapter-backed dry-run query rendering cannot be trusted."""
+
+
 class DryRunExecutor:
     """Handles dry run execution and output generation."""
 
@@ -185,6 +189,8 @@ class DryRunExecutor:
 
             result.estimated_resources = self._estimate_resources(benchmark, system_profile, benchmark_config.name)
 
+        except DryRunQueryExtractionError:
+            raise
         except Exception as e:
             result.warnings.append(f"Dry run execution error: {e}")
 
@@ -466,6 +472,8 @@ class DryRunExecutor:
 
             return self._extract_standard_queries(benchmark, benchmark_config, platform_adapter)
 
+        except DryRunQueryExtractionError:
+            raise
         except Exception:
             return {}
 
@@ -487,22 +495,26 @@ class DryRunExecutor:
     ) -> dict[str, str]:
         if platform_adapter is not None and hasattr(platform_adapter, "_get_dialect_queries"):
             benchmark_name = normalize_benchmark_id(benchmark_config.name) if benchmark_config else ""
-            queries = platform_adapter._get_dialect_queries(
-                benchmark,
-                benchmark_slug=benchmark_name,
-                connection=None,
-            )
-            if benchmark_config is not None and hasattr(platform_adapter, "_filter_queries"):
-                options = benchmark_config.options if isinstance(benchmark_config.options, dict) else {}
-                queries = platform_adapter._filter_queries(
-                    queries,
+            try:
+                queries = platform_adapter._get_dialect_queries(
                     benchmark,
-                    benchmark_name,
-                    {
-                        "query_subset": benchmark_config.queries,
-                        "categories": options.get("categories"),
-                    },
+                    benchmark_slug=benchmark_name,
+                    connection=None,
+                    strict_translation=True,
                 )
+                if benchmark_config is not None and hasattr(platform_adapter, "_filter_queries"):
+                    options = benchmark_config.options if isinstance(benchmark_config.options, dict) else {}
+                    queries = platform_adapter._filter_queries(
+                        queries,
+                        benchmark,
+                        benchmark_name,
+                        {
+                            "query_subset": benchmark_config.queries,
+                            "categories": options.get("categories"),
+                        },
+                    )
+            except Exception as exc:
+                raise DryRunQueryExtractionError(f"Dry-run query extraction failed: {exc}") from exc
             if queries and isinstance(next(iter(queries.keys())), int):
                 return {str(k): v for k, v in queries.items()}
             return queries
