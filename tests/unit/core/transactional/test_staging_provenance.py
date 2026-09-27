@@ -246,6 +246,39 @@ class TestTransactionPrimitivesStagingProvenance:
             with pytest.raises(duckdb.CatalogException):
                 loaded_tpch_conn.execute(f"SELECT 1 FROM {legacy}")
 
+    def test_v2_manifest_row_from_before_catalog_managed_ddl_is_not_reused(self, tmp_path: Path, loaded_tpch_conn):
+        """A v2 manifest row cannot certify pre-catalogManaged staging tables.
+
+        The v2 row is internally consistent (right scale, spec, source digest)
+        but the tables it describes predate the Databricks catalogManaged DDL
+        requirement. Reusing it would leave ``CREATE TABLE IF NOT EXISTS`` as a
+        no-op on legacy tables and keep failing transaction operations, so the
+        v3 generation must force one rebuild and drop the v2 table as cruft.
+        """
+        bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        benchmark_id, scale, spec_version = bench._staging_provenance_key()
+        digest = bench._staging_source_digest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
+
+        loaded_tpch_conn.execute(
+            "CREATE TABLE benchbox_staging_manifest_v2 (benchmark VARCHAR, scale VARCHAR, "
+            "spec_version VARCHAR, source_digest VARCHAR, created_at VARCHAR)"
+        )
+        loaded_tpch_conn.execute(
+            "INSERT INTO benchbox_staging_manifest_v2 VALUES "
+            f"('{benchmark_id}', '{scale}', '{spec_version}', '{digest}', '2026-09-01T00:00:00Z')"
+        )
+        loaded_tpch_conn.execute("CREATE TABLE txn_orders AS SELECT * FROM orders LIMIT 1")
+        loaded_tpch_conn.execute("CREATE TABLE txn_lineitem AS SELECT * FROM lineitem LIMIT 1")
+        loaded_tpch_conn.execute("CREATE TABLE txn_customer AS SELECT * FROM customer LIMIT 1")
+
+        assert bench.is_setup(loaded_tpch_conn) is False
+
+        bench.setup(loaded_tpch_conn, force=False)
+        assert _rows(loaded_tpch_conn, "txn_orders") == _rows(loaded_tpch_conn, "orders")
+        assert bench.is_setup(loaded_tpch_conn) is True
+        with pytest.raises(duckdb.CatalogException):
+            loaded_tpch_conn.execute("SELECT 1 FROM benchbox_staging_manifest_v2")
+
 
 class TestWritePrimitivesStagingProvenance:
     """WritePrimitivesBenchmark.is_setup() via the shared manifest."""
@@ -330,6 +363,22 @@ class TestStagingManifestHelpers:
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         bench._write_staging_manifest(loaded_tpch_conn, ["orders", "lineitem", "customer"])
         assert bench._staging_manifest_matches(loaded_tpch_conn, ["orders", "lineitem", "customer"]) is True
+
+    @pytest.mark.parametrize(
+        ("dialect", "expected"),
+        [
+            ("databricks", "STRING"),
+            ("bigquery", "STRING"),
+            ("snowflake", "VARCHAR"),
+            ("duckdb", "VARCHAR"),
+            ("standard", "VARCHAR"),
+        ],
+    )
+    def test_manifest_text_type_matches_dialect(self, tmp_path: Path, dialect: str, expected: str):
+        """Databricks rejects a bare VARCHAR (verified live) and BigQuery has no VARCHAR."""
+        bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+        bench._setup_dialect = dialect
+        assert bench._manifest_text_type() == expected
 
     def test_different_spec_version_does_not_match(self, tmp_path: Path, loaded_tpch_conn):
         bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
