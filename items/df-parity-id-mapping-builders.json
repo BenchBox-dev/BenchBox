@@ -5,7 +5,7 @@
     "test_dataframe_ids_map_to_sql_ids passes in the fast unit suite and fails if any supports_dataframe benchmark gains an unmapped ID",
     "CrossSurfaceData.query_ids carries the canonical SQL-side ID in new builders"
   ],
-  "context": "Adversarial finding: a sql_id alias on DataFrameQuery would be dead mechanism no resolver, runner, or comparator reads (builders/amplab.py:26, builders/datavault.py:47-48 translate inside lambdas). Mapping must live in builder-local dicts only. tpch_skew has 0 raw id overlap, so it joins the Q-prefix group, not verbatim. Full review: /Users/joe/.jcode/scratch/agy_review.txt findings 2 and 5. Final plan: /Users/joe/.jcode/scratch/parity_plan_final.md Phase 0.",
+  "context": "Batch df-parity: mapping work committed as 4461dca77 in worktree ../BenchBox.wt-df-parity-mapping branch fix/df-parity-id-mapping-builders, PR 2422 OPEN (checks queued at snapshot). Next: verify PR 2422 merged, then finish with generation 0e24109b94884d42ab510f1a1779a162.",
   "description": "Add builder-local ID translation for mismatched-ID benchmarks without touching the DataFrameQuery core. nyctaxi: 25 hand-authored pairs (23 name-joinable, Q20 Weekday/Weekend Comparison vs Weekday vs Weekend and Q23 Single-Day Summary vs Single Day Summary hand-resolved). tsbs_devops: 18 fully hand-authored pairs. tpch/tpcds/tpch_skew: mechanical Q-prefix strip. Add fast unit test asserting exact bidirectional SQL<->DF ID coverage per supports_dataframe benchmark minus classified exclusions. Guardrails: no changes to benchbox/core/dataframe/query.py or query_resolution.py; follow amplab/datavault lambda pattern; test must be fast-marked.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "generation": "0e24109b94884d42ab510f1a1779a162",
       "op": "take",
       "op_id": "b8158a118f824b10b1a6487302156a31",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T14:14:48Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "b19e838147ff477980a81a8c6716fd53",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
