@@ -188,3 +188,23 @@ class TestLoadFileBatches:
             mock_reg.get_compression_handler.return_value.open.return_value = ctx
             rows = load_file_batches(cursor, f, "s.t")
         assert rows == 5
+
+    def test_explicit_delimiter_overrides_extension_heuristic(self, tmp_path: Path) -> None:
+        """A resolver-derived comma delimiter wins over the .tbl pipe heuristic."""
+        f = self._make_file(tmp_path, "1,Alice\n")
+        cursor = MagicMock()
+        with (
+            patch(
+                "benchbox.utils.file_format.get_delimiter_for_file",
+                side_effect=AssertionError("heuristic must not run"),
+            ),
+            patch("benchbox.platforms.base.data_loading.FileFormatRegistry") as mock_reg,
+        ):
+            ctx = MagicMock()
+            ctx.__enter__ = lambda s: open(f, encoding="utf-8")
+            ctx.__exit__ = MagicMock(return_value=False)
+            mock_reg.get_compression_handler.return_value.open.return_value = ctx
+            rows = load_file_batches(cursor, f, "s.t", delimiter=",")
+        assert rows == 1
+        sql = cursor.execute.call_args[0][0]
+        assert sql.startswith("INSERT INTO s.t VALUES (1, 'Alice')")

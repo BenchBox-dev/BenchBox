@@ -18,6 +18,16 @@ from typing import Callable
 SCHEMA_DDL_SCOPE = "schema_ddl"
 WORKLOAD_QUERY_SCOPE = "workload_query"
 
+#: Normalized sqlglot targets translated with ``identify=False``. These engines
+#: fold unquoted identifiers in a way that matches BenchBox's generated DDL,
+#: while quoting would preserve a case the engine-side unquoted SQL cannot
+#: find: ClickHouse is case-sensitive without folding, PostgreSQL/DataFusion
+#: fold to lowercase, Snowflake folds to UPPERCASE, and Exasol folds to
+#: UPPERCASE. Reserved words stay safe: each generator's RESERVED_KEYWORDS
+#: still quotes them. Shared with ``benchbox/platforms/base/dialect_translation.py``;
+#: keep both call sites on this constant instead of parallel literals.
+NO_IDENTIFY_DIALECTS = frozenset({"clickhouse", "postgres", "snowflake", "exasol"})
+
 
 def _resolve_translation_scope(scope: str | None) -> str:
     """Return the effective workload scope, defaulting to benchmark queries."""
@@ -334,8 +344,8 @@ def normalize_dialect_for_sqlglot(dialect: str) -> str:
     dialects to their closest supported equivalent.
 
     SQLGlot supports these dialects: 'athena', 'bigquery', 'clickhouse',
-    'databricks', 'doris', 'drill', 'druid', 'duckdb', 'dune', 'hive',
-    'materialize', 'mysql', 'oracle', 'postgres', 'presto', 'prql',
+    'databricks', 'doris', 'drill', 'druid', 'duckdb', 'dune', 'exasol',
+    'hive', 'materialize', 'mysql', 'oracle', 'postgres', 'presto', 'prql',
     'redshift', 'risingwave', 'snowflake', 'spark', 'spark2', 'sqlite',
     'starrocks', 'tableau', 'teradata', 'trino', 'tsql'.
 
@@ -458,13 +468,8 @@ def translate_sql_query(
                 processed_query = pre_proc(processed_query)
 
         # Translate using SQLGlot
-        # Some databases don't need identifier quoting:
-        # - ClickHouse: case-sensitive without case-folding, lowercase schema matches unquoted lowercase
-        # - PostgreSQL/DataFusion: unquoted identifiers are folded to lowercase by the engine
-        # - Snowflake: unquoted identifiers are folded to UPPERCASE by the engine,
-        #   matching unquoted UPPER DDL; quoted lowercase would not resolve.
-        # Quoting preserves case which causes mismatches with folded schemas.
-        should_identify = identify and (tgt not in ("clickhouse", "postgres", "snowflake"))
+        # Targets in NO_IDENTIFY_DIALECTS skip identifier quoting (see constant).
+        should_identify = identify and (tgt not in NO_IDENTIFY_DIALECTS)
         translated = sqlglot.transpile(processed_query, read=src, write=tgt, identify=should_identify)[0]
 
         # Built-in optional post-fix:
