@@ -11,6 +11,12 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 
+def _require_at_least(name: str, value: float, minimum: float, expectation: str) -> None:
+    """Raise ValueError unless a numeric pattern argument meets its floor."""
+    if value < minimum:
+        raise ValueError(f"{name} must be {expectation}")
+
+
 @dataclass
 class WorkloadPhase:
     """A phase in the workload pattern."""
@@ -18,6 +24,11 @@ class WorkloadPhase:
     concurrency: int
     duration_seconds: float
     phase_name: str = ""
+    roles: dict[str, int] | None = None
+    # Optional per-role stream targets for role-aware execution.
+    # Maps a stream role (e.g. "writer") to the desired concurrent stream
+    # count during this phase. When None, the phase is undifferentiated
+    # and executors fill `concurrency` streams with the default workload.
 
 
 class WorkloadPattern(ABC):
@@ -475,14 +486,12 @@ class WavePattern(WorkloadPattern):
             period_seconds: Duration of one complete wave cycle
             num_periods: Number of wave cycles to execute
         """
-        if min_concurrency < 1:
-            raise ValueError("min_concurrency must be at least 1")
+        _require_at_least("min_concurrency", min_concurrency, 1, "at least 1")
         if max_concurrency < min_concurrency:
             raise ValueError("max_concurrency must be >= min_concurrency")
         if period_seconds <= 0:
             raise ValueError("period_seconds must be positive")
-        if num_periods < 1:
-            raise ValueError("num_periods must be at least 1")
+        _require_at_least("num_periods", num_periods, 1, "at least 1")
 
         self._min = min_concurrency
         self._max = max_concurrency
@@ -522,3 +531,121 @@ class WavePattern(WorkloadPattern):
     @property
     def max_concurrency(self) -> int:
         return self._max
+
+
+class MultiWriterPattern(WorkloadPattern):
+    """Concurrent-writer pattern: N writers plus M readers ("multiplayer").
+
+    Models the multi-client concurrent-writer story: several writers issue
+    INSERT/UPDATE statements against one table while readers run SELECTs.
+    The writer and reader phases overlap in time so lock contention,
+    snapshot isolation, and write-serialization behavior are exercised.
+    Readers scale down first so the run ends with writers draining.
+    """
+
+    def __init__(
+        self,
+        writers: int,
+        readers: int,
+        duration_seconds: float,
+        drain_seconds: float = 5.0,
+    ) -> None:
+        """Initialize the multi-writer pattern.
+
+        Args:
+            writers: Number of concurrent writer streams.
+            readers: Number of concurrent reader streams.
+            duration_seconds: Overlapped read/write duration.
+            drain_seconds: Writer-only drain tail after readers stop.
+        """
+        _require_at_least("writers", writers, 1, "at least 1")
+        _require_at_least("readers", readers, 1, "at least 1")
+        if duration_seconds <= 0:
+            raise ValueError("duration_seconds must be positive")
+        _require_at_least("drain_seconds", drain_seconds, 0, "non-negative")
+
+        self._writers = writers
+        self._readers = readers
+        self._duration = duration_seconds
+        self._drain = drain_seconds
+
+    def get_phases(self) -> list[WorkloadPhase]:
+        phases = [
+            WorkloadPhase(
+                concurrency=self._writers + self._readers,
+                duration_seconds=self._duration,
+                phase_name="read-write",
+                roles={"writer": self._writers, "reader": self._readers},
+            )
+        ]
+        if self._drain > 0:
+            phases.append(
+                WorkloadPhase(
+                    concurrency=self._writers,
+                    duration_seconds=self._drain,
+                    phase_name="write-drain",
+                    roles={"writer": self._writers},
+                )
+            )
+        return phases
+
+    def writers_in_phase(self, phase_name: str) -> int:
+        """Return the writer stream target for a phase of this pattern.
+
+        Args:
+            phase_name: Phase to inspect ("read-write" or "write-drain").
+
+        Raises:
+            ValueError: If the phase name is unknown for this pattern.
+        """
+        if phase_name == "read-write":
+            return self._writers
+        if phase_name == "write-drain":
+            if self._drain <= 0:
+                raise ValueError("write-drain phase is absent when drain_seconds is 0")
+            return self._writers
+        raise ValueError(f"unknown MultiWriterPattern phase: {phase_name!r}")
+
+    def readers_in_phase(self, phase_name: str) -> int:
+        """Return the reader stream target for a phase of this pattern.
+
+        Args:
+            phase_name: Phase to inspect ("read-write" or "write-drain").
+
+        Raises:
+            ValueError: If the phase name is unknown for this pattern.
+        """
+        if phase_name == "read-write":
+            return self._readers
+        if phase_name == "write-drain":
+            if self._drain <= 0:
+                raise ValueError("write-drain phase is absent when drain_seconds is 0")
+            return 0
+        raise ValueError(f"unknown MultiWriterPattern phase: {phase_name!r}")
+
+    def get_concurrency_at(self, elapsed_seconds: float) -> int:
+        if elapsed_seconds < 0:
+            return 0
+        if elapsed_seconds <= self._duration:
+            return self._writers + self._readers
+        if elapsed_seconds <= self._duration + self._drain:
+            return self._writers
+        return 0
+
+    @property
+    def total_duration(self) -> float:
+        return self._duration + self._drain
+
+    @property
+    def max_concurrency(self) -> int:
+        return self._writers + self._readers
+
+    @property
+    def writer_count(self) -> int:
+        """Number of writer streams."""
+        return self._writers
+
+    @property
+    def reader_count(self) -> int:
+        """Number of reader streams."""
+        return self._readers
