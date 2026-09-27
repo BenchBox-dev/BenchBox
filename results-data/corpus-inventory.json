@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-27T14:06:31.783315+00:00",
+  "generated_at": "2026-09-27T16:04:27.666319+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -1197,6 +1197,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "076e423d748ec2a53c5c057aefe200b804725bd125fcfad296c2fd8d4105c496"
+    },
+    {
+      "file": "nyctaxi_sf10_bigquery_sql_20260927_120407_fec02550.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-27T12:04:07.234314",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "585fa981bed9b2cfb967de19d7bca15c016a8f45135d5b5135699cf6abb4281d"
     },
     {
       "file": "nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
@@ -2915,6 +2928,19 @@
       "bundle_sha256": "88eb5edd3059dffe4b1c9bb2b26698e18acd807ec8146243b42689e27eab9d2e"
     },
     {
+      "file": "tpch_skew_sf10_bigquery_sql_20260927_104923_b3fc1da6.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-27T10:49:22.998631",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "df395339a592d9b8008d1a42fc95ac85ae6a9ef38ed2e2b5ec7daafa9036ca8e"
+    },
+    {
       "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -3381,6 +3407,9 @@
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
     ],
+    "nyctaxi@sf10.0": [
+      "BigQuery"
+    ],
     "read_primitives@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -3534,6 +3563,9 @@
       "Polars v1.40.0",
       "SQLite v3.53.1"
     ],
+    "tpch_skew@sf10.0": [
+      "BigQuery"
+    ],
     "tpchavoc@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -3554,7 +3586,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 249,
+    "total_bundles": 251,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
@@ -3564,19 +3596,19 @@
       "h2odb": 18,
       "joinorder": 6,
       "metadata_primitives": 1,
-      "nyctaxi": 9,
+      "nyctaxi": 10,
       "read_primitives": 12,
       "ssb": 32,
       "tpcdi": 9,
       "tpcds": 22,
       "tpcds_obt": 4,
       "tpch": 44,
-      "tpch_skew": 15,
+      "tpch_skew": 16,
       "tpchavoc": 9,
       "transaction_primitives": 1
     },
     "by_platform": {
-      "BigQuery": 1,
+      "BigQuery": 3,
       "CedarDB": 1,
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
@@ -3594,10 +3626,10 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 249
+      "maintainer-run": 251
     },
     "by_funding": {
-      "unspecified": 249
+      "unspecified": 251
     }
   }
 }
