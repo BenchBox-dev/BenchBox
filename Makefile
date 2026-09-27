@@ -298,6 +298,22 @@ flightdata-cross-surface-equivalence-report:
 datavault-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault
 
+# Enforced gate: NYC Taxi DataFrame surface vs its own SQL surface on a bounded
+# offline synthetic cell (SF=0.01, 12k trips; the builder forces synthesis and
+# fails on any network download). 25 SQL slugs map to DataFrame Q1..Q25;
+# airport-trips is classified legitimately empty (synthetic rate_code_id=1 vs
+# IN (2, 3) filter). Exits non-zero on any unclassified divergence.
+nyctaxi-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark nyctaxi
+
+# Enforced gate: TSBS DevOps DataFrame surface vs its own SQL surface on a
+# bounded offline cell (SF=0.01). 18 SQL slugs map to DataFrame Q1..Q18;
+# three threshold queries are classified legitimately empty (generator caps
+# usage_user at ~55, floors available_percent at ~17). Exits non-zero on any
+# unclassified divergence.
+tsbs-devops-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tsbs_devops
+
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
 # the blocking gate run never prunes; only writes when the run is otherwise fully

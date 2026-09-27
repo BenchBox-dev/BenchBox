@@ -103,8 +103,11 @@ from benchbox.core.equivalence.builders import (
     build_flightdata_duckdb,
     build_h2odb_duckdb,
     build_joinorder_synthetic_duckdb,
+    build_nyctaxi_duckdb,
     build_read_primitives_duckdb,
     build_ssb_duckdb,
+    build_tpch_skew_duckdb,
+    build_tsbs_devops_duckdb,
 )
 from benchbox.core.equivalence.dataframe_surface import (
     DATAFRAME_BACKENDS,
@@ -1400,6 +1403,8 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # belong here (registering a red gate here would be coverage theater).
 _FLIGHTDATA_SCALE = 0.01
 _DATAVAULT_SCALE = 0.01
+_NYCTAXI_SCALE = 0.01
+_TSBS_DEVOPS_SCALE = 0.01
 
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(
@@ -1542,6 +1547,43 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_DATAVAULT_SCALE,
     ),
+    # NYC Taxi: 25 SQL slugs map 1:1 to DataFrame Q1..Q25 via the builder-local
+    # hand-authored dict. Offline synthetic cell (12k trips at SF=0.01); the
+    # builder forces synthesis and fails if any network download runs.
+    # Promoted from STAGED_GATES with an empty divergence baseline: all
+    # compared cells match; airport-trips is classified legitimately empty
+    # (synthetic rate_code_id=1 vs IN (2, 3) filter).
+    "nyctaxi": CrossSurfaceGate(
+        name="nyctaxi",
+        build=build_nyctaxi_duckdb,
+        legitimately_empty={
+            "airport-trips": "Synthetic generator hardcodes rate_code_id=1; query filters rate_code_id IN (2, 3), so the reference returns 0 rows.",
+        },
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "NYC Taxi expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_NYCTAXI_SCALE,
+    ),
+    # TSBS DevOps: 18 SQL slugs map 1:1 to DataFrame Q1..Q18 via the
+    # builder-local hand-authored dict. Fully offline generator. Promoted from
+    # STAGED_GATES with an empty divergence baseline: all compared cells
+    # match; three threshold queries are classified legitimately empty
+    # (generator caps usage_user at ~55 and floors available_percent at ~17).
+    "tsbs_devops": CrossSurfaceGate(
+        name="tsbs_devops",
+        build=build_tsbs_devops_duckdb,
+        legitimately_empty={
+            "high-cpu-1-hr": "Generator caps usage_user at ~55; usage_user > 90 never fires at SF 0.01-0.1.",
+            "high-cpu-12-hr": "Generator caps usage_user at ~55; HAVING COUNT(*) > 10 over usage_user > 90 never fires.",
+            "low-memory-hosts": "Generator floor for available_percent is ~17; MIN(available_percent) < 10 never fires.",
+        },
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TSBS DevOps expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TSBS_DEVOPS_SCALE,
+    ),
 }
 
 # Staged gates: a load-faithful builder is wired and runnable in report mode,
@@ -1552,7 +1594,28 @@ GATES: dict[str, CrossSurfaceGate] = {
 # enforcement.
 # The next gateable benchmarks (nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
-STAGED_GATES: dict[str, CrossSurfaceGate] = {}
+_TPCH_SKEW_SCALE = 0.01
+
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    # TPC-H Skew: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q22"), the same convention as amplab and
+    # datavault. Bounded cell at the shared small scale. Q8 is legitimately
+    # empty: the skewed generator emits no part rows with p_type
+    # 'ECONOMY ANODIZED STEEL' at any probed scale (0.01/0.05/0.1), so the
+    # reference itself returns 0 rows independent of either surface.
+    "tpch_skew": CrossSurfaceGate(
+        name="tpch_skew",
+        build=build_tpch_skew_duckdb,
+        legitimately_empty={
+            "8": "Skewed generator emits zero 'ECONOMY ANODIZED STEEL' part rows at SF 0.01-0.1; reference returns 0 rows.",
+        },
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-H Skew expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCH_SKEW_SCALE,
+    ),
+}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:

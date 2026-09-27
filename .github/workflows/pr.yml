@@ -881,6 +881,12 @@ jobs:
       - name: Run Data Vault cross-surface SQL<->DataFrame equivalence gate
         run: make datavault-cross-surface-equivalence-report
 
+      - name: Run NYC Taxi cross-surface SQL<->DataFrame equivalence gate
+        run: make nyctaxi-cross-surface-equivalence-report
+
+      - name: Run TSBS DevOps cross-surface SQL<->DataFrame equivalence gate
+        run: make tsbs-devops-cross-surface-equivalence-report
+
   plan-capture-gate:
     name: plan-capture-gate
     needs: ci-paths
