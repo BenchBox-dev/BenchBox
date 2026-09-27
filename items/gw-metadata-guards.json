@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "get_platform_info carries gateway:{vendor,host,port,protocol} (sanitized), gateway_routed bool, execution_engine default, tpc_compliant=false when gateway active, cache_control slot",
+    "Per-query gateway_routing:{execution_engine,receipt_source,fallback} defaulting unknown/none/false; separate DuckDB/Snowflake/unknown buckets, never blended",
+    "is_native_run helper wired into compare.py (block unless --allow-heterogeneous-comparison), regression_policy.py, analytics.py baseline selection; unit test proves gateway run cannot enter native baseline set",
+    "SHOW WAREHOUSES/CURRENT_REGION probes degrade gracefully (metadata_degraded:true, never IndexError) on empty/truncated/synthetic gateway rows",
+    "Cost suppression: cost_estimated null + cost_status not_comparable_gateway in both Snowflake and Databricks normalized metadata when gateway active"
+  ],
+  "context": "Plan v2 C1-C5. Depends on gw-snowflake-conn, gw-databricks, gw-snowflake-querytag. Run make duplicate-check-delta before adding is_native_run. Guardrails: never blend native/gateway numbers; tpc_compliant:false unconditional; sanitize userinfo.",
+  "description": "Gateway-aware run metadata for both adapters: platform-info gateway block, per-query routing payload with unknown default, wired baseline guard (is_native_run in compare/regression/analytics), hardened metadata probes, wired cost suppression in normalized metadata.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T01:19:06Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "e58aff054a5349fdad1cbaeb3ed5fcb6",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
+}

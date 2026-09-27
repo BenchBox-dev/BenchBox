@@ -7652,6 +7652,17 @@
       "status": "open",
       "title": "Databricks adapter gateway label + PAT-only guardrail"
     },
+    "gw-metadata-guards": {
+      "claim": null,
+      "needs": [
+        "gw-databricks",
+        "gw-snowflake-conn",
+        "gw-snowflake-querytag"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Gateway-aware metadata, baseline guard, cost suppression"
+    },
     "gw-snowflake-conn": {
       "claim": null,
       "needs": [],
