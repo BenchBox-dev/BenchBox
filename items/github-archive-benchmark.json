@@ -1,4 +1,5 @@
 {
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.",
   "description": "Implement a GitHub Archive benchmark using the GH Archive dataset, which records\nthe public GitHub timeline since 2011. This benchmark provides a realistic\nevent-driven analytics workload with nested JSON structures, enabling performance\ntesting of aggregations, trend analysis, and semi-structured data processing.\n\nGitHub Archive is excellent for benchmarking because:\n- Massive scale: 7.5+ billion events, continuously growing\n- Real developer activity with natural distributions\n- Event-driven schema with nested JSON payloads\n- Multiple access methods (BigQuery, ClickHouse, direct download)\n- Rich analytical patterns: trending repos, developer metrics, language trends\n\nUse cases covered:\n- Repository trending and popularity analysis\n- Developer activity and contribution metrics\n- Programming language ecosystem trends\n- Open source project health metrics\n- Event-based time-series analysis\n",
   "legacy": {
     "anti_patterns": [
@@ -274,5 +275,15 @@
         "wid": "w9"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:05:04Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "d9211fc0255c4590a74dbbd880f093aa",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
