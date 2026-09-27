@@ -4807,6 +4807,13 @@
       "status": "open",
       "title": "Builder-local SQL-to-DataFrame ID maps plus mapping unit test"
     },
+    "df-parity-joinorder-posture": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Record canonical JoinOrder non-blocking posture"
+    },
     "df-parity-promote-nyctaxi-tsbs": {
       "claim": null,
       "needs": [

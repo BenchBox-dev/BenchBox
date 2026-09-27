@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Decision record committed stating joinorder_synthetic remains the sole blocking CI gate with the cost evidence (IMDb 2013 manifest fetch, 36M-row cast_info, 113x3 execution cost)",
+    "Canonical JOB documented as non-blocking or manual with its invocation path",
+    "No canonical-JOB blocking CI step added"
+  ],
+  "context": "Adversarial finding: canonical JoinOrder needs the multi-GB IMDb 2013 archive (data_manifest.toml, 36.2M cast_info rows) and 113 queries across 3 backends, which exhausts routine CI memory and time; joinorder_synthetic is already enforced at pr.yml:870 for exactly this reason. Full review: /Users/joe/.jcode/scratch/agy_review.txt finding 7. No dependencies; standalone.",
+  "description": "Write the canonical JoinOrder posture decision record: reaffirm joinorder_synthetic as the blocking gate, document the canonical suite as non-blocking or manual with its run path, and record the cost evidence. Guardrails: option (a) promotion is struck, do not re-litigate it here; if canonical coverage is ever wanted it becomes a new explicitly scoped item.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:35:52Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "c9c0eb7ba00c472ea3554cafea14df85",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
