@@ -4834,15 +4834,10 @@
       "title": "Promote tpch_skew, tpch, tpcds-subset to enforced gates"
     },
     "df-parity-read-primitives-counts": {
-      "claim": {
-        "expires_at": "2026-09-28T15:31:31Z",
-        "generation": "ca745193167d4214a895c19f4c8f8c6d",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Reconcile read_primitives query counts and fix registry metadata"
     },
     "df-parity-residual-closeout": {
