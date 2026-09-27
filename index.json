@@ -19929,10 +19929,15 @@
       "title": "Write the Phase 2 results-platform operations runbook"
     },
     "xdist-internalerror-monitoring-gate-flake": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-28T00:17:46Z",
+        "generation": "3c505ab12b10459099b1d0b6af17beb2",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Flake: xdist INTERNALERROR worker crash on test_monitoring_import_gate"
     },
     "xdist-internalerror-monitoring-import-gate": {
