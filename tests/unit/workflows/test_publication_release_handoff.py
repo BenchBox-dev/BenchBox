@@ -96,3 +96,16 @@ def test_handoff_permissions_are_scoped() -> None:
     assert wf.get("permissions") == {"contents": "read"}
     job_perm = wf["jobs"]["handoff"]["permissions"]
     assert job_perm == {"contents": "read", "actions": "write", "issues": "write"}
+
+
+RELEASE_PATH = ROOT / ".github" / "workflows" / "release.yml"
+
+
+def test_release_dispatches_handoff_with_actions_permission() -> None:
+    """gh workflow run needs actions:write on the dispatching job."""
+    assert RELEASE_PATH.is_file(), f"Workflow file missing at {RELEASE_PATH}"
+    wf = yaml.safe_load(RELEASE_PATH.read_text(encoding="utf-8"))
+    job = wf["jobs"]["github-release"]
+    assert job["permissions"].get("actions") == "write"
+    run_text = "\n".join(str(step.get("run", "")) for step in job["steps"])
+    assert 'gh workflow run "Publication Release Handoff"' in run_text
