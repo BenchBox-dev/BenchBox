@@ -1,4 +1,5 @@
 {
+  "context": "SCOPE CORRECTION 2026-09-27 (tracker-corpus-repair sweep): the do_not_modify rule on benchbox/core/runner.py is inert, that file does not exist, it is shadowed by the benchbox/core/runner/ package directory. Intended protection is benchbox/core/runner/. Scope rules are create-time-only and cannot be edited; on any re-create, deny benchbox/core/runner/ instead.",
   "description": "Implement a Wikipedia Pageviews benchmark using Wikimedia Foundation data dumps.\nThis benchmark provides a high-volume time-series analytics workload based on\none of the world's largest websites, enabling performance testing of temporal\naggregations, trending analysis, and high-cardinality data processing.\n\nWikipedia Pageviews is excellent for benchmarking because:\n- Massive scale: 400B+ rows, 10+ TB across all years\n- Simple schema with high-cardinality string columns (page titles)\n- Real traffic patterns with natural spikes and trends\n- Time-series optimized workload (hourly granularity)\n- Multiple access methods (BigQuery, direct download)\n\nUse cases covered:\n- Trending page detection\n- Traffic pattern analysis (temporal, geographic)\n- Cross-language comparisons\n- Spike detection and event correlation\n- High-cardinality aggregations\n",
   "legacy": {
     "anti_patterns": [
@@ -254,5 +255,15 @@
         "wid": "w9"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:07:20Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "41ec0787e9824fcca8295b8b1cd042ff",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
