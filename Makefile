@@ -327,6 +327,13 @@ tpch-skew-cross-surface-equivalence-report:
 tpch-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch
 
+# Staged report (NOT a blocking gate): full-99 TPC-DS SQL<->DataFrame
+# equivalence at SF=0.01 (~13s wall). Only Q38/Q88 currently pass
+# discriminating, so no blocking subset exists yet; this target feeds the
+# weekly scheduled path that tracks DF surface maturation toward one.
+tpcds-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
+
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
 # the blocking gate run never prunes; only writes when the run is otherwise fully
