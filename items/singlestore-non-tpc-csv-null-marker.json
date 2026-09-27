@@ -1,4 +1,5 @@
 {
+  "context": "LADDER CORRECTION 2026-09-27 (tracker-corpus-repair sweep): one legacy verification invokes _project/scripts/todo_cli.py and validate_todo.py, both deleted in the G5 cutover; that command cannot run. Modern equivalents are the todo-db CLI (todo-db list/show/validate) and the MCP tracker tools. Legacy verification text is preserved as history.",
   "description": "nyctaxi, clickbench, and amplab benchmarks do not set csv_null_marker in their\ngenerator manifest metadata.  SingleStore LOAD DATA INFILE in strict mode requires\nNULL DEFINED BY to handle nullable integer columns; without it, empty fields hit\nerror 1264 \"Out of range value for column\".\n\nnyctaxi sets csv_null_marker=None explicitly (core/nyctaxi/benchmark.py:294);\nclickbench sets csv_null_marker=None (core/clickbench/generator.py:390); amplab\nsets nothing.  nyctaxi at minimum has nullable integer columns and will fail as\nsoon as a SingleStore smoke test runs against it.\n\nThis is pre-existing — not introduced by the CSV-loading work — but was surfaced\nduring that review.  Address before pointing SingleStore smoke tests at these\nbenchmarks.\n",
   "legacy": {
     "item_meta": {
@@ -100,5 +101,15 @@
         "wid": "w2"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:08:12Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "c235bd6888d5406cad4c4e61ee4e5f31",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
