@@ -398,12 +398,14 @@ class SQLiteAdapter(PlatformAdapter):
         sqlite3.register_adapter(Decimal, float)
 
         # Create connection. Throughput streams run on cursors of this one
-        # connection (SHARED_CURSOR), and sqlite3's per-connection statement
-        # cache hands the same prepared statement to concurrent cursors running
-        # identical SQL, so one stream's execute resets another's result set
-        # and it reads wrong or missing rows. Disabling the cache gives every
-        # cursor its own statement; the re-prepare cost is negligible next to
-        # benchmark query execution.
+        # connection (SHARED_CURSOR). CPython's sqlite3 keeps a per-connection
+        # statement cache (sqlite3.connect cached_statements, default 128):
+        # concurrent cursors running identical SQL can share one prepared
+        # statement, so one stream's execute resets another's result set and it
+        # reads wrong or missing rows (sqlite 3.53.1, threadsafety 1). Zero
+        # disables reuse so each cursor prepares its own statement. The cost is
+        # one extra prepare per stream query; benchmark queries dominate it,
+        # and this adapter serves single-file testing, not a hot OLTP path.
         conn = sqlite3.connect(
             db_path,
             timeout=self.timeout,

@@ -482,36 +482,52 @@ class TestSQLiteSharedCursorConcurrentUse:
         """Streams issuing the SAME SQL must not share sqlite3's cached statement.
 
         With the default per-connection statement cache, concurrent cursors
-        running identical SQL receive one prepared statement, so one stream's
-        execute resets the other's result set and it reads a wrong or missing
-        row. Many rounds make the race near-certain without the fix.
+        running identical SQL can receive one prepared statement, so one
+        stream's execute resets another's result set and it reads a wrong or
+        missing row. This drives the same `_stream_wrapper` validation-mode
+        path the throughput entry points use, and asserts on the wrapper's own
+        `fetchall()` accessor, where the missing-row symptom surfaced.
         """
         adapter = SQLiteAdapter(database_path=str(tmp_path / "shared.db"))
         shared_connection = adapter.create_connection()
         try:
-            shared_connection.execute("CREATE TABLE probe (value INTEGER)")
-            shared_connection.executemany("INSERT INTO probe VALUES (?)", [(value,) for value in range(10)])
-            shared_connection.commit()
+            setup = _stream_wrapper(adapter, shared_connection)
+            try:
+                setup.execute("CREATE TABLE probe (value INTEGER)")
+                for value in range(10):
+                    setup.execute(f"INSERT INTO probe VALUES ({value})")
+            finally:
+                setup.close()
 
+            barrier = threading.Barrier(4)
+            lock = threading.Lock()
+            errors: dict[str, BaseException] = {}
             wrong: list[Any] = []
 
-            def run() -> None:
-                for _ in range(2000):
-                    cursor = adapter.new_stream_connection(shared_connection)
-                    try:
-                        cursor.execute("SELECT COUNT(*) FROM probe")
-                        rows = cursor.fetchall()
-                    finally:
-                        cursor.close()
-                    if rows != [(10,)]:
-                        wrong.append(rows)
+            def run(name: str) -> None:
+                try:
+                    barrier.wait(timeout=30)
+                    for _ in range(500):
+                        wrapper = _stream_wrapper(adapter, shared_connection)
+                        try:
+                            rows = wrapper.execute("SELECT COUNT(*) FROM probe").fetchall()
+                        finally:
+                            wrapper.close()
+                        if rows != [(10,)]:
+                            with lock:
+                                wrong.append(rows)
+                except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                    with lock:
+                        errors[name] = exc
 
-            threads = [threading.Thread(target=run) for _ in range(4)]
+            threads = [threading.Thread(target=run, args=(f"stream-{index}",)) for index in range(4)]
             for thread in threads:
                 thread.start()
             for thread in threads:
                 thread.join(timeout=120)
+            assert not any(thread.is_alive() for thread in threads), "shared-cursor read streams hung"
 
+            assert not errors, f"concurrent shared-cursor read streams raised: {errors}"
             assert not wrong, f"{len(wrong)} shared-cursor reads saw another stream's statement state: {wrong[:3]}"
         finally:
             shared_connection.close()
