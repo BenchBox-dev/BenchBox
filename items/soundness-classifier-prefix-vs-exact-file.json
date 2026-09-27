@@ -1,5 +1,5 @@
 {
-  "context": "Separate exact-file entries from directory-prefix entries so the two matchers agree with CODEOWNERS semantics, and pin the sibling shapes so the mirror claim stays true.",
+  "context": "Batch 2026-09-27: implemented in worktree BenchBox.wt-soundness-classifier, branch fix/soundness-classifier-prefix-vs-exact-file, commit d59a511d5, PR 2417 (BLOCKED pending CI). 91/91 mirror tests pass, ruff clean, self-reviewed per code rubric with no Critical/Required findings. Finding: the item's measured case (anonymization.py.bak) no longer reproduces; the live defect class was unpinned prefix/sibling shapes plus the override-glob duality, now structurally guarded. Soundness-path PR: owner review + manual merge required, auto-merge withheld.",
   "description": "is_soundness_path uses normalized.startswith(SOUNDNESS_PREFIXES), so an entry naming a single file also matches any path that merely starts with it. Measured: is_soundness_path returns True for benchbox/core/results/anonymization.py.bak. The failure mode is over-gating, which is fail-safe, so this is low priority. What it does break is the 1:1 mirror with .github/CODEOWNERS that #1529 claims, since CODEOWNERS matches the exact path and the classifier does not.",
   "legacy": {
     "item_meta": {
@@ -96,6 +96,14 @@
       "generation": "5ac086849e76470b888ec221903e2e8b",
       "op": "take",
       "op_id": "49e5811a986147e39223b7a1ace6630d",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:23:46Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "0bb468a2f38b43ea92ceb2c26fb361a6",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
     }
   ]
