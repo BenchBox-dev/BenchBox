@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "builders/nyctaxi.py bypasses downloader.download() network calls and invokes synthetic generation directly; gate passes with network disabled",
+    "builders/tsbs_devops.py and builders/tpch_skew.py wired with ID maps from item 1",
+    "Each staged gate runs green in report mode with empty-or-classified baseline and measurable vacuity accounting (reference_row_counts[qid] > 0 per query; zero unclassified vacuous cells)",
+    "Cheapest discriminating scale recorded per gate; no gate left with an unprobed scale choice"
+  ],
+  "context": "Adversarial findings: nyctaxi is not-cheaply-gateable at bounded scale because downloader.py fetches CloudFront Parquet before synthetic fallback; the builder must force offline synthesis. Vacuity has exact mechanics (reference_row_counts > 0 or legitimately_empty with written reason). tpcds_obt is excluded entirely (abandoned decision). Full review: /Users/joe/.jcode/scratch/agy_review.txt findings 1, 8, 9. Depends on df-parity-id-mapping-builders for the nyctaxi/tsbs maps.",
+  "description": "Wire STAGED_GATES builders for nyctaxi, tsbs_devops, and tpch_skew. nyctaxi builder must bypass network download and call _generate_synthetic_month directly; verify with network disabled. Probe SF 0.01 vs 0.1 and record the cheapest fully discriminating cell per gate. Confirm tpch_skew generator discriminating at the small cell. Burn down divergences to empty-or-classified baselines with honest surface_independence rationales. Guardrails: STAGED only, no GATES promotion, no Make/CI wiring in this item; tpcds_obt must not be touched (abandoned verdict); legitimately_empty entries only with written reasons, never to mute a fixable query.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:34:31Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "1bebc9eaf70543fcb9770b19f8793b5a",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

@@ -4814,6 +4814,15 @@
       "status": "open",
       "title": "Reconcile read_primitives query counts and fix registry metadata"
     },
+    "df-parity-staged-builders-small": {
+      "claim": null,
+      "needs": [
+        "df-parity-id-mapping-builders"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Stage nyctaxi, tsbs_devops, tpch_skew cross-surface builders"
+    },
     "df-suffix-platform-options-unreachable": {
       "claim": null,
       "needs": [],
