@@ -61,7 +61,12 @@ DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives,
 flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
 ``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
 .. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
-``"Q1"`` .. ``"Q22"``). Additional dual-surface
+``"Q1"`` .. ``"Q22"``). Staged (registered in :data:`STAGED_GATES`, runnable
+in report mode, not CI-enforced): ``tpch`` (22 queries, unseeded-vs-unseeded
+at ``SF=0.01``; a fixed-stream gate needs seeded DF overrides first) and
+``tpcds`` (full 99 staged, ~13s wall at ``SF=0.01``; the 10-15 query blocking
+subset is deferred until the DF surface matures past 2 passing queries).
+Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Waiver review policy. A ``known_divergences`` entry may carry an OPTIONAL
@@ -106,6 +111,8 @@ from benchbox.core.equivalence.builders import (
     build_nyctaxi_duckdb,
     build_read_primitives_duckdb,
     build_ssb_duckdb,
+    build_tpcds_duckdb,
+    build_tpch_duckdb,
     build_tpch_skew_duckdb,
     build_tsbs_devops_duckdb,
 )
@@ -1594,9 +1601,34 @@ GATES: dict[str, CrossSurfaceGate] = {
 # enforcement.
 # The next gateable benchmarks (nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+_TPCH_SCALE = 0.01
+_TPCDS_SCALE = 0.01
 _TPCH_SKEW_SCALE = 0.01
 
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q22"), unseeded-vs-unseeded at SF=0.01.
+    "tpch": CrossSurfaceGate(
+        name="tpch",
+        build=build_tpch_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-H expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCH_SCALE,
+    ),
+    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q99"). Full-99 CI cost is measured by this
+    # item; the blocking subset decision lands with the promotion item.
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
+    ),
     # TPC-H Skew: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
     # mechanical Q prefix ("Q1".."Q22"), the same convention as amplab and
     # datavault. Bounded cell at the shared small scale. Q8 is legitimately
