@@ -323,6 +323,22 @@ class TestQ16Q18StructuralShapes:
         )
         assert filtered_lineitem_legs["count"] >= 1, "Q17v10 must filter the threshold leg before the part join"
 
+    def test_q18v4_threshold_gate_skips_prune_for_small_thresholds(self, q18_context, monkeypatch) -> None:
+        """Q18v4 must not prune single-line orders when the threshold allows them.
+
+        At threshold 30 the single-line order 1 (total 100) qualifies, so the
+        line-count prune must be skipped and v4 must match v1 exactly.
+        """
+        import benchbox.core.tpch.dataframe_queries as tpch_queries
+        import benchbox.core.tpchavoc.dataframe_queries.q18 as q18_module
+
+        monkeypatch.setattr(q18_module, "get_tpch_parameters", lambda _n: {"quantity_threshold": 30})
+        monkeypatch.setattr(tpch_queries, "get_tpch_parameters", lambda _n: {"quantity_threshold": 30})
+        base = _collect_frame(get_query("Q18v1").expression_impl(q18_context))
+        result = _collect_frame(get_query("Q18v4").expression_impl(q18_context))
+        assert result.height == 4, f"Q18v4 must keep all four orders at threshold 30, got {result.height}"
+        assert_frame_equal(result, base)
+
     def test_q18v6_bands_are_disjoint_nonempty_and_cover_large_orders(self, q18_context) -> None:
         """Q18v6 must split large orders into disjoint, non-empty nation bands that union exactly."""
         seen: list[list[int]] = []
