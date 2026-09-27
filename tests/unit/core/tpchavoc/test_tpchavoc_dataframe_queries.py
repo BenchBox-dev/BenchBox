@@ -587,8 +587,10 @@ class TestQ16Q18VariantEquivalence:
             "lineitem",
             pl.DataFrame(
                 {
+                    # Every part contributes survivors so no band or part is
+                    # vacuous: part1 [1,2]<2.2, part2 0.5<1.0, part4 0.5<1.0.
                     "l_partkey": [1, 1, 1, 2, 2, 3, 4, 4],
-                    "l_quantity": [1.0, 2.0, 30.0, 5.0, 5.0, 5.0, 4.0, 6.0],
+                    "l_quantity": [1.0, 2.0, 30.0, 0.5, 9.5, 5.0, 0.5, 9.5],
                     "l_extendedprice": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
                 }
             ).lazy(),
@@ -657,7 +659,13 @@ class TestQ16Q18VariantEquivalence:
         ctx.register_table(
             "supplier",
             pl.DataFrame(
-                {"s_suppkey": [10, 11, 12], "s_comment": ["ok", "has Customer Complaints issue", "ok"]}
+                # Supplier 10 (a supplier of surviving part 2) carries a
+                # complaint so the complaint anti-join is load-bearing: an
+                # implementation that drops it reports supplier_cnt 2, not 1.
+                {
+                    "s_suppkey": [10, 11, 12],
+                    "s_comment": ["Customer Complaints here", "has Customer Complaints issue", "ok"],
+                }
             ).lazy(),
         )
         return ctx
@@ -686,7 +694,7 @@ class TestQ16Q18VariantEquivalence:
             pd.DataFrame(
                 {
                     "l_partkey": [1, 1, 1, 2, 2, 3, 4, 4],
-                    "l_quantity": [1.0, 2.0, 30.0, 5.0, 5.0, 5.0, 4.0, 6.0],
+                    "l_quantity": [1.0, 2.0, 30.0, 0.5, 9.5, 5.0, 0.5, 9.5],
                     "l_extendedprice": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0, 80.0],
                 }
             ),
@@ -762,7 +770,12 @@ class TestQ16Q18VariantEquivalence:
         )
         ctx.register_table(
             "supplier",
-            pd.DataFrame({"s_suppkey": [10, 11, 12], "s_comment": ["ok", "has Customer Complaints issue", "ok"]}),
+            pd.DataFrame(
+                {
+                    "s_suppkey": [10, 11, 12],
+                    "s_comment": ["Customer Complaints here", "has Customer Complaints issue", "ok"],
+                }
+            ),
         )
         return ctx
 
@@ -775,23 +788,19 @@ class TestQ16Q18VariantEquivalence:
     @pytest.mark.parametrize("variant_id", [f"Q18v{v}" for v in range(1, 11)])
     def test_q18_expression_variants_match_baseline(self, q18_expr_context, variant_id: str) -> None:
         # Canonical TPC-H Q18 ordering: total price descending, then order date.
-        base = _collect_frame(get_query("Q18v1").expression_impl(q18_expr_context)).sort(
-            ["o_totalprice", "o_orderdate"], descending=[True, False]
-        )
-        result = _collect_frame(get_query(variant_id).expression_impl(q18_expr_context)).sort(
-            ["o_totalprice", "o_orderdate"], descending=[True, False]
-        )
+        # Compared in emitted order (no re-sort) so a variant that breaks
+        # ordering fails instead of being masked.
+        base = _collect_frame(get_query("Q18v1").expression_impl(q18_expr_context))
+        result = _collect_frame(get_query(variant_id).expression_impl(q18_expr_context))
         assert_frame_equal(result, base)
 
     @pytest.mark.parametrize("variant_id", [f"Q16v{v}" for v in range(1, 11)])
     def test_q16_expression_variants_match_baseline(self, q16_expr_context, variant_id: str) -> None:
         # Canonical TPC-H Q16 ordering: supplier count descending, then brand/type/size.
-        base = _collect_frame(get_query("Q16v1").expression_impl(q16_expr_context)).sort(
-            ["supplier_cnt", "p_brand", "p_type", "p_size"], descending=[True, False, False, False]
-        )
-        result = _collect_frame(get_query(variant_id).expression_impl(q16_expr_context)).sort(
-            ["supplier_cnt", "p_brand", "p_type", "p_size"], descending=[True, False, False, False]
-        )
+        # Compared in emitted order (no re-sort) so a variant that breaks
+        # ordering fails instead of being masked.
+        base = _collect_frame(get_query("Q16v1").expression_impl(q16_expr_context))
+        result = _collect_frame(get_query(variant_id).expression_impl(q16_expr_context))
         assert_frame_equal(result, base)
 
     @pytest.mark.parametrize("variant_id", [f"Q17v{v}" for v in range(1, 11)])
@@ -807,16 +816,10 @@ class TestQ16Q18VariantEquivalence:
         from pandas.testing import assert_frame_equal as assert_pandas_equal
 
         # Canonical TPC-H Q18 ordering: total price descending, then order date.
-        base = (
-            _collect_pandas(get_query("Q18v1").pandas_impl(q18_pandas_context))
-            .sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True])
-            .reset_index(drop=True)
-        )
-        result = (
-            _collect_pandas(get_query(variant_id).pandas_impl(q18_pandas_context))
-            .sort_values(["o_totalprice", "o_orderdate"], ascending=[False, True])
-            .reset_index(drop=True)
-        )
+        # Compared in emitted order (no re-sort) so a variant that breaks
+        # ordering fails instead of being masked.
+        base = _collect_pandas(get_query("Q18v1").pandas_impl(q18_pandas_context)).reset_index(drop=True)
+        result = _collect_pandas(get_query(variant_id).pandas_impl(q18_pandas_context)).reset_index(drop=True)
         assert_pandas_equal(result, base, check_dtype=False)
 
     @pytest.mark.parametrize("variant_id", [f"Q16v{v}" for v in range(1, 11)])
@@ -824,16 +827,10 @@ class TestQ16Q18VariantEquivalence:
         from pandas.testing import assert_frame_equal as assert_pandas_equal
 
         # Canonical TPC-H Q16 ordering: supplier count descending, then brand/type/size.
-        base = (
-            _collect_pandas(get_query("Q16v1").pandas_impl(q16_pandas_context))
-            .sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
-            .reset_index(drop=True)
-        )
-        result = (
-            _collect_pandas(get_query(variant_id).pandas_impl(q16_pandas_context))
-            .sort_values(["supplier_cnt", "p_brand", "p_type", "p_size"], ascending=[False, True, True, True])
-            .reset_index(drop=True)
-        )
+        # Compared in emitted order (no re-sort) so a variant that breaks
+        # ordering fails instead of being masked.
+        base = _collect_pandas(get_query("Q16v1").pandas_impl(q16_pandas_context)).reset_index(drop=True)
+        result = _collect_pandas(get_query(variant_id).pandas_impl(q16_pandas_context)).reset_index(drop=True)
         assert_pandas_equal(result, base, check_dtype=False)
 
 

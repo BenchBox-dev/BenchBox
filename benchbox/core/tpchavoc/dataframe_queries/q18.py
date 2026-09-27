@@ -102,15 +102,19 @@ def _make_q18_expression_impl(variant: int) -> VariantImpl:
             # Order-key prefilter: lineitem is first semi-pruned to the rows
             # of orders whose line count could reach the threshold (at least
             # two lines), so the quantity aggregate scans the reduced set.
-            # The count gate is implied by the threshold (no single line can
-            # exceed 50 units), hence a real pruning semi-join.
-            multi_line_keys = (
-                lineitem.group_by("l_orderkey")
-                .agg(col("l_orderkey").count().alias("line_cnt"))
-                .filter(col("line_cnt") > lit(1))
-                .select("l_orderkey")
-            )
-            pruned = lineitem.join(multi_line_keys, left_on="l_orderkey", right_on="l_orderkey", how="semi")
+            # The count gate is sound only when a single line cannot reach
+            # the threshold (TPC-H l_quantity <= 50 < default 300); the
+            # prune is skipped for small thresholds where one line qualifies.
+            if threshold > 50:
+                multi_line_keys = (
+                    lineitem.group_by("l_orderkey")
+                    .agg(col("l_orderkey").count().alias("line_cnt"))
+                    .filter(col("line_cnt") > lit(1))
+                    .select("l_orderkey")
+                )
+                pruned = lineitem.join(multi_line_keys, left_on="l_orderkey", right_on="l_orderkey", how="semi")
+            else:
+                pruned = lineitem
             large_orders = _q18_expr_large_orders(pruned, col, lit, threshold)
             joined = (
                 customer.join(orders, left_on="c_custkey", right_on="o_custkey")
@@ -257,12 +261,12 @@ def _make_q18_pandas_impl(variant: int) -> VariantImpl:
                 order_qty[order_qty["total_qty"] > threshold].drop_duplicates("l_orderkey")["l_orderkey"]
             )
             joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
-            joined = joined.merge(
+            keyed = joined.merge(
                 pd.DataFrame({"l_orderkey": large_orders}),
                 left_on="o_orderkey",
                 right_on="l_orderkey",
-            )
-            return _q18_pandas_aggregate(joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
+            ).drop(columns=["l_orderkey"])
+            return _q18_pandas_aggregate(keyed.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey"))
 
         if variant == 3:
             # Late filtering mirror: lineitem merged before the large-order filter.
@@ -273,10 +277,14 @@ def _make_q18_pandas_impl(variant: int) -> VariantImpl:
             return _q18_pandas_aggregate(joined[joined["o_orderkey"].isin(large_orders)])
 
         if variant == 4:
-            # Order-key prefilter mirror: multi-line orders only.
-            line_counts = lineitem.groupby("l_orderkey", as_index=False).agg(line_cnt=("l_orderkey", "count"))
-            multi_line = _to_list(line_counts[line_counts["line_cnt"] > 1]["l_orderkey"])
-            pruned = lineitem[lineitem["l_orderkey"].isin(multi_line)]
+            # Order-key prefilter mirror: multi-line orders only. Sound only
+            # when a single line cannot reach the threshold (l_quantity <= 50).
+            if threshold > 50:
+                line_counts = lineitem.groupby("l_orderkey", as_index=False).agg(line_cnt=("l_orderkey", "count"))
+                multi_line = _to_list(line_counts[line_counts["line_cnt"] > 1]["l_orderkey"])
+                pruned = lineitem[lineitem["l_orderkey"].isin(multi_line)]
+            else:
+                pruned = lineitem
             large_orders = _q18_pandas_large_orders(pruned, threshold)
             joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
             joined = joined[joined["o_orderkey"].isin(large_orders)]

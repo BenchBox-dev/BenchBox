@@ -32,7 +32,7 @@ _DESCRIPTIONS = [
     "Anti-null reformulation: left-join the average table with an is-null exclusion",
     "Commuted formula: per-row revenue divided by 7.0 before the final sum",
     "Revenue materialization: with_columns revenue before the final sum",
-    "Threshold-first ordering: quantity filter applied before the average join",
+    "Threshold-first ordering: threshold survivors selected before the part join",
 ]
 
 
@@ -72,15 +72,13 @@ def _make_q17_expression_impl(variant: int) -> VariantImpl:
             )
 
         if variant == 3:
-            # Late average join: part and lineitem join first, and the
-            # per-part average table joins after the big join instead of
-            # before it, reversing the canonical join order.
-            avg_table = lineitem.group_by("l_partkey").agg(_q17_expr_avg(col, lit))
-            joined = (
-                part.filter(part_filter)
-                .join(lineitem, left_on="p_partkey", right_on="l_partkey")
-                .join(avg_table, left_on="p_partkey", right_on="l_partkey")
-            )
+            # Late average join: the big part/lineitem join runs first and
+            # the per-part average is derived FROM the joined frame (rather
+            # than precomputed from lineitem), so the average leg reads the
+            # joined rows instead of the base table.
+            joined = part.filter(part_filter).join(lineitem, left_on="p_partkey", right_on="l_partkey")
+            avg_table = joined.group_by("p_partkey").agg(_q17_expr_avg(col, lit))
+            joined = joined.join(avg_table, left_on="p_partkey", right_on="p_partkey")
             return joined.filter(col("l_quantity") < col("avg_qty")).select(
                 (col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly")
             )
@@ -215,13 +213,12 @@ def _make_q17_pandas_impl(variant: int) -> VariantImpl:
             return _q17_pandas_sum(joined[joined["l_quantity"] < joined["avg_qty"]])
 
         if variant == 3:
-            # Late average join mirror: part/lineitem merge before the average merge.
-            avg_table = _q17_pandas_avg(lineitem)
-            joined = (
-                part[mask]
-                .merge(lineitem, left_on="p_partkey", right_on="l_partkey")
-                .merge(avg_table, left_on="p_partkey", right_on="l_partkey")
-            )
+            # Late average join mirror: the average is derived from the
+            # merged part/lineitem frame instead of precomputed lineitem.
+            merged = part[mask].merge(lineitem, left_on="p_partkey", right_on="l_partkey")
+            avg_table = merged.groupby("p_partkey", as_index=False).agg(avg_qty=("l_quantity", "mean"))
+            avg_table["avg_qty"] = avg_table["avg_qty"] * 0.2
+            joined = merged.merge(avg_table, left_on="p_partkey", right_on="p_partkey")
             return _q17_pandas_sum(joined[joined["l_quantity"] < joined["avg_qty"]])
 
         if variant == 4:
