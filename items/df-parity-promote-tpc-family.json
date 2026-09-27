@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "tpch_skew, tpch, and tpcds-subset promoted to GATES with Make targets and pr.yml steps",
+    "Full-99 TPC-DS scheduled or non-blocking path wired with measured runtime documented",
+    "Mutation targets, coverage map regen, pinning and mutation guards green, pr-preflight run"
+  ],
+  "context": "Depends on df-parity-staged-builders-small (skew burn-down) and df-parity-staged-tpch-tpcds (subset decision plus measurements). Same promotion guardrails as df-parity-promote-nyctaxi-tsbs.",
+  "description": "Promote tpch_skew, tpch, and the budgeted tpcds subset to enforced blocking gates with full CI wiring, and wire the full-99 TPC-DS scheduled path. Guardrails: promotion only with clean burn-downs; no baseline entries muting genuine regressions; do not bundle unrelated cleanup.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:35:29Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "a6d507948b674973b1ea5b09b9dd0859",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
