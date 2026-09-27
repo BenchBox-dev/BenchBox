@@ -4841,10 +4841,15 @@
       "title": "Reconcile read_primitives query counts and fix registry metadata"
     },
     "df-parity-residual-closeout": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-28T15:29:30Z",
+        "generation": "e678f88176514bc0aa5b3648ab047ec1",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Close datavault wording, scope, release-posture residuals"
     },
     "df-parity-staged-builders-small": {
