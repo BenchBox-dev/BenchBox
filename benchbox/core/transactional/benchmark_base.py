@@ -28,6 +28,9 @@ from benchbox.core.transactional.operations_registry_base import OperationsRegis
 
 ResultT = TypeVar("ResultT")
 _POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
+# Dialects whose driver rollback() is a no-op under autocommit, so an explicit
+# SQL ROLLBACK is needed to close a transaction opened by catalog BEGIN SQL.
+_SQL_ROLLBACK_AFTER_ERROR_DIALECTS = frozenset({"databricks"})
 _UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
 _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
     r"SET\s+TRANSACTION\s+ISOLATION\s+LEVEL\s+(?P<level>REPEATABLE\s+READ|SERIALIZABLE|READ\s+COMMITTED)\s*;\s*"
@@ -340,12 +343,25 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         return _SET_THEN_BEGIN_ISOLATION_RE.sub(r"BEGIN TRANSACTION ISOLATION LEVEL \g<level>;", sql)
 
     def _rollback_connection_after_error(self, connection: DatabaseConnection) -> None:
-        """Clear aborted transaction state on drivers that require explicit rollback after errors."""
+        """Clear aborted transaction state after an operation error.
+
+        Catalog operations open transactions with explicit ``BEGIN TRANSACTION``
+        SQL. Under autocommit, a DB-API ``rollback()`` is a no-op on some
+        drivers (Databricks SQL), so a statement that fails between BEGIN and
+        COMMIT leaves the SQL transaction open and every later statement on the
+        session fails. Issue a SQL ROLLBACK as well; engines with no open
+        transaction treat it as a no-op or raise, and either is ignored.
+        """
         try:
             if hasattr(connection, "rollback"):
                 connection.rollback()
         except Exception as exc:
             self.log_verbose(f"Warning: rollback after operation error failed: {exc}")
+        if (getattr(self, "_setup_dialect", None) or "").lower() in _SQL_ROLLBACK_AFTER_ERROR_DIALECTS:
+            try:
+                connection.execute("ROLLBACK")
+            except Exception as exc:
+                self.log_verbose(f"SQL ROLLBACK after operation error was not needed or failed: {exc}")
 
     # ------------------------------------------------------------------
     # Staging provenance manifest
@@ -368,21 +384,33 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
     #: write_primitives sharing one physical database do not clobber each
     #: other's row.
     #:
-    #: The ``_v2`` generation is load-bearing, not cosmetic. The first release
-    #: of this manifest wrote a row unconditionally at the end of ``setup()``,
-    #: including on the path that skipped repopulation because the staging
-    #: tables were already non-empty. Those rows are *internally consistent* --
-    #: correct scale, correct spec version, and a digest of the live source
-    #: tables -- while the staging data they describe is stale. Reusing the
-    #: original table name would therefore match them, ``is_setup()`` would
-    #: short-circuit, and every database that generation already mis-certified
-    #: would stay silently wrong forever. A new name makes them unmatchable, so
-    #: those databases take the missing-manifest path and rebuild once.
-    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v2"
+    #: The ``_v3`` generation is load-bearing, not cosmetic, as was the
+    #: ``_v2`` bump before it. The first release of this manifest wrote a row
+    #: unconditionally at the end of ``setup()``, including on the path that
+    #: skipped repopulation because the staging tables were already non-empty.
+    #: Those rows are *internally consistent* -- correct scale, correct spec
+    #: version, and a digest of the live source tables -- while the staging
+    #: data they describe is stale; the ``_v2`` name made them unmatchable so
+    #: those databases rebuilt once. The ``_v2`` generation in turn can certify
+    #: staging tables created before the Databricks catalogManaged DDL
+    #: requirement: again internally consistent rows describing plain
+    #: (non-catalog-managed) Delta tables that Databricks multi-statement
+    #: transactions cannot write
+    #: (TRANSACTION_NOT_SUPPORTED.WRITE_NON_CATALOG_MANAGED_TABLE). Reusing the
+    #: ``_v2`` name would therefore match them, ``is_setup()`` would
+    #: short-circuit, ``CREATE TABLE IF NOT EXISTS`` would leave the legacy
+    #: tables in place, and every affected database would keep failing its
+    #: transaction operations. A new name makes them unmatchable, so those
+    #: databases take the missing-manifest path and rebuild once with the
+    #: catalogManaged DDL.
+    _STAGING_MANIFEST_TABLE = "benchbox_staging_manifest_v3"
 
-    #: Superseded manifest table, dropped on rebuild so a database does not
+    #: Superseded manifest tables, dropped on rebuild so a database does not
     #: carry a stale generation's rows around indefinitely. Never read.
-    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = ("benchbox_staging_manifest",)
+    _LEGACY_STAGING_MANIFEST_TABLES: tuple[str, ...] = (
+        "benchbox_staging_manifest_v2",
+        "benchbox_staging_manifest",
+    )
 
     def _quote_identifier(self, identifier: str) -> str:
         """Quote a SQL identifier. Subclasses override for dialect-specific quoting."""
@@ -477,6 +505,16 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         payload = "|".join(parts)
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
+    def _manifest_text_type(self) -> str:
+        """Return the unbounded text column type for the staging manifest DDL.
+
+        Databricks SQL rejects ``VARCHAR`` without a length, and BigQuery has
+        no ``VARCHAR`` at all; both spell the type ``STRING``. Other engines
+        accept a bare ``VARCHAR``.
+        """
+        dialect = (getattr(self, "_setup_dialect", None) or "standard").lower()
+        return "STRING" if dialect in ("databricks", "bigquery") else "VARCHAR"
+
     def _write_staging_manifest(self, connection: DatabaseConnection, source_tables: list[str]) -> None:
         """Persist this setup()'s staging provenance so a later is_setup() can require an exact match.
 
@@ -489,10 +527,11 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         source_digest = self._staging_source_digest(connection, source_tables)
         quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
 
+        text_type = self._manifest_text_type()
         res1 = connection.execute(
             f"CREATE TABLE IF NOT EXISTS {quoted_table} ("
-            "benchmark VARCHAR, scale VARCHAR, spec_version VARCHAR, "
-            "source_digest VARCHAR, created_at VARCHAR)"
+            f"benchmark {text_type}, scale {text_type}, spec_version {text_type}, "
+            f"source_digest {text_type}, created_at {text_type})"
         )
         if (err := failed_platform_error(res1)) is not None:
             raise RuntimeError(f"Failed to create staging manifest table: {err}")

@@ -26,6 +26,7 @@ from benchbox.experimental.load_testing.executor import (
 )
 from benchbox.experimental.load_testing.patterns import (
     BurstPattern,
+    MultiWriterPattern,
     RampUpPattern,
     SpikePattern,
     SteadyPattern,
@@ -55,6 +56,7 @@ __all__ = [
     "SpikePattern",
     "StepPattern",
     "WavePattern",
+    "MultiWriterPattern",
     # Analysis
     "LoadAnalyzer",
     "QueueAnalysis",
