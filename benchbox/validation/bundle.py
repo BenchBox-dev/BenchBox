@@ -276,19 +276,12 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
     ),
     "postgres": frozenset(
         [
-            "10_v7",
             "10_v9",
-            "11_v7",
             "11_v9",
             "13_v9",
             "1_v7",
-            "3_v7",
-            "4_v7",
-            "5_v7",
             "5_v9",
-            "7_v7",
             "7_v9",
-            "9_v7",
             "9_v9",
         ]
     ),
