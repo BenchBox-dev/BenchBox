@@ -4807,6 +4807,15 @@
       "status": "open",
       "title": "Builder-local SQL-to-DataFrame ID maps plus mapping unit test"
     },
+    "df-parity-promote-nyctaxi-tsbs": {
+      "claim": null,
+      "needs": [
+        "df-parity-staged-builders-small"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Promote nyctaxi and tsbs_devops to enforced CI gates"
+    },
     "df-parity-read-primitives-counts": {
       "claim": null,
       "needs": [],

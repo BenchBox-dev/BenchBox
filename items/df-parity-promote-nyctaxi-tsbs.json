@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "nyctaxi and tsbs_devops promoted to GATES with Make targets and pr.yml correctness-gate steps",
+    "Zero unclassified divergences and zero unclassified vacuous cells at promotion",
+    "Mutation targets added for both gates; pinning guard and mutation-sensitivity guard green",
+    "oracle-coverage-map regenerated and oracle-coverage-map-check passes",
+    "pr-preflight run once before opening the PR"
+  ],
+  "context": "Promotion follows the established path: staged burn-down, then GATES entry, Make target, pr.yml step, mutation targets, coverage map regen. Depends on df-parity-staged-builders-small. Full review findings 9 and 11 govern vacuity accounting and CI wiring.",
+  "description": "Promote nyctaxi and tsbs_devops from STAGED_GATES to enforced GATES with full blocking CI wiring. Add Make targets, pr.yml correctness-gate steps, and mutation targets for both. Regenerate the oracle coverage map. Guardrails: promotion only with clean burn-down; no baseline entries that mute genuine regressions; baseline pruning only via make cross-surface-update-baseline in a reviewed change; do not bundle unrelated cleanup.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-27T13:34:58Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "b7338406e3014e5f9611c8f2f9be1d10",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
