@@ -80,27 +80,67 @@ FAST_LANE_DELTA_WARN_THRESHOLD = 75
 
 CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
-# Composition grace (merge queue and develop post-merge only). Independently
-# green PRs can compose over the ceiling in one merge group; ejecting the group
-# blames PRs that each fit, and re-queueing repeats the failure until someone
-# bumps the ceiling. Those lanes set FAST_LANE_CEILING_GRACE so an overage no
-# larger than one PR's delta limit warns instead of failing. The pull_request
-# lane leaves it unset, so a PR whose own merge ref crosses still fails there,
-# and the nightly ratchet files the bump issue once headroom is negative.
-CEILING_GRACE_ENV = "FAST_LANE_CEILING_GRACE"
+# Composition grace (merge queue only). Independently green PRs can compose over
+# the ceiling in one merge group; ejecting the group blames PRs that each fit,
+# and re-queueing repeats the failure until someone bumps the ceiling. The
+# merge_group lane passes --ceiling-grace (at most one PR's delta limit) so an
+# overage no larger than that warns instead of failing. The value is an
+# explicit CLI flag, not an environment variable: pr.yml runs the PR's own
+# workflow file, so an env-var decision could be self-granted by editing the
+# workflow. The pull_request lane passes no grace, so a PR whose own merge ref
+# crosses still fails there, and the nightly ratchet files the bump issue once
+# headroom is negative.
 MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD
 
 
-def _ceiling_grace() -> int:
-    raw = os.environ.get(CEILING_GRACE_ENV, "").strip()
-    if not raw:
-        return 0
+def _github_event_name() -> str | None:
+    """Read the triggering event from the runner-provided event file.
+
+    GITHUB_EVENT_PATH is written by the runner from the triggering event, not
+    from the PR's workflow file, so a PR cannot self-grant grace by editing
+    its own copy of pr.yml.
+    """
+    event_path = os.environ.get("GITHUB_EVENT_PATH", "").strip()
+    if not event_path:
+        return None
     try:
-        grace = int(raw)
-    except ValueError as exc:
-        raise ValueError(f"{CEILING_GRACE_ENV} must be an integer, got {raw!r}") from exc
+        with open(event_path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    event = payload.get("event_name") or payload.get("event")
+    if isinstance(event, str) and event.strip():
+        return event.strip()
+    action = payload.get("action")
+    if isinstance(action, str) and action.strip():
+        return "pull_request"
+    return None
+
+
+def _ceiling_grace_from_event(raw: str | None) -> int:
+    """Resolve the grace flag against the triggering event.
+
+    The flag is only honored on merge_group. A pull_request run passes no
+    flag in the committed workflow, and a forged flag on any other event is
+    rejected instead of silently ignored, so misconfiguration fails closed.
+    """
+    event = _github_event_name()
+    if raw is None or not raw.strip():
+        return 0
+    if event != "merge_group":
+        raise ValueError(f"--ceiling-grace is only valid for merge_group runs (event: {event!r})")
+    return _parse_ceiling_grace(raw)
+
+
+def _parse_ceiling_grace(raw: str | None) -> int:
+    if raw is None or not raw.strip():
+        return 0
+    text = raw.strip()
+    if not re.fullmatch(r"[0-9]+", text):
+        raise ValueError(f"--ceiling-grace must be a plain integer, got {raw!r}")
+    grace = int(text, 10)
     if not 0 <= grace <= MAX_CEILING_GRACE:
-        raise ValueError(f"{CEILING_GRACE_ENV} must be between 0 and {MAX_CEILING_GRACE}, got {grace}")
+        raise ValueError(f"--ceiling-grace must be between 0 and {MAX_CEILING_GRACE}, got {grace}")
     return grace
 
 
@@ -204,7 +244,7 @@ def _has_justified_ceiling_bump(repo_root: Path) -> bool:
     )
 
 
-def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str]:
+def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy, *, ceiling_grace: int = 0) -> list[str]:
     if not policy or not policy.get("enabled", True):
         return []
 
@@ -221,14 +261,15 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
     if fast_count is None:
         raise _collect_environment_error("fast", rc, fast_output)
     print(f"Fast lane tests collected: {fast_count}")
-    grace = _ceiling_grace()
-    if fast_count > max_fast_tests + grace:
-        violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests}")
+    if ceiling_grace:
+        print(f"Composition grace active: {ceiling_grace} tests (merge queue composition only)")
+    if fast_count > max_fast_tests + ceiling_grace:
+        violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests} (grace {ceiling_grace})")
     elif fast_count > max_fast_tests:
         print(
             f"FAST_LANE_WARNING: composed tree collects {fast_count}, "
             f"{fast_count - max_fast_tests} over the {max_fast_tests} ceiling but within the "
-            f"{grace}-test composition grace - bump per {CEILING_LOG_PATH} conventions (+500 quantum)"
+            f"{ceiling_grace}-test composition grace - bump per {CEILING_LOG_PATH} conventions (+500 quantum)"
         )
     else:
         headroom = max_fast_tests - fast_count
@@ -371,6 +412,15 @@ def main() -> int:
         help="Fast-lane guardrail JSON file path",
     )
     parser.add_argument("--strict", action="store_true", help="Fail on any non-allowlisted wall-clock violations")
+    parser.add_argument(
+        "--ceiling-grace",
+        default=None,
+        help=(
+            "Composition grace in tests above the fast-lane ceiling that warns instead of failing "
+            f"(merge_group lane only; 0-{MAX_CEILING_GRACE}). The lane is derived inside "
+            "the script from the unforgeable GitHub event file, never the environment."
+        ),
+    )
     lane_group = parser.add_mutually_exclusive_group()
     lane_group.add_argument(
         "--skip-fast-lane",
@@ -455,11 +505,17 @@ def main() -> int:
         if len(violations) > 200:
             print(f"... truncated {len(violations) - 200} additional violations")
 
+    try:
+        ceiling_grace = _ceiling_grace_from_event(args.ceiling_grace)
+    except ValueError as exc:
+        print(f"FAST_LANE_CONFIGURATION_ERROR: {exc}", file=sys.stderr)
+        return 2
+
     if not args.skip_fast_lane:
         fast_lane_policy_path = repo_root / args.fast_lane_policy
         fast_lane_policy = _load_fast_lane_policy(fast_lane_policy_path)
         try:
-            fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
+            fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy, ceiling_grace=ceiling_grace)
         except FastLaneCollectError as exc:
             # Not a policy violation: the lane was never measured. Reported
             # separately so a broken environment cannot masquerade as a set of

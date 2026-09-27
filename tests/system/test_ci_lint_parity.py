@@ -62,7 +62,23 @@ SETUP_STEP_NAMES = {"Install dependencies"}
 # Steps that are genuinely CI-only. Every entry needs a reason, and the test
 # below fails if a listed step is renamed or removed -- so this dict can't
 # rot into cover for a guard that quietly stopped existing.
+MERGE_GROUP_ONLY_NOTE = (
+    "merge_group-only input, honored by `timing_policy_check.py` only when the "
+    "runner's own event file also says merge_group: the script rejects the "
+    "flag on any other event, so a PR editing its own workflow copy cannot "
+    "self-grant grace, and ci-lint's local run carries no event file and "
+    "therefore enforces the strict ceiling."
+)
+
 EXCLUDED_STEPS: dict[str, str] = {
+    # The timing-policy step itself is mirrored line-for-line in ci-lint; only
+    # its merge_group-only grace flag is CI-shaped. ci-lint runs without a
+    # `--ceiling-grace` argument, which is the strict ceiling every
+    # pull_request run also enforces. The flag's own behavior (event-file
+    # gating, rejection on non-queue events) is pinned by
+    # `test_ceiling_grace_is_scoped_to_the_queue_lane` in
+    # `tests/unit/scripts/test_timing_policy_modes.py`.
+    "Timing policy (wall-clock allowlist)": MERGE_GROUP_ONLY_NOTE,
     "Fast lane ceiling delta vs develop": (
         "CI-cache-dependent, no local equivalent: the guard's input is "
         "`fast-lane-count.txt`, restored from the GitHub Actions cache "

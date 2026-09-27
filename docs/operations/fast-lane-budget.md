@@ -114,15 +114,19 @@ pointer string.
   tripped. Bump per the convention above; this is the hard stop, not a
   suggestion.
 - **`FAST_LANE_WARNING: composed tree collects N, K over the M ceiling but
-  within the G-test composition grace` (merge queue and develop post-merge,
-  advisory):** independently green PRs composed over the ceiling. Those two
-  lanes set `FAST_LANE_CEILING_GRACE=150` (one PR's delta limit), so an
-  overage of up to 150 warns instead of ejecting a group of PRs that each fit
-  or opening reverts against them on develop. The `pull_request` lane stays
-  strict, so the next PR whose own merge ref crosses the ceiling still fails
-  there, and the nightly ratchet issue fires on the negative headroom. Bump
-  per the convention above. An overage beyond the grace is still a
-  `FAST_LANE_VIOLATION` in every lane.
+  within the G-test composition grace` (merge queue only, advisory):**
+  independently green PRs composed over the ceiling. The queue lane passes
+  `--ceiling-grace 150` (one PR's delta limit), so an overage of up to 150
+  warns instead of ejecting a group of PRs that each fit. The flag is only
+  honored when the runner's own event file says `merge_group`, so a PR cannot
+  self-grant it by editing its workflow copy, and the delta guard below stays
+  `pull_request`-only, so a composed overage ejects nowhere silently. Develop
+  post-merge keeps the strict ceiling, so a graced queue tip that lands over
+  the ceiling still trips the normal lint failure and revert path, and the
+  nightly ratchet issue fires on the negative headroom. An overage beyond the
+  grace is still a `FAST_LANE_VIOLATION` in every lane, and a `--ceiling-grace`
+  flag on any other event fails closed with
+  `FAST_LANE_CONFIGURATION_ERROR`.
 - **`FAST_LANE_DELTA_WARNING` (`guard-fast-lane-delta`, non-blocking):**
   this PR alone adds more than 75 fast tests over develop's current
   baseline. Consider whether the new coverage needs sub-second fast-lane

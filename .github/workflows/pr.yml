@@ -492,13 +492,14 @@ jobs:
       - name: Timing policy (wall-clock allowlist)
         id: guard-timing-policy
         continue-on-error: true
-        env:
-          # A merge group composes independently green PRs, so an overage of
-          # up to one PR's delta limit warns instead of ejecting the group.
-          # Pull requests keep the strict ceiling. See
-          # docs/operations/fast-lane-budget.md.
-          FAST_LANE_CEILING_GRACE: ${{ github.event_name == 'merge_group' && '150' || '' }}
-        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+        # A merge group composes independently green PRs, so an overage of up
+        # to one PR's delta limit warns instead of ejecting the group. The
+        # The script grants the grace only when the runner's own event file
+        # says merge_group, so a PR cannot self-grant it by editing this line:
+        # pr.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
+        # written by the runner. The delta guard below stays pull_request-only,
+        # so a composed overage cannot slip through it either.
+        run: uv run -- python _project/scripts/timing_policy_check.py --strict --ceiling-grace 150
 
       - name: Restore fast-lane develop baseline count
         # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
@@ -513,6 +514,9 @@ jobs:
           key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
 
       - name: Fast lane ceiling delta vs develop
+        # Pull requests only: in a merge group the delta is the sum of every
+        # composed PR, so it would eject groups whose members each fit.
+        if: github.event_name == 'pull_request'
         # Additive to guard-timing-policy above, never a replacement: that
         # step enforces the absolute max_fast_tests ceiling unconditionally.
         # This guard fails open (exit 0, DELTA_CHECK_SKIPPED) when the cache
