@@ -1,5 +1,5 @@
 {
-  "context": "Superseded by schema 3 task architecture (which removed legacy YAML work breakdown units and verification command arrays) and existing review guidance in .claude/skills/todo/references/review.md (L2 review checklist, own-edit-target freshness) and docs/agent/todo-review.md.",
+  "context": "LADDER CORRECTION 2026-09-27 (tracker-corpus-repair sweep): legacy verifications invoke _project/scripts/todo_cli.py and validate_todo.py, both deleted in the G5 cutover; those commands cannot run. Modern equivalents are the todo-db CLI (todo-db list/show/validate) and the MCP tracker tools. The annotated path_globs in scope (prose annotations, not paths) should move into the description on any re-create. Legacy text is preserved as history.",
   "description": "Follow-up from the PR 719 TODO review L2 audit. The review found defects that\nschema validation did not catch:\n\n- mutually exclusive work units encoded as normal pending work, even though the\n  TODO lifecycle has no skipped/waived work status;\n- verification commands whose shell semantics can produce ambiguous output;\n- missing `prior_art` on TODOs that add new modules, file locations, or\n  conventions;\n- evidence wording that uses one label for different domains, such as local\n  Docker host port vs adapter service/container port.\n\nThese are review-framework blind spots. Capture them as reusable TODO-review\nguardrails so future TODO reviews fail the pattern directly instead of relying\non reviewer memory.\n",
   "legacy": {
     "anti_patterns": [
@@ -202,5 +202,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:6280078c56c0df9c143f7794",
+      "at": "2026-09-27T00:09:30Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "dc7033b1ef1a4bb6ac2490d4a5dbfc22",
+      "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    }
+  ]
 }
