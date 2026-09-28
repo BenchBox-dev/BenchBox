@@ -1,11 +1,12 @@
 {
   "acceptance": [
-    "Test: every path/pattern in auto_merge_soundness_paths.py is matched by a CODEOWNERS rule (test survives the predicate's later deletion by pinning the list)",
-    "Live proof: a throwaway PR touching an owned path is shown unable to enqueue without approval (screenshot or API output recorded), then closed",
-    "Ledger row soundness-path owner hold updated"
+    "Test: the new path file covers every path/pattern in auto_merge_soundness_paths.py (pinned list so the test survives the predicate's deletion)",
+    "Test: soundness-flag fails without the review section and passes with it; passes for PRs not touching soundness paths",
+    "Live proof: a throwaway PR touching a soundness path shows soundness-flag failing, then passing after the section is added; PR closed unmerged",
+    "AGENTS.md policy text updated in the same PR (G10); ledger row soundness-path hold updated"
   ],
   "context": "codex C1, agy A9.",
-  "description": "Decision D4. _project/scripts/auto_merge_soundness_paths.py withholds auto-merge on paths that can redefine correctness, privacy, or publication policy (docs/operations/repo-admin-settings.md ~line 250: CI cannot catch an oracle redefining itself). Replacement: .github/CODEOWNERS entries (owner @joeharris76) for every path in that predicate, enforced by require_code_owner_review=true in ruleset develop-squash-only. Add a test asserting CODEOWNERS covers the predicate's full path set, then prove live that a PR touching an owned path cannot enter the merge queue without owner approval.",
+  "description": "Decision D4 (approved). The CODEOWNERS/code-owner-review route does NOT enforce a hold: ruleset develop-squash-only has required_approving_review_count=0, agents act as the owner, and PR #2416 touched owned paths and merged with no review decision. New mechanism:\n1. Move the path list from _project/scripts/auto_merge_soundness_paths.py into one data file (e.g. .github/soundness-paths.txt) and a small checker.\n2. ci.yml `tooling` job `soundness-flag`: when a PR diff touches a soundness path, it passes only if the PR body contains a `Soundness review:` section naming the external reviewer (codex, muse, or agy), linking the review output (PR comment), and stating all Critical/High findings resolved. Otherwise it fails with instructions.\n3. Agent policy in AGENTS.md: soundness-path PRs get a dedicated external adversarial review before enqueueing.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -13,6 +14,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "3072600784b94e51a85940aff328139a",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T15:05:06Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9b9397a70e19489fa970917bc3893315",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
     }
   ]

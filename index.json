@@ -5063,7 +5063,7 @@
       ],
       "priority": "critical",
       "status": "open",
-      "title": "Prove CODEOWNERS enforces the soundness-path owner hold before retiring the auto-merge predicate"
+      "title": "Replace the auto-merge soundness predicate with a CI soundness flag plus required external adversarial review"
     },
     "dlv2-33-ruleset-remove-old-checks": {
       "claim": null,
