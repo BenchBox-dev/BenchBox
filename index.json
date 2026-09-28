@@ -4935,6 +4935,13 @@
       "status": "open",
       "title": "Dev loop v2: owner sign-off on decisions D1-D7 and record the ADR"
     },
+    "dlv2-01-baseline-and-backups": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Dev loop v2: capture baseline metrics and back up all GitHub settings before any change"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],

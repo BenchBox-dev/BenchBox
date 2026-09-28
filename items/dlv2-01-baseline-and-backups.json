@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "_project/archive/dev-loop-v2/ contains the ruleset, environment, label, branch, secret-name, and Pages exports with capture date and repo SHA",
+    "No secret values appear in any committed file",
+    "Baseline metrics table committed (docs/development/dev-loop-property-ledger.md appendix or _project/archive/dev-loop-v2/baseline.md) with the measurement commands"
+  ],
+  "context": "Read-only against GitHub (gh api GET only). G9: no admin mutation in this item.",
+  "description": "Guardrail G5 prerequisite. Record the pre-change state so every later GitHub-side change is reversible and success can be measured.\n\nBaseline (from develop HEAD): workflow count and lines (46 files, 15,483 lines at 5e09d0e49); Makefile 2,050 root lines + 529 in make/*.mk and 199 targets per make/inventory.json; process-test file count per the property ledger classification; median PR open->merge; merge-queue wait p50/p95; T1/T2 wall time; develop-red incidents per month.\n\nBackups to _project/archive/dev-loop-v2/: JSON exports of rulesets 15611785 develop-squash-only, 19149459 release-only, 15611787 v-release-branches-minimal, 18774756 v-tag-restricted; environments (github-pages, pypi, test-pypi, publication-attestation) with protection rules; label list; remote branch list; secret NAMES only (never values); Pages settings (build_type workflow, custom domain benchbox.dev).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:49:08Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0fbf8284f7474779808c54079ba49c97",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
