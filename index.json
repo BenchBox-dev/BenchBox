@@ -5148,6 +5148,15 @@
       "status": "open",
       "title": "Build the tag-triggered release workflow that verifies signatures and publishes the exact queue-tested artifacts"
     },
+    "dlv2-52-release-rehearsal-and-first-release": {
+      "claim": null,
+      "needs": [
+        "dlv2-51-release-yml-v2"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Rehearse the new release path on TestPyPI, then ship the first real release through it"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

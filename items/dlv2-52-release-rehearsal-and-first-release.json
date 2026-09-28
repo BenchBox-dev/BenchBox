@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "TestPyPI rehearsal evidence: tag, run URL, hashes equal to queue run",
+    "Owner go decision recorded",
+    "PyPI release evidence: run URL, hashes, attestation, install checks green",
+    "Release freeze lifted in writing"
+  ],
+  "context": "muse M6: legacy release path retirement waits for this item.",
+  "description": "DECISION GATE. Release freeze (G7) is in force from the start of dlv2-40 until this item finishes; the legacy release path remains the fallback throughout.\n1. release-prep a pre-release version, queue it, sign the tag, run release-v2 to TestPyPI; record that published hashes equal the queue-run hashes and that pip install from TestPyPI works on all T4 cells.\n2. Owner decides go/no-go.\n3. Ship the next real release via release-v2 to PyPI; verify hashes, attestation, and pypi-latest installability (nightly t3:install).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:53:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a49a0a136fa4487d86f04343b4fdae5b",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
