@@ -5245,6 +5245,7 @@
       "needs": [
         "dlv2-53-retire-legacy-release-path",
         "dlv2-61-retire-docs-yml-pages-fallback",
+        "dlv2-62-publication-cutover-and-retirement",
         "dlv2-70-retire-scheduled-workflows",
         "dlv2-82-makefile-rewrite"
       ],
