@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "G3 ledger rows for release curation, readiness, dependency bounds, installability, drift all point at release-v2/nightly jobs",
+    "G4 sweep clean for every deleted name, including AGENTS.md, CONTRIBUTING.md, docs, skills source",
+    "Archive tag exists before branch deletion; ruleset JSON archived before deletion",
+    "Next patch-release rehearsal (dry run) passes on the new path"
+  ],
+  "context": "agy A4: drift/ruleset scripts used by release-canary stay until here.",
+  "description": "After dlv2-52. Code PR(s) (G6): delete .github/workflows/{test.yml, lint.yml, perf-smoke.yml (perf now t3:perf), validate-release-pr.yml, release-canary.yml (installability now t3:install; drift in ci.yml), rehearse-release-isolation.yml}; replace release.yml with release-v2 content; delete .github/RELEASE_PR_TEMPLATE.md; scripts/{release_cut_start.sh, release_cut_abort.sh, release_finalize.py, release_canary_incident.py, release_canary_sharding.py}; release_readiness_check.py and check_release_curation.py only if fully folded into release-check; Makefile release-cut, release-cut-abort, release-finalize; tests/unit/{test_release_canary_incident, test_release_canary_sharding, test_release_readiness}, rewrite test_release_infrastructure; tests/unit/release/* (retarget ruleset tests to the final ruleset); tests/unit/workflows/{test_release_isolation, test_release_canary_shard_evidence, test_release_uat_charter_guard}; update tests/uat/CHARTER.md branch wording; rewrite docs/operations/release-guide.md.\nOwner/admin steps (G5, G9, separate from code PRs): tag archive/release-<date> at release branch tip, delete branch release, delete ruleset 19149459 release-only.\nKeep: v-tag-restricted, v-release-branches-minimal, pypi and test-pypi environments, update_version.py, generate_changelog_entry.py, check_dependency_bounds.py.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:54:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "faef9edec0fe4a5ca991eef8ff9f8b0b",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

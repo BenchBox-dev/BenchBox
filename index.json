@@ -5157,6 +5157,15 @@
       "status": "open",
       "title": "Rehearse the new release path on TestPyPI, then ship the first real release through it"
     },
+    "dlv2-53-retire-legacy-release-path": {
+      "claim": null,
+      "needs": [
+        "dlv2-52-release-rehearsal-and-first-release"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Retire the release branch, its ruleset, workflows, scripts, targets, and tests"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
