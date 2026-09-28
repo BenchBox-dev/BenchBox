@@ -5146,7 +5146,7 @@
       ],
       "priority": "critical",
       "status": "open",
-      "title": "Build the tag-triggered release workflow that verifies signatures and publishes the exact queue-tested artifacts"
+      "title": "Build the tag-triggered release workflow that publishes the exact queue-tested artifacts"
     },
     "dlv2-52-release-rehearsal-and-first-release": {
       "claim": null,
