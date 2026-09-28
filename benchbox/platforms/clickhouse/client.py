@@ -137,7 +137,9 @@ class ClickHouseLocalClient:
         TODO(chdb-tuple-dataframe): once chDB's `format="DataFrame"` stops
         SIGABRTing on Tuple-typed columns, the explicit ArrowStream + pyarrow
         decode here can be reverted to a direct DataFrame fetch. File / track
-        this in the chdb upstream issue tracker.
+        this in the chdb upstream issue tracker (https://github.com/chdb-io/chdb),
+        then link the issue URL here. Indexed with removal criteria in
+        docs/platforms/workaround-index.md.
         """
         import pandas as pd
 
