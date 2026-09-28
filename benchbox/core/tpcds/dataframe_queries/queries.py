@@ -135,38 +135,92 @@ def _date_item_sales_pandas(
     )
 
 
-def _manufacturer_month_expression(ctx: DataFrameContext, query_id: int, value_col: str, alias: str) -> Any:
+def _manufacturer_month_expression(
+    ctx: DataFrameContext,
+    query_id: int,
+    value_col: str,
+    alias: str,
+    id_col: str,
+    period_col: str,
+    avg_alias: str,
+    categories_a: tuple[str, ...],
+    classes_a: tuple[str, ...],
+    brands_a: tuple[str, ...],
+    categories_b: tuple[str, ...],
+    classes_b: tuple[str, ...],
+    brands_b: tuple[str, ...],
+    sort_by: tuple[str, ...],
+    dms_default: int = 1212,
+) -> Any:
     params = get_parameters(query_id)
-    manufacturer_ids = params.get("manufacturer_ids", [88, 33, 160, 129])
+    dms = params.get("dms", dms_default)
     col = ctx.col
-    return (
+    lit = ctx.lit
+    in_a = (
+        col("i_category").is_in(list(categories_a))
+        & col("i_class").is_in(list(classes_a))
+        & col("i_brand").is_in(list(brands_a))
+    )
+    in_b = (
+        col("i_category").is_in(list(categories_b))
+        & col("i_class").is_in(list(classes_b))
+        & col("i_brand").is_in(list(brands_b))
+    )
+    grouped = (
         ctx.get_table("store_sales")
         .join(ctx.get_table("item"), left_on="ss_item_sk", right_on="i_item_sk")
         .join(ctx.get_table("date_dim"), left_on="ss_sold_date_sk", right_on="d_date_sk")
         .join(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
-        .filter(col("i_manufact_id").is_in(manufacturer_ids) & col("d_month_seq").is_in(list(range(1200, 1212))))
-        .group_by("i_manufact_id", "d_qoy")
+        .filter(col("d_month_seq").is_in(list(range(dms, dms + 12))) & (in_a | in_b))
+        .group_by(id_col, period_col)
         .agg(col(value_col).sum().alias(alias))
-        .sort("i_manufact_id", "d_qoy")
+    )
+    with_avg = grouped.with_columns(ctx.window_avg(alias, partition_by=[id_col]).alias(avg_alias))
+    # SQL keeps rows where ABS(sum-avg)/avg > 0.1 with avg > 0 (else NULL, filtered out).
+    return (
+        with_avg.filter((col(avg_alias) > lit(0)) & ((col(alias) - col(avg_alias)).abs() / col(avg_alias) > lit(0.1)))
+        .sort(list(sort_by))
         .limit(100)
     )
 
 
-def _manufacturer_month_pandas(ctx: DataFrameContext, query_id: int, value_col: str, alias: str) -> Any:
+def _manufacturer_month_pandas(
+    ctx: DataFrameContext,
+    query_id: int,
+    value_col: str,
+    alias: str,
+    id_col: str,
+    period_col: str,
+    avg_alias: str,
+    categories_a: tuple[str, ...],
+    classes_a: tuple[str, ...],
+    brands_a: tuple[str, ...],
+    categories_b: tuple[str, ...],
+    classes_b: tuple[str, ...],
+    brands_b: tuple[str, ...],
+    sort_by: tuple[str, ...],
+    dms_default: int = 1212,
+) -> Any:
     params = get_parameters(query_id)
-    manufacturer_ids = params.get("manufacturer_ids", [88, 33, 160, 129])
+    dms = params.get("dms", dms_default)
     merged = ctx.get_table("store_sales").merge(ctx.get_table("item"), left_on="ss_item_sk", right_on="i_item_sk")
     merged = merged.merge(ctx.get_table("date_dim"), left_on="ss_sold_date_sk", right_on="d_date_sk")
     merged = merged.merge(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
-    filtered = merged[
-        (merged["i_manufact_id"].isin(manufacturer_ids)) & (merged["d_month_seq"].isin(list(range(1200, 1212))))
-    ]
-    return (
-        filtered.groupby(["i_manufact_id", "d_qoy"], as_index=False)
-        .agg(**{alias: (value_col, "sum")})
-        .sort_values(["i_manufact_id", "d_qoy"])
-        .head(100)
+    in_a = (
+        (merged["i_category"].isin(list(categories_a)))
+        & (merged["i_class"].isin(list(classes_a)))
+        & (merged["i_brand"].isin(list(brands_a)))
     )
+    in_b = (
+        (merged["i_category"].isin(list(categories_b)))
+        & (merged["i_class"].isin(list(classes_b)))
+        & (merged["i_brand"].isin(list(brands_b)))
+    )
+    filtered = merged[(merged["d_month_seq"].isin(list(range(dms, dms + 12)))) & (in_a | in_b)]
+    grouped = filtered.groupby([id_col, period_col], as_index=False).agg(**{alias: (value_col, "sum")})
+    grouped[avg_alias] = grouped.groupby(id_col)[alias].transform("mean")
+    kept = grouped[(grouped[avg_alias] > 0) & ((grouped[alias] - grouped[avg_alias]).abs() / grouped[avg_alias] > 0.1)]
+    return kept.sort_values(list(sort_by)).head(100)
 
 
 def _item_category_sales_expression(
@@ -1021,11 +1075,25 @@ def _web_multi_warehouse_expression(
         .join(multi_warehouse_orders, on="ws_order_number", how="semi")
         .join(returned_orders, left_on="ws_order_number", right_on="wr_order_number", how=return_mode)
     )
-    return result.select(
+    # SQL SUM() over an empty set is NULL (not 0.0) while COUNT DISTINCT is 0:
+    # select NULL sums when the row count is zero so every backend yields one
+    # NULL row like the reference query.
+    tallied = result.select(
         [
             col("ws_order_number").n_unique().alias("order count"),
-            ctx.sum("ws_ext_ship_cost").alias("total shipping cost"),
-            ctx.sum("ws_net_profit").alias("total net profit"),
+            ctx.sum("ws_ext_ship_cost").alias("ship_cost"),
+            ctx.sum("ws_net_profit").alias("net_profit"),
+            col("ws_order_number").count().alias("n"),
+        ]
+    )
+    return tallied.select(
+        [
+            col("order count"),
+            ctx.when(col("n") > lit(0))
+            .then(col("ship_cost"))
+            .otherwise(lit(None))
+            .alias("total shipping cost"),
+            ctx.when(col("n") > lit(0)).then(col("net_profit")).otherwise(lit(None)).alias("total net profit"),
         ]
     )
 
@@ -1048,9 +1116,10 @@ def _web_multi_warehouse_pandas(
     )
 
     start_date = datetime(year, month, 1).date()
-    if return_mode == "anti":
-        start_date = pd.Timestamp(datetime(year, month, 1))
     end_date = start_date + timedelta(days=60)
+    date_dim = date_dim.copy()
+    if len(date_dim) > 0 and hasattr(date_dim["d_date"].iloc[0], "date"):
+        date_dim["d_date"] = pd.to_datetime(date_dim["d_date"]).dt.date
     date_filtered = date_dim[(date_dim["d_date"] >= start_date) & (date_dim["d_date"] <= end_date)][["d_date_sk"]]
     ca_filtered = customer_address[customer_address["ca_state"].isin(states)]
     ws_filtered = web_site[web_site["web_company_name"] == "pri"]
@@ -1078,6 +1147,9 @@ def _web_multi_warehouse_pandas(
         )[["wr_order_number"]]
         result = result.merge(returned_multi_wh, left_on="ws_order_number", right_on="wr_order_number")
 
+    # SQL SUM() over an empty set is NULL (not 0.0) while COUNT DISTINCT is 0.
+    if len(result) == 0:
+        return pd.DataFrame({"order count": [0], "total shipping cost": [None], "total net profit": [None]})
     return pd.DataFrame(
         {
             "order count": [result["ws_order_number"].nunique()],

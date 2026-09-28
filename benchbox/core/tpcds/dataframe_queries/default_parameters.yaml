@@ -266,11 +266,7 @@
   month: 12
   year: 1998
 53:
-  manufacturer_ids:
-  - 88
-  - 33
-  - 160
-  - 129
+  dms: 1212
   month: 11
 54:
   month: 4
@@ -281,11 +277,12 @@
   year: 2001
 56:
   colors:
-  - slate
-  - blanched
-  - burnished
-  gmt_offset: -5.0
-  year: 2001
+  - orchid
+  - chiffon
+  - lace
+  gmt_offset: -8.0
+  month: 1
+  year: 2000
 57:
   year: 1999
 58:
@@ -296,9 +293,11 @@
   year: 1999
 60:
   categories:
-  - Music
-  gmt_offset: -5.0
-  year: 2001
+  - Children
+  category: Children
+  gmt_offset: -6.0
+  month: 9
+  year: 1999
 61:
   category: Jewelry
   gmt_offset: -5.0
@@ -310,11 +309,7 @@
   - 12
   year: 1999
 63:
-  manufacturer_ids:
-  - 88
-  - 33
-  - 160
-  - 129
+  dms: 1212
   month: 11
 64:
   income_band: 38128
@@ -431,16 +426,14 @@
 93:
   reason: reason 28
 94:
+  month: 5
   states:
   - TX
-  - OR
-  - AZ
   year: 1999
 95:
+  month: 5
   states:
   - TX
-  - OR
-  - AZ
   year: 1999
 96:
   hours:

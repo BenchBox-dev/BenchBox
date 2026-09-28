@@ -116,13 +116,71 @@ helper_queries:
   args:
   - ss_sales_price
   - sum_sales
+  - i_manufact_id
+  - d_qoy
+  - avg_quarterly_sales
+  - - Books
+    - Children
+    - Electronics
+  - - personal
+    - portable
+    - reference
+    - self-help
+  - - scholaramalgamalg #14
+    - scholaramalgamalg #7
+    - exportiunivamalg #9
+    - scholaramalgamalg #9
+  - - Women
+    - Music
+    - Men
+  - - accessories
+    - classical
+    - fragrances
+    - pants
+  - - amalgimporto #1
+    - edu packscholar #1
+    - exportiimporto #1
+    - importoamalg #1
+  - - avg_quarterly_sales
+    - sum_sales
+    - i_manufact_id
+  - 1212
 - query_id: 63
   title: Store Manufacturer Profit
   expression_helper: _manufacturer_month_expression
   pandas_helper: _manufacturer_month_pandas
   args:
-  - ss_net_profit
-  - sum_profit
+  - ss_sales_price
+  - sum_sales
+  - i_manager_id
+  - d_moy
+  - avg_monthly_sales
+  - - Books
+    - Children
+    - Electronics
+  - - personal
+    - portable
+    - reference
+    - self-help
+  - - scholaramalgamalg #14
+    - scholaramalgamalg #7
+    - exportiunivamalg #9
+    - scholaramalgamalg #9
+  - - Women
+    - Music
+    - Men
+  - - accessories
+    - classical
+    - fragrances
+    - pants
+  - - amalgimporto #1
+    - edu packscholar #1
+    - exportiimporto #1
+    - importoamalg #1
+  - - i_manager_id
+    - avg_monthly_sales
+    - sum_sales
+  - 1212
 - query_id: 98
   title: Store Sales Item Band
   expression_helper: _item_category_sales_expression
@@ -277,9 +335,9 @@ helper_queries:
   args:
   - i_color
   - colors
-  - - pale
+  - - orchid
     - chiffon
-    - thistle
+    - lace
   - 1
   - - total_sales
     - i_item_id
@@ -291,6 +349,6 @@ helper_queries:
   - i_category
   - category
   - Children
-  - 8
+  - 9
   - - i_item_id
     - total_sales
