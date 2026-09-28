@@ -260,6 +260,8 @@ class TestBigQueryAdapter:
         mock_benchmark = Mock()
         mock_benchmark.get_create_tables_sql.return_value = """
             CREATE TABLE table1 (id INT64, name STRING);
+            -- Generated staging load tables
+            CREATE TABLE orders_stage (id INT64);
             CREATE TABLE table2 (id INT64, data STRING);
         """
 
@@ -268,7 +270,10 @@ class TestBigQueryAdapter:
         # Mock translate_sql method
         with patch.object(adapter, "translate_sql") as mock_translate:
             mock_translate.return_value = (
-                "CREATE TABLE table1 (id INT64, name STRING);\nCREATE TABLE table2 (id INT64, data STRING);"
+                "CREATE TABLE table1 (id INT64, name STRING);\n"
+                "-- Generated staging load tables\n"
+                "CREATE TABLE orders_stage (id INT64);\n"
+                "CREATE TABLE table2 (id INT64, data STRING);"
             )
 
             schema_time = adapter.create_schema(mock_benchmark, mock_client)
@@ -278,8 +283,11 @@ class TestBigQueryAdapter:
 
         # Should create tables via DDL execution
         query_calls = list(mock_client.query.call_args_list)
-        assert len(query_calls) >= 2  # At least 2 CREATE TABLE statements
-        # Note: Actual SQL will be converted to BigQuery format with dataset qualification
+        assert len(query_calls) == 3
+        executed_ddl = [call.args[0] for call in query_calls]
+        assert any("`test-project.test_dataset.TABLE1`" in ddl for ddl in executed_ddl)
+        assert any("`test-project.test_dataset.ORDERS_STAGE`" in ddl for ddl in executed_ddl)
+        assert any("`test-project.test_dataset.TABLE2`" in ddl for ddl in executed_ddl)
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_csv_upload(self, mock_bigquery, dependencies_available):
