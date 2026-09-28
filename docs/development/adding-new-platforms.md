@@ -68,6 +68,7 @@ The following inventory is generated from the manifest:
 | `athena-spark` | — | SQL + DataFrame | `experimental` | #35 `benchbox.platforms.aws:AthenaSparkAdapter` |
 | `bigquery` | `bq` (cli), `gbq` (cli) | SQL | `beta` | #12 `benchbox.platforms.bigquery:BigQueryAdapter` |
 | `cedardb` | — | SQL | `experimental` | #23 `benchbox.platforms.cedardb:CedarDBAdapter` |
+| `citus` | — | SQL | `experimental` | #48 `benchbox.platforms.citus:CitusAdapter` |
 | `clickhouse` | — | SQL | `deprecated` | #6 `benchbox.platforms.clickhouse:ClickHouseAdapter` |
 | `clickhouse-cloud` | — | SQL | `beta` | #9 `benchbox.platforms.clickhouse_cloud:ClickHouseCloudAdapter` |
 | `clickhouse-local` | `ch` (cli) | SQL | `beta` | #7 `benchbox.platforms.clickhouse_local:ClickHouseLocalAdapter` |
@@ -93,6 +94,7 @@ The following inventory is generated from the manifest:
 | `lakesail` | `lakesail-df` (cli, mode=dataframe) | SQL + DataFrame | `experimental` | #42 `benchbox.platforms.lakesail:LakeSailAdapter` |
 | `motherduck` | — | SQL | `beta` | #1 `benchbox.platforms.motherduck:MotherDuckAdapter` |
 | `pandas` | `pandas-df` (cli, mode=dataframe) | DataFrame | `stable` | DataFrame factory only |
+| `paradedb` | — | SQL | `experimental` | #47 `benchbox.platforms.paradedb:ParadeDBAdapter` |
 | `pg-duckdb` | `pg_duckdb` (registry) | SQL | `experimental` | #20 `benchbox.platforms.pg_duckdb:PgDuckDBAdapter` |
 | `pg-mooncake` | — | SQL | `experimental` | #21 `benchbox.platforms.pg_mooncake:PgMooncakeAdapter` |
 | `polars` | `polars-df` (cli, mode=dataframe) | DataFrame | `stable` | #44 `benchbox.platforms.polars_platform:PolarsAdapter` |

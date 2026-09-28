@@ -13,6 +13,7 @@ Pins:
 
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import re
 import subprocess
@@ -232,10 +233,13 @@ def test_push_drop_inventory_subject_set_matches_workflows() -> None:
                 hits_develop = False
             else:
                 branches = push.get("branches")
-                if branches is None and "branches-ignore" not in push:
-                    hits_develop = "tags" not in push
+                if branches is not None:
+                    hits_develop = "develop" in list(branches)
+                elif "branches-ignore" in push:
+                    ignored = list(push.get("branches-ignore") or [])
+                    hits_develop = not any(fnmatch.fnmatchcase("develop", str(pattern)) for pattern in ignored)
                 else:
-                    hits_develop = branches is not None and "develop" in list(branches)
+                    hits_develop = "tags" not in push
         if hits_develop:
             subjects.append(path.name)
 

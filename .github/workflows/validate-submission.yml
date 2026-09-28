@@ -56,7 +56,7 @@ jobs:
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
           # Fetch PR merge commit (GitHub's ephemeral test merge of PR into base)
           # Fetch depth 1 is sufficient; we only need the merge commit itself.
-          # Fallback when git fetch origin pull/${{number}}/merge FETCH_HEAD missing
+          # Fallback when git fetch origin pull/<number>/merge FETCH_HEAD missing
           # (conflicts): GitHub does not create a merge ref for conflicted PRs.
           # Fall back to head.sha so validation can still revalidate payload (will
           # likely fail if conflicts exist, which is correct closed behavior).
