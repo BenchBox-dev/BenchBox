@@ -189,10 +189,16 @@
   state: TN
   year: 2001
 37:
-  current_price_max: 98
-  current_price_min: 68
+  current_price_max: 52
+  current_price_min: 22
+  manufact_ids:
+  - 678
+  - 964
+  - 918
+  - 849
   month_end: 6
   month_start: 1
+  sales_date: '2001-06-02'
   year: 2000
 38:
   year: 2002
@@ -375,10 +381,16 @@
   state: GA
   year: 2000
 82:
+  manufact_ids:
+  - 437
+  - 129
+  - 727
+  - 663
   month_end: 6
   month_start: 1
-  price_max: 92
-  price_min: 62
+  price_max: 60
+  price_min: 30
+  sales_date: '2002-05-30'
   year: 2000
 83:
   dates:

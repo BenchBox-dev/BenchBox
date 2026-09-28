@@ -219,9 +219,15 @@ helper_queries:
   - cs_item_sk
   - - current_price_min
     - current_price_max
-  - - 68
-    - 98
+  - - 22
+    - 52
   - true
+  - manufact_ids
+  - - 678
+    - 964
+    - 918
+    - 849
+  - '2001-06-02'
 - query_id: 82
   title: Store Sales Inventory
   expression_helper: _inventory_item_expression
@@ -231,9 +237,15 @@ helper_queries:
   - ss_item_sk
   - - price_min
     - price_max
-  - - 62
-    - 92
+  - - 30
+    - 60
   - false
+  - manufact_ids
+  - - 437
+    - 129
+    - 727
+    - 663
+  - '2002-05-30'
 - query_id: 92
   title: Web Sales Excess Discount
   expression_helper: _excess_discount_expression

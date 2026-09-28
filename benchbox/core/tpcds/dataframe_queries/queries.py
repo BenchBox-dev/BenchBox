@@ -1095,23 +1095,28 @@ def _inventory_item_expression(
     price_param_names: tuple[str, str],
     price_defaults: tuple[int, int],
     inventory_first: bool,
+    manufact_param: str = "manufact_ids",
+    manufact_default: tuple[int, ...] = (),
+    sales_date_default: str = "2001-06-02",
 ) -> Any:
     params = get_parameters(query_id)
-    year = params.get("year", 2000)
-    month_start = params.get("month_start", 1)
-    month_end = params.get("month_end", 6)
+    start_date, end_date = _sales_date_window(query_id, sales_date_default, days=60)
     price_min = params.get(price_param_names[0], price_defaults[0])
     price_max = params.get(price_param_names[1], price_defaults[1])
+    manufact_ids = params.get(manufact_param, list(manufact_default))
     col, lit = ctx.col, ctx.lit
     price_filter = (col("i_current_price") >= lit(price_min)) & (col("i_current_price") <= lit(price_max))
-    date_filter = (col("d_year") == lit(year)) & (col("d_moy") >= lit(month_start)) & (col("d_moy") <= lit(month_end))
+    date_filter = (col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date))
     inventory_filter = (col("inv_quantity_on_hand") >= lit(100)) & (col("inv_quantity_on_hand") <= lit(500))
+    manufact_filter = col("i_manufact_id").is_in(manufact_ids)
     return (
         ctx.get_table("item")
         .join(ctx.get_table("inventory"), left_on="i_item_sk", right_on="inv_item_sk")
         .join(ctx.get_table("date_dim"), left_on="inv_date_sk", right_on="d_date_sk")
         .join(ctx.get_table(source_table), left_on="i_item_sk", right_on=source_key)
-        .filter(price_filter & (inventory_filter & date_filter if inventory_first else date_filter & inventory_filter))
+        .filter(
+            price_filter & manufact_filter & (inventory_filter & date_filter if inventory_first else date_filter & inventory_filter)
+        )
         .select("i_item_id", "i_item_desc", "i_current_price")
         .unique()
         .sort("i_item_id")
@@ -1127,22 +1132,31 @@ def _inventory_item_pandas(
     price_param_names: tuple[str, str],
     price_defaults: tuple[int, int],
     _inventory_first: bool,
+    manufact_param: str = "manufact_ids",
+    manufact_default: tuple[int, ...] = (),
+    sales_date_default: str = "2001-06-02",
 ) -> Any:
+    import pandas as pd
+
     params = get_parameters(query_id)
-    year = params.get("year", 2000)
-    month_start = params.get("month_start", 1)
-    month_end = params.get("month_end", 6)
+    start_date, end_date = _sales_date_window(query_id, sales_date_default, days=60)
     price_min = params.get(price_param_names[0], price_defaults[0])
     price_max = params.get(price_param_names[1], price_defaults[1])
+    manufact_ids = params.get(manufact_param, list(manufact_default))
 
     item, inventory, date_dim = _tables(ctx, "item", "inventory", "date_dim")
     source = ctx.get_table(source_table)
 
-    item_filtered = item[(item["i_current_price"] >= price_min) & (item["i_current_price"] <= price_max)]
-    inv_filtered = inventory[(inventory["inv_quantity_on_hand"] >= 100) & (inventory["inv_quantity_on_hand"] <= 500)]
-    date_filtered = date_dim[
-        (date_dim["d_year"] == year) & (date_dim["d_moy"] >= month_start) & (date_dim["d_moy"] <= month_end)
+    item_filtered = item[
+        (item["i_current_price"] >= price_min)
+        & (item["i_current_price"] <= price_max)
+        & (item["i_manufact_id"].isin(manufact_ids))
     ]
+    inv_filtered = inventory[(inventory["inv_quantity_on_hand"] >= 100) & (inventory["inv_quantity_on_hand"] <= 500)]
+    date_dim = date_dim.copy()
+    if len(date_dim) > 0 and hasattr(date_dim["d_date"].iloc[0], "date"):
+        date_dim["d_date"] = pd.to_datetime(date_dim["d_date"]).dt.date
+    date_filtered = date_dim[(date_dim["d_date"] >= start_date) & (date_dim["d_date"] <= end_date)]
     merged = item_filtered.merge(inv_filtered, left_on="i_item_sk", right_on="inv_item_sk")
     merged = merged.merge(date_filtered, left_on="inv_date_sk", right_on="d_date_sk")
     merged = merged[merged["i_item_sk"].isin(_to_list(source[source_key].unique()))]
