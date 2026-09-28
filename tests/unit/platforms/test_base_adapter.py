@@ -248,6 +248,15 @@ class BenchmarkWithStrictTranslationFailure:
         raise SQLTranslationError("strict translation failed", outcome)
 
 
+class BenchmarkWithUnexpectedTranslationFailure:
+    """Benchmark stub whose dialect-aware path raises an unexpected error."""
+
+    def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
+        if dialect is None:
+            return {"Q1": "SELECT fallback"}
+        raise ValueError("unexpected translation failure")
+
+
 class TestPowerResultConversionHelpers:
     def test_power_query_result_preserves_warmup_fields(self):
         result = _power_query_result(
@@ -3564,6 +3573,19 @@ class TestDialectQuerySelection:
                 benchmark_slug="tpch",
                 connection=Mock(name="strict_translation_connection"),
             )
+
+    def test_get_dialect_queries_can_reject_generic_fallbacks(self):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = BenchmarkWithUnexpectedTranslationFailure()
+
+        with pytest.raises(RuntimeError, match="Dialect query extraction failed for benchmark tpchavoc"):
+            adapter._get_dialect_queries(
+                benchmark,
+                benchmark_slug="tpchavoc",
+                strict_translation=True,
+            )
+
+        assert adapter._get_dialect_queries(benchmark, benchmark_slug="tpchavoc") == {"Q1": "SELECT fallback"}
 
 
 class TestStatisticsPhase:
