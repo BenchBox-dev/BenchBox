@@ -57,7 +57,7 @@ def clickhouse_divergences(tmp_path_factory):
 
     ClickHouse runs in-process via chDB, so "unreachable" means "chDB not
     installed" - skip cleanly in that case (mirroring the DataFusion sample's
-    import-only skip). The 202-variant sweep is the expensive part, so it is
+    import-only skip). The executable-variant sweep is the expensive part, so it is
     computed a single time at module scope and shared across the assertions below.
     """
     pytest.importorskip("chdb", reason="chDB (clickhouse-local) not installed")
