@@ -501,6 +501,9 @@ def _sales_returns_rollup_expression(ctx: DataFrameContext, combined: Any) -> An
                 col("profit").sum().alias("profit"),
             ],
             ctx=ctx,
+            # SQL SUM() over all-NULL inputs is NULL (not 0.0): restore NULL
+            # for groups with zero non-null inputs (e.g. a NULL-id channel row).
+            count_sources={"sales": "sales", "returns": "returns", "profit": "profit"},
         )
         # The SQL projection has no GROUPING() column: drop the helper's grouping_id.
         .select(["channel", "id", "sales", "returns", "profit"])
@@ -522,6 +525,9 @@ def _sales_returns_rollup_pandas(ctx: DataFrameContext, combined: Any) -> Any:
                 "profit": ("profit", "sum"),
             },
             ctx=ctx,
+            # SQL SUM() over all-NULL inputs is NULL (not 0.0): restore NULL
+            # for groups with zero non-null inputs (e.g. a NULL-id channel row).
+            count_sources={"sales": "sales", "returns": "returns", "profit": "profit"},
         )[["channel", "id", "sales", "returns", "profit"]]
         .sort_values(["channel", "id"])
         .head(100)
@@ -805,14 +811,34 @@ def _q77_expression_channel(
     sales = ctx.get_table(sales_table).join(date_filtered, left_on=sales_date_col, right_on="d_date_sk")
     if sales_dim_table:
         sales = sales.join(ctx.get_table(sales_dim_table), left_on=sales_dim_left, right_on=sales_dim_right)
+    # SQL SUM() over all-NULL inputs is NULL (not 0.0): guard each sum with its
+    # non-null count so NULL-sk groups keep NULL sums like the reference query.
     sales = sales.group_by(sales_group).agg(
-        [col(sales_col).sum().alias("sales"), col(profit_col).sum().alias("profit")]
+        [
+            ctx.when(col(sales_col).count() > lit(0))
+            .then(col(sales_col).sum())
+            .otherwise(lit(None))
+            .alias("sales"),
+            ctx.when(col(profit_col).count() > lit(0))
+            .then(col(profit_col).sum())
+            .otherwise(lit(None))
+            .alias("profit"),
+        ]
     )
     returns = ctx.get_table(returns_table).join(date_filtered, left_on=returns_date_col, right_on="d_date_sk")
     if returns_dim_table:
         returns = returns.join(ctx.get_table(returns_dim_table), left_on=returns_dim_left, right_on=returns_dim_right)
     returns = returns.group_by(returns_group).agg(
-        [col(returns_col).sum().alias("returns"), col(loss_col).sum().alias("profit_loss")]
+        [
+            ctx.when(col(returns_col).count() > lit(0))
+            .then(col(returns_col).sum())
+            .otherwise(lit(None))
+            .alias("returns"),
+            ctx.when(col(loss_col).count() > lit(0))
+            .then(col(loss_col).sum())
+            .otherwise(lit(None))
+            .alias("profit_loss"),
+        ]
     )
     join_kwargs: dict[str, Any] = {"how": join_how}
     if join_how != "cross":
@@ -863,7 +889,22 @@ def _q77_pandas_channel(
         sales = sales.merge(
             ctx.get_table(sales_dim_table)[[sales_dim_right]], left_on=sales_dim_left, right_on=sales_dim_right
         )
-    sales = sales.groupby(sales_group, as_index=False).agg(sales=(sales_col, "sum"), profit=(profit_col, "sum"))
+    # SQL GROUP BY keeps NULL keys and SQL SUM() over all-NULL inputs is NULL:
+    # keep NaN groups, then restore None for empty groups in object columns.
+    import pandas as _pd
+
+    sales = sales.groupby(sales_group, as_index=False, dropna=False).agg(
+        sales=(sales_col, "sum"),
+        n_sales=(sales_col, "count"),
+        profit=(profit_col, "sum"),
+        n_profit=(profit_col, "count"),
+    )
+    sales["sales"] = _pd.Series(
+        [value if count > 0 else None for value, count in zip(sales["sales"], sales["n_sales"])], dtype=object
+    )
+    sales["profit"] = _pd.Series(
+        [value if count > 0 else None for value, count in zip(sales["profit"], sales["n_profit"])], dtype=object
+    )
     returns = ctx.get_table(returns_table).merge(date_filtered, left_on=returns_date_col, right_on="d_date_sk")
     if returns_dim_table:
         returns = returns.merge(
@@ -871,8 +912,18 @@ def _q77_pandas_channel(
             left_on=returns_dim_left,
             right_on=returns_dim_right,
         )
-    returns = returns.groupby(returns_group, as_index=False).agg(
-        returns=(returns_col, "sum"), profit_loss=(loss_col, "sum")
+    returns = returns.groupby(returns_group, as_index=False, dropna=False).agg(
+        returns=(returns_col, "sum"),
+        n_returns=(returns_col, "count"),
+        profit_loss=(loss_col, "sum"),
+        n_loss=(loss_col, "count"),
+    )
+    returns["returns"] = _pd.Series(
+        [value if count > 0 else None for value, count in zip(returns["returns"], returns["n_returns"])], dtype=object
+    )
+    returns["profit_loss"] = _pd.Series(
+        [value if count > 0 else None for value, count in zip(returns["profit_loss"], returns["n_loss"])],
+        dtype=object,
     )
     if join_how == "cross":
         sales["_key"] = 1
@@ -880,10 +931,19 @@ def _q77_pandas_channel(
         result = sales.merge(returns, on="_key").drop(columns=["_key"])
     else:
         result = sales.merge(returns, left_on=sales_group, right_on=returns_group, how=join_how)
-        result["returns"] = result["returns"].fillna(0)
-        result["profit_loss"] = result["profit_loss"].fillna(0)
-    result["profit"] = result["profit"] - result["profit_loss"]
+        result["returns"] = result["returns"].where(result["returns"].notna(), 0)
+        result["profit_loss"] = result["profit_loss"].where(result["profit_loss"].notna(), 0)
+    # SQL NULL propagates through the subtraction; None - x raises in pandas,
+    # so compute with explicit None handling.
+    result["profit"] = [
+        None if profit is None or loss is None else profit - loss
+        for profit, loss in zip(result["profit"], result["profit_loss"])
+    ]
     result["channel"] = channel_name
+    # A NULL dimension id arrives as float NaN, which the order-key grouping
+    # distinguishes from SQL NULL: map NaN back to None in an object column so
+    # NULL keys group and compare equal.
+    result[sales_group] = result[sales_group].astype(object).where(result[sales_group].notna(), None)
     result["id"] = result[sales_group]
     return result[["channel", "id", "sales", "returns", "profit"]]
 
@@ -6217,7 +6277,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
     """
     col = ctx.col
     lit = ctx.lit
-    date_filtered = _date_window_expression(ctx, 5, "2000-08-23", days=14)
+    date_filtered = _date_window_expression(ctx, 5, "1998-08-04", days=14)
 
     def channel(
         channel_name: str,
@@ -6293,7 +6353,7 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q5: Three-channel sales-returns with ROLLUP (Pandas)."""
-    date_filtered = _date_window_pandas(ctx, 5, "2000-08-23", days=14)
+    date_filtered = _date_window_pandas(ctx, 5, "1998-08-04", days=14)
 
     def part(frame: Any, columns: dict[str, str], sales: bool) -> Any:
         result = frame[list(columns)].rename(columns=columns).copy()
@@ -7836,7 +7896,7 @@ def q77_expression_impl(ctx: DataFrameContext) -> Any:
     Tables: store_sales, store_returns, catalog_sales, catalog_returns,
             web_sales, web_returns, date_dim, store, web_page
     """
-    date_filtered = _date_window_expression(ctx, 77, "2000-08-23")
+    date_filtered = _date_window_expression(ctx, 77, "1998-08-04")
     combined = ctx.concat(
         [
             _q77_expression_channel(ctx, date_filtered, channel, sales, returns, how)
@@ -7848,7 +7908,7 @@ def q77_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q77_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q77: Three-channel sales-returns with separate CTEs and ROLLUP (Pandas)."""
-    date_filtered = _date_window_pandas(ctx, 77, "2000-08-23")
+    date_filtered = _date_window_pandas(ctx, 77, "1998-08-04")
     combined = ctx.concat(
         [
             _q77_pandas_channel(ctx, date_filtered, channel, sales, returns, how)

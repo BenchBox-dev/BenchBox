@@ -11,6 +11,7 @@
 4:
   year: 2001
 5:
+  sales_date: '1998-08-04'
   year: 2000
 6:
   month: 1
@@ -405,6 +406,7 @@
   year: 2001
 77:
   channel_type: store channel
+  sales_date: '1998-08-04'
   year: 2001
 78:
   year: 2000
