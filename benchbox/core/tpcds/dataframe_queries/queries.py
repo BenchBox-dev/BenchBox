@@ -502,7 +502,9 @@ def _sales_returns_rollup_expression(ctx: DataFrameContext, combined: Any) -> An
             ],
             ctx=ctx,
         )
-        .sort(["channel", "id"])
+        # The SQL projection has no GROUPING() column: drop the helper's grouping_id.
+        .select(["channel", "id", "sales", "returns", "profit"])
+        .sort(["channel", "id"], nulls_last=True)
         .limit(100)
     )
 
@@ -520,7 +522,7 @@ def _sales_returns_rollup_pandas(ctx: DataFrameContext, combined: Any) -> Any:
                 "profit": ("profit", "sum"),
             },
             ctx=ctx,
-        )
+        )[["channel", "id", "sales", "returns", "profit"]]
         .sort_values(["channel", "id"])
         .head(100)
     )
@@ -2662,7 +2664,7 @@ def q62_expression_impl(ctx: DataFrameContext) -> Any:
     Pattern: Multi-join -> filter by month_seq -> CASE WHEN aggregation -> group by -> order by
     """
     params = get_parameters(62)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     web_sales, warehouse, ship_mode, web_site, date_dim = _tables(
         ctx, "web_sales", "warehouse", "ship_mode", "web_site", "date_dim"
@@ -2712,7 +2714,7 @@ def q62_expression_impl(ctx: DataFrameContext) -> Any:
 def q62_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q62: Web Sales Delivery Analysis (Pandas Family)."""
     params = get_parameters(62)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     web_sales, warehouse, ship_mode, web_site, date_dim = _tables(
         ctx, "web_sales", "warehouse", "ship_mode", "web_site", "date_dim"
@@ -2766,7 +2768,7 @@ def q99_expression_impl(ctx: DataFrameContext) -> Any:
     Pattern: Multi-join -> filter by month_seq -> CASE WHEN aggregation -> group by -> order by
     """
     params = get_parameters(99)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     catalog_sales, warehouse, ship_mode, call_center, date_dim = _tables(
         ctx, "catalog_sales", "warehouse", "ship_mode", "call_center", "date_dim"
@@ -2816,7 +2818,7 @@ def q99_expression_impl(ctx: DataFrameContext) -> Any:
 def q99_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q99: Catalog Sales Delivery Analysis (Pandas Family)."""
     params = get_parameters(99)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     catalog_sales, warehouse, ship_mode, call_center, date_dim = _tables(
         ctx, "catalog_sales", "warehouse", "ship_mode", "call_center", "date_dim"
@@ -3656,7 +3658,7 @@ def q86_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     params = get_parameters(86)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     col = ctx.col
     lit = ctx.lit
@@ -3727,7 +3729,7 @@ def q86_pandas_impl(ctx: DataFrameContext) -> Any:
     from benchbox.core.tpcds.dataframe_queries.rollup_helper import expand_rollup_pandas
 
     params = get_parameters(86)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     # Get tables
     web_sales, date_dim, item = _tables(ctx, "web_sales", "date_dim", "item")
@@ -3920,7 +3922,7 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
     finds where web cumulative exceeds store cumulative.
     """
     params = get_parameters(51)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     col = ctx.col
 
@@ -4012,7 +4014,7 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
 def q51_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q51: Cumulative Web/Store Sales (Pandas Family)."""
     params = get_parameters(51)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     # Get tables
     web_sales, store_sales, date_dim = _tables(ctx, "web_sales", "store_sales", "date_dim")
@@ -4300,7 +4302,7 @@ def q67_expression_impl(ctx: DataFrameContext) -> Any:
     from benchbox.core.tpcds.dataframe_queries.rollup_helper import expand_rollup_expression
 
     params = get_parameters(67)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     col = ctx.col
     lit = ctx.lit
@@ -4376,7 +4378,7 @@ def q67_pandas_impl(ctx: DataFrameContext) -> Any:
     from benchbox.core.tpcds.dataframe_queries.rollup_helper import expand_rollup_pandas
 
     params = get_parameters(67)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     # Get tables
     store_sales, date_dim, item, store = _tables(ctx, "store_sales", "date_dim", "item", "store")
@@ -4455,7 +4457,7 @@ def q70_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     params = get_parameters(70)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     col = ctx.col
     lit = ctx.lit
@@ -4528,7 +4530,7 @@ def q70_pandas_impl(ctx: DataFrameContext) -> Any:
     from benchbox.core.tpcds.dataframe_queries.rollup_helper import expand_rollup_pandas
 
     params = get_parameters(70)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     # Get tables
     store_sales, date_dim, store = _tables(ctx, "store_sales", "date_dim", "store")
@@ -5441,7 +5443,7 @@ def q97_expression_impl(ctx: DataFrameContext) -> Any:
     Tables: store_sales, catalog_sales, date_dim
     """
     params = get_parameters(97)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     store_sales, catalog_sales, date_dim = _tables(ctx, "store_sales", "catalog_sales", "date_dim")
     col = ctx.col
@@ -5511,7 +5513,7 @@ def q97_pandas_impl(ctx: DataFrameContext) -> Any:
     import pandas as pd
 
     params = get_parameters(97)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
 
     store_sales, catalog_sales, date_dim = _tables(ctx, "store_sales", "catalog_sales", "date_dim")
 
@@ -6447,7 +6449,7 @@ def _customer_date_sets_pandas(ctx: DataFrameContext, date_filtered: Any) -> tup
 
 def _three_channel_customer_count_expression(ctx: DataFrameContext, query_id: int, mode: str) -> Any:
     params = get_parameters(query_id)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
     col = ctx.col
     lit = ctx.lit
     date_filtered = ctx.get_table("date_dim").filter(
@@ -6466,7 +6468,7 @@ def _three_channel_customer_count_pandas(ctx: DataFrameContext, query_id: int, m
     import pandas as pd
 
     params = get_parameters(query_id)
-    dms = params.get("dms", 1200)
+    dms = params.get("dms", 1212)
     date_filtered = ctx.get_table("date_dim")
     date_filtered = date_filtered[(date_filtered["d_month_seq"] >= dms) & (date_filtered["d_month_seq"] <= dms + 11)][
         ["d_date_sk", "d_date"]
@@ -6734,6 +6736,17 @@ def q69_expression_impl(ctx: DataFrameContext) -> Any:
         .group_by(group_cols)
         .agg(ctx.count().alias("cnt1"))
         .with_columns([col("cnt1").alias("cnt2"), col("cnt1").alias("cnt3")])
+        # Match the SQL projection order: key, count, key, count, ...
+        .select(
+            "cd_gender",
+            "cd_marital_status",
+            "cd_education_status",
+            "cnt1",
+            "cd_purchase_estimate",
+            "cnt2",
+            "cd_credit_rating",
+            "cnt3",
+        )
         .sort(group_cols)
         .head(100)
     )
@@ -6760,7 +6773,18 @@ def q69_pandas_impl(ctx: DataFrameContext) -> Any:
     result = base.groupby(group_cols, as_index=False).size().rename(columns={"size": "cnt1"})
     result["cnt2"] = result["cnt1"]
     result["cnt3"] = result["cnt1"]
-    return result.sort_values(group_cols).head(100)
+    # Match the SQL projection order: key, count, key, count, ...
+    cols = [
+        "cd_gender",
+        "cd_marital_status",
+        "cd_education_status",
+        "cnt1",
+        "cd_purchase_estimate",
+        "cnt2",
+        "cd_credit_rating",
+        "cnt3",
+    ]
+    return result[cols].sort_values(group_cols).head(100)
 
 
 # =============================================================================
@@ -7763,7 +7787,7 @@ def q80_expression_impl(ctx: DataFrameContext) -> Any:
     """
     col = ctx.col
     lit = ctx.lit
-    date_filtered = _date_window_expression(ctx, 80, "2000-08-23")
+    date_filtered = _date_window_expression(ctx, 80, "1998-08-04")
     item_filtered = ctx.get_table("item").filter(col("i_current_price") > lit(50))
     promo_filtered = ctx.get_table("promotion").filter(col("p_channel_tv") == lit("N"))
     combined = ctx.concat(
@@ -7777,7 +7801,7 @@ def q80_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q80_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q80: Three-channel sales-returns with ROLLUP aggregation (Pandas)."""
-    date_filtered = _date_window_pandas(ctx, 80, "2000-08-23")
+    date_filtered = _date_window_pandas(ctx, 80, "1998-08-04")
     item, promotion = _tables(ctx, "item", "promotion")
     item_filtered = item[item["i_current_price"] > 50][["i_item_sk"]]
     promo_filtered = promotion[promotion["p_channel_tv"] == "N"][["p_promo_sk"]]

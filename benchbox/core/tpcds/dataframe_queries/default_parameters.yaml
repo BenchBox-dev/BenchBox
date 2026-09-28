@@ -209,6 +209,7 @@
   sales_date: '2001-06-02'
   year: 2000
 38:
+  dms: 1212
   year: 2002
 39:
   months:
@@ -274,6 +275,7 @@
   month: 9
   year: 2000
 51:
+  dms: 1212
   months:
   - 1
   - 2
@@ -322,6 +324,7 @@
   month: 11
   year: 1998
 62:
+  dms: 1212
   months:
   - 11
   - 12
@@ -345,6 +348,7 @@
   - pri
   year: 2001
 67:
+  dms: 1212
   year: 2001
 68:
   cities:
@@ -358,13 +362,14 @@
   - 1
   - 2
 69:
-  month: 4
+  month: 1
   states:
-  - KY
-  - GA
-  - NM
-  year: 2001
+  - CO
+  - IL
+  - MN
+  year: 1999
 70:
+  dms: 1212
   year: 2001
 71:
   brand: 'amalgexporti #1'
@@ -408,6 +413,7 @@
   - 1
   - 2
 80:
+  sales_date: '1998-08-04'
   year: 2000
 81:
   state: IL
@@ -436,8 +442,10 @@
 85:
   year: 1998
 86:
+  dms: 1212
   year: 2001
 87:
+  dms: 1212
   month: 4
   year: 2001
 88:
@@ -478,6 +486,7 @@
   - - 8
     - 9
 97:
+  dms: 1212
   month: 4
   year: 2002
 98:
@@ -488,5 +497,6 @@
   sales_date: '2001-01-12'
   year: 1999
 99:
+  dms: 1212
   month: 2
   year: 1999
