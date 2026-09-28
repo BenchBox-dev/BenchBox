@@ -11,8 +11,6 @@ from collections.abc import Sequence
 
 import pyarrow as pa
 
-from ._dependencies import import_chdb, import_chdb_session
-
 logger = logging.getLogger(__name__)
 
 
@@ -88,6 +86,8 @@ class ClickHouseLocalClient:
     def __init__(self, db_path: str | None = None):
         """Initialize local client with optional persistent storage path."""
         self._initialized = True
+        from ._dependencies import import_chdb, import_chdb_session
+
         # Use persistent session if path provided, otherwise use in-memory connection
         if db_path:
             Session = import_chdb_session().Session
