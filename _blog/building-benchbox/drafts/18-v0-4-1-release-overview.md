@@ -7,7 +7,7 @@ series: building-benchbox
 post_number: 18
 type: release-notes
 tags: benchbox, release, lakehouse, delta, iceberg, hudi, results-explorer, cost
-meta_description: "BenchBox v0.4.1 adds four lakehouse table pairings, stricter result submissions, cost reporting without guesses, and requires Python 3.11 and pandas 3."
+meta_description: "BenchBox v0.4.1 adds three lakehouse benchmark pairings, Databricks Hudi table creation, stricter result submissions, cost reporting without guesses, and requires Python 3.11 and pandas 3."
 ---
 # BenchBox v0.4.1: more lakehouse pairings, stricter results
 
@@ -15,7 +15,7 @@ meta_description: "BenchBox v0.4.1 adds four lakehouse table pairings, stricter 
 
 ---
 
-![BenchBox 0.4.1 lakehouse support matrix. Delta: BigQuery, Redshift Spectrum, Databricks, Snowflake, ClickHouse (new), DuckDB, DataFusion, Trino/Presto, Apache Spark, Athena Spark, and Onehouse Quanton. Iceberg: BigQuery (new), Redshift Spectrum (new), Snowflake, ClickHouse Cloud, DuckDB, DataFusion, Trino/Presto, Apache Spark, Athena Spark, and Onehouse Quanton. Hudi: Databricks (new), Apache Spark, and Onehouse Quanton. The Apache Spark column also covers EMR Serverless and Dataproc; the Athena Spark column also covers Synapse Spark and Fabric Spark.](../images/v041_lakehouse_matrix.png)
+![BenchBox 0.4.1 lakehouse support matrix. Delta: BigQuery, Redshift Spectrum, Databricks, Snowflake, ClickHouse (new), DuckDB, DataFusion, Trino/Presto, Apache Spark, Athena Spark, and Onehouse Quanton. Iceberg: BigQuery (new), Redshift Spectrum (new), Snowflake, ClickHouse Cloud, DuckDB, DataFusion, Trino/Presto, Apache Spark, Athena Spark, and Onehouse Quanton. Hudi: Databricks (creation-only), Apache Spark, and Onehouse Quanton. The Apache Spark column also covers EMR Serverless and Dataproc; the Athena Spark column also covers Synapse Spark and Fabric Spark.](../images/v041_lakehouse_matrix.png)
 
 BenchBox v0.4.1 was released on **September 24, 2026**.
 
