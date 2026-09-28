@@ -149,11 +149,13 @@
   promo_channel: channel_demo
   year: 1998
 27:
-  education: College
-  gender: M
-  marital_status: S
+  education: Primary
+  gender: F
+  marital_status: W
   state: TN
-  year: 2002
+  states:
+  - TN
+  year: 1998
 28:
   quantity_ranges:
   - - 0

@@ -7649,11 +7649,11 @@ def q27_expression_impl(ctx: DataFrameContext) -> Any:
     from .rollup_helper import expand_rollup_expression
 
     params = get_parameters(27)
-    year = params.get("year", 2002)
-    gender = params.get("gender", "M")
-    marital_status = params.get("marital_status", "S")
-    education = params.get("education", "College")
-    states = params.get("states", ["TN", "TX", "FL", "CA", "NY", "PA"])
+    year = params.get("year", 1998)
+    gender = params.get("gender", "F")
+    marital_status = params.get("marital_status", "W")
+    education = params.get("education", "Primary")
+    states = params.get("states", ["TN"])
 
     store_sales, customer_demographics, date_dim, store, item = _tables(
         ctx, "store_sales", "customer_demographics", "date_dim", "store", "item"
@@ -7694,8 +7694,15 @@ def q27_expression_impl(ctx: DataFrameContext) -> Any:
     group_cols = ["i_item_id", "s_state"]
     result = expand_rollup_expression(ss_joined, group_cols, agg_exprs, ctx)
 
-    # Sort and limit
-    return result.sort(["i_item_id", "s_state"], nulls_last=True).head(100)
+    # SQL projects GROUPING(s_state) AS g_state in third position with no
+    # grouping_id column: bit 0 of the helper's grouping_id is exactly the
+    # rolled-up-state flag for this two-column ROLLUP.
+    return (
+        result.with_columns(((col("grouping_id") & lit(1))).alias("g_state"))
+        .select(["i_item_id", "s_state", "g_state", "agg1", "agg2", "agg3", "agg4"])
+        .sort(["i_item_id", "s_state"], nulls_last=True)
+        .head(100)
+    )
 
 
 def q27_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -7703,11 +7710,11 @@ def q27_pandas_impl(ctx: DataFrameContext) -> Any:
     from .rollup_helper import expand_rollup_pandas
 
     params = get_parameters(27)
-    year = params.get("year", 2002)
-    gender = params.get("gender", "M")
-    marital_status = params.get("marital_status", "S")
-    education = params.get("education", "College")
-    states = params.get("states", ["TN", "TX", "FL", "CA", "NY", "PA"])
+    year = params.get("year", 1998)
+    gender = params.get("gender", "F")
+    marital_status = params.get("marital_status", "W")
+    education = params.get("education", "Primary")
+    states = params.get("states", ["TN"])
 
     store_sales, customer_demographics, date_dim, store, item = _tables(
         ctx, "store_sales", "customer_demographics", "date_dim", "store", "item"
@@ -7742,8 +7749,12 @@ def q27_pandas_impl(ctx: DataFrameContext) -> Any:
 
     result = expand_rollup_pandas(ss_joined, ["i_item_id", "s_state"], agg_dict, ctx)
 
-    # Sort and limit
-    return result.sort_values(["i_item_id", "s_state"], na_position="last").head(100)
+    # SQL projects GROUPING(s_state) AS g_state in third position with no
+    # grouping_id column: bit 0 of the helper's grouping_id is exactly the
+    # rolled-up-state flag for this two-column ROLLUP.
+    result["g_state"] = result["grouping_id"] & 1
+    out_cols = ["i_item_id", "s_state", "g_state", "agg1", "agg2", "agg3", "agg4"]
+    return result[out_cols].sort_values(["i_item_id", "s_state"], na_position="last").head(100)
 
 
 # =============================================================================
