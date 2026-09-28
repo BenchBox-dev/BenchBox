@@ -5254,6 +5254,16 @@
       "status": "open",
       "title": "Final audit: zero references to retired items, complete ledger, and 30-day success metrics"
     },
+    "dlv2-90-stacked-prs-pilot": {
+      "claim": null,
+      "needs": [
+        "dlv2-33-ruleset-remove-old-checks",
+        "dlv2-40-retire-pr-gate-workflows"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Pilot GitHub native stacked PRs once merge-queue support is confirmed on this repository"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

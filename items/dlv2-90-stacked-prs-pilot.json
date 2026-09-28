@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "GitHub support confirmation recorded (changelog/docs link or observed queue behavior)",
+    "Pilot stack merged through the queue with every layer's checks green",
+    "AGENTS.md section on when to stack (dependent core changes only)"
+  ],
+  "context": "Sources: GitHub docs 'About stacked pull requests' and 'Merging stacked pull requests'; changelog 2026-07-30.",
+  "description": "DECISION GATE: start only when GitHub confirms merge-queue support for native stacks on BenchBox-dev/BenchBox (public preview since 2026-07-30; queue support rolling out; stacks cannot use auto-merge; same-repo only; gh extension install github/gh-stack). Pilot one dependent core change (2-3 layers): each layer gets ci.yml on pull_request (no branch filter), layers land bottom-up through the queue, children auto-rebase. Document the workflow in AGENTS.md. No custom stack tooling or guards.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:55:33Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2c9d85b16c144a459ff39f813d26e603",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
