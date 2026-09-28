@@ -8,14 +8,7 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _assemble_
 
 
 def build_tpch_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate TPC-H data, load it into in-memory DuckDB, and wire both surfaces.
-
-    Both surfaces use unseeded defaults: the SQL surface renders get_queries()
-    without a stream seed and the DataFrame surface reads the shared static
-    defaults (plus the Q11 scale seam). A fixed-stream gate would need seeded
-    DF overrides per query; until that seam exists, unseeded-vs-unseeded is
-    the honest like-for-like comparison.
-    """
+    """Generate TPC-H data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.tpch.schema import TABLES
     from benchbox.tpch import TPCH
 
@@ -23,6 +16,8 @@ def build_tpch_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData
         import benchbox.core.dataframe.benchmark_suite  # noqa: F401  # break circular import
         from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, set_scale_factor_for_benchmark
 
+        # Q11's value threshold is scale-dependent (0.0001/SF): align the
+        # shared DataFrame parameter seam with this run's scale.
         set_scale_factor_for_benchmark("tpch", scale_factor)
         return TPCH_DATAFRAME_QUERIES.get_or_raise(f"Q{query_id}")
 

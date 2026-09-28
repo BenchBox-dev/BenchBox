@@ -1575,8 +1575,10 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
         scale_factor=_TPCH_SCALE,
     ),
     # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q99"). Full-99 CI cost is measured by this
-    # item; the blocking subset decision lands with the promotion item.
+    # mechanical Q prefix ("Q1".."Q99"). Only Q38/Q88 pass against the
+    # DataFrame surface today, so the staged gate records full-99 CI cost
+    # (~13s wall) while the 10-15 query blocking subset waits until the
+    # DataFrame surface matures past two passing queries.
     "tpcds": CrossSurfaceGate(
         name="tpcds",
         build=build_tpcds_duckdb,
