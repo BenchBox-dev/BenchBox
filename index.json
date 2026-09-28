@@ -5057,9 +5057,9 @@
     },
     "dlv2-32-codeowners-soundness-hold": {
       "claim": {
-        "expires_at": "2026-09-29T20:56:23Z",
+        "expires_at": "2026-09-29T20:56:44Z",
         "generation": "be2242561fc441ee81a705c1210402be",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
       },
       "needs": [
