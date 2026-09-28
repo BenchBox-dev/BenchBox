@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "PR merged on develop; drift check passes against the current live ruleset and against the planned transitional ruleset (tested with a fixture)",
+    "No live ruleset change in this item (G6)"
+  ],
+  "context": "agy A3 (verified mechanism: drift check reads docs on base ref).",
+  "description": "Guardrail G11. scripts/ruleset_drift_check.py parses expected settings from docs/operations/repo-admin-settings.md on the base ref and `ruleset-drift` is a required check on develop. Changing the live ruleset first would fail drift closed on every PR and deadlock the queue. Merge a PR that makes the expected settings accept the transitional state (old four + new six required), before dlv2-31.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:51:32Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0828e2d5518b41ba8f091cc03c4bc93f",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

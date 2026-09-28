@@ -5036,6 +5036,15 @@
       "status": "open",
       "title": "Add the new T3 nightly workflow with per-domain jobs and run it in shadow for seven nights"
     },
+    "dlv2-30-drift-settings-add-new-checks": {
+      "claim": null,
+      "needs": [
+        "dlv2-21-ci-yml-shadow"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Update the ruleset drift expected settings to include the six new required checks before any ruleset change"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
