@@ -181,7 +181,6 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json",
-    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260926_190957_413c18af.json",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json",
