@@ -1786,6 +1786,8 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
             )
         finally:
             connection.close()
+            if data.cleanup is not None:
+                data.cleanup()
 
     total = len(data.query_ids) * len(gate.backends)
     vacuous_cells_total = sum(vacuous_cells.values())

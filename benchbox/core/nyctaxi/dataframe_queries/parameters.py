@@ -84,12 +84,17 @@ def get_parameters(query_id: str) -> NYCTaxiParameters:
 _parameter_overrides: dict[str, dict[str, Any]] | None = None
 
 
-def set_parameter_overrides(overrides: dict[str, dict[str, Any]] | None) -> None:
+def set_parameter_overrides(
+    overrides: dict[str, dict[str, Any]] | None,
+) -> dict[str, dict[str, Any]] | None:
     """Inject seed-derived parameters for a gate run.
 
     Called by the cross-surface builder before query execution so the DataFrame
     surface reads the same windows the SQL surface rendered. Pass None to clear
-    and revert to static defaults.
+    and revert to static defaults. Returns the prior value so the caller can
+    restore it when the gate run finishes.
     """
     global _parameter_overrides
+    prior = _parameter_overrides
     _parameter_overrides = overrides
+    return prior

@@ -76,8 +76,9 @@ def build_tsbs_devops_duckdb(scale_factor: float, output_dir: Path) -> CrossSurf
 
     connection = _load_duckdb_cell(benchmark, output_dir, list(TSBS_DEVOPS_SCHEMA.keys()), label="TSBS DevOps")
     sql_queries = benchmark.get_queries()
-    # Align the DF surface with the seeded SQL windows before wiring queries.
-    set_parameter_overrides(_extract_sql_windows(sql_queries))
+    # Gate-run scoping (mirrors the NYC Taxi builder): restore the prior
+    # value when the gate data leaves this builder.
+    _prior_overrides = set_parameter_overrides(_extract_sql_windows(sql_queries))
     queries = TSBS_DEVOPS_DATAFRAME_QUERIES
     return CrossSurfaceData(
         connection=connection,
@@ -86,4 +87,5 @@ def build_tsbs_devops_duckdb(scale_factor: float, output_dir: Path) -> CrossSurf
         dataframe_query=lambda query_id: queries.get_or_raise(TSBS_DEVOPS_SQL_TO_DF_IDS[query_id]),
         benchmark=benchmark,
         data_dir=output_dir,
+        cleanup=lambda: set_parameter_overrides(_prior_overrides),
     )

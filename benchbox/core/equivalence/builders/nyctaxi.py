@@ -113,8 +113,11 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
 
     connection = _load_duckdb_cell(benchmark, output_dir, ["taxi_zones", "trips"], label="NYC Taxi")
     sql_queries = benchmark.get_queries()
-    # Align the DF surface with the seeded SQL windows before wiring queries.
-    set_parameter_overrides(_extract_sql_windows(sql_queries))
+    # Align the DF surface with the seeded SQL windows for this gate run
+    # only: install the seed-derived overrides, and restore the prior
+    # (default None) value when the gate data leaves this builder so later
+    # ordinary NYC Taxi runs in the same process keep documented defaults.
+    _prior_overrides = set_parameter_overrides(_extract_sql_windows(sql_queries))
     queries = NYCTAXI_DATAFRAME_QUERIES
     return CrossSurfaceData(
         connection=connection,
@@ -123,4 +126,5 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
         dataframe_query=lambda query_id: queries.get_or_raise(NYCTAXI_SQL_TO_DF_IDS[query_id]),
         benchmark=benchmark,
         data_dir=output_dir,
+        cleanup=lambda: set_parameter_overrides(_prior_overrides),
     )
