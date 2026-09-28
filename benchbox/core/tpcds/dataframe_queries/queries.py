@@ -4752,6 +4752,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     compare weekly sales between current year and next year.
     """
     col = ctx.col
+    lit = ctx.lit
 
     # Parameters
     params = get_parameters(2)
@@ -4796,11 +4797,35 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
             ctx.when(col("d_day_name") == "Thursday").then(col("sales_price")).otherwise(None).sum().alias("thu_sales"),
             ctx.when(col("d_day_name") == "Friday").then(col("sales_price")).otherwise(None).sum().alias("fri_sales"),
             ctx.when(col("d_day_name") == "Saturday").then(col("sales_price")).otherwise(None).sum().alias("sat_sales"),
+            # Companion non-null counts: SQL SUM() over all-NULL inputs is NULL.
+            *[
+                ctx.when(col("d_day_name") == day)
+                .then(col("sales_price"))
+                .otherwise(None)
+                .count()
+                .alias(f"n_{alias}")
+                for day, alias in [
+                    ("Sunday", "sun_sales"),
+                    ("Monday", "mon_sales"),
+                    ("Tuesday", "tue_sales"),
+                    ("Wednesday", "wed_sales"),
+                    ("Thursday", "thu_sales"),
+                    ("Friday", "fri_sales"),
+                    ("Saturday", "sat_sales"),
+                ]
+            ],
         ]
     )
+    # Restore NULL day sums whose day has zero rows in the week.
+    for _alias in ["sun_sales", "mon_sales", "tue_sales", "wed_sales", "thu_sales", "fri_sales", "sat_sales"]:
+        wswscs = wswscs.with_columns(
+            ctx.when(col(f"n_{_alias}") > lit(0)).then(col(_alias)).otherwise(None).alias(_alias)
+        )
 
-    # Get year's weeks - join with date_dim to filter by year
-    date_weeks = date_dim.filter(col("d_year") == year).select(["d_week_seq"]).unique()
+    # Get year's weeks - join with date_dim to filter by year. SQL joins
+    # wswscs to date_dim on week_seq WITHOUT deduplication, so each week fans
+    # out over its dates: replicate that fan-out instead of filtering weeks.
+    date_weeks = date_dim.filter(col("d_year") == year).select(["d_week_seq"])
     y1 = wswscs.join(date_weeks, on="d_week_seq", how="inner").select(
         [
             col("d_week_seq").alias("d_week_seq1"),
@@ -4815,7 +4840,7 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Get next year's weeks
-    date_weeks_next = date_dim.filter(col("d_year") == year + 1).select(["d_week_seq"]).unique()
+    date_weeks_next = date_dim.filter(col("d_year") == year + 1).select(["d_week_seq"])
     y2 = wswscs.join(date_weeks_next, on="d_week_seq", how="inner").select(
         [
             col("d_week_seq").alias("d_week_seq2"),
@@ -4874,44 +4899,58 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     # Join with date_dim
     joined = wscs.merge(date_dim, left_on="sold_date_sk", right_on="d_date_sk", how="inner")
 
-    # Pivot by day of week and aggregate by week_seq
-    # Use vectorized operations instead of .apply() for Dask compatibility
+    # Pivot by day of week and aggregate by week_seq.
+    # SQL SUM() over all-NULL inputs is NULL (not 0.0): pivot with NaN (not 0)
+    # and restore NaN for day-weeks with zero rows via mask counts.
     days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
     day_cols = ["sun_sales", "mon_sales", "tue_sales", "wed_sales", "thu_sales", "fri_sales", "sat_sales"]
 
-    # Create conditional columns using vectorized where
+    # Create conditional columns using vectorized where (NaN where the day differs)
     for day, day_col in zip(days, day_cols):
         # Use Dask-compatible conditional assignment
         mask = joined["d_day_name"] == day
-        joined[day_col] = joined["sales_price"].where(mask, 0)
+        joined[day_col] = joined["sales_price"].where(mask)
+        joined[f"n_{day_col}"] = mask.astype(int)
 
     agg_dict = dict.fromkeys(day_cols, "sum")
+    agg_dict.update({f"n_{day_col}": "sum" for day_col in day_cols})
     wswscs = ctx.groupby_agg(joined, "d_week_seq", agg_dict, as_index=False)
+    for day_col in day_cols:
+        wswscs[day_col] = wswscs[day_col].where(wswscs[f"n_{day_col}"] > 0)
+    wswscs = wswscs.drop(columns=[f"n_{day_col}" for day_col in day_cols])
 
-    # Get weeks for each year (compute to set for Dask .isin() compatibility)
-    year_weeks = date_dim[date_dim["d_year"] == year]["d_week_seq"]
-    next_year_weeks = date_dim[date_dim["d_year"] == year + 1]["d_week_seq"]
-    year_weeks_set = ctx.to_set(year_weeks)
-    next_year_weeks_set = ctx.to_set(next_year_weeks)
+    # Join (not filter) with the year's date_dim weeks so each week fans out
+    # over its dates exactly like the SQL reference.
+    year_weeks = date_dim[date_dim["d_year"] == year][["d_week_seq"]]
+    next_year_weeks = date_dim[date_dim["d_year"] == year + 1][["d_week_seq"]]
 
-    y1 = wswscs[wswscs["d_week_seq"].isin(year_weeks_set)].copy()
+    y1 = wswscs.merge(year_weeks, on="d_week_seq", how="inner").copy()
     y1.columns = ["d_week_seq1"] + [f"{c}1" for c in day_cols]
 
-    y2 = wswscs[wswscs["d_week_seq"].isin(next_year_weeks_set)].copy()
+    y2 = wswscs.merge(next_year_weeks, on="d_week_seq", how="inner").copy()
     y2.columns = ["d_week_seq2"] + [f"{c}2" for c in day_cols]
 
     # Join where week_seq1 = week_seq2 - 53
     y2["join_key"] = y2["d_week_seq2"] - 53
     result = y1.merge(y2, left_on="d_week_seq1", right_on="join_key", how="inner")
 
-    # Calculate ratios
+    # Calculate ratios (NaN propagates like SQL NULL)
     for day_col in day_cols:
         result[f"{day_col[:3]}_ratio"] = (result[f"{day_col}1"] / result[f"{day_col}2"]).round(2)
 
     result = result[
         ["d_week_seq1", "sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]
     ]
-    return result.sort_values("d_week_seq1")
+    result = result.sort_values("d_week_seq1")
+    # SQL NULL ratios arrive as NaN: map back to None in object columns so
+    # NULLs compare equal (assigning None into float64 would coerce to NaN).
+    import pandas as _pd
+
+    for column in ["sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]:
+        result[column] = _pd.Series(
+            [None if value != value else value for value in result[column].tolist()], dtype=object
+        )
+    return result
 
 
 # =============================================================================
