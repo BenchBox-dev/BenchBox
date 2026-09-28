@@ -17823,6 +17823,15 @@
       "status": "open",
       "title": "TPC-DS parity B3: fix multi-channel unions and ROLLUP grouping sets"
     },
+    "tpcds-parity-b4-windows-semantics": {
+      "claim": null,
+      "needs": [
+        "tpcds-parity-b3-channels-rollup"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DS parity B4: fix window, NULL/decimal, and complex-query semantics"
+    },
     "tpcds-pyspark-compatibility": {
       "claim": null,
       "needs": [],

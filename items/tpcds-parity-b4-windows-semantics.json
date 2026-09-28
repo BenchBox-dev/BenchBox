@@ -1,0 +1,13 @@
+{
+  "description": "Fix remaining hand-written divergent queries by failure mode: window/ranking frames (Polars .over(partition) vs pandas groupby.transform, explicit pre-sort), NULL/COALESCE and division-by-zero (safe-divide: NULL on zero denom, matching SQL NULLIF), decimal handling (DF computes float64 per harness DECIMAL->DOUBLE cast; match within tolerance, never widen it), CHAR blank-padding comparisons, anti-join NULL-key filtering, CTE/subquery flattening order. Trace each join/filter against the SQL template from get_queries(dialect=duckdb). SCOPE: named qN expression+pandas impls in queries.py only (plus default_parameters.yaml if a literal is proven wrong per B2 rule). GUARDRAILS: both backends pass per query; tolerance/comparator/baseline untouched; SQL immutable; all previously-passing queries still pass (monotonic). VERIFY: staged report + pytest -m tpcds + lint + typecheck. DECISION GATE: zero DIVERGENT queries remain; every query is PASS or VACUOUS.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-28T12:45:25Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "c673ce926f044e419018624ca3fdb497",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
