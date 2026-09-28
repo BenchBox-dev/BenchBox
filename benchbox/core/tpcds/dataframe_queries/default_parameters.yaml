@@ -382,7 +382,11 @@
 73:
   county: Williamson County
   state: TN
-  year: 1999
+  year: 1998
+  year_offsets:
+  - 0
+  - 1
+  - 2
 74:
   year: 2001
 75:
@@ -397,8 +401,16 @@
 78:
   year: 2000
 79:
+  dep_count: 8
+  dow: 1
+  emp_max: 295
+  emp_min: 200
   household_dep_count: 6
-  year: 2000
+  year: 1998
+  year_offsets:
+  - 0
+  - 1
+  - 2
 80:
   year: 2000
 81:
