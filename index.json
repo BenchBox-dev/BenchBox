@@ -18383,10 +18383,10 @@
     },
     "tpchavoc-pg-ambiguous-cols": {
       "claim": {
-        "expires_at": "2026-09-27T21:05:10Z",
-        "generation": "10dab8460a134a80abfa94c89ad1442d",
+        "expires_at": "2026-09-29T19:58:09Z",
+        "generation": "ffe8d435094943b6939ab6a47d49c4c1",
         "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:9a799d2f295a007379f70a62"
+        "worker": "jcode-tpchavoc-closeout"
       },
       "needs": [],
       "priority": "medium",
