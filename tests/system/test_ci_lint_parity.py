@@ -71,29 +71,22 @@ MERGE_GROUP_ONLY_NOTE = (
 )
 
 EXCLUDED_STEPS: dict[str, str] = {
-    # The timing-policy step itself is mirrored line-for-line in ci-lint; only
-    # its merge_group-only grace flag is CI-shaped. ci-lint runs without a
-    # `--ceiling-grace` argument, which is the strict ceiling every
-    # pull_request run also enforces. The flag's own behavior (event-file
-    # gating, rejection on non-queue events) is pinned by
-    # `test_ceiling_grace_is_scoped_to_the_queue_lane` in
-    # `tests/unit/scripts/test_timing_policy_modes.py`.
+    # The timing-policy step is excluded only because its merge_group-only
+    # branch has no local equivalent. The dedicated strict-command test below
+    # pins the ordinary --strict command to the Makefile recipe, while the
+    # merge-group branch and skip aggregation are pinned by workflow assertions.
     "Timing policy (wall-clock allowlist)": MERGE_GROUP_ONLY_NOTE,
     "Fast lane ceiling delta vs develop": (
         "CI-cache-dependent, no local equivalent: the guard's input is "
         "`fast-lane-count.txt`, restored from the GitHub Actions cache "
-        "(`actions/cache/restore@v4`, exact key "
+        "(`actions/cache/restore@v5.1.0`, exact key "
         "`fast-lane-count-develop-<base-sha>`, populated by "
         "develop-post-merge.yml's own cache-save step) -- "
-        "there is no Actions cache to restore from in a local shell. This "
-        "is fail-open by design: `timing_policy_check.py --delta-check` "
-        "prints `DELTA_CHECK_SKIPPED (no develop baseline available - "
-        "absolute ceiling still enforced)` and exits 0 whenever the count "
-        "file is missing, which is exactly the state a local run is always "
-        "in. `guard-timing-policy` (the `--strict` step just above this "
-        "one) already enforces the absolute `max_fast_tests` ceiling "
-        "locally via `ci-lint` -- this guard is additive to that, not a "
-        "replacement for it. See docs/operations/fast-lane-budget.md."
+        "there is no Actions cache to restore from in a local shell. The "
+        "pull-request command passes `--require-develop-baseline`, so a "
+        "missing cache fails closed with `DELTA_CHECK_BASELINE_ERROR`; "
+        "direct callers without that flag retain the compatibility skip. "
+        "See docs/operations/fast-lane-budget.md."
     ),
 }
 
@@ -450,6 +443,18 @@ def test_lint_job_guards_run_in_ci_lint() -> None:
         "command to the ci-lint recipe in the Makefile (or, if genuinely "
         "CI-only, add it to EXCLUDED_STEPS with a reason):\n  " + "\n  ".join(missing)
     )
+
+
+def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
+    """The merge-group-only branch must not hide the ordinary strict guard."""
+    timing = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-timing-policy")
+    workflow_run = str(timing["run"])
+    recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
+    strict_command = "uv run -- python _project/scripts/timing_policy_check.py --strict"
+
+    assert strict_command in recipe_lines
+    assert "args=(--strict)" in workflow_run
+    assert 'timing_policy_check.py "${args[@]}"' in workflow_run
 
 
 def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemption() -> None:

@@ -61,13 +61,12 @@ own collect count against it:
 - delta > 150 fails the guard (`guard-fast-lane-delta`, `pr.yml`).
 - delta > 75 warns (does not fail).
 - No baseline available (cache miss -- e.g. the very first run after this
-  landed, or a cache eviction) -- **fails open**: prints
-  `DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling
-  still enforced)` and exits 0. This is deliberate: the absolute ceiling
-  check (`guard-timing-policy`, run just before this guard in the same
-  job) is the enforced backstop in that case, and a hard failure on a
-  missing baseline would make the delta guard a single point of failure for
-  every PR whenever the cache happens to be cold.
+  landed, or a cache eviction) -- the pull-request workflow passes
+  `--require-develop-baseline`, so the guard fails closed with
+  `DELTA_CHECK_BASELINE_ERROR` instead of allowing a queued PR to bypass the
+  per-PR prerequisite. Restore the exact develop baseline or rerun after the
+  baseline producer completes. Direct callers that omit the flag retain the
+  historical skip behavior.
 
 **3. Nightly ratchet signal -- surfaces the need for a bump before the next
 PR collides with it.** `_project/scripts/fast_lane_ratchet_check.py` runs
@@ -143,12 +142,16 @@ pointer string.
 - **`DELTA_CHECK_ENVIRONMENT_ERROR` (`guard-fast-lane-delta`, blocking):** a
   develop baseline exists, but the PR's fast-lane collection failed or did not
   produce a count. Fix the collection environment before relying on the delta
-  result; this is distinct from a cold-cache baseline miss.
+  result.
+- **`DELTA_CHECK_BASELINE_ERROR` (`guard-fast-lane-delta`, blocking):** the
+  pull-request workflow could not read the exact develop fast-lane baseline.
+  Restore the cache-producing develop baseline or rerun after it completes;
+  the guard fails closed because merge-group composition grace depends on every
+  queued member proving its own per-PR delta.
 - **`DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling
-  still enforced)` (`guard-fast-lane-delta`, exits 0):** no cached develop
-  count was found (cold cache, first run after this feature landed, or an
-  eviction). Not an error -- `guard-timing-policy`'s absolute ceiling is
-  still enforcing normally. No action needed.
+  still enforced)`** (`--delta-check` callers that omit
+  `--require-develop-baseline`, exits 0): no cached develop count was found.
+  This compatibility mode is not used by the pull-request workflow.
 - **Nightly issue "Fast-lane ceiling needs a quantum bump":** open a normal
   PR making the exact edit the issue body names (ceiling bump +
   `fast_lane_ceiling_log.md` entry). The issue self-clears (patched once,

@@ -338,23 +338,33 @@ def _emit_fast_count(repo_root: Path) -> int:
     return 0
 
 
-def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
-    """Compare this run's fast-lane collect count against a develop baseline.
+def _delta_check(repo_root: Path, develop_count_file: Path, *, require_baseline: bool = False) -> int:
+    """Compare this run's fast-lane collect count against a develop baseline count.
 
-    FAIL-OPEN BY DESIGN when no baseline is available (missing/unreadable
-    file): the absolute ceiling check (_check_fast_lane_policy, run as its
-    own separate --strict step) remains the enforced backstop in that case.
-    This delta guard is additive on top of it, never a replacement.
+    Callers that can tolerate a cold cache may retain the historical skip by
+    leaving ``require_baseline`` false. The pull-request guard sets it true so
+    every PR proves its per-PR delta before a merge-group composition can rely
+    on the corresponding grace allowance.
     """
-    if not develop_count_file.exists():
+
+    def baseline_unavailable(reason: str) -> int:
+        if require_baseline:
+            print(
+                "DELTA_CHECK_BASELINE_ERROR: "
+                f"{reason}; expected an exact develop fast-lane count at {develop_count_file}",
+                file=sys.stderr,
+            )
+            return 1
         print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
         return 0
+
+    if not develop_count_file.exists():
+        return baseline_unavailable("no develop baseline available")
 
     try:
         develop_count = int(develop_count_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
-        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
-        return 0
+        return baseline_unavailable("develop baseline is missing or invalid")
 
     rc, output = _run_pytest_collect(repo_root, "fast")
     if rc not in (0, 5):
@@ -464,9 +474,18 @@ def main() -> int:
         "--develop-count-file",
         help="Path (repo-root-relative or absolute) to the develop baseline count file, used with --delta-check.",
     )
+    parser.add_argument(
+        "--require-develop-baseline",
+        action="store_true",
+        help="Fail --delta-check when the exact develop baseline is missing or invalid.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[2]
+
+    if args.require_develop_baseline and not args.delta_check:
+        print("--require-develop-baseline requires --delta-check", file=sys.stderr)
+        return 2
 
     if args.emit_fast_count:
         return _emit_fast_count(repo_root)
@@ -478,7 +497,7 @@ def main() -> int:
         develop_count_file = Path(args.develop_count_file)
         if not develop_count_file.is_absolute():
             develop_count_file = repo_root / develop_count_file
-        return _delta_check(repo_root, develop_count_file)
+        return _delta_check(repo_root, develop_count_file, require_baseline=args.require_develop_baseline)
 
     violations: list[Any] = []
     fast_lane_violations: list[str] = []

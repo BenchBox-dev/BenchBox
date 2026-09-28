@@ -136,6 +136,27 @@ def test_delta_check_skips_when_baseline_file_unreadable(tmp_path: Path, capsys:
     assert "DELTA_CHECK_SKIPPED" in out
 
 
+def test_delta_check_requires_baseline_when_missing(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    missing = tmp_path / "does-not-exist.txt"
+    rc = mod._delta_check(Path("/nonexistent"), missing, require_baseline=True)
+    err = capsys.readouterr().err
+
+    assert rc == 1
+    assert "DELTA_CHECK_BASELINE_ERROR" in err
+    assert "no develop baseline available" in err
+
+
+def test_delta_check_requires_baseline_when_invalid(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    bad = tmp_path / "develop-count.txt"
+    bad.write_text("not-an-int", encoding="utf-8")
+    rc = mod._delta_check(Path("/nonexistent"), bad, require_baseline=True)
+    err = capsys.readouterr().err
+
+    assert rc == 1
+    assert "DELTA_CHECK_BASELINE_ERROR" in err
+    assert "missing or invalid" in err
+
+
 def test_delta_check_fails_when_pr_count_unparseable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
@@ -472,6 +493,7 @@ def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
     assert "--ceiling-grace 750" in timing["run"]
     delta = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-delta")
     assert delta["if"] == "github.event_name == 'pull_request'"
+    assert "--require-develop-baseline" in delta["run"]
     # Develop post-merge keeps the strict ceiling so a graced queue tip still
     # opens the normal revert path instead of recording a clean baseline.
     post = yaml.safe_load((_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8"))
