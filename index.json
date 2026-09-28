@@ -5187,6 +5187,15 @@
       "status": "open",
       "title": "Retire docs.yml once the publication plane owns every public route"
     },
+    "dlv2-62-publication-cutover-and-retirement": {
+      "claim": null,
+      "needs": [
+        "dlv2-60-publication-integration"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Cut benchbox.dev over to site-deploy and retire the publication control plane"
+    },
     "dlv2-70-retire-scheduled-workflows": {
       "claim": null,
       "needs": [
