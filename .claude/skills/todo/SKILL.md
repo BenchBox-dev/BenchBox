@@ -38,6 +38,14 @@ the product repository.
   the `generation` returned by `take`; after a restart, `take` the same item
   again to re-adopt it (fresh generation, refreshed lease — any earlier process
   image holding the old generation goes stale).
+- **Take over a foreign live claim only when its session cannot resume.**
+  `takeover(item_id, expected_holder, reason)` transfers a live claim held by
+  another worker: name the exact holder you inspected with `show_item` and say
+  why that session is dead. It is refused when the task has no live claim (use
+  `take`), when you already hold it (use `take` to re-adopt), when the holder
+  changed under you (re-read, then decide), or when you hold another live claim
+  (`E_MULTIPLE_CLAIMS`). Batch ownership held by the displaced worker transfers
+  with the item. Requires todo-db 0.8.1 or later.
 - **Prepared work is not completion.** The prepared lifecycle is fail-closed
   and capability-versioned: `register_batch` must first persist one project /
   repository identity, owner generation, integration branch/worktree and
@@ -74,6 +82,7 @@ the product repository.
 | — | `register_batch` / `bind_batch_pr` / `abort_batch` | Register the immutable batch contract, bind exactly one final PR identity, or owner-abort after claims are released. Reject duplicates, foreign owners, late membership, and incompatible capability/schema versions. |
 | — | `prepare` | Persist verified member work and hand back the claim without marking the member done. Requires the registered batch, explicit same-batch edge, exact clean source checkout, original base, accepted/current heads, and frozen scope. |
 | — | `release` | Hand the claim back without finishing (needs the `generation`). |
+| — | `takeover` | Take over a live claim whose session cannot resume: name the inspected holder and why it is dead. Requires todo-db 0.8.1. |
 | — | `drop` | Abandon a task as dropped. Unclaimed tasks drop freely; a live claim needs its `generation`. |
 
 ## Reading the response envelope
@@ -157,6 +166,7 @@ prepared evidence transitively.
 | List or search items | `list_items` with `status`/`priority`/`text` |
 | Create or amend work | `create_item`, `update_item` |
 | Claim, extend, close, hand back, drop | `take`, `renew`, `finish`, `release`, `drop` |
+| Take over a dead session's live claim | `takeover` (0.8.1+) |
 
 ## Process guides
 

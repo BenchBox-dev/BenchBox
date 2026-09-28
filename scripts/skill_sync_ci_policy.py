@@ -53,7 +53,6 @@ EXPECTED_GROUPS = [
     {"skills": ["benchbox"]},
     {
         "skills": [
-            "bossmode",
             "blog",
             "code",
             "test",

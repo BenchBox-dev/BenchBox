@@ -80,6 +80,81 @@ FAST_LANE_DELTA_WARN_THRESHOLD = 75
 
 CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 
+# Composition grace (merge queue only). Independently green PRs can compose over
+# the ceiling in one merge group; ejecting the group blames PRs that each fit,
+# and re-queueing repeats the failure until someone bumps the ceiling. The
+# repository's approved native queue permits five entries per merge group, so
+# the grace covers one delta limit for every possible queued entry rather than
+# assuming a one-PR group.
+#
+# Keep this synchronized with APPROVED_MERGE_QUEUE["max_entries_to_merge"] in
+# scripts/ruleset_drift_check.py. The value is an explicit CLI flag, not an
+# environment variable: pr.yml runs the PR's own workflow file, so an env-var
+# decision could be self-granted by editing the workflow. The pull_request lane
+# passes no grace, so a PR whose own merge ref crosses still fails there, and the
+# nightly ratchet files the bump issue once headroom is negative.
+MAX_MERGE_QUEUE_ENTRIES = 5
+MAX_CEILING_GRACE = FAST_LANE_DELTA_FAIL_THRESHOLD * MAX_MERGE_QUEUE_ENTRIES
+
+
+def _github_event_name() -> str | None:
+    """Read the triggering event from runner-provided event identity.
+
+    ``GITHUB_EVENT_NAME`` is set by the runner and cannot be supplied by the
+    pull request workflow. Prefer it because merge_group payloads expose an
+    action and merge-group metadata, but do not include an ``event_name``
+    field. The event file remains the fallback for local tests and runners that
+    do not export the name directly.
+    """
+    runner_event = os.environ.get("GITHUB_EVENT_NAME", "").strip()
+    if runner_event:
+        return runner_event
+
+    event_path = os.environ.get("GITHUB_EVENT_PATH", "").strip()
+    if not event_path:
+        return None
+    try:
+        with open(event_path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    event = payload.get("event_name") or payload.get("event")
+    if isinstance(event, str) and event.strip():
+        return event.strip()
+    if "merge_group" in payload:
+        return "merge_group"
+    action = payload.get("action")
+    if isinstance(action, str) and action.strip():
+        return "pull_request"
+    return None
+
+
+def _ceiling_grace_from_event(raw: str | None) -> int:
+    """Resolve the grace flag against the triggering event.
+
+    The flag is only honored on merge_group. A pull_request run passes no
+    flag in the committed workflow, and a forged flag on any other event is
+    rejected instead of silently ignored, so misconfiguration fails closed.
+    """
+    event = _github_event_name()
+    if raw is None or not raw.strip():
+        return 0
+    if event != "merge_group":
+        raise ValueError(f"--ceiling-grace is only valid for merge_group runs (event: {event!r})")
+    return _parse_ceiling_grace(raw)
+
+
+def _parse_ceiling_grace(raw: str | None) -> int:
+    if raw is None or not raw.strip():
+        return 0
+    text = raw.strip()
+    if not re.fullmatch(r"[0-9]+", text):
+        raise ValueError(f"--ceiling-grace must be a plain integer, got {raw!r}")
+    grace = int(text, 10)
+    if not 0 <= grace <= MAX_CEILING_GRACE:
+        raise ValueError(f"--ceiling-grace must be between 0 and {MAX_CEILING_GRACE}, got {grace}")
+    return grace
+
 
 def _run_pytest_collect(repo_root: Path, markexpr: str) -> tuple[int, str]:
     env = dict(os.environ)
@@ -181,7 +256,7 @@ def _has_justified_ceiling_bump(repo_root: Path) -> bool:
     )
 
 
-def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str]:
+def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy, *, ceiling_grace: int = 0) -> list[str]:
     if not policy or not policy.get("enabled", True):
         return []
 
@@ -198,8 +273,16 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy) -> list[str
     if fast_count is None:
         raise _collect_environment_error("fast", rc, fast_output)
     print(f"Fast lane tests collected: {fast_count}")
-    if fast_count > max_fast_tests:
-        violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests}")
+    if ceiling_grace:
+        print(f"Composition grace active: {ceiling_grace} tests (merge queue composition only)")
+    if fast_count > max_fast_tests + ceiling_grace:
+        violations.append(f"fast lane count {fast_count} exceeds limit {max_fast_tests} (grace {ceiling_grace})")
+    elif fast_count > max_fast_tests:
+        print(
+            f"FAST_LANE_WARNING: composed tree collects {fast_count}, "
+            f"{fast_count - max_fast_tests} over the {max_fast_tests} ceiling but within the "
+            f"{ceiling_grace}-test composition grace - bump per {CEILING_LOG_PATH} conventions (+500 quantum)"
+        )
     else:
         headroom = max_fast_tests - fast_count
         if headroom < FAST_LANE_HEADROOM_WARNING_THRESHOLD:
@@ -255,23 +338,33 @@ def _emit_fast_count(repo_root: Path) -> int:
     return 0
 
 
-def _delta_check(repo_root: Path, develop_count_file: Path) -> int:
-    """Compare this run's fast-lane collect count against a develop baseline.
+def _delta_check(repo_root: Path, develop_count_file: Path, *, require_baseline: bool = False) -> int:
+    """Compare this run's fast-lane collect count against a develop baseline count.
 
-    FAIL-OPEN BY DESIGN when no baseline is available (missing/unreadable
-    file): the absolute ceiling check (_check_fast_lane_policy, run as its
-    own separate --strict step) remains the enforced backstop in that case.
-    This delta guard is additive on top of it, never a replacement.
+    Callers that can tolerate a cold cache may retain the historical skip by
+    leaving ``require_baseline`` false. The pull-request guard sets it true so
+    every PR proves its per-PR delta before a merge-group composition can rely
+    on the corresponding grace allowance.
     """
-    if not develop_count_file.exists():
+
+    def baseline_unavailable(reason: str) -> int:
+        if require_baseline:
+            print(
+                "DELTA_CHECK_BASELINE_ERROR: "
+                f"{reason}; expected an exact develop fast-lane count at {develop_count_file}",
+                file=sys.stderr,
+            )
+            return 1
         print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
         return 0
+
+    if not develop_count_file.exists():
+        return baseline_unavailable("no develop baseline available")
 
     try:
         develop_count = int(develop_count_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
-        print("DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling still enforced)")
-        return 0
+        return baseline_unavailable("develop baseline is missing or invalid")
 
     rc, output = _run_pytest_collect(repo_root, "fast")
     if rc not in (0, 5):
@@ -341,6 +434,15 @@ def main() -> int:
         help="Fast-lane guardrail JSON file path",
     )
     parser.add_argument("--strict", action="store_true", help="Fail on any non-allowlisted wall-clock violations")
+    parser.add_argument(
+        "--ceiling-grace",
+        default=None,
+        help=(
+            "Composition grace in tests above the fast-lane ceiling that warns instead of failing "
+            f"(merge_group lane only; 0-{MAX_CEILING_GRACE}). The lane is derived inside "
+            "the script from runner-provided event identity, never a workflow-controlled grace value."
+        ),
+    )
     lane_group = parser.add_mutually_exclusive_group()
     lane_group.add_argument(
         "--skip-fast-lane",
@@ -372,9 +474,18 @@ def main() -> int:
         "--develop-count-file",
         help="Path (repo-root-relative or absolute) to the develop baseline count file, used with --delta-check.",
     )
+    parser.add_argument(
+        "--require-develop-baseline",
+        action="store_true",
+        help="Fail --delta-check when the exact develop baseline is missing or invalid.",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[2]
+
+    if args.require_develop_baseline and not args.delta_check:
+        print("--require-develop-baseline requires --delta-check", file=sys.stderr)
+        return 2
 
     if args.emit_fast_count:
         return _emit_fast_count(repo_root)
@@ -386,7 +497,7 @@ def main() -> int:
         develop_count_file = Path(args.develop_count_file)
         if not develop_count_file.is_absolute():
             develop_count_file = repo_root / develop_count_file
-        return _delta_check(repo_root, develop_count_file)
+        return _delta_check(repo_root, develop_count_file, require_baseline=args.require_develop_baseline)
 
     violations: list[Any] = []
     fast_lane_violations: list[str] = []
@@ -425,11 +536,17 @@ def main() -> int:
         if len(violations) > 200:
             print(f"... truncated {len(violations) - 200} additional violations")
 
+    try:
+        ceiling_grace = _ceiling_grace_from_event(args.ceiling_grace)
+    except ValueError as exc:
+        print(f"FAST_LANE_CONFIGURATION_ERROR: {exc}", file=sys.stderr)
+        return 2
+
     if not args.skip_fast_lane:
         fast_lane_policy_path = repo_root / args.fast_lane_policy
         fast_lane_policy = _load_fast_lane_policy(fast_lane_policy_path)
         try:
-            fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy)
+            fast_lane_violations = _check_fast_lane_policy(repo_root, fast_lane_policy, ceiling_grace=ceiling_grace)
         except FastLaneCollectError as exc:
             # Not a policy violation: the lane was never measured. Reported
             # separately so a broken environment cannot masquerade as a set of

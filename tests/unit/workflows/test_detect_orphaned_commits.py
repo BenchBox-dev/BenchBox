@@ -10,6 +10,7 @@ import importlib.util
 from pathlib import Path
 
 import pytest
+import yaml
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -162,3 +163,17 @@ class TestMergedHeadForBranch:
             ],
         )
         assert mod.merged_head_for_branch("o", "r", "b", "tok") == "b" * 40
+
+
+def test_push_trigger_still_watches_feature_branches() -> None:
+    workflow_path = Path(__file__).resolve().parents[3] / ".github" / "workflows" / "orphaned-commit-detector.yml"
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    triggers = workflow.get("on", workflow.get(True))
+    push = triggers["push"] or {}
+    # Feature-branch pushes are where orphans are created: no branches
+    # allowlist may narrow the trigger to develop, and only the queue's own
+    # branches (never human-pushed) are excluded.
+    assert "branches" not in push
+    assert push.get("branches-ignore") == ["gh-readonly-queue/**"]
+    schedule = triggers["schedule"]
+    assert any(str(entry.get("cron", "")).strip() for entry in schedule)

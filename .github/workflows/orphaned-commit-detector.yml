@@ -54,7 +54,14 @@ on:
   #
   # Cost: a read-only ~1 minute job per push. That is the price of catching a
   # stranded commit at the moment it is created rather than up to a week later.
+  #
+  # Merge-queue branches are the one exclusion. GitHub creates them from PRs
+  # already in the queue, nobody pushes to them, and they are deleted after the
+  # group resolves, so they can never strand a commit. Every queue group used
+  # to start a run here and compete with the queue's own checks for runners.
   push:
+    branches-ignore:
+      - "gh-readonly-queue/**"
 
 permissions:
   contents: read

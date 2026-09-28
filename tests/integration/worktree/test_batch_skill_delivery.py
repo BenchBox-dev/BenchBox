@@ -13,7 +13,7 @@ import pytest
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[3]
-CATALOG_REV = "67ab679ded13f2ab47151a3bd7d1e41855357202"
+CATALOG_REV = "5c7ff93e8103ee5a4ac59ea2330625e85250b206"
 SOURCE_REV = "aaad6c97632f0a36341cb670c9e1a7fe0b3a860b"
 TODO_DB_VERSION = "0.8.1"
 SCRIPTS_PROJECT = ROOT / "_project/scripts"
