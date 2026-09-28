@@ -298,7 +298,6 @@ def _excess_discount_expression(
     manufact_id: int,
     sales_date_default: str = "1998-03-18",
 ) -> Any:
-    params = get_parameters(query_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim")
@@ -347,7 +346,6 @@ def _excess_discount_pandas(
 ) -> Any:
     import pandas as pd
 
-    params = get_parameters(query_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim").copy()
