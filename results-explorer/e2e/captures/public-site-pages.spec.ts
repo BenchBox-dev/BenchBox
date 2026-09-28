@@ -151,9 +151,13 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   }
   const baseline = JSON.parse(await readFile(path.join(BASELINE, "manifest.json"), "utf8")) as typeof manifest;
   expect(baseline.browser).toBe("chromium");
-  if (process.env.PUBLIC_SITE_VISUAL_BASE_SHA) {
-    expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
-  }
+  // When comparison is required, the baseline must be bound to a real SHA:
+  // an empty BASE_SHA skips this assertion and compares pixels only, which
+  // would let a stale or wrong-tree baseline pass unread.
+  expect(process.env.PUBLIC_SITE_VISUAL_BASE_SHA, "PUBLIC_SITE_VISUAL_BASE_SHA binds the baseline").toMatch(
+    /^[0-9a-f]{40}$/,
+  );
+  expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
   const comparison = compareVisualManifests(
     baseline as VisualManifest,
     manifest as VisualManifest,
