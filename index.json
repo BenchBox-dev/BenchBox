@@ -4942,6 +4942,13 @@
       "status": "open",
       "title": "Dev loop v2: capture baseline metrics and back up all GitHub settings before any change"
     },
+    "dlv2-02-property-ledger": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Dev loop v2: build the safety property ledger mapping every guard to its replacement"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],

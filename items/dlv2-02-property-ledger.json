@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Ledger file merged with every listed property and every file in the listed directories classified",
+    "Known misclassification traps recorded as KEEP: detect_self_binding.py, rp_scoped_check.py, timing_audit.py and the wall-clock policy in timing_policy_check.py, test_workflow_context_availability.py, ruleset_drift_check.py, validate_submission.py",
+    "A unit test fails if a workflow file or process test exists that the ledger does not list"
+  ],
+  "context": "Reviewers found R1 of the plan had misclassified product checks as process (agy A1/A2/A7/A8, codex C2/C4/C5). The ledger is the single guard against that.",
+  "description": "Guardrail G3. docs/development/dev-loop-property-ledger.md: one row per safety property with columns current guard (workflow/job/script/test/hook), new guard, proof (run URL or test id), status. No test, workflow, script, or hook may be deleted by any dlv2 item unless this ledger shows its property still covered or classifies it pure-process.\n\nRequired properties: correctness oracle (digest arming, query discrimination, no-skip; TestCorrectnessGateOracle in tests/unit/test_standardized_test_commands.py); SQL self-binding lint (_project/scripts/detect_self_binding.py); monotonic-clock policy (_project/scripts/timing_policy_check.py wall-clock part + timing_audit.py); submission validation and corpus trust boundary (validate-submission*.yml, scripts/validate_submission.py, tests/unit/workflows/test_validate_submission_*, test_corpus_trust_boundary); artifact privacy; publication rollback/transactions; explorer snapshot/UI compatibility (results-explorer/src/db.ts:289); public-site visual acceptance (docs.yml required result); binary integrity (_binaries hashes, dbgen framing tests); wheel installability; dependency bounds; release curation/readiness; ruleset/settings drift; soundness-path owner hold; workflow context validity (test_workflow_context_availability); merge_group triggers; read_primitives cross-surface check (rp_scoped_check.py).\nEvery file in .github/workflows/, tests/unit/workflows/, tests/unit/scripts/, tests/unit/release/, tests/unit/test_auto_merge_*, tests/unit/test_release_*, scripts/, _project/scripts/, and every .pre-commit-config.yaml hook must appear with a classification: product-safety (keep/port), pure-process (retire), or tooling (keep).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:49:18Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e54ed2839b1847ac9f3586cc1de81cfc",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
