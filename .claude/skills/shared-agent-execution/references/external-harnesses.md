@@ -26,9 +26,17 @@ from flag drift. Do not run those checks proactively.
   - Reviewer (Hard Read-Only): `(cd "$WORKSPACE" && claude --print --tools Read,Grep,Glob --model "$MODEL" --effort "$EFFORT" "$PROMPT")`
   - Known-good models: `claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`
 - **agy**
-  - Worker (Write): `(cd "$WORKSPACE" && agy --model "$MODEL" --effort "$EFFORT" --print="$PROMPT")`
-  - Reviewer (Soft Read-Only): `(cd "$WORKSPACE" && agy --model "$MODEL" --effort "$EFFORT" --mode plan --print="$PROMPT")`
+  - Worker (Write): `(cd "$WORKSPACE" && agy --model "$MODEL" --print="$PROMPT")`
+  - Reviewer (Soft Read-Only): `(cd "$WORKSPACE" && agy --model "$MODEL" --mode plan --print="$PROMPT")`
   - Known-good models: `gemini-3.7-flash-high`, `gemini-3.7-flash-medium`, `gemini-3.7-flash-low`
+  - Note: Tier is the `-low` / `-medium` / `-high` model suffix. Never pass
+    `--effort` alongside a suffixed model: `agy` rejects the pair
+    (`--model X conflicts with --effort=Y`), including `--effort max`.
+  - Note: Headless `--print` runs cannot approve tool use. A prompt that needs
+    the reviewer to run commands (read the repo, run `git`) is auto-denied and
+    returns nothing with exit 0, so keep `agy` prompts self-contained with the
+    evidence inline. Live repo access needs a pre-authorized allow-rule in
+    `settings.json`; never `--dangerously-skip-permissions` on a Reviewer.
 - **grok**
   - Worker (Write): `grok --cwd "$WORKSPACE" --single "$PROMPT" --model "$MODEL" --reasoning-effort "$EFFORT"`
   - Reviewer (Soft Read-Only): `grok --cwd "$WORKSPACE" --single "$PROMPT" --model "$MODEL" --reasoning-effort "$EFFORT" --permission-mode plan`
