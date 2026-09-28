@@ -4943,10 +4943,15 @@
       "title": "Dev loop v2: capture baseline metrics and back up all GitHub settings before any change"
     },
     "dlv2-02-property-ledger": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-29T17:53:48Z",
+        "generation": "4f16a403ce4f4796a94a2adf84326a0e",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [],
       "priority": "critical",
-      "status": "open",
+      "status": "active",
       "title": "Dev loop v2: build the safety property ledger mapping every guard to its replacement"
     },
     "dlv2-10-chdb-cwd-guard": {
