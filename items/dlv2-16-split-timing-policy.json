@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Wall-clock policy runs standalone (script + pre-commit hook timing-policy-check + T1) with its tests passing",
+    "Fast-lane ceiling code, its JSON policy, ceiling log, and the timing-policy-fast-lane pre-push hook are isolated so dlv2-42/dlv2-44 can delete them without touching (a)",
+    "Property ledger row for monotonic-clock policy points at the new location"
+  ],
+  "context": "agy A2 (verified): R1 wrongly deleted both.",
+  "description": "_project/scripts/timing_policy_check.py enforces two unrelated things: (a) the product invariant that benchmark code uses benchbox.utils.clock.mono_time() rather than wall clocks (with timing_audit.py and a wall-clock allowlist; AGENTS.md documents it), and (b) the fast-lane test-count ceiling (_check_fast_lane_policy, _project/config/fast_lane_ceiling_log.md). (a) is product safety and stays as a pre-commit hook and T1 check. (b) is dev-loop machinery replaced by dlv2-13 duration tiering.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:50:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "760429b23ade4590858c11f7034786ae",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

@@ -4995,6 +4995,15 @@
       "status": "open",
       "title": "Define the required T2 engine cases and fail T2 when a required case skips"
     },
+    "dlv2-16-split-timing-policy": {
+      "claim": null,
+      "needs": [
+        "dlv2-02-property-ledger"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Split timing_policy_check.py: keep the monotonic-clock policy, separate the fast-lane ceiling for retirement"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
