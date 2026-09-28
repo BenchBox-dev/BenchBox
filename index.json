@@ -5076,6 +5076,16 @@
       "status": "open",
       "title": "Owner action: remove the four legacy required checks and retune the merge queue after the G1 window"
     },
+    "dlv2-40-retire-pr-gate-workflows": {
+      "claim": null,
+      "needs": [
+        "dlv2-33-ruleset-remove-old-checks",
+        "dlv2-22-nightly-t3-shadow"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Retire the legacy PR-gate workflows replaced by ci.yml"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

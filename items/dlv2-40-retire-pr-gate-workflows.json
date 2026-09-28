@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "G3: every job's property mapped in the ledger to a ci.yml or nightly job",
+    "G4: grep for each deleted workflow filename and job name returns zero hits outside CHANGELOG/archives (scripts, tests, docs, AGENTS.md, CONTRIBUTING.md, skills source)",
+    "Tests that only asserted these workflows' structure are deleted in the same PR; tests guarding kept properties are retargeted to ci.yml",
+    "Queue stays green for 5 runs after merge"
+  ],
+  "context": "Guardrails G3, G4, G6, G7, G10. muse M3 (pr-base-guard), codex C6.",
+  "description": "Delete (one PR, G6): .github/workflows/pr.yml, publication-lane-docs.yml, publication-lane-explorer.yml, results-explorer-browser.yml (chromium now in ci.yml explorer; firefox/webkit in nightly t3:browser), gitignore-lint.yml (folded into ci.yml tooling), pr-base-guard.yml (safe only because ci.yml pull_request has no branch filter), auto-merge-on-open.yml (only after dlv2-32 proof), extension-smoke.yml (only after dlv2-22 shadow shows t3:extension green), and the PR/build jobs of docs.yml (its Pages deploy job stays until dlv2-61). Release-branch workflows (test.yml, lint.yml, perf-smoke.yml, validate-release-pr.yml) are NOT touched here (G7).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:52:20Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bb7147dc5506454ba45abde0d6f707e3",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
