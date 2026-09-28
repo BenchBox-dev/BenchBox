@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Evidence of 20 consecutive green queue runs linked",
+    "Ledger shows no uncovered property from the four removed contexts",
+    "Before/after ruleset JSON archived; rollback command recorded",
+    "Subsequent queue runs green with only the six unit contexts required"
+  ],
+  "context": "Rollback: re-add the old contexts; old workflows remain until dlv2-40/41. muse M1, codex C4/C5.",
+  "description": "DECISION GATE + ADMIN CHANGE (G9). Preconditions (G1): new checks required and green for >=20 consecutive queue runs; property ledger shows every property of the legacy checks covered by the new ones (visual acceptance in docs/landing; browser gate in explorer; ci-required-result in core; drift in tooling).\nSteps: (1) PR updating drift expected settings to the final state (G11); (2) owner removes ci-required-result, Results Explorer browser gate, Public-site visual acceptance, and the standalone ruleset-drift context; (3) queue parameters max_entries_to_merge 5->3, max_entries_to_build 5->3, check_response_timeout 60->30 min; keep SQUASH, linear history, code-owner review.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:52:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0b00ac8e392148ad9c565913dbc76058",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

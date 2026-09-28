@@ -5065,6 +5065,17 @@
       "status": "open",
       "title": "Prove CODEOWNERS enforces the soundness-path owner hold before retiring the auto-merge predicate"
     },
+    "dlv2-33-ruleset-remove-old-checks": {
+      "claim": null,
+      "needs": [
+        "dlv2-31-ruleset-add-new-checks",
+        "dlv2-32-codeowners-soundness-hold",
+        "dlv2-02-property-ledger"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Owner action: remove the four legacy required checks and retune the merge queue after the G1 window"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
