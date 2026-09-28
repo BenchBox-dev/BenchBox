@@ -38,10 +38,19 @@ function queueRun(overrides: Run = {}): Run {
   });
 }
 
-function fakeGithub(artifacts: Array<{ id: number; name: string; runId: number; headSha?: string }>, runs: Record<number, Run>) {
+function fakeGithub(
+  artifacts: Array<{ id: number; name: string; runId: number; headSha?: string }>,
+  runs: Record<number, Run>,
+  jobs: Record<number, Array<{ name: string; status: string; conclusion: string }>> = {},
+) {
   const calls: string[] = [];
   const github = async (path: string) => {
     calls.push(path);
+    const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs$/);
+    if (jobsMatch) {
+      const runId = Number(jobsMatch[1]);
+      return { jobs: jobs[runId] ?? [] };
+    }
     const runMatch = path.match(/\/actions\/runs\/(\d+)$/);
     if (runMatch) return runs[Number(runMatch[1])];
     const name = decodeURIComponent(new URL(`https://x${path}`).searchParams.get("name") ?? "");
@@ -128,6 +137,26 @@ describe("findTrustedBaseline", () => {
     );
     expect(await findTrustedBaseline({ github, repository: REPO, baseSha: BASE })).toBeUndefined();
     expect(calls.some((path) => path.endsWith("/actions/runs/10"))).toBe(false);
+  });
+
+  it("trusts a develop baseline when the overall run failed but Public-site visual regression succeeded", async () => {
+    const { github } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: developRun({ conclusion: "failure" }) },
+      { 10: [{ name: "Public-site visual regression", status: "completed", conclusion: "success" }] },
+    );
+    const found = await findTrustedBaseline({ github, repository: REPO, baseSha: BASE });
+    expect(found).toMatchObject({ source: "develop", artifact: { id: 1 } });
+  });
+
+  it("rejects a develop baseline when the overall run failed and Public-site visual regression failed", async () => {
+    const { github } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: developRun({ conclusion: "failure" }) },
+      { 10: [{ name: "Public-site visual regression", status: "completed", conclusion: "failure" }] },
+    );
+    const found = await findTrustedBaseline({ github, repository: REPO, baseSha: BASE });
+    expect(found).toBeUndefined();
   });
 });
 

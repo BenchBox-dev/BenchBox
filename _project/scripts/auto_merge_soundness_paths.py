@@ -8,6 +8,13 @@ import re
 import sys
 from collections.abc import Iterable
 
+_VALIDATION_RE = re.compile(r"^benchbox/core/(?:.+/)?validation\.py$")
+_OVERRIDE_RE = re.compile(r"^results-data/bundles/.+\.override\.json$")
+# CODEOWNERS mirror spelling for committed override artifacts. This glob lives
+# in SOUNDNESS_FILES so the 1:1 mirror test sees it, but exact membership can
+# never match it: _OVERRIDE_RE is the operative gate. Keep both in sync.
+OVERRIDE_FILES_GLOB = "results-data/bundles/**/*.override.json"
+
 SOUNDNESS_PREFIXES = (
     "benchbox/core/equivalence/",
     "benchbox/core/query_plans/parsers/",
@@ -150,15 +157,31 @@ SOUNDNESS_FILES = (
     # Committed plausibility override artifacts: each one waives a
     # warn-require-override finding for its bundle, so minting or editing
     # one needs the same owner review as the validator itself.
-    "results-data/bundles/**/*.override.json",
+    # (Glob spelling kept in OVERRIDE_FILES_GLOB; exact membership never
+    # matches it -- _OVERRIDE_RE is the operative gate.)
+    OVERRIDE_FILES_GLOB,
 )
-_VALIDATION_RE = re.compile(r"^benchbox/core/(?:.+/)?validation\.py$")
-_OVERRIDE_RE = re.compile(r"^results-data/bundles/.+\.override\.json$")
 
 
 def normalize_path(path: str) -> str:
     """Normalize a git path for predicate checks."""
     return path.strip().replace("\\", "/")
+
+
+def surface_invariant_violations() -> list[str]:
+    """Name malformed soundness-surface entries, if any.
+
+    Directory prefixes must end with "/" so an exact-file entry can never
+    over-match a sibling path that merely starts with it (CODEOWNERS
+    distinguishes exact paths from ``dir/**`` globs, and the 1:1 mirror test
+    pins that agreement). Exact files belong in SOUNDNESS_FILES.
+    """
+    violations = [
+        f"SOUNDNESS_PREFIXES entry {prefix!r} must end with '/' (exact files belong in SOUNDNESS_FILES)"
+        for prefix in SOUNDNESS_PREFIXES
+        if not prefix.endswith("/")
+    ]
+    return violations
 
 
 def is_soundness_path(path: str) -> bool:
