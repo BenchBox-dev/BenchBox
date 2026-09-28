@@ -4933,7 +4933,7 @@
       "needs": [],
       "priority": "critical",
       "status": "open",
-      "title": "Dev loop v2: owner sign-off on decisions D1-D7 and record the ADR"
+      "title": "Dev loop v2: record the owner-approved decisions and standing approvals in an ADR"
     },
     "dlv2-01-baseline-and-backups": {
       "claim": null,
