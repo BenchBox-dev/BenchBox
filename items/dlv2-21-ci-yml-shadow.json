@@ -1,9 +1,10 @@
 {
   "acceptance": [
     "ci.yml merged non-required; trigger test proves pull_request has no branch filter, merge_group present, and all six result jobs use if: always()",
+    "tooling includes the soundness-flag job from dlv2-32 once that item lands",
     "Shadow report: >=5 working days, every old-red/new-green or old-green/new-red disagreement explained or fixed",
-    "Measured p95: T1 <=5 min test + <=2 min setup; T2 <=15 min (if over, add shards; never drop required cases)",
-    "T2 uploads hashed wheel+sdist artifacts retrievable by commit SHA"
+    "Measured p95: T1 <=5 min test + <=2 min setup; T2 <=15 min. Owner-approved budget rule: if over, add shards on standard GitHub-hosted runners up to 10; if still over 15 min, accept up to 20 min and record it; never use paid larger runners; never drop required cases",
+    "T2 uploads hashed wheel+sdist artifacts retrievable by commit SHA with retention >= 90 days"
   ],
   "context": "Guardrails: G2 shadow, G3 ledger, G6 no settings changes in this PR. Local measurements (Apple Silicon, clean env): uv sync warm 2 s; unit 239 s/8 workers; slow 78 s; integration 227 s/8 workers; engine cases ~107 s; gate 23 s; build 7 s; install 1 s; CLI smoke 13 s. GitHub runners estimated 2-3x slower, so ~6 shards for T2.",
   "description": "New .github/workflows/ci.yml:\n- on: pull_request with NO branches filter (stacked/feature-based PRs get CI; this is what later retires pr-base-guard.yml) and merge_group.\n- classify job (dlv2-20), then per-unit jobs; each unit ends in a result job named exactly core, explorer, results-data, docs, landing, tooling with if: always(); it fails on any failed/cancelled dependency and passes when the unit is untouched.\n- core: T1 on pull_request (touched-unit tests, duration-balanced shards, offline adapter tests, contract tests, leak detector, 0.5 s budget); T2 on merge_group (all unit tests, required engine cases per dlv2-15, correctness gate + oracle tests on Linux, slow tests, wheel+sdist build, sha256, upload artifact keyed by commit SHA, install smoke on Linux/macOS/Windows incl. one dbgen and dsdgen run per OS, Python 3.11 and 3.14 on Linux, sdist source install, check_dependency_bounds.py).\n- explorer: vitest, typecheck, build, chromium e2e, snapshot/UI mixed-version compatibility in both orders (results-explorer/src/db.ts:289 rejects older snapshots).\n- docs and landing: build plus the exact-base public-site visual comparison with follower-baseline handling (port from docs.yml required result) when affected.\n- results-data: submission validator + explorer contract.\n- tooling: lint, workflow tests (tests/unit/workflows/test_workflow_context_availability.py; a new ci.yml trigger/always-report test replacing test_merge_group_triggers), and scripts/ruleset_drift_check.py (D7).\nShadow: non-required for >=5 working days; record every verdict disagreement with pr.yml/docs.yml/results-explorer-browser.yml.",
@@ -14,6 +15,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "7761dcf4078540d098c1dd4df08ac067",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T15:06:13Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "852cc4f66d854a0d871c0ae96bf8a594",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
     }
   ]
