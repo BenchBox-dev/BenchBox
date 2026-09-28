@@ -242,17 +242,17 @@ def _excess_discount_expression(
     date_key: str,
     discount_col: str,
     manufact_id: int,
+    sales_date_default: str = "1998-03-18",
 ) -> Any:
     params = get_parameters(query_id)
-    year = params.get("year", 2000)
-    days = params.get("days", 90)
+    start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim")
     col = ctx.col
     lit = ctx.lit
     avg_discount = (
         sales.join(date_dim, left_on=date_key, right_on="d_date_sk")
-        .filter((col("d_year") == lit(year)) & (col("d_dom") <= lit(days)))
+        .filter((col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date)))
         .select(col(discount_col).mean().alias("avg_discount"))
     )
     return (
@@ -261,11 +261,23 @@ def _excess_discount_expression(
         .join(avg_discount, how="cross")
         .filter(
             (col("i_manufact_id") == lit(manufact_id))
-            & (col("d_year") == lit(year))
-            & (col("d_dom") <= lit(days))
+            & (col("d_date") >= lit(start_date))
+            & (col("d_date") <= lit(end_date))
             & (col(discount_col) > lit(1.3) * col("avg_discount"))
         )
-        .select(col(discount_col).sum().alias("excess_discount_amount"))
+        # SQL SUM() over an empty set is NULL (not 0.0): stay lazy and
+        # single-pass, selecting NULL when the row count is zero so every
+        # backend yields one NULL row like the reference query.
+        .select(
+            col(discount_col).sum().alias("excess_discount_amount"),
+            col(discount_col).count().alias("n"),
+        )
+        .select(
+            ctx.when(col("n") > lit(0))
+            .then(col("excess_discount_amount"))
+            .otherwise(lit(None))
+            .alias("excess_discount_amount")
+        )
     )
 
 
@@ -277,26 +289,31 @@ def _excess_discount_pandas(
     date_key: str,
     discount_col: str,
     manufact_id: int,
+    sales_date_default: str = "1998-03-18",
 ) -> Any:
     import pandas as pd
 
     params = get_parameters(query_id)
-    year = params.get("year", 2000)
-    days = params.get("days", 90)
+    start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     sales = ctx.get_table(sales_table)
-    date_dim = ctx.get_table("date_dim")
+    date_dim = ctx.get_table("date_dim").copy()
+    if len(date_dim) > 0 and hasattr(date_dim["d_date"].iloc[0], "date"):
+        date_dim["d_date"] = pd.to_datetime(date_dim["d_date"]).dt.date
     merged_for_avg = sales.merge(date_dim, left_on=date_key, right_on="d_date_sk")
-    avg_discount = merged_for_avg[(merged_for_avg["d_year"] == year) & (merged_for_avg["d_dom"] <= days)][
-        discount_col
-    ].mean()
+    avg_discount = merged_for_avg[
+        (merged_for_avg["d_date"] >= start_date) & (merged_for_avg["d_date"] <= end_date)
+    ][discount_col].mean()
     merged = sales.merge(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
     merged = merged.merge(date_dim, left_on=date_key, right_on="d_date_sk")
     filtered = merged[
         (merged["i_manufact_id"] == manufact_id)
-        & (merged["d_year"] == year)
-        & (merged["d_dom"] <= days)
+        & (merged["d_date"] >= start_date)
+        & (merged["d_date"] <= end_date)
         & (merged[discount_col] > 1.3 * avg_discount)
     ]
+    # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
+    if len(filtered) == 0:
+        return pd.DataFrame({"excess_discount_amount": [None]})
     return pd.DataFrame({"excess_discount_amount": [filtered[discount_col].sum()]})
 
 

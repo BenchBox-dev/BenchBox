@@ -209,7 +209,7 @@ helper_queries:
   - cs_item_sk
   - cs_sold_date_sk
   - cs_ext_discount_amt
-  - 977
+  - 269
 - query_id: 37
   title: Item Inventory Analysis
   expression_helper: _inventory_item_expression
@@ -243,7 +243,7 @@ helper_queries:
   - ws_item_sk
   - ws_sold_date_sk
   - ws_ext_discount_amt
-  - 350
+  - 269
 - query_id: 94
   title: Web Orders from Multiple Warehouses Not Returned
   expression_helper: _web_multi_warehouse_expression
