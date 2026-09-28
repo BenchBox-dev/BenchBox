@@ -1,0 +1,13 @@
+{
+  "description": "Promoted from deferral 1 on tpchavoc-pg-ambiguous-cols: The implementation and rendered-SQL compile checks are complete, but no local PostgreSQL service was available during verification. A live engine execution probe remains outstanding and should be run when a PostgreSQL test service is available.",
+  "sessions": [
+    {
+      "actor": "jcode-tpchavoc-closeout",
+      "at": "2026-09-28T19:58:49Z",
+      "client": "jcode",
+      "op": "promote",
+      "op_id": "acc4a703e2334bceb8b3bdb895582b40",
+      "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
+    }
+  ]
+}

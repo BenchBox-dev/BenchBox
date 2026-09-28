@@ -18393,6 +18393,13 @@
       "status": "active",
       "title": "Revalidate postgres ambiguous-column tpchavoc skips"
     },
+    "tpchavoc-pg-ambiguous-cols-deferral-1": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Run live PostgreSQL probe for qualified TPC-Havoc ambiguous-column queries"
+    },
     "tpchavoc-pg-dual-rewrite": {
       "claim": null,
       "needs": [],
