@@ -35,6 +35,32 @@ TSBS_DEVOPS_SQL_TO_DF_IDS: dict[str, str] = {
 TSBS_DEVOPS_DF_TO_SQL_IDS: dict[str, str] = {df_id: sql_id for sql_id, df_id in TSBS_DEVOPS_SQL_TO_DF_IDS.items()}
 
 
+def _tsbs_sql_overrides(df_id: str) -> dict[str, object]:
+    """Render SQL overrides from the DataFrame default parameters.
+
+    The DataFrame implementations read fixed ``TSBS_DEVOPS_DEFAULT_PARAMS``
+    (datetimes for the window bounds, ``host_0``/``us-east-1`` identifiers)
+    while the SQL query manager randomizes its windows, hostnames, and
+    regions. Passing the DataFrame values through ``get_query(params=...)``
+    binds both surfaces to the same slice; the manager formats datetimes
+    as ``%Y-%m-%d %H:%M:%S`` strings, so datetimes are formatted here.
+    """
+    from benchbox.core.tsbs_devops.dataframe_queries.parameters import TSBS_DEVOPS_DEFAULT_PARAMS
+
+    params = TSBS_DEVOPS_DEFAULT_PARAMS.get(df_id, {})
+    overrides: dict[str, object] = {}
+    start = params.get("start_time")
+    end = params.get("end_time")
+    if start is not None:
+        overrides["start_time"] = start.strftime("%Y-%m-%d %H:%M:%S") if hasattr(start, "strftime") else start
+    if end is not None:
+        overrides["end_time"] = end.strftime("%Y-%m-%d %H:%M:%S") if hasattr(end, "strftime") else end
+    for key in ("hostname", "region"):
+        if key in params:
+            overrides[key] = params[key]
+    return overrides
+
+
 def build_tsbs_devops_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
     """Generate TSBS DevOps data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
@@ -46,8 +72,11 @@ def build_tsbs_devops_duckdb(scale_factor: float, output_dir: Path) -> CrossSurf
     benchmark.generate_data()
 
     connection = _load_duckdb_cell(benchmark, output_dir, list(TSBS_DEVOPS_SCHEMA.keys()), label="TSBS DevOps")
-    sql_queries = benchmark.get_queries()
     queries = TSBS_DEVOPS_DATAFRAME_QUERIES
+    sql_queries = {
+        sql_id: benchmark.get_query(sql_id, params=_tsbs_sql_overrides(df_id))
+        for sql_id, df_id in TSBS_DEVOPS_SQL_TO_DF_IDS.items()
+    }
     return CrossSurfaceData(
         connection=connection,
         query_ids=list(sql_queries.keys()),
