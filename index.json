@@ -5180,12 +5180,12 @@
     "dlv2-61-retire-docs-yml-pages-fallback": {
       "claim": null,
       "needs": [
-        "dlv2-60-publication-integration",
+        "dlv2-62-publication-cutover-and-retirement",
         "dlv2-40-retire-pr-gate-workflows"
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Retire docs.yml once the publication plane owns every public route"
+      "title": "Retire docs.yml once site-deploy owns every public route"
     },
     "dlv2-62-publication-cutover-and-retirement": {
       "claim": null,
