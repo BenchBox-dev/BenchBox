@@ -117,3 +117,74 @@ def test_collection_hook_does_not_skip_quarantine_in_t3(monkeypatch: pytest.Monk
     monkeypatch.setattr(benchbox_conftest, "_items_require_test_databases", lambda items: False)
 
     benchbox_conftest.pytest_collection_modifyitems(None, None, [Item()])
+
+
+def test_collect_junit_durations_derives_nodeid_from_classname_without_file(tmp_path: Path) -> None:
+    report = tmp_path / "pytest_report.xml"
+    report.write_text(
+        "<testsuite>"
+        '<testcase classname="tests.unit.test_example" name="test_func" time="0.1"/>'
+        '<testcase classname="tests.unit.test_example.TestClass" name="test_method" time="0.2"/>'
+        '<testcase classname="" name="tests.unit.skipped_module" time="0.0">'
+        '<skipped message="collection skipped"/></testcase>'
+        "</testsuite>",
+        encoding="utf-8",
+    )
+
+    durations = collect_junit_durations([report])
+    assert durations == {
+        "tests/unit/test_example.py::test_func": 0.1,
+        "tests/unit/test_example.py::TestClass::test_method": 0.2,
+        "tests/unit/skipped_module.py": 0.0,
+    }
+
+
+def test_t1_budget_violations_rejects_missing_timing_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests import duration_policy
+
+    monkeypatch.delenv("BENCHBOX_TEST_DURATION_BOOTSTRAP", raising=False)
+    item = SimpleNamespace(
+        nodeid="tests/unit/test_new.py::test_unmeasured",
+        get_closest_marker=lambda name: object() if name == "fast" else None,
+    )
+
+    violations = duration_policy.t1_budget_violations(item, {}, allow_missing=False)
+    assert len(violations) == 1
+    assert "missing timing record" in violations[0]
+
+
+def test_t1_budget_violations_bootstrap_allows_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests import duration_policy
+
+    monkeypatch.setenv("BENCHBOX_TEST_DURATION_BOOTSTRAP", "1")
+    item = SimpleNamespace(
+        nodeid="tests/unit/test_new.py::test_unmeasured",
+        get_closest_marker=lambda name: object() if name == "fast" else None,
+    )
+
+    violations = duration_policy.t1_budget_violations(item, {}, allow_missing=True)
+    assert violations == []
+
+
+def test_is_bootstrap_artifact_requires_an_empty_explicit_baseline(tmp_path: Path) -> None:
+    from tests.duration_policy import is_bootstrap_artifact
+
+    empty = tmp_path / "empty.json"
+    empty.write_text(json.dumps({"bootstrap": True, "tests": {}}), encoding="utf-8")
+    assert is_bootstrap_artifact(empty) is True
+
+    populated = tmp_path / "populated.json"
+    populated.write_text(
+        json.dumps({"bootstrap": True, "tests": {"tests/unit/test.py::test": {"p95_seconds": 0.1}}}),
+        encoding="utf-8",
+    )
+    assert is_bootstrap_artifact(populated) is False
+
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text("invalid json", encoding="utf-8")
+    assert is_bootstrap_artifact(malformed) is False
+
+
+def test_write_duration_file_rejects_non_empty_bootstrap_artifact(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="empty tests map"):
+        write_duration_file(tmp_path / "durations.json", {"tests/unit/test.py::test": 0.1}, bootstrap=True)

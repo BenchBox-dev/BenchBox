@@ -56,8 +56,16 @@ uv run -- python _project/scripts/update_test_durations.py \
 ```
 
 The nightly T3 publication job is responsible for supplying those reports and
-refreshing the artifact. A missing or malformed artifact fails collection so a
-stale or partial measurement cannot silently weaken the T1 budget.
+refreshing the artifact. It merges the fast and T3 reports so the artifact
+retains a record for every T1 test. A missing or malformed artifact fails
+collection so a stale or partial measurement cannot silently weaken the T1
+budget. An unexempted fast test without a timing record in
+`test_durations.json` fails collection unless covered by
+`@pytest.mark.duration_exempt`. The checked-in artifact may use
+`"bootstrap": true` only while its `tests` map is empty, or the one-time
+baseline run may set `BENCHBOX_TEST_DURATION_BOOTSTRAP=1`. The updater omits
+that flag, so a populated artifact fails closed for newly added or renamed
+fast tests.
 
 Collection-time policy is deliberately separate from speed-marker assignment.
 It never rewrites `fast`, `medium`, or `slow` markers based on local timing.

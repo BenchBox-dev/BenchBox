@@ -60,17 +60,73 @@ def _percentile(values: list[float], percentile: float) -> float:
     return ordered[lower] + (ordered[upper] - ordered[lower]) * fraction
 
 
-def _junit_nodeid(testcase: ET.Element) -> str:
-    file_name = testcase.get("file", "").replace("\\", "/").lstrip("./")
-    path_parts = file_name.split("/")
+def _nodeid_from_file(file_attr: str, classname: str, name: str) -> str:
+    path_parts = file_attr.split("/")
     if "tests" in path_parts:
         file_name = "/".join(path_parts[path_parts.index("tests") :])
-    name = testcase.get("name", "")
-    if not file_name or not name:
-        raise ValueError("JUnit testcase requires non-empty file and name attributes")
+    else:
+        file_name = file_attr
+
+    stem = Path(file_name).stem
+    class_parts: list[str] = []
+    if classname:
+        c_parts = classname.split(".")
+        if stem in c_parts:
+            idx = c_parts.index(stem)
+            class_parts = c_parts[idx + 1 :]
+        elif c_parts and c_parts[-1] != stem:
+            class_parts = [c_parts[-1]]
+    if class_parts:
+        return f"{file_name}::{'::'.join(class_parts)}::{name}"
+    return f"{file_name}::{name}"
+
+
+def _find_module_split_index(parts: list[str]) -> int:
+    for i in range(len(parts), 0, -1):
+        if Path("/".join(parts[:i]) + ".py").exists():
+            return i
+    for i, part in enumerate(parts):
+        if part.startswith("test_") or part.endswith("_test"):
+            return i + 1
+    for i, part in enumerate(parts):
+        if part and part[0].isupper():
+            return i
+    return len(parts)
+
+
+def _nodeid_from_classname(classname: str, name: str) -> str:
+    parts = classname.split(".")
+    file_idx = _find_module_split_index(parts)
+    file_parts = parts[:file_idx]
+    if "tests" in file_parts:
+        file_parts = file_parts[file_parts.index("tests") :]
+    file_name = "/".join(file_parts)
+    if not file_name.endswith(".py"):
+        file_name += ".py"
+
+    class_parts = parts[file_idx:]
+    if class_parts:
+        return f"{file_name}::{'::'.join(class_parts)}::{name}"
+    return f"{file_name}::{name}"
+
+
+def _junit_nodeid(testcase: ET.Element) -> str | None:
+    name = testcase.get("name", "").strip()
+    if not name:
+        raise ValueError("JUnit testcase requires non-empty name attribute")
     if name.startswith("tests/") and "::" in name:
         return name
-    return f"{file_name}::{name}"
+
+    file_attr = testcase.get("file", "").strip().replace("\\", "/").lstrip("./")
+    classname = testcase.get("classname", "").strip()
+
+    if file_attr:
+        return _nodeid_from_file(file_attr, classname, name)
+    if not classname:
+        if name.startswith("tests.") and "::" not in name:
+            return f"{name.replace('.', '/')}.py"
+        return None
+    return _nodeid_from_classname(classname, name)
 
 
 def collect_junit_durations(paths: list[Path]) -> dict[str, float]:
@@ -88,8 +144,23 @@ def collect_junit_durations(paths: list[Path]) -> dict[str, float]:
                 raise ValueError(f"JUnit testcase has invalid time {raw_time!r}: {path}") from exc
             if not math.isfinite(duration) or duration < 0:
                 raise ValueError(f"JUnit testcase has invalid finite non-negative time {raw_time!r}: {path}")
-            samples.setdefault(_junit_nodeid(testcase), []).append(duration)
+            nodeid = _junit_nodeid(testcase)
+            if nodeid is None:
+                continue
+            samples.setdefault(nodeid, []).append(duration)
+
     return {nodeid: _percentile(values, 95) for nodeid, values in sorted(samples.items())}
+
+
+def is_bootstrap_artifact(path: Path = DURATION_FILE) -> bool:
+    """Return whether the artifact explicitly declares an empty initial baseline."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    return payload.get("bootstrap") is True and payload.get("tests") == {}
 
 
 def write_duration_file(
@@ -98,20 +169,25 @@ def write_duration_file(
     *,
     generated_at: str | None = None,
     source: str = "T3 nightly JUnit reports",
+    bootstrap: bool = False,
 ) -> None:
     """Write the committed duration artifact in stable, reviewable JSON."""
+    if bootstrap and durations:
+        raise ValueError("bootstrap duration artifacts must contain an empty tests map")
     for nodeid, value in durations.items():
         if not isinstance(nodeid, str) or not nodeid or not isinstance(value, (int, float)) or isinstance(value, bool):
             raise ValueError(f"duration for {nodeid!r} must contain a numeric value")
         if not math.isfinite(float(value)) or value < 0:
             raise ValueError(f"duration for {nodeid!r} must be finite and non-negative")
 
-    payload = {
+    payload: dict[str, Any] = {
         "schema_version": 1,
         "generated_at": generated_at or datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         "source": source,
-        "tests": {nodeid: {"p95_seconds": round(value, 6)} for nodeid, value in sorted(durations.items())},
     }
+    if bootstrap:
+        payload["bootstrap"] = True
+    payload["tests"] = {nodeid: {"p95_seconds": round(value, 6)} for nodeid, value in sorted(durations.items())}
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
@@ -161,14 +237,33 @@ def validate_markers(item: Any, *, today: date | None = None) -> list[str]:
     return errors
 
 
-def t1_budget_violations(item: Any, durations: dict[str, float]) -> list[str]:
-    """Return unexempted fast tests whose measured p95 exceeds the T1 budget."""
+def t1_budget_violations(
+    item: Any,
+    durations: dict[str, float],
+    *,
+    allow_missing: bool | None = None,
+) -> list[str]:
+    """Return unexempted fast tests whose measured p95 exceeds the T1 budget or lack timing records."""
     if item.get_closest_marker("fast") is None:
         return []
-    duration = durations.get(item.nodeid)
-    if duration is None or duration <= T1_BUDGET_SECONDS or item.get_closest_marker("duration_exempt") is not None:
+    if item.get_closest_marker("duration_exempt") is not None:
         return []
-    return [
-        f"{item.nodeid}: p95 duration {duration:.3f}s exceeds the T1 budget of "
-        f"{T1_BUDGET_SECONDS:.3f}s; add a valid @pytest.mark.duration_exempt or move it to T2"
-    ]
+    duration = durations.get(item.nodeid)
+    if duration is None:
+        if allow_missing is None:
+            allow_missing = (
+                os.environ.get("BENCHBOX_TEST_DURATION_BOOTSTRAP", "").strip().lower() in {"1", "true", "yes"}
+                or is_bootstrap_artifact()
+            )
+        if not allow_missing:
+            return [
+                f"{item.nodeid}: missing timing record in {DURATION_FILE.name}; "
+                "add a valid @pytest.mark.duration_exempt or refresh duration artifact"
+            ]
+        return []
+    if duration > T1_BUDGET_SECONDS:
+        return [
+            f"{item.nodeid}: p95 duration {duration:.3f}s exceeds the T1 budget of "
+            f"{T1_BUDGET_SECONDS:.3f}s; add a valid @pytest.mark.duration_exempt or move it to T2"
+        ]
+    return []

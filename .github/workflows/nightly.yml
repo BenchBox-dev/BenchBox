@@ -65,7 +65,15 @@ jobs:
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
-          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70 --junitxml=junit-fast.xml
+
+      - name: Upload fast test duration report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: fast-junit-report
+          path: junit-fast.xml
+          if-no-files-found: ignore
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -77,6 +85,8 @@ jobs:
 
   slow-tier-observation:
     name: Slow tier observation
+    needs: test
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 90
     continue-on-error: true
@@ -102,7 +112,34 @@ jobs:
 
       - name: Observe non-credentialed slow tests
         run: |
-          uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" -n 0 --tb=short --timeout=1200 --durations=20
+          uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" -n 0 --tb=short --timeout=1200 --durations=20 --junitxml=junit-t3-slow.xml
+
+      - name: Download fast test duration report
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: fast-junit-report
+          path: duration-inputs
+        continue-on-error: true
+
+      - name: Refresh test duration artifact
+        if: success()
+        run: |
+          test -f duration-inputs/junit-fast.xml
+          test -f junit-t3-slow.xml
+          uv run -- python _project/scripts/update_test_durations.py \
+            --input duration-inputs/junit-fast.xml \
+            --input junit-t3-slow.xml
+
+      - name: Upload duration report and artifact
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: t3-test-durations
+          path: |
+            junit-t3-slow.xml
+            duration-inputs/junit-fast.xml
+            tests/fixtures/test_durations.json
+          if-no-files-found: ignore
 
   duckdb-preview:
     name: DuckDB 2.0 preview compatibility
