@@ -30,6 +30,17 @@
       "op": "take",
       "op_id": "04229bdb989849c48f74d19199ca020a",
       "session_id": "18216dd02c7b43378947aa9650e38019"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-28T17:00:18Z",
+      "client": "jcode",
+      "displaced": "mcp:antigravity-client:joe@joe-mac-mini.local:9d137dd78e9abd52ff510fa5",
+      "generation": "432bed1197064a3193452a780e91829c",
+      "op": "takeover",
+      "op_id": "ac2075f3fbad477198294888b1963934",
+      "reason": "agy conversation 9a56add9 ended with quota exhaustion plus server restart stopping all subagents; agy cannot resume, continuing from transcript and worktrees.",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
 }

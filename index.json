@@ -4930,10 +4930,10 @@
     },
     "dlv2-00-decisions-adr": {
       "claim": {
-        "expires_at": "2026-09-29T15:24:11Z",
-        "generation": "aad4138f1ee6406dad42375a8c870576",
+        "expires_at": "2026-09-29T17:00:18Z",
+        "generation": "432bed1197064a3193452a780e91829c",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:9d137dd78e9abd52ff510fa5"
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
       },
       "needs": [],
       "priority": "critical",
