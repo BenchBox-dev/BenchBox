@@ -1664,7 +1664,8 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
     Pattern: Multi-join -> filter -> group by -> aggregate -> order by
     """
     params = get_parameters(25)
-    year = params.get("year", 2001)
+    year = params.get("year", 2000)
+    month = params.get("month", 4)
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
         ctx, "store_sales", "store_returns", "catalog_sales", "date_dim", "store", "item"
@@ -1672,12 +1673,17 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Filter date_dim for sales and returns periods
-    d1 = date_dim.filter((col("d_year") == lit(year)) & (col("d_qoy").is_in([1, 2, 3])))
-    d2 = date_dim.filter((col("d_year") == lit(year + 1)) & (col("d_qoy").is_in([1, 2, 3])))
-    d3 = date_dim.filter((col("d_year") == lit(year + 1)) & (col("d_qoy").is_in([1, 2, 3])))
+    # Date windows from the SQL template: d1 is the base month, d2/d3 span
+    # month..month+6, all in the same year.
+    d1 = date_dim.filter((col("d_year") == lit(year)) & (col("d_moy") == lit(month)))
+    d2 = date_dim.filter(
+        (col("d_year") == lit(year)) & (col("d_moy") >= lit(month)) & (col("d_moy") <= lit(month + 6))
+    )
+    d3 = date_dim.filter(
+        (col("d_year") == lit(year)) & (col("d_moy") >= lit(month)) & (col("d_moy") <= lit(month + 6))
+    )
 
-    return (
+    joined_returns = (
         store_sales.join(item, left_on="ss_item_sk", right_on="i_item_sk")
         .join(store, left_on="ss_store_sk", right_on="s_store_sk")
         .join(d1, left_on="ss_sold_date_sk", right_on="d_date_sk")
@@ -1687,7 +1693,12 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
             right_on=["sr_customer_sk", "sr_item_sk", "sr_ticket_number"],
         )
         .join(d2.select("d_date_sk"), left_on="sr_returned_date_sk", right_on="d_date_sk")
-        .join(
+    )
+    return (
+        # SQL joins the catalog leg on the store_returns keys; the inner join
+        # above drops the right-side sr_* keys, so use the equal preserved
+        # ss_* keys (identical values after the inner equi-join).
+        joined_returns.join(
             catalog_sales,
             left_on=["ss_customer_sk", "ss_item_sk"],
             right_on=["cs_bill_customer_sk", "cs_item_sk"],
@@ -1707,16 +1718,18 @@ def q25_expression_impl(ctx: DataFrameContext) -> Any:
 def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q25: Store/Catalog Sales Item Analysis (Pandas Family)."""
     params = get_parameters(25)
-    year = params.get("year", 2001)
+    year = params.get("year", 2000)
+    month = params.get("month", 4)
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
         ctx, "store_sales", "store_returns", "catalog_sales", "date_dim", "store", "item"
     )
 
-    # Filter date_dim
-    d1 = date_dim[(date_dim["d_year"] == year) & (date_dim["d_qoy"].isin([1, 2, 3]))]
-    d2 = date_dim[(date_dim["d_year"] == year + 1) & (date_dim["d_qoy"].isin([1, 2, 3]))]
-    d3 = date_dim[(date_dim["d_year"] == year + 1) & (date_dim["d_qoy"].isin([1, 2, 3]))]
+    # Date windows from the SQL template: d1 is the base month, d2/d3 span
+    # month..month+6, all in the same year.
+    d1 = date_dim[(date_dim["d_year"] == year) & (date_dim["d_moy"] == month)]
+    d2 = date_dim[(date_dim["d_year"] == year) & (date_dim["d_moy"] >= month) & (date_dim["d_moy"] <= month + 6)]
+    d3 = date_dim[(date_dim["d_year"] == year) & (date_dim["d_moy"] >= month) & (date_dim["d_moy"] <= month + 6)]
 
     # Build joins
     merged = store_sales.merge(item, left_on="ss_item_sk", right_on="i_item_sk")
@@ -1728,9 +1741,10 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
         right_on=["sr_customer_sk", "sr_item_sk", "sr_ticket_number"],
     )
     merged = merged.merge(d2[["d_date_sk"]], left_on="sr_returned_date_sk", right_on="d_date_sk")
+    # SQL joins the catalog leg on the store_returns keys, not the store-sales keys.
     merged = merged.merge(
         catalog_sales,
-        left_on=["ss_customer_sk", "ss_item_sk"],
+        left_on=["sr_customer_sk", "sr_item_sk"],
         right_on=["cs_bill_customer_sk", "cs_item_sk"],
     )
     merged = merged.merge(d3[["d_date_sk"]], left_on="cs_sold_date_sk", right_on="d_date_sk")
