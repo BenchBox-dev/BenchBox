@@ -214,6 +214,44 @@ def test_ready_all_green(tmp_path: Path) -> None:
     assert landing.ready_failures(_identity(repo, head), head, _evidence(head), repo) == []
 
 
+def test_ready_allows_empty_review_decision_for_non_soundness_pr(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "docs").mkdir()
+    (repo / "docs" / "note.md").write_text("documentation")
+    subprocess.run(["git", "add", "docs/note.md"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "docs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    evidence = _evidence(head, review_decision="")
+
+    assert landing.ready_failures(_identity(repo, head, base), head, evidence, repo) == []
+
+
+def test_ready_rejects_empty_review_decision_for_soundness_pr(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "publication").mkdir()
+    (repo / "publication" / "policy.json").write_text("{}")
+    subprocess.run(["git", "add", "publication/policy.json"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "soundness"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    failures = landing.ready_failures(_identity(repo, head, base), head, _evidence(head, review_decision=""), repo)
+
+    assert any("not APPROVED" in failure for failure in failures)
+
+
 def test_batch_ready_requires_active_registered_runtime(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     head = subprocess.run(
