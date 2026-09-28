@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Unit tier passes on a clean macOS and a clean Linux checkout with no ~/.benchbox present",
+    "Leak detector enabled in T1; a deliberately leaking test fails it; test_tpch_generator.py cwd test passes",
+    "No test derives repo root from cwd (grep evidence in PR)"
+  ],
+  "context": "Codex C8: rule targets leaks, not legitimate in-test cwd use. Guardrail G3.",
+  "description": "Clean develop gave 93 local unit failures, many from environment coupling. Fix at source:\n1. Enumerate Path.cwd()/os.getcwd() repo-root assumptions in tests (grep -rnE \"Path\\.cwd\\(\\)|os\\.getcwd\\(\\)\" tests) and derive repo root from the test file location (one shared helper).\n2. Tests must not read the real home directory (~/.benchbox) or wall clock; inject them.\n3. Replace process-global mutable state (benchbox.utils.printing _QUIET, utils.config_interface provider) with injection where practical; keep the autouse reset fixtures in tests/conftest.py as a safety net.\n4. Add an autouse leak detector that fails a test only when cwd, os.environ, or registered globals differ after teardown. Tests that legitimately chdir (e.g. tests/unit/generators/test_tpch_generator.py:910) must restore via fixture and pass.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:50:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "852da3ce97ee4bbd98e288889c8279a1",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

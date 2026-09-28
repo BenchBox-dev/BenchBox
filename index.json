@@ -4963,6 +4963,15 @@
       "status": "open",
       "title": "Make optional-engine tests skip cleanly when the engine is installed but unusable"
     },
+    "dlv2-12-hermeticity-leak-detector": {
+      "claim": null,
+      "needs": [
+        "dlv2-10-chdb-cwd-guard"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the unit tier hermetic: repo root from test location and a required state-leak detector"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
