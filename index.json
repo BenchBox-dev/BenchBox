@@ -18157,12 +18157,17 @@
       "title": "TPC-DS parity B0: run staged report and record 99-query baseline matrix"
     },
     "tpcds-parity-b1-helpers": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-29T16:29:40Z",
+        "generation": "c7503eb7e2be47a991870f8ebc6f2d5c",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [
         "tpcds-parity-b0-diagnose"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-DS parity B1: fix shared-helper query families (spec-driven + helper impls)"
     },
     "tpcds-parity-b2-params": {
