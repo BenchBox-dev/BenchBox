@@ -4973,10 +4973,15 @@
       "title": "Make the unit tier hermetic: repo root from test location and a required state-leak detector"
     },
     "dlv2-13-durations-budget-quarantine": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-29T20:26:16Z",
+        "generation": "8a5f453b988b424c9f8dbad532c1d28d",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Tier tests by measured duration: durations file, T1 0.5 s budget, and a quarantine marker"
     },
     "dlv2-14-adapter-offline-inventory": {
