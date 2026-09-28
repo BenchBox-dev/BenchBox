@@ -3,6 +3,7 @@
     "Every deleted file is classified pure-process in the ledger (G3)",
     "G4 sweep clean for every deleted name",
     "MUST KEEP list files still present with passing tests",
+    "No Make target or pre-commit hook points at a deleted script at any merged commit: either the calling targets are removed in this PR, or this PR and dlv2-43 land as one stack in the same queue group",
     "Unit tier time reduction measured and recorded against the dlv2-01 baseline"
   ],
   "context": "Release-path scripts (ruleset/release canary/release cut) are handled in dlv2-53 per G7 and agy A4. Makefile targets that call these scripts are removed together in dlv2-43 (same PR or stacked immediately after) so no target points at a missing script.",
@@ -14,6 +15,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "f9c5a32a2aed43fabce3acb57c27a2ca",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:55:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a77d1df977cc436eb0db39a960368bd3",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
     }
   ]
