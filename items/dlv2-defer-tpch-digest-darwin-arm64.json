@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Root cause identified and recorded (binary data difference, seed handling, or regression)",
+    "Either the darwin-arm64 gate matches reference digests, or the gate is documented and enforced as Linux-only with a tracked cross-OS data-parity check in T3",
+    "The correctness gate is not made a required case on any macOS job until this item is done"
+  ],
+  "context": "Blocks the macOS portion of dlv2-15-required-t2-cases and T4 cross-OS correctness claims in dlv2-51-release-yml-v2.",
+  "description": "Deferred from the 2026-09-28 dev-loop planning session; not investigated by owner instruction.\n\nObserved: running the correctness gate locally on a 10-core Apple Silicon Mac (Darwin 27) in a clean uv env at develop@5e09d0e49:\nBENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22 pytest -m stress \"tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]\" -n 0\nfailed with VALUE DIGEST mismatch for tpch query 2 (expected 9e98f3d5..., actual bae86f3b...), query 10 (expected b1ed6912..., actual 40752477...), query 15 (expected da98d50d..., actual ed6b766d...); row counts matched. Environment note: chdb was uninstalled in that env (chdb 4.1.6 fails dlopen on Darwin 27). CI status of the gate on Linux was not confirmed.\n\nHypotheses (unverified): darwin-arm64 bundled dbgen produces different data than linux-x86_64; qgen seed/parameter drift on macOS; a real regression on develop.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:49:28Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "333c23b39a9447fc9187de7ea1bb6498",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
