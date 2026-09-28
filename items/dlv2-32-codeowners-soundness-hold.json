@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Test: every path/pattern in auto_merge_soundness_paths.py is matched by a CODEOWNERS rule (test survives the predicate's later deletion by pinning the list)",
+    "Live proof: a throwaway PR touching an owned path is shown unable to enqueue without approval (screenshot or API output recorded), then closed",
+    "Ledger row soundness-path owner hold updated"
+  ],
+  "context": "codex C1, agy A9.",
+  "description": "Decision D4. _project/scripts/auto_merge_soundness_paths.py withholds auto-merge on paths that can redefine correctness, privacy, or publication policy (docs/operations/repo-admin-settings.md ~line 250: CI cannot catch an oracle redefining itself). Replacement: .github/CODEOWNERS entries (owner @joeharris76) for every path in that predicate, enforced by require_code_owner_review=true in ruleset develop-squash-only. Add a test asserting CODEOWNERS covers the predicate's full path set, then prove live that a PR touching an owned path cannot enter the merge queue without owner approval.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:51:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3072600784b94e51a85940aff328139a",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

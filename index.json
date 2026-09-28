@@ -5055,6 +5055,16 @@
       "status": "open",
       "title": "Owner action: add the six new unit checks as required contexts on develop (old checks stay required)"
     },
+    "dlv2-32-codeowners-soundness-hold": {
+      "claim": null,
+      "needs": [
+        "dlv2-00-decisions-adr",
+        "dlv2-02-property-ledger"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Prove CODEOWNERS enforces the soundness-path owner hold before retiring the auto-merge predicate"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
