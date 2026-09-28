@@ -277,7 +277,8 @@
 50:
   channel: store channel
   days: 30
-  year: 2001
+  month: 9
+  year: 2000
 51:
   months:
   - 1

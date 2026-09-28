@@ -2087,6 +2087,93 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     return result
 
 
+_Q50_STORE_COLS = [
+    "s_store_name",
+    "s_company_id",
+    "s_street_number",
+    "s_street_name",
+    "s_street_type",
+    "s_suite_number",
+    "s_city",
+    "s_county",
+    "s_state",
+    "s_zip",
+]
+
+
+def q50_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q50: Store Sales Returns Analysis (Expression Family).
+
+    Buckets store-return lags into five date-difference ranges per store
+    address.
+
+    Tables: store_sales, store_returns, store, date_dim
+    Pattern: multi-key join -> date-diff buckets -> group by -> order by
+    """
+    params = get_parameters(50)
+    year = params.get("year", 2000)
+    month = params.get("month", 9)
+    col = ctx.col
+    lit = ctx.lit
+    lag = col("sr_returned_date_sk") - col("ss_sold_date_sk")
+    return (
+        ctx.get_table("store_sales")
+        .join(
+            ctx.get_table("store_returns"),
+            left_on=["ss_ticket_number", "ss_item_sk", "ss_customer_sk"],
+            right_on=["sr_ticket_number", "sr_item_sk", "sr_customer_sk"],
+        )
+        .join(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
+        .join(ctx.get_table("date_dim").select("d_date_sk"), left_on="ss_sold_date_sk", right_on="d_date_sk")
+        .join(
+            ctx.get_table("date_dim").filter((col("d_year") == lit(year)) & (col("d_moy") == lit(month))),
+            left_on="sr_returned_date_sk",
+            right_on="d_date_sk",
+        )
+        .group_by(*_Q50_STORE_COLS)
+        .agg(
+            ctx.when(lag <= 30).then(1).otherwise(0).sum().alias("30 days"),
+            ctx.when((lag > 30) & (lag <= 60)).then(1).otherwise(0).sum().alias("31-60 days"),
+            ctx.when((lag > 60) & (lag <= 90)).then(1).otherwise(0).sum().alias("61-90 days"),
+            ctx.when((lag > 90) & (lag <= 120)).then(1).otherwise(0).sum().alias("91-120 days"),
+            ctx.when(lag > 120).then(1).otherwise(0).sum().alias(">120 days"),
+        )
+        .sort(_Q50_STORE_COLS, nulls_last=True)
+        .limit(100)
+    )
+
+
+def q50_pandas_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q50: Store Sales Returns Analysis (Pandas Family)."""
+    params = get_parameters(50)
+    year = params.get("year", 2000)
+    month = params.get("month", 9)
+
+    store_sales, store_returns, store, date_dim = _tables(ctx, "store_sales", "store_returns", "store", "date_dim")
+    merged = store_sales.merge(
+        store_returns,
+        left_on=["ss_ticket_number", "ss_item_sk", "ss_customer_sk"],
+        right_on=["sr_ticket_number", "sr_item_sk", "sr_customer_sk"],
+    )
+    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
+    merged = merged.merge(date_dim[["d_date_sk"]], left_on="ss_sold_date_sk", right_on="d_date_sk")
+    d2 = date_dim[(date_dim["d_year"] == year) & (date_dim["d_moy"] == month)]
+    merged = merged.merge(d2[["d_date_sk"]], left_on="sr_returned_date_sk", right_on="d_date_sk")
+    lag = merged["sr_returned_date_sk"] - merged["ss_sold_date_sk"]
+    merged["30 days"] = (lag <= 30).astype(int)
+    merged["31-60 days"] = ((lag > 30) & (lag <= 60)).astype(int)
+    merged["61-90 days"] = ((lag > 60) & (lag <= 90)).astype(int)
+    merged["91-120 days"] = ((lag > 90) & (lag <= 120)).astype(int)
+    merged[">120 days"] = (lag > 120).astype(int)
+    buckets = ["30 days", "31-60 days", "61-90 days", "91-120 days", ">120 days"]
+    return (
+        merged.groupby(_Q50_STORE_COLS, as_index=False, dropna=False)
+        .agg(**{bucket: (bucket, "sum") for bucket in buckets})
+        .sort_values(_Q50_STORE_COLS)
+        .head(100)
+    )
+
+
 # =============================================================================
 # Moderate Queries - CTEs, subqueries, and more complex patterns
 # =============================================================================

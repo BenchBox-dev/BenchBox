@@ -33,22 +33,6 @@ joined_aggregate:
     aggs:
       - [total_sales, cs_sales_price, sum]
     sort_by: [ca_zip]
-  - query_id: 50
-    title: Store Sales Returns Analysis
-    base: store_sales
-    joins:
-      - [store_returns, [ss_item_sk, ss_customer_sk, ss_ticket_number], [sr_item_sk, sr_customer_sk, sr_ticket_number]]
-      - [store, ss_store_sk, s_store_sk]
-      - [date_dim, sr_returned_date_sk, d_date_sk]
-    filters:
-      - [eq, d_year, {param: year, default: 2001}]
-      - [eq, d_moy, 8]
-    group_by: [s_store_name, s_company_id, s_street_number, s_street_name, s_street_type]
-    aggs:
-      - [return_amt, sr_return_amt, sum]
-      - [net_loss, sr_net_loss, sum]
-    sort_by: [s_store_name, s_company_id, return_amt]
-    descending: [false, false, true]
   - query_id: 65
     title: Store Sales Item Profit
     base: store_sales
