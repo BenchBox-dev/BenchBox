@@ -4656,7 +4656,7 @@
         "dev-loop-step-5-measurement-window"
       ],
       "priority": "medium",
-      "status": "blocked",
+      "status": "dropped",
       "title": "Pre-register four 2026-04-30 blind-spots as Step 6 queue acceptance criteria"
     },
     "dev-loop-step-0-verify-assumptions": {

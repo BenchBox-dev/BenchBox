@@ -178,5 +178,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T15:04:36Z",
+      "client": "claude-code",
+      "op": "drop",
+      "op_id": "70988a87fa5348dfa37d25672ddcc98a",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
 }
