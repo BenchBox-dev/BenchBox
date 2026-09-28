@@ -1,4 +1,5 @@
 {
+  "context": "Released 2026-09-28T16:56Z by same worker to take over interrupted agy dev-loop v2 session (conversation 9a56add9) per explicit user request. No work performed on this item in the current session; re-take to resume.",
   "description": "Fix shared-helper TPC-DS queries (19 helper_query_specs.yaml + 13 query_specs.yaml entries: Q3/Q7/Q42/Q43 joined paths, promotion/sales helpers, state_average_returns). Audit default_parameters.yaml vs SQL template literals for these queries; audit rollup_helper.expand_rollup_expression/expand_rollup_pandas grouping-set order, NULL fill, empty-group grand total; audit channel_helper union column mappings. Fix helpers, not per-query copies. SCOPE: benchbox/core/tpcds/dataframe_queries/helper_query_specs.yaml, query_specs.yaml, rollup_helper.py, channel_helper.py, channel_mappings.yaml, default_parameters.yaml + affected call sites in queries.py only. GUARDRAILS: both expression and pandas impls must pass per query; comparator tolerance stays 1e-10, treat_nan_as_null/strip_strings unchanged; no known_divergences additions; SQL reference immutable; Q38/Q88 still pass. VERIFY: staged report + uv run -- pytest tests/ -m tpcds -q + make lint + make typecheck. DECISION GATE: every shared-helper query is PASS or VACUOUS-classified, zero DIVERGENT among them, no regressions.",
   "sessions": [
     {
@@ -16,6 +17,14 @@
       "generation": "c7503eb7e2be47a991870f8ebc6f2d5c",
       "op": "take",
       "op_id": "c173bca05aa441a9836f0356d6ceb1b2",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-28T16:57:16Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "f906228396a245eaa4b2b60aaba573e7",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
