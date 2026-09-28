@@ -23,6 +23,18 @@ Out of scope for the cross-surface gate, by construction:
   expected-results subset), not to a cross-surface builder:
   `write_primitives`, `metadata_primitives`, `transaction_primitives`,
   `tpcdi` (see `_project/analysis/cross-surface-applicability.md`).
+- Dual-surface benchmarks that have a SQL surface plus a DataFrame query
+  registry but are not currently gated, per
+  `_project/analysis/cross-surface-applicability.md`: `joinorder` and
+  `nyctaxi` are not cheaply gateable (bounded-scale rejection, canonical
+  manifest fetch, or downloader-backed network fetch); `tpch_skew` and
+  `tsbs_devops` have unverified SQL-to-DataFrame ID mappings (zero verbatim
+  ID overlap, mapping must be confirmed independently, never guessed);
+  `tpcds_obt` has an abandoned correspondence (OBT-native Q1..Q17 versus
+  TPC-DS numbered SQL IDs, ruled out without renumbering one side). These
+  stay outside `GATES` until their named precondition is met; the
+  `joinorder_synthetic` CI-enforced gate covers scaled smoke-test data for
+  the JoinOrder family in the meantime.
 - `ai_primitives` and `vector_search` stay `supports_dataframe: false` in
   `benchmark_registry.yaml` and are likewise single-surface benchmarks
   needing a fallback oracle, not cross-surface members.
