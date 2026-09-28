@@ -5242,6 +5242,18 @@
       "status": "open",
       "title": "Rewrite dev-loop documentation and delete obsolete runbooks"
     },
+    "dlv2-84-final-audit-and-metrics": {
+      "claim": null,
+      "needs": [
+        "dlv2-80-github-cleanup",
+        "dlv2-81-config-cleanup",
+        "dlv2-82-makefile-rewrite",
+        "dlv2-83-docs-cleanup"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Final audit: zero references to retired items, complete ledger, and 30-day success metrics"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
