@@ -17841,6 +17841,15 @@
       "status": "open",
       "title": "TPC-DS parity B5: vacuity closeout (scale probe or legitimately-empty)"
     },
+    "tpcds-parity-b6-promote": {
+      "claim": null,
+      "needs": [
+        "tpcds-parity-b5-vacuity"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DS parity B6: promote tpcds to enforced blocking gate"
+    },
     "tpcds-pyspark-compatibility": {
       "claim": null,
       "needs": [],
