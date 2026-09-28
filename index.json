@@ -4928,6 +4928,13 @@
       "status": "done",
       "title": "Distinct Database Naming Based on Configuration Characteristics"
     },
+    "dlv2-00-decisions-adr": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Dev loop v2: owner sign-off on decisions D1-D7 and record the ADR"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],

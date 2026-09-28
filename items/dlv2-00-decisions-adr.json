@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Owner approval of D1-D7 recorded (each decision accepted or amended) in a user message or PR review",
+    "docs/development/adr/adr-dev-loop-v2.md merged, recording D1-D7, the rejected options (rename to main, full publication replacement now, per-module test selection, live cloud in PR/queue), and superseding docs/operations/merge-queue-governance.md, docs/development/pr-base-branch-policy.md, and the release-guide version-branch flow",
+    "ADR lists guardrails G1-G11 verbatim so later items can cite them"
+  ],
+  "context": "Origin: 2026-09-28 dev-loop redesign session, three adversarial review rounds (muse, agy, codex gpt-6-sol). Guardrails G1-G11 are copied into every dlv2-* item. Supersedes the blocked legacy item dev-loop-queue-acceptance-criteria-from-blind-spots (owner to decide whether to drop it).",
+  "description": "DECISION GATE for the dev-loop v2 program (single trunk behind merge queue, six always-reporting unit checks, T0-T4 tiers, build-once hashed artifacts, retirement of the old CI/post-merge/release-branch machinery). Nothing in phases 2+ starts until the owner approves these decisions in writing.\n\nD1 Trunk stays `develop` (no rename to main in this program).\nD2 Publication control plane stays; this program only wires it to the new CI and retires lane workflows and the docs.yml legacy Pages fallback. Full replacement is a separate program with entry criteria: pinned source+corpus SHAs, retained artifact identity, post-deploy route+digest probes, durable receipt, exact-artifact rollback with last-known-good check, one serialized production writer with generation check, route-manifest support in scripts/assemble_public_site.py, rollback tested with github-pages reviewers enabled.\nD3 Results corpus homes unchanged (results-data/ + published-results branch).\nD4 Soundness hold moves to CODEOWNERS + require_code_owner_review (already on in ruleset develop-squash-only); agents may enqueue directly for non-owned paths.\nD5 Agent tooling kept (worktree targets, agent-identity-check, agent-write-preflight, check_agent_trailers, todo-state); agent PR-loop tooling (pr-landing, pr-followups, soundness drain, local-validation) retires.\nD6 Codecov kept, informational, uploaded from T2; CODECOV_TOKEN stays.\nD7 Ruleset drift detection kept: scripts/ruleset_drift_check.py runs inside ci.yml `tooling` (required) and release.yml; RULESET_DRIFT_TOKEN stays.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:48:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a756dd19ef82404499f7f9d35d069649",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
