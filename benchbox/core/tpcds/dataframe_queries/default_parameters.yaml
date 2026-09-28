@@ -42,6 +42,12 @@
     - 80
   - - 81
     - 100
+  thresholds:
+  - 25437
+  - 22746
+  - 9387
+  - 10098
+  - 18213
 10:
   gender: F
   month: 2
@@ -57,8 +63,26 @@
   sales_date: '2001-01-12'
   year: 1999
 13:
+  demo1_education: 2 yr Degree
+  demo1_marital: D
+  demo2_education: Secondary
+  demo2_marital: S
+  demo3_education: Advanced Degree
+  demo3_marital: W
   education: Advanced Degree
   marital_status: M
+  states1:
+  - CO
+  - IL
+  - MN
+  states2:
+  - OH
+  - MT
+  - NM
+  states3:
+  - TX
+  - MO
+  - MI
   year: 2001
 14:
   day: 11
@@ -157,6 +181,20 @@
   - TN
   year: 1998
 28:
+  coupon_amts:
+  - 460
+  - 1430
+  - 920
+  - 3054
+  - 14180
+  - 2513
+  list_prices:
+  - 11
+  - 91
+  - 66
+  - 142
+  - 135
+  - 28
   quantity_ranges:
   - - 0
     - 5
@@ -170,6 +208,13 @@
     - 25
   - - 26
     - 30
+  wholesale_costs:
+  - 14
+  - 32
+  - 4
+  - 80
+  - 38
+  - 42
 29:
   months:
   - 1
@@ -279,7 +324,25 @@
 47:
   year: 2000
 48:
-  year: 2000
+  demo1_education: 4 yr Degree
+  demo1_marital: M
+  demo2_education: Primary
+  demo2_marital: D
+  demo3_education: Advanced Degree
+  demo3_marital: U
+  states1:
+  - KY
+  - GA
+  - NM
+  states2:
+  - MT
+  - OR
+  - IN
+  states3:
+  - WI
+  - MO
+  - WV
+  year: 1998
 49:
   year: 2001
 50:

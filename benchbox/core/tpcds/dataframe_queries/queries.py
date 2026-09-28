@@ -2939,6 +2939,15 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
     """
     params = get_parameters(13)
     year = params.get("year", 2001)
+    demo1_marital = params.get("demo1_marital", "D")
+    demo1_education = params.get("demo1_education", "2 yr Degree")
+    demo2_marital = params.get("demo2_marital", "S")
+    demo2_education = params.get("demo2_education", "Secondary")
+    demo3_marital = params.get("demo3_marital", "W")
+    demo3_education = params.get("demo3_education", "Advanced Degree")
+    states1 = params.get("states1", ["CO", "IL", "MN"])
+    states2 = params.get("states2", ["OH", "MT", "NM"])
+    states3 = params.get("states3", ["TX", "MO", "MI"])
 
     store_sales, store, customer_demographics, household_demographics, customer_address, date_dim = _tables(
         ctx, "store_sales", "store", "customer_demographics", "household_demographics", "customer_address", "date_dim"
@@ -2958,24 +2967,24 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
             & (
                 # Demographics condition 1
                 (
-                    (col("cd_marital_status") == lit("M"))
-                    & (col("cd_education_status") == lit("Advanced Degree"))
+                    (col("cd_marital_status") == lit(demo1_marital))
+                    & (col("cd_education_status") == lit(demo1_education))
                     & col("ss_sales_price").is_between(100.0, 150.0)
                     & (col("hd_dep_count") == lit(3))
                 )
                 |
                 # Demographics condition 2
                 (
-                    (col("cd_marital_status") == lit("S"))
-                    & (col("cd_education_status") == lit("College"))
+                    (col("cd_marital_status") == lit(demo2_marital))
+                    & (col("cd_education_status") == lit(demo2_education))
                     & col("ss_sales_price").is_between(50.0, 100.0)
                     & (col("hd_dep_count") == lit(1))
                 )
                 |
                 # Demographics condition 3
                 (
-                    (col("cd_marital_status") == lit("W"))
-                    & (col("cd_education_status") == lit("2 yr Degree"))
+                    (col("cd_marital_status") == lit(demo3_marital))
+                    & (col("cd_education_status") == lit(demo3_education))
                     & col("ss_sales_price").is_between(150.0, 200.0)
                     & (col("hd_dep_count") == lit(1))
                 )
@@ -2984,21 +2993,21 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
                 # Address condition 1
                 (
                     (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(["TX", "OH", "TX"])
+                    & col("ca_state").is_in(states1)
                     & col("ss_net_profit").is_between(100, 200)
                 )
                 |
                 # Address condition 2
                 (
                     (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(["OR", "NM", "KY"])
+                    & col("ca_state").is_in(states2)
                     & col("ss_net_profit").is_between(150, 300)
                 )
                 |
                 # Address condition 3
                 (
                     (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(["VA", "TX", "MS"])
+                    & col("ca_state").is_in(states3)
                     & col("ss_net_profit").is_between(50, 250)
                 )
             )
@@ -3018,6 +3027,15 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
 
     params = get_parameters(13)
     year = params.get("year", 2001)
+    demo1_marital = params.get("demo1_marital", "D")
+    demo1_education = params.get("demo1_education", "2 yr Degree")
+    demo2_marital = params.get("demo2_marital", "S")
+    demo2_education = params.get("demo2_education", "Secondary")
+    demo3_marital = params.get("demo3_marital", "W")
+    demo3_education = params.get("demo3_education", "Advanced Degree")
+    states1 = params.get("states1", ["CO", "IL", "MN"])
+    states2 = params.get("states2", ["OH", "MT", "NM"])
+    states3 = params.get("states3", ["TX", "MO", "MI"])
 
     store_sales, store, customer_demographics, household_demographics, customer_address, date_dim = _tables(
         ctx, "store_sales", "store", "customer_demographics", "household_demographics", "customer_address", "date_dim"
@@ -3032,22 +3050,22 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Demographics conditions
     demo_cond1 = (
-        (merged["cd_marital_status"] == "M")
-        & (merged["cd_education_status"] == "Advanced Degree")
+        (merged["cd_marital_status"] == demo1_marital)
+        & (merged["cd_education_status"] == demo1_education)
         & (merged["ss_sales_price"] >= 100.0)
         & (merged["ss_sales_price"] <= 150.0)
         & (merged["hd_dep_count"] == 3)
     )
     demo_cond2 = (
-        (merged["cd_marital_status"] == "S")
-        & (merged["cd_education_status"] == "College")
+        (merged["cd_marital_status"] == demo2_marital)
+        & (merged["cd_education_status"] == demo2_education)
         & (merged["ss_sales_price"] >= 50.0)
         & (merged["ss_sales_price"] <= 100.0)
         & (merged["hd_dep_count"] == 1)
     )
     demo_cond3 = (
-        (merged["cd_marital_status"] == "W")
-        & (merged["cd_education_status"] == "2 yr Degree")
+        (merged["cd_marital_status"] == demo3_marital)
+        & (merged["cd_education_status"] == demo3_education)
         & (merged["ss_sales_price"] >= 150.0)
         & (merged["ss_sales_price"] <= 200.0)
         & (merged["hd_dep_count"] == 1)
@@ -3056,19 +3074,19 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
     # Address conditions
     addr_cond1 = (
         (merged["ca_country"] == "United States")
-        & merged["ca_state"].isin(["TX", "OH", "TX"])
+        & merged["ca_state"].isin(states1)
         & (merged["ss_net_profit"] >= 100)
         & (merged["ss_net_profit"] <= 200)
     )
     addr_cond2 = (
         (merged["ca_country"] == "United States")
-        & merged["ca_state"].isin(["OR", "NM", "KY"])
+        & merged["ca_state"].isin(states2)
         & (merged["ss_net_profit"] >= 150)
         & (merged["ss_net_profit"] <= 300)
     )
     addr_cond3 = (
         (merged["ca_country"] == "United States")
-        & merged["ca_state"].isin(["VA", "TX", "MS"])
+        & merged["ca_state"].isin(states3)
         & (merged["ss_net_profit"] >= 50)
         & (merged["ss_net_profit"] <= 250)
     )
@@ -3099,7 +3117,16 @@ def q48_expression_impl(ctx: DataFrameContext) -> Any:
     Pattern: Multi-join -> complex OR filter -> aggregate (no GROUP BY)
     """
     params = get_parameters(48)
-    year = params.get("year", 2000)
+    year = params.get("year", 1998)
+    demo1_marital = params.get("demo1_marital", "M")
+    demo1_education = params.get("demo1_education", "4 yr Degree")
+    demo2_marital = params.get("demo2_marital", "D")
+    demo2_education = params.get("demo2_education", "Primary")
+    demo3_marital = params.get("demo3_marital", "U")
+    demo3_education = params.get("demo3_education", "Advanced Degree")
+    states1 = params.get("states1", ["KY", "GA", "NM"])
+    states2 = params.get("states2", ["MT", "OR", "IN"])
+    states3 = params.get("states3", ["WI", "MO", "WV"])
 
     store_sales, store, customer_demographics, customer_address, date_dim = _tables(
         ctx, "store_sales", "store", "customer_demographics", "customer_address", "date_dim"
@@ -3118,22 +3145,22 @@ def q48_expression_impl(ctx: DataFrameContext) -> Any:
             & (
                 # Demographics condition 1
                 (
-                    (col("cd_marital_status") == lit("M"))
-                    & (col("cd_education_status") == lit("Advanced Degree"))
+                    (col("cd_marital_status") == lit(demo1_marital))
+                    & (col("cd_education_status") == lit(demo1_education))
                     & col("ss_sales_price").is_between(100.0, 150.0)
                 )
                 |
                 # Demographics condition 2
                 (
-                    (col("cd_marital_status") == lit("S"))
-                    & (col("cd_education_status") == lit("College"))
+                    (col("cd_marital_status") == lit(demo2_marital))
+                    & (col("cd_education_status") == lit(demo2_education))
                     & col("ss_sales_price").is_between(50.0, 100.0)
                 )
                 |
                 # Demographics condition 3
                 (
-                    (col("cd_marital_status") == lit("W"))
-                    & (col("cd_education_status") == lit("2 yr Degree"))
+                    (col("cd_marital_status") == lit(demo3_marital))
+                    & (col("cd_education_status") == lit(demo3_education))
                     & col("ss_sales_price").is_between(150.0, 200.0)
                 )
             )
@@ -3141,21 +3168,21 @@ def q48_expression_impl(ctx: DataFrameContext) -> Any:
                 # Address condition 1
                 (
                     (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(["TX", "OH", "TX"])
+                    & col("ca_state").is_in(states1)
                     & col("ss_net_profit").is_between(0, 2000)
                 )
                 |
                 # Address condition 2
                 (
                     (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(["OR", "NM", "KY"])
+                    & col("ca_state").is_in(states2)
                     & col("ss_net_profit").is_between(150, 3000)
                 )
                 |
                 # Address condition 3
                 (
                     (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(["VA", "TX", "MS"])
+                    & col("ca_state").is_in(states3)
                     & col("ss_net_profit").is_between(50, 25000)
                 )
             )
@@ -3169,7 +3196,16 @@ def q48_pandas_impl(ctx: DataFrameContext) -> Any:
     import pandas as pd
 
     params = get_parameters(48)
-    year = params.get("year", 2000)
+    year = params.get("year", 1998)
+    demo1_marital = params.get("demo1_marital", "M")
+    demo1_education = params.get("demo1_education", "4 yr Degree")
+    demo2_marital = params.get("demo2_marital", "D")
+    demo2_education = params.get("demo2_education", "Primary")
+    demo3_marital = params.get("demo3_marital", "U")
+    demo3_education = params.get("demo3_education", "Advanced Degree")
+    states1 = params.get("states1", ["KY", "GA", "NM"])
+    states2 = params.get("states2", ["MT", "OR", "IN"])
+    states3 = params.get("states3", ["WI", "MO", "WV"])
 
     store_sales, store, customer_demographics, customer_address, date_dim = _tables(
         ctx, "store_sales", "store", "customer_demographics", "customer_address", "date_dim"
@@ -3183,20 +3219,20 @@ def q48_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Demographics conditions
     demo_cond1 = (
-        (merged["cd_marital_status"] == "M")
-        & (merged["cd_education_status"] == "Advanced Degree")
+        (merged["cd_marital_status"] == demo1_marital)
+        & (merged["cd_education_status"] == demo1_education)
         & (merged["ss_sales_price"] >= 100.0)
         & (merged["ss_sales_price"] <= 150.0)
     )
     demo_cond2 = (
-        (merged["cd_marital_status"] == "S")
-        & (merged["cd_education_status"] == "College")
+        (merged["cd_marital_status"] == demo2_marital)
+        & (merged["cd_education_status"] == demo2_education)
         & (merged["ss_sales_price"] >= 50.0)
         & (merged["ss_sales_price"] <= 100.0)
     )
     demo_cond3 = (
-        (merged["cd_marital_status"] == "W")
-        & (merged["cd_education_status"] == "2 yr Degree")
+        (merged["cd_marital_status"] == demo3_marital)
+        & (merged["cd_education_status"] == demo3_education)
         & (merged["ss_sales_price"] >= 150.0)
         & (merged["ss_sales_price"] <= 200.0)
     )
@@ -3204,19 +3240,19 @@ def q48_pandas_impl(ctx: DataFrameContext) -> Any:
     # Address conditions
     addr_cond1 = (
         (merged["ca_country"] == "United States")
-        & merged["ca_state"].isin(["TX", "OH", "TX"])
+        & merged["ca_state"].isin(states1)
         & (merged["ss_net_profit"] >= 0)
         & (merged["ss_net_profit"] <= 2000)
     )
     addr_cond2 = (
         (merged["ca_country"] == "United States")
-        & merged["ca_state"].isin(["OR", "NM", "KY"])
+        & merged["ca_state"].isin(states2)
         & (merged["ss_net_profit"] >= 150)
         & (merged["ss_net_profit"] <= 3000)
     )
     addr_cond3 = (
         (merged["ca_country"] == "United States")
-        & merged["ca_state"].isin(["VA", "TX", "MS"])
+        & merged["ca_state"].isin(states3)
         & (merged["ss_net_profit"] >= 50)
         & (merged["ss_net_profit"] <= 25000)
     )
@@ -9152,7 +9188,7 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
     params = get_parameters(9)
     quantity_ranges = params.get("quantity_ranges", [(1, 20), (21, 40), (41, 60), (61, 80), (81, 100)])
     # Row count thresholds for CASE-WHEN (simplified for DataFrame)
-    thresholds = params.get("thresholds", [1000, 1000, 1000, 1000, 1000])
+    thresholds = params.get("thresholds", [25437, 22746, 9387, 10098, 18213])
 
     store_sales, reason = _tables(ctx, "store_sales", "reason")
 
@@ -9173,8 +9209,8 @@ def q9_expression_impl(ctx: DataFrameContext) -> Any:
             # Return avg of ss_ext_discount_amt
             avg_val = bucket.select(ctx.mean("ss_ext_discount_amt").alias("avg_val"))
         else:
-            # Return avg of ss_net_paid
-            avg_val = bucket.select(ctx.mean("ss_net_paid").alias("avg_val"))
+            # Return avg of ss_net_profit
+            avg_val = bucket.select(ctx.mean("ss_net_profit").alias("avg_val"))
 
         if hasattr(avg_val, "scalar"):
             val = avg_val.scalar(0, 0)
@@ -9199,7 +9235,7 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
 
     params = get_parameters(9)
     quantity_ranges = params.get("quantity_ranges", [(1, 20), (21, 40), (41, 60), (61, 80), (81, 100)])
-    thresholds = params.get("thresholds", [1000, 1000, 1000, 1000, 1000])
+    thresholds = params.get("thresholds", [25437, 22746, 9387, 10098, 18213])
 
     store_sales = ctx.get_table("store_sales")
 
@@ -9211,7 +9247,7 @@ def q9_pandas_impl(ctx: DataFrameContext) -> Any:
 
         threshold = thresholds[i] if i < len(thresholds) else 1000
 
-        avg_val = bucket["ss_ext_discount_amt"].mean() if cnt > threshold else bucket["ss_net_paid"].mean()
+        avg_val = bucket["ss_ext_discount_amt"].mean() if cnt > threshold else bucket["ss_net_profit"].mean()
 
         buckets.append(avg_val)
 
@@ -9236,9 +9272,9 @@ def q28_expression_impl(ctx: DataFrameContext) -> Any:
     """Q28: Extended price analysis across 6 quantity buckets (Polars)."""
     params = get_parameters(28)
     quantity_ranges = params.get("quantity_ranges", [(0, 5), (6, 10), (11, 15), (16, 20), (21, 25), (26, 30)])
-    list_prices = params.get("list_prices", [90, 91, 92, 93, 94, 95])
-    coupon_amts = params.get("coupon_amts", [1000, 2000, 3000, 4000, 5000, 6000])
-    wholesale_costs = params.get("wholesale_costs", [10, 20, 30, 40, 50, 60])
+    list_prices = params.get("list_prices", [11, 91, 66, 142, 135, 28])
+    coupon_amts = params.get("coupon_amts", [460, 1430, 920, 3054, 14180, 2513])
+    wholesale_costs = params.get("wholesale_costs", [14, 32, 4, 80, 38, 42])
 
     store_sales = ctx.get_table("store_sales")
     col = ctx.col
@@ -9283,9 +9319,9 @@ def q28_pandas_impl(ctx: DataFrameContext) -> Any:
 
     params = get_parameters(28)
     quantity_ranges = params.get("quantity_ranges", [(0, 5), (6, 10), (11, 15), (16, 20), (21, 25), (26, 30)])
-    list_prices = params.get("list_prices", [90, 91, 92, 93, 94, 95])
-    coupon_amts = params.get("coupon_amts", [1000, 2000, 3000, 4000, 5000, 6000])
-    wholesale_costs = params.get("wholesale_costs", [10, 20, 30, 40, 50, 60])
+    list_prices = params.get("list_prices", [11, 91, 66, 142, 135, 28])
+    coupon_amts = params.get("coupon_amts", [460, 1430, 920, 3054, 14180, 2513])
+    wholesale_costs = params.get("wholesale_costs", [14, 32, 4, 80, 38, 42])
 
     store_sales = ctx.get_table("store_sales")
 
