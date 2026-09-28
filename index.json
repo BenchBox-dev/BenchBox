@@ -5219,6 +5219,17 @@
       "status": "open",
       "title": "Remove obsolete test and CI config files"
     },
+    "dlv2-82-makefile-rewrite": {
+      "claim": null,
+      "needs": [
+        "dlv2-43-makefile-agent-instructions-lockstep",
+        "dlv2-53-retire-legacy-release-path",
+        "dlv2-81-config-cleanup"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Rewrite the Makefile into grouped modules and replace the inventory contract with a documented-target test"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

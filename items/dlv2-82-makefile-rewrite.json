@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Target count 199 -> <=90 (aliases counted until removed); root Makefile short, modules grouped",
+    "Documented-target test passes and fails when a doc names a missing target",
+    "No literal consumer of the old inventory remains (G4)",
+    "make check, make test, make test-queue, make build, make docs, make ci-linux verified on macOS and Linux"
+  ],
+  "context": "muse M5/M15/M16: baseline is 2,050 root lines + 529 module lines, 199 targets per inventory.",
+  "description": "First migrate literal consumers of make/inventory.json and Makefile text (tests/unit/test_standardized_test_commands.py remnants, tests/system/test_ci_lint_parity.py, scripts/check_release_curation.py if kept, docs). Then restructure into make/{test,quality,build,docs,explorer,platform-tests,uat,reports,worktrees}.mk with a short root Makefile; move cross-surface equivalence report targets to make/reports.mk; keep docker/live/UAT/data-generator targets. Consolidate duplicate test aliases (test-quick, test-fast, test-dev, test-pytest, test-verbose, test-parallel, test-parallel-fast, test-full, test-all, test-ci, test-medium, test-medium-selected, test-smoke, test-window, test-no-cloud, test-olap) into tier targets; aliases print the replacement for one release, then are removed in a follow-up. Replace make/{inventory.json, monolith-baseline.json, migration-proof.json, check_makefile_inventory.py} and makefile-inventory-check with one test: every make target named in AGENTS.md, CONTRIBUTING.md, docs/, and the skill-sync source resolves with make -n.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:55:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4d1d4305400748d3b0387596c9be063f",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
