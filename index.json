@@ -4951,9 +4951,9 @@
     },
     "dlv2-10-chdb-cwd-guard": {
       "claim": {
-        "expires_at": "2026-09-29T20:14:41Z",
-        "generation": "07a7cda394c943f0b469abe68722cb7c",
-        "renewals": 0,
+        "expires_at": "2026-09-29T20:24:51Z",
+        "generation": "f36866bfb1dd42e89fb19070d42de791",
+        "renewals": 1,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
       },
       "needs": [],
