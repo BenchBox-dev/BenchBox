@@ -9870,19 +9870,15 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     from .rollup_helper import expand_rollup_expression
 
     params = get_parameters(22)
-    year = params.get("year", 2001)
-    months = params.get("months", [1, 2, 3, 4, 5, 6])
+    dms = params.get("dms", 1212)
 
     # Get tables
     inventory, item, date_dim = _tables(ctx, "inventory", "item", "date_dim")
 
     col = ctx.col
-    lit = ctx.lit
 
-    # Filter dates by month_seq range (approximated by year and months)
-    # d_month_seq is typically: year * 12 + month - 1
-    # For months param, filter by d_moy in months and d_year
-    date_filtered = date_dim.filter((col("d_year") == lit(year)) & (col("d_moy").is_in(months)))
+    # Filter dates by the d_month_seq window from the SQL template.
+    date_filtered = date_dim.filter(col("d_month_seq").is_between(dms, dms + 11))
 
     # Join inventory with item and date
     inv_data = inventory.join(date_filtered, left_on="inv_date_sk", right_on="d_date_sk").join(
@@ -9894,7 +9890,13 @@ def q22_expression_impl(ctx: DataFrameContext) -> Any:
     agg_exprs = [ctx.mean("inv_quantity_on_hand").alias("qoh")]
 
     result = expand_rollup_expression(inv_data, group_cols, agg_exprs, ctx)
-    return result.sort(["qoh", "i_product_name", "i_brand", "i_class", "i_category"]).head(100)
+    # The SQL projection has no GROUPING() column: drop the helper's grouping_id
+    # and sort NULLs last like DuckDB ASC.
+    return (
+        result.select([*group_cols, "qoh"])
+        .sort(["qoh", "i_product_name", "i_brand", "i_class", "i_category"], nulls_last=True)
+        .head(100)
+    )
 
 
 def q22_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -9902,14 +9904,13 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     from .rollup_helper import expand_rollup_pandas
 
     params = get_parameters(22)
-    year = params.get("year", 2001)
-    months = params.get("months", [1, 2, 3, 4, 5, 6])
+    dms = params.get("dms", 1212)
 
     # Get tables
     inventory, item, date_dim = _tables(ctx, "inventory", "item", "date_dim")
 
-    # Filter dates
-    date_filtered = date_dim[(date_dim["d_year"] == year) & (date_dim["d_moy"].isin(months))]
+    # Filter dates by the d_month_seq window from the SQL template.
+    date_filtered = date_dim[(date_dim["d_month_seq"] >= dms) & (date_dim["d_month_seq"] <= dms + 11)]
 
     # Join tables
     inv_data = inventory.merge(date_filtered, left_on="inv_date_sk", right_on="d_date_sk")
@@ -9920,7 +9921,9 @@ def q22_pandas_impl(ctx: DataFrameContext) -> Any:
     agg_dict = {"qoh": ("inv_quantity_on_hand", "mean")}
 
     result = expand_rollup_pandas(inv_data, group_cols, agg_dict, ctx)
-    return result.sort_values(["qoh", "i_product_name", "i_brand", "i_class", "i_category"]).head(100)
+    # The SQL projection has no GROUPING() column: drop the helper's grouping_id.
+    # pandas sort_values already sorts NaN last, matching DuckDB ASC.
+    return result[[*group_cols, "qoh"]].sort_values(["qoh", "i_product_name", "i_brand", "i_class", "i_category"]).head(100)
 
 
 # =============================================================================
