@@ -27,9 +27,15 @@ new explicitly scoped item rather than a reopening of this record.
   (`benchbox/core/joinorder/benchmark.py`); there is no bounded small cell
   that keeps all 113 queries discriminating the way the synthetic gate's
   bounded DuckDB cell does.
-- The synthetic gate exists for exactly this reason: bounded, offline,
-  fully discriminating coverage without the archive fetch or the 113x3
-  execution cost on every PR.
+- The synthetic gate exists for exactly this reason: bounded, offline
+  coverage without the archive fetch or the 113x3
+  execution cost on every PR. At the enforced SF=0.1 cell, 10 of the 13
+  queries return all-NULL aggregates and therefore prove little (see
+  `_project/analysis/cross-surface-mutation-sensitivity.md`); the gate's
+  discriminating power comes from the queries that return real rows, plus
+  the 34-query discriminating head of the extended 113-query surface with
+  golden-entity seeding. Prefer a bounded cell that makes every query
+  discriminating before describing this coverage as complete.
 
 ## Manual run path
 
