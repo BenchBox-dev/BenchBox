@@ -4956,6 +4956,13 @@
       "status": "open",
       "title": "Guard every chdb import so a failed native load cannot leave the process cwd in site-packages/chdb"
     },
+    "dlv2-11-optional-engine-clean-skips": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Make optional-engine tests skip cleanly when the engine is installed but unusable"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

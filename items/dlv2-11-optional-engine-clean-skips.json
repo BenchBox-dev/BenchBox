@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Shared availability helpers for chdb and PySpark check usability and are used by all listed tests",
+    "In an env with chdb removed and an unsupported Java, the listed tests skip with explicit reasons and none fail",
+    "Required T2 cases (dlv2-15) are NOT affected: a required case that would skip fails T2 instead"
+  ],
+  "context": "Needed so T1/T2 results do not depend on host quirks. Guardrails G3 (skips must not hide required cases).",
+  "description": "In a clean env without a loadable chdb and with Java 26 (unsupported by PySpark), 66 unit tests failed instead of skipping: tests/unit/platforms/dataframe/test_pyspark_df.py (37), test_pyspark_df_session_branches.py (2), tests/unit/platforms/test_clickhouse_local.py (14, \"module 'chdb' has no attribute 'connect'\"), test_clickhouse_adapter.py (1), tests/unit/test_import_isolation.py (8), plus integration test_dataframe_adapter_smoke.py (10), test_ssb_clickhouse_integration.py (3), test_clickhouse_local_cross_platform.py (1), test_clickhouse_applied_ledger_live.py (6 errors), validation/test_read_primitives_variant_parity.py (17 errors). Availability probes must test usability (native load succeeds; supported Java version) not just importability, and skip with a reason.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:49:56Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "67154cebf77c41cc9f4e6c55c6f0c6c4",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
