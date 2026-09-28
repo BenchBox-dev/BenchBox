@@ -5096,6 +5096,18 @@
       "status": "open",
       "title": "Retire the post-merge safety-net and process-monitoring workflows"
     },
+    "dlv2-42-retire-dev-loop-scripts-tests": {
+      "claim": null,
+      "needs": [
+        "dlv2-40-retire-pr-gate-workflows",
+        "dlv2-41-retire-post-merge-workflows",
+        "dlv2-16-split-timing-policy",
+        "dlv2-32-codeowners-soundness-hold"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Delete dev-loop scripts and their pure-process tests after their workflows are gone"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

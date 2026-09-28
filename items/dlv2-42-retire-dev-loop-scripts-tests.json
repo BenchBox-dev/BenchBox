@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Every deleted file is classified pure-process in the ledger (G3)",
+    "G4 sweep clean for every deleted name",
+    "MUST KEEP list files still present with passing tests",
+    "Unit tier time reduction measured and recorded against the dlv2-01 baseline"
+  ],
+  "context": "Release-path scripts (ruleset/release canary/release cut) are handled in dlv2-53 per G7 and agy A4. Makefile targets that call these scripts are removed together in dlv2-43 (same PR or stacked immediately after) so no target points at a missing script.",
+  "description": "Delete (with G3 + G4 evidence) scripts/: heavy_tier_needed.py, local_validation.py, post_merge_signature.py, pr_landing.py, pr_refresh_certification.py, pr_refresh_replay.py, queue_certification.py, sweep_coverage.py, detect_develop_post_merge_gaps.py, phase2_metrics.py, batch_integration.py, branch_prune_merged.py, canary_impact.py, cleanup_workflows.py. _project/scripts/: auto_merge_soundness_paths.py, browser_gate_aggregate.py, ci_lint_environment_gate.py, detect_orphaned_commits.py, dev_loop_pr_metrics.py, fast_lane_ratchet_check.py, green_unmerged_sweep.py, pr_review_followups.py + prompts/pr_review_followup.md, required_lane.py, report_slow_test_coverage.py, soundness_drain_report.py, oneoff_rewrite_review_followup_marker.py, fixtures/{fast_lane_ratchet,green_unmerged,soundness_drain}_fixture.json, and the isolated fast-lane parts from dlv2-16.\nTests: tests/unit/workflows/{test_auto_merge_enablement_point, test_auto_merge_partial_stack_race, test_develop_post_merge_gaps, test_develop_post_merge_metrics, test_detect_orphaned_commits, test_heavy_tier_queue_only, test_pr_refresh_shadow_workflow, test_pr_workflow_outputs, test_pr_workflow_path_classifier (replaced by dlv2-20 tests), test_queue_certification, test_stacked_pr_base_guard, test_sweep_coverage, test_docs_concurrency, test_docs_skip_marker, test_results_explorer_browser_gate, test_merge_group_triggers (replaced by ci.yml trigger test)}; tests/unit/{test_auto_merge_hold_is_durable, test_auto_merge_soundness_paths (replaced by dlv2-32 test), test_contributing_pr_open_auto_merge_docs}; matching tests/unit/scripts/* for deleted scripts. Split tests/unit/test_standardized_test_commands.py: keep TestCorrectnessGateOracle rewritten against the gate; delete command-spelling checks.\nMUST KEEP: detect_self_binding.py, rp_scoped_check.py, timing_audit.py, timing_policy_check.py wall-clock policy, ruleset_drift_check.py, ruleset_review_enforcement.py, path_filter_decision.py, validate_submission.py, tests/unit/workflows/test_workflow_context_availability.py, test_develop_ruleset_drift.py (retargeted), all test_validate_submission_* and test_corpus_trust_boundary.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:52:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f9c5a32a2aed43fabce3acb57c27a2ca",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
