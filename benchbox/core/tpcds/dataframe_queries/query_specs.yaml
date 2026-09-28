@@ -33,19 +33,6 @@ joined_aggregate:
     aggs:
       - [total_sales, cs_sales_price, sum]
     sort_by: [ca_zip]
-  - query_id: 43
-    title: Store Sales Day Analysis
-    base: date_dim
-    joins:
-      - [store_sales, d_date_sk, ss_sold_date_sk]
-      - [store, ss_store_sk, s_store_sk]
-    filters:
-      - [eq, s_gmt_offset, {param: gmt_offset, default: -5.0}]
-      - [eq, d_year, {param: year, default: 2000}]
-    group_by: [s_store_name, s_store_id, d_day_name]
-    aggs:
-      - [total_sales, ss_sales_price, sum]
-    sort_by: [s_store_name, s_store_id, d_day_name]
   - query_id: 46
     title: Store Sales Household Analysis
     base: store_sales

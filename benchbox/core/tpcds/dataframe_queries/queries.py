@@ -1684,6 +1684,65 @@ def q25_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def q43_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q43: Store Sales Day Analysis (Expression Family).
+
+    Pivots store sales into per-day-of-week sums with conditional aggregation.
+
+    Tables: date_dim, store_sales, store
+    Pattern: 3-way join -> filter -> conditional-agg pivot -> order by
+    """
+    params = get_parameters(43)
+    gmt_offset = params.get("gmt_offset", -5.0)
+    year = params.get("year", 1998)
+    col = ctx.col
+    lit = ctx.lit
+    days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    aliases = ["sun_sales", "mon_sales", "tue_sales", "wed_sales", "thu_sales", "fri_sales", "sat_sales"]
+    return (
+        ctx.get_table("date_dim")
+        .join(ctx.get_table("store_sales"), left_on="d_date_sk", right_on="ss_sold_date_sk")
+        .join(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
+        .filter((col("s_gmt_offset") == lit(gmt_offset)) & (col("d_year") == lit(year)))
+        .group_by("s_store_name", "s_store_id")
+        .agg(
+            *(
+                ctx.when(col("d_day_name") == lit(day))
+                .then(col("ss_sales_price"))
+                .otherwise(lit(None))
+                .sum()
+                .alias(alias)
+                for day, alias in zip(days, aliases)
+            )
+        )
+        .sort(["s_store_name", "s_store_id", *aliases])
+        .limit(100)
+    )
+
+
+def q43_pandas_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q43: Store Sales Day Analysis (Pandas Family)."""
+    params = get_parameters(43)
+    gmt_offset = params.get("gmt_offset", -5.0)
+    year = params.get("year", 1998)
+
+    date_dim, store_sales, store = _tables(ctx, "date_dim", "store_sales", "store")
+    merged = date_dim.merge(store_sales, left_on="d_date_sk", right_on="ss_sold_date_sk")
+    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
+    filtered = merged[(merged["s_gmt_offset"] == gmt_offset) & (merged["d_year"] == year)]
+
+    days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    aliases = ["sun_sales", "mon_sales", "tue_sales", "wed_sales", "thu_sales", "fri_sales", "sat_sales"]
+    for day, alias in zip(days, aliases):
+        filtered[alias] = filtered["ss_sales_price"].where(filtered["d_day_name"] == day)
+    return (
+        filtered.groupby(["s_store_name", "s_store_id"], as_index=False)
+        .agg(**{alias: (alias, "sum") for alias in aliases})
+        .sort_values(["s_store_name", "s_store_id", *aliases])
+        .head(100)
+    )
+
+
 # =============================================================================
 # Moderate Queries - CTEs, subqueries, and more complex patterns
 # =============================================================================

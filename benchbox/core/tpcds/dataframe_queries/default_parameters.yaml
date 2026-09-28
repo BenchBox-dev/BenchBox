@@ -234,7 +234,7 @@
   year: 1998
 43:
   gmt_offset: -5.0
-  year: 2000
+  year: 1998
 44:
   null_col: ss_addr_sk
   store_sk: 4
