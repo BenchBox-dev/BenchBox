@@ -654,6 +654,12 @@ jobs:
             outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
             if [ "$outcome" = "success" ]; then
               echo "| $id | ✅ success |" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$id" = "guard-fast-lane-delta" ] \
+              && [ "${GITHUB_EVENT_NAME:-}" = "merge_group" ] \
+              && [ "$outcome" = "skipped" ]; then
+              # This guard is intentionally pull_request-only because its
+              # aggregate delta is not meaningful for a composed merge group.
+              echo "| $id | ✅ skipped (merge_group composition) |" >> "$GITHUB_STEP_SUMMARY"
             else
               echo "| $id | ⚠️ $outcome |" >> "$GITHUB_STEP_SUMMARY"
               echo "FAILED: $id ($outcome)"

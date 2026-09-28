@@ -597,11 +597,15 @@ def test_lint_guard_summary_step_exists() -> None:
     assert steps[-1] is aggregator, f"{AGGREGATOR_STEP_NAME!r} must be the last step in the code-lint job"
 
 
-def test_lint_guard_summary_only_marks_success_as_passing() -> None:
+def test_lint_guard_summary_accepts_only_success_or_intentional_merge_skip() -> None:
     aggregator = next(step for step in _load_lint_job_steps() if step.get("name") == AGGREGATOR_STEP_NAME)
     run = aggregator["run"]
 
     assert 'if [ "$outcome" = "success" ]; then' in run
+    assert '[ "$id" = "guard-fast-lane-delta" ]' in run
+    assert '[ "${GITHUB_EVENT_NAME:-}" = "merge_group" ]' in run
+    assert '[ "$outcome" = "skipped" ]' in run
+    assert "merge_group composition" in run
     assert 'echo "FAILED: $id ($outcome)"' in run
     assert "All lint guards passed." in run
 
