@@ -5117,6 +5117,16 @@
       "status": "open",
       "title": "Replace PR-loop Make targets with tier targets and update agent instructions in the same change"
     },
+    "dlv2-44-precommit-trim": {
+      "claim": null,
+      "needs": [
+        "dlv2-16-split-timing-policy",
+        "dlv2-43-makefile-agent-instructions-lockstep"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Trim pre-commit hooks to product and hygiene checks"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

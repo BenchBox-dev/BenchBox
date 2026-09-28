@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "pre-commit run --all-files passes",
+    "Every removed hook is classified pure-process in the ledger; every kept hook listed with its property",
+    "Scripts only used by removed hooks are deleted or listed for dlv2-81"
+  ],
+  "context": "agy A12 (blind-spot-validate and agent-write-preflight dispositions).",
+  "description": ".pre-commit-config.yaml: remove timing-policy-fast-lane (pre-push), pr-preflight-fast-tests (pre-push), uat-loc-table, agent-instructions-check, duplicate-code-warn (manual). Keep timing-policy-check (wall-clock policy only, after dlv2-16), blind-spot-validate, agent-write-preflight, agent-git-identity, agent-attribution-trailers (commit-msg), corpus-inventory, uv-lock-revision-guard, explorer-tokens, ruff, codespell, pre-commit-hooks hygiene, markdownlint.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:53:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "adfd94ed14644f0fb50510a543d3cbd2",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
