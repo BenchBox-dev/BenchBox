@@ -4929,15 +4929,10 @@
       "title": "Distinct Database Naming Based on Configuration Characteristics"
     },
     "dlv2-00-decisions-adr": {
-      "claim": {
-        "expires_at": "2026-09-29T20:13:51Z",
-        "generation": "16fe232a939a45a0aa1ef488757e9ef2",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
-      },
+      "claim": null,
       "needs": [],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Dev loop v2: record the owner-approved decisions and standing approvals in an ADR"
     },
     "dlv2-01-baseline-and-backups": {
