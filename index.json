@@ -5176,6 +5176,16 @@
       "status": "open",
       "title": "Wire the publication control plane to queue-tested trunk commits and add the route manifest"
     },
+    "dlv2-61-retire-docs-yml-pages-fallback": {
+      "claim": null,
+      "needs": [
+        "dlv2-60-publication-integration",
+        "dlv2-40-retire-pr-gate-workflows"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Retire docs.yml once the publication plane owns every public route"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

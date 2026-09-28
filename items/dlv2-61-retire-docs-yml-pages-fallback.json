@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Publication plane has deployed every route at least once from the manifest",
+    "linkcheck/spellcheck/example-validation have a new home recorded in the ledger",
+    "G4 sweep clean for docs.yml job names"
+  ],
+  "context": "Guardrails G3, G4.",
+  "description": "docs.yml still carries a legacy release-to-Pages fallback guarded by publication ownership receipts, plus build/linkcheck/spellcheck/example-validation jobs. After dlv2-60 and dlv2-40 (build/visual jobs moved to ci.yml docs/landing), delete docs.yml; move linkcheck, spellcheck, and example validation into ci.yml docs (fast parts) or nightly (external linkcheck).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:54:22Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0675d6c9034f4979a68f700a584fab31",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
