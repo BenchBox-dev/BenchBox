@@ -25,6 +25,10 @@ https://www\.iso\.org/standard/.*
 # SIGMOD intermittently refuses automated link checks
 https://sigmod\.org/.*
 
+# VLDB host intermittently times out on connect and read from CI runners.
+# Both schemes appear in docs (for example joinorder.rst links http).
+https?://www\.vldb\.org/.*
+
 # SelectDB portal intermittently drops connections
 https://selectdb\.com
 
