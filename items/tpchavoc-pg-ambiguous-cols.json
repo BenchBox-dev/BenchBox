@@ -3,6 +3,16 @@
     "2_v5 and 17_v2 pass compile-check with qualified references or the ambiguity is confirmed genuine"
   ],
   "context": "Implemented on PR #2412, branch fix/tpchavoc-cloud-skip-sync, commit 82774ef11. Added targeted PostgreSQL qualification for 2_v5 (partsupp.ps_partkey/ps_supplycost) and 17_v2 (lineitem.l_partkey/l_quantity/l_extendedprice), removed both execution skips, registered family-wide query-adapter rules, updated validation mirrors and generated compatibility docs. Verification: Ruff passed; 5 focused tests passed; compat-docs and DDL drift checks passed. Rendered PostgreSQL SQL is parseable and contains no targeted unqualified references. No local PostgreSQL service was reachable for an engine execution probe.",
+  "deferrals": [
+    {
+      "created_at": "2026-09-28T19:58:30Z",
+      "from_item": "tpchavoc-pg-ambiguous-cols",
+      "id": 1,
+      "reason": "The implementation and rendered-SQL compile checks are complete, but no local PostgreSQL service was available during verification. A live engine execution probe remains outstanding and should be run when a PostgreSQL test service is available.",
+      "resolution": "open",
+      "summary": "Run a live PostgreSQL execution probe for the qualified 2_v5 and 17_v2 TPC-Havoc queries."
+    }
+  ],
   "description": "Postgres reports ambiguous ps_partkey (2_v5) and l_partkey (17_v2) resolution. Qualifying with the table alias should resolve; same probe applies to the LakeSail ambiguous-attribute set.",
   "sessions": [
     {
@@ -37,6 +47,14 @@
       "generation": "ffe8d435094943b6939ab6a47d49c4c1",
       "op": "take",
       "op_id": "314680d9d4ab4532bb91fbfb431f99ea",
+      "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
+    },
+    {
+      "actor": "jcode-tpchavoc-closeout",
+      "at": "2026-09-28T19:58:30Z",
+      "client": "jcode",
+      "op": "defer",
+      "op_id": "05219ab84d4b402eb75b7803b668a56f",
       "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
     }
   ]
