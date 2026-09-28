@@ -3,8 +3,8 @@
 Guardrail G3 backstop for the development loop modernization: every file in
 the ledger's scope must appear in docs/development/dev-loop-property-ledger.md
 so deletions cannot silently drop coverage. The ledger may list a file by
-exact name or, for the large scripts directories, by an explicit
-"Remaining ..." catch-all row that forces individual reclassification before
+exact relative path or, for the large scripts directories, by an explicit
+per-directory catch-all row that forces individual reclassification before
 any deletion.
 """
 
@@ -29,10 +29,22 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 PROJECT_SCRIPTS_DIR = REPO_ROOT / "_project" / "scripts"
 HOOKS_FILE = REPO_ROOT / ".pre-commit-config.yaml"
 
-# Files with an explicit "Remaining ..." catch-all row in the ledger: the row
-# text names the directory so unlisted single files still resolve, while the
-# row itself requires individual reclassification before any deletion.
-CATCH_ALL_DIRS = ("scripts/*.py", "_project/scripts/*.py")
+# Section headers in the ledger mapped to the directory their rows resolve
+# against. Bare filenames in a row resolve inside that directory; entries
+# containing a slash resolve from the repository root.
+SECTION_DIRS = {
+    "### `.github/workflows/`": WORKFLOW_DIR,
+    "### `tests/unit/workflows/`": WORKFLOWS_TEST_DIR,
+    "### `tests/unit/scripts/` (complete)": SCRIPTS_TEST_DIR,
+    "### `tests/unit/release/`": RELEASE_TEST_DIR,
+    "### `tests/unit/test_auto_merge_*`": UNIT_DIR,
+    "### `tests/unit/test_release_*`": UNIT_DIR,
+    "### `scripts/`": SCRIPTS_DIR,
+    "### `_project/scripts/`": PROJECT_SCRIPTS_DIR,
+}
+# Sections whose rows name hooks or globs rather than files in a directory;
+# the reverse file-existence check skips them.
+NON_FILE_SECTIONS = {"### `.pre-commit-config.yaml` hooks"}
 
 
 def _ledger_text() -> str:
@@ -40,10 +52,25 @@ def _ledger_text() -> str:
     return LEDGER.read_text(encoding="utf-8")
 
 
-def _covered(name: str, text: str) -> bool:
-    if name in text:
+def _section_rows(text: str) -> dict[str, list[str]]:
+    """Map each known section header to its table row texts."""
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in text.splitlines():
+        if line.startswith("### "):
+            current = line if line in SECTION_DIRS else None
+            if current is not None:
+                sections[current] = []
+        elif current is not None and line.startswith("|"):
+            sections[current].append(line)
+    return sections
+
+
+def _covered(entry: str, section: str, sections: dict[str, list[str]]) -> bool:
+    rows = sections.get(section, [])
+    if any(entry in row for row in rows):
         return True
-    return any(marker in text for marker in CATCH_ALL_DIRS)
+    return any("ledger-catch-all:" in row for row in rows)
 
 
 def _workflow_files() -> list[str]:
@@ -52,6 +79,10 @@ def _workflow_files() -> list[str]:
 
 def _test_files(directory: Path) -> list[str]:
     return sorted(p.name for p in directory.glob("test_*.py"))
+
+
+def _recursive_test_files(directory: Path) -> list[str]:
+    return sorted(str(p.relative_to(directory)) for p in directory.rglob("test_*.py"))
 
 
 def test_ledger_lists_every_workflow() -> None:
@@ -68,7 +99,11 @@ def test_ledger_lists_every_workflows_test() -> None:
 
 def test_ledger_lists_every_scripts_test() -> None:
     text = _ledger_text()
-    missing = [name for name in _test_files(SCRIPTS_TEST_DIR) if name not in text]
+    sections = _section_rows(text)
+    section = "### `tests/unit/scripts/` (complete)"
+    names = _recursive_test_files(SCRIPTS_TEST_DIR)
+    assert len(names) > len(_test_files(SCRIPTS_TEST_DIR)), "expected nested suites under tests/unit/scripts/"
+    missing = [name for name in names if not _covered(name, section, sections)]
     assert not missing, f"tests/unit/scripts files missing from ledger: {missing}"
 
 
@@ -89,11 +124,52 @@ def test_ledger_lists_auto_merge_and_release_tests() -> None:
 
 def test_ledger_lists_every_script() -> None:
     text = _ledger_text()
-    names = sorted(p.name for p in SCRIPTS_DIR.glob("*.py"))
-    names += sorted(p.name for p in PROJECT_SCRIPTS_DIR.glob("*.py"))
-    assert names, "expected scripts in scripts/ and _project/scripts/"
-    missing = [name for name in names if not _covered(name, text)]
+    sections = _section_rows(text)
+    top_level = sorted(p.name for p in SCRIPTS_DIR.glob("*.py"))
+    project_level = sorted(p.name for p in PROJECT_SCRIPTS_DIR.glob("*.py"))
+    assert top_level and project_level, "expected scripts in scripts/ and _project/scripts/"
+    missing = [name for name in top_level if not _covered(name, "### `scripts/`", sections)]
+    missing += [name for name in project_level if not _covered(name, "### `_project/scripts/`", sections)]
     assert not missing, f"scripts missing from ledger: {missing}"
+
+
+def test_ledger_covers_only_existing_files() -> None:
+    """Reverse check: every ledger row must resolve to a file on disk.
+
+    The forward tests catch additions missing from the ledger. This test
+    catches the deletion scenario: removing a guarded file while leaving
+    its row unchanged fails here because the row no longer resolves.
+    Bare filenames resolve inside their section directory; slashed entries
+    resolve from the repository root.
+    """
+    text = _ledger_text()
+    sections = _section_rows(text)
+    orphaned = []
+    for section, source_dir in SECTION_DIRS.items():
+        if section in NON_FILE_SECTIONS:
+            continue
+        for row in sections.get(section, []):
+            # The file entry is the first backtick span in the row; later
+            # spans name guards or reasons, not files in this directory.
+            match = re.search(r"`([^`]+)`", row)
+            if not match:
+                continue
+            entry = match.group(1)
+            if "ledger-catch-all:" in entry:
+                continue
+            if "*" in entry:
+                continue
+            # Entries are ledger-relative: bare names and section-relative
+            # subpaths resolve inside the section directory; anything else
+            # resolves from the repository root.
+            section_candidate = source_dir / entry
+            if section_candidate.is_file():
+                continue
+            candidate = REPO_ROOT / entry
+            if candidate.is_file():
+                continue
+            orphaned.append(f"{section} {entry}")
+    assert not orphaned, f"ledger entries with no file on disk: {orphaned}"
 
 
 def test_ledger_lists_every_pre_commit_hook() -> None:

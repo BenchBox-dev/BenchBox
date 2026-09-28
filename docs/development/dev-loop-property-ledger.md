@@ -236,6 +236,48 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_validate_submission_slim_fallback.py` | product-safety |
 | `test_verify_mcp_conformance.py` | tooling |
 | `test_worktree_audit.py` | tooling |
+| `explorer_pipeline/test_cpu_hardware_identity.py` | product-safety |
+| `explorer_pipeline/test_duckdb_browser_contract.py` | product-safety |
+| `explorer_pipeline/test_duckdb_builder.py` | product-safety |
+| `explorer_pipeline/test_duckdb_readonly_fuzz.py` | product-safety |
+| `explorer_pipeline/test_duplicate_result_id.py` | product-safety |
+| `explorer_pipeline/test_legacy_artifact_guard.py` | pure-process |
+| `explorer_pipeline/test_measurement_basis.py` | product-safety |
+| `explorer_pipeline/test_meta_leaderboard.py` | product-safety |
+| `explorer_pipeline/test_normalized_cost_contract.py` | product-safety |
+| `explorer_pipeline/test_override_display.py` | product-safety |
+| `explorer_pipeline/test_pipeline.py` | pure-process |
+| `explorer_pipeline/test_privacy_rejection.py` | product-safety |
+| `explorer_pipeline/test_ranking.py` | product-safety |
+| `explorer_pipeline/test_read_model_contract.py` | product-safety |
+| `explorer_pipeline/test_result_id_contract.py` | product-safety |
+| `explorer_pipeline/test_transformer.py` | pure-process |
+| `explorer_pipeline/test_visible_metrics_registry.py` | product-safety |
+| `publication/test_acquire_canary_evidence.py` | product-safety |
+| `publication/test_artifacts.py` | product-safety |
+| `publication/test_assembler.py` | product-safety |
+| `publication/test_audit_mirror_prs.py` | product-safety |
+| `publication/test_baseline.py` | product-safety |
+| `publication/test_candidate.py` | product-safety |
+| `publication/test_check_control_plane.py` | tooling |
+| `publication/test_check_corpus_bijection.py` | product-safety |
+| `publication/test_check_explorer_compat.py` | product-safety |
+| `publication/test_check_pages_artifact_wiring.py` | product-safety |
+| `publication/test_check_workflow_permissions.py` | tooling |
+| `publication/test_db_digest.py` | product-safety |
+| `publication/test_journal.py` | product-safety |
+| `publication/test_ledger_seed.py` | product-safety |
+| `publication/test_manifest.py` | product-safety |
+| `publication/test_override_companion_exclusion.py` | product-safety |
+| `publication/test_pages.py` | product-safety |
+| `publication/test_plan_reconciliation.py` | product-safety |
+| `publication/test_reconciler.py` | product-safety |
+| `publication/test_reconciliation.py` | product-safety |
+| `publication/test_transaction.py` | product-safety |
+| `publication/test_transaction_executor.py` | product-safety |
+| `publication/test_verify_corpus_promotion.py` | product-safety |
+| `publication/test_verify_lane_isolation.py` | product-safety |
+| `publication/test_verify_live.py` | product-safety |
 
 ### `tests/unit/release/`
 
@@ -245,12 +287,17 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_ruleset_drift_review_coverage.py` | product-safety | Ruleset drift |
 | `test_ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 
-### `tests/unit/test_auto_merge_*` and `tests/unit/test_release_*`
+### `tests/unit/test_auto_merge_*`
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
 | `test_auto_merge_hold_is_durable.py` | pure-process | Auto-merge hold mechanics; replaced by CI flag |
 | `test_auto_merge_soundness_paths.py` | product-safety | Soundness path manifest lockstep |
+
+### `tests/unit/test_release_*`
+
+| File | Classification | Property or reason |
+| --- | --- | --- |
 | `test_release_canary_incident.py` | product-safety | Release canary |
 | `test_release_canary_sharding.py` | product-safety | Release canary sharding |
 | `test_release_infrastructure.py` | product-safety | Release infrastructure |
@@ -268,18 +315,15 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `generate_landing_quickstarts.py` | product-safety | Landing quickstart generation |
 | `check_doc_relative_links.py` | tooling | Docs hygiene |
 | `check_duplicate_code.py` | tooling | Hygiene |
-| `check_uv_lock_revision.py` | tooling | Lockfile hygiene |
 | `check_windows_antipatterns.py` | tooling | Hygiene |
 | `path_filter_decision.py` | tooling | Path classifier shared with ci.yml units |
 | `pr_landing.py` | pure-process | PR-loop mechanics |
 | `pr_refresh_certification.py` | pure-process | Refresh mechanics |
 | `pr_refresh_replay.py` | pure-process | Refresh mechanics |
-| `pr_review_followups.py` | pure-process | PR-loop mechanics |
 | `post_merge_signature.py` | pure-process | Post-merge mechanics |
 | `local_validation.py` | pure-process | PR-loop mechanics |
 | `phase2_metrics.py` | pure-process | Legacy metrics mechanics |
-| `dev_loop_pr_metrics.py` | tooling | Baseline metrics for this program |
-| Remaining `scripts/*.py` | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
+| Remaining scripts (ledger-catch-all: scripts/) | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
 
 ### `_project/scripts/`
 
@@ -297,7 +341,10 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `agent_instruction_audit.py` | tooling | Agent instruction lockstep |
 | `worktree_audit.py` | tooling | Worktree hygiene |
 | `todo_state_contract_check.py` | tooling | Tracker state contract |
-| Remaining `_project/scripts/*.py` | product-safety | Sweep, corpus, and validation product code; reclassify individually before any deletion |
+| `check_uv_lock_revision.py` | tooling | Lockfile hygiene |
+| `pr_review_followups.py` | pure-process | PR-loop mechanics |
+| `dev_loop_pr_metrics.py` | pure-process | Program baseline metrics mechanics |
+| Remaining project scripts (ledger-catch-all: _project/scripts/) | product-safety | Sweep, corpus, and validation product code; reclassify individually before any deletion |
 
 ### `.pre-commit-config.yaml` hooks
 
