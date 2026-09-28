@@ -5136,6 +5136,18 @@
       "status": "open",
       "title": "Add release-prep and release-check targets that produce and verify the complete pre-tag trunk state"
     },
+    "dlv2-51-release-yml-v2": {
+      "claim": null,
+      "needs": [
+        "dlv2-21-ci-yml-shadow",
+        "dlv2-50-release-prep-targets",
+        "dlv2-33-ruleset-remove-old-checks",
+        "dlv2-22-nightly-t3-shadow"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Build the tag-triggered release workflow that verifies signatures and publishes the exact queue-tested artifacts"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

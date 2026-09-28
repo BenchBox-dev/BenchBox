@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Unsigned or unapproved-key tags are refused (tested with a throwaway pre-release tag on TestPyPI path)",
+    "Artifact hash mismatch or missing queue run refuses publish (tested)",
+    "Workflow never rebuilds artifacts (static check)",
+    "pypi environment reviewers unchanged; test-pypi used for rehearsal"
+  ],
+  "context": "codex C3/C7, muse M6/M8, earlier-round C3. Artifact retention must cover the time between queue run and tag (set retention >= 90 days or re-upload to release storage).",
+  "description": "New release workflow (release-v2.yml until dlv2-53 renames/replaces release.yml) on push of tags v*:\n1. Verify the tag is annotated and signed by an approved key (keys listed in repo); refuse otherwise.\n2. Resolve the tag commit; require it is on develop and has a successful merge_group ci.yml run; download that run's wheel+sdist; verify sha256 equals the recorded hashes (no rebuild).\n3. T4: install+smoke on Python 3.11-3.14 x Linux/macOS/Windows (cross-OS correctness claims only after dlv2-defer-tpch-digest-darwin-arm64), UAT release-gate configs (tests/uat/configs/release-gate-*.yaml), _binaries hash manifest check, make release-check (dlv2-50), ruleset drift (D7), no open release-blocking t3:* issue.\n4. Attest artifacts; publish via environment pypi (required reviewers kept; OIDC); GitHub release with notes.\nLegacy release.yml keeps working in parallel until dlv2-53 (G7).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:53:36Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6e6ddbdc9d9b41818b16efe51dafaf46",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
