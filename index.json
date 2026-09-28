@@ -5108,6 +5108,15 @@
       "status": "open",
       "title": "Delete dev-loop scripts and their pure-process tests after their workflows are gone"
     },
+    "dlv2-43-makefile-agent-instructions-lockstep": {
+      "claim": null,
+      "needs": [
+        "dlv2-42-retire-dev-loop-scripts-tests"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Replace PR-loop Make targets with tier targets and update agent instructions in the same change"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

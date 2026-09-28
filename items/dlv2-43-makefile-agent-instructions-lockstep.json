@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "No agent instruction or skill references a deleted target (G4 sweep incl. skill-sync source)",
+    "Aliases print the replacement and exit with the replacement's status",
+    "An agent session following AGENTS.md end-to-end (preflight, open PR, enqueue) succeeds on the new targets",
+    "makefile-inventory-check updated or superseded consistently (full replacement is dlv2-82)"
+  ],
+  "context": "agy A6, muse M15. Release targets (release-cut*, release-finalize) untouched until dlv2-53 (G7).",
+  "description": "Guardrail G10. Delete targets: pr-arm-auto-merge, pr-conflict-scan, pr-content-guard, pr-fanout, pr-followup-record, pr-followup-resume, pr-landing-ready, pr-landing-start, pr-landing-withdraw, pr-refresh, pr-review-followups, pr-review-followups-list, pr-status, local-validation, local-validation-path, local-validation-show, soundness-drain-report, soundness-drain-self-test, dev-loop-metrics, guards-fix, lane-isolation-check, test-unlock.\nAdd tier targets: `make check` (T0), `make test` (T1 local for touched units), `make test-queue` (T2 local mirror), keep `make ci-linux` as a thin Docker wrapper for macOS hosts. pr-preflight*, pr-open, pr-ready, ci-docs, ci-linkcheck, ci-lint, ci-local, ci-test become aliases that print their replacement and run it, for one release.\nSame PR: update AGENTS.md (write closeout currently mandates make pr-preflight/pr-open/pr-ready and make ci-linux on macOS), CONTRIBUTING.md, .claude/commands/pr.md, docs/development/testing.md, and the skill-sync SOURCE for the benchbox, code, test, and todo skills (not the generated .claude/skills mirror), then re-sync.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:52:50Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "93d8a599795b4b22af3274389c4c3f38",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
