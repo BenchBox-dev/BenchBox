@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "A candidate from a commit without a green merge_group run is refused (tested)",
+    "Assembled site serves stable docs/landing from the release tag and dev docs/results from trunk (verified on preview)",
+    "Explorer mixed-state tests (old UI/new snapshot, new UI/old snapshot) pass in the transaction verify step",
+    "No publication workflow, script, branch, env, App, or secret removed"
+  ],
+  "context": "codex C2/C3, muse M7/M14, agy A10: full replacement is a separate future program with the D2 entry criteria.",
+  "description": "Decision D2 (keep the control plane). Changes inside the existing candidate/transaction flow (scripts/publication/*, publication-*.yml): candidates come only from develop commits with a successful merge_group ci.yml run; add a route manifest: `/` (landing) and `/docs/` from the latest release tag, `/docs/dev/` and blog from trunk, `/results/` (explorer UI + snapshot) from trunk; add explorer ordering to the transaction: snapshot deploys before UI, UI rolls back before snapshot; cross-route link check on the assembled tree. Keep all probes, receipts, rollback, serialized writer, github-pages reviewers.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:54:11Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e2cc525be80e49f8a856903333aac880",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
