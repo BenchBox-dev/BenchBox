@@ -1,0 +1,13 @@
+{
+  "description": "Fix shared-helper TPC-DS queries (19 helper_query_specs.yaml + 13 query_specs.yaml entries: Q3/Q7/Q42/Q43 joined paths, promotion/sales helpers, state_average_returns). Audit default_parameters.yaml vs SQL template literals for these queries; audit rollup_helper.expand_rollup_expression/expand_rollup_pandas grouping-set order, NULL fill, empty-group grand total; audit channel_helper union column mappings. Fix helpers, not per-query copies. SCOPE: benchbox/core/tpcds/dataframe_queries/helper_query_specs.yaml, query_specs.yaml, rollup_helper.py, channel_helper.py, channel_mappings.yaml, default_parameters.yaml + affected call sites in queries.py only. GUARDRAILS: both expression and pandas impls must pass per query; comparator tolerance stays 1e-10, treat_nan_as_null/strip_strings unchanged; no known_divergences additions; SQL reference immutable; Q38/Q88 still pass. VERIFY: staged report + uv run -- pytest tests/ -m tpcds -q + make lint + make typecheck. DECISION GATE: every shared-helper query is PASS or VACUOUS-classified, zero DIVERGENT among them, no regressions.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-28T12:43:24Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "ebed170c36e045daa19062cd1b920692",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

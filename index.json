@@ -17796,6 +17796,15 @@
       "status": "open",
       "title": "TPC-DS parity B0: run staged report and record 99-query baseline matrix"
     },
+    "tpcds-parity-b1-helpers": {
+      "claim": null,
+      "needs": [
+        "tpcds-parity-b0-diagnose"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DS parity B1: fix shared-helper query families (spec-driven + helper impls)"
+    },
     "tpcds-pyspark-compatibility": {
       "claim": null,
       "needs": [],
