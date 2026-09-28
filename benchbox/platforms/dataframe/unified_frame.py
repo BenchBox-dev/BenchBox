@@ -1029,6 +1029,12 @@ class UnifiedExpr:
             return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
         return UnifiedExpr(other_expr / self._expr)
 
+    def __mod__(self, other: Any) -> UnifiedExpr:
+        return UnifiedExpr(self._expr % self._unwrap(other))
+
+    def __rmod__(self, other: Any) -> UnifiedExpr:
+        return UnifiedExpr(self._unwrap(other) % self._expr)
+
     # =========================================================================
     # Comparison Operations
     # =========================================================================

@@ -136,8 +136,8 @@ def _expr_derive(ctx: DataFrameContext, frame: Any, names: str) -> Any:
             frame = frame.with_columns(col("pickup_datetime").dt.truncate("1mo").alias("month"))
         elif name == "day_of_week":
             # Postgres DOW: Sunday=0..Saturday=6. UnifiedDtExpr.weekday() is
-            # ISO (Monday=0..Sunday=6) on every backend, so DOW = (iso + 1) mod 7.
-            frame = frame.with_columns(((col("pickup_datetime").dt.weekday() + lit(1)) % lit(7)).alias("day_of_week"))
+            # ISO (Monday=1..Sunday=7) on every backend, so DOW = iso mod 7.
+            frame = frame.with_columns((col("pickup_datetime").dt.weekday() % lit(7)).alias("day_of_week"))
         elif name == "tip_pct_nonzero":
             frame = frame.with_columns(
                 ctx.when(col("fare_amount") != lit(0))
@@ -172,7 +172,7 @@ def _expr_derive(ctx: DataFrameContext, frame: Any, names: str) -> Any:
                 ((col("duration_sec") / lit(60) / lit(5)).floor() * lit(5)).alias("duration_bucket_min")
             )
         elif name == "day_type":
-            dow = (col("pickup_datetime").dt.weekday() + lit(1)) % lit(7)
+            dow = col("pickup_datetime").dt.weekday() % lit(7)
             frame = frame.with_columns(
                 col("pickup_datetime").dt.hour().alias("hour"),
                 ctx.when(dow.is_in([0, 6])).then(lit("weekend")).otherwise(lit("weekday")).alias("day_type"),

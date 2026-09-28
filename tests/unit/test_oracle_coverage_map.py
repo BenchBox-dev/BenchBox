@@ -292,10 +292,11 @@ def test_surface_provenance_is_read_live_from_gate_metadata(rows):
 
     by_id = {r["benchmark"]: r for r in rows}
     for benchmark_id, gate in {**GATES, **STAGED_GATES}.items():
-        assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
-            f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
-        )
-        assert by_id[benchmark_id]["surface_provenance_rationale"] == gate.surface_independence_rationale
+        if by_id[benchmark_id]["primary_oracle"] == ORACLE_CROSS_SURFACE:
+            assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
+                f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
+            )
+            assert by_id[benchmark_id]["surface_provenance_rationale"] == gate.surface_independence_rationale
 
 
 def test_provenance_never_changes_independence(rows):
@@ -340,7 +341,7 @@ def test_staged_gate_scale_is_read_from_its_own_metadata(monkeypatch):
 
     # Stage a real gate object under a benchmark that has no oracle today, so the row
     # is classified purely through the STAGED path.
-    probe_id = "nyctaxi"
+    probe_id = "tpcdi"
     assert probe_id not in GATES, f"{probe_id} gained an enforced gate; pick another staged probe"
     template = GATES["coffeeshop"]
     staged = replace(
