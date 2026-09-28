@@ -18,7 +18,7 @@ Repository SHA: `64f2f1f603083fc3f6b9c3b13d12ce73f97e6fd3` (`origin/develop`)
 | Pre-commit hooks | 23 hooks | Parsed from `.pre-commit-config.yaml` |
 | Local fast test tier (T1 local) | ~2 min 18 s | `make pr-preflight-fast-tests` (32,208 passed in 138 s across 5 workers) |
 | Merge-queue test tier (T2 local) | ~12 min | Component sum: unit 252s + integration 228s + slow 80s + matrix_sql 75s + matrix_df 32s + gate 25s + smoke 13s + build 7s |
-| Median PR open->merge wall time | 14,205 s (~3.95 h) | `uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 30` (401 merged PRs) |
+| Median PR open->merge wall time | 14,205 s (~3.95 h) | `uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 30` (pinned in `pr-metrics-snapshot.json`, 401 merged PRs) |
 | Median pushes after open | 1 push | `uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 30` |
 | First-pass required-lane green rate | 70.4% (n=399) | `uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 30` |
 | Fast-test CI job seconds (avg / p95) | 1,108 s / 1,458 s | `uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 30` (18.5 min avg / 24.3 min p95) |
@@ -29,6 +29,8 @@ Repository SHA: `64f2f1f603083fc3f6b9c3b13d12ce73f97e6fd3` (`origin/develop`)
 | Configured labels | 15 labels | `gh api repos/BenchBox-dev/BenchBox/labels --paginate --jq '.[].name' \| wc -l` |
 | Configured environments | 4 environments | `gh api repos/BenchBox-dev/BenchBox/environments` (`github-pages`, `publication-attestation`, `pypi`, `test-pypi`) |
 | Configured repository secrets | 7 secrets | `gh secret list --repo BenchBox-dev/BenchBox` (names only: `CODECOV_TOKEN`, `PUBLICATION_APP_ID`, `PUBLICATION_APP_PRIVATE_KEY`, `RULESET_DRIFT_TOKEN`, `TODO_DB_RO_AUTH_TOKEN`, `TODO_DB_URL`, `TODO_EXPORT_PR_TOKEN`) |
+
+> Note: The 30-day cohort metrics and per-PR evaluation records are preserved in `pr-metrics-snapshot.json` (`backup-metadata.json`), capturing the fixed trailing window ending at `2026-09-28T11:45:00-04:00` against develop SHA `64f2f1f603083fc3f6b9c3b13d12ce73f97e6fd3`.
 
 ## 2. Directory Breakdown of Tracked Process Files
 
@@ -62,4 +64,4 @@ Repository SHA: `64f2f1f603083fc3f6b9c3b13d12ce73f97e6fd3` (`origin/develop`)
 
 4. `v-tag-restricted` (ID 18774756):
    - Target: `refs/tags/v*`
-   - Creation/update: restricted
+   - Creation: restricted

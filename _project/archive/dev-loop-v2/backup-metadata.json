@@ -13,6 +13,7 @@
     "labels.json",
     "branches.json",
     "secret-names.json",
-    "pages.json"
+    "pages.json",
+    "pr-metrics-snapshot.json"
   ]
 }
