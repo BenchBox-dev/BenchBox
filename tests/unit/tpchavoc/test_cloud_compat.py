@@ -49,6 +49,50 @@ def test_filtered_aggregate_rewrite_preserves_null_and_distinct_semantics():
     assert duckdb.sql(executable).fetchall() == expected
 
 
+def test_q1_v7_native_array_rewrite_parses_but_stays_skipped_until_live_compile():
+    benchmark = TPCHavocBenchmark(scale_factor=0.1)
+    queries = {dialect: benchmark.get_query("1_v7", dialect=dialect) for dialect in CLOUD_TPCHAVOC_SKIPS}
+
+    # The BigQuery/Databricks native-array rewrite exists and parses, but a
+    # parse check cannot catch engine-side limits (see Snowflake 2_v2 002031),
+    # so the 1_v7 skip stays in both sets until the rewrite compiles live on
+    # each cloud engine. The Snowflake leg is unimplemented (no native array
+    # REDUCE exists), so Snowflake input falls through unchanged.
+    for dialect, query in queries.items():
+        assert "1_v7" in CLOUD_TPCHAVOC_SKIPS[dialect]
+        assert sqlglot.parse_one(query, read=dialect)
+    for dialect in ("bigquery", "databricks"):
+        assert "LIST_SUM" not in queries[dialect].upper()
+        assert "LIST_ZIP" not in queries[dialect].upper()
+
+    # Snowflake has no proven native array reduction: the query must fall
+    # through unchanged (no REDUCE, no rewritten projections).
+    assert "REDUCE(" not in queries["snowflake"]
+    assert "ARRAY_AGG(" in queries["bigquery"]
+    assert "ORDER BY l_orderkey, l_linenumber" in queries["bigquery"]
+    assert "FROM UNNEST(" in queries["bigquery"]
+    assert "SAFE_OFFSET(" in queries["bigquery"]
+    assert "COLLECT_LIST(" in queries["databricks"]
+    assert "SORT_ARRAY(" in queries["databricks"]
+    assert "AGGREGATE(" in queries["databricks"]
+    assert "TRANSFORM(" in queries["databricks"]
+    assert "ZIP_WITH(" in queries["databricks"]
+
+
+def test_snowflake_2_v2_stays_skipped_until_live_compile_passes():
+    benchmark = TPCHavocBenchmark(scale_factor=0.1)
+    query = benchmark.get_query("2_v2", dialect="snowflake")
+
+    # Live Snowflake compilation rejects the correlated scalar subquery
+    # (002031/42601, verified 2026-09-26); a sqlglot parse check cannot catch
+    # that engine-side limit, so the skip stays in both the runtime and
+    # validator sets until a rewrite compiles live on Snowflake.
+    assert "2_v2" in CLOUD_TPCHAVOC_SKIPS["snowflake"]
+    assert sqlglot.parse_one(query, read="snowflake")
+    assert "SELECT MIN(ps_supplycost)" in query
+    assert "GROUP BY ps_partkey" in query
+
+
 def test_snowflake_empty_group_rewrite_is_targeted():
     benchmark = TPCHavocBenchmark(scale_factor=0.1)
     snowflake = benchmark.get_queries(dialect="snowflake")
@@ -99,6 +143,14 @@ def test_registry_describes_runtime_rewrites():
         platform: {key[3] for key, _ in REGISTRY.all_rules() if key[:3] == (Phase.QUERY_ADAPTER, platform, "tpchavoc")}
         for platform in ("bigquery", "snowflake", "databricks")
     }
-    assert registered["bigquery"] == BIGQUERY_FILTER_IDS | {"7_v8", "12_v8", "13_v8", "18_v4", "5_v4", "11_v4", "3_v9"}
+    assert registered["bigquery"] == BIGQUERY_FILTER_IDS | {
+        "7_v8",
+        "12_v8",
+        "13_v8",
+        "18_v4",
+        "5_v4",
+        "11_v4",
+        "3_v9",
+    }
     assert registered["snowflake"] == {"6_v2", "14_v2"}
     assert len(registered["databricks"]) == 11
