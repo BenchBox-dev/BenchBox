@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Before/after ruleset JSON committed to _project/archive/dev-loop-v2/",
+    "Next queue runs show all ten contexts reporting; ruleset-drift green",
+    "Rollback command recorded (restore before JSON)"
+  ],
+  "context": "Starts the G1 counter: >=20 consecutive green queue runs with the new checks required.",
+  "description": "ADMIN CHANGE (G9: owner performs or approves this specific change). Ruleset 15611785 develop-squash-only: add required status checks core, explorer, results-data, docs, landing, tooling. Keep ci-required-result, Results Explorer browser gate, ruleset-drift, Public-site visual acceptance required. Export the ruleset JSON before and after (G5).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:51:42Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9dae35fe613048dda8c4d5c3befa8f5a",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

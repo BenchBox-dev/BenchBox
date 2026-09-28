@@ -5045,6 +5045,16 @@
       "status": "open",
       "title": "Update the ruleset drift expected settings to include the six new required checks before any ruleset change"
     },
+    "dlv2-31-ruleset-add-new-checks": {
+      "claim": null,
+      "needs": [
+        "dlv2-30-drift-settings-add-new-checks",
+        "dlv2-01-baseline-and-backups"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Owner action: add the six new unit checks as required contexts on develop (old checks stay required)"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
