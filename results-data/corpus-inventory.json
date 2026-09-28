@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-28T04:19:48.809427+00:00",
+  "generated_at": "2026-09-28T15:02:27.476436+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -2343,6 +2343,19 @@
       "bundle_sha256": "4d34fab2ee7d5b20e0bfabb233323e0604c6ae8c4ff51843c8b71517aabc8baa"
     },
     {
+      "file": "tpcds_obt_sf1_databricks_sql_20260928_093626_09243b52.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-28T09:36:25.906404",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d4057af7fc63578e50dbfdc8c40f1799612d528a334bb30ded7a41977894c443"
+    },
+    {
       "file": "tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
       "benchmark": "tpcds_obt",
       "benchmark_name": "TPC-DS One Big Table",
@@ -3500,6 +3513,7 @@
     "tpcds_obt@sf1.0": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2"
     ],
     "tpch@sf0.01": [
@@ -3588,7 +3602,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 251,
+    "total_bundles": 252,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
@@ -3603,7 +3617,7 @@
       "ssb": 32,
       "tpcdi": 9,
       "tpcds": 22,
-      "tpcds_obt": 3,
+      "tpcds_obt": 4,
       "tpch": 44,
       "tpch_skew": 16,
       "tpchavoc": 9,
@@ -3615,7 +3629,7 @@
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
       "DataFusion": 45,
-      "Databricks": 2,
+      "Databricks": 3,
       "DuckDB": 80,
       "DuckLake": 1,
       "LakeSail": 1,
@@ -3628,10 +3642,10 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 251
+      "maintainer-run": 252
     },
     "by_funding": {
-      "unspecified": 251
+      "unspecified": 252
     }
   }
 }
