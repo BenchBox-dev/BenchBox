@@ -63,9 +63,23 @@
   day: 11
   year: 1999
 15:
+  min_price: 500
   quarter: 2
-  year: 2001
-  zip_prefix: '85'
+  states:
+  - CA
+  - WA
+  - GA
+  year: 2000
+  zip_codes:
+  - '85669'
+  - '86197'
+  - '88274'
+  - '83405'
+  - '86475'
+  - '85392'
+  - '85460'
+  - '80348'
+  - '81792'
 16:
   call_center: Bill Bowden
   county: Williamson County
@@ -91,7 +105,7 @@
   - VA
   year: 2001
 19:
-  manager_id: 8
+  manager_id: 7
   month: 11
   year: 1999
 20:
@@ -159,7 +173,7 @@
   - 3
   year: 1999
 30:
-  state: GA
+  state: IL
   year: 2002
 31:
   gmt_offset: -5.0
@@ -373,8 +387,8 @@
 80:
   year: 2000
 81:
-  state: GA
-  year: 2000
+  state: IL
+  year: 1998
 82:
   manufact_ids:
   - 437
@@ -417,8 +431,9 @@
     - 20
   year: 2001
 91:
+  buy_potential: 0-500
   month: 11
-  year: 1998
+  year: 1999
 92:
   days: 90
   sales_date: '1998-03-18'

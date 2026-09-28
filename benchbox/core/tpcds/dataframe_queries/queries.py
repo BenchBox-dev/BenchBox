@@ -1324,6 +1324,13 @@ def _joined_agg_expr_condition(ctx: DataFrameContext, params: Any, condition: _J
         return col(column).cast_string().str.slice(0, condition[2]) == lit(
             _resolve_joined_agg_value(params, condition[3])
         )
+    if op == "substr_in":
+        return (
+            col(column)
+            .cast_string()
+            .str.slice(0, _resolve_joined_agg_value(params, condition[2]))
+            .is_in([str(value) for value in list(_resolve_joined_agg_value(params, condition[3]))])
+        )
     if op == "prefix_ne_cols":
         return col(column).cast_string().str.slice(0, condition[3]) != col(condition[2]).cast_string().str.slice(
             0, condition[3]
@@ -1353,6 +1360,10 @@ def _joined_agg_pandas_condition(frame: Any, params: Any, condition: _JoinedAggC
         return frame[column].isin(list(_resolve_joined_agg_value(params, condition[2])))
     if op == "prefix_eq":
         return frame[column].astype(str).str[: condition[2]] == _resolve_joined_agg_value(params, condition[3])
+    if op == "substr_in":
+        length = _resolve_joined_agg_value(params, condition[2])
+        values = [str(value) for value in list(_resolve_joined_agg_value(params, condition[3]))]
+        return frame[column].astype(str).str[:length].isin(values)
     if op == "prefix_ne_cols":
         return frame[column].astype(str).str[: condition[3]] != frame[condition[2]].astype(str).str[: condition[3]]
     if op == "starts_with":
@@ -1481,7 +1492,14 @@ def _state_average_returns_pandas_impl(ctx: DataFrameContext, spec: dict[str, An
     result = ctr_filtered.merge(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
     result = result.merge(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
     cols = [column for column in spec["pandas_select"] if column in result.columns]
-    return result[cols].sort_values(cols).head(100)
+    result = result[cols].sort_values(cols).head(100)
+    # A NULL merged through pandas object columns arrives as float NaN, which
+    # the strict comparator distinguishes from SQL NULL: map NaN back to None
+    # in object columns so NULLs compare equal.
+    for column in result.columns:
+        if result[column].dtype == object:
+            result[column] = result[column].where(result[column].notna(), None)
+    return result
 
 
 def _make_state_average_returns_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:

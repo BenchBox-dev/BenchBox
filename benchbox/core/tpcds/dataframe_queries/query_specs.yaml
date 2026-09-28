@@ -9,7 +9,7 @@ joined_aggregate:
       - [customer_address, c_current_addr_sk, ca_address_sk]
       - [store, ss_store_sk, s_store_sk]
     filters:
-      - [eq, i_manager_id, {param: manager_id, default: 8}]
+      - [eq, i_manager_id, {param: manager_id, default: 7}]
       - [eq, d_moy, {param: month, default: 11}]
       - [eq, d_year, {param: year, default: 1999}]
       - [prefix_ne_cols, ca_zip, s_zip, 5]
@@ -27,8 +27,8 @@ joined_aggregate:
       - [date_dim, cs_sold_date_sk, d_date_sk]
     filters:
       - [eq, d_qoy, {param: quarter, default: 2}]
-      - [eq, d_year, {param: year, default: 2001}]
-      - [prefix_eq, ca_zip, 2, {param: zip_prefix, default: "85"}]
+      - [eq, d_year, {param: year, default: 2000}]
+      - [or, [substr_in, ca_zip, 5, {param: zip_codes, default: ["85669", "86197", "88274", "83405", "86475", "85392", "85460", "80348", "81792"]}], [in, ca_state, {param: states, default: [CA, WA, GA]}], [gt, cs_sales_price, {param: min_price, default: 500}]]
     group_by: [ca_zip]
     aggs:
       - [total_sales, cs_sales_price, sum]
@@ -176,10 +176,10 @@ joined_aggregate:
       - [household_demographics, c_current_hdemo_sk, hd_demo_sk]
       - [customer_address, c_current_addr_sk, ca_address_sk]
     filters:
-      - [eq, d_year, {param: year, default: 1998}]
+      - [eq, d_year, {param: year, default: 1999}]
       - [eq, d_moy, {param: month, default: 11}]
       - [or, [and, [eq, cd_marital_status, M], [eq, cd_education_status, Unknown]], [and, [eq, cd_marital_status, W], [eq, cd_education_status, "Advanced Degree"]]]
-      - [starts_with, hd_buy_potential, {param: buy_potential, default: Unknown}]
+      - [starts_with, hd_buy_potential, {param: buy_potential, default: 0-500}]
       - [eq, ca_gmt_offset, {param: gmt_offset, default: -7}]
     group_by: [cc_call_center_id, cc_name, cc_manager, cd_marital_status, cd_education_status]
     aggs:
@@ -197,7 +197,7 @@ state_average_returns:
     return_customer_key: wr_returning_customer_sk
     return_amount: wr_return_amt
     year_default: 2002
-    state_default: GA
+    state_default: IL
     expression_select: [c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return]
     pandas_select: [c_customer_id, c_salutation, c_first_name, c_last_name, c_preferred_cust_flag, c_birth_day, c_birth_month, c_birth_year, c_birth_country, c_login, c_email_address, c_last_review_date_sk, ctr_total_return]
   - query_id: 81
@@ -207,8 +207,8 @@ state_average_returns:
     return_addr_key: cr_returning_addr_sk
     return_customer_key: cr_returning_customer_sk
     return_amount: cr_return_amt_inc_tax
-    year_default: 2000
-    state_default: GA
+    year_default: 1998
+    state_default: IL
     expression_select:
       - c_customer_id
       - c_salutation
@@ -220,10 +220,10 @@ state_average_returns:
       - ca_suite_number
       - ca_city
       - ca_county
-      - {column: ca_state, alias: ca_state_out}
+      - ca_state
       - ca_zip
       - ca_country
       - ca_gmt_offset
       - ca_location_type
       - ctr_total_return
-    pandas_select: [c_customer_id, c_salutation, c_first_name, c_last_name, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state_y, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ctr_total_return]
+    pandas_select: [c_customer_id, c_salutation, c_first_name, c_last_name, ca_street_number, ca_street_name, ca_street_type, ca_suite_number, ca_city, ca_county, ca_state, ca_zip, ca_country, ca_gmt_offset, ca_location_type, ctr_total_return]
