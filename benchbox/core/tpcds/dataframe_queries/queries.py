@@ -4141,9 +4141,10 @@ def _rolling_average_expression_impl(
     channel_join_key_left: str,
     channel_join_key_right: str,
     channel_cols: list[str],
+    output_cols: list[str],
 ) -> Any:
     params = get_parameters(query_id)
-    year = params.get("year", 1999)
+    year = params.get("year", 2000)
     col = ctx.col
     lit = ctx.lit
     sales = ctx.get_table(sales_table)
@@ -4192,7 +4193,9 @@ def _rolling_average_expression_impl(
             ]
         )
         .with_columns((col("sum_sales") - col("avg_monthly_sales")).alias("diff"))
-        .sort(["diff", "avg_monthly_sales"])
+        # SQL orders by the deviation then the lead-month sales.
+        .sort(["diff", "nsum"])
+        .select([col(name) for name in output_cols])
         .head(100)
     )
 
@@ -4210,6 +4213,16 @@ def q47_expression_impl(ctx: DataFrameContext) -> Any:
         channel_join_key_left="ss_store_sk",
         channel_join_key_right="s_store_sk",
         channel_cols=["s_store_name", "s_company_name"],
+        output_cols=[
+            "i_category",
+            "i_brand",
+            "d_year",
+            "d_moy",
+            "avg_monthly_sales",
+            "sum_sales",
+            "psum",
+            "nsum",
+        ],
     )
 
 
@@ -4225,6 +4238,7 @@ def _rolling_average_pandas_impl(
     channel_join_key_left: str,
     channel_join_key_right: str,
     channel_cols: list[str],
+    output_cols: list[str],
 ) -> Any:
     """Shared rolling average implementation for Q47/Q57 (Pandas Family).
 
@@ -4232,7 +4246,7 @@ def _rolling_average_pandas_impl(
     with the same algorithm but different dimension tables and column names.
     """
     params = get_parameters(query_id)
-    year = params.get("year", 1999)
+    year = params.get("year", 2000)
 
     # Get tables
     sales = ctx.get_table(sales_table)
@@ -4295,11 +4309,10 @@ def _rolling_average_pandas_impl(
         & (abs(result["sum_sales"] - result["avg_monthly_sales"]) / result["avg_monthly_sales"] > 0.1)
     ]
 
-    # Select and sort
+    # Select and sort (SQL orders by the deviation then the lead-month sales)
     result["diff"] = result["sum_sales"] - result["avg_monthly_sales"]
-    output_cols = [*partition_keys, "d_year", "d_moy", "avg_monthly_sales", "sum_sales", "psum", "nsum"]
-    result = result[output_cols]
-    return result.sort_values(["diff", "avg_monthly_sales"]).head(100)
+    result = result.sort_values(["diff", "nsum"]).head(100)
+    return result[output_cols]
 
 
 def q47_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -4315,6 +4328,16 @@ def q47_pandas_impl(ctx: DataFrameContext) -> Any:
         channel_join_key_left="ss_store_sk",
         channel_join_key_right="s_store_sk",
         channel_cols=["s_store_name", "s_company_name"],
+        output_cols=[
+            "i_category",
+            "i_brand",
+            "d_year",
+            "d_moy",
+            "avg_monthly_sales",
+            "sum_sales",
+            "psum",
+            "nsum",
+        ],
     )
 
 
@@ -4336,6 +4359,15 @@ def q57_expression_impl(ctx: DataFrameContext) -> Any:
         channel_join_key_left="cs_call_center_sk",
         channel_join_key_right="cc_call_center_sk",
         channel_cols=["cc_name"],
+        output_cols=[
+            "cc_name",
+            "d_year",
+            "d_moy",
+            "avg_monthly_sales",
+            "sum_sales",
+            "psum",
+            "nsum",
+        ],
     )
 
 
@@ -4352,6 +4384,15 @@ def q57_pandas_impl(ctx: DataFrameContext) -> Any:
         channel_join_key_left="cs_call_center_sk",
         channel_join_key_right="cc_call_center_sk",
         channel_cols=["cc_name"],
+        output_cols=[
+            "cc_name",
+            "d_year",
+            "d_moy",
+            "avg_monthly_sales",
+            "sum_sales",
+            "psum",
+            "nsum",
+        ],
     )
 
 
