@@ -17832,6 +17832,15 @@
       "status": "open",
       "title": "TPC-DS parity B4: fix window, NULL/decimal, and complex-query semantics"
     },
+    "tpcds-parity-b5-vacuity": {
+      "claim": null,
+      "needs": [
+        "tpcds-parity-b4-windows-semantics"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DS parity B5: vacuity closeout (scale probe or legitimately-empty)"
+    },
     "tpcds-pyspark-compatibility": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,13 @@
+{
+  "description": "Close out every VACUOUS query (sql_rows==0 at SF=0.01). Per query: (1) check parameter drift vs SQL template (fix per B2 if drifted); (2) else probe at SF=0.05/0.1 and full-99 wall time: raise gate scale_factor ONLY if full-99 stays under 20s wall AND the raise is the cheapest discriminating path (per-gate scale, never global EQUIVALENCE_SCALE=0.1); (3) else classify in CrossSurfaceGate.legitimately_empty with per-query rationale: exact table+filter causing zero matches, both backends return 0 rows, SF=1.0 probe confirms rows at full scale (template valid). Follow the _AMPLAB/_CLICKBENCH legitimately-empty evidence format in cross_surface.py. SCOPE: builders/tpcds.py scale only if step-2 passes; cross_surface.py legitimately_empty entries; any B2 fixes. GUARDRAILS: never classify a query fixable by scale/params; never touch comparator or known_divergences; SQL immutable. VERIFY: staged report exits with zero unclassified vacuous + zero divergences. DECISION GATE: all 99 queries accounted: PASS discriminating or classified legitimately_empty, 0 unclassified.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-28T12:45:54Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "deb7e69c40fc4ba2b1b9cf192b22ae7c",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
