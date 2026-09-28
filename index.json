@@ -17805,6 +17805,15 @@
       "status": "open",
       "title": "TPC-DS parity B1: fix shared-helper query families (spec-driven + helper impls)"
     },
+    "tpcds-parity-b2-params": {
+      "claim": null,
+      "needs": [
+        "tpcds-parity-b1-helpers"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DS parity B2: align DF parameter defaults with SQL template literals"
+    },
     "tpcds-pyspark-compatibility": {
       "claim": null,
       "needs": [],
