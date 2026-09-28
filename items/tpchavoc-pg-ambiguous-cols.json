@@ -84,6 +84,17 @@
       "op": "renew",
       "op_id": "1321e9276a4c4bddaf2b4181d2120c67",
       "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
+    },
+    {
+      "actor": "jcode-tpchavoc-closeout-recovery",
+      "at": "2026-09-28T20:02:52Z",
+      "client": "jcode",
+      "displaced": "jcode-tpchavoc-closeout",
+      "generation": "342373b43a1f43a891edae3a875d74c1",
+      "op": "takeover",
+      "op_id": "916f90961c0b40258f297209166c7e23",
+      "reason": "The dedicated closeout worker stopped responding during repeated finish and renew calls. Its finish attempt timed out without changing the item, so recovery is taking over the expired/nonresponsive claim to complete the already-verified tracker closeout.",
+      "session_id": "52edd7f7638740259b3dcc97c8045eb5"
     }
   ]
 }

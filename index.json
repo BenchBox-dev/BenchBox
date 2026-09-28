@@ -18378,10 +18378,10 @@
     },
     "tpchavoc-pg-ambiguous-cols": {
       "claim": {
-        "expires_at": "2026-09-29T20:00:49Z",
-        "generation": "07bfcc81c97a4828b7d08db2b6e8378e",
-        "renewals": 2,
-        "worker": "jcode-tpchavoc-closeout"
+        "expires_at": "2026-09-29T20:02:52Z",
+        "generation": "342373b43a1f43a891edae3a875d74c1",
+        "renewals": 0,
+        "worker": "jcode-tpchavoc-closeout-recovery"
       },
       "needs": [],
       "priority": "medium",
