@@ -116,8 +116,10 @@ pointer string.
 - **`FAST_LANE_WARNING: composed tree collects N, K over the M ceiling but
   within the G-test composition grace` (merge queue only, advisory):**
   independently green PRs composed over the ceiling. The queue lane passes
-  `--ceiling-grace 150` (one PR's delta limit), so an overage of up to 150
-  warns instead of ejecting a group of PRs that each fit. The flag is only
+  `--ceiling-grace 750`, which is five entries times the 150-test per-PR
+  delta limit permitted by the approved merge-queue configuration. This lets
+  every independently compliant five-entry composition warn instead of ejecting
+  the group. The flag is only
   honored when the runner's own event file says `merge_group`, so a PR cannot
   self-grant it by editing its workflow copy, and the delta guard below stays
   `pull_request`-only, so a composed overage ejects nowhere silently. Develop

@@ -493,8 +493,8 @@ jobs:
         id: guard-timing-policy
         continue-on-error: true
         # A merge group composes independently green PRs, so an overage of up
-        # to one PR's delta limit warns instead of ejecting the group. The
-        # The script grants the grace only when the runner's own event file
+        # to one delta limit per possible queued entry warns instead of
+        # ejecting the group. The script grants the grace only when the runner's own event file
         # says merge_group, so a PR cannot self-grant it by editing this line:
         # pr.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
         # written by the runner. The delta guard below stays pull_request-only,
@@ -502,7 +502,9 @@ jobs:
         run: |
           args=(--strict)
           if [ "${{ github.event_name }}" = "merge_group" ]; then
-            args+=(--ceiling-grace 150)
+            # APPROVED_MERGE_QUEUE permits five entries; 150 per entry keeps
+            # every independently compliant composition from being ejected.
+            args+=(--ceiling-grace 750)
           fi
           uv run -- python _project/scripts/timing_policy_check.py "${args[@]}"
 

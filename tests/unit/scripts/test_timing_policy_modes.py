@@ -389,7 +389,7 @@ def test_ceiling_grace_still_fails_beyond_grace(monkeypatch: pytest.MonkeyPatch)
     assert violations == ["fast lane count 10151 exceeds limit 10000 (grace 150)"]
 
 
-@pytest.mark.parametrize("value", ["-1", "151", "lots", "+150", "1_50", "0150x"])
+@pytest.mark.parametrize("value", ["-1", "751", "lots", "+150", "1_50", "0751x"])
 def test_parse_ceiling_grace_rejects_out_of_range_values(value: str) -> None:
     with pytest.raises(ValueError, match="--ceiling-grace"):
         mod._parse_ceiling_grace(value)
@@ -451,7 +451,7 @@ def test_ceiling_grace_flag_rejected_on_other_events(
         mod._ceiling_grace_from_event("150")
     _write_event(event_file, {"event_name": "merge_group"})
     with pytest.raises(ValueError, match="--ceiling-grace"):
-        mod._ceiling_grace_from_event("151")
+        mod._ceiling_grace_from_event("751")
     # No event file (local ci-lint runs) means no grace can apply: the flag
     # is rejected rather than silently ignored.
     monkeypatch.delenv("GITHUB_EVENT_PATH")
@@ -469,7 +469,7 @@ def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
     # No environment variable may smuggle the grace in: the committed command
     # carries the flag and the script gates it on runner event identity.
     assert "FAST_LANE_CEILING_GRACE" not in (timing.get("env") or {})
-    assert "--ceiling-grace 150" in timing["run"]
+    assert "--ceiling-grace 750" in timing["run"]
     delta = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-delta")
     assert delta["if"] == "github.event_name == 'pull_request'"
     # Develop post-merge keeps the strict ceiling so a graced queue tip still
