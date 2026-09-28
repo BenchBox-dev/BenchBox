@@ -66,6 +66,15 @@
       "op": "promote",
       "op_id": "acc4a703e2334bceb8b3bdb895582b40",
       "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
+    },
+    {
+      "actor": "jcode-tpchavoc-closeout",
+      "at": "2026-09-28T20:00:11Z",
+      "client": "jcode",
+      "generation": "07bfcc81c97a4828b7d08db2b6e8378e",
+      "op": "take",
+      "op_id": "aa41453720e24c88b2a20d1314db3e92",
+      "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
     }
   ]
 }

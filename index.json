@@ -18383,9 +18383,9 @@
     },
     "tpchavoc-pg-ambiguous-cols": {
       "claim": {
-        "expires_at": "2026-09-29T19:58:09Z",
-        "generation": "ffe8d435094943b6939ab6a47d49c4c1",
-        "renewals": 0,
+        "expires_at": "2026-09-29T20:00:10Z",
+        "generation": "07bfcc81c97a4828b7d08db2b6e8378e",
+        "renewals": 1,
         "worker": "jcode-tpchavoc-closeout"
       },
       "needs": [],
