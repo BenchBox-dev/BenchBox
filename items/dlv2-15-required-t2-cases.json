@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Required case list lives in one module and is asserted by a test",
+    "SQLite subset added and passing",
+    "Skipping any required case fails the T2 job (demonstrated in a test)",
+    "Correctness gate NOT required on macOS until dlv2-defer-tpch-digest-darwin-arm64 is done"
+  ],
+  "context": "Measured locally (clean env, 3 workers): duckdb tpch+tpcds + datafusion tpch 75 s; polars-df tpch 32 s; correctness gate 23 s.",
+  "description": "tests/integration/test_local_platform_benchmark_matrix.py:39-43 has LOCAL_SQL_STABLE_MATRIX duckdb {tpch,tpcds}, datafusion {tpch}, sqlite set() and skips excluded cases (line ~457). Define the required T2 set explicitly: duckdb tpch + tpcds, datafusion tpch (tpcds when stable), polars-df tpch, and a new SQLite subset. A required case that skips or is deselected fails T2 (generalize the JUnit guard used by the Makefile test-correctness-gate target). Keep the 18-query correctness gate (CORRECTNESS_GATE_QUERY_IDS) and its oracle checks in T2 on Linux.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:50:34Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4835de5e18144a6e94352d5074bf2736",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

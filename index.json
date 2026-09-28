@@ -4986,6 +4986,15 @@
       "status": "open",
       "title": "Inventory offline test coverage for every registered platform adapter and fill the gaps"
     },
+    "dlv2-15-required-t2-cases": {
+      "claim": null,
+      "needs": [
+        "dlv2-11-optional-engine-clean-skips"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Define the required T2 engine cases and fail T2 when a required case skips"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
