@@ -18150,10 +18150,15 @@
       "title": "Expand TPC-DS OBT Query Coverage to 93 Queries"
     },
     "tpcds-parity-b0-diagnose": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-29T16:20:06Z",
+        "generation": "22eda9f74f134eefb460f9a0fa5d7958",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-DS parity B0: run staged report and record 99-query baseline matrix"
     },
     "tpcds-parity-b1-helpers": {
