@@ -1121,4 +1121,13 @@ ignore_rules = [
     # _quote_wrapped core, differing only in quote char and error messages.
     # Both names are pinned public API (delta builders + unit tests).
     { function_names = ["quote_literal", "quote_identifier"], path_contains = ["benchbox/platforms/clickhouse/delta_lake.py"] },
+
+    # Gate-run parameter override setters: per-benchmark modules each own a
+    # module-global override cell with identical set/restore shape. The
+    # builders import each benchmark's own setter, so consolidation would
+    # cross benchmark module boundaries for a 14-line accessor.
+    { function_names = ["set_parameter_overrides"], path_contains = [
+        "benchbox/core/nyctaxi/dataframe_queries/parameters.py",
+        "benchbox/core/tsbs_devops/dataframe_queries/parameters.py",
+    ] },
 ]
