@@ -60,12 +60,12 @@ Required status checks:
 ```
 
 Required-check activation is ordered because `ruleset-drift` runs from the
-trusted `develop` tree. Land the PR containing the tooling workflow, the
-always-reporting visual workflow, this expected list, and their drift/landing
-pins while the hosted ruleset still requires the prior three checks. After the
-merge, add `tooling` and `Public-site visual acceptance` to ruleset `15611785`
-without changing strictness, review, queue, or bypass settings. The interval
-between merge and ruleset update is fail closed: the trusted drift check
+trusted `develop` tree. Land the PR containing the tooling workflow, this
+expected list, and their drift/landing pins while the hosted ruleset still
+requires the existing four checks. After the merge, add `tooling` to ruleset
+`15611785` without changing strictness, review, queue, or bypass
+settings. The interval between merge and ruleset update is fail closed: the
+trusted drift check
 reports the missing hosted contexts. Read the live ruleset back and run
 `scripts/ruleset_drift_check.py` before claiming activation. Record a real
 develop PR and merge-group check run with the exact head SHA; a green PR run
