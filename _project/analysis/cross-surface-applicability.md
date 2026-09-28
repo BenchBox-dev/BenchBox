@@ -6,7 +6,7 @@
 
 **Gateable also means CHEAP, not merely overlapping.** A benchmark that rejects the bounded SF=0.01 cell, fetches a canonical dataset via `data_manifest.toml`, or performs downloader-backed network fetches at the bounded scale is `not-cheaply-gateable`, NOT gateable, no matter its id overlap: wiring it would drag a full dataset fetch into routine PRs. The table reason names the scale/provenance evidence.
 
-**Summary:** 9 dual-surface candidates (unguarded + staged, registered but not CI-enforced) — 0 cross-surface gateable (verified verbatim id overlap at a bounded scale), 2 candidate-unverified (registry exists but ZERO verified id overlap — needs a confirmed id mapping first), 2 not-cheaply-gateable (rejects a bounded scale or needs a canonical fetch), 4 have no DataFrame query surface (need a w2 fallback oracle), 1 abandoned (correspondence investigated and ruled out), 0 blocked.
+**Summary:** 11 dual-surface candidates (unguarded + staged, registered but not CI-enforced) — 0 cross-surface gateable (verified verbatim id overlap at a bounded scale), 4 candidate-unverified (registry exists but ZERO verified id overlap — needs a confirmed id mapping first), 2 not-cheaply-gateable (rejects a bounded scale or needs a canonical fetch), 4 have no DataFrame query surface (need a w2 fallback oracle), 1 abandoned (correspondence investigated and ruled out), 0 blocked.
 
 | Benchmark | Status | SQL queries | DataFrame queries | Raw id overlap | Note |
 | --- | --- | --- | --- | --- | --- |
@@ -14,7 +14,9 @@
 | metadata_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 | nyctaxi | not-cheaply-gateable | 25 | 25 | 0 | → NOT a routine-PR gate: downloader-backed network fetch at the bounded scale (downloader.py) |
 | tpcdi | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
+| tpcds | candidate-unverified | 99 | 99 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) [staged, not CI-enforced] |
 | tpcds_obt | abandoned | 89 | 17 | 0 | → correspondence abandoned: DataFrame Q1..Q17 denote OBT-native analytics while SQL ids denote TPC-DS queries; no clean correspondence without renumbering one side (see tests/unit/core/tpcds_obt/test_tpcds_obt_id_mapping_decision.py) Also rejects bounded scale SF=0.01 (requires SF=1). |
+| tpch | candidate-unverified | 22 | 22 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) [staged, not CI-enforced] |
 | tpch_skew | candidate-unverified | 22 | 22 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
 | transaction_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 | tsbs_devops | candidate-unverified | 18 | 18 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
@@ -23,7 +25,7 @@
 ## Campaign dispatch
 
 - **Cross-surface gate, ids overlap as-is (w3):** none.
-- **Candidate-unverified (NOT gateable yet):** tpch_skew, tsbs_devops — a DataFrame query registry exists but ZERO ids overlap the SQL ids verbatim, so there is no verified query correspondence. Each needs an independent, per-benchmark id mapping confirmed (the campaign TODO says "do NOT guess") before a gate can be wired; do not count these as coverage.
+- **Candidate-unverified (NOT gateable yet):** tpcds, tpch, tpch_skew, tsbs_devops — a DataFrame query registry exists but ZERO ids overlap the SQL ids verbatim, so there is no verified query correspondence. Each needs an independent, per-benchmark id mapping confirmed (the campaign TODO says "do NOT guess") before a gate can be wired; do not count these as coverage.
 - **Not-cheaply-gateable (NOT a routine-PR gate):** joinorder, nyctaxi — rejects the bounded SF=0.01 cell, needs a canonical manifest fetch, or performs downloader-backed network fetches at the bounded scale; do not wire as a routine-PR gate.
 - **Abandoned (do NOT re-investigate):** tpcds_obt — the SQL↔DataFrame id correspondence was investigated and ruled out; the row reason records the verdict. Do not re-open as candidate-unverified without renumbering one side first.
 - **w2 fallback oracle** — no DataFrame query registry, so the cross-surface gate cannot reach them; they need a differential second-engine check or a curated expected-results subset: metadata_primitives, tpcdi, transaction_primitives, write_primitives.
