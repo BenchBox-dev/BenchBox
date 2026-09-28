@@ -47,6 +47,7 @@ from benchbox.core.validation.cross_platform import (
     compare_query_results,
     register_query_tolerance,
 )
+from benchbox.platforms.clickhouse._dependencies import import_chdb_session
 
 # ---------------------------------------------------------------------------
 # Tolerance overrides - spec-anchored, registered once at module load time.
@@ -283,8 +284,10 @@ def clickhouse_session(tpch_parquet_dir):
     ``ClickHouseQueryTransformer`` before execution - the same path the full
     ClickHouse platform adapter uses.
     """
-    pytest.importorskip("chdb", reason="chdb not installed")
-    from chdb import session as chdb_session
+    try:
+        chdb_session = import_chdb_session()
+    except ImportError as exc:
+        pytest.skip(f"chdb not installed: {exc}")
 
     sess = chdb_session.Session()
     sess.query("CREATE DATABASE IF NOT EXISTS tpch", "CSV")

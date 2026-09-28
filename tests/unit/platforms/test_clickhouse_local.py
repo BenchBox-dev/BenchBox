@@ -19,11 +19,16 @@ pytestmark = [
 ]
 
 
-pytest.importorskip("chdb", reason="ClickHouse local mode requires chdb for these tests", exc_type=ImportError)
-
 # Include the project root to the Python path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
+
+from benchbox.platforms.clickhouse._dependencies import import_chdb  # noqa: E402
+
+try:
+    import_chdb()
+except ImportError as exc:
+    pytest.skip(f"ClickHouse local mode requires chdb for these tests: {exc}", allow_module_level=True)
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient  # noqa: E402
 

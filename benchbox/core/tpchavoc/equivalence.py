@@ -1041,10 +1041,11 @@ def run_clickhouse_sample() -> int:
     """
     import tempfile
 
+    from benchbox.platforms.clickhouse._dependencies import import_chdb
     from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 
     try:
-        import chdb  # noqa: F401
+        import_chdb()
     except ImportError as exc:
         print(f"ClickHouse equivalence sample SKIPPED - chDB (clickhouse-local) not installed: {exc}")
         return 0
