@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Sphinx build with warnings-as-errors passes",
+    "No doc links to a deleted page",
+    "repo-admin-settings.md matches the live ruleset (drift check green)"
+  ],
+  "context": "Guardrails G4, G10.",
+  "description": "Rewrite docs/development/{testing.md, makefile-architecture.md, quality-gate-policy.md}, docs/operations/{repo-admin-settings.md (final rulesets; drift expected settings), merge-queue-governance.md, pr-triage.md}. Delete docs/operations/{ci-local-parity.md, develop-post-merge-gaps.md, develop-push-drop-inventory.md, fast-lane-budget.md, guards-fix.md, merge-queue-canary-runbook.md, soundness-drain.md, branch-rename-runbook.md (D1 keeps develop)} and docs/development/pr-base-branch-policy.md. Update the Sphinx toctrees and docs/linkcheck_ignore.txt accordingly.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:55:12Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "232e3601a68c47a48780cb60e5a26a31",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

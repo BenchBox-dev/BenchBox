@@ -5230,6 +5230,18 @@
       "status": "open",
       "title": "Rewrite the Makefile into grouped modules and replace the inventory contract with a documented-target test"
     },
+    "dlv2-83-docs-cleanup": {
+      "claim": null,
+      "needs": [
+        "dlv2-53-retire-legacy-release-path",
+        "dlv2-61-retire-docs-yml-pages-fallback",
+        "dlv2-70-retire-scheduled-workflows",
+        "dlv2-82-makefile-rewrite"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Rewrite dev-loop documentation and delete obsolete runbooks"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
