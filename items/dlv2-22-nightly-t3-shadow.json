@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "nightly-v2 runs >=7 nights alongside the existing scheduled workflows with job-level parity report",
+    "Each domain has its own job conclusion, artifacts, and label",
+    "Durations file refreshed by the nightly run",
+    "Owner response policy documented: fix or revert within one working day"
+  ],
+  "context": "Moved before any deletion per codex C6 / agy A5 / muse M11. Guardrails G2, G3.",
+  "description": "New .github/workflows/nightly-v2.yml (renamed to nightly.yml when the old one retires in dlv2-70) at trunk tip with separate jobs and separate failure labels: t3:docker (postgres, clickhouse, trino from docker-integration.yml), t3:cloud (credentialed, optional), t3:perf (perf-smoke), t3:matrix (Python 3.11-3.14 x Linux/macOS/Windows from cross-platform-validation.yml), t3:browser (firefox/webkit explorer), t3:extension (duckdb-datasketches from extension-smoke.yml), t3:install (pypi-latest installability from release-canary.yml), t3:drift (weekly: corpus-drift, pricing-data drift, submission-validator drift, cross-surface baseline autodetect); plus quarantined tests and durations-file refresh. Each failing domain opens/updates one issue with its own label and owner. An open t3:* issue marked release-blocking blocks release.yml (dlv2-51). The trunk-tip run replaces the develop-post-merge push-triggered re-run.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:51:22Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "66dd8c441b9f471a9250145fe18a34bf",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

@@ -5026,6 +5026,16 @@
       "status": "open",
       "title": "Add ci.yml with six always-reporting unit checks and run it in shadow for five working days"
     },
+    "dlv2-22-nightly-t3-shadow": {
+      "claim": null,
+      "needs": [
+        "dlv2-00-decisions-adr",
+        "dlv2-13-durations-budget-quarantine"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Add the new T3 nightly workflow with per-domain jobs and run it in shadow for seven nights"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
