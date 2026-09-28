@@ -5196,6 +5196,18 @@
       "status": "open",
       "title": "Retire the scheduled workflows replaced by the nightly T3 domains"
     },
+    "dlv2-80-github-cleanup": {
+      "claim": null,
+      "needs": [
+        "dlv2-41-retire-post-merge-workflows",
+        "dlv2-53-retire-legacy-release-path",
+        "dlv2-70-retire-scheduled-workflows",
+        "dlv2-01-baseline-and-backups"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Owner action: clean up obsolete GitHub branches, labels, and secrets"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
