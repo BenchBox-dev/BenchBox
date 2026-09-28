@@ -10,8 +10,11 @@ continue. Do not retry the same call unchanged.
 `take` the same item again: re-adopting your own claim is allowed, mints a
 fresh `generation`, and refreshes the lease. An earlier process image still
 holding the old generation goes stale — that is the protection working. If
-someone else holds the claim, you get `E_CONFLICT`; report that rather than
-forcing it.
+someone else holds the claim, you get `E_CONFLICT`; `show_item` to see who
+holds it. When the holder's session is dead and cannot resume, take it over
+deliberately with `takeover(item_id, expected_holder, reason)`: name the exact
+holder you inspected and say why that session is gone. Never take over a live,
+reachable session to skip coordination — report the conflict instead.
 
 `E_MULTIPLE_CLAIMS` means you already hold a live claim on another task. Finish
 or `release` it first — one live claim per worker.

@@ -492,31 +492,47 @@ jobs:
       - name: Timing policy (wall-clock allowlist)
         id: guard-timing-policy
         continue-on-error: true
-        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+        # A merge group composes independently green PRs, so an overage of up
+        # to one delta limit per possible queued entry warns instead of
+        # ejecting the group. The script grants the grace only when the runner's own event file
+        # says merge_group, so a PR cannot self-grant it by editing this line:
+        # pr.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
+        # written by the runner. The delta guard below stays pull_request-only,
+        # so a composed overage cannot slip through it either.
+        run: |
+          args=(--strict)
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            # APPROVED_MERGE_QUEUE permits five entries; 150 per entry keeps
+            # every independently compliant composition from being ejected.
+            args+=(--ceiling-grace 750)
+          fi
+          uv run -- python _project/scripts/timing_policy_check.py "${args[@]}"
 
       - name: Restore fast-lane develop baseline count
         # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
-        # naming-convention comment above): a cache miss here is not a
-        # failure, it's the normal "no exact baseline yet" state that the delta
-        # guard below fails open on. The key is the PR event's actual develop
-        # base SHA; a prefix restore would compare the PR against an unrelated
-        # develop tip when merges or baseline jobs complete out of order.
+        # naming-convention comment above): a cache miss here is not itself a
+        # failure, but the delta guard below reports it as a blocking baseline
+        # error. The key is the PR event's actual develop base SHA; a prefix
+        # restore would compare the PR against an unrelated develop tip when
+        # merges or baseline jobs complete out of order.
         uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: fast-lane-count.txt
           key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
 
       - name: Fast lane ceiling delta vs develop
+        # Pull requests only: in a merge group the delta is the sum of every
+        # composed PR, so it would eject groups whose members each fit.
+        if: github.event_name == 'pull_request'
         # Additive to guard-timing-policy above, never a replacement: that
         # step enforces the absolute max_fast_tests ceiling unconditionally.
-        # This guard fails open (exit 0, DELTA_CHECK_SKIPPED) when the cache
-        # restore above found no baseline -- see
-        # docs/operations/fast-lane-budget.md and the EXCLUDED_STEPS entry
-        # in tests/system/test_ci_lint_parity.py (the restored cache has no
-        # local equivalent).
+        # The pull-request lane requires the exact develop baseline so every
+        # queued member proves its +150 per-PR delta before composition grace
+        # is allowed. A missing cache fails closed instead of weakening that
+        # prerequisite.
         id: guard-fast-lane-delta
         continue-on-error: true
-        run: uv run -- python _project/scripts/timing_policy_check.py --delta-check --develop-count-file fast-lane-count.txt
+        run: uv run -- python _project/scripts/timing_policy_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
 
       - name: UAT spec LOC table drift check
         # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
@@ -637,6 +653,12 @@ jobs:
             outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
             if [ "$outcome" = "success" ]; then
               echo "| $id | ✅ success |" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$id" = "guard-fast-lane-delta" ] \
+              && [ "${GITHUB_EVENT_NAME:-}" = "merge_group" ] \
+              && [ "$outcome" = "skipped" ]; then
+              # This guard is intentionally pull_request-only because its
+              # aggregate delta is not meaningful for a composed merge group.
+              echo "| $id | ✅ skipped (merge_group composition) |" >> "$GITHUB_STEP_SUMMARY"
             else
               echo "| $id | ⚠️ $outcome |" >> "$GITHUB_STEP_SUMMARY"
               echo "FAILED: $id ($outcome)"
