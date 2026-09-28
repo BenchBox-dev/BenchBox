@@ -283,8 +283,11 @@ class TestBigQueryAdapter:
 
         # Should create tables via DDL execution
         query_calls = list(mock_client.query.call_args_list)
-        assert len(query_calls) >= 2  # At least 2 CREATE TABLE statements
-        assert any("`test-project.test_dataset.ORDERS_STAGE`" in call.args[0] for call in query_calls)
+        assert len(query_calls) == 3
+        executed_ddl = [call.args[0] for call in query_calls]
+        assert any("`test-project.test_dataset.TABLE1`" in ddl for ddl in executed_ddl)
+        assert any("`test-project.test_dataset.ORDERS_STAGE`" in ddl for ddl in executed_ddl)
+        assert any("`test-project.test_dataset.TABLE2`" in ddl for ddl in executed_ddl)
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_csv_upload(self, mock_bigquery, dependencies_available):
