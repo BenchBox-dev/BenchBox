@@ -1,12 +1,13 @@
 {
   "acceptance": [
-    "A candidate from a commit without a green merge_group run is refused (tested)",
-    "Assembled site serves stable docs/landing from the release tag and dev docs/results from trunk (verified on preview)",
-    "Explorer mixed-state tests (old UI/new snapshot, new UI/old snapshot) pass in the transaction verify step",
-    "No publication workflow, script, branch, env, App, or secret removed"
+    "assemble_public_site.py builds routes from site/routes.yml with per-route refs (tests)",
+    "Refuses candidates without a green merge_group run and candidates older than the deployed generation (tests incl. overlapping runs)",
+    "Privacy, explorer-compat (both orders), corpus bijection, digest, and link gates wired and tested",
+    "Post-deploy probes and receipt produced in shadow; rollback-by-receipt exercised in shadow with github-pages reviewer approval via API",
+    ">=5 working days shadow with byte/route parity against the current production site explained"
   ],
-  "context": "codex C2/C3, muse M7/M14, agy A10: full replacement is a separate future program with the D2 entry criteria.",
-  "description": "Decision D2 (keep the control plane). Changes inside the existing candidate/transaction flow (scripts/publication/*, publication-*.yml): candidates come only from develop commits with a successful merge_group ci.yml run; add a route manifest: `/` (landing) and `/docs/` from the latest release tag, `/docs/dev/` and blog from trunk, `/results/` (explorer UI + snapshot) from trunk; add explorer ordering to the transaction: snapshot deploys before UI, UI rolls back before snapshot; cross-route link check on the assembled tree. Keep all probes, receipts, rollback, serialized writer, github-pages reviewers.",
+  "context": "Reviewer findings covered: codex C2 (proof of public bytes, last-known-good rollback), C3 (out-of-order deploys), muse M7/M14 (receipts, reviewers), agy A10 (assembler lacks manifest support). Existing contract/threat model to satisfy or explicitly supersede: docs/operations/independent-publication-contract.md, docs/development/independent-publication-threat-model.md, docs/development/adr/adr-independent-publication-authorities.md.",
+  "description": "Decision D2 (approved): REPLACE the publication control plane. This item builds and shadows the replacement; dlv2-62 cuts over and retires the old plane.\nRequired design (from adversarial review; all mandatory):\n1. Route manifest site/routes.yml: `/` (landing) and `/docs/` from the latest release tag; `/docs/dev/`, blog, and `/results/` (explorer UI + DuckDB snapshot) from trunk. Extend scripts/assemble_public_site.py (currently copies local build dirs only) to read the manifest and build each route from its pinned ref.\n2. Candidate identity: only develop commits with a successful merge_group ci.yml run; record source SHA per route, corpus SHA, and the sha256 of the assembled artifact.\n3. Pre-deploy gates (reuse existing scripts): scripts/publication/check_artifact_privacy.py, check_explorer_compat.py (both mixed-version orders; results-explorer/src/db.ts:289 rejects older snapshots), check_corpus_bijection.py, compare_db_digest.py, validator_parity.py, cross-route link check.\n4. One serialized production writer: a single workflow with concurrency group, cancel-in-progress false, and a generation check that refuses a candidate older than the currently deployed one, tested with delayed and overlapping runs in both trigger orders.\n5. Deploy via actions/deploy-pages with environment github-pages (reviewers kept; the agent approves pending deployments via API after gates pass, per standing approval). Explorer ordering: snapshot before UI; rollback UI before snapshot.\n6. Post-deploy probes: fetch every route and verify served bytes/digests match the artifact (reuse scripts/publication/verify_live.py logic); write a durable receipt (deployment id, SHAs, artifact hash, probe results) as a GitHub Deployment status plus a retained workflow artifact.\n7. Rollback job: redeploy an exact prior artifact by receipt, after verifying it is the last known good (probed green), then probe again.\n8. Shadow: deploy to a non-production target (preview Pages site or artifact-only dry run with full probes against a local server) for >=5 working days alongside the existing plane; compare outputs.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -14,6 +15,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "e2cc525be80e49f8a856903333aac880",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T15:06:52Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ff20ee9149e347dc8dddb9b25b3fd0be",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
     }
   ]
