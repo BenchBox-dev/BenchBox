@@ -7293,9 +7293,10 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
 
     params = get_parameters(18)
     year = params.get("year", 2001)
-    states = params.get("states", ["TX", "OH", "TX", "OR", "NM", "KY", "VA"])
+    states = params.get("states", ["ND", "WI", "AL", "NC", "OK", "MS", "TN"])
     cd_gender = params.get("cd_gender", "M")
     cd_education_status = params.get("cd_education_status", "College")
+    birth_months = params.get("birth_months", [9, 5, 12, 4, 1, 10])
 
     catalog_sales, customer_demographics, customer, customer_address, date_dim, item = _tables(
         ctx, "catalog_sales", "customer_demographics", "customer", "customer_address", "date_dim", "item"
@@ -7314,12 +7315,15 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
     # Filter customer_address
     ca_filtered = customer_address.filter(col("ca_state").is_in(states))
 
+    # Filter customers by birth month from the SQL template.
+    customer_filtered = customer.filter(col("c_birth_month").is_in(birth_months))
+
     # Join catalog_sales with dimensions
     cs_joined = (
         catalog_sales.join(date_filtered, left_on="cs_sold_date_sk", right_on="d_date_sk")
         .join(item, left_on="cs_item_sk", right_on="i_item_sk")
         .join(cd1, left_on="cs_bill_cdemo_sk", right_on="cd_demo_sk")
-        .join(customer, left_on="cs_bill_customer_sk", right_on="c_customer_sk")
+        .join(customer_filtered, left_on="cs_bill_customer_sk", right_on="c_customer_sk")
         .join(ca_filtered, left_on="c_current_addr_sk", right_on="ca_address_sk")
         .join(
             customer_demographics.rename({"cd_demo_sk": "cd2_demo_sk", "cd_dep_count": "cd2_dep_count"}),
@@ -7343,8 +7347,10 @@ def q18_expression_impl(ctx: DataFrameContext) -> Any:
     group_cols = ["i_item_id", "ca_country", "ca_state", "ca_county"]
     result = expand_rollup_expression(cs_joined, group_cols, agg_exprs, ctx)
 
-    # Sort and limit
-    return result.sort(["ca_country", "ca_state", "ca_county", "i_item_id"], nulls_last=True).head(100)
+    # The SQL projection has no GROUPING() column: drop the helper's grouping_id.
+    sort_cols = ["ca_country", "ca_state", "ca_county", "i_item_id"]
+    out_cols = [*group_cols, "agg1", "agg2", "agg3", "agg4", "agg5", "agg6", "agg7"]
+    return result.select(out_cols).sort(sort_cols, nulls_last=True).head(100)
 
 
 def q18_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -7353,9 +7359,10 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
 
     params = get_parameters(18)
     year = params.get("year", 2001)
-    states = params.get("states", ["TX", "OH", "TX", "OR", "NM", "KY", "VA"])
+    states = params.get("states", ["ND", "WI", "AL", "NC", "OK", "MS", "TN"])
     cd_gender = params.get("cd_gender", "M")
     cd_education_status = params.get("cd_education_status", "College")
+    birth_months = params.get("birth_months", [9, 5, 12, 4, 1, 10])
 
     catalog_sales, customer_demographics, customer, customer_address, date_dim, item = _tables(
         ctx, "catalog_sales", "customer_demographics", "customer", "customer_address", "date_dim", "item"
@@ -7373,12 +7380,15 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
     # Filter customer_address
     ca_filtered = customer_address[customer_address["ca_state"].isin(states)]
 
+    # Filter customers by birth month from the SQL template.
+    customer_filtered = customer[customer["c_birth_month"].isin(birth_months)]
+
     # Join catalog_sales with dimensions
     cs_joined = catalog_sales.merge(date_filtered, left_on="cs_sold_date_sk", right_on="d_date_sk")
     cs_joined = cs_joined.merge(item[["i_item_sk", "i_item_id"]], left_on="cs_item_sk", right_on="i_item_sk")
     cs_joined = cs_joined.merge(cd1, left_on="cs_bill_cdemo_sk", right_on="cd_demo_sk")
     cs_joined = cs_joined.merge(
-        customer[["c_customer_sk", "c_current_cdemo_sk", "c_current_addr_sk", "c_birth_year"]],
+        customer_filtered[["c_customer_sk", "c_current_cdemo_sk", "c_current_addr_sk", "c_birth_year"]],
         left_on="cs_bill_customer_sk",
         right_on="c_customer_sk",
     )
@@ -7408,8 +7418,9 @@ def q18_pandas_impl(ctx: DataFrameContext) -> Any:
 
     result = expand_rollup_pandas(cs_joined, ["i_item_id", "ca_country", "ca_state", "ca_county"], agg_dict, ctx)
 
-    # Sort and limit
-    return result.sort_values(
+    # The SQL projection has no GROUPING() column: drop the helper's grouping_id.
+    out_cols = ["i_item_id", "ca_country", "ca_state", "ca_county", "agg1", "agg2", "agg3", "agg4", "agg5", "agg6", "agg7"]
+    return result[out_cols].sort_values(
         ["ca_country", "ca_state", "ca_county", "i_item_id"],
         na_position="last",
     ).head(100)
@@ -9293,7 +9304,7 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     from .rollup_helper import expand_rollup_expression
 
     params = get_parameters(14)
-    year = params.get("year", 1999)
+    year = params.get("year", 1998)
 
     # Get tables
     store_sales, catalog_sales, web_sales, item, date_dim = _tables(
@@ -9359,9 +9370,11 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
             sales_df.join(date_target, left_on=date_col, right_on="d_date_sk")
             .join(cross_item_sks, left_on=item_col, right_on="i_item_sk", how="semi")
             .join(item, left_on=item_col, right_on="i_item_sk")
+            # SQL sums the per-row quantity*price product, not SUM(qty)*AVG(price).
+            .with_columns((col(qty_col) * col(price_col)).alias("sales"))
         )
         grouped = df.group_by(["i_brand_id", "i_class_id", "i_category_id"]).agg(
-            (ctx.sum(qty_col) * ctx.mean(price_col)).alias("sales"),
+            col("sales").sum().alias("sales"),
             ctx.len().alias("number_sales"),
         )
         # Filter by average sales
@@ -9384,7 +9397,13 @@ def q14_expression_impl(ctx: DataFrameContext) -> Any:
     ]
 
     result = expand_rollup_expression(combined, group_cols, agg_exprs, ctx)
-    return result.sort(["channel", "i_brand_id", "i_class_id", "i_category_id"]).head(100)
+    # The SQL projection is (channel, brand, class, category, sales, number_sales)
+    # with no GROUPING() column: drop the helper's grouping_id and sort NULLs last.
+    return (
+        result.select([*group_cols, "sum_sales", "sum_number_sales"])
+        .sort(group_cols, nulls_last=True)
+        .head(100)
+    )
 
 
 def q14_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -9392,7 +9411,7 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
     from .rollup_helper import expand_rollup_pandas
 
     params = get_parameters(14)
-    year = params.get("year", 1999)
+    year = params.get("year", 1998)
 
     # Get tables
     store_sales, catalog_sales, web_sales, item, date_dim = _tables(
@@ -9470,7 +9489,10 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
     }
 
     result = expand_rollup_pandas(combined, group_cols, agg_dict, ctx)
-    return result.sort_values(["channel", "i_brand_id", "i_class_id", "i_category_id"]).head(100)
+    # The SQL projection is (channel, brand, class, category, sales, number_sales)
+    # with no GROUPING() column: drop the helper's grouping_id.
+    out_cols = [*group_cols, "sum_sales", "sum_number_sales"]
+    return result[out_cols].sort_values(["channel", "i_brand_id", "i_class_id", "i_category_id"]).head(100)
 
 
 # =============================================================================

@@ -61,7 +61,7 @@
   year: 2001
 14:
   day: 11
-  year: 1999
+  year: 1998
 15:
   min_price: 500
   quarter: 2
@@ -92,17 +92,24 @@
   state: OK
   year: 2001
 18:
+  birth_months:
+  - 9
+  - 5
+  - 12
+  - 4
+  - 1
+  - 10
   cd_education_status: College
   cd_gender: M
   cd_marital_status: S
   states:
-  - TX
-  - OH
-  - TX
-  - OR
-  - NM
-  - KY
-  - VA
+  - ND
+  - WI
+  - AL
+  - NC
+  - OK
+  - MS
+  - TN
   year: 2001
 19:
   manager_id: 7
