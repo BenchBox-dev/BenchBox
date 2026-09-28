@@ -29,6 +29,36 @@ class CrossSurfaceData:
     data_dir: Path
 
 
+def _assemble_simple_duckdb_cell(
+    benchmark: Any,
+    output_dir: Path,
+    table_names: Sequence[str],
+    *,
+    label: str,
+    dataframe_query: Callable[[Any], Any],
+) -> CrossSurfaceData:
+    """Generate data, load it into an in-memory DuckDB cell, and wire both surfaces.
+
+    Shared assembly for builders whose SQL and DataFrame surfaces share the same
+    query ids (the common TPC-H / TPC-DS / TPC-H Skew shape). Builders with
+    divergent id schemes (NYC Taxi, TSBS DevOps) keep their own assembly plus a
+    builder-local id map.
+    """
+    output_dir = Path(output_dir)
+    benchmark.generate_data()
+
+    connection = _load_duckdb_cell(benchmark, output_dir, table_names, label=label)
+    sql_queries = benchmark.get_queries()
+    return CrossSurfaceData(
+        connection=connection,
+        query_ids=list(sql_queries.keys()),
+        reference_sql=lambda query_id: sql_queries[query_id],
+        dataframe_query=dataframe_query,
+        benchmark=benchmark,
+        data_dir=output_dir,
+    )
+
+
 def _load_duckdb_cell(benchmark: Any, output_dir: Path, table_names: Sequence[str], *, label: str) -> Any:
     """Create an in-memory DuckDB, build the schema, load the data, and verify it."""
     import duckdb
