@@ -9816,8 +9816,8 @@ def q14_pandas_impl(ctx: DataFrameContext) -> Any:
 def q23_expression_impl(ctx: DataFrameContext) -> Any:
     """Q23: Sum of catalog+web sales for frequent items by best customers (Polars)."""
     params = get_parameters(23)
-    year = params.get("year", 2000)
-    month = params.get("month", 4)
+    year = params.get("year", 1999)
+    month = params.get("month", 1)
     top_percent = params.get("top_percent", 95)
 
     # Get tables
@@ -9844,13 +9844,15 @@ def q23_expression_impl(ctx: DataFrameContext) -> Any:
         .unique()
     )
 
-    # Max store sales by customer in 4-year period
+    # Max store sales by customer in 4-year period. SQL sums the per-row
+    # quantity*price product, not SUM(qty)*AVG(price).
     # Note: c_customer_sk is dropped after join, use ss_customer_sk instead
     max_store_sales = (
         store_sales.join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
         .join(date_4yr, left_on="ss_sold_date_sk", right_on="d_date_sk")
+        .with_columns((col("ss_quantity") * col("ss_sales_price")).alias("csales_row"))
         .group_by("ss_customer_sk")
-        .agg((ctx.sum("ss_quantity") * ctx.mean("ss_sales_price")).alias("csales"))
+        .agg(col("csales_row").sum().alias("csales"))
         .select(ctx.max_("csales").alias("tpcds_cmax"))
     )
 
@@ -9865,8 +9867,9 @@ def q23_expression_impl(ctx: DataFrameContext) -> Any:
     # Note: c_customer_sk is dropped after join, use ss_customer_sk instead
     best_customers = (
         store_sales.join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
+        .with_columns((col("ss_quantity") * col("ss_sales_price")).alias("ssales_row"))
         .group_by("ss_customer_sk")
-        .agg((ctx.sum("ss_quantity") * ctx.mean("ss_sales_price")).alias("ssales"))
+        .agg(col("ssales_row").sum().alias("ssales"))
         .filter(col("ssales") > lit(threshold))
         .select(col("ss_customer_sk").alias("c_customer_sk"))
     )
@@ -9890,9 +9893,15 @@ def q23_expression_impl(ctx: DataFrameContext) -> Any:
         .select((col("ws_quantity") * col("ws_list_price")).alias("sales"))
     )
 
-    # Union and sum
+    # Union and sum. SQL SUM() over an empty set is NULL (not 0.0).
     all_sales = ctx.concat([cs_sales, ws_sales])
-    return all_sales.select(ctx.sum("sales").alias("sum_sales"))
+    tallied = all_sales.select(
+        ctx.sum("sales").alias("sum_sales"),
+        col("sales").count().alias("n"),
+    )
+    return tallied.select(
+        ctx.when(col("n") > lit(0)).then(col("sum_sales")).otherwise(lit(None)).alias("sum_sales")
+    )
 
 
 def q23_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -9900,8 +9909,8 @@ def q23_pandas_impl(ctx: DataFrameContext) -> Any:
     import pandas as pd
 
     params = get_parameters(23)
-    year = params.get("year", 2000)
-    month = params.get("month", 4)
+    year = params.get("year", 1999)
+    month = params.get("month", 1)
     top_percent = params.get("top_percent", 95)
 
     # Get tables
@@ -9955,6 +9964,9 @@ def q23_pandas_impl(ctx: DataFrameContext) -> Any:
     ws = ws[ws["ws_bill_customer_sk"].isin(best_customer_sks)]
     ws["sales"] = ws["ws_quantity"] * ws["ws_list_price"]
 
+    # SQL SUM() over an empty set is NULL (not 0.0).
+    if len(cs) == 0 and len(ws) == 0:
+        return pd.DataFrame({"sum_sales": [None]})
     total = cs["sales"].sum() + ws["sales"].sum()
     return pd.DataFrame({"sum_sales": [total]})
 
