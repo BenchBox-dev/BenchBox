@@ -1,12 +1,11 @@
 {
   "acceptance": [
-    "Generated deletion lists reviewed and approved by owner before execution",
-    "Archive tags created for auto-revert/* and any branch with unmerged commits",
+    "Deletion lists generated, archived, and executed; archive tags created for auto-revert/* and any branch with unmerged commits",
     "No workflow references a deleted label or secret (G4)",
-    "Post-cleanup branch list archived"
+    "Post-cleanup branch/label/secret-name lists archived"
   ],
   "context": "muse M12/M13.",
-  "description": "ADMIN CHANGES (G5, G8, G9), each separately approved.\nBranches (owner reviews the generated list first): gh-readonly-queue/* with no queued entry and no workflow run referencing the SHA; auto-revert/* after their PRs are closed (archive tags first); auto/* whose PRs are closed; fix/*, claude/*, feat/*, docs/*, chore/* whose PRs are merged or closed. Never delete develop, published-results, publication, todo-state, v*.\nLabels: delete incident:develop-red, incident:develop-red-revert-conflict, incident:release-canary-red, no-auto-merge; keep awaiting-owner if D4 uses it and incident:todo-export-failed; confirm quarantine and t3:* labels exist.\nSecrets: TODO_DB_URL, TODO_DB_RO_AUTH_TOKEN, TODO_EXPORT_PR_TOKEN only after confirming no workflow, script, or external automation uses them. Keep CODECOV_TOKEN (D6), RULESET_DRIFT_TOKEN (D7), PUBLICATION_APP_* (D2).",
+  "description": "Pre-approved admin changes (standing approvals); G5 backups and archive tags first.\nBranches: gh-readonly-queue/* with no queued entry and no workflow run referencing the SHA; auto-revert/* after closing their PRs (archive tags first); auto/* whose PRs are closed; fix/*, claude/*, feat/*, docs/*, chore/* whose PRs are merged or closed. Never delete develop, published-results, todo-state, v*, or any branch with an open PR. (`release` is removed in dlv2-53, `publication` in dlv2-62.)\nLabels: delete incident:develop-red, incident:develop-red-revert-conflict, incident:release-canary-red, no-auto-merge; keep awaiting-owner and incident:todo-export-failed; confirm quarantine and t3:* labels exist.\nSecrets: delete TODO_DB_URL, TODO_DB_RO_AUTH_TOKEN, TODO_EXPORT_PR_TOKEN if rg finds no reference anywhere in the repo (workflows, scripts, docs); otherwise keep and record why. Keep CODECOV_TOKEN (D6) and RULESET_DRIFT_TOKEN (D7).",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
@@ -14,6 +13,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "c23c37f8743943628c2e2ea917186c56",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T15:08:54Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b71820b03b764d7eb7acf0e2ea9ff384",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
     }
   ]

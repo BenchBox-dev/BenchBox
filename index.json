@@ -5212,11 +5212,12 @@
         "dlv2-41-retire-post-merge-workflows",
         "dlv2-53-retire-legacy-release-path",
         "dlv2-70-retire-scheduled-workflows",
-        "dlv2-01-baseline-and-backups"
+        "dlv2-01-baseline-and-backups",
+        "dlv2-62-publication-cutover-and-retirement"
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Owner action: clean up obsolete GitHub branches, labels, and secrets"
+      "title": "Clean up obsolete GitHub branches, labels, and secrets"
     },
     "dlv2-81-config-cleanup": {
       "claim": null,
