@@ -18158,9 +18158,9 @@
     },
     "tpcds-parity-b1-helpers": {
       "claim": {
-        "expires_at": "2026-09-29T16:29:40Z",
-        "generation": "c7503eb7e2be47a991870f8ebc6f2d5c",
-        "renewals": 0,
+        "expires_at": "2026-09-29T16:58:35Z",
+        "generation": "077858d4dc8e4471974fc56e716706e1",
+        "renewals": 1,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
       },
       "needs": [
