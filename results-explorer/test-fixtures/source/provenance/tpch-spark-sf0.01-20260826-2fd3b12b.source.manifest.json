@@ -1,0 +1,8 @@
+{
+  "manifest_version": "1.0",
+  "fixture_bundle": "tpch-spark-sf0.01-20260826-2fd3b12b.json",
+  "source_bundle": "results-data/bundles/tpch_sf001_spark_sql_20260826_191913_2fd3b12b.json",
+  "bundle_hash": "3e59911b7cd0598f62424d4e4f4a52dc90a79cf33f2d745a7a567abc3665b443",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
