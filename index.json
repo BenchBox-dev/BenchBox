@@ -4936,10 +4936,15 @@
       "title": "Dev loop v2: record the owner-approved decisions and standing approvals in an ADR"
     },
     "dlv2-01-baseline-and-backups": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-09-29T20:03:05Z",
+        "generation": "7c6d169fc92a4c71bcb9c33453cc1471",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Dev loop v2: capture baseline metrics and back up all GitHub settings before any change"
     },
     "dlv2-02-property-ledger": {
