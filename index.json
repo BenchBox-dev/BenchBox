@@ -4979,6 +4979,13 @@
       "status": "open",
       "title": "Tier tests by measured duration: durations file, T1 0.5 s budget, and a quarantine marker"
     },
+    "dlv2-14-adapter-offline-inventory": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Inventory offline test coverage for every registered platform adapter and fill the gaps"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A test enumerates registered adapters and fails if any lacks an entry in the inventory",
+    "Every adapter has at least translation and DDL offline cases, or a recorded justified exemption",
+    "Offline adapter tests run in T1 (touched core) and T2"
+  ],
+  "context": "Muse A7 / agy A1 / codex C6.",
+  "description": "T2 runs only four local engines, so breakage in the other 50+ adapters must be caught offline in T1/T2. Build a machine-checked inventory mapping every adapter registered in the platform registry to its offline cases: SQL translation/dialect (e.g. tests/unit/platforms/test_athena_sql_generation.py), DDL generation, sql_compat rules, CLI argument wiring. Missing cases become tests in this item (or child items if large).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:50:25Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "860b9ac318d44b839b4e511344eac427",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
