@@ -2378,44 +2378,39 @@ def q89_pandas_impl(ctx: DataFrameContext) -> Any:
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q1: Customer Returns Analysis (Expression Family).
 
-    Finds customers with above-average returns for their state.
-    Uses CTE pattern for state-level aggregation.
+    Customers whose per-store returns exceed 1.2x their store's average,
+    restricted to stores in a given state.
 
-    Tables: store_returns, date_dim, store, customer, customer_address
-    Pattern: CTE -> join -> filter by aggregation -> order by
+    Tables: store_returns, date_dim, store, customer
+    Pattern: CTE -> correlated per-store average -> filter -> order by
     """
     params = get_parameters(1)
     year = params.get("year", 2000)
     state = params.get("state", "TN")
 
-    store_returns, date_dim, store, customer, customer_address = _tables(
-        ctx, "store_returns", "date_dim", "store", "customer", "customer_address"
-    )
+    store_returns, date_dim, store, customer = _tables(ctx, "store_returns", "date_dim", "store", "customer")
     col = ctx.col
     lit = ctx.lit
 
-    # CTE: Calculate customer returns by state
-    # Note: After joins, right-side join keys are dropped. Use sr_customer_sk (preserved)
-    # instead of c_customer_sk (dropped) in group_by
+    # CTE: returns per customer and store (SQL sums SR_FEE, not the return amount).
     customer_total = (
         store_returns.join(date_dim, left_on="sr_returned_date_sk", right_on="d_date_sk")
-        .join(store, left_on="sr_store_sk", right_on="s_store_sk")
-        .join(customer, left_on="sr_customer_sk", right_on="c_customer_sk")
-        .join(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
-        .filter((col("d_year") == lit(year)) & (col("ca_state") == lit(state)))
-        .group_by("sr_customer_sk", "c_customer_id", "c_first_name", "c_last_name", "c_salutation")
-        .agg(col("sr_return_amt").sum().alias("ctr_total_return"))
+        .filter(col("d_year") == lit(year))
+        .group_by(col("sr_customer_sk").alias("ctr_customer_sk"), col("sr_store_sk").alias("ctr_store_sk"))
+        .agg(col("sr_fee").sum().alias("ctr_total_return"))
     )
 
-    # Calculate state average
-    state_avg = customer_total.select(col("ctr_total_return").mean().alias("avg_return"))
+    # Correlated per-store average: average over the same store only.
+    store_avg = customer_total.group_by("ctr_store_sk").agg(col("ctr_total_return").mean().alias("store_avg"))
 
-    # Main result: filter customers with above-average returns
+    # Main result: above-average customers at stores in the target state.
     return (
-        customer_total.join(state_avg, how="cross")
-        .filter(col("ctr_total_return") > col("avg_return") * lit(1.2))
-        .select("c_customer_id", "c_salutation", "c_first_name", "c_last_name", "ctr_total_return")
-        .sort("ctr_total_return", descending=True)
+        customer_total.join(store_avg, on="ctr_store_sk")
+        .filter(col("ctr_total_return") > col("store_avg") * lit(1.2))
+        .join(store.filter(col("s_state") == lit(state)), left_on="ctr_store_sk", right_on="s_store_sk")
+        .join(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
+        .select("c_customer_id")
+        .sort("c_customer_id")
         .limit(100)
     )
 
@@ -2426,33 +2421,29 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     year = params.get("year", 2000)
     state = params.get("state", "TN")
 
-    store_returns, date_dim, store, customer, customer_address = _tables(
-        ctx, "store_returns", "date_dim", "store", "customer", "customer_address"
+    store_returns, date_dim, store, customer = _tables(ctx, "store_returns", "date_dim", "store", "customer")
+
+    # CTE: returns per customer and store (SQL sums SR_FEE, not the return amount).
+    merged = store_returns.merge(date_dim[["d_date_sk", "d_year"]], left_on="sr_returned_date_sk", right_on="d_date_sk")
+    merged = merged[merged["d_year"] == year]
+    customer_total = merged.groupby(["sr_customer_sk", "sr_store_sk"], as_index=False, dropna=False).agg(
+        ctr_total_return=("sr_fee", "sum")
+    )
+    customer_total = customer_total.rename(
+        columns={"sr_customer_sk": "ctr_customer_sk", "sr_store_sk": "ctr_store_sk"}
     )
 
-    # Build joins
-    merged = store_returns.merge(date_dim, left_on="sr_returned_date_sk", right_on="d_date_sk")
-    merged = merged.merge(store, left_on="sr_store_sk", right_on="s_store_sk")
-    merged = merged.merge(customer, left_on="sr_customer_sk", right_on="c_customer_sk")
-    merged = merged.merge(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
-
-    # Filter
-    filtered = merged[(merged["d_year"] == year) & (merged["ca_state"] == state)]
-
-    # Calculate customer totals
-    customer_total = filtered.groupby(
-        ["c_customer_sk", "c_customer_id", "c_first_name", "c_last_name", "c_salutation"], as_index=False
-    ).agg(ctr_total_return=("sr_return_amt", "sum"))
-
-    # Calculate state average and filter
-    avg_return = customer_total["ctr_total_return"].mean()
-    return (
-        customer_total[customer_total["ctr_total_return"] > avg_return * 1.2][
-            ["c_customer_id", "c_salutation", "c_first_name", "c_last_name", "ctr_total_return"]
-        ]
-        .sort_values("ctr_total_return", ascending=False)
-        .head(100)
+    # Correlated per-store average: average over the same store only.
+    store_avg = customer_total.groupby("ctr_store_sk", as_index=False, dropna=False).agg(
+        store_avg=("ctr_total_return", "mean")
     )
+
+    # Main result: above-average customers at stores in the target state.
+    result = customer_total.merge(store_avg, on="ctr_store_sk")
+    result = result[result["ctr_total_return"] > result["store_avg"] * 1.2]
+    result = result.merge(store[store["s_state"] == state], left_on="ctr_store_sk", right_on="s_store_sk")
+    result = result.merge(customer, left_on="ctr_customer_sk", right_on="c_customer_sk")
+    return result[["c_customer_id"]].sort_values("c_customer_id").head(100)
 
 
 def q6_expression_impl(ctx: DataFrameContext) -> Any:
