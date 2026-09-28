@@ -2956,68 +2956,89 @@ def q13_expression_impl(ctx: DataFrameContext) -> Any:
     lit = ctx.lit
 
     # Join tables
-    return (
+    joined = (
         store_sales.join(store, left_on="ss_store_sk", right_on="s_store_sk")
         .join(customer_demographics, left_on="ss_cdemo_sk", right_on="cd_demo_sk")
         .join(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
         .join(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
         .join(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
-        .filter(
-            (col("d_year") == lit(year))
-            & (
-                # Demographics condition 1
-                (
-                    (col("cd_marital_status") == lit(demo1_marital))
-                    & (col("cd_education_status") == lit(demo1_education))
-                    & col("ss_sales_price").is_between(100.0, 150.0)
-                    & (col("hd_dep_count") == lit(3))
-                )
-                |
-                # Demographics condition 2
-                (
-                    (col("cd_marital_status") == lit(demo2_marital))
-                    & (col("cd_education_status") == lit(demo2_education))
-                    & col("ss_sales_price").is_between(50.0, 100.0)
-                    & (col("hd_dep_count") == lit(1))
-                )
-                |
-                # Demographics condition 3
-                (
-                    (col("cd_marital_status") == lit(demo3_marital))
-                    & (col("cd_education_status") == lit(demo3_education))
-                    & col("ss_sales_price").is_between(150.0, 200.0)
-                    & (col("hd_dep_count") == lit(1))
-                )
+    )
+    predicate = (col("d_year") == lit(year)) & (
+        (
+            # Demographics condition 1
+            (
+                (col("cd_marital_status") == lit(demo1_marital))
+                & (col("cd_education_status") == lit(demo1_education))
+                & col("ss_sales_price").is_between(100.0, 150.0)
+                & (col("hd_dep_count") == lit(3))
             )
-            & (
-                # Address condition 1
-                (
-                    (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(states1)
-                    & col("ss_net_profit").is_between(100, 200)
-                )
-                |
-                # Address condition 2
-                (
-                    (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(states2)
-                    & col("ss_net_profit").is_between(150, 300)
-                )
-                |
-                # Address condition 3
-                (
-                    (col("ca_country") == lit("United States"))
-                    & col("ca_state").is_in(states3)
-                    & col("ss_net_profit").is_between(50, 250)
-                )
+            |
+            # Demographics condition 2
+            (
+                (col("cd_marital_status") == lit(demo2_marital))
+                & (col("cd_education_status") == lit(demo2_education))
+                & col("ss_sales_price").is_between(50.0, 100.0)
+                & (col("hd_dep_count") == lit(1))
+            )
+            |
+            # Demographics condition 3
+            (
+                (col("cd_marital_status") == lit(demo3_marital))
+                & (col("cd_education_status") == lit(demo3_education))
+                & col("ss_sales_price").is_between(150.0, 200.0)
+                & (col("hd_dep_count") == lit(1))
             )
         )
-        .select(
-            col("ss_quantity").mean().alias("avg_ss_quantity"),
-            col("ss_ext_sales_price").mean().alias("avg_ss_ext_sales_price"),
-            col("ss_ext_wholesale_cost").mean().alias("avg_ss_ext_wholesale_cost"),
-            col("ss_ext_wholesale_cost").sum().alias("sum_ss_ext_wholesale_cost"),
+        & (
+            # Address condition 1
+            (
+                (col("ca_country") == lit("United States"))
+                & col("ca_state").is_in(states1)
+                & col("ss_net_profit").is_between(100, 200)
+            )
+            |
+            # Address condition 2
+            (
+                (col("ca_country") == lit("United States"))
+                & col("ca_state").is_in(states2)
+                & col("ss_net_profit").is_between(150, 300)
+            )
+            |
+            # Address condition 3
+            (
+                (col("ca_country") == lit("United States"))
+                & col("ca_state").is_in(states3)
+                & col("ss_net_profit").is_between(50, 250)
+            )
         )
+    )
+    filtered = joined.filter(predicate)
+    # SQL aggregates over an empty set yield NULL (not 0.0/NaN): guard each
+    # output with the non-null input count.
+    tallied = filtered.select(
+        col("ss_quantity").mean().alias("avg_ss_quantity"),
+        col("ss_ext_sales_price").mean().alias("avg_ss_ext_sales_price"),
+        col("ss_ext_wholesale_cost").mean().alias("avg_ss_ext_wholesale_cost"),
+        col("ss_ext_wholesale_cost").sum().alias("sum_ss_ext_wholesale_cost"),
+        col("ss_quantity").count().alias("n"),
+    )
+    return tallied.select(
+        ctx.when(col("n") > lit(0))
+        .then(col("avg_ss_quantity"))
+        .otherwise(lit(None))
+        .alias("avg_ss_quantity"),
+        ctx.when(col("n") > lit(0))
+        .then(col("avg_ss_ext_sales_price"))
+        .otherwise(lit(None))
+        .alias("avg_ss_ext_sales_price"),
+        ctx.when(col("n") > lit(0))
+        .then(col("avg_ss_ext_wholesale_cost"))
+        .otherwise(lit(None))
+        .alias("avg_ss_ext_wholesale_cost"),
+        ctx.when(col("n") > lit(0))
+        .then(col("sum_ss_ext_wholesale_cost"))
+        .otherwise(lit(None))
+        .alias("sum_ss_ext_wholesale_cost"),
     )
 
 
@@ -3096,6 +3117,16 @@ def q13_pandas_impl(ctx: DataFrameContext) -> Any:
         (merged["d_year"] == year) & (demo_cond1 | demo_cond2 | demo_cond3) & (addr_cond1 | addr_cond2 | addr_cond3)
     ]
 
+    # SQL aggregates over an empty set yield NULL (not NaN/0.0).
+    if len(filtered) == 0:
+        return pd.DataFrame(
+            {
+                "avg_ss_quantity": [None],
+                "avg_ss_ext_sales_price": [None],
+                "avg_ss_ext_wholesale_cost": [None],
+                "sum_ss_ext_wholesale_cost": [None],
+            }
+        )
     # Aggregate (single row result)
     return pd.DataFrame(
         {
@@ -9299,8 +9330,10 @@ def q28_expression_impl(ctx: DataFrameContext) -> Any:
 
         stats = bucket.select(
             ctx.mean("ss_list_price").alias(f"B{i + 1}_LP"),
-            ctx.len().alias(f"B{i + 1}_CNT"),
-            col("ss_list_price").n_unique().alias(f"B{i + 1}_CNTD"),
+            # SQL counts non-null ss_list_price values, not rows.
+            col("ss_list_price").count().alias(f"B{i + 1}_CNT"),
+            # SQL COUNT(DISTINCT col) excludes NULL; mask nulls first.
+            col("ss_list_price").filter(col("ss_list_price").is_not_null()).n_unique().alias(f"B{i + 1}_CNTD"),
         )
 
         bucket_results.append(stats)
@@ -9343,7 +9376,8 @@ def q28_pandas_impl(ctx: DataFrameContext) -> Any:
         ]
 
         result_dict[f"B{i + 1}_LP"] = bucket["ss_list_price"].mean()
-        result_dict[f"B{i + 1}_CNT"] = len(bucket)
+        # SQL counts non-null ss_list_price values, not rows.
+        result_dict[f"B{i + 1}_CNT"] = bucket["ss_list_price"].count()
         result_dict[f"B{i + 1}_CNTD"] = bucket["ss_list_price"].nunique()
 
     # Create single row result
