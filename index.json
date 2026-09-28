@@ -4937,9 +4937,9 @@
     },
     "dlv2-01-baseline-and-backups": {
       "claim": {
-        "expires_at": "2026-09-29T20:11:01Z",
-        "generation": "b3cd7f3809cb4709bc82ef3059de1701",
-        "renewals": 1,
+        "expires_at": "2026-09-29T20:12:22Z",
+        "generation": "ab9063c8b57147068d593a010f0fe99a",
+        "renewals": 2,
         "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
       },
       "needs": [],
