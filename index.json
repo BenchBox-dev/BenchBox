@@ -5086,6 +5086,16 @@
       "status": "open",
       "title": "Retire the legacy PR-gate workflows replaced by ci.yml"
     },
+    "dlv2-41-retire-post-merge-workflows": {
+      "claim": null,
+      "needs": [
+        "dlv2-33-ruleset-remove-old-checks",
+        "dlv2-22-nightly-t3-shadow"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Retire the post-merge safety-net and process-monitoring workflows"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

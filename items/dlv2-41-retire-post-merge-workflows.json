@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Evidence that nightly-v2 has run >=7 nights green at trunk tip and the queue has been sole gate for >=20 runs",
+    "G3 ledger rows for each job resolved (covered or pure-process)",
+    "G4 reference sweep clean",
+    "Labels incident:develop-red and incident:develop-red-revert-conflict no longer created by any workflow (label deletion itself is dlv2-80)"
+  ],
+  "context": "muse M2 partially accepted: push-drop risk is addressed by the queue fast-forward plus trunk-tip nightly, not by keeping push-triggered reruns.",
+  "description": "With the merge queue fast-forwarding develop to the tested merge-group commit and nightly-v2 running at trunk tip, delete: develop-post-merge.yml (hourly + push; auto-revert, orphan-PR close, queue certification, sweep coverage, metrics), develop-post-merge-gap-detector.yml, develop-refresh-shadow.yml, orphaned-commit-detector.yml, soundness-drain.yml, phase3-promotion-review.yml, develop-ruleset-drift.yml (drift runs inside ci.yml tooling and release.yml per D7).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:52:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c3abe2126ca549d39ad3729a91a4932b",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
