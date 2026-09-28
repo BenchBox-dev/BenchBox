@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "No workflow, Make target, script, test, or doc references the deleted files (G4)",
+    "pytest --strict-markers collection passes",
+    "Marker list documented in docs/development/testing.md"
+  ],
+  "context": "Guardrails G3, G4.",
+  "description": "Delete pytest-ci.ini, tox.ini, .github/path-filters.yml (replaced by .github/ci-units.yml), and scripts left unused by dlv2-44; trim pytest.ini markers to tier markers plus engine/benchmark selection markers still used; keep .importlinter, codecov.yml, .pre-commit-config.yaml (trimmed).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:54:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "aa31de144a5042488553d7a715318d51",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

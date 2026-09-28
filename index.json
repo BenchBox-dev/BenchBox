@@ -5208,6 +5208,17 @@
       "status": "open",
       "title": "Owner action: clean up obsolete GitHub branches, labels, and secrets"
     },
+    "dlv2-81-config-cleanup": {
+      "claim": null,
+      "needs": [
+        "dlv2-42-retire-dev-loop-scripts-tests",
+        "dlv2-53-retire-legacy-release-path",
+        "dlv2-44-precommit-trim"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove obsolete test and CI config files"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
