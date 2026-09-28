@@ -5013,6 +5013,19 @@
       "status": "open",
       "title": "Add the six-unit path map and extend path_filter_decision.py into the unit classifier"
     },
+    "dlv2-21-ci-yml-shadow": {
+      "claim": null,
+      "needs": [
+        "dlv2-20-ci-units-classifier",
+        "dlv2-12-hermeticity-leak-detector",
+        "dlv2-13-durations-budget-quarantine",
+        "dlv2-15-required-t2-cases",
+        "dlv2-02-property-ledger"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Add ci.yml with six always-reporting unit checks and run it in shadow for five working days"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
