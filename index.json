@@ -5053,7 +5053,7 @@
       ],
       "priority": "critical",
       "status": "open",
-      "title": "Owner action: add the six new unit checks as required contexts on develop (old checks stay required)"
+      "title": "Add the six new unit checks as required contexts on develop (old checks stay required)"
     },
     "dlv2-32-codeowners-soundness-hold": {
       "claim": null,
