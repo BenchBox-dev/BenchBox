@@ -42,19 +42,49 @@ NYCTAXI_SQL_TO_DF_IDS: dict[str, str] = {
 NYCTAXI_DF_TO_SQL_IDS: dict[str, str] = {df_id: sql_id for sql_id, df_id in NYCTAXI_SQL_TO_DF_IDS.items()}
 
 
+def _nyctaxi_sql_overrides(df_id: str) -> dict[str, object]:
+    """Render SQL overrides from the DataFrame default parameters.
+
+    The DataFrame implementations read fixed ``NYCTAXI_DEFAULT_PARAMS``
+    (datetimes for the window bounds, int for ``zone_id``) while the SQL
+    query manager randomizes its windows and zones. Passing the DataFrame
+    values through ``get_query(params=...)`` binds both surfaces to the
+    same predicates; the manager formats dates as ``%Y-%m-%d`` strings,
+    so datetimes are formatted here to match.
+    """
+    from benchbox.core.nyctaxi.dataframe_queries.parameters import NYCTAXI_DEFAULT_PARAMS
+
+    params = NYCTAXI_DEFAULT_PARAMS.get(df_id, {})
+    overrides: dict[str, object] = {}
+    start = params.get("start_date")
+    end = params.get("end_date")
+    if start is not None:
+        overrides["start_date"] = start.strftime("%Y-%m-%d") if hasattr(start, "strftime") else start
+    if end is not None:
+        overrides["end_date"] = end.strftime("%Y-%m-%d") if hasattr(end, "strftime") else end
+    if "zone_id" in params:
+        overrides["zone_id"] = params["zone_id"]
+    return overrides
+
+
 def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
     """Generate NYC Taxi data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
     from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
-    from benchbox.core.nyctaxi.schema import TABLE_ORDER
 
     output_dir = Path(output_dir)
     benchmark = NYCTaxiBenchmark(scale_factor=scale_factor, output_dir=output_dir)
     benchmark.generate_data()
 
-    connection = _load_duckdb_cell(benchmark, output_dir, list(TABLE_ORDER), label="NYC Taxi")
-    sql_queries = benchmark.get_queries()
+    # Load only the benchmark's active tables: the default Yellow-only
+    # configuration generates taxi_zones and trips, while TABLE_ORDER also
+    # lists green/hvfhv/fhv tables that are intentionally absent.
+    connection = _load_duckdb_cell(benchmark, output_dir, benchmark._get_active_tables(), label="NYC Taxi")
     queries = NYCTAXI_DATAFRAME_QUERIES
+    sql_queries = {
+        sql_id: benchmark.get_query(sql_id, params=_nyctaxi_sql_overrides(df_id))
+        for sql_id, df_id in NYCTAXI_SQL_TO_DF_IDS.items()
+    }
     return CrossSurfaceData(
         connection=connection,
         query_ids=list(sql_queries.keys()),
