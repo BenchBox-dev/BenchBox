@@ -3,7 +3,7 @@
     "grep shows no direct chdb import outside the helper (tests may import the helper)",
     "A unit test simulates a failing chdb native import and asserts os.getcwd() is unchanged afterwards",
     "With a chdb that fails to load, tests/unit/test_standardized_test_commands.py and the local matrix tests no longer fail due to cwd",
-    "Upstream issue link recorded in context"
+    "Upstream issue filed on the chdb GitHub repository (owner-approved) describing the missing try/finally around os.chdir in chdb/__init__.py; link recorded in context"
   ],
   "context": "Guardrails: G3 ledger unaffected (product fix). Evidence captured 2026-09-28 on Darwin 27 / Python 3.12.",
   "description": "chdb/__init__.py:58-62 (chdb 4.1.6) does os.chdir(package_dir); from . import _chdb; os.chdir(cwd) with no try/finally. When the native load fails (the wheel fails dlopen on Darwin 27 with \"mis-aligned LINKEDIT string pool\"), the process cwd stays in site-packages/chdb. Observed effects: tests/unit/test_standardized_test_commands.py resolves Makefile under site-packages/chdb (42 failures); CLI subprocesses write results under the wrong cwd so tests/integration/test_local_platform_benchmark_matrix.py finds no result JSON; stray evil.duckdb and datafusion_working/ appear in site-packages/chdb and the repo root.\n\nImplement one helper (e.g. benchbox/platforms/clickhouse/_dependencies.py) that saves cwd, imports chdb, and restores cwd in finally; route all sites through it. Enumerate with grep -rnE \"import chdb|from chdb\" benchbox tests scripts _project/scripts. Known sites: benchbox/platforms/clickhouse/_dependencies.py:16, client.py:91 (from chdb.session import Session), client.py:96, metadata.py:178, benchbox/core/tpchavoc/equivalence.py:1047. File an upstream chdb issue.",
@@ -14,6 +14,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "93e55542077e4b5e973bb0cfe2d3082f",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T15:06:24Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2ea85197794744c1949fb07296db7b0c",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
     }
   ]
