@@ -7166,9 +7166,9 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
     from datetime import datetime, timedelta
 
     params = get_parameters(16)
-    year = params.get("year", 2002)
-    months = params.get("months", [3])
-    state = params.get("state", "TN")
+    year = params.get("year", 1999)
+    months = params.get("months", [2])
+    state = params.get("state", "IL")
     county = params.get("county", "Williamson County")
 
     catalog_sales, catalog_returns, date_dim, customer_address, call_center = _tables(
@@ -7229,12 +7229,24 @@ def q16_expression_impl(ctx: DataFrameContext) -> Any:
         .join(returned_orders, left_on="cs_order_number", right_on="cr_order_number", how="anti")
     )
 
-    # Aggregate
-    return result.select(
+    # Aggregate. SQL SUM() over an empty set is NULL (not 0.0) while COUNT
+    # DISTINCT is 0: guard the sums with the row count.
+    tallied = result.select(
         [
             col("cs_order_number").n_unique().alias("order count"),
-            ctx.sum("cs_ext_ship_cost").alias("total shipping cost"),
-            ctx.sum("cs_net_profit").alias("total net profit"),
+            ctx.sum("cs_ext_ship_cost").alias("ship_cost"),
+            ctx.sum("cs_net_profit").alias("net_profit"),
+            col("cs_order_number").count().alias("n"),
+        ]
+    )
+    return tallied.select(
+        [
+            col("order count"),
+            ctx.when(col("n") > lit(0))
+            .then(col("ship_cost"))
+            .otherwise(lit(None))
+            .alias("total shipping cost"),
+            ctx.when(col("n") > lit(0)).then(col("net_profit")).otherwise(lit(None)).alias("total net profit"),
         ]
     )
 
@@ -7246,9 +7258,9 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     import pandas as pd
 
     params = get_parameters(16)
-    year = params.get("year", 2002)
-    months = params.get("months", [3])
-    state = params.get("state", "TN")
+    year = params.get("year", 1999)
+    months = params.get("months", [2])
+    state = params.get("state", "IL")
     county = params.get("county", "Williamson County")
 
     catalog_sales, catalog_returns, date_dim, customer_address, call_center = _tables(
@@ -7289,8 +7301,11 @@ def q16_pandas_impl(ctx: DataFrameContext) -> Any:
     )
     result = result[result["_merge"] == "left_only"]
 
-    # Aggregate
+    # Aggregate. SQL SUM() over an empty set is NULL (not 0.0) while COUNT
+    # DISTINCT is 0.
     order_count = result["cs_order_number"].nunique()
+    if len(result) == 0:
+        return pd.DataFrame({"order count": [order_count], "total shipping cost": [None], "total net profit": [None]})
     total_shipping = result["cs_ext_ship_cost"].sum()
     total_profit = result["cs_net_profit"].sum()
 
@@ -7318,7 +7333,7 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     Tables: store_sales, store_returns, catalog_sales, date_dim, store, item
     """
     params = get_parameters(17)
-    year = params.get("year", 2001)
+    year = params.get("year", 1998)
     quarter = params.get("quarter", 1)
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
@@ -7335,8 +7350,8 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     quarter_names_ret = [f"{year}Q{q}" for q in range(quarter, min(quarter + 3, 5))]
     d2 = date_dim.filter(col("d_quarter_name").is_in(quarter_names_ret))
 
-    # Filter date_dim for catalog sales (years)
-    d3 = date_dim.filter(col("d_year").is_in([year, year + 1, year + 2]))
+    # Filter date_dim for catalog sales (same Q1-Q3 quarters as returns)
+    d3 = date_dim.filter(col("d_quarter_name").is_in(quarter_names_ret))
 
     # Join store_sales with date, item, store
     # Select only needed columns from date_dim to avoid column conflicts in later joins
@@ -7395,6 +7410,27 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
                 ),
             ]
         )
+        # SQL interleaves each channel's cov after its stdev; with_columns
+        # appends at the end, so select the SQL column order explicitly.
+        .select(
+            [
+                "i_item_id",
+                "i_item_desc",
+                "s_state",
+                "store_sales_quantitycount",
+                "store_sales_quantityave",
+                "store_sales_quantitystdev",
+                "store_sales_quantitycov",
+                "store_returns_quantitycount",
+                "store_returns_quantityave",
+                "store_returns_quantitystdev",
+                "store_returns_quantitycov",
+                "catalog_sales_quantitycount",
+                "catalog_sales_quantityave",
+                "catalog_sales_quantitystdev",
+                "catalog_sales_quantitycov",
+            ]
+        )
         .sort(["i_item_id", "i_item_desc", "s_state"])
         .head(100)
     )
@@ -7403,7 +7439,7 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
 def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q17: Store sales/returns + catalog sales analysis with statistics (Pandas)."""
     params = get_parameters(17)
-    year = params.get("year", 2001)
+    year = params.get("year", 1998)
     quarter = params.get("quarter", 1)
 
     store_sales, store_returns, catalog_sales, date_dim, store, item = _tables(
@@ -7418,8 +7454,8 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     quarter_names_ret = [f"{year}Q{q}" for q in range(quarter, min(quarter + 3, 5))]
     d2 = date_dim[date_dim["d_quarter_name"].isin(quarter_names_ret)][["d_date_sk"]]
 
-    # Filter date_dim for catalog sales (years)
-    d3 = date_dim[date_dim["d_year"].isin([year, year + 1, year + 2])][["d_date_sk"]]
+    # Filter date_dim for catalog sales (same Q1-Q3 quarters as returns)
+    d3 = date_dim[date_dim["d_quarter_name"].isin(quarter_names_ret)][["d_date_sk"]]
 
     # Join store_sales with date, item, store
     ss_joined = store_sales.merge(d1, left_on="ss_sold_date_sk", right_on="d_date_sk")
@@ -7476,8 +7512,40 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     result["store_returns_quantitycov"] = result["store_returns_quantitystdev"] / result["store_returns_quantityave"]
     result["catalog_sales_quantitycov"] = result["catalog_sales_quantitystdev"] / result["catalog_sales_quantityave"]
 
-    # Sort and limit
-    return result.sort_values(["i_item_id", "i_item_desc", "s_state"]).head(100)
+    # SQL interleaves each channel's cov after its stdev; select that order explicitly.
+    out_cols = [
+        "i_item_id",
+        "i_item_desc",
+        "s_state",
+        "store_sales_quantitycount",
+        "store_sales_quantityave",
+        "store_sales_quantitystdev",
+        "store_sales_quantitycov",
+        "store_returns_quantitycount",
+        "store_returns_quantityave",
+        "store_returns_quantitystdev",
+        "store_returns_quantitycov",
+        "catalog_sales_quantitycount",
+        "catalog_sales_quantityave",
+        "catalog_sales_quantitystdev",
+        "catalog_sales_quantitycov",
+    ]
+    # SQL STDDEV_SAMP over a single row is NULL; pandas yields NaN. Map NaN
+    # back to None in object columns so NULLs compare equal (assigning None
+    # into float64 would coerce back to NaN).
+    import pandas as _pd
+
+    result = result[out_cols].sort_values(["i_item_id", "i_item_desc", "s_state"]).head(100)
+    for column in result.columns:
+        if result[column].dtype == object:
+            result[column] = result[column].where(result[column].notna(), None)
+        elif result[column].dtype == float:
+            values = result[column].tolist()
+            if any(value != value for value in values):
+                result[column] = _pd.Series(
+                    [None if value != value else value for value in values], dtype=object
+                )
+    return result
 
 
 # =============================================================================
@@ -10038,6 +10106,7 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     month = params.get("month", 1)
     price_min = params.get("price_min", 0.99)
     price_max = params.get("price_max", 1.49)
+    sales_date_default = params.get("sales_date", "1998-04-08")
 
     # Get tables
     inventory, warehouse, item, date_dim = _tables(ctx, "inventory", "warehouse", "item", "date_dim")
@@ -10045,8 +10114,12 @@ def q21_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
 
-    # Define the sales date (middle of the date range)
-    sales_date = date(year, month, 31)
+    # Pivot date from parameters (stream-0 SQL uses 1998-04-08)
+    sales_date = (
+        datetime.strptime(sales_date_default, "%Y-%m-%d").date()
+        if isinstance(sales_date_default, str)
+        else sales_date_default
+    )
     date_start = sales_date - timedelta(days=30)
     date_end = sales_date + timedelta(days=30)
 
@@ -10106,13 +10179,18 @@ def q21_pandas_impl(ctx: DataFrameContext) -> Any:
     month = params.get("month", 1)
     price_min = params.get("price_min", 0.99)
     price_max = params.get("price_max", 1.49)
+    sales_date_default = params.get("sales_date", "1998-04-08")
 
     # Get tables
     inventory, warehouse, item, date_dim = _tables(ctx, "inventory", "warehouse", "item", "date_dim")
 
-    # Define date range
+    # Define date range (stream-0 SQL pivots on 1998-04-08)
     # Note: Use datetime.date consistently as d_date column may contain date objects
-    sales_date = date(year, month, 31)
+    sales_date = (
+        datetime.strptime(sales_date_default, "%Y-%m-%d").date()
+        if isinstance(sales_date_default, str)
+        else sales_date_default
+    )
     date_start = sales_date - timedelta(days=30)
     date_end = sales_date + timedelta(days=30)
 

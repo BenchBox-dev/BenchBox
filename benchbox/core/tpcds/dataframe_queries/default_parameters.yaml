@@ -109,13 +109,13 @@
   call_center: Bill Bowden
   county: Williamson County
   months:
-  - 3
-  state: TN
-  year: 2002
+  - 2
+  state: IL
+  year: 1999
 17:
   quarter: 1
   state: OK
-  year: 2001
+  year: 1998
 18:
   birth_months:
   - 9
@@ -150,6 +150,7 @@
   year: 1999
 21:
   month: 1
+  sales_date: '1998-04-08'
   warehouse_id: 2
   year: 2000
 22:
