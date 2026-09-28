@@ -243,8 +243,14 @@ def test_surface_provenance_column_present(rows):
         assert "surface_provenance_rationale" in r and r["surface_provenance_rationale"], (
             f"{r['benchmark']} missing surface_provenance_rationale"
         )
-        # The axis only applies to cross-surface gates; everything else reports `—`.
-        if r["primary_oracle"] != ORACLE_CROSS_SURFACE:
+        # The axis discloses the authorship distance of any registered
+        # cross-surface gate (enforced or staged), even when a
+        # higher-priority oracle is primary; benchmarks with no registered
+        # gate report `—`.
+        from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
+
+        has_gate = r["benchmark"] in GATES or r["benchmark"] in STAGED_GATES
+        if r["primary_oracle"] != ORACLE_CROSS_SURFACE and not has_gate:
             assert r["surface_provenance"] == PROVENANCE_NONE, (
                 f"{r['benchmark']} is not cross-surface but discloses provenance={r['surface_provenance']}"
             )
