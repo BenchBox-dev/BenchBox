@@ -20,13 +20,13 @@ helper_queries:
   args:
   - - - i_manufact_id
       - manufact_id
-      - 128
+      - 436
     - - d_moy
       - month
-      - 11
+      - 12
   - - d_year
-    - i_brand
     - i_brand_id
+    - i_brand
   - ss_ext_sales_price
   - sum_agg
   - - d_year
@@ -45,10 +45,10 @@ helper_queries:
       - 1
     - - d_moy
       - month
-      - 11
+      - 12
     - - d_year
       - year
-      - 2000
+      - 1998
   - - d_year
     - i_category_id
     - i_category
@@ -72,13 +72,13 @@ helper_queries:
       - 1
     - - d_moy
       - month
-      - 11
+      - 12
     - - d_year
       - year
-      - 2000
+      - 1998
   - - d_year
-    - i_brand
     - i_brand_id
+    - i_brand
   - ss_ext_sales_price
   - ext_price
   - - d_year
@@ -94,13 +94,13 @@ helper_queries:
   args:
   - - - i_manager_id
       - manager_id
-      - 28
+      - 36
     - - d_moy
       - month
-      - 11
+      - 12
     - - d_year
       - year
-      - 1999
+      - 2001
   - - i_brand_id
     - i_brand
   - ss_ext_sales_price
@@ -133,15 +133,17 @@ helper_queries:
   - ss_sold_date_sk
   - ss_ext_sales_price
   - categories
-  - 1
-  - - i_item_desc
+  - '2001-01-12'
+  - - i_item_id
+    - i_item_desc
     - i_category
     - i_class
     - i_current_price
   - - i_category
     - i_class
-    - itemrevenue
+    - i_item_id
     - i_item_desc
+    - revenueratio
 - query_id: 12
   title: Web Sales Item Analysis
   expression_helper: _item_category_sales_expression
@@ -152,7 +154,7 @@ helper_queries:
   - ws_sold_date_sk
   - ws_ext_sales_price
   - item_categories
-  - 2
+  - '2001-01-12'
   - - i_item_id
     - i_item_desc
     - i_category
@@ -160,8 +162,9 @@ helper_queries:
     - i_current_price
   - - i_category
     - i_class
-    - itemrevenue
     - i_item_id
+    - i_item_desc
+    - revenueratio
 - query_id: 20
   title: Catalog Sales Item Analysis
   expression_helper: _item_category_sales_expression
@@ -172,7 +175,7 @@ helper_queries:
   - cs_sold_date_sk
   - cs_ext_sales_price
   - item_categories
-  - 2
+  - '2001-01-12'
   - - i_item_id
     - i_item_desc
     - i_category
@@ -180,8 +183,9 @@ helper_queries:
     - i_current_price
   - - i_category
     - i_class
-    - itemrevenue
     - i_item_id
+    - i_item_desc
+    - revenueratio
 - query_id: 26
   title: Catalog Sales Promo Analysis
   expression_helper: _promotion_sales_expression

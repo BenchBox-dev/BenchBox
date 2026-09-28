@@ -6,8 +6,8 @@
   year: 2001
 3:
   agg_column: ss_ext_sales_price
-  manufact_id: 128
-  month: 11
+  manufact_id: 436
+  month: 12
 4:
   year: 2001
 5:
@@ -17,10 +17,10 @@
   year: 2001
 7:
   channel_promo: channel_demo
-  education: College
-  gender: M
-  marital_status: S
-  year: 2000
+  education: Primary
+  gender: F
+  marital_status: W
+  year: 1998
 8:
   year: 1998
   zip_codes:
@@ -49,10 +49,11 @@
   year: 2001
 12:
   item_categories:
+  - Jewelry
   - Sports
   - Books
-  - Home
   month: 2
+  sales_date: '2001-01-12'
   year: 1999
 13:
   education: Advanced Degree
@@ -95,10 +96,11 @@
   year: 1999
 20:
   item_categories:
+  - Jewelry
   - Sports
   - Books
-  - Home
   month: 2
+  sales_date: '2001-01-12'
   year: 1999
 21:
   month: 1
@@ -125,11 +127,11 @@
   - 3
   year: 2001
 26:
-  education: College
-  gender: M
-  marital_status: S
+  education: Primary
+  gender: F
+  marital_status: W
   promo_channel: channel_demo
-  year: 2000
+  year: 1998
 27:
   education: College
   gender: M
@@ -207,8 +209,8 @@
   - 830
   - 540
 42:
-  month: 11
-  year: 2000
+  month: 12
+  year: 1998
 43:
   gmt_offset: -5.0
   year: 2000
@@ -254,8 +256,8 @@
   - 4
   year: 2001
 52:
-  month: 11
-  year: 2000
+  month: 12
+  year: 1998
 53:
   manufacturer_ids:
   - 88
@@ -267,9 +269,9 @@
   month: 4
   year: 2000
 55:
-  manager_id: 28
-  month: 11
-  year: 1999
+  manager_id: 36
+  month: 12
+  year: 2001
 56:
   colors:
   - slate
@@ -435,9 +437,10 @@
   year: 2002
 98:
   categories:
+  - Jewelry
   - Sports
   - Books
-  - Home
+  sales_date: '2001-01-12'
   year: 1999
 99:
   month: 2

@@ -177,24 +177,32 @@ def _item_category_sales_expression(
     date_key: str,
     value_col: str,
     category_param: str,
-    month_default: int,
+    sales_date_default: str,
     group_by: tuple[str, ...],
     sort_by: tuple[str, ...],
 ) -> Any:
     params = get_parameters(query_id)
-    year = params.get("year", 1999)
-    month = params.get("month", month_default)
     categories = params.get(category_param, ["Sports", "Books", "Home"])
+    start_date, end_date = _sales_date_window(query_id, sales_date_default)
     col = ctx.col
     lit = ctx.lit
-    return (
+    grouped = (
         ctx.get_table(sales_table)
         .join(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
         .join(ctx.get_table("date_dim"), left_on=date_key, right_on="d_date_sk")
-        .filter(col("i_category").is_in(categories) & (col("d_year") == lit(year)) & (col("d_moy") == lit(month)))
+        .filter(
+            col("i_category").is_in(categories)
+            & (col("d_date") >= lit(start_date))
+            & (col("d_date") <= lit(end_date))
+        )
         .group_by(*group_by)
         .agg(col(value_col).sum().alias("itemrevenue"))
-        .sort(list(sort_by), descending=[False, False, True, False])
+    )
+    return (
+        grouped.with_columns(
+            (col("itemrevenue") * 100 / ctx.window_sum("itemrevenue", partition_by=["i_class"])).alias("revenueratio")
+        )
+        .sort(list(sort_by))
         .limit(100)
     )
 
@@ -207,23 +215,23 @@ def _item_category_sales_pandas(
     date_key: str,
     value_col: str,
     category_param: str,
-    month_default: int,
+    sales_date_default: str,
     group_by: tuple[str, ...],
     sort_by: tuple[str, ...],
 ) -> Any:
     params = get_parameters(query_id)
-    year = params.get("year", 1999)
-    month = params.get("month", month_default)
     categories = params.get(category_param, ["Sports", "Books", "Home"])
+    start_date, end_date = _sales_date_window(query_id, sales_date_default)
     merged = ctx.get_table(sales_table).merge(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
     merged = merged.merge(ctx.get_table("date_dim"), left_on=date_key, right_on="d_date_sk")
-    filtered = merged[(merged["i_category"].isin(categories)) & (merged["d_year"] == year) & (merged["d_moy"] == month)]
-    return (
-        filtered.groupby(list(group_by), as_index=False)
-        .agg(itemrevenue=(value_col, "sum"))
-        .sort_values(list(sort_by), ascending=[True, True, False, True])
-        .head(100)
+    filtered = merged[
+        (merged["i_category"].isin(categories)) & (merged["d_date"] >= start_date) & (merged["d_date"] <= end_date)
+    ]
+    grouped = filtered.groupby(list(group_by), as_index=False).agg(itemrevenue=(value_col, "sum"))
+    grouped["revenueratio"] = (
+        grouped["itemrevenue"] * 100 / grouped.groupby("i_class")["itemrevenue"].transform("sum")
     )
+    return grouped.sort_values(list(sort_by)).head(100)
 
 
 def _excess_discount_expression(
@@ -862,6 +870,9 @@ def _promotion_sales_expression(
 ) -> Any:
     params = get_parameters(query_id)
     year = params.get("year", 2000)
+    gender = params.get("gender", "M")
+    marital_status = params.get("marital_status", "S")
+    education = params.get("education", "College")
     col, lit = ctx.col, ctx.lit
     return (
         ctx.get_table(sales_table)
@@ -870,9 +881,9 @@ def _promotion_sales_expression(
         .join(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
         .join(ctx.get_table("promotion"), left_on=promo_key, right_on="p_promo_sk")
         .filter(
-            (col("cd_gender") == lit("M"))
-            & (col("cd_marital_status") == lit("S"))
-            & (col("cd_education_status") == lit("College"))
+            (col("cd_gender") == lit(gender))
+            & (col("cd_marital_status") == lit(marital_status))
+            & (col("cd_education_status") == lit(education))
             & ((col("p_channel_email") == lit("N")) | (col("p_channel_event") == lit("N")))
             & (col("d_year") == lit(year))
         )
@@ -903,6 +914,9 @@ def _promotion_sales_pandas(
 ) -> Any:
     params = get_parameters(query_id)
     year = params.get("year", 2000)
+    gender = params.get("gender", "M")
+    marital_status = params.get("marital_status", "S")
+    education = params.get("education", "College")
     merged = ctx.get_table(sales_table).merge(
         ctx.get_table("customer_demographics"), left_on=cdemo_key, right_on="cd_demo_sk"
     )
@@ -910,9 +924,9 @@ def _promotion_sales_pandas(
     merged = merged.merge(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
     merged = merged.merge(ctx.get_table("promotion"), left_on=promo_key, right_on="p_promo_sk")
     filtered = merged[
-        (merged["cd_gender"] == "M")
-        & (merged["cd_marital_status"] == "S")
-        & (merged["cd_education_status"] == "College")
+        (merged["cd_gender"] == gender)
+        & (merged["cd_marital_status"] == marital_status)
+        & (merged["cd_education_status"] == education)
         & ((merged["p_channel_email"] == "N") | (merged["p_channel_event"] == "N"))
         & (merged["d_year"] == year)
     ]
