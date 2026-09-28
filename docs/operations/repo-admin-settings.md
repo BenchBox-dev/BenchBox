@@ -53,21 +53,23 @@ Required status checks:
 
 ```text
 - ci-required-result
+- tooling
 - Results Explorer browser gate
 - ruleset-drift
 - Public-site visual acceptance
 ```
 
-Visual-check activation is ordered because `ruleset-drift` runs from the
-trusted `develop` tree. Land the PR containing the always-reporting workflow,
-this expected list, and its drift/landing pins while the hosted ruleset still
-requires the prior three checks. After the merge, add `Public-site visual
-acceptance` to ruleset `15611785` without changing strictness, review,
-queue, or bypass settings. The interval between merge and ruleset update is
-fail closed: the new trusted drift check reports the missing hosted context.
-Read the live ruleset back and run `scripts/ruleset_drift_check.py` before
-claiming activation. Record a real develop PR and merge-group check run with
-the exact head SHA; a green PR run alone does not prove queue coverage.
+Required-check activation is ordered because `ruleset-drift` runs from the
+trusted `develop` tree. Land the PR containing the tooling workflow, the
+always-reporting visual workflow, this expected list, and their drift/landing
+pins while the hosted ruleset still requires the prior three checks. After the
+merge, add `tooling` and `Public-site visual acceptance` to ruleset `15611785`
+without changing strictness, review, queue, or bypass settings. The interval
+between merge and ruleset update is fail closed: the trusted drift check
+reports the missing hosted contexts. Read the live ruleset back and run
+`scripts/ruleset_drift_check.py` before claiming activation. Record a real
+develop PR and merge-group check run with the exact head SHA; a green PR run
+alone does not prove queue coverage.
 
 A code-PR `synchronize` is not one Develop PR run. The same head SHA also
 starts Results Explorer browser tests, PR base guard, auto-merge revocation,

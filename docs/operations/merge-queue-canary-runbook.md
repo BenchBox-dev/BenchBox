@@ -7,7 +7,7 @@ This runbook provides the operational procedure and scenario checklist for condu
 ## 1. Objectives & Safety Invariants
 
 - **Isolation Invariant:** The production `develop-squash-only` ruleset must remain untouched during initial canary runs. Rehearsals run against a dedicated test branch (e.g. `smoke/merge-queue-canary`) or staged sandbox ruleset.
-- **Contract Proof:** Prove that all four required status checks (`ci-required-result`, `Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`) report successfully under `merge_group: checks_requested`.
+- **Contract Proof:** Prove that all five required status checks (`ci-required-result`, `tooling`, `Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`) report successfully under `merge_group: checks_requested`.
 - **Soundness Gate Proof:** Prove that pull requests touching `SOUNDNESS_PREFIXES` are strictly withheld from auto-enqueueing.
 
 ---
@@ -22,6 +22,7 @@ This runbook provides the operational procedure and scenario checklist for condu
   3. Inspect the spawned `merge_group` workflow run:
      - `ci-paths` classifies `safe-content-only: true`.
      - Code lanes skip; `content-guard` passes; `ci-required-result` aggregates green.
+     - `tooling` reports success for the unchanged soundness surface.
      - `Results Explorer browser gate` reports success (no explorer changes).
      - `ruleset-drift` executes trusted base check and reports green.
      - `Public-site visual acceptance` requires the exact-base comparison.
@@ -36,6 +37,7 @@ This runbook provides the operational procedure and scenario checklist for condu
      - `ci-paths` classifies `needs-code-ci: true`.
      - `code-lint`, `code-test`, `medium-test`, `correctness-gate`, and `parity-check` execute fully on the speculative merge tree.
      - `ci-required-result` aggregates green.
+     - `tooling` reports success for the unchanged soundness surface.
      - `Results Explorer browser gate` reports success.
      - `ruleset-drift` reports green.
      - `Public-site visual acceptance` reports success for unaffected site inputs.
@@ -59,7 +61,7 @@ This runbook provides the operational procedure and scenario checklist for condu
 | 1. Workflow YAML Validity | Pass with zero syntax errors | `python -c "import yaml; [yaml.safe_load(open(f)) for f in ['.github/workflows/pr.yml', '.github/workflows/results-explorer-browser.yml', '.github/workflows/develop-ruleset-drift.yml', '.github/workflows/docs.yml']]"` |
 | 2. Unit Tests Passing | All workflow tests green | `uv run -- python -m pytest tests/unit/workflows/ -q` |
 | 3. Soundness Tests Passing | All 38 soundness tests green | `uv run -- python -m pytest tests/unit/test_auto_merge_soundness_paths.py -q` |
-| 4. Status Check Match | Exact required check names match ruleset | `rg -n 'ci-required-result|Results Explorer browser gate|ruleset-drift|Public-site visual acceptance' .github/workflows/` |
+| 4. Status Check Match | Exact required check names match ruleset | `rg -n 'ci-required-result|tooling|Results Explorer browser gate|ruleset-drift|Public-site visual acceptance' .github/workflows/` |
 | 5. Trusted Base Drift | Checkout uses `merge_group.base_sha` | `rg -n 'merge_group.base_sha' .github/workflows/develop-ruleset-drift.yml` |
 
 ---

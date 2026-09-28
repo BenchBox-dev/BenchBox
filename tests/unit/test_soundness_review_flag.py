@@ -103,6 +103,7 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     assert triggers is not None
     assert "pull_request" in triggers
     assert "merge_group" in triggers
+    assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "edited"]
 
     tooling = workflow["jobs"]["tooling"]
     assert tooling["name"] == "tooling"
@@ -111,8 +112,13 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     assert "check_soundness_review.py" in soundness_step["run"]
     assert "if" not in tooling
     assert "MERGE_GROUP_PRS" in soundness_step["env"]
+    assert "BASE_SHA" in soundness_step["env"]
     assert "gh api --paginate" in soundness_step["run"]
     assert "previous_filename" in soundness_step["run"]
+    assert "trusted-soundness" in soundness_step["run"]
+    assert 'git show "${BASE_SHA}:_project/scripts/check_soundness_review.py"' in soundness_step["run"]
+    assert "auto_merge_soundness_paths.py" in soundness_step["run"]
+    assert "python _project/scripts/check_soundness_review.py" not in soundness_step["run"]
 
 
 def test_checker_cli_reports_failure_and_success(tmp_path: Path) -> None:

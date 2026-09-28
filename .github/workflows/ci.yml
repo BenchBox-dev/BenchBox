@@ -2,6 +2,7 @@ name: CI v2
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   merge_group:
 
 concurrency:
@@ -36,9 +37,86 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
           PR_BODY: ${{ github.event.pull_request.body || '' }}
           MERGE_GROUP_PRS: ${{ toJson(github.event.merge_group.pull_requests) }}
         run: |
+          set -euo pipefail
+
+          check_one() {
+            local paths_file="$1"
+            local body_file="$2"
+            local trusted_root="$RUNNER_TEMP/trusted-soundness"
+            local result
+            rm -rf "$trusted_root"
+            mkdir -p "$trusted_root/_project/scripts"
+            mkdir -p "$trusted_root/.github"
+
+            # After this rollout lands, the base revision contains the checker
+            # and manifest. Execute those immutable base files, never the PR
+            # checkout, so a PR cannot narrow its own soundness predicate.
+            if git cat-file -e "${BASE_SHA}:_project/scripts/check_soundness_review.py" 2>/dev/null \
+              && git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null \
+              && git cat-file -e "${BASE_SHA}:.github/soundness-paths.txt" 2>/dev/null; then
+              git show "${BASE_SHA}:_project/scripts/check_soundness_review.py" \
+                > "$trusted_root/_project/scripts/check_soundness_review.py"
+              git show "${BASE_SHA}:_project/scripts/soundness_paths.py" \
+                > "$trusted_root/_project/scripts/soundness_paths.py"
+              git show "${BASE_SHA}:.github/soundness-paths.txt" \
+                > "$trusted_root/.github/soundness-paths.txt"
+              python "$trusted_root/_project/scripts/check_soundness_review.py" \
+                --paths-file "$paths_file" \
+                --body-file "$body_file"
+              return
+            fi
+
+            # Bootstrap compatibility for this first rollout: develop does not
+            # yet contain the new checker. Use the immutable legacy predicate
+            # plus the fixed gate-file list, then validate the required body
+            # fields without executing any PR-side path predicate. Once this
+            # workflow is on develop, this branch is unreachable.
+            git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" \
+              > "$trusted_root/auto_merge_soundness_paths.py"
+            result="$(python "$trusted_root/auto_merge_soundness_paths.py" \
+              --paths-file "$paths_file" --format github-output)"
+            case "$result" in
+              soundness_path=true|soundness_path=false) ;;
+              *)
+                echo "soundness-flag: trusted bootstrap predicate returned an invalid result" >&2
+                return 1
+                ;;
+            esac
+
+            for protected_path in \
+              "AGENTS.md" \
+              ".github/CODEOWNERS" \
+              ".github/PULL_REQUEST_TEMPLATE.md" \
+              ".github/soundness-paths.txt" \
+              ".github/workflows/ci.yml" \
+              "_project/scripts/auto_merge_soundness_paths.py" \
+              "_project/scripts/check_soundness_review.py" \
+              "_project/scripts/soundness_paths.py"; do
+              if ! grep -qxF "$protected_path" "$paths_file"; then
+                continue
+              fi
+              result="soundness_path=true"
+              break
+            done
+            if [ "$result" = "soundness_path=false" ]; then
+              return
+            fi
+
+            grep -Eiq '^[[:space:]]*(#{1,6}[[:space:]]+)?Soundness review:[[:space:]]*$' "$body_file" \
+              || { echo "soundness-flag: missing Soundness review section" >&2; return 1; }
+            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?(External[[:space:]]+)?reviewer:[[:space:]]*(codex|muse|agy)\b' "$body_file" \
+              || { echo "soundness-flag: missing approved external reviewer" >&2; return 1; }
+            grep -Eiq 'https://github\.com/[^/[:space:])]+/[^/[:space:])]+/pull/[0-9]+#issuecomment-[0-9]+' "$body_file" \
+              || { echo "soundness-flag: missing external review PR comment link" >&2; return 1; }
+            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?all[[:space:]]+(critical/high|critical[[:space:]]+and[[:space:]]+high)[[:space:]]+findings[[:space:]]+(are[[:space:]]+)?resolved[.!]?[[:space:]]*$' "$body_file" \
+              || { echo "soundness-flag: missing resolved Critical/High finding statement" >&2; return 1; }
+            echo "soundness-flag: passed (trusted bootstrap path)"
+          }
+
           if [ "${{ github.event_name }}" = "merge_group" ]; then
             printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
             if [ ! -s "$RUNNER_TEMP/merge-group-prs.txt" ]; then
@@ -49,13 +127,9 @@ jobs:
               gh api "repos/$REPO/pulls/$pr_number" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
               gh api --paginate "repos/$REPO/pulls/$pr_number/files" \
                 --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
-              python _project/scripts/check_soundness_review.py \
-                --paths-file "$RUNNER_TEMP/changed-paths.txt" \
-                --body-file "$RUNNER_TEMP/pr-body.md"
+              check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
             done < "$RUNNER_TEMP/merge-group-prs.txt"
             exit 0
           fi
           printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
-          python _project/scripts/check_soundness_review.py \
-            --paths-file "$RUNNER_TEMP/changed-paths.txt" \
-            --body-file "$RUNNER_TEMP/pr-body.md"
+          check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"

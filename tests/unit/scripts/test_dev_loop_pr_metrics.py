@@ -112,6 +112,7 @@ def test_runtime_metrics_only_include_successful_jobs() -> None:
 def test_event_fanout_for_pr_fetches_same_head_runs_jobs_and_checks() -> None:
     checks = [
         _check("ci-required-result", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"),
+        _check("tooling", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:00:30Z"),
         _check("Results Explorer browser gate", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:01:00Z"),
         _check("ruleset-drift", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
         _check("Public-site visual acceptance", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:03:00Z"),
@@ -179,6 +180,7 @@ def test_required_gate_uses_latest_rerun_and_ignores_stale_failure() -> None:
             "ci-required-result", conclusion="failure", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"
         ),
         _check("ci-required-result", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:20:00Z"),
+        _check("tooling", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
         _check("ruleset-drift", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
         _check("Public-site visual acceptance", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
@@ -288,6 +290,7 @@ def test_cancelled_jobs_are_excluded_from_completed_runner_minutes() -> None:
 def test_event_fanout_separates_required_gate_from_documentation() -> None:
     checks = [
         _check("ci-required-result", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"),
+        _check("tooling", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:15Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:20Z"),
         _check("ruleset-drift", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:30Z"),
         _check("Public-site visual acceptance", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:05:00Z"),
