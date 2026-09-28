@@ -318,6 +318,36 @@ class TestDryRunValidation:
         # Should get past scale validation
         assert "must be whole integers" not in result.output
 
+    def test_dry_run_rejects_invalid_query_subset_without_saving_preview(self, tmp_path):
+        """Invalid query IDs must fail the public CLI instead of saving an empty preview."""
+        output_dir = tmp_path / "invalid-query-preview"
+        result = CliRunner().invoke(
+            run,
+            [
+                "--platform",
+                "datafusion",
+                "--benchmark",
+                "tpchavoc",
+                "--scale",
+                "0.01",
+                "--queries",
+                "definitely-invalid",
+                "--phases",
+                "power",
+                "--dry-run",
+                str(output_dir),
+                "--non-interactive",
+            ],
+            obj=_run_obj(),
+        )
+
+        assert result.exit_code == 1
+        assert "Dry-run query extraction failed" in result.output
+        assert "Invalid query" in result.output
+        assert "definitely-invalid" in result.output
+        assert "Traceback" not in result.output
+        assert list(output_dir.glob("**/*")) == []
+
     def test_dry_run_joinorder_omitted_scale_uses_benchmark_default(self, tmp_path):
         """Omitted --scale should use JoinOrder's canonical SF=1 registry default."""
         runner = CliRunner()

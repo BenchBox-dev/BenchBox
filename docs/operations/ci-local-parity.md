@@ -117,14 +117,14 @@ The `lint` job's "Fast lane ceiling delta vs develop" step
 (`guard-fast-lane-delta`) restores a GitHub Actions cache entry (the
 develop fast-lane baseline count, populated by `develop-post-merge.yml`
 after every push to develop) and diffs this PR's own fast-lane collect
-count against it. There is no local equivalent for an Actions cache
-restore, so this has no `ci-lint` counterpart. It does not weaken local
-enforcement: `guard-timing-policy` (the `--strict` step immediately above
-it) already runs the absolute `max_fast_tests` ceiling check both in CI and
-in `make ci-lint` -- the delta guard is additive to that check, not a
-replacement, and is fail-open (`DELTA_CHECK_SKIPPED`, exit 0) whenever no
-baseline is available, which is always true locally. See
-docs/operations/fast-lane-budget.md for the full model.
+count against it. The hosted pull-request command passes
+`--require-develop-baseline`, so a missing or invalid cache fails closed with
+`DELTA_CHECK_BASELINE_ERROR` rather than allowing a PR to enter a composition
+without proving its per-PR delta.
+There is no local equivalent for the cache restore, so `ci-lint` does not run
+this cache-dependent guard. Direct script callers that omit the strict flag
+retain the compatibility `DELTA_CHECK_SKIPPED` behavior. See
+`docs/operations/fast-lane-budget.md` for the full model.
 
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
