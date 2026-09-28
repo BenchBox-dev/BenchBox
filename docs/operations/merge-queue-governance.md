@@ -48,7 +48,7 @@ The operator configures the merge queue within the `develop-squash-only` ruleset
     "min_entries_to_merge": 1,
     "max_entries_to_merge": 5,
     "grouping_strategy": "ALLGREEN",
-    "check_response_timeout_minutes": 120,
+    "check_response_timeout_minutes": 60,
     "max_entries_to_build": 5,
     "min_entries_to_merge_wait_minutes": 0
   }
@@ -57,7 +57,7 @@ The operator configures the merge queue within the `develop-squash-only` ruleset
 
 - **`merge_method: SQUASH`**: Guarantees atomic, single-commit integration.
 - **`grouping_strategy: ALLGREEN`**: Groups only entries whose required checks are green.
-- **`check_response_timeout_minutes: 120`**: Provides the live queue timeout with enough room for the heavy merge-group lane and runner contention without allowing an indefinitely stalled group.
+- **`check_response_timeout_minutes: 60`**: Provides the live queue timeout while preventing hung runners from stalling the queue.
 - **`max_entries_to_build: 5`** and **`max_entries_to_merge: 5`**: Bound speculative builds and queue merges at five entries each.
 - **`min_entries_to_merge: 1`** and **`min_entries_to_merge_wait_minutes: 0`**: Permit immediate single-entry merges without an artificial wait.
 

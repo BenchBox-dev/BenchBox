@@ -98,7 +98,7 @@ def test_merge_queue_followers_wait_briefly_within_the_queue_timeout() -> None:
     assert wait == "${{ github.event_name == 'merge_group' && '600' || '0' }}"
     # The wait holds a runner, so it must leave room for capture and compare
     # inside the job timeout, and build (about 15 minutes) plus this job must
-    # leave runner-queueing slack inside the 120-minute merge-queue timeout.
+    # leave runner-queueing slack inside the 60-minute merge-queue timeout.
     assert 600 / 60 + 10 <= visual["timeout-minutes"] <= 30
 
 

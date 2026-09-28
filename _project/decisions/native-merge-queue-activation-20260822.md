@@ -45,11 +45,6 @@ not change the ruleset. The operator-facing activation runbook has recorded
 the `ALLGREEN`/60-minute direction since PR #1814; current evidence does not
 justify a protected-settings rollback within this documentation-only item.
 
-The timeout value in this historical amendment was superseded on 2026-09-28 by
-[`native-merge-queue-timeout-2026-09-28.md`](native-merge-queue-timeout-2026-09-28.md),
-which records the observed queue certification overrun and the applied
-120-minute response timeout.
-
 Slow-marked reproducer jobs remain required PR CI through
 `ci-required-result`: post-merge has fast and medium lanes but no slow-signature
 lane, so removing them from required PR CI would remove their only required
