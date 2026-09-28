@@ -2,6 +2,7 @@ name: Nightly Validation
 
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+  BENCHBOX_TEST_TIER: t1
 
 on:
   workflow_dispatch:
@@ -79,6 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     continue-on-error: true
+    env:
+      BENCHBOX_TEST_TIER: t3
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -312,6 +315,8 @@ jobs:
 
   integration-smoke:
     runs-on: ${{ matrix.os }}
+    env:
+      BENCHBOX_TEST_TIER: t2
     strategy:
       fail-fast: false
       matrix:
@@ -343,6 +348,8 @@ jobs:
   integration-table-formats:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      BENCHBOX_TEST_TIER: t2
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -366,6 +373,8 @@ jobs:
   postgres-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      BENCHBOX_TEST_TIER: t3
     services:
       postgres:
         image: postgres:17
@@ -448,6 +457,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      BENCHBOX_TEST_TIER: t3
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
       SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
@@ -517,6 +527,8 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      BENCHBOX_TEST_TIER: t2
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
