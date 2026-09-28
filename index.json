@@ -5074,7 +5074,7 @@
       ],
       "priority": "critical",
       "status": "open",
-      "title": "Owner action: remove the four legacy required checks and retune the merge queue after the G1 window"
+      "title": "Remove the four legacy required checks and retune the merge queue after the G1 window"
     },
     "dlv2-40-retire-pr-gate-workflows": {
       "claim": null,
