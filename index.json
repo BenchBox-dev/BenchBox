@@ -5186,6 +5186,16 @@
       "status": "open",
       "title": "Retire docs.yml once the publication plane owns every public route"
     },
+    "dlv2-70-retire-scheduled-workflows": {
+      "claim": null,
+      "needs": [
+        "dlv2-22-nightly-t3-shadow",
+        "dlv2-52-release-rehearsal-and-first-release"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Retire the scheduled workflows replaced by the nightly T3 domains"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],

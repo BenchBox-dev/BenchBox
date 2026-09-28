@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Job-level parity evidence for each deleted workflow",
+    "G4 sweep clean",
+    "Workflow inventory table (kept vs deleted, with owner and purpose) committed in the ledger"
+  ],
+  "context": "muse M11: per-domain jobs and labels retained in nightly.",
+  "description": "After nightly-v2 has >=7 green shadow nights and one release has shipped on the new path: delete nightly.yml (old), docker-integration.yml, cross-platform-validation.yml, cross-surface-baseline-autodetect.yml, pricing-data-drift-check.yml, submission-validator-drift-check.yml, corpus-drift-check.yml, and extension-smoke.yml if not already gone; rename nightly-v2.yml to nightly.yml. KEEP: validate-submission.yml, validate-submission-comment.yml, sync-results-data-to-published.yml, corpus-event-bridge.yml, corpus-reconciler.yml, seed-corpus.yml, upload-answers.yml, todo-state-validate.yml, all publication-*.yml.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:54:31Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b27142823f9d4079933356785fe38cfb",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}
