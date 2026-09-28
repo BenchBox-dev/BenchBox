@@ -2174,6 +2174,142 @@ def q50_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def q65_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q65: Store Sales Item Profit (Expression Family).
+
+    Finds store/item pairs whose revenue is at most 10% of the store average
+    over a twelve-month window.
+
+    Tables: store_sales, date_dim, store, item
+    Pattern: nested aggregate -> average per store -> outlier filter
+    """
+    params = get_parameters(65)
+    dms = params.get("dms", 1212)
+    col = ctx.col
+    lit = ctx.lit
+    sales = ctx.get_table("store_sales").join(
+        ctx.get_table("date_dim").filter(col("d_month_seq").is_between(dms, dms + 11)),
+        left_on="ss_sold_date_sk",
+        right_on="d_date_sk",
+    )
+    revenue = sales.group_by("ss_store_sk", "ss_item_sk").agg(col("ss_sales_price").sum().alias("revenue"))
+    store_avg = revenue.group_by("ss_store_sk").agg(col("revenue").mean().alias("ave"))
+    flagged = (
+        revenue.join(store_avg, on="ss_store_sk")
+        .filter(col("revenue") <= lit(0.1) * col("ave"))
+        .select("ss_store_sk", "ss_item_sk", "revenue")
+    )
+    return (
+        flagged.join(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
+        .join(ctx.get_table("item"), left_on="ss_item_sk", right_on="i_item_sk")
+        .select("s_store_name", "i_item_desc", "revenue", "i_current_price", "i_wholesale_cost", "i_brand")
+        .sort(["s_store_name", "i_item_desc"], nulls_last=True)
+        .limit(100)
+    )
+
+
+def q65_pandas_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q65: Store Sales Item Profit (Pandas Family)."""
+    params = get_parameters(65)
+    dms = params.get("dms", 1212)
+
+    store_sales, date_dim, store, item = _tables(ctx, "store_sales", "date_dim", "store", "item")
+    window = date_dim[(date_dim["d_month_seq"] >= dms) & (date_dim["d_month_seq"] <= dms + 11)]
+    sales = store_sales.merge(window[["d_date_sk"]], left_on="ss_sold_date_sk", right_on="d_date_sk")
+    revenue = sales.groupby(["ss_store_sk", "ss_item_sk"], as_index=False, dropna=False).agg(
+        revenue=("ss_sales_price", "sum")
+    )
+    store_avg = revenue.groupby("ss_store_sk", as_index=False).agg(ave=("revenue", "mean"))
+    flagged = revenue.merge(store_avg, on="ss_store_sk")
+    flagged = flagged[flagged["revenue"] <= 0.1 * flagged["ave"]][["ss_store_sk", "ss_item_sk", "revenue"]]
+    outer = flagged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
+    outer = outer.merge(item, left_on="ss_item_sk", right_on="i_item_sk")
+    cols = ["s_store_name", "i_item_desc", "revenue", "i_current_price", "i_wholesale_cost", "i_brand"]
+    result = outer[cols].sort_values(["s_store_name", "i_item_desc"]).head(100)
+    for column in result.columns:
+        if result[column].dtype == object:
+            result[column] = result[column].where(result[column].notna(), None)
+    return result
+
+
+_Q89_CATEGORIES_A = ("Home", "Books", "Electronics")
+_Q89_CLASSES_A = ("wallpaper", "parenting", "musical")
+_Q89_CATEGORIES_B = ("Shoes", "Jewelry", "Men")
+_Q89_CLASSES_B = ("womens", "birdal", "pants")
+
+
+def q89_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q89: Store Item Sales Profit (Expression Family).
+
+    Monthly sales compared against the windowed average per
+    category/brand/store with a 10% deviation filter.
+
+    Tables: item, store_sales, date_dim, store
+    Pattern: filtered aggregate -> window average -> deviation filter
+    """
+    params = get_parameters(89)
+    year = params.get("year", 2000)
+    col = ctx.col
+    lit = ctx.lit
+    in_a = col("i_category").is_in(list(_Q89_CATEGORIES_A)) & col("i_class").is_in(list(_Q89_CLASSES_A))
+    in_b = col("i_category").is_in(list(_Q89_CATEGORIES_B)) & col("i_class").is_in(list(_Q89_CLASSES_B))
+    grouped = (
+        ctx.get_table("item")
+        .join(ctx.get_table("store_sales"), left_on="i_item_sk", right_on="ss_item_sk")
+        .join(ctx.get_table("date_dim"), left_on="ss_sold_date_sk", right_on="d_date_sk")
+        .join(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
+        .filter((col("d_year") == lit(year)) & (in_a | in_b))
+        .group_by("i_category", "i_class", "i_brand", "s_store_name", "s_company_name", "d_moy")
+        .agg(col("ss_sales_price").sum().alias("sum_sales"))
+    )
+    partition = ["i_category", "i_brand", "s_store_name", "s_company_name"]
+    with_avg = grouped.with_columns(ctx.window_avg("sum_sales", partition_by=partition).alias("avg_monthly_sales"))
+    deviation = (col("sum_sales") - col("avg_monthly_sales")).abs() / col("avg_monthly_sales")
+    return (
+        # SQL keeps rows where |sum-avg|/avg > 0.1 with avg <> 0 (else NULL, filtered out).
+        with_avg.filter((col("avg_monthly_sales") != lit(0)) & (deviation > lit(0.1)))
+        .with_columns((col("sum_sales") - col("avg_monthly_sales")).alias("diff"))
+        .sort(["diff", "s_store_name"], nulls_last=True)
+        .select(
+            "i_category",
+            "i_class",
+            "i_brand",
+            "s_store_name",
+            "s_company_name",
+            "d_moy",
+            "sum_sales",
+            "avg_monthly_sales",
+        )
+        .limit(100)
+    )
+
+
+def q89_pandas_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q89: Store Item Sales Profit (Pandas Family)."""
+    params = get_parameters(89)
+    year = params.get("year", 2000)
+
+    item, store_sales, date_dim, store = _tables(ctx, "item", "store_sales", "date_dim", "store")
+    merged = item.merge(store_sales, left_on="i_item_sk", right_on="ss_item_sk")
+    merged = merged.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
+    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
+    in_a = (merged["i_category"].isin(list(_Q89_CATEGORIES_A))) & (merged["i_class"].isin(list(_Q89_CLASSES_A)))
+    in_b = (merged["i_category"].isin(list(_Q89_CATEGORIES_B))) & (merged["i_class"].isin(list(_Q89_CLASSES_B)))
+    filtered = merged[(merged["d_year"] == year) & (in_a | in_b)]
+    grouped = filtered.groupby(
+        ["i_category", "i_class", "i_brand", "s_store_name", "s_company_name", "d_moy"],
+        as_index=False,
+        dropna=False,
+    ).agg(sum_sales=("ss_sales_price", "sum"))
+    partition = ["i_category", "i_brand", "s_store_name", "s_company_name"]
+    grouped["avg_monthly_sales"] = grouped.groupby(partition, dropna=False)["sum_sales"].transform("mean")
+    deviation = (grouped["sum_sales"] - grouped["avg_monthly_sales"]).abs() / grouped["avg_monthly_sales"]
+    kept = grouped[(grouped["avg_monthly_sales"] != 0) & (deviation > 0.1)].copy()
+    kept["diff"] = kept["sum_sales"] - kept["avg_monthly_sales"]
+    cols = ["i_category", "i_class", "i_brand", "s_store_name", "s_company_name", "d_moy", "sum_sales", "avg_monthly_sales"]
+    return kept.sort_values(["diff", "s_store_name"])[cols].head(100)
+
+
 # =============================================================================
 # Moderate Queries - CTEs, subqueries, and more complex patterns
 # =============================================================================

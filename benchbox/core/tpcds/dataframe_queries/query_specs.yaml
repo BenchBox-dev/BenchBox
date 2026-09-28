@@ -33,21 +33,6 @@ joined_aggregate:
     aggs:
       - [total_sales, cs_sales_price, sum]
     sort_by: [ca_zip]
-  - query_id: 65
-    title: Store Sales Item Profit
-    base: store_sales
-    joins:
-      - [store, ss_store_sk, s_store_sk]
-      - [item, ss_item_sk, i_item_sk]
-      - [date_dim, ss_sold_date_sk, d_date_sk]
-    filters:
-      - [eq, d_year, {param: year, default: 2000}]
-      - [between, d_dom, 1, 15]
-    group_by: [s_store_name, i_item_desc]
-    aggs:
-      - [revenue, ss_sales_price, sum]
-    sort_by: [revenue, s_store_name, i_item_desc]
-    descending: [true, false, false]
   - query_id: 73
     title: Store Sales Household Vehicle
     base: store_sales
@@ -70,20 +55,6 @@ joined_aggregate:
     sort_by: [cnt, c_last_name]
     descending: [true, false]
     limit:
-  - query_id: 89
-    title: Store Item Sales Profit
-    base: store_sales
-    joins:
-      - [date_dim, ss_sold_date_sk, d_date_sk]
-      - [store, ss_store_sk, s_store_sk]
-      - [item, ss_item_sk, i_item_sk]
-    filters:
-      - [eq, d_year, {param: year, default: 1999}]
-      - [or, [and, [eq, i_category, Books], [eq, i_class, business]], [and, [eq, i_category, Electronics], [eq, i_class, portable]]]
-    group_by: [i_category, i_class, i_brand, s_store_name, s_company_name, d_moy]
-    aggs:
-      - [sum_sales, ss_sales_price, sum]
-    sort_by: [sum_sales, s_store_name, i_category]
   - query_id: 91
     title: Call Center Returns Analysis
     base: catalog_returns
