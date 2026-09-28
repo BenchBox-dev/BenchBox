@@ -1039,14 +1039,16 @@ def run_clickhouse_sample() -> int:
     sample). Schema, load (incl. the row-count guard), translation, and sweep
     failures all propagate as real failures.
     """
+    import os
     import tempfile
 
-    from benchbox.platforms.clickhouse._dependencies import import_chdb
     from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
 
+    original_cwd = os.getcwd()
     try:
-        import_chdb()
+        import chdb  # noqa: F401
     except ImportError as exc:
+        os.chdir(original_cwd)
         print(f"ClickHouse equivalence sample SKIPPED - chDB (clickhouse-local) not installed: {exc}")
         return 0
 
