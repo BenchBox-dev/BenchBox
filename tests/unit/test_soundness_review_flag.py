@@ -110,7 +110,9 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     soundness_step = next(step for step in tooling["steps"] if step.get("name") == "soundness-flag")
     assert "check_soundness_review.py" in soundness_step["run"]
     assert "if" not in tooling
-    assert "merge_group reuses the pull_request review gate" in soundness_step["run"]
+    assert "MERGE_GROUP_PRS" in soundness_step["env"]
+    assert "gh api --paginate" in soundness_step["run"]
+    assert "previous_filename" in soundness_step["run"]
 
 
 def test_checker_cli_reports_failure_and_success(tmp_path: Path) -> None:

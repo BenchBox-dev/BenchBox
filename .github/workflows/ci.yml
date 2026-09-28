@@ -34,10 +34,25 @@ jobs:
 
       - name: soundness-flag
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           PR_BODY: ${{ github.event.pull_request.body || '' }}
+          MERGE_GROUP_PRS: ${{ toJson(github.event.merge_group.pull_requests) }}
         run: |
           if [ "${{ github.event_name }}" = "merge_group" ]; then
-            echo "soundness-flag: merge_group reuses the pull_request review gate"
+            printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
+            if [ ! -s "$RUNNER_TEMP/merge-group-prs.txt" ]; then
+              echo "soundness-flag: merge_group has no pull requests to validate" >&2
+              exit 1
+            fi
+            while IFS= read -r pr_number; do
+              gh api "repos/$REPO/pulls/$pr_number" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
+              gh api --paginate "repos/$REPO/pulls/$pr_number/files" \
+                --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
+              python _project/scripts/check_soundness_review.py \
+                --paths-file "$RUNNER_TEMP/changed-paths.txt" \
+                --body-file "$RUNNER_TEMP/pr-body.md"
+            done < "$RUNNER_TEMP/merge-group-prs.txt"
             exit 0
           fi
           printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
