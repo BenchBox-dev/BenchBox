@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Classifier tests cover every widened trigger, unknown-path fail-closed, and both event types' diff base",
+    "Classifier output is a JSON set of affected units consumed by ci.yml",
+    ".github/path-filters.yml is not deleted here (retired in dlv2-81)"
+  ],
+  "context": "Guardrails G1-G11 apply (see dlv2-00 ADR). muse M10 (merge_group base), muse/agy coupling findings.",
+  "description": "Create .github/ci-units.yml mapping paths to units core (benchbox/, tests/, _sources/, _binaries/, pyproject.toml, uv.lock), explorer (results-explorer/), results-data (results-data/), docs (docs/), landing (landing/), tooling (scripts/, _project/scripts/, .github/, Makefile, make/, .pre-commit-config.yaml). Widened triggers: explorer also on benchbox/core/results/** and results-data/**; results-data runs the explorer contract; docs also on benchbox/cli/**, the public API surface, and registries; landing also on PlatformRegistry and dependency-group changes (scripts/generate_landing_quickstarts.py inputs). Reuse scripts/path_filter_decision.py (extend, do not rewrite). Diff base: PR base SHA on pull_request, merge_group.base_sha on merge_group. Unknown paths fail closed to all units.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:51:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "20eca31bd5b44feeb780ca7ac60db5aa",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

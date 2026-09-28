@@ -5004,6 +5004,15 @@
       "status": "open",
       "title": "Split timing_policy_check.py: keep the monotonic-clock policy, separate the fast-lane ceiling for retirement"
     },
+    "dlv2-20-ci-units-classifier": {
+      "claim": null,
+      "needs": [
+        "dlv2-00-decisions-adr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Add the six-unit path map and extend path_filter_decision.py into the unit classifier"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
