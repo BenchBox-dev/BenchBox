@@ -191,7 +191,8 @@
   - Books
   gmt_offset: -5.0
   manufacturer_id: 88
-  year: 1998
+  month: 3
+  year: 1999
 34:
   county: Williamson County
   state: TN
@@ -205,7 +206,9 @@
   - 2002
 36:
   state: TN
-  year: 2001
+  states:
+  - TN
+  year: 2000
 37:
   current_price_max: 52
   current_price_min: 22
@@ -354,9 +357,10 @@
   ship_carriers:
   - DIAMOND
   - AIRBORNE
+  time_start: 49530
   web_names:
   - pri
-  year: 2001
+  year: 2002
 67:
   dms: 1212
   year: 2001

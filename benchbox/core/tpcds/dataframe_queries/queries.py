@@ -3847,8 +3847,8 @@ def q36_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     params = get_parameters(36)
-    year = params.get("year", 2001)
-    states = params.get("states", ["TN", "SD", "AL", "NC", "OK", "MS", "WI", "IN"])
+    year = params.get("year", 2000)
+    states = params.get("states", ["TN"])
 
     col = ctx.col
     lit = ctx.lit
@@ -3921,8 +3921,8 @@ def q36_pandas_impl(ctx: DataFrameContext) -> Any:
     from benchbox.core.tpcds.dataframe_queries.rollup_helper import expand_rollup_pandas
 
     params = get_parameters(36)
-    year = params.get("year", 2001)
-    states = params.get("states", ["TN", "SD", "AL", "NC", "OK", "MS", "WI", "IN"])
+    year = params.get("year", 2000)
+    states = params.get("states", ["TN"])
 
     # Get tables
     store_sales, date_dim, item, store = _tables(ctx, "store_sales", "date_dim", "item", "store")
@@ -5027,8 +5027,8 @@ def q33_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Parameters
     params = get_parameters(33)
-    year = params.get("year", 1998)
-    month = params.get("month", 1)
+    year = params.get("year", 1999)
+    month = params.get("month", 3)
     gmt_offset = params.get("gmt_offset", -5)
     category = params.get("category", "Books")
 
@@ -5068,8 +5068,8 @@ def q33_pandas_impl(ctx: DataFrameContext) -> Any:
     # Parameters
     """Q33: Three-channel sales by manufacturer with category filter (Pandas)."""
     params = get_parameters(33)
-    year = params.get("year", 1998)
-    month = params.get("month", 1)
+    year = params.get("year", 1999)
+    month = params.get("month", 3)
     gmt_offset = params.get("gmt_offset", -5)
     category = params.get("category", "Books")
 
@@ -8760,9 +8760,9 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
     Tables: web_sales, catalog_sales, warehouse, date_dim, time_dim, ship_mode
     """
     params = get_parameters(66)
-    year = params.get("year", 2001)
+    year = params.get("year", 2002)
     ship_carriers = params.get("ship_carriers", ["DIAMOND", "AIRBORNE"])
-    time_start = params.get("time_start", 30838)
+    time_start = params.get("time_start", 49530)
 
     col = ctx.col
     lit = ctx.lit
@@ -8800,7 +8800,7 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
             )
         return aggs
 
-    # Web sales aggregation
+    # Web sales aggregation (net uses the paid-inc-tax column from the SQL template)
     ws = (
         web_sales.join(warehouse, left_on="ws_warehouse_sk", right_on="w_warehouse_sk")
         .join(date_filtered, left_on="ws_sold_date_sk", right_on="d_date_sk")
@@ -8810,7 +8810,9 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
 
     ws_agg = (
         ws.group_by(["w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "d_year"])
-        .agg(build_monthly_aggs("ws_ext_sales_price", "ws_net_profit", "ws_quantity"))
+        # SQL multiplies the unit sales_price by quantity (ext_sales_price is
+        # already extended and must not be multiplied again).
+        .agg(build_monthly_aggs("ws_sales_price", "ws_net_paid_inc_tax", "ws_quantity"))
         .with_columns(
             [
                 lit(carriers_str).alias("ship_carriers"),
@@ -8819,7 +8821,7 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    # Catalog sales aggregation
+    # Catalog sales aggregation (net uses the paid-inc-ship-tax column from the SQL template)
     cs = (
         catalog_sales.join(warehouse, left_on="cs_warehouse_sk", right_on="w_warehouse_sk")
         .join(date_filtered, left_on="cs_sold_date_sk", right_on="d_date_sk")
@@ -8829,7 +8831,8 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
 
     cs_agg = (
         cs.group_by(["w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "d_year"])
-        .agg(build_monthly_aggs("cs_ext_sales_price", "cs_net_profit", "cs_quantity"))
+        # SQL multiplies the unit sales_price by quantity (see the web leg above).
+        .agg(build_monthly_aggs("cs_sales_price", "cs_net_paid_inc_ship_tax", "cs_quantity"))
         .with_columns(
             [
                 lit(carriers_str).alias("ship_carriers"),
@@ -8857,17 +8860,29 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
     agg_exprs = []
     for mname in month_names:
         agg_exprs.append(ctx.sum(f"{mname}_sales").alias(f"{mname}_sales"))
+    for mname in month_names:
         agg_exprs.append(ctx.sum(f"{mname}_net").alias(f"{mname}_net"))
 
-    return combined.group_by(group_cols).agg(agg_exprs).sort("w_warehouse_name").head(100)
+    grouped = combined.group_by(group_cols).agg(agg_exprs)
+    # SQL computes the per-square-foot columns as SUM(monthly / sq_ft); sq_ft is
+    # constant per warehouse group, so divide the summed monthlies by its first
+    # value (referencing the grouped column inside agg() would yield a list).
+    per_foot = [(col(f"{mname}_sales") / col("w_warehouse_sq_ft").first()).alias(f"{mname}_sales_per_sq_foot") for mname in month_names]
+    ordered = (
+        group_cols
+        + [f"{m}_sales" for m in month_names]
+        + [f"{m}_sales_per_sq_foot" for m in month_names]
+        + [f"{m}_net" for m in month_names]
+    )
+    return grouped.with_columns(per_foot).select(ordered).sort("w_warehouse_name").head(100)
 
 
 def q66_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q66: Web/catalog sales monthly warehouse analysis (Pandas)."""
     params = get_parameters(66)
-    year = params.get("year", 2001)
+    year = params.get("year", 2002)
     ship_carriers = params.get("ship_carriers", ["DIAMOND", "AIRBORNE"])
-    time_start = params.get("time_start", 30838)
+    time_start = params.get("time_start", 49530)
 
     web_sales, catalog_sales, warehouse, date_dim, time_dim, ship_mode = _tables(
         ctx, "web_sales", "catalog_sales", "warehouse", "date_dim", "time_dim", "ship_mode"
@@ -8906,27 +8921,28 @@ def q66_pandas_impl(ctx: DataFrameContext) -> Any:
         result["year"] = result["d_year"]
         return result
 
-    # Process web sales
+    # Process web sales (net uses the paid-inc-tax column from the SQL template;
+    # monthly sales multiply the unit price by quantity)
     ws_agg = process_channel(
         web_sales,
         "ws_warehouse_sk",
         "ws_sold_date_sk",
         "ws_sold_time_sk",
         "ws_ship_mode_sk",
-        "ws_ext_sales_price",
-        "ws_net_profit",
+        "ws_sales_price",
+        "ws_net_paid_inc_tax",
         "ws_quantity",
     )
 
-    # Process catalog sales
+    # Process catalog sales (net uses the paid-inc-ship-tax column from the SQL template)
     cs_agg = process_channel(
         catalog_sales,
         "cs_warehouse_sk",
         "cs_sold_date_sk",
         "cs_sold_time_sk",
         "cs_ship_mode_sk",
-        "cs_ext_sales_price",
-        "cs_net_profit",
+        "cs_sales_price",
+        "cs_net_paid_inc_ship_tax",
         "cs_quantity",
     )
 
@@ -8948,7 +8964,17 @@ def q66_pandas_impl(ctx: DataFrameContext) -> Any:
     agg_dict.update({f"{m}_net": "sum" for m in month_names})
 
     result = combined.groupby(group_cols, as_index=False).agg(agg_dict)
-    return result.sort_values("w_warehouse_name").head(100)
+    # SQL computes the per-square-foot columns as SUM(monthly / sq_ft); sq_ft is
+    # constant per warehouse group, so divide the summed monthlies.
+    for mname in month_names:
+        result[f"{mname}_sales_per_sq_foot"] = result[f"{mname}_sales"] / result["w_warehouse_sq_ft"]
+    out_cols = (
+        group_cols
+        + [f"{m}_sales" for m in month_names]
+        + [f"{m}_sales_per_sq_foot" for m in month_names]
+        + [f"{m}_net" for m in month_names]
+    )
+    return result[out_cols].sort_values("w_warehouse_name").head(100)
 
 
 # =============================================================================
