@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "release-prep produces a PR whose diff is exactly the version-sync file set (tested with a fixture version)",
+    "release-check fails on each missing element (tests per element)",
+    "docs/operations/release-guide.md draft section describes prep -> queue -> signed tag"
+  ],
+  "context": "codex C9. Guardrail G7: legacy release-cut stays working until dlv2-53.",
+  "description": "Retiring release-cut needs a replacement that synchronizes everything a release touches. `make release-prep VERSION=X.Y.Z` (via scripts/update_version.py and scripts/generate_changelog_entry.py) updates pyproject version, uv.lock, CHANGELOG.md, documentation version markers, and the landing badge, producing one normal PR through the queue. `make release-check VERSION=X.Y.Z` verifies that complete state locally and in release.yml (version equality everywhere, changelog entry present, lock revision, curation rules from check_release_curation.py, dependency bounds with --fail-on=cap-reached).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ea32adff11bd0f17607daca2",
+      "at": "2026-09-28T13:53:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3e7cda3071754efaa085db9965fa68af",
+      "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    }
+  ]
+}

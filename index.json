@@ -5127,6 +5127,15 @@
       "status": "open",
       "title": "Trim pre-commit hooks to product and hygiene checks"
     },
+    "dlv2-50-release-prep-targets": {
+      "claim": null,
+      "needs": [
+        "dlv2-00-decisions-adr"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Add release-prep and release-check targets that produce and verify the complete pre-tag trunk state"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
