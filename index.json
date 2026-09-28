@@ -4972,6 +4972,13 @@
       "status": "open",
       "title": "Make the unit tier hermetic: repo root from test location and a required state-leak detector"
     },
+    "dlv2-13-durations-budget-quarantine": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Tier tests by measured duration: durations file, T1 0.5 s budget, and a quarantine marker"
+    },
     "dlv2-defer-tpch-digest-darwin-arm64": {
       "claim": null,
       "needs": [],
