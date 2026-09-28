@@ -1,0 +1,46 @@
+name: CI v2
+
+on:
+  pull_request:
+  merge_group:
+
+concurrency:
+  group: ci-v2-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  tooling:
+    name: tooling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch pull request base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: git fetch --no-tags origin "${BASE_SHA}:refs/remotes/origin/ci-v2-base"
+
+      - name: Collect changed paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/changed-paths.txt"
+
+      - name: soundness-flag
+        env:
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+        run: |
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "soundness-flag: merge_group reuses the pull_request review gate"
+            exit 0
+          fi
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          python _project/scripts/check_soundness_review.py \
+            --paths-file "$RUNNER_TEMP/changed-paths.txt" \
+            --body-file "$RUNNER_TEMP/pr-body.md"

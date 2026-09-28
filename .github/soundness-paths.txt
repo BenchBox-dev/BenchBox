@@ -1,0 +1,73 @@
+# Shared soundness review surface.
+# Format: kind<TAB>pattern. Kinds are prefix, file, glob, or regex.
+# Prefixes end in / and exact paths use file. The glob and regex entries are
+# matching rules, not CODEOWNERS spellings.
+regex	^benchbox/core/(?:.+/)?validation\.py$
+glob	results-data/bundles/**/*.override.json
+
+prefix	benchbox/core/equivalence/
+prefix	benchbox/core/query_plans/parsers/
+prefix	benchbox/core/expected_results/
+prefix	publication/
+prefix	scripts/publication/
+
+file	scripts/heavy_tier_needed.py
+file	benchbox/platforms/base/result_capture.py
+file	benchbox/sql_compat/resolver.py
+file	benchbox/sql_compat/decision.py
+file	benchbox/sql_compat/rules/_registration.py
+file	benchbox/core/results/anonymization.py
+file	benchbox/core/results/anonymization_specs.yaml
+file	benchbox/core/results/provenance.py
+file	benchbox/core/results/status.py
+file	benchbox/core/results/query_status.py
+file	benchbox/validation/bundle.py
+file	benchbox/core/publishing/admission.py
+file	benchbox/core/publishing/bundle_publisher.py
+file	_project/scripts/explorer_pipeline/models.py
+file	_project/scripts/explorer_pipeline/pipeline.py
+file	_project/scripts/explorer_pipeline/ranking.py
+file	_project/scripts/explorer_pipeline/transformer.py
+file	_project/scripts/explorer_pipeline/duckdb_builder.py
+file	_project/scripts/explorer_pipeline/compare_math.py
+file	_project/scripts/results_explorer_snapshot_invariants.py
+file	benchbox/core/results/canonical_json.py
+file	benchbox/core/results/schema_policy.py
+file	_project/scripts/explorer_publish.py
+file	scripts/generate_corpus_inventory.py
+file	scripts/validate_submission.py
+file	.github/workflows/validate-submission.yml
+file	.github/workflows/sync-results-data-to-published.yml
+file	.github/workflows/docs.yml
+file	.github/workflows/publication-deploy.yml
+file	.github/workflows/publication-preview-deploy.yml
+file	.github/workflows/publication-preview-soak.yml
+file	.github/workflows/publication-lane-docs.yml
+file	.github/workflows/publication-lane-explorer.yml
+file	.github/workflows/publication-corpus-cutover.yml
+file	.github/workflows/publication-transaction.yml
+file	.github/workflows/publication-recover.yml
+file	.github/workflows/publication-canaries.yml
+file	scripts/publication/verify_lane_isolation.py
+file	_project/scripts/auto_merge_soundness_paths.py
+file	_project/scripts/soundness_paths.py
+file	_project/scripts/check_soundness_review.py
+file	.github/soundness-paths.txt
+file	.github/PULL_REQUEST_TEMPLATE.md
+file	.github/CODEOWNERS
+file	AGENTS.md
+file	.github/workflows/ci.yml
+file	.github/workflows/auto-merge-on-open.yml
+file	.github/workflows/release.yml
+file	_project/decisions/independent-publication-a0-freeze-2026-08-31.md
+file	docs/development/adr/adr-independent-publication-authorities.md
+file	docs/development/adr/adr-public-result-id-permanence.md
+file	docs/development/adr/adr-published-results-slim-corpus-branch.md
+file	docs/development/independent-publication-threat-model.md
+file	docs/operations/independent-publication-contract.md
+file	docs/operations/publication-deployer-soak-and-retirement.md
+file	docs/operations/results-phase-2-runbook.md
+file	docs/operations/results-phase-3-runbook.md
+file	docs/reference/hosted-results-contract.md
+file	docs/reference/threat-model.md
+file	scripts/check_decision_records.py

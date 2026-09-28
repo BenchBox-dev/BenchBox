@@ -165,7 +165,7 @@ def test_workflow_disables_on_soundness() -> None:
 
 def test_workflow_listens_for_labeled_to_make_hold_durable() -> None:
     """Without `labeled`, applying no-auto-merge would not revoke until a push."""
-    types = _triggers(_load_yaml(AUTO_MERGE_WORKFLOW))["pull_request"]["types"]
+    types = _triggers(_load_yaml(AUTO_MERGE_WORKFLOW))["pull_request_target"]["types"]
     assert "labeled" in types
     for required in ("opened", "reopened", "synchronize"):
         assert required in types
@@ -213,25 +213,22 @@ def test_arm_helper_refuses_hold_label_before_enqueue() -> None:
     assert "unparseable gh pr list output" in resolve_source
 
 
-def test_soundness_unions_base_ref_and_pr_copy_predicates() -> None:
-    """Disable uses base OR PR-copy; enable still requires soundness_path != true.
-
-    Base-ref alone cannot see a gate widened in the same PR. PR-copy alone
-    would let a PR narrow the surface. Union + enable-on-not-true preserves
-    both properties.
-    """
+def test_soundness_uses_only_trusted_base_predicate_and_fails_closed() -> None:
+    """The target workflow must not execute PR-controlled code with its token."""
     text = AUTO_MERGE_WORKFLOW.read_text(encoding="utf-8")
     assert "predicate_base.py" in text
-    assert (
-        "git show \"origin/${{ github.base_ref || 'develop' }}:_project/scripts/auto_merge_soundness_paths.py\"" in text
-    )
-    # PR checkout copy is evaluated for the union (widening).
-    assert "python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" in text
-    # Union is OR of both results.
-    assert '[ "$base_result" = "soundness_path=true" ] || [ "$pr_result" = "soundness_path=true" ]' in text
-    # Self-touch override remains.
-    assert 'grep -qxF "_project/scripts/auto_merge_soundness_paths.py"' in text
-    assert 'grep -qxF ".github/workflows/auto-merge-on-open.yml"' in text
+    assert "_project/scripts/soundness_paths.py" in text
+    assert "pull_request_target" in text
+    assert "persist-credentials: false" in text
+    assert "contents: read" in text
+    assert "contents: write" not in text
+    assert "python3 _project/scripts/soundness_paths.py --stdin --format github-output" not in text
+    assert 'base_result="soundness_path=true"' in text
+    # Self-touch override remains and protects its own CODEOWNERS file.
+    assert '".github/CODEOWNERS"' in text
+    assert '"_project/scripts/auto_merge_soundness_paths.py"' in text
+    assert '"_project/scripts/soundness_paths.py"' in text
+    assert '".github/soundness-paths.txt"' in text
 
 
 # ---------------------------------------------------------------------------

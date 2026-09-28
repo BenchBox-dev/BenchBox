@@ -253,7 +253,7 @@ def test_auto_merge_workflow_keeps_revocation_triggers() -> None:
     auto-merge (nothing to revoke), and its only historical use was the dead
     arm point.
     """
-    types = _triggers(_load_workflow())["pull_request"]["types"]
+    types = _triggers(_load_workflow())["pull_request_target"]["types"]
     for required in ("opened", "reopened", "synchronize", "labeled"):
         assert required in types, f"pull_request types missing {required!r}: {types}"
     assert "ready_for_review" not in types, "ready_for_review is back; the arm point must not return"
