@@ -1743,6 +1743,241 @@ def q43_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def _ticket_household_inner_expression(
+    ctx: DataFrameContext,
+    query_id: int,
+    year_default: int,
+    cities_default: list[str],
+    dep_default: int,
+    aggs: tuple[tuple[str, str], ...],
+    dom_range: tuple[int, int] | None = None,
+    dow_list: tuple[int, ...] | None = None,
+) -> Any:
+    """Shared ticket-household inner aggregate (TPC-DS Q46/Q68 ``dn`` subquery)."""
+    params = get_parameters(query_id)
+    year = params.get("year", year_default)
+    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
+    cities = params.get("cities", cities_default)
+    dep_count = params.get("dep_count", dep_default)
+    vehicle_count = params.get("vehicle_count", 3)
+    col = ctx.col
+    lit = ctx.lit
+    date_filter = col("d_year").is_in(years)
+    if dom_range is not None:
+        date_filter = date_filter & col("d_dom").is_between(dom_range[0], dom_range[1])
+    if dow_list is not None:
+        date_filter = date_filter & col("d_dow").is_in(list(dow_list))
+    return (
+        ctx.get_table("store_sales")
+        .join(ctx.get_table("date_dim"), left_on="ss_sold_date_sk", right_on="d_date_sk")
+        .join(ctx.get_table("store"), left_on="ss_store_sk", right_on="s_store_sk")
+        .join(ctx.get_table("household_demographics"), left_on="ss_hdemo_sk", right_on="hd_demo_sk")
+        .join(ctx.get_table("customer_address"), left_on="ss_addr_sk", right_on="ca_address_sk")
+        .filter(
+            date_filter
+            & col("s_city").is_in(cities)
+            & ((col("hd_dep_count") == lit(dep_count)) | (col("hd_vehicle_count") == lit(vehicle_count)))
+        )
+        .group_by("ss_ticket_number", "ss_customer_sk", "ss_addr_sk", col("ca_city").alias("bought_city"))
+        .agg(*(col(source).sum().alias(alias) for alias, source in aggs))
+    )
+
+
+def _ticket_household_outer_expression(
+    ctx: DataFrameContext,
+    inner: Any,
+    select_cols: list[str],
+    sort_cols: list[str],
+) -> Any:
+    """Shared customer/current-address outer join for TPC-DS Q46/Q68."""
+    col = ctx.col
+    return (
+        inner.join(ctx.get_table("customer"), left_on="ss_customer_sk", right_on="c_customer_sk")
+        .join(
+            ctx.get_table("customer_address"),
+            left_on="c_current_addr_sk",
+            right_on="ca_address_sk",
+        )
+        .filter(col("ca_city") != col("bought_city"))
+        .select(*select_cols)
+        # DuckDB ASC sorts NULLs last; match that placement explicitly.
+        .sort(sort_cols, nulls_last=True)
+        .limit(100)
+    )
+
+
+def q46_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q46: Store Sales Household Analysis (Expression Family).
+
+    Inner ticket aggregate over a weekend window joined to the customer's
+    current address, keeping tickets bought away from home.
+
+    Tables: store_sales, date_dim, store, household_demographics, customer_address, customer
+    Pattern: subquery -> self-join -> inequality filter -> order by
+    """
+    inner = _ticket_household_inner_expression(
+        ctx,
+        46,
+        1999,
+        ["Midway", "Fairview", "Fairview", "Fairview", "Fairview"],
+        5,
+        (("amt", "ss_coupon_amt"), ("profit", "ss_net_profit")),
+        dow_list=(6, 0),
+    )
+    return _ticket_household_outer_expression(
+        ctx,
+        inner,
+        ["c_last_name", "c_first_name", "ca_city", "bought_city", "ss_ticket_number", "amt", "profit"],
+        ["c_last_name", "c_first_name", "ca_city", "bought_city", "ss_ticket_number"],
+    )
+
+
+def q46_pandas_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q46: Store Sales Household Analysis (Pandas Family)."""
+    params = get_parameters(46)
+    year = params.get("year", 1999)
+    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
+    cities = params.get("cities", ["Midway", "Fairview", "Fairview", "Fairview", "Fairview"])
+    dep_count = params.get("dep_count", 5)
+    vehicle_count = params.get("vehicle_count", 3)
+    dow = params.get("dow", [6, 0])
+
+    store_sales, date_dim, store, household_demographics, customer_address, customer = _tables(
+        ctx, "store_sales", "date_dim", "store", "household_demographics", "customer_address", "customer"
+    )
+    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
+    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
+    merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
+    merged = merged.merge(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
+    filtered = merged[
+        (merged["d_year"].isin(years))
+        & (merged["d_dow"].isin(dow))
+        & (merged["s_city"].isin(cities))
+        & ((merged["hd_dep_count"] == dep_count) | (merged["hd_vehicle_count"] == vehicle_count))
+    ]
+    inner = (
+        filtered.groupby(["ss_ticket_number", "ss_customer_sk", "ss_addr_sk", "ca_city"], as_index=False)
+        .agg(amt=("ss_coupon_amt", "sum"), profit=("ss_net_profit", "sum"))
+        .rename(columns={"ca_city": "bought_city"})
+    )
+    outer = inner.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
+    # The inner query renamed its address city to bought_city, so the current
+    # address merge has no ca_city collision and lands as plain ca_city.
+    outer = outer.merge(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
+    # SQL <> drops NULL cities (UNKNOWN); pandas != keeps NaN rows, so exclude
+    # nulls explicitly to match.
+    outer = outer[
+        (outer["ca_city"] != outer["bought_city"]) & outer["ca_city"].notna() & outer["bought_city"].notna()
+    ]
+    cols = ["c_last_name", "c_first_name", "ca_city", "bought_city", "ss_ticket_number", "amt", "profit"]
+    result = outer[cols].sort_values(cols).head(100)
+    # A NULL merged through pandas object columns arrives as float NaN, which
+    # the strict comparator distinguishes from SQL NULL: map NaN back to None.
+    for column in result.columns:
+        if result[column].dtype == object:
+            result[column] = result[column].where(result[column].notna(), None)
+    return result
+
+
+def q68_expression_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q68: Store Sales Customer Household (Expression Family).
+
+    Same ticket-away-from-home shape as Q46 over a day-of-month window with
+    extended-price aggregates.
+
+    Tables: store_sales, date_dim, store, household_demographics, customer_address, customer
+    Pattern: subquery -> self-join -> inequality filter -> order by
+    """
+    inner = _ticket_household_inner_expression(
+        ctx,
+        68,
+        1999,
+        ["Midway", "Fairview"],
+        5,
+        (
+            ("extended_price", "ss_ext_sales_price"),
+            ("list_price", "ss_ext_list_price"),
+            ("extended_tax", "ss_ext_tax"),
+        ),
+        dom_range=(1, 2),
+    )
+    return _ticket_household_outer_expression(
+        ctx,
+        inner,
+        [
+            "c_last_name",
+            "c_first_name",
+            "ca_city",
+            "bought_city",
+            "ss_ticket_number",
+            "extended_price",
+            "extended_tax",
+            "list_price",
+        ],
+        ["c_last_name", "ss_ticket_number"],
+    )
+
+
+def q68_pandas_impl(ctx: DataFrameContext) -> Any:
+    """TPC-DS Q68: Store Sales Customer Household (Pandas Family)."""
+    params = get_parameters(68)
+    year = params.get("year", 1999)
+    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
+    cities = params.get("cities", ["Midway", "Fairview"])
+    dep_count = params.get("dep_count", 5)
+    vehicle_count = params.get("vehicle_count", 3)
+
+    store_sales, date_dim, store, household_demographics, customer_address, customer = _tables(
+        ctx, "store_sales", "date_dim", "store", "household_demographics", "customer_address", "customer"
+    )
+    merged = store_sales.merge(date_dim, left_on="ss_sold_date_sk", right_on="d_date_sk")
+    merged = merged.merge(store, left_on="ss_store_sk", right_on="s_store_sk")
+    merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
+    merged = merged.merge(customer_address, left_on="ss_addr_sk", right_on="ca_address_sk")
+    filtered = merged[
+        (merged["d_year"].isin(years))
+        & (merged["d_dom"] >= 1)
+        & (merged["d_dom"] <= 2)
+        & (merged["s_city"].isin(cities))
+        & ((merged["hd_dep_count"] == dep_count) | (merged["hd_vehicle_count"] == vehicle_count))
+    ]
+    inner = (
+        filtered.groupby(["ss_ticket_number", "ss_customer_sk", "ss_addr_sk", "ca_city"], as_index=False)
+        .agg(
+            extended_price=("ss_ext_sales_price", "sum"),
+            list_price=("ss_ext_list_price", "sum"),
+            extended_tax=("ss_ext_tax", "sum"),
+        )
+        .rename(columns={"ca_city": "bought_city"})
+    )
+    outer = inner.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
+    # The inner query renamed its address city to bought_city, so the current
+    # address merge has no ca_city collision and lands as plain ca_city.
+    outer = outer.merge(customer_address, left_on="c_current_addr_sk", right_on="ca_address_sk")
+    # SQL <> drops NULL cities (UNKNOWN); pandas != keeps NaN rows, so exclude
+    # nulls explicitly to match.
+    outer = outer[
+        (outer["ca_city"] != outer["bought_city"]) & outer["ca_city"].notna() & outer["bought_city"].notna()
+    ]
+    cols = [
+        "c_last_name",
+        "c_first_name",
+        "ca_city",
+        "bought_city",
+        "ss_ticket_number",
+        "extended_price",
+        "extended_tax",
+        "list_price",
+    ]
+    result = outer[cols].sort_values(["c_last_name", "ss_ticket_number"]).head(100)
+    # A NULL merged through pandas object columns arrives as float NaN, which
+    # the strict comparator distinguishes from SQL NULL: map NaN back to None.
+    for column in result.columns:
+        if result[column].dtype == object:
+            result[column] = result[column].where(result[column].notna(), None)
+    return result
+
+
 # =============================================================================
 # Moderate Queries - CTEs, subqueries, and more complex patterns
 # =============================================================================

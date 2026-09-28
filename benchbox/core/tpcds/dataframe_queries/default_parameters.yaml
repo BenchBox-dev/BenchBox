@@ -253,12 +253,21 @@
   - '86475'
 46:
   cities:
-  - Fairview
   - Midway
   - Fairview
   - Fairview
   - Fairview
-  year: 2001
+  - Fairview
+  dep_count: 5
+  dow:
+  - 6
+  - 0
+  vehicle_count: 3
+  year: 1999
+  year_offsets:
+  - 0
+  - 1
+  - 2
 47:
   year: 2000
 48:
@@ -345,7 +354,13 @@
   cities:
   - Midway
   - Fairview
-  year: 2001
+  dep_count: 5
+  vehicle_count: 3
+  year: 1999
+  year_offsets:
+  - 0
+  - 1
+  - 2
 69:
   month: 4
   states:
