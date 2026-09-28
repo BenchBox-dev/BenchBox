@@ -1,0 +1,13 @@
+{
+  "description": "TPC-DS DataFrame full parity: wire staged tpcds cross-surface gate. DEPENDS ON df-parity-staged-tpch-tpcds landing (build_tpcds_duckdb, STAGED_GATES tpcds entry, tpcds-cross-surface-equivalence-report target, maturation workflow). Do NOT re-create that infrastructure. Ground truth: DF surface = 99/99 registered (67 hand-written qN impls in queries.py + 13 query_specs.yaml joined_agg/state_average_returns + 19 helper_query_specs.yaml shared-helper impls); SQL surface = 99/99 via runner.get_queries(dialect=duckdb) (dsqgen netezza base + SQLGlot + _apply_target_dialect_overrides, default overrides valid for SF>=1). Q22 already filters d_month_seq is_between(dms, dms+11); the risk is the default dms=1200 vs the SQL template DMS literal, not year/month approximation. Run: uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds > /tmp/tpcds_baseline_run.log. Bucket every query into PASS (sql_rows>0, both backends match) / VACUOUS (sql_rows==0) / DIVERGENT (sql_rows>0, mismatch or error) / MISSING_BACKEND (get_impl_for_family None). Record baseline: _project/analysis/tpcds_staged_baseline_matrix.json (per-query sql_rows, per-backend status, error text) + /tmp log. GUARDRAILS: Q38/Q88 must still pass at end; read-only diagnosis, no source edits; no comparator/baseline changes. DECISION GATE: matrix committed covering all 99 queries, counts reconcile to 99.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-28T12:42:49Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "28eb05234e5a4d8898c0cd561e2a42c5",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

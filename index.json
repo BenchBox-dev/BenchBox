@@ -17789,6 +17789,13 @@
       "status": "done",
       "title": "Expand TPC-DS OBT Query Coverage to 93 Queries"
     },
+    "tpcds-parity-b0-diagnose": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "TPC-DS parity B0: run staged report and record 99-query baseline matrix"
+    },
     "tpcds-pyspark-compatibility": {
       "claim": null,
       "needs": [],
