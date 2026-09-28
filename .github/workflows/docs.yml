@@ -236,7 +236,7 @@ jobs:
       github.event_name == 'merge_group'
     needs: [visual-inputs, build]
     runs-on: ubuntu-latest
-    # Build (about 15 minutes) plus this job must fit inside the 60-minute
+    # Build (about 15 minutes) plus this job must fit inside the 120-minute
     # merge-queue check timeout with room for runner queueing, so the job
     # never idles long on a runner waiting for a baseline.
     timeout-minutes: 30

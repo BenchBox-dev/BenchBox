@@ -184,7 +184,7 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 {
   "type": "merge_queue",
   "parameters": {
-    "check_response_timeout_minutes": 60,
+    "check_response_timeout_minutes": 120,
     "grouping_strategy": "ALLGREEN",
     "max_entries_to_build": 5,
     "max_entries_to_merge": 5,
@@ -194,6 +194,12 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
   }
 }
 ```
+
+The live queue timeout is 120 minutes. The previous 60-minute setting removed
+PR #2439 from the queue at the response deadline even though its merge-group
+checks completed successfully after 76 minutes. No other queue parameter
+changed. The amendment and its evidence are recorded in
+[`_project/decisions/native-merge-queue-timeout-2026-09-28.md`](../../_project/decisions/native-merge-queue-timeout-2026-09-28.md).
 
 - **Speculative Integration:** `max_entries_to_build: 5` evaluates up to 5 concurrent pull requests speculatively without serializing check waits.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.

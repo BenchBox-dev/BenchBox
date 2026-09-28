@@ -339,8 +339,8 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
 
 
 # Approved native merge-queue parameters for refs/heads/develop, per
-# _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
-# amendment: ALLGREEN, 60-minute timeout, max 5 build / 5 merge). One
+# _project/decisions/native-merge-queue-timeout-2026-09-28.md (2026-09-28
+# amendment: ALLGREEN, 120-minute timeout, max 5 build / 5 merge). One
 # expected-policy source; protected-setting changes are reported for
 # operator action, never silently repaired.
 APPROVED_MERGE_QUEUE: dict[str, object] = {
@@ -349,7 +349,7 @@ APPROVED_MERGE_QUEUE: dict[str, object] = {
     "min_entries_to_merge": 1,
     "max_entries_to_build": 5,
     "max_entries_to_merge": 5,
-    "check_response_timeout_minutes": 60,
+    "check_response_timeout_minutes": 120,
     "min_entries_to_merge_wait_minutes": 0,
 }
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (

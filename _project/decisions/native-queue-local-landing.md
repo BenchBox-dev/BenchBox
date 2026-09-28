@@ -5,7 +5,7 @@ approved native merge queue guards `refs/heads/develop`.
 
 ## Decision
 
-When the queue configuration is verified (SQUASH, ALLGREEN, 1/5/5, 60-minute
+When the queue configuration is verified (SQUASH, ALLGREEN, 1/5/5, 120-minute
 timeout, 0 wait, `ci-required-result` + Results Explorer browser gate +
 `ruleset-drift` required; `scripts/ruleset_drift_check.py::merge_queue_findings`
 and the develop protection checks green), a conflict-free branch behind
