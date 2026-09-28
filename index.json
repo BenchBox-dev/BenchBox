@@ -4950,15 +4950,10 @@
       "title": "Dev loop v2: build the safety property ledger mapping every guard to its replacement"
     },
     "dlv2-10-chdb-cwd-guard": {
-      "claim": {
-        "expires_at": "2026-09-29T20:24:51Z",
-        "generation": "f36866bfb1dd42e89fb19070d42de791",
-        "renewals": 1,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Guard every chdb import so a failed native load cannot leave the process cwd in site-packages/chdb"
     },
     "dlv2-11-optional-engine-clean-skips": {
