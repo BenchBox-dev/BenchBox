@@ -388,12 +388,12 @@
 71:
   brand: 'amalgexporti #1'
   manager_id: 1
-  month: 11
-  year: 1999
+  month: 12
+  year: 2000
 72:
-  buy_potential: '>10000'
-  marital_status: D
-  year: 1999
+  buy_potential: 1001-5000
+  marital_status: M
+  year: 2001
 73:
   county: Williamson County
   state: TN

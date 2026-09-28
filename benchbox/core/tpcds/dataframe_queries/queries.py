@@ -2546,9 +2546,9 @@ def q72_expression_impl(ctx: DataFrameContext) -> Any:
     to ~17.5M rows.
     """
     params = get_parameters(72)
-    year = params.get("year", 1999)
-    buy_potential = params.get("buy_potential", ">10000")
-    marital_status = params.get("marital_status", "D")
+    year = params.get("year", 2001)
+    buy_potential = params.get("buy_potential", "1001-5000")
+    marital_status = params.get("marital_status", "M")
 
     catalog_sales, inventory, date_dim, item, warehouse, customer_demographics, household_demographics, promotion = (
         _tables(
@@ -2615,7 +2615,7 @@ def q72_expression_impl(ctx: DataFrameContext) -> Any:
         # Apply remaining filter conditions
         .filter(
             (col("inv_quantity_on_hand") < col("cs_quantity"))
-            & (col("d3_date") > col("d1_date"))  # Ship date after sold date
+            & (col("d3_date") > ctx.date_add(col("d1_date"), 5))  # Ship date after sold date + 5 days
             & (col("hd_buy_potential") == lit(buy_potential))
             & (col("cd_marital_status") == lit(marital_status))
         )
@@ -2637,10 +2637,12 @@ def q72_pandas_impl(ctx: DataFrameContext) -> Any:
     See q72_expression_impl for detailed documentation.
     CRITICAL: Must join on (item_sk, week_seq) to prevent cartesian explosion.
     """
+    import pandas as pd
+
     params = get_parameters(72)
-    year = params.get("year", 1999)
-    buy_potential = params.get("buy_potential", ">10000")
-    marital_status = params.get("marital_status", "D")
+    year = params.get("year", 2001)
+    buy_potential = params.get("buy_potential", "1001-5000")
+    marital_status = params.get("marital_status", "M")
 
     catalog_sales, inventory, date_dim, item, warehouse, customer_demographics, household_demographics, promotion = (
         _tables(
@@ -2685,10 +2687,14 @@ def q72_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = merged.merge(household_demographics, left_on="cs_bill_hdemo_sk", right_on="hd_demo_sk")
     merged = merged.merge(promotion, left_on="cs_promo_sk", right_on="p_promo_sk", how="left")
 
-    # Filter
+    # Filter (ship date after sold date + 5 days). The date_dim date columns
+    # may be Arrow date32, which cannot mix with Timedelta arithmetic:
+    # normalize both sides to python dates first.
+    d1 = pd.to_datetime(merged["d1_date"]).dt.date
+    d3 = pd.to_datetime(merged["d3_date"]).dt.date
     filtered = merged[
         (merged["inv_quantity_on_hand"] < merged["cs_quantity"])
-        & (merged["d3_date"] > merged["d1_date"])
+        & (d3 > d1 + pd.to_timedelta(5, unit="D"))
         & (merged["hd_buy_potential"] == buy_potential)
         & (merged["cd_marital_status"] == marital_status)
     ]
@@ -4427,7 +4433,8 @@ def q67_expression_impl(ctx: DataFrameContext) -> Any:
                 "s_store_id",
                 "sumsales",
                 "rk",
-            ]
+            ],
+            nulls_last=True,
         )
         .head(100)
     )
@@ -5119,8 +5126,8 @@ def q71_expression_impl(ctx: DataFrameContext) -> Any:
 
     # Parameters
     params = get_parameters(71)
-    year = params.get("year", 1999)
-    month = params.get("month", 11)
+    year = params.get("year", 2000)
+    month = params.get("month", 12)
 
     date_dim, item, time_dim = _tables(ctx, "date_dim", "item", "time_dim")
 
@@ -5164,8 +5171,8 @@ def q71_pandas_impl(ctx: DataFrameContext) -> Any:
     # Parameters
     """Q71: Three-channel sales by brand and meal time (Pandas)."""
     params = get_parameters(71)
-    year = params.get("year", 1999)
-    month = params.get("month", 11)
+    year = params.get("year", 2000)
+    month = params.get("month", 12)
 
     date_dim, item, time_dim = _tables(ctx, "date_dim", "item", "time_dim")
 
