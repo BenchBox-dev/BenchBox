@@ -5,7 +5,7 @@
     "Live proof: a throwaway PR touching a soundness path shows soundness-flag failing, then passing after the section is added; PR closed unmerged",
     "AGENTS.md policy text updated in the same PR (G10); ledger row soundness-path hold updated"
   ],
-  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2444 open, all checks green (verified live 2026-09-29), mergeStateStatus CLEAN. Green run: https://github.com/BenchBox-dev/BenchBox/actions/runs/36563600071/job/109402091003. Already queued to merge at position 2 (develop queue; position 1 is unrelated PR 2420); local make pr-ready refused because soundness-path PRs require manual maintainer merge. Will monitor the merge, then rebase the flip branch (dlv2-f1).",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2444 re-queued after fix. First queue run failed on the merge_group anchor check (ancestry assumption wrong for squash merges); fixed on the branch (new head a1e277337) with content-equality verification, dequeued, pushed, and re-armed. Green PR run: https://github.com/BenchBox-dev/BenchBox/actions/runs/36563600071/job/109402091003. Flip branch feat/dev-loop-v2-flip rebased onto the fix and force-pushed (head 14839f930); still no PR. Unit tier on flip: 31700 passed, 95 failed (all in known env buckets or under baseline comparison).",
   "description": "Decision D4 (approved). The CODEOWNERS/code-owner-review route does NOT enforce a hold: ruleset develop-squash-only has required_approving_review_count=0, agents act as the owner, and PR #2416 touched owned paths and merged with no review decision. New mechanism:\n1. Move the path list from _project/scripts/auto_merge_soundness_paths.py into one data file (e.g. .github/soundness-paths.txt) and a small checker.\n2. ci.yml `tooling` job `soundness-flag`: when a PR diff touches a soundness path, it passes only if the PR body contains a `Soundness review:` section naming the external reviewer (codex, muse, or agy), linking the review output (PR comment), and stating all Critical/High findings resolved. Otherwise it fails with instructions.\n3. Agent policy in AGENTS.md: soundness-path PRs get a dedicated external adversarial review before enqueueing.",
   "sessions": [
     {
@@ -70,6 +70,14 @@
       "client": "jcode",
       "op": "update",
       "op_id": "b478623d6c63427e8b8b54805ae60ad5",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T13:10:35Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "154644bf4eed4e038a1cc7496347194c",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
