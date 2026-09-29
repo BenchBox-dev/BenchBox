@@ -5098,7 +5098,7 @@
         "dlv2-22-nightly-t3-shadow"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "Retire the post-merge safety-net and process-monitoring workflows"
     },
     "dlv2-42-retire-dev-loop-scripts-tests": {
