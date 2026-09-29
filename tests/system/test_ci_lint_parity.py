@@ -63,7 +63,7 @@ SETUP_STEP_NAMES = {"Install dependencies"}
 # below fails if a listed step is renamed or removed -- so this dict can't
 # rot into cover for a guard that quietly stopped existing.
 MERGE_GROUP_ONLY_NOTE = (
-    "merge_group-only input, honored by `timing_policy_check.py` only when the "
+    "merge_group-only input, honored by `fast_lane_ceiling_check.py` only when the "
     "runner's own event file also says merge_group: the script rejects the "
     "flag on any other event, so a PR editing its own workflow copy cannot "
     "self-grant grace, and ci-lint's local run carries no event file and "
@@ -71,11 +71,11 @@ MERGE_GROUP_ONLY_NOTE = (
 )
 
 EXCLUDED_STEPS: dict[str, str] = {
-    # The timing-policy step is excluded only because its merge_group-only
+    # The fast-lane ceiling step is excluded only because its merge_group-only
     # branch has no local equivalent. The dedicated strict-command test below
     # pins the ordinary --strict command to the Makefile recipe, while the
     # merge-group branch and skip aggregation are pinned by workflow assertions.
-    "Timing policy (wall-clock allowlist)": MERGE_GROUP_ONLY_NOTE,
+    "Fast lane ceiling": MERGE_GROUP_ONLY_NOTE,
     "Fast lane ceiling delta vs develop": (
         "CI-cache-dependent, no local equivalent: the guard's input is "
         "`fast-lane-count.txt`, restored from the GitHub Actions cache "
@@ -530,15 +530,26 @@ def test_lint_job_guards_run_in_ci_lint() -> None:
 
 
 def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
-    """The merge-group-only branch must not hide the ordinary strict guard."""
+    """The wall-clock policy runs the same command in the workflow and in ci-lint."""
     timing = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-timing-policy")
     workflow_run = str(timing["run"])
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
     strict_command = "uv run -- python _project/scripts/timing_policy_check.py --strict"
 
     assert strict_command in recipe_lines
+    assert strict_command in workflow_run
+
+
+def test_fast_lane_ceiling_strict_command_is_mirrored_in_ci_lint() -> None:
+    """The merge-group-only branch must not hide the ordinary strict guard."""
+    ceiling = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-ceiling")
+    workflow_run = str(ceiling["run"])
+    recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
+    strict_command = "uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict"
+
+    assert strict_command in recipe_lines
     assert "args=(--strict)" in workflow_run
-    assert 'timing_policy_check.py "${args[@]}"' in workflow_run
+    assert 'fast_lane_ceiling_check.py "${args[@]}"' in workflow_run
 
 
 def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemption() -> None:

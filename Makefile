@@ -820,6 +820,8 @@ ci-lint:
 	fi; \
 	uv run -- python _project/scripts/timing_policy_check.py --strict; \
 	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
+	uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \
+	[ $$? -eq 0 ] || failed="$$failed fast-lane-ceiling"; \
 	uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \
 	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
 	$(MAKE) compat-docs-check; \
