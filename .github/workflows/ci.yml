@@ -119,8 +119,24 @@ jobs:
 
           if [ "${{ github.event_name }}" = "merge_group" ]; then
             if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
-              echo "soundness-flag: merge_group payload has no pull_requests; failing closed — re-run with member payload" >&2
-              exit 1
+              echo "soundness-flag: merge_group payload has no pull_requests; resolving anchor from queue ref" >&2
+              QUEUE_REF="${{ github.ref }}"
+              ANCHOR_NUMBER="$(printf '%s' "$QUEUE_REF" | grep -oE 'pr-[0-9]+' | head -1 | cut -d- -f2)"
+              if [ -z "$ANCHOR_NUMBER" ]; then
+                echo "soundness-flag: cannot parse anchor PR from queue ref $QUEUE_REF; failing closed" >&2
+                exit 1
+              fi
+              ANCHOR_HEAD="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.head.sha')"
+              if [ -z "$ANCHOR_HEAD" ]; then
+                echo "soundness-flag: cannot resolve head of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
+                exit 1
+              fi
+              if ! git merge-base --is-ancestor "$ANCHOR_HEAD" HEAD; then
+                echo "soundness-flag: anchor PR #$ANCHOR_NUMBER head $ANCHOR_HEAD is not an ancestor of group HEAD; failing closed" >&2
+                exit 1
+              fi
+              printf '%s\n' "$ANCHOR_NUMBER" > "$RUNNER_TEMP/merge-group-prs.txt"
+              echo "soundness-flag: payload empty; validating anchor PR #$ANCHOR_NUMBER with group base diff" >&2
             else
               printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
             fi
@@ -134,6 +150,12 @@ jobs:
                 --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
               check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
             done < "$RUNNER_TEMP/merge-group-prs.txt"
+            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
+              echo "soundness-flag: also validating full group base diff for soundness paths" >&2
+              git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/group-diff-paths.txt"
+              gh api "repos/$REPO/pulls/$(head -1 "$RUNNER_TEMP/merge-group-prs.txt")" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
+              check_one "$RUNNER_TEMP/group-diff-paths.txt" "$RUNNER_TEMP/pr-body.md"
+            fi
             exit 0
           fi
           printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
