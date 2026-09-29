@@ -52,6 +52,17 @@
       "op_id": "426fa77b97f24779aecea7d8ab9d413e",
       "reason": "Owner-requested takeover of jcode session_vole (todo session 9fa4e20e): session Closed, last activity 11:44Z, all child sessions Closed, no process in the 2444 worktree, worktree clean at 6f14c93bb.",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T12:48:48Z",
+      "client": "jcode",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "generation": "84e6716b03d042228bb531388b89a023",
+      "op": "takeover",
+      "op_id": "cc18048249484ee8b253f59dd6e523d5",
+      "reason": "Owner-requested takeover in jcode session: Claude session a3bb7d00 (todo session ebb0f23e) was interrupted mid-work; user asked jcode to take over and complete. Holder cannot resume.",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
 }

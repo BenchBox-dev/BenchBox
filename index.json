@@ -5057,10 +5057,10 @@
     },
     "dlv2-32-codeowners-soundness-hold": {
       "claim": {
-        "expires_at": "2026-09-30T12:04:21Z",
-        "generation": "a8f2f1b9d76b42318d0f4b6ae88f7f05",
+        "expires_at": "2026-09-30T12:48:48Z",
+        "generation": "84e6716b03d042228bb531388b89a023",
         "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e"
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
       },
       "needs": [
         "dlv2-00-decisions-adr",
