@@ -1954,7 +1954,9 @@
     },
     "ch-altinity-adapter": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "ch-altinity-spike"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Add the Altinity Cloud native platform adapter"
