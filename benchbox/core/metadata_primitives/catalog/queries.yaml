@@ -9,6 +9,7 @@ queries:
   sql: "SELECT\n    schema_name,\n    catalog_name\nFROM information_schema.schemata\nORDER BY schema_name;\n"
   variants:
     clickhouse: "SELECT\n    name AS schema_name,\n    'default' AS catalog_name\nFROM system.databases\nORDER BY name;\n"
+    bigquery: "SELECT\n    schema_name,\n    catalog_name\nFROM INFORMATION_SCHEMA.SCHEMATA\nORDER BY schema_name;\n"
 - id: schema_list_tables
   category: schema
   description: List all tables in the current schema
@@ -107,6 +108,7 @@ queries:
   variants:
     duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    numeric_precision,\n    numeric_scale\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type IN ('INTEGER', 'BIGINT', 'SMALLINT', 'DECIMAL', 'DOUBLE', 'FLOAT', 'REAL', 'HUGEINT', 'UINTEGER', 'UBIGINT')\nORDER BY table_name, column_name;\n"
     clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    0 AS numeric_precision,\n    0 AS numeric_scale\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND (type LIKE 'Int%' OR type LIKE 'UInt%' OR type LIKE 'Float%' OR type LIKE 'Decimal%')\nORDER BY table, name;\n"
+    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    CAST(NULL AS INT64) AS numeric_precision,\n    CAST(NULL AS INT64) AS numeric_scale\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE data_type IN ('INT64', 'NUMERIC', 'BIGNUMERIC', 'FLOAT64')\nORDER BY table_name, column_name;\n"
 - id: column_string_columns
   category: column
   description: List all string/text columns
@@ -114,6 +116,7 @@ queries:
   variants:
     duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    character_maximum_length\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type = 'VARCHAR'\nORDER BY table_name, column_name;\n"
     clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    0 AS character_maximum_length\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND (type = 'String' OR type LIKE 'FixedString%')\nORDER BY table, name;\n"
+    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    CAST(NULL AS INT64) AS character_maximum_length\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE data_type = 'STRING'\nORDER BY table_name, column_name;\n"
 - id: stats_row_counts
   category: stats
   description: Estimated row counts per table
@@ -121,7 +124,7 @@ queries:
   variants:
     clickhouse: "SELECT\n    database AS table_schema,\n    name AS table_name,\n    total_rows AS estimated_rows,\n    total_bytes AS size_bytes\nFROM system.tables\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\nORDER BY total_rows DESC;\n"
     snowflake: "SELECT\n    table_schema,\n    table_name,\n    row_count AS estimated_rows,\n    bytes AS size_bytes\nFROM information_schema.tables\nWHERE table_schema NOT IN ('INFORMATION_SCHEMA')\n  AND table_type = 'BASE TABLE'\nORDER BY row_count DESC;\n"
-    bigquery: "SELECT\n    table_schema,\n    table_name,\n    row_count AS estimated_rows,\n    size_bytes\nFROM INFORMATION_SCHEMA.TABLE_STORAGE\nORDER BY row_count DESC;\n"
+    bigquery: "SELECT\n    dataset_id AS table_schema,\n    table_id AS table_name,\n    row_count AS estimated_rows\nFROM __TABLES__\nORDER BY row_count DESC;\n"
 - id: stats_table_sizes
   category: stats
   description: Table storage sizes (where available)
@@ -383,6 +386,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(NULL AS VARCHAR) AS is_grantable\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type,\n    IF(grant_option = 1, 'YES', 'NO') AS is_grantable\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nORDER BY table, user_name, access_type;\n"
@@ -401,6 +405,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(NULL AS VARCHAR) AS is_grantable\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type,\n    IF(grant_option = 1, 'YES', 'NO') AS is_grantable\nFROM system.grants\nWHERE table LIKE 'benchbox_%'\nORDER BY table, user_name, access_type;\n"
@@ -419,6 +424,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(0 AS INTEGER) AS grant_count\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    access_type AS privilege_type,\n    COUNT(*) AS grant_count\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY access_type\nORDER BY grant_count DESC;\n"
@@ -437,6 +443,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(0 AS INTEGER) AS grantee_count,\n    CAST(0 AS INTEGER) AS total_grants\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    table AS table_name,\n    uniq(user_name) AS grantee_count,\n    COUNT(*) AS total_grants\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY table\nORDER BY grantee_count DESC\nLIMIT 20;\n"
@@ -455,6 +462,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   - starrocks
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(0 AS INTEGER) AS total_grants\nWHERE 1=0;\n"
@@ -545,6 +553,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type\nFROM system.grants\nWHERE grant_option = 1\n  AND database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nORDER BY table, user_name;\n"
@@ -564,6 +573,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS grantee,\n    CAST(NULL AS VARCHAR) AS table_schema,\n    CAST(NULL AS VARCHAR) AS table_name,\n    CAST(NULL AS VARCHAR) AS privilege_type\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    user_name AS grantee,\n    database AS table_schema,\n    table AS table_name,\n    access_type AS privilege_type\nFROM system.grants\nWHERE user_name LIKE 'benchbox_role_%'\nORDER BY user_name, table, access_type;\n"
@@ -584,6 +594,7 @@ queries:
   - spark
   - polars
   - athena
+  - bigquery
   variants:
     duckdb: "-- DuckDB lacks TABLE_PRIVILEGES introspection; return empty result\nSELECT\n    CAST(NULL AS VARCHAR) AS privilege_type,\n    CAST(0 AS INTEGER) AS total_grants,\n    CAST(0 AS INTEGER) AS distinct_grantees,\n    CAST(0 AS INTEGER) AS distinct_tables\nWHERE 1=0;\n"
     clickhouse: "SELECT\n    access_type AS privilege_type,\n    COUNT(*) AS total_grants,\n    uniq(user_name) AS distinct_grantees,\n    uniq(table) AS distinct_tables\nFROM system.grants\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND table != ''\nGROUP BY access_type\nORDER BY total_grants DESC;\n"
