@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "f11b33d531d5451eb8feb4532be42ab43e154c27507a1e24c29f200eb799876b",
+  "contract_sha256": "fac1108c3d1a3816a9eedf4064b443b67dfb190fbd652e32aaede727ec69d415",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -116,9 +116,11 @@
     "quality-governance-typecheck",
     "query-docs",
     "read-primitives-cross-surface-equivalence-report",
+    "release-check",
     "release-cut",
     "release-cut-abort",
     "release-finalize",
+    "release-prep",
     "security-audit",
     "shrink-rollup",
     "skill-integrity-check",
@@ -179,7 +181,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 209,
+  "public_target_count": 211,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -292,9 +294,11 @@
     "quality-governance-typecheck",
     "query-docs",
     "read-primitives-cross-surface-equivalence-report",
+    "release-check",
     "release-cut",
     "release-cut-abort",
     "release-finalize",
+    "release-prep",
     "run-test",
     "security-audit",
     "shrink-rollup",
@@ -1340,6 +1344,13 @@
         "recipe_sha256": "133d3d8b589bec7380c061af85a561c4a7bedf5e08d315e67d024c19f4628477"
       }
     ],
+    "release-check": [
+      {
+        "header": "release-check:",
+        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py check --version \"$(VERSION)\"",
+        "recipe_sha256": "bb93cf233b3619103e99e1c2891223d8b70606aa8038fd574907e6f323b05b23"
+      }
+    ],
     "release-cut": [
       {
         "header": "release-cut: .release-cut-tree-required",
@@ -1359,6 +1370,13 @@
         "header": "release-finalize:",
         "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-finalize VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_finalize.py --version \"$(VERSION)\" --required-contexts \"$(RELEASE_REQUIRED_CONTEXTS)\"\n\t@echo\n\t@echo \"Check the matching release.yml run before reporting publication.\"\n\t@echo \"Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"develop is intentionally unchanged \u2014 dev-only paths persist on develop.\"",
         "recipe_sha256": "3cde08716cc0d143e62528afa6973f16a0c21426c675aed8668f5f8bfeb11f8e"
+      }
+    ],
+    "release-prep": [
+      {
+        "header": "release-prep:",
+        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-prep VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py prep --version \"$(VERSION)\" $(if $(SINCE_REF),--since-ref \"$(SINCE_REF)\",)",
+        "recipe_sha256": "be996ec46839b6fd26b200f59411971d4603892592ad43e1a15a79818064d3a0"
       }
     ],
     "run-test": [
@@ -2139,7 +2157,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "f4dd69bf6348c3c4591343e56d8b62ad7fc5ed8298d708aa4f4dd24fdf8b28c6",
+  "semantic_sha256": "93f3e5906489eeb090f832d08c8afdc77d105947b27a05f9bb80c6f9653e3ec9",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3784,6 +3802,30 @@
       ]
     },
     {
+      "body": ".PHONY: release-prep release-check",
+      "kind": "rule",
+      "sha256": "b0b94f58b8bfe8ae4f4716c87e904f5e16759ef2df5dc10b417b39e9bca637c6",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
+      "body": "release-prep:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-prep VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py prep --version \"$(VERSION)\" $(if $(SINCE_REF),--since-ref \"$(SINCE_REF)\",)",
+      "kind": "rule",
+      "sha256": "60838ef2edb26e70b7e989563fb02ad3a37a7f969ef4e82e1e16bf3656b3ad56",
+      "targets": [
+        "release-prep"
+      ]
+    },
+    {
+      "body": "release-check:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py check --version \"$(VERSION)\"",
+      "kind": "rule",
+      "sha256": "583928354ed0f3c85a51098a0393034ee29f616295cfa21bfa871f05701bf50d",
+      "targets": [
+        "release-check"
+      ]
+    },
+    {
       "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
       "kind": "rule",
       "sha256": "63633fe7fabde38d081289a39c1e1775862d001bf95838ea64471dcb4381411d",
@@ -4366,7 +4408,7 @@
       ]
     }
   ],
-  "target_count": 215,
+  "target_count": 217,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4482,9 +4524,11 @@
     "quality-governance-typecheck",
     "query-docs",
     "read-primitives-cross-surface-equivalence-report",
+    "release-check",
     "release-cut",
     "release-cut-abort",
     "release-finalize",
+    "release-prep",
     "run-test",
     "security-audit",
     "shrink-rollup",
