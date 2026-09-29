@@ -108,7 +108,7 @@ def test_auto_merge_partial_stack_soundness_revocation_is_unchanged() -> None:
     The detector change must not have disturbed the auto-merge path itself.
     """
     workflow = _load(AUTO_MERGE_WORKFLOW)
-    types = _triggers(workflow)["pull_request"]["types"]
+    types = _triggers(workflow)["pull_request_target"]["types"]
     assert "synchronize" in types, "auto-merge no longer re-evaluates on push, so a later soundness commit can ride"
 
     steps = [step for job in workflow["jobs"].values() for step in job.get("steps", [])]

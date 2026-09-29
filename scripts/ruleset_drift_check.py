@@ -354,6 +354,7 @@ APPROVED_MERGE_QUEUE: dict[str, object] = {
 }
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "ci-required-result",
+    "tooling",
     "Results Explorer browser gate",
     "ruleset-drift",
     "Public-site visual acceptance",
