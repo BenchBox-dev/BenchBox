@@ -1269,6 +1269,53 @@ jobs:
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
+  dist-artifact:
+    name: dist-artifact
+    needs: ci-paths
+    # Merge-group only: builds the exact wheel+sdist the release workflow
+    # publishes (docs/operations/release-artifacts.md). Runs on every merge
+    # group so the tag commit always has a dist-<sha> artifact; never gated
+    # on packaging paths because release needs it for every merge.
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Build wheel and sdist
+        run: |
+          set -euo pipefail
+          uv build
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          sdist_count=$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ] || [ "$sdist_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel and one sdist, found $wheel_count wheel(s) and $sdist_count sdist(s)"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          (cd dist && sha256sum ./*.whl ./*.tar.gz > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: dist-${{ github.sha }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 90
+
   dependency-audit:
     name: dependency-audit
     needs: ci-paths
@@ -1958,7 +2005,7 @@ jobs:
   # Unit result: core. Required by the merge ruleset; reports on every event and passes when untouched.
   core:
     name: core
-    needs: [ci-paths, code-lint, code-test, medium-test, correctness-gate, plan-capture-gate, datafusion-integration, package-smoke, dependency-audit]
+    needs: [ci-paths, code-lint, code-test, medium-test, correctness-gate, plan-capture-gate, datafusion-integration, package-smoke, dist-artifact, dependency-audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -1987,6 +2034,7 @@ jobs:
             --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect datafusion-integration=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect package-smoke=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} \
+            --expect dist-artifact=${{ github.event_name == 'merge_group' }} \
             --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
 
   # Unit result: explorer.
@@ -2139,4 +2187,3 @@ jobs:
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
             --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} \
             --expect ruleset-drift=${{ github.event_name == 'merge_group' }}
-
