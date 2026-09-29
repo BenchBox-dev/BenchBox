@@ -1,9 +1,9 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-09-29T12:44:48.193753+00:00",
+  "generated_at": "2026-09-29T15:36:05.800460+00:00",
   "source": "f02f42f3b75d1674f18b1d4686c37729d26426f9",
   "source_ref": "origin/published-results",
-  "source_resolved_at": "2026-09-29T12:44:48.193753+00:00",
+  "source_resolved_at": "2026-09-29T15:36:05.800460+00:00",
   "source_resolved_from": "origin/published-results",
   "main_source": "working-tree",
   "bidirectional": false,
@@ -53,7 +53,6 @@
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json",
     "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
-    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
     "results-data/bundles/datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json",
@@ -178,7 +177,6 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json",
-    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260928_093626_09243b52.json",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json",
@@ -302,7 +300,6 @@
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json": "accepted",
     "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json": "legacy_overlay",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json": "accepted",
-    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json": "legacy_overlay",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json": "accepted",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json": "accepted",
     "results-data/bundles/datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json": "accepted",
@@ -427,7 +424,6 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json": "accepted",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json": "accepted",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json": "accepted",
-    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260928_093626_09243b52.json": "legacy_overlay",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json": "accepted",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json": "accepted",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json": "accepted",
@@ -551,7 +547,6 @@
     "results-data/bundles/coffeeshop_sf1_sqlite_sql_20260826_183039_5bd85b97.json": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81",
     "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json": "01ac92413a4d434b6a5ca293da43c59bc7f36871bb9d944ac93bc777db00c83e",
     "results-data/bundles/datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json": "262f235e9acfea7d431c57affeff6b1ca8132c972061c5de455bbe51275e5fe5",
-    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json": "010cd801703e1bb50e2bd7a1a776012af69cc2ad6d5002b80d765331ce1958bb",
     "results-data/bundles/datavault_sf001_datafusion_sql_20260825_174206_a0f056fa.json": "2ea72f0a8164e756b36bba0023129779242b9ddd049dd99c09fc4fd90075f2ec",
     "results-data/bundles/datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json": "3a3892389747b7b38285d4afb0ff96f0d68b3f92225e4ddebb891e6f63f6751a",
     "results-data/bundles/datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json": "14bd9a74c372b8475bad2e630f5e12ea9a8761bf0f500a53f934ad751b3b603f",
@@ -676,7 +671,6 @@
     "results-data/bundles/tpcds/datafusion/sf1/tpcds_sf1_datafusion_sql_20260901_123155_6bed4cfc.json": "e7ccec583a82ac6c876ce8b57aabc9bed5014efe4f32385f4a0c6edeaaf0904e",
     "results-data/bundles/tpcds/duckdb/sf1/tpcds_sf1_duckdb_sql_20260901_123050_2e3c74db.json": "06b7cf914e17f3e59ea97f42a4a0726e0019d4d5b5b2c1b3e6dac74a85c40cf9",
     "results-data/bundles/tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json": "895bbece3b93e7e2048454ba742f0564afa4a07c93c78bcab43ebcd01ce5a87c",
-    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260928_093626_09243b52.json": "d4057af7fc63578e50dbfdc8c40f1799612d528a334bb30ded7a41977894c443",
     "results-data/bundles/tpcds_obt_sf1_datafusion_sql_20260826_164619_4e6d3fff.json": "4d34fab2ee7d5b20e0bfabb233323e0604c6ae8c4ff51843c8b71517aabc8baa",
     "results-data/bundles/tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json": "224c18b9fc693297fcfee359bc96c134446ce4ca3172eeec1f2bc4ea8d65ca48",
     "results-data/bundles/tpcds_sf10_datafusion_sql_20260823_225543_15b41887.json": "cc8c667977efdea05b713c2a120b44cb5b5713055c85efb853f3b2ae0211de29",
@@ -756,9 +750,7 @@
   },
   "published_only": [],
   "legacy_overlay": [
-    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
-    "results-data/bundles/datavault_sf001_databricks_sql_20260926_180335_d2571791.json",
-    "results-data/bundles/tpcds_obt_sf1_databricks_sql_20260928_093626_09243b52.json"
+    "results-data/bundles/datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json"
   ],
-  "count": 247
+  "count": 245
 }
