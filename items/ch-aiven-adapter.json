@@ -1,0 +1,13 @@
+{
+  "description": "Add the Aiven for ClickHouse native platform adapter, modeled on ch-altinity-adapter (AivenAdapter(ClickHouseAdapter), key `aiven-clickhouse`, experimental). Aiven publishes literal connection recipes for both native (clickhouse-driver, secure=True) and HTTPS transports.\n\nDECISION GATE: proceeds only after ch-tier2-spike records a go for Aiven AND wave 1 (Altinity adapter) has landed, so shared hosted-ClickHouse patterns are visible before cloning. If the Altinity adapter reveals abstraction-worthy duplication, propose the shared base in that PR rather than here.\n\nGuardrails: same as Altinity adapter (manifest authority, lazy imports, compat-docs-check, no credentials, 7-10 files).",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:13:58Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "a13346baa10a4822b6264cf1763ce117",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
