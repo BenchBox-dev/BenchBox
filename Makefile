@@ -251,7 +251,7 @@ coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
 # Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (datavault remains staged) and run in the blocking correctness-gate (pr.yml);
+# In GATES (datavault remains staged) and run in the blocking correctness-gate (ci.yml);
 # exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
 # classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
@@ -259,7 +259,7 @@ clickbench-cross-surface-equivalence-report:
 
 # Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
 # cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
-# (pr.yml); exits non-zero on any unclassified divergence (see
+# (ci.yml); exits non-zero on any unclassified divergence (see
 # _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic
@@ -626,7 +626,7 @@ skill-sync-check:
 	fi; \
 	echo "skill-sync-check: tracked mirror up to date."
 
-# Fail-closed local counterpart of pr.yml's required skill-integrity job. The
+# Fail-closed local counterpart of ci.yml's required skill-integrity job. The
 # tool pin comes from the same policy module as CI; the vendored wrapper
 # needs no network, no Node, and no build, so verification runs directly
 # against the committed payload. A missing wrapper is a hard failure.
@@ -737,14 +737,14 @@ guards-fix:
 # These targets mirror GitHub Actions workflows for local validation
 
 # CI lint check - superset covering both lint.yml (release-branch gate) and
-# the pr.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
+# the ci.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
 # few extra local-only conveniences (lint-explorer-tokens,
 # lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
-# pr.yml `lint` job runs (after dependency install) must also run here at the
+# ci.yml `lint` job runs (after dependency install) must also run here at the
 # COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
 # docs/operations/ci-local-parity.md.
 #
-# Report-all: mirrors pr.yml's `lint-guard-summary` design. Every guard runs
+# Report-all: mirrors ci.yml's `lint-guard-summary` design. Every guard runs
 # to completion in one pass (no stopping at the first failure) with its
 # output streamed live as it runs; failures are collected into `failed` and
 # a single consolidated FAILED-guards list prints at the end, with a
@@ -984,7 +984,7 @@ ci-local:
 	@echo "========================================"
 
 # --- Apple container Linux CI-parity sandbox (opt-in; Apple silicon + macOS 26) ---
-# Reproduce the Linux pr.yml gate locally inside a `container machine`. Motivated by a
+# Reproduce the Linux ci.yml gate locally inside a `container machine`. Motivated by a
 # MEASURED macOS<->Linux divergence: on identical DuckDB 1.3.2/arm64, TPC-H Q2/Q10/Q15
 # value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
 # silicon (the pinned digest references are Linux-generated). This wrapper is the only way

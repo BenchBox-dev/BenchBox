@@ -90,7 +90,7 @@ def _named_modules(workflow: str) -> set[str]:
 
 def main() -> None:
     slow = _slow_modules()
-    pr = slow & _named_modules("pr.yml")
+    pr = slow & _named_modules("ci.yml")
     nightly = slow & _named_modules("nightly.yml")
     print(f"Slow test modules: {len(slow)}")
     print(f"Named in PR workflow: {len(pr)}")

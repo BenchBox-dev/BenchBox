@@ -17,12 +17,11 @@ default_workflow_permissions: read
 can_approve_pull_request_reviews: true
 ```
 
-The default token permission is intentionally read-only. The
-`develop-post-merge.yml` `auto-revert-on-failure` job declares
-`contents: write`, `issues: write`, `pull-requests: write` at the job level
-to scope writes narrowly. `can_approve_pull_request_reviews: true` lets the
-workflow request review on the auto-revert PR from the original PR author
-when the GraphQL lookup populates the field.
+The default token permission is intentionally read-only. Any workflow that
+needs to write declares the specific scopes at the job level to keep writes
+narrow. `can_approve_pull_request_reviews: true` is a leftover from the
+retired post-merge auto-revert job, which used it to request review from the
+original PR author; no current workflow depends on it.
 
 Verify:
 
@@ -118,16 +117,13 @@ The latest bounded, read-only wall and runner-minute remeasure is recorded in
 It keeps `pull_request` and `merge_group` event evidence separate and does
 not authorize changing required contexts or skipping jobs.
 
-`refresh-shadow` (added with the strict-base refresh shadow rollout) is the
-observational job in `.github/workflows/develop-refresh-shadow.yml`. It is
-**not a required** context. It classifies exact `develop` refreshes using the
-trusted base copy of `scripts/pr_refresh_certification.py` and publishes a
-bounded artifact. It cannot skip Develop PR lanes, cannot satisfy
-`ci-required-result`, and does not change auto-merge or ruleset 15611785.
-`.github/workflows/pr.yml` also uploads `pr-certification-identity` and
-`pr-certification-lanes` artifacts so a later activation gate can bind a full
-run to a specific head, base, merge tree, workflow fingerprint, and lane
-set. Missing artifacts fail closed to `full_required`.
+The strict-base refresh shadow (`develop-refresh-shadow.yml`) and the
+`pr-certification-identity` and `pr-certification-lanes` artifacts that
+`pr.yml` uploaded for it were retired with the six-unit CI. The shadow was
+observational and never a required context. `scripts/pr_refresh_certification.py`
+remains as a library for a later activation gate, which would need to bind a
+full run to a specific head, base, merge tree, workflow fingerprint, and lane
+set from `ci.yml`. Until then a stale base means a refresh and a fresh run.
 
 Verify:
 
@@ -543,12 +539,12 @@ For the first release that introduces `release-canary.yml`, before GitHub can
 run the workflow from the default branch, `validate-base` runs the same
 non-fast canary suite and ruleset drift check inline as bootstrap evidence.
 
-Ruleset drift is checked for every develop PR by
-`develop-ruleset-drift.yml` and independently by `release-canary.yml`. The PR
-workflow uses `pull_request_target`, checks out only the trusted base SHA, and
-never executes pull-request-head code with the admin-visible token. Its
-`ruleset-drift` job is a required `develop-squash-only` context, so drift blocks
-the next merge instead of waiting for the scheduled canary. The script parses this runbook for
+Ruleset drift is checked in the merge queue by the `ruleset-drift` job of the
+`tooling` unit in `ci.yml`, and independently by `release-canary.yml`. The job
+runs only on `merge_group`, checks out only the trusted base SHA, and never
+executes pull-request-head code with the admin-visible token. Because
+`tooling` is a required `develop-squash-only` context, drift blocks the next
+merge instead of waiting for the scheduled canary. The script parses this runbook for
 `develop-squash-only` and `release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
@@ -574,8 +570,8 @@ from both CI call sites without a separate code path.
 > copy, so every develop-authored scheduled workflow now registers and fires
 > directly — the "land it on `main`" problem below no longer exists. Verified
 > 2026-07-08 via the Actions list-workflows API: `release-canary.yml`
-> (id 309070628), `phase3-promotion-review.yml`, and
-> `orphaned-commit-detector.yml` are now registered (26 workflows, up from 19).
+> (id 309070628) and two other scheduled workflows (since retired) are now
+> registered (26 workflows, up from 19).
 > Activation options (a)/(b)/(c) and the "Admin steps (w2)" below are
 > **superseded** and retained only as history. The `nightly.yml`
 > `scheduled-workflow-liveness` guard now runs from `develop` directly (no
@@ -593,25 +589,10 @@ Historical live state observed 2026-07-05 (release-canary-scheduled-activation T
   `on.schedule` cron has **never fired** and none of its jobs
   (pypi-latest-installability, ruleset-drift, credential-free-non-fast,
   plus the release-canary-result aggregator) has ever executed.
-- Same class, second instance: `phase3-promotion-review.yml` (quarterly
-  cron `0 9 1-7 1,4,7,10 *`) is also on `develop` but absent from
-  `origin/main`, so its schedule has never fired either. The liveness
-  guard below will name it alongside release-canary; the admin should
-  land it on `main` in the same pass (or deliberately remove its
-  schedule and record that decision here). Its `review` job now checks out
-  `develop` explicitly via a `PHASE3_REVIEW_REF` env var (the same
-  `RELEASE_CANARY_REF` shell pattern release-canary.yml uses), so landing
-  the file on `main` does not leave a scheduled run checking out `main`'s
-  stripped tree (no `_project/` or `scripts/phase2_metrics.py`) by default.
-- Same class, third instance (#1020 review): `orphaned-commit-detector.yml`
-  (weekly cron `0 7 * * 1`) is also on `develop` but absent from
-  `origin/main`, so its schedule has never fired either — only its
-  path-filtered `push: branches: [develop]` trigger can run, on the cadence
-  of detector/allowlist edits rather than weekly. It already hardcodes
-  `ref: develop` on its checkout step (the same shell pattern as
-  release-canary.yml/phase3-promotion-review.yml), so it is safe to land on
-  `main` as-is whenever the admin does the next pass for this class of fix —
-  no `main`-relative edits needed first.
+- Same class, other instances: `phase3-promotion-review.yml` (quarterly) and
+  `orphaned-commit-detector.yml` (weekly) were also on `develop` but absent
+  from `origin/main`, so their schedules never fired either. Both workflows
+  were retired with the six-unit CI, so the history no longer needs action.
 
 GitHub runs `on.schedule` workflows only from the default branch (historically
 `main`; **now `develop` as of 2026-07-08** — see the RESOLVED note above, which
@@ -672,26 +653,11 @@ access and let the canary return to green.
 
 ## Repository labels
 
-The `develop-post-merge.yml` auto-revert job creates these labels on
-demand if they do not exist:
-
-- `incident:develop-red` — used on an auto-revert PR or an owned
-  post-merge incident/advisory when attribution is unproven.
-- `incident:develop-red-revert-conflict` — used on the manual-action issue
-  when a proven revert path cannot complete (revert conflict, push failure,
-  PR-creation failure, or target/diff inspection failure).
-
-Attribution incidents include the immutable failing commit and PR, test/job
-identifiers, predecessor and source-input evidence, ownership match,
-classification, owner, next action, and a stable incident key. The workflow
-must not create a revert proposal from temporal adjacency, missing evidence,
-an unmappable job failure, stale target state, external-reference drift, or a
-transient rerun. Those outcomes keep develop red and update the existing
-`incident:develop-red` issue by incident key.
-
-The on-demand `gh label create … || true` in the workflow means a fresh
-clone or transfer does not need the labels pre-created. They will appear
-the first time develop goes red.
+The `incident:develop-red` and `incident:develop-red-revert-conflict` labels
+were created on demand by the retired post-merge auto-revert job. No workflow
+creates or reads them now. Any that still exist on the repository are legacy
+and are scheduled for deletion in the dev-loop v2 cleanup
+(`docs/development/adr/adr-dev-loop-v2.md`).
 
 Verify:
 
@@ -721,8 +687,9 @@ transfer, re-apply in this order:
    resolving the live ruleset **by name** (`develop-squash-only`) in
    workflows; do not treat a stale numeric id as authority.
 3. Verify with the `gh api … rulesets/<id> --jq …` command above.
-4. Push a no-op commit to develop and confirm `develop-post-merge.yml`
-   produces a `metrics` artifact and the lint + fast-test jobs are green.
+4. Open a no-op pull request against develop and confirm the six unit
+   results report on it. Merge it through the queue and confirm
+   `fast-lane-baseline.yml` records the fast-lane count for the new tip.
    This validates that workflow permissions are correct end-to-end.
 
 ## Out-of-scope

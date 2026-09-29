@@ -81,7 +81,7 @@ EXCLUDED_STEPS: dict[str, str] = {
         "`fast-lane-count.txt`, restored from the GitHub Actions cache "
         "(`actions/cache/restore@v5.1.0`, exact key "
         "`fast-lane-count-develop-<base-sha>`, populated by "
-        "develop-post-merge.yml's own cache-save step) -- "
+        "fast-lane-baseline.yml's cache-save step) -- "
         "there is no Actions cache to restore from in a local shell. The "
         "pull-request command passes `--require-develop-baseline`, so a "
         "missing cache fails closed with `DELTA_CHECK_BASELINE_ERROR`; "

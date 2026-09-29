@@ -44,21 +44,21 @@ side had already closed out.
 
 ## Browser-lane triage
 
-- Chromium's full e2e suite **does** gate develop merges. The required
-  status check is `Results Explorer browser gate` (ruleset
-  `develop-squash-only`), not a subordinate of `ci-required-result` —
-  browser and PR workflows are separate. The gate is path-aware via
-  `explorer-changes`: a red Chromium run on explorer-relevant paths makes
-  the PR unmergeable; unrelated PRs get a green gate without running the
-  suite. Before attributing a red Chromium (or gate) result to the PR under
+- Chromium's full e2e suite **does** gate develop merges. It is the
+  `explorer-e2e` job of the required `explorer` unit (ruleset
+  `develop-squash-only`). The unit is path-aware through `.github/ci-units.yml`:
+  a red Chromium run on explorer-relevant paths makes the PR unmergeable;
+  unrelated PRs get a green `explorer` unit without running the
+  suite. Before attributing a red Chromium (or `explorer`) result to the PR under
   review, check whether develop's own tip is already red for the same
   reason; a pre-existing develop-side failure is not the PR's fault.
   Full wiring and lane status:
   [`docs/operations/browser-ci.md`](browser-ci.md) (merge-gate decision).
   Historical tracker id `chromium-blocking-suite-not-in-required-checks`
   described the pre-ruleset state and is no longer accurate.
-- Firefox `@smoke` has been green in recent history — a red Firefox run is
-  worth investigating as a real signal, not waved off as routine flake.
+- Firefox `@smoke` runs nightly and has been green in recent history — a red
+  Firefox run is worth investigating as a real signal, not waved off as
+  routine flake.
 - WebKit failures are **not** dismissible as flake. See
   `docs/operations/browser-ci.md` for current lane status and the
   triage rule in force there.
@@ -94,9 +94,9 @@ a PR's mergeability — both only alert.
   the PR timeline shows prior arm intent that was lost. "Required lane
   green" means **every** `develop-squash-only` required context is
   latest-success — the documented required contexts are
-  `ci-required-result`, `tooling`, `Results Explorer browser gate`,
-  `ruleset-drift`, and `Public-site visual acceptance` — so a PR that is
-  green on one and red or silent on the other is not green and is not alerted.
+  `core`, `explorer`, `results-data`, `docs`, `landing`, and `tooling` — so a
+  PR that is green on one and red or silent on another is not green and is not
+  alerted.
   `--apply` only
   upserts the digest issue; it **never** enables auto-merge and must not
   re-arm a hold it did not set.
@@ -162,12 +162,10 @@ Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly
 once when it drains — never a per-run flood of new issues.
 
-## Develop post-merge SLA
+## Red develop tip
 
-The green-unmerged sweep also checks the most recent "Develop post-merge"
-workflow run (`.github/workflows/develop-post-merge.yml`) on develop's
-tip. If that run's conclusion is `failure`, treat it as **same-day
-fix-forward priority**: every PR opened after a red develop tip inherits
-that breakage, so the fix should land before the day ends rather than
-queuing behind routine work. This SLA is about triage priority only —
-it does not change how `develop-post-merge.yml` itself behaves.
+There is no post-merge workflow: the merge queue runs the six required units
+on the exact tree that lands, so a red develop tip means something reached
+develop outside the queue or a queue certification was wrong. Treat it as
+**same-day fix-forward priority**, because every PR opened after a red tip
+inherits the breakage. The green-unmerged sweep no longer reports it.

@@ -100,7 +100,7 @@ directory name.
 The standard gates are intentionally split by the risk they are meant to catch:
 
 - `make test-fast`: quick developer and develop-PR feedback for code-impacting
-  changes. The matching selection in `.github/workflows/pr.yml` also collects
+  changes. The matching selection in `.github/workflows/ci.yml` also collects
   coverage.
 - `make test-correctness-gate`: bounded develop-PR real-result gate. It runs the
   DuckDB TPC-H matrix slice (SF=1, pinned reference qgen seed) through generate,
@@ -152,7 +152,7 @@ The standard gates are intentionally split by the risk they are meant to catch:
     SKIPs (e.g. duckdb unavailable, or the case dropped from the stable matrix),
     which would otherwise pass the gate without executing anything.
   - **Required CI job composition**: the `correctness-gate` job in
-    `.github/workflows/pr.yml` runs more than this row-count+value gate. It also runs
+    `.github/workflows/ci.yml` runs more than this row-count+value gate. It also runs
     the value-level cross-surface and TPC-Havoc equivalence gates
     (`tpchavoc-equivalence-report`, `tpchavoc-dataframe-equivalence-report`, and the
     ssb/amplab/coffeeshop/clickbench/joinorder-synthetic cross-surface reports), so

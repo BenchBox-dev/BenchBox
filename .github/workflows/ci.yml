@@ -730,7 +730,7 @@ jobs:
       # `continue-on-error: true` so one guard's failure doesn't hide the
       # others' results behind a stopped job. The job as a whole still
       # fails iff any guard failed -- see the `lint-guard-summary` step,
-      # which is what `ci-required-result` actually gates on. Setup steps
+      # which is what the `core` unit actually gates on. Setup steps
       # above (checkout/setup-python/setup-uv/install deps) are not
       # guards and carry neither `id: guard-*` nor `continue-on-error`.
       - name: Validate uv.lock revision against the PR base
@@ -809,7 +809,7 @@ jobs:
         # to one delta limit per possible queued entry warns instead of
         # ejecting the group. The script grants the grace only when the runner's own event file
         # says merge_group, so a PR cannot self-grant it by editing this line:
-        # pr.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
+        # ci.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
         # written by the runner. The delta guard below stays pull_request-only,
         # so a composed overage cannot slip through it either.
         run: |
@@ -1494,7 +1494,7 @@ jobs:
     # locally, so it is cheap enough to block develop PRs.
     #
     # PROMOTED TO THE REQUIRED LANE 2026-07-05 (parity-check-promotion): the
-    # job is now observed by ci-required-result via PARITY_CHECK_RESULT with
+    # job is now observed by the explorer unit via PARITY_CHECK_RESULT with
     # the package-smoke skipped-counts-as-pass rule, and continue-on-error is
     # dropped. Both promotion criteria met: (1) one green run on a real
     # GitHub runner (PR #973, run 28742318825 job 85227174150 - the runner's

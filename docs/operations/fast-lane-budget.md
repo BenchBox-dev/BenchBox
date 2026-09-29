@@ -3,7 +3,7 @@
 The "fast lane" is every test collected under `pytest -m fast` (excluding
 `slow`/`stress`/`resource_heavy`/`live_integration`) -- the required,
 sub-few-minutes suite every develop PR runs in `code-test`
-(`.github/workflows/pr.yml`). `_project/scripts/timing_policy_check.py`'s
+(`.github/workflows/ci.yml`). `_project/scripts/timing_policy_check.py`'s
 fast-lane check enforces a hard ceiling on how many tests that lane may
 collect, `max_fast_tests` in `_project/config/fast_test_lane_policy.json`.
 
@@ -39,9 +39,8 @@ of relying on whoever happens to hit the wall.
 
 **1. Quantum ceiling -- coarse backstop, everywhere, every phase.**
 `max_fast_tests` in `fast_test_lane_policy.json` remains the absolute,
-always-enforced limit: PR lane (`guard-timing-policy` in `pr.yml`), the
-develop-post-merge safety net (`lint` job in `develop-post-merge.yml`, via
-`make ci-lint`), and the release lane (`lint.yml`). This is a **backstop**,
+always-enforced limit: PR lane (`guard-timing-policy` in `ci.yml`) and the
+release lane (`lint.yml`). This is a **backstop**,
 never a delta-only check -- a fast lane growing by small increments across
 many PRs still eventually needs a real ceiling, and this is it.
 
@@ -54,11 +53,11 @@ contention (few, larger, uncontested bumps beat many, minimal, colliding
 ones).
 
 **2. Per-PR delta guard -- catches runaway growth early.** The PR lane's
-`code-lint` job restores the most recent develop fast-lane count (cached by
-`develop-post-merge.yml` after every push to develop) and compares this PR's
+`code-lint` job restores the fast-lane count recorded for the PR's base commit
+(cached by `fast-lane-baseline.yml` after every push to develop) and compares this PR's
 own collect count against it:
 
-- delta > 150 fails the guard (`guard-fast-lane-delta`, `pr.yml`).
+- delta > 150 fails the guard (`guard-fast-lane-delta`, `ci.yml`).
 - delta > 75 warns (does not fail).
 - No baseline available (cache miss -- e.g. the very first run after this
   landed, or a cache eviction) -- the pull-request workflow passes
@@ -209,14 +208,14 @@ not silently demote the count guards.
 
 Not to be confused with w6: that gate is about *replacing* the fast lane's
 count ceiling. This is the `medium-test` job's `timeout-minutes` in
-`.github/workflows/pr.yml` -- a hard cancel, not a policy check.
+`.github/workflows/ci.yml` -- a hard cancel, not a policy check.
 
 Sizing rule: **observed p95 + >=30% headroom**, rounded up. The timeout is
 the only backstop against a genuinely hung medium tier, so it is not set to
 a large "never think about it again" value -- that converts a hang into an
 hour-long queue stall.
 
-**2026-07-25 resize, 30 -> 40 min.** Last 20 `pr.yml` runs: min 20.2 /
+**2026-07-25 resize, 30 -> 40 min.** Last 20 runs of the former `pr.yml`: min 20.2 /
 median 27.4 / p95 29.9 min, with 8 of 19 successful runs within 48s of the
 old 30-minute cap. PR #1306 was cancelled twice at 30m16s having reached
 95% of the suite; it added three monkeypatched tests worth ~2s, so it was
@@ -240,9 +239,9 @@ so the metric and the budget it measures cannot drift apart.
 
 ## Required-gate versus whole-event fan-out
 
-Merge-unblock latency is the last **required** context (`ci-required-result`,
-`tooling`, `Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`).
-The remaining documentation, integration samples, and other synchronize jobs
+Merge-unblock latency is the last **required** context (`core`, `explorer`,
+`results-data`, `docs`, `landing`, `tooling`).
+The remaining integration samples and other synchronize jobs
 are all-workflow fan-out: they consume runner-minutes and can extend wall time
 after the PR is already mergeable.
 `dev_loop_pr_metrics.py --event-fanout` emits the versioned
