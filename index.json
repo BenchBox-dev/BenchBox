@@ -1966,6 +1966,13 @@
       "status": "open",
       "title": "Evaluate Altinity Cloud locally and record driver, SQL, and connection-limit facts"
     },
+    "ch-doublecloud-adapter": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add the DoubleCloud Managed ClickHouse native platform adapter"
+    },
     "ch-tier2-spike": {
       "claim": null,
       "needs": [],

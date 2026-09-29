@@ -1,0 +1,13 @@
+{
+  "description": "Add the DoubleCloud Managed ClickHouse native platform adapter, modeled on ch-altinity-adapter (DoubleCloudAdapter(ClickHouseAdapter), key `doublecloud`, experimental). Note the IP-allowlist default-on behavior in setup docs; trial from ~$24/mo is the cheapest validation path in the family.\n\nDECISION GATE: proceeds only after ch-tier2-spike records a go for DoubleCloud AND wave 1 (Altinity adapter) has landed.\n\nGuardrails: same as Altinity adapter (manifest authority, lazy imports, compat-docs-check, no credentials, 7-10 files).",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:14:13Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "17f1d1329c8e407ba953446cb8ceb299",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
