@@ -1998,7 +1998,9 @@
     },
     "ch-tinybird-adapter": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "ch-tinybird-spike"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Add the Tinybird dual-path native platform adapter"
