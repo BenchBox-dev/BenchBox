@@ -41,6 +41,17 @@
       "op": "renew",
       "op_id": "77e7d659b0764e27b5c65ea7f83a2223",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T12:04:21Z",
+      "client": "claude-code",
+      "displaced": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "generation": "a8f2f1b9d76b42318d0f4b6ae88f7f05",
+      "op": "takeover",
+      "op_id": "426fa77b97f24779aecea7d8ab9d413e",
+      "reason": "Owner-requested takeover of jcode session_vole (todo session 9fa4e20e): session Closed, last activity 11:44Z, all child sessions Closed, no process in the 2444 worktree, worktree clean at 6f14c93bb.",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
     }
   ]
 }
