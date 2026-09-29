@@ -5295,6 +5295,16 @@
       "status": "open",
       "title": "Stabilize the merge queue now and unstick the open dev-loop PRs"
     },
+    "dlv2-f1-build-flip-branch": {
+      "claim": null,
+      "needs": [
+        "dlv2-00-decisions-adr",
+        "dlv2-02-property-ledger"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Build the flip branch: ci.yml with lean T2, and deletion of the legacy PR-gate and post-merge workflows"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],
