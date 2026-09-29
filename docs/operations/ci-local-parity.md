@@ -300,8 +300,4 @@ The explicit exceptions cover inputs that only exist in their hosted gate:
 
 These are intentionally named in the parity test with the reason they cannot
 be reproduced from a normal checkout. They are not skipped by local validation
-under another name. The publication docs lane has a local equivalent:
-`make pr-preflight` consumes the classifier's `PATH_LISTS` and invokes
-`make lane-isolation-check`, which runs the existing verifier for site,
-explorer, and corpus against the exact changed-path artifact. The target fails
-closed when that artifact is absent or empty.
+under another name.

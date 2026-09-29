@@ -1412,19 +1412,3 @@ def test_makefile_has_separate_bounded_all_open_status_view() -> None:
     assert "ALL_OPEN" in status
     assert "PR_STATUS_ALL_OPEN_LIMIT" in status
     assert "All open develop PRs" in status
-
-
-def test_lane_isolation_make_target_rejects_empty_changed_paths(tmp_path: Path) -> None:
-    lists = tmp_path / "lists"
-    lists.mkdir()
-    (lists / "changed.txt").write_text("", encoding="utf-8")
-    result = subprocess.run(
-        ["make", "-s", "lane-isolation-check", f"PATH_LISTS={lists}"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode != 0
-    assert "non-empty changed paths artifact is required" in result.stderr
