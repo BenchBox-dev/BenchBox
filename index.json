@@ -5088,7 +5088,7 @@
         "dlv2-22-nightly-t3-shadow"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "Retire the legacy PR-gate workflows replaced by ci.yml"
     },
     "dlv2-41-retire-post-merge-workflows": {
