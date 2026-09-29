@@ -5104,10 +5104,8 @@
     "dlv2-42-retire-dev-loop-scripts-tests": {
       "claim": null,
       "needs": [
-        "dlv2-40-retire-pr-gate-workflows",
-        "dlv2-41-retire-post-merge-workflows",
-        "dlv2-16-split-timing-policy",
-        "dlv2-32-codeowners-soundness-hold"
+        "dlv2-f3-flip-window",
+        "dlv2-16-split-timing-policy"
       ],
       "priority": "high",
       "status": "open",
