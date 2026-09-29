@@ -605,7 +605,6 @@ jobs:
             tests/unit/scripts/test_skill_sync_ci_policy.py \
             tests/unit/scripts/test_path_filter_decision.py \
             tests/unit/scripts/test_ci_lint_environment_boundary.py \
-            tests/unit/workflows/test_pr_workflow_path_classifier.py \
             tests/unit/scripts/test_agent_instruction_audit.py \
             -q
 
