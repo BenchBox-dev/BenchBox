@@ -1952,6 +1952,13 @@
       "status": "open",
       "title": "Evaluate Altinity Cloud locally and record driver, SQL, and connection-limit facts"
     },
+    "ch-tier2-spike": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Evaluate Aiven, DoubleCloud, and OVHcloud ClickHouse trials with per-vendor verdicts"
+    },
     "ch-tinybird-spike": {
       "claim": null,
       "needs": [],

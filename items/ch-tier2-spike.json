@@ -1,0 +1,13 @@
+{
+  "description": "Combined evaluation of Aiven for ClickHouse, DoubleCloud Managed ClickHouse, and OVHcloud Managed ClickHouse. Same questions as ch-altinity-spike per vendor: endpoint, auth model, SELECT version() output, DDL/DML deviation from open-source ClickHouse, trial cost, and TLS/allowlist behavior (DoubleCloud IP allowlist default-on is a setup note). Self-serve trials only; no sales-led engagement.\n\nDECISION GATE: per-vendor go/no-go recorded in this item. A vendor that fails (no trial access, protocol deviation, prohibitive cost) is parked with its reason, not retried silently.\n\nGuardrails: trial credentials in env only; SF 0.01 probe tables max; read-only recon where possible.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:13:04Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "da575f3404424ec4871cda1ec0cfbb46",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
