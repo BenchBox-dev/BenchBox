@@ -351,4 +351,3 @@ See Also
 - :doc:`../base` - Base benchmark interface
 - :doc:`../results` - Results API
 - :doc:`/benchmarks/tpc-h` - TPC-H guide
-- :doc:`/tpch_official_benchmark_guide` - Official benchmark guide

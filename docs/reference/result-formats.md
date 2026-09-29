@@ -384,7 +384,7 @@ CSV export provides tabular query-level data for spreadsheet analysis.
 
 ### Query Results CSV
 
-```csv
+```text
 id,ms,rows,iter,stream,run_type,status
 Q1,1520,4,1,0,measurement,SUCCESS
 Q2,892,460,1,0,measurement,SUCCESS
@@ -394,7 +394,7 @@ Q3,1230,10,1,0,measurement,SUCCESS
 
 ### Summary CSV
 
-```csv
+```text
 metric,value
 benchmark,tpch
 scale_factor,0.1

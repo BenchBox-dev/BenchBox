@@ -442,8 +442,7 @@ API Reference
 ~~~~~~~~~~~~~
 
 - :doc:`../base` - Base benchmark interface
-- :doc:`index` - Python API overview
-- :doc:`/usage/api-reference` - High-level API guide
+- :doc:`/reference/python-api/index` - Python API overview
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

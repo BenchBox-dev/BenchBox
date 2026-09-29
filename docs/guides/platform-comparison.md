@@ -350,7 +350,7 @@ benchbox compare \
 
 The JSON output includes:
 
-```json
+```text
 {
   "config": {
     "platform_type": "sql",
