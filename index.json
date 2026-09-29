@@ -5023,7 +5023,7 @@
         "dlv2-02-property-ledger"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "dropped",
       "title": "Add ci.yml with six always-reporting unit checks and run it in shadow for five working days"
     },
     "dlv2-22-nightly-t3-shadow": {
