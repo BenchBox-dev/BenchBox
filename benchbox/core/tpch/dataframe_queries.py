@@ -901,23 +901,24 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Calculate average quantity per part
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    # Main query. SQL SUM over an empty set returns NULL, not 0: when the
-    # small-quantity filter matches nothing, emit a single NULL row so the
-    # gate compares NULL-vs-NULL instead of manufacturing 0.0. Emptiness is
-    # detected by materializing the filtered row count (the backend's SUM
-    # scalar returns 0.0 on empty input, which is exactly the lie avoided).
+    # Main query. The backend's SUM scalar returns 0.0 on empty input, but
+    # SQL SUM over an empty set is NULL: probe emptiness once via a row
+    # count and emit a single native NULL row so the gate compares
+    # NULL-vs-NULL instead of manufacturing 0.0. The count probe reads one
+    # integer (no row materialization); the NULL row stays in the active
+    # expression backend so adapters never see a foreign frame.
     filtered = (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
     )
-    from benchbox.core.equivalence.dataframe_surface import materialize_rows
+    empty_probe = filtered.select(col("l_extendedprice").count().alias("__n"))
+    from benchbox.core.equivalence.dataframe_surface import materialize_rows as _probe_rows
 
-    if len(materialize_rows(filtered.select(col("l_extendedprice")))) == 0:
-        import pandas as pd
-
-        return pd.DataFrame({"avg_yearly": [None]})
+    (row_count,) = _probe_rows(empty_probe)[0]
+    if not row_count:
+        return filtered.limit(0).select(lit(None).alias("avg_yearly"))
     return filtered.select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
 
 
