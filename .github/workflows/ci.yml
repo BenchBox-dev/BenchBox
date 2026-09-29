@@ -24,6 +24,31 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Base guard: stacked PRs get CI from this workflow (no branch filter),
+  # so an unsupported feature-branch base must fail loudly here instead of
+  # sliding into develop unvalidated under a parent PR.
+  base-guard:
+    name: PR base branch is an integration branch
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          case "$BASE_REF" in
+            develop|release|published-results)
+              echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
+              ;;
+            *)
+              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
+              echo "Retarget this PR at develop, or fold the change into the parent PR."
+              exit 1
+              ;;
+          esac
+
   # Classifier: shared with the legacy path rules, plus the six-unit ownership map.
   ci-paths:
     name: ci-paths
@@ -1185,6 +1210,9 @@ jobs:
       - name: Run in-process plan-capture gate
         run: make plan-capture-gate
 
+      - name: Verify bundled dbgen binaries emit clean framing
+        run: uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -v
+
   datafusion-integration:
     name: datafusion-integration
     needs: ci-paths
@@ -1813,7 +1841,7 @@ jobs:
 
   public-site-visual-regression:
     name: Public-site visual regression
-    if: ${{ needs.visual-inputs.outputs.render_changed == 'true' && ((github.event_name == 'pull_request' && github.base_ref == 'develop') || github.event_name == 'merge_group') }}
+    if: ${{ needs.visual-inputs.outputs.render_changed == 'true' && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
     needs: [visual-inputs, docs-build]
     runs-on: ubuntu-latest
     # Build (about 15 minutes) plus this job must fit inside the 60-minute
@@ -2166,7 +2194,7 @@ jobs:
   # Unit result: tooling.
   tooling:
     name: tooling
-    needs: [ci-paths, soundness-flag, content-guard, skill-integrity, audit-sha, ruleset-drift]
+    needs: [ci-paths, base-guard, soundness-flag, content-guard, skill-integrity, audit-sha, ruleset-drift]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2189,6 +2217,7 @@ jobs:
             --needs "$NEEDS_JSON" \
             --always ci-paths \
             --always soundness-flag \
+            --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
             --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} \
