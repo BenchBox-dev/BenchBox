@@ -718,7 +718,7 @@ exclusions = []
 # identifiers). The threshold is a ceiling on total duplicated lines; raise it
 # only when intentional duplication is added and lower it as clones are removed.
 #
-# PR gate: `make duplicate-check-delta` / pr.yml `guard-duplicate-delta` compares
+# PR gate: `make duplicate-check-delta` / ci.yml `guard-duplicate-delta` compares
 # duplicated lines against the merge-base of the PR base (or origin/develop) and
 # fails only when the change *increases* the count. Absolute `threshold` below
 # remains for local/campaign use (`make duplicate-check`), not the PR delta path.

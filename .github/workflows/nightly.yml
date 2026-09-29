@@ -482,7 +482,7 @@ jobs:
     # compute on Redshift and MotherDuck), so this job stays inside free-tier /
     # trial budgets. Unlike the postgres-integration gate above, an all-skipped
     # run stays green: until the cloud secrets below are configured, there are
-    # no credentials and every test skips. Never move this to pr.yml:
+    # no credentials and every test skips. Never move this to ci.yml:
     # PR-triggered cloud queries from arbitrary branches incur uncontrolled
     # billing.
     # Expected secret names match the env vars the conftest fixtures read:
@@ -722,7 +722,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Bare python3 is intentional: stdlib-only, no uv sync needed for a
-        # pure API check (same precedent as pr.yml's path classifier). The
+        # pure API check (same precedent as ci.yml's path classifier). The
         # schedule detection regex is scoped to the `on:` block to stay
         # stdlib-only without a YAML parser.
         run: |
@@ -1172,11 +1172,9 @@ jobs:
       pull-requests: read
       issues: write
       # green_unmerged_sweep.py lists check runs (commits/{sha}/check-runs) for
-      # every candidate PR, and with --check-post-merge also lists workflow runs
-      # (actions/workflows/develop-post-merge.yml/runs). A job-level permissions
-      # map sets every unlisted scope to "no access", so without these two the
-      # scheduled sweep 403s before it can classify PRs or update its tracking
-      # issue.
+      # every candidate PR. A job-level permissions map sets every unlisted
+      # scope to "no access", so without these two the scheduled sweep 403s
+      # before it can classify PRs or update its tracking issue.
       checks: read
       actions: read
     steps:
@@ -1194,13 +1192,13 @@ jobs:
       - name: Run green-unmerged sweep
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply --check-post-merge
+        run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply
 
   fast-lane-ratchet-check:
     # Auto-ratchet signal for the fast-lane test-count ceiling (see
     # fast-lane-decouple-ceiling-contention-2 and
     # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
-    # pr.yml's guard-timing-policy step uses and, when headroom drops below
+    # ci.yml's guard-timing-policy step uses and, when headroom drops below
     # the warning threshold, files/updates ONE marker-tagged tracking issue
     # with the current numbers and the exact edit to make -- it does NOT
     # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no

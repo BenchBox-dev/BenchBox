@@ -1,14 +1,13 @@
-"""A PR based on a feature branch must not present an empty check list.
+"""A PR based on a feature branch must fail loudly inside the single CI workflow.
 
-Every other PR workflow filters on `branches: [develop]` (or release /
-published-results), so a PR whose base is another feature branch triggers
-nothing at all. The PR page looks calm rather than alarming - no failing
-checks, because no checks - and the content reaches develop only when the
-parent merges, never having been validated on its own.
-
-`pr-base-guard.yml` is the one check such a PR does get. These tests pin the
-two properties that make it work: it carries no branch filter (so it always
-reports), and it rejects a base that is not an integration branch.
+The flip retires ``pr-base-guard.yml`` as a standalone workflow and folds the
+same policy into ``ci.yml`` as the ``base-guard`` job, because ``ci.yml``
+deliberately carries no branch filter: a stacked PR gets the ordinary six
+unit checks instead of an empty check list. Without the folded guard its
+content could slide into develop under a parent PR, never validated as its
+own integration-base diff. These tests pin the two properties that make the
+folded guard work: it runs on every PR whatever its base, and it rejects a
+base that is not an integration branch.
 """
 
 from __future__ import annotations
@@ -23,7 +22,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 WORKFLOWS = REPO_ROOT / ".github" / "workflows"
-GUARD = WORKFLOWS / "pr-base-guard.yml"
+WORKFLOW = WORKFLOWS / "ci.yml"
+JOB = "base-guard"
+STEP_NAME = "Check base branch"
 
 INTEGRATION_BRANCHES = {"develop", "release", "published-results"}
 
@@ -40,12 +41,18 @@ def _triggers(workflow: dict[str, Any]) -> dict[str, Any]:
     return triggers
 
 
-def _load(path: Path) -> dict[str, Any]:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+def _load() -> dict[str, Any]:
+    return yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
 
 
-def test_stacked_pr_base_guard_exists() -> None:
-    assert GUARD.is_file(), "pr-base-guard.yml is missing; a stacked PR would present an empty check list"
+def _job() -> dict[str, Any]:
+    jobs = _load()["jobs"]
+    assert JOB in jobs, f"ci.yml has no {JOB!r} job; a stacked PR would present no base-policy failure"
+    return jobs[JOB]
+
+
+def test_stacked_pr_base_guard_lives_in_ci_workflow() -> None:
+    _job()
 
 
 def test_stacked_pr_base_guard_has_no_branch_filter() -> None:
@@ -55,11 +62,11 @@ def test_stacked_pr_base_guard_has_no_branch_filter() -> None:
     match it, and the list would go stale as branches are added. Absence cannot
     go stale.
     """
-    pull_request = _triggers(_load(GUARD))["pull_request"] or {}
+    pull_request = _triggers(_load())["pull_request"] or {}
     assert "branches" not in pull_request, (
-        "pr-base-guard filters on branches, so the stacked PRs it exists to catch would not trigger it"
+        "ci.yml filters on branches, so the stacked PRs base-guard exists to catch would not trigger it"
     )
-    assert "paths" not in pull_request, "pr-base-guard is path-filtered, so a stacked PR could still report nothing"
+    assert "paths" not in pull_request, "ci.yml is path-filtered, so a stacked PR could still report nothing"
 
 
 def test_stacked_pr_base_guard_reevaluates_when_a_pr_is_retargeted() -> None:
@@ -68,14 +75,20 @@ def test_stacked_pr_base_guard_reevaluates_when_a_pr_is_retargeted() -> None:
     Without `edited`, a PR opened against develop and later repointed at a
     feature branch keeps its stale green result.
     """
-    types = (_triggers(_load(GUARD))["pull_request"] or {}).get("types", [])
+    types = (_triggers(_load())["pull_request"] or {}).get("types", [])
     assert "edited" in types, "guard does not re-evaluate on retarget; a repointed PR keeps a stale pass"
     assert "opened" in types
 
 
 def test_stacked_pr_base_guard_accepts_only_integration_branches() -> None:
     """The guard's accept list must be exactly the branches CI actually covers."""
-    body = GUARD.read_text(encoding="utf-8")
+    job = _job()
+    assert job.get("if") == "${{ github.event_name == 'pull_request' }}", (
+        "base-guard must run on every PR event so a stacked base always reports"
+    )
+    step = next((s for s in job.get("steps", []) if s.get("name") == STEP_NAME), None)
+    assert step is not None, f"base-guard has no {STEP_NAME!r} step"
+    body = str(step.get("run", ""))
     accepted = {branch for branch in INTEGRATION_BRANCHES if branch in body}
     assert accepted == INTEGRATION_BRANCHES, (
         f"guard does not name every integration branch: missing {INTEGRATION_BRANCHES - accepted}"
@@ -83,30 +96,19 @@ def test_stacked_pr_base_guard_accepts_only_integration_branches() -> None:
     assert "exit 1" in body, "guard never fails, so a stacked PR would still show an all-green check list"
 
 
-def test_every_other_pr_workflow_still_filters_to_integration_branches() -> None:
-    """Pin the premise this guard exists for.
+def test_stacked_pr_base_guard_feeds_the_tooling_result() -> None:
+    """A failing guard must fail the tooling unit, not just its own job.
 
-    If the other workflows ever stop filtering, stacked PRs would get real CI
-    and this guard becomes redundant rather than load-bearing - which is worth
-    noticing deliberately rather than discovering later.
+    The merge ruleset requires the unit context, not the raw job, so a guard
+    outside the tooling aggregation would be advisory noise a stacked PR
+    could merge past.
     """
-    filtered: list[str] = []
-    for path in sorted(WORKFLOWS.glob("*.yml")):
-        if path.name == GUARD.name:
-            continue
-        workflow = _load(path)
-        if not isinstance(workflow, dict):
-            continue
-        triggers = workflow.get("on", workflow.get(True))
-        if not isinstance(triggers, dict):
-            continue
-        pull_request = triggers.get("pull_request")
-        if pull_request is None:
-            continue
-        branches = (pull_request or {}).get("branches")
-        if branches:
-            filtered.append(path.name)
-            assert set(branches) <= INTEGRATION_BRANCHES, (
-                f"{path.name} filters on {branches}, which is outside the known integration branches"
-            )
-    assert filtered, "no PR workflow filters on an integration branch; this guard's premise no longer holds"
+    workflow = _load()
+    tooling = workflow["jobs"]["tooling"]
+    assert JOB in tooling["needs"], (
+        f"tooling result does not aggregate {JOB}; a stacked-PR failure would not gate merge"
+    )
+    run_text = "\n".join(str(step.get("run", "")) for step in tooling.get("steps", []))
+    assert "base-guard" in run_text, (
+        "tooling result never evaluates base-guard; a stacked-PR failure would not gate merge"
+    )

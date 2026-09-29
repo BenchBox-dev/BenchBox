@@ -100,15 +100,16 @@ def test_corpus_only_change_routes_to_required_code_ci() -> None:
 def test_code_test_is_gated_by_ci_required_result() -> None:
     """``code-test`` must remain a dependency of the one required check.
 
-    develop's ruleset requires only ``ci-required-result``. A job that is not
-    in its ``needs`` list cannot block a merge no matter what it reports, so
-    this invariant's required-ness rests entirely on that edge.
+    develop's ruleset requires the six unit results from ``ci.yml``. A job
+    that is not in a unit result's ``needs`` list cannot block a merge no
+    matter what it reports, so this invariant's required-ness rests entirely
+    on that edge.
     """
     import yaml
 
-    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/pr.yml").read_text(encoding="utf-8"))
-    needs = workflow["jobs"]["ci-required-result"]["needs"]
-    assert "code-test" in needs, "ci-required-result no longer gates on code-test"
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    needs = workflow["jobs"]["core"]["needs"]
+    assert "code-test" in needs, "the core unit result no longer gates on code-test"
 
 
 def _anonymize(payload: dict, path: Path, manager: AnonymizationManager) -> dict:

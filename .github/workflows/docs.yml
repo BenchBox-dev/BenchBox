@@ -1,12 +1,10 @@
 name: Documentation
 
 on:
+  # Pull-request and merge-queue validation lives in ci.yml. This workflow keeps
+  # the protected-develop baseline capture and the release Pages deploy.
   push:
     branches: [release, develop]
-  pull_request:
-    branches: [release, develop]
-  merge_group:
-    types: [checks_requested]
   workflow_dispatch:
     inputs:
       baseline_source_sha:

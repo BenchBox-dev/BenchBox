@@ -17,12 +17,11 @@ default_workflow_permissions: read
 can_approve_pull_request_reviews: true
 ```
 
-The default token permission is intentionally read-only. The
-`develop-post-merge.yml` `auto-revert-on-failure` job declares
-`contents: write`, `issues: write`, `pull-requests: write` at the job level
-to scope writes narrowly. `can_approve_pull_request_reviews: true` lets the
-workflow request review on the auto-revert PR from the original PR author
-when the GraphQL lookup populates the field.
+The default token permission is intentionally read-only. Any workflow that
+needs to write declares the specific scopes at the job level to keep writes
+narrow. `can_approve_pull_request_reviews: true` is a leftover from the
+retired post-merge auto-revert job, which used it to request review from the
+original PR author; no current workflow depends on it.
 
 Verify:
 
@@ -52,73 +51,49 @@ Ruleset name: `develop-squash-only` (id `15611785`), targets
 Required status checks:
 
 ```text
-- ci-required-result
+- core
+- explorer
+- results-data
+- docs
+- landing
 - tooling
-- Results Explorer browser gate
-- ruleset-drift
-- Public-site visual acceptance
 ```
 
-Required-check activation is ordered because `ruleset-drift` runs from the
-trusted `develop` tree. Land the PR containing the tooling workflow, this
-expected list, and their drift/landing pins while the hosted ruleset still
-requires the existing four checks. After the merge, add `tooling` to ruleset
-`15611785` without changing strictness, review, queue, or bypass
-settings. The interval between merge and ruleset update is fail closed: the
-trusted drift check
-reports the missing hosted contexts. Read the live ruleset back and run
-`scripts/ruleset_drift_check.py` before claiming activation. Record a real
-develop PR and merge-group check run with the exact head SHA; a green PR run
-alone does not prove queue coverage.
+Each required context is one always-reporting result job in
+`.github/workflows/ci.yml`. The `ci-paths` job maps changed paths to units with
+`.github/ci-units.yml`; a unit no path touches reports success immediately, and
+a touched unit succeeds only when every job it requires succeeded. A required
+job that was skipped fails the unit, so a path filter or a broken `if:` can
+never read as a pass (`scripts/ci_unit_result.py` holds the rule). Because all
+six contexts report on every `pull_request` and `merge_group` event, no
+required check can stay pending forever on a change that does not touch it.
 
-A code-PR `synchronize` is not one Develop PR run. The same head SHA also
-starts Results Explorer browser tests, PR base guard, auto-merge revocation,
-the unconditional `develop-refresh-shadow` observational workflow, and
-ruleset-drift (plus path-filtered siblings such as extension-smoke and
-gitignore lint). Documentation (`docs.yml`) reports `Public-site visual
-acceptance` on every develop PR and merge group. Its input classifier skips
-the build and comparison only when the former documentation path filter is
-unaffected. Split runner minutes from wall minutes by workflow when judging
-savings; the next-slowest sibling can dominate remaining wall time after
-`pr.yml` jobs are skipped.
+| Context | Runs for | Jobs it requires |
+| --- | --- | --- |
+| `core` | `benchbox/`, `tests/`, packaging, executable docs code | lint, unit tests, and in the merge queue the heavy tier: medium tests, correctness gate, plan-capture gate, DataFusion integration; package smoke and dependency audit on packaging changes |
+| `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite, public-site visual comparison |
+| `results-data` | `results-data/`, submission validator, `benchbox/core/results/` | corpus inventory and validation, submission validator sync, corpus and explorer-pipeline contract tests |
+| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, docstring coverage, visual comparison |
+| `landing` | `landing/`, quickstart inputs | site theme token scan, visual comparison |
+| `tooling` | every event | soundness review flag; content guard, skill integrity, and audit checks by path; ruleset drift in the merge queue |
 
-`ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
-that aggregates the jobs in its `needs` contract: `ci-paths`,
-`tpch-binary-framing`, `content-guard`, `skill-integrity`, `code-lint`,
-`code-test`, `correctness-gate`, `plan-capture-gate`, `medium-test`
-(added 2026-07-11, #1139 — the medium tier now gates code PRs pre-merge via
-the same umbrella, no ruleset change needed), `explorer-tokens`,
-`site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
-`dependency-audit`, `parity-check`, and `publication-reconciliation`. This list intentionally mirrors the
-`needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
-skipped where their classifier says they are not applicable. Since the
-heavy-tier queue-only change, the heavy tier (`medium-test`,
-`correctness-gate`, `plan-capture-gate`, `tpch-binary-framing`, and the
-integration samples) additionally reports skipped on `pull_request` runs
-unless the `heavy-needed` output fires (merge queue, soundness paths, or
-packaging paths); the umbrella requires success when the tier ran and
-skipped when it was deferred, so a silent skip can never read as a pass.
+The visual comparison runs only when a rendered public-site input changed
+(`render_changed` in the `visual-inputs` job). The site build keeps the broader
+input list so Sphinx warnings still fail before merge.
 
-Slow-marked reproducer jobs remain required PR CI through this umbrella. The
-post-merge workflow has fast and medium lanes but no slow-signature lane, so
-moving those reproducers out of required PR CI would remove their only
-required execution path.
+`ruleset-drift` runs inside the `tooling` unit on `merge_group` events only. It
+checks out the trusted base revision, so the script and this runbook are read
+from the base, never from the change under test, and pull-request events never
+receive the token it uses.
 
-`Results Explorer browser gate` (added 2026-08-03) is the umbrella job in
-`.github/workflows/results-explorer-browser.yml`. It is required because the
-Chromium full-suite job's own name has claimed to block since it was written,
-while the ruleset required only `ci-required-result` — so the full `e2e/` suite
-gated nothing. The gate job, not the Chromium job, holds the required context:
-the browser jobs are conditional, and GitHub keeps a PR unmergeable forever
-waiting on a required check that never reports. The gate runs `if: always()`,
-passes when Chromium succeeded or when no explorer-relevant path changed, and
-fails closed if change detection itself broke. Firefox and WebKit stay advisory
-and are deliberately absent from its `needs`.
-Branch protection deliberately keys off the umbrella so the path-aware
-classifier can skip subordinate jobs without making the protected check
-disappear. The classifier fails closed: any path not on the
-`safe-content` allowlist in `.github/path-filters.yml` (including unknown
-top-level paths) routes through `code-lint` + `code-test`.
+Required-check changes are ordered because the drift check reads this runbook
+from the trusted base revision. Change this list and
+`APPROVED_MERGE_QUEUE_CONTEXTS` in `scripts/ruleset_drift_check.py` in the same
+PR that changes the workflow, then update the hosted ruleset in one API call
+immediately after that PR merges; the interval is fail closed. Read the live
+ruleset back and run `scripts/ruleset_drift_check.py` before claiming
+activation, and record a merge-group run for the exact head SHA. A green
+pull-request run alone does not prove queue coverage.
 
 Other ruleset properties to preserve:
 
@@ -142,16 +117,13 @@ The latest bounded, read-only wall and runner-minute remeasure is recorded in
 It keeps `pull_request` and `merge_group` event evidence separate and does
 not authorize changing required contexts or skipping jobs.
 
-`refresh-shadow` (added with the strict-base refresh shadow rollout) is the
-observational job in `.github/workflows/develop-refresh-shadow.yml`. It is
-**not a required** context. It classifies exact `develop` refreshes using the
-trusted base copy of `scripts/pr_refresh_certification.py` and publishes a
-bounded artifact. It cannot skip Develop PR lanes, cannot satisfy
-`ci-required-result`, and does not change auto-merge or ruleset 15611785.
-`.github/workflows/pr.yml` also uploads `pr-certification-identity` and
-`pr-certification-lanes` artifacts so a later activation gate can bind a full
-run to a specific head, base, merge tree, workflow fingerprint, and lane
-set. Missing artifacts fail closed to `full_required`.
+The strict-base refresh shadow (`develop-refresh-shadow.yml`) and the
+`pr-certification-identity` and `pr-certification-lanes` artifacts that
+`pr.yml` uploaded for it were retired with the six-unit CI. The shadow was
+observational and never a required context. `scripts/pr_refresh_certification.py`
+remains as a library for a later activation gate, which would need to bind a
+full run to a specific head, base, merge tree, workflow fingerprint, and lane
+set from `ci.yml`. Until then a stale base means a refresh and a fresh run.
 
 Verify:
 
@@ -188,8 +160,8 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
   "parameters": {
     "check_response_timeout_minutes": 60,
     "grouping_strategy": "ALLGREEN",
-    "max_entries_to_build": 5,
-    "max_entries_to_merge": 5,
+    "max_entries_to_build": 2,
+    "max_entries_to_merge": 3,
     "merge_method": "SQUASH",
     "min_entries_to_merge": 1,
     "min_entries_to_merge_wait_minutes": 0
@@ -197,9 +169,9 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 }
 ```
 
-- **Speculative Integration:** `max_entries_to_build: 5` evaluates up to 5 concurrent pull requests speculatively without serializing check waits.
+- **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** Soundness PRs are withheld from auto-enqueue by `auto_merge_soundness_paths.py` and require CODEOWNERS approval before entry.
+- **Soundness Gate:** the `soundness-flag` job in the `tooling` unit fails a PR that touches a path in `.github/soundness-paths.txt` unless its body carries a `Soundness review:` section that names an external reviewer, links the review comment, and states that all Critical and High findings are resolved.
 - **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)
@@ -567,12 +539,12 @@ For the first release that introduces `release-canary.yml`, before GitHub can
 run the workflow from the default branch, `validate-base` runs the same
 non-fast canary suite and ruleset drift check inline as bootstrap evidence.
 
-Ruleset drift is checked for every develop PR by
-`develop-ruleset-drift.yml` and independently by `release-canary.yml`. The PR
-workflow uses `pull_request_target`, checks out only the trusted base SHA, and
-never executes pull-request-head code with the admin-visible token. Its
-`ruleset-drift` job is a required `develop-squash-only` context, so drift blocks
-the next merge instead of waiting for the scheduled canary. The script parses this runbook for
+Ruleset drift is checked in the merge queue by the `ruleset-drift` job of the
+`tooling` unit in `ci.yml`, and independently by `release-canary.yml`. The job
+runs only on `merge_group`, checks out only the trusted base SHA, and never
+executes pull-request-head code with the admin-visible token. Because
+`tooling` is a required `develop-squash-only` context, drift blocks the next
+merge instead of waiting for the scheduled canary. The script parses this runbook for
 `develop-squash-only` and `release-only`, then compares live GitHub
 rulesets for required status check contexts, strict-base settings, bypass
 actors, linear history, non-fast-forward protection, deletion protection, and
@@ -598,8 +570,8 @@ from both CI call sites without a separate code path.
 > copy, so every develop-authored scheduled workflow now registers and fires
 > directly — the "land it on `main`" problem below no longer exists. Verified
 > 2026-07-08 via the Actions list-workflows API: `release-canary.yml`
-> (id 309070628), `phase3-promotion-review.yml`, and
-> `orphaned-commit-detector.yml` are now registered (26 workflows, up from 19).
+> (id 309070628) and two other scheduled workflows (since retired) are now
+> registered (26 workflows, up from 19).
 > Activation options (a)/(b)/(c) and the "Admin steps (w2)" below are
 > **superseded** and retained only as history. The `nightly.yml`
 > `scheduled-workflow-liveness` guard now runs from `develop` directly (no
@@ -617,25 +589,10 @@ Historical live state observed 2026-07-05 (release-canary-scheduled-activation T
   `on.schedule` cron has **never fired** and none of its jobs
   (pypi-latest-installability, ruleset-drift, credential-free-non-fast,
   plus the release-canary-result aggregator) has ever executed.
-- Same class, second instance: `phase3-promotion-review.yml` (quarterly
-  cron `0 9 1-7 1,4,7,10 *`) is also on `develop` but absent from
-  `origin/main`, so its schedule has never fired either. The liveness
-  guard below will name it alongside release-canary; the admin should
-  land it on `main` in the same pass (or deliberately remove its
-  schedule and record that decision here). Its `review` job now checks out
-  `develop` explicitly via a `PHASE3_REVIEW_REF` env var (the same
-  `RELEASE_CANARY_REF` shell pattern release-canary.yml uses), so landing
-  the file on `main` does not leave a scheduled run checking out `main`'s
-  stripped tree (no `_project/` or `scripts/phase2_metrics.py`) by default.
-- Same class, third instance (#1020 review): `orphaned-commit-detector.yml`
-  (weekly cron `0 7 * * 1`) is also on `develop` but absent from
-  `origin/main`, so its schedule has never fired either — only its
-  path-filtered `push: branches: [develop]` trigger can run, on the cadence
-  of detector/allowlist edits rather than weekly. It already hardcodes
-  `ref: develop` on its checkout step (the same shell pattern as
-  release-canary.yml/phase3-promotion-review.yml), so it is safe to land on
-  `main` as-is whenever the admin does the next pass for this class of fix —
-  no `main`-relative edits needed first.
+- Same class, other instances: `phase3-promotion-review.yml` (quarterly) and
+  `orphaned-commit-detector.yml` (weekly) were also on `develop` but absent
+  from `origin/main`, so their schedules never fired either. Both workflows
+  were retired with the six-unit CI, so the history no longer needs action.
 
 GitHub runs `on.schedule` workflows only from the default branch (historically
 `main`; **now `develop` as of 2026-07-08** — see the RESOLVED note above, which
@@ -696,26 +653,11 @@ access and let the canary return to green.
 
 ## Repository labels
 
-The `develop-post-merge.yml` auto-revert job creates these labels on
-demand if they do not exist:
-
-- `incident:develop-red` — used on an auto-revert PR or an owned
-  post-merge incident/advisory when attribution is unproven.
-- `incident:develop-red-revert-conflict` — used on the manual-action issue
-  when a proven revert path cannot complete (revert conflict, push failure,
-  PR-creation failure, or target/diff inspection failure).
-
-Attribution incidents include the immutable failing commit and PR, test/job
-identifiers, predecessor and source-input evidence, ownership match,
-classification, owner, next action, and a stable incident key. The workflow
-must not create a revert proposal from temporal adjacency, missing evidence,
-an unmappable job failure, stale target state, external-reference drift, or a
-transient rerun. Those outcomes keep develop red and update the existing
-`incident:develop-red` issue by incident key.
-
-The on-demand `gh label create … || true` in the workflow means a fresh
-clone or transfer does not need the labels pre-created. They will appear
-the first time develop goes red.
+The `incident:develop-red` and `incident:develop-red-revert-conflict` labels
+were created on demand by the retired post-merge auto-revert job. No workflow
+creates or reads them now. Any that still exist on the repository are legacy
+and are scheduled for deletion in the dev-loop v2 cleanup
+(`docs/development/adr/adr-dev-loop-v2.md`).
 
 Verify:
 
@@ -745,8 +687,9 @@ transfer, re-apply in this order:
    resolving the live ruleset **by name** (`develop-squash-only`) in
    workflows; do not treat a stale numeric id as authority.
 3. Verify with the `gh api … rulesets/<id> --jq …` command above.
-4. Push a no-op commit to develop and confirm `develop-post-merge.yml`
-   produces a `metrics` artifact and the lint + fast-test jobs are green.
+4. Open a no-op pull request against develop and confirm the six unit
+   results report on it. Merge it through the queue and confirm
+   `fast-lane-baseline.yml` records the fast-lane count for the new tip.
    This validates that workflow permissions are correct end-to-end.
 
 ## Out-of-scope

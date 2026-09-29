@@ -38,7 +38,7 @@ implementations/consumers rather than from comments alone:
 2. `Makefile` targets `lint`, `ci-lint`, `complexity-check`,
    `quality-governance-typecheck`, `duplicate-check`, and
    `duplicate-check-delta` define local operation and report-all behavior.
-3. `.github/workflows/pr.yml` defines the required develop-PR aggregation and
+3. `.github/workflows/ci.yml` defines the required develop-PR units and
    the base SHA supplied to duplicate delta.
 4. `.github/workflows/lint.yml`, `test.yml`, and `nightly.yml` consume the
    configured Ruff/ty policy on release and compatibility surfaces; they do not
