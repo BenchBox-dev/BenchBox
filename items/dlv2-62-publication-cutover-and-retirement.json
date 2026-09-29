@@ -1,6 +1,6 @@
 {
   "acceptance": [
-    "Production deploys from site-deploy for >=5 working days with green probes; rollback drill evidence recorded",
+    "Production deploys from site-deploy green for 24 hours or 3 deploys, whichever comes first; rollback drill evidence recorded",
     "G3 ledger: publication rollback, artifact privacy, explorer compatibility, availability probe all mapped to site-deploy or nightly",
     "G4 sweep clean for every retired publication name",
     "Archive tag for `publication` exists; environment, secrets, and App removed; before-state archived"
@@ -15,6 +15,14 @@
       "op": "create",
       "op_id": "8e72b28011ce4a9c89868b5e14c21d2b",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:52:08Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "37f0ed4c367343fb8cca2030d080d1da",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
     }
   ]
 }

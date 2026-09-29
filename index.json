@@ -5190,7 +5190,8 @@
     "dlv2-62-publication-cutover-and-retirement": {
       "claim": null,
       "needs": [
-        "dlv2-60-publication-integration"
+        "dlv2-60-publication-integration",
+        "dlv2-f3-flip-window"
       ],
       "priority": "high",
       "status": "open",
