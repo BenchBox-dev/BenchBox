@@ -69,7 +69,11 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # tpcds_obt was previously here; its id correspondence was then explicitly
 # abandoned, so it is `abandoned` instead. datavault was previously here too;
 # it is now an enforced cross-surface gate.)
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpch_skew", "tsbs_devops"}
+# tpch and tpcds are STAGED gates (registered but not CI-enforced): their
+# expression/pandas implementations are separately handwritten per query, but
+# the verbatim id overlap is still zero, so they stay candidate-unverified
+# until the mapping is verified.
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpch", "tpch_skew", "tpcds", "tsbs_devops"}
 
 # Benchmarks that cannot land as a routine-PR gate because they reject the
 # bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
@@ -179,10 +183,13 @@ def test_staged_gates_are_marked_not_unguarded(rows):
     """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
     # flightdata and datavault both graduated to enforced GATES, so neither is
-    # a candidate anymore and no staged candidates remain.
+    # a candidate anymore. tpch and tpcds are the current staged pair:
+    # registered in STAGED_GATES but not CI-enforced, so they are drilled
+    # here and marked staged.
     assert "flightdata" not in by_id
     assert "datavault" not in by_id
-    assert not [r["benchmark"] for r in rows if r.get("staged")], "unexpected staged candidates remain"
+    staged = {r["benchmark"] for r in rows if r.get("staged")}
+    assert staged == {"tpch", "tpcds"}, f"staged set changed: {sorted(staged)}"
     assert by_id["joinorder"].get("staged") is False
 
 
