@@ -1,5 +1,10 @@
 {
+  "context": "Live evidence resolved the deferral: merged PR #2412 head 0392c291fb7c6e84643c245d98c7c06a821e4341 passed the GitHub postgres-integration job (job 108640619595). The job ran 8 PostgreSQL live connection/query/plan tests and 2 TPC-Havoc PostgreSQL equivalence tests. The equivalence sweep covered every PostgreSQL-executable TPC-Havoc variant with no unexpected divergence; the current skip set excludes 2_v5 and 17_v2. Local macOS lacked pg_isready and Docker, so the evidence is the real Linux CI service-container path.",
   "description": "Promoted from deferral 1 on tpchavoc-pg-ambiguous-cols: The implementation and rendered-SQL compile checks are complete, but no local PostgreSQL service was available during verification. A live engine execution probe remains outstanding and should be run when a PostgreSQL test service is available.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/actions/runs/36324169426/job/108640619595",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2412"
+  ],
   "sessions": [
     {
       "actor": "jcode-tpchavoc-closeout",
@@ -16,6 +21,14 @@
       "generation": "7bdcdb69113b481cbd98ef3973185c07",
       "op": "take",
       "op_id": "8053445efc1547e9bd8654251c5024c8",
+      "session_id": "52edd7f7638740259b3dcc97c8045eb5"
+    },
+    {
+      "actor": "jcode-tpchavoc-closeout-recovery",
+      "at": "2026-09-29T15:16:01Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "3bbbace2dedd41e5a36c74802e0e132c",
       "session_id": "52edd7f7638740259b3dcc97c8045eb5"
     }
   ]
