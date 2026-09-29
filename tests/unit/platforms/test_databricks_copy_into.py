@@ -120,8 +120,8 @@ def test_copy_into_from_uc_volume(adapter):
     assert "COPY INTO ORDERS FROM 'dbfs:/Volumes/workspace/raw/source/tpch_sf01/orders.csv'" in sqls
     assert "CREATE OR REPLACE TEMPORARY VIEW" not in sqls
     assert "INSERT INTO" not in sqls
-    assert stats["LINEITEM"] == 42
-    assert stats["ORDERS"] == 42
+    assert stats["lineitem"] == 42
+    assert stats["orders"] == 42
 
 
 def test_copy_into_requires_staging(adapter):

@@ -89,7 +89,7 @@ CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 #
 # Keep this synchronized with APPROVED_MERGE_QUEUE["max_entries_to_merge"] in
 # scripts/ruleset_drift_check.py. The value is an explicit CLI flag, not an
-# environment variable: pr.yml runs the PR's own workflow file, so an env-var
+# environment variable: ci.yml runs the PR's own workflow file, so an env-var
 # decision could be self-granted by editing the workflow. The pull_request lane
 # passes no grace, so a PR whose own merge ref crosses still fails there, and the
 # nightly ratchet files the bump issue once headroom is negative.
@@ -318,7 +318,7 @@ def _check_fast_lane_policy(repo_root: Path, policy: FastLanePolicy, *, ceiling_
 def _emit_fast_count(repo_root: Path) -> int:
     """Collect the fast lane and print ONLY the machine-readable count.
 
-    Used by develop-post-merge.yml to persist a baseline count for the PR
+    Used by fast-lane-baseline.yml to persist a baseline count for the PR
     lane's --delta-check (see below) to diff against. Deliberately minimal
     output (bare integer, nothing else on stdout) so a workflow step can
     redirect stdout straight into a cache-backed file. On a collection failure

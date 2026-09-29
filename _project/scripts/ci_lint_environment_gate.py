@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Decide whether a `make ci-lint` guard is meaningful on a CI runner.
 
-`ci-lint` (Makefile) exists to mirror the `pr.yml` `code-lint` job locally
-(docs/operations/ci-local-parity.md), but `develop-post-merge.yml` also runs
-`make ci-lint` directly on a real, ephemeral GitHub-hosted runner -- not as a
-local-parity convenience, but as a blocking gate wired into auto-revert. Most
+`ci-lint` (Makefile) exists to mirror the `ci.yml` `code-lint` job locally
+(docs/operations/ci-local-parity.md), but `make ci-lint` can also run
+directly on a real, ephemeral GitHub-hosted runner (no workflow does today; the
+post-merge workflow that did was retired with the six-unit CI). Most
 guards are equally meaningful there: they inspect the checked-out tree, the
 installed venv, or the registries the repo ships, none of which differ
 between a laptop and a runner.
@@ -46,7 +46,7 @@ import sys
 # run there. Each entry is the ci-lint recipe's own `failed="$$failed <slug>"`
 # tag, so the mapping to a specific guard is unambiguous. Adding an entry
 # here removes real CI coverage for that guard inside `make ci-lint`'s own
-# CI invocation (develop-post-merge.yml) -- do it only when the guard is
+# CI invocation -- do it only when the guard is
 # ALSO covered for real elsewhere in CI (see each reason below), never to
 # quiet a guard that is merely awkward to satisfy on a runner.
 RUNNER_INAPPLICABLE_GUARDS: dict[str, str] = {
@@ -57,7 +57,7 @@ RUNNER_INAPPLICABLE_GUARDS: dict[str, str] = {
         "than fail); supplying a synthetic identity instead only swaps one "
         "always-passing input for another synthetic one that can never match "
         "a known agent identity either. Either way the check cannot fail on a "
-        "runner, so it verifies nothing there -- see pr.yml's `code-lint` job, "
+        "runner, so it verifies nothing there -- see ci.yml's `code-lint` job, "
         "which already has no counterpart step for the same reason. "
         "agent-commit-range-check is the real merge-time control (it reads "
         "the commits the branch actually carries, not resolved config) and is "
@@ -68,11 +68,11 @@ RUNNER_INAPPLICABLE_GUARDS: dict[str, str] = {
         "mirrors against the developer-local source checkout layout named in "
         "skill-sync.conf (`~/Developer/...`) that does not exist on a runner; "
         "left ungated it fails there for a reason that has nothing to do "
-        "with the code under test. The real CI-side coverage is pr.yml's required "
+        "with the code under test. The real CI-side coverage is ci.yml's required "
         "`skill-integrity` job: for changed skill surfaces it validates "
         "config/receipt/tool-pin policy, clones the skill sources, and runs "
         "the full preview/apply/verify/check cycle before "
-        "ci-required-result can pass. See "
+        "the tooling unit can pass. See "
         "docs/operations/ci-local-parity.md's 'Required skill-integrity "
         "lane' section for why that check has no local/ci-lint equivalent "
         "of its own."

@@ -33,6 +33,7 @@ from benchbox.core.tuning.applied_ledger import (
 )
 from benchbox.core.tuning.interface import TableTuning, TuningColumn, UnifiedTuningConfiguration
 from benchbox.core.tuning.introspection import corroborate
+from benchbox.platforms.clickhouse._dependencies import import_chdb
 from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
 from benchbox.platforms.clickhouse.client import ClickHouseLocalClient
 from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
@@ -42,7 +43,10 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-chdb = pytest.importorskip("chdb", exc_type=ImportError)
+try:
+    chdb = import_chdb()
+except ImportError as exc:
+    pytest.skip(f"chDB not installed: {exc}", allow_module_level=True)
 
 SOURCE_DDL = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_shipdate DATE)"
 TUNED_PARTITION_CLAUSE = " PARTITION BY (toYYYYMM(l_shipdate))"

@@ -15,8 +15,8 @@ and alerts only when all of the following hold:
     (a) required-lane green -- EVERY develop-ruleset required status
         context in `REQUIRED_CHECK_NAMES` has its LATEST check run on the
         PR's head SHA completed with conclusion `success`. Today that is
-        `ci-required-result`, `Results Explorer browser gate`, and
-        `ruleset-drift`
+        `ci-required-result`, `tooling`, `Results Explorer browser gate`,
+        `ruleset-drift`, and `Public-site visual acceptance`
         (docs/operations/repo-admin-settings.md; live ruleset
         develop-squash-only). Partial green (one context success, another
         missing or red) is NOT required-green. Every required context
@@ -56,18 +56,12 @@ and alerts only when all of the following hold:
 The only mutation this script ever performs (and only under `--apply`) is
 creating/updating ONE marker-tagged tracking issue (title "Green-but-unmerged
 PR sweep") with the current digest -- created/refreshed while the stranded
-set is non-empty (or develop post-merge is red, see `--check-post-merge`
-below), and patched to the empty state exactly once when it drains, then
-left alone. It never enables auto-merge, never merges, never labels, and
+set is non-empty, and patched to the empty state exactly once when it
+drains, then left alone. It never enables auto-merge, never merges, never labels, and
 never comments on a PR -- enabling auto-merge outside the sanctioned
 predicate path in `auto-merge-on-open.yml` / `make pr-ready` would bypass
 the soundness gate and would re-arm intentional holds (including a
 ``no-auto-merge`` hold this sweep did not set).
-
-`--check-post-merge` additionally checks the most recent "Develop post-merge"
-workflow run; if its conclusion is `failure`, a prominent section is added to
-the top of the sweep issue calling out the fix-forward SLA (same day -- see
-docs/operations/pr-triage.md). This does not touch develop-post-merge.yml.
 
 Known timing behavior (observed live 2026-07-23 against PRs #1282-#1286,
 all opened and auto-merge-enabled the same day): the `auto-merge-on-open.yml`
@@ -93,7 +87,7 @@ hand. No long-lived PAT is required or read from anywhere else.
 Usage:
     uv run -- python _project/scripts/green_unmerged_sweep.py
     uv run -- python _project/scripts/green_unmerged_sweep.py --json
-    uv run -- python _project/scripts/green_unmerged_sweep.py --apply --check-post-merge
+    uv run -- python _project/scripts/green_unmerged_sweep.py --apply
     uv run -- python _project/scripts/green_unmerged_sweep.py --self-test
 """
 
@@ -129,8 +123,6 @@ FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
-DEVELOP_POST_MERGE_WORKFLOW = "develop-post-merge.yml"
-
 # Durable explicit hold shared with `.github/workflows/auto-merge-on-open.yml`
 # (exact label name; keep both layers in lockstep — pinned by
 # tests/unit/test_auto_merge_hold_is_durable.py). Applying this label is the
@@ -142,8 +134,6 @@ PINNED_ISSUE_TITLE = "Green-but-unmerged PR sweep"
 # find_pinned_issue never adopts (and later clobbers) a human issue that
 # happens to reuse the title.
 DIGEST_BODY_MARKER = "<!-- green-unmerged-sweep -->"
-POST_MERGE_SLA = "fix-forward SLA: same day"
-
 # Timeline event names that prove someone asked to arm auto-merge (or that
 # auto-merge was previously on and later dropped). Intentional holds never
 # emit these; true stranding after an arm always leaves at least one.
@@ -339,19 +329,6 @@ def stranded_prs(classified: list[ClassifiedPR]) -> list[ClassifiedPR]:
     return sorted(hits, key=lambda c: c.head_age_hours, reverse=True)
 
 
-def is_post_merge_red(run: dict[str, Any] | None) -> bool:
-    """True when the most recent Develop post-merge run completed red.
-
-    Anything other than a completed `failure` (queued/in-progress,
-    cancelled, success, or no run found at all) is treated as not-red --
-    this flag exists to raise a same-day SLA on a genuine failure, not to
-    editorialize about cancellations or in-flight runs.
-    """
-    if not run:
-        return False
-    return run.get("status") == "completed" and run.get("conclusion") == "failure"
-
-
 def _fmt_hours(hours: float) -> str:
     days, rem = divmod(hours, 24.0)
     if days >= 1:
@@ -364,14 +341,12 @@ def build_digest(
     *,
     now: dt.datetime,
     repo: str,
-    post_merge_red: bool = False,
-    post_merge_run: dict[str, Any] | None = None,
 ) -> str:
     """Human-readable digest body.
 
-    Empty-queue body (no stranded PRs, develop post-merge not red) is used
-    by local/manual runs and by the one-time "mark existing digest empty"
-    patch; --apply never CREATES an issue for that state.
+    Empty-queue body (no stranded PRs) is used by local/manual runs and by
+    the one-time "mark existing digest empty" patch; --apply never CREATES
+    an issue for that state.
     """
     hits = stranded_prs(classified)
     stamp = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -380,17 +355,6 @@ def build_digest(
         f"Green-but-unmerged PR sweep -- nightly digest (last updated {stamp})",
         "",
     ]
-
-    if post_merge_red:
-        run_url = (post_merge_run or {}).get("html_url", "")
-        lines.append(f"## develop post-merge is RED -- {POST_MERGE_SLA}")
-        lines.append("")
-        lines.append(
-            'The most recent "Develop post-merge" workflow run on develop\'s tip '
-            f"completed with conclusion `failure` -- {run_url}".rstrip()
-        )
-        lines.append('See docs/operations/pr-triage.md "Develop post-merge SLA" for the fix-forward expectation.')
-        lines.append("")
 
     if not hits:
         lines.append(
@@ -612,16 +576,6 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
     return normalized
 
 
-def fetch_latest_develop_post_merge_run(client: GitHubClient, owner: str, repo: str) -> dict[str, Any] | None:
-    """Latest "Develop post-merge" workflow run on develop, or None."""
-    runs = client.get_all(
-        f"repos/{owner}/{repo}/actions/workflows/{DEVELOP_POST_MERGE_WORKFLOW}/runs",
-        {"branch": "develop", "per_page": "1"},
-        max_items=1,
-    )
-    return runs[0] if runs else None
-
-
 # ---------------------------------------------------------------------------
 # Mutations (only reached under --apply): pinned-issue upsert only. No
 # label, no auto-merge call, no PR comments.
@@ -717,23 +671,6 @@ def run_self_test() -> int:
         "build_digest output missing DIGEST_BODY_MARKER",
     )
 
-    post_merge_run = fixture.get("post_merge_run")
-    if "expected_post_merge_red" in fixture:
-        actual_red = is_post_merge_red(post_merge_run)
-        expect(
-            actual_red == fixture["expected_post_merge_red"],
-            f"is_post_merge_red mismatch: expected {fixture['expected_post_merge_red']}, got {actual_red}",
-        )
-        if actual_red:
-            digest_with_sla = build_digest(
-                classified,
-                now=now,
-                repo=fixture.get("repo", DEFAULT_REPO),
-                post_merge_red=True,
-                post_merge_run=post_merge_run,
-            )
-            expect(POST_MERGE_SLA in digest_with_sla, "post-merge-red digest missing the fix-forward SLA line")
-
     if failures:
         print("SELF-TEST FAILED:", file=sys.stderr)
         for f in failures:
@@ -766,11 +703,6 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         default=GRACE_PERIOD_HOURS,
         help=f"Grace period in hours since head push (default: {GRACE_PERIOD_HOURS}).",
     )
-    parser.add_argument(
-        "--check-post-merge",
-        action="store_true",
-        help="Also check the latest 'Develop post-merge' run and flag the issue if it's red.",
-    )
     parser.add_argument("--self-test", action="store_true", help="Run the bundled fixture-based classifier test.")
     return parser.parse_args(argv)
 
@@ -801,12 +733,6 @@ def main(argv: list[str] | None = None) -> int:
     classified = classify_all(prs, now, grace_hours=args.grace_hours)
     hits = stranded_prs(classified)
 
-    post_merge_run: dict[str, Any] | None = None
-    post_merge_red = False
-    if args.check_post_merge:
-        post_merge_run = fetch_latest_develop_post_merge_run(client, owner, repo)
-        post_merge_red = is_post_merge_red(post_merge_run)
-
     if args.json:
         print(
             json.dumps(
@@ -815,25 +741,17 @@ def main(argv: list[str] | None = None) -> int:
                     "repo": args.repo,
                     "evaluated_count": len(classified),
                     "stranded": [c.to_dict() for c in hits],
-                    "post_merge_checked": args.check_post_merge,
-                    "post_merge_red": post_merge_red,
                 },
                 indent=2,
             )
         )
     else:
-        print(
-            build_digest(
-                classified, now=now, repo=args.repo, post_merge_red=post_merge_red, post_merge_run=post_merge_run
-            )
-        )
+        print(build_digest(classified, now=now, repo=args.repo))
 
     if args.apply:
-        should_have_issue = bool(hits) or post_merge_red
+        should_have_issue = bool(hits)
         if should_have_issue:
-            body = build_digest(
-                classified, now=now, repo=args.repo, post_merge_red=post_merge_red, post_merge_run=post_merge_run
-            )
+            body = build_digest(classified, now=now, repo=args.repo)
             outcome = upsert_pinned_issue(client, owner, repo, body)
             print(f"digest issue: {outcome}", file=sys.stderr)
         else:
@@ -843,9 +761,9 @@ def main(argv: list[str] | None = None) -> int:
             existing = find_pinned_issue(client, owner, repo)
             existing_body = (existing or {}).get("body") or ""
             # Stale content = either yesterday's stranded list OR a RED
-            # post-merge banner from a recovered incident: a red+zero-stranded
-            # day writes a body that ALREADY contains the clear-state line, so
-            # guarding on that line alone would leave the RED banner up forever.
+            # post-merge banner written by an earlier version of this script:
+            # such a body already contains the clear-state line, so guarding
+            # on that line alone would leave the banner up forever.
             stale = "No stranded PRs" not in existing_body or "develop post-merge is RED" in existing_body
             if existing is not None and stale:
                 client.patch(

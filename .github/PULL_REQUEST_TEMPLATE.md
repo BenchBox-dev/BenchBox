@@ -51,3 +51,11 @@ How did you verify the change? Include the commands you ran (e.g.
 ## Notes
 
 Anything you want reviewers to focus on (risks, follow-ups, deferred work).
+
+## Soundness review:
+
+Complete this section when the PR changes a path in `.github/soundness-paths.txt`.
+
+- External reviewer: codex, muse, or agy
+- Review output: link to the external review PR comment
+- Findings: all Critical/High findings resolved
