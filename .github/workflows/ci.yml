@@ -1632,6 +1632,11 @@ jobs:
       - name: Corpus validation
         run: uv run -- python results-data/validate_corpus.py
       - name: Submission validator stays in sync
+        # Judges this change, not external branch state: fail only when the
+        # change touches the validator or its checker. Standing drift against
+        # published-results is reported by submission-validator-drift-check.yml
+        # (weekly and on develop pushes), so it cannot block unrelated changes.
+        if: ${{ contains(needs.ci-paths.outputs.changed-paths, '.github/workflows/validate-submission.yml') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_submission_validator_sync.py') }}
         run: |
           git fetch --no-tags --depth=1 origin published-results
           git show FETCH_HEAD:.github/workflows/validate-submission.yml \
