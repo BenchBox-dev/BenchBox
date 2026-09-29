@@ -52,3 +52,5 @@ This page provides a quick overview of all benchmark modules. For detailed API d
 .. automodule:: benchbox.tpchavoc
    :members:
    :noindex:
+
+See :doc:`dlv2-canary-missing-page` for details.
