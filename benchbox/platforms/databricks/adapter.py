@@ -345,10 +345,15 @@ class DatabricksAdapter(PlatformAdapter):
         force_upload_val = config.get("force_upload")
         self.force_upload = bool(force_upload_val if force_upload_val is not None else False)
 
-        # Result cache control - disable by default for accurate benchmarking
-        self.disable_result_cache = config.get("disable_result_cache", True)
+        # Result cache control - disable by default for accurate benchmarking.
+        # None-safe: the config builder inserts every platform field with None
+        # when no source provides it, so config.get(key, True) returns None
+        # (key present) and a bare truthiness gate would skip the disable.
+        disable_result_cache = config.get("disable_result_cache", True)
+        self.disable_result_cache = True if disable_result_cache is None else bool(disable_result_cache)
         self._liquid_clustering_operations: list[dict[str, Any]] = []
         self._z_order_operations: list[dict[str, Any]] = []
+        self._cache_disabled_sessions: Any = None
         self._applied_layout_operations: list[dict[str, Any]] = []
         self._skipped_layout_operations: list[dict[str, Any]] = []
 
@@ -376,6 +381,7 @@ class DatabricksAdapter(PlatformAdapter):
 
     def _reset_run_scoped_state(self) -> None:
         super()._reset_run_scoped_state()
+        self._cache_disabled_sessions = None
         self._liquid_clustering_operations = []
         self._z_order_operations = []
         self._applied_layout_operations = []
@@ -2590,6 +2596,55 @@ class DatabricksAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
+    def _ensure_session_cache_disabled(self, cursor: Any) -> None:
+        """Emit SET use_cached_result = false once per query session.
+
+        Sessions that never pass through create_connection() (pooled and
+        per-stream) need the disable on their own session. Tracking uses a
+        WeakSet so dead sessions drop out; cursors that reject weak
+        references fall back to one SET per call (always safe, never
+        timed). Successful SETs are recorded in the applied ledger.
+        Never raises: capture and execution must survive a failed SET.
+        """
+        import weakref
+
+        tracked = getattr(self, "_cache_disabled_sessions", None)
+        if tracked is None:
+            try:
+                tracked = weakref.WeakSet()
+            except Exception:
+                tracked = None
+            self._cache_disabled_sessions = tracked
+        if tracked is not None:
+            try:
+                if cursor in tracked:
+                    return
+            except Exception:
+                pass
+        try:
+            cursor.execute("SET use_cached_result = false")
+            try:
+                cursor.fetchall()
+            except Exception:
+                pass
+        except Exception as e:
+            self.logger.warning(f"Failed to disable Databricks result cache: {e}")
+            return
+        if tracked is not None:
+            try:
+                tracked.add(cursor)
+            except Exception:
+                pass
+        ledger = getattr(self, "_applied_tuning_ledger", None)
+        record = getattr(ledger, "record", None)
+        if callable(record):
+            try:
+                from benchbox.core.tuning.applied_ledger import PHASE_SESSION
+
+                record("SET use_cached_result = false", PHASE_SESSION, mechanism="session_cache_disable")
+            except Exception:
+                pass
+
     def execute_query(
         self,
         connection: Any,
@@ -2606,10 +2661,6 @@ class DatabricksAdapter(PlatformAdapter):
         power harness passes a per-stream cursor through the facade, which has
         no ``cursor()`` method of its own.
         """
-        start_time = mono_time()
-        self.log_verbose(f"Executing query {query_id}")
-        self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
-
         own_cursor = False
         if hasattr(connection, "cursor"):
             cursor = connection.cursor()
@@ -2617,32 +2668,27 @@ class DatabricksAdapter(PlatformAdapter):
         else:
             cursor = connection
 
+        # Result cache control is per-session on serverless: pooled or
+        # per-stream sessions never pass through create_connection(), so
+        # enforce it on each session the first time it executes a query
+        # here. This runs before the timed region starts so the one-time
+        # SET never pollutes a recorded measurement. Sessions are tracked
+        # in a WeakSet (cursor attribute flags fail on __slots__ cursors,
+        # which would re-emit the SET per query). Successful SETs are
+        # recorded in the applied ledger so bundles carry the session
+        # state. Verified live 2026-09-29: SET use_cached_result = false
+        # takes a COUNT(*) from 0.28s (cached) to 1.01s (fresh).
+        if self.disable_result_cache:
+            self._ensure_session_cache_disabled(cursor)
+
+        start_time = mono_time()
+        self.log_verbose(f"Executing query {query_id}")
+        self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
+
         try:
             # Schema context is already set in create_connection() and persists for the session
             # No need to set USE <catalog>.<schema> before every query - it adds unnecessary overhead
             # (Each USE statement = 1 extra round-trip to Databricks)
-
-            # Result cache control is per-session on serverless: pooled or
-            # per-stream sessions never pass through create_connection(),
-            # so enforce it on each session the first time it executes a
-            # query here. Verified live 2026-09-29: SET use_cached_result =
-            # false takes a COUNT(*) from 0.28s (cached) to 1.01s (fresh);
-            # without this, recorded iterations collapse ~10x after warmup.
-            if self.disable_result_cache:
-                cache_flag = getattr(cursor, "_benchbox_cache_disabled", False)
-                if not cache_flag:
-                    try:
-                        cursor.execute("SET use_cached_result = false")
-                        try:
-                            cursor.fetchall()
-                        except Exception:
-                            pass
-                        try:
-                            cursor._benchbox_cache_disabled = True
-                        except Exception:
-                            pass
-                    except Exception as e:
-                        self.logger.warning(f"Failed to disable Databricks result cache: {e}")
 
             # Execute the query
             # Note: Query dialect translation is now handled automatically by the base adapter.
