@@ -5078,7 +5078,7 @@
         "dlv2-02-property-ledger"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "dropped",
       "title": "Remove the four legacy required checks and retune the merge queue after the G1 window"
     },
     "dlv2-40-retire-pr-gate-workflows": {
