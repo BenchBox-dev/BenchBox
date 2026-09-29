@@ -23,12 +23,10 @@ pytestmark = [
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from benchbox.platforms.clickhouse._dependencies import import_chdb  # noqa: E402
+from tests.utilities.optional_engines import require_chdb  # noqa: E402
 
-try:
-    import_chdb()
-except ImportError as exc:
-    pytest.skip(f"ClickHouse local mode requires chdb for these tests: {exc}", allow_module_level=True)
+# Local mode needs a chDB whose native library loads, not just an installed package.
+require_chdb()
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient  # noqa: E402
 

@@ -9,32 +9,18 @@ Copyright 2026 Joe Harris / BenchBox Project
 from __future__ import annotations
 
 import signal
-import sys
 from collections.abc import Generator
 
 import pytest
 
-from benchbox.platforms.pyspark import (
-    PYSPARK_AVAILABLE,
-    SparkSessionManager,
-    ensure_compatible_java,
-    get_java_skip_reason,
-    is_java_compatible,
-)
+from benchbox.platforms.pyspark import SparkSessionManager
+from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 
-# Ensure compatible Java is configured at import time
-# This allows skipif decorators to evaluate correctly
-_java_version, _java_home = ensure_compatible_java()
-
-# Skip conditions for PySpark tests
-# Windows is skipped because Hadoop requires winutils.exe setup which is not available in CI
-_IS_WINDOWS = sys.platform == "win32"
-PYSPARK_SQL_TESTS_SKIPPED = _IS_WINDOWS or not PYSPARK_AVAILABLE or not is_java_compatible(_java_version)
-PYSPARK_SQL_SKIP_REASON = (
-    "PySpark tests skipped on Windows - Hadoop requires winutils.exe setup"
-    if _IS_WINDOWS
-    else get_java_skip_reason() or "PySpark or a compatible Java runtime is unavailable"
-)
+# Skip unless a local Spark session can start: PySpark installed, supported JDK
+# (JAVA_HOME is switched at import time when the default is unsupported) and a
+# matching Python worker. Windows is skipped because Hadoop requires winutils.exe.
+PYSPARK_SQL_TESTS_SKIPPED = not pyspark_usable()
+PYSPARK_SQL_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 
 @pytest.fixture(autouse=True)

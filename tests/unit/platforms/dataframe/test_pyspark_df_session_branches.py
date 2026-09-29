@@ -16,12 +16,8 @@ import sys
 
 import pytest
 
-from benchbox.platforms.pyspark import (
-    PYSPARK_AVAILABLE,
-    ensure_compatible_java,
-    get_java_skip_reason,
-    is_java_compatible,
-)
+from benchbox.platforms.pyspark import PYSPARK_AVAILABLE
+from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 
 pytestmark = [
     pytest.mark.unit,
@@ -32,9 +28,8 @@ pytestmark = [
     ),
 ]
 
-_java_version, _java_home = ensure_compatible_java()
-_SKIP_PYSPARK = not PYSPARK_AVAILABLE or not is_java_compatible(_java_version)
-_SKIP_REASON = get_java_skip_reason() or "PySpark tests enabled"
+_SKIP_PYSPARK = not pyspark_usable()
+_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 if PYSPARK_AVAILABLE:
     from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter

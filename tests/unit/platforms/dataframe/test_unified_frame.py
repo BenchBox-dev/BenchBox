@@ -15,6 +15,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from tests.utilities.optional_engines import require_pyspark
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -1194,12 +1196,7 @@ class TestFrameAggIdiomsPySpark:
 
     @pytest.fixture(scope="class")
     def sframe(self):
-        pytest.importorskip("pyspark")
-        from benchbox.platforms.pyspark import ensure_compatible_java, is_java_compatible
-
-        _java_version, _ = ensure_compatible_java()
-        if not is_java_compatible(_java_version):
-            pytest.skip("no compatible Java for PySpark")
+        require_pyspark()
 
         from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 

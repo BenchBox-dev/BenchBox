@@ -29,12 +29,8 @@ from benchbox.core.dataframe.tuning import (
     MemoryConfiguration,
     ParallelismConfiguration,
 )
-from benchbox.platforms.pyspark import (
-    PYSPARK_AVAILABLE,
-    ensure_compatible_java,
-    get_java_skip_reason,
-    is_java_compatible,
-)
+from benchbox.platforms.pyspark import PYSPARK_AVAILABLE
+from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 
 pytestmark = [
     pytest.mark.unit,
@@ -46,13 +42,11 @@ pytestmark = [
 ]
 
 
-# Ensure compatible Java is configured at import time
-# This allows skipif decorators to evaluate correctly
-_java_version, _java_home = ensure_compatible_java()
-
-# Skip conditions for PySpark tests
-_SKIP_PYSPARK = not PYSPARK_AVAILABLE or not is_java_compatible(_java_version)
-_SKIP_REASON = get_java_skip_reason() or "PySpark tests enabled"
+# Skip unless PySpark can actually start a session: installed, a supported JDK
+# (JAVA_HOME is switched at import time when the default is unsupported) and a
+# Python worker matching the driver.
+_SKIP_PYSPARK = not pyspark_usable()
+_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 # Check if PySpark is available and import adapter
 if PYSPARK_AVAILABLE:
