@@ -311,6 +311,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if query_id == 90 and target in {"spark", "lakesail"}:
             return self._rewrite_spark_q90_zero_denominator(query)
 
+        if query_id == 90:
+            return self._rewrite_default_q90_zero_denominator(query)
+
         if "clickhouse" not in target:
             return query
 
@@ -339,6 +342,34 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return re.sub(
             r"/\s+CAST\(pmc\s+AS\s+DECIMAL\(15,\s*4\)\)",
             "/ NULLIF(CAST(pmc AS DECIMAL(15, 4)), 0)",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+
+    @staticmethod
+    def _rewrite_default_q90_zero_denominator(query: str) -> str:
+        """Guard Q90's PM count denominator on all other dialects.
+
+        The canonical TPC-DS template divides by ``pmc`` with no zero guard, so
+        an empty PM bucket is engine-defined (DuckDB yields NaN, Postgres-style
+        engines error). Default every remaining dialect to NULLIF(pmc, 0) so the
+        zero-denominator result is consistently SQL NULL.
+        """
+        rewritten = re.sub(
+            r"/\s*CAST\(pmc\s+AS\s+DECIMAL\(15,\s*4\)\)",
+            "/CAST(NULLIF(pmc, 0) AS DECIMAL(15, 4))",
+            query,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+        if rewritten != query:
+            return rewritten
+        return re.sub(
+            r"/\s*CAST\((?P<quote>[`\"])(?P<name>pmc)(?P=quote)\s+AS\s+DECIMAL\(15,\s*4\)\)",
+            lambda match: (
+                f"/CAST(NULLIF({match.group('quote')}{match.group('name')}{match.group('quote')}, 0) AS DECIMAL(15, 4))"
+            ),
             query,
             count=1,
             flags=re.IGNORECASE,
