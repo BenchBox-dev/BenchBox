@@ -1,0 +1,893 @@
+name: Nightly T3
+
+# Tier 3 nightly validation, split into independent domain jobs. Each domain
+# has its own conclusion and artifacts, and the final `report` job keeps one
+# GitHub issue per domain label (t3:docker, t3:perf, ...): it opens or updates
+# the issue while the domain is red and closes it on the next green run.
+# Domains, labels, and the owner response policy are in
+# docs/operations/nightly-t3.md.
+#
+# Every domain job installs its own environment and reads only `contents`.
+# Only `report` holds `issues: write`.
+#
+# Live cloud tests run only when the repository variable
+# BENCHBOX_T3_CLOUD_ENABLED is exactly 'true' (default: unset, so skipped).
+
+env:
+  BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+
+on:
+  schedule:
+    # 07:30 UTC, off-peak and clear of the other scheduled workflows
+    # (docker 07:00, orphaned-commit 07:00, gap detector 07:47).
+    - cron: "30 7 * * *"
+  workflow_dispatch:
+    inputs:
+      run_drift:
+        description: "Run the t3:drift checks (scheduled runs run them on Mondays only)"
+        type: boolean
+        required: false
+        default: true
+
+concurrency:
+  group: nightly-t3-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------- t3:docker
+  # Ported from docker-integration.yml: compose-backed live suites.
+  docker:
+    name: "t3:docker | ${{ matrix.service }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: postgres
+            compose: docker/postgresql/docker-compose.yml
+            tests: tests/integration/platforms/test_postgresql_live.py
+            marker: live_postgresql
+          - service: clickhouse
+            compose: docker/clickhouse/docker-compose.yml
+            tests: tests/integration/platforms/test_clickhouse_live.py
+            marker: live_clickhouse
+          - service: trino
+            compose: docker/trino/docker-compose.yml
+            tests: tests/integration/platforms/test_trino_live.py
+            marker: live_trino
+    env:
+      # Read by the ClickHouse compose file only; the other stacks ignore it.
+      CLICKHOUSE_MEMORY_LIMIT: 4g
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Bring up compose stack
+        run: docker compose -f "${{ matrix.compose }}" up -d --wait
+
+      - name: Run live integration tests
+        run: |
+          set -o pipefail
+          uv run -- python -m pytest "${{ matrix.tests }}" \
+            -m "${{ matrix.marker }}" --tb=short -v -p no:cacheprovider \
+            | tee "docker-${{ matrix.service }}-output.txt"
+          if ! grep -Eq '[0-9]+ passed' "docker-${{ matrix.service }}-output.txt"; then
+            echo "::error::${{ matrix.service }} Docker integration produced no passing tests."
+            exit 1
+          fi
+
+      - name: Collect compose logs
+        if: failure()
+        run: docker compose -f "${{ matrix.compose }}" logs --no-color > "docker-${{ matrix.service }}-compose.log" || true
+
+      - name: Tear down compose stack
+        if: always()
+        run: docker compose -f "${{ matrix.compose }}" down -v
+
+      - name: Upload docker artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-docker-${{ matrix.service }}
+          path: |
+            docker-${{ matrix.service }}-output.txt
+            docker-${{ matrix.service }}-compose.log
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ----------------------------------------------------------------- t3:cloud
+  # Ported from nightly.yml's cloud-live-plan-capture. Credentialed, so it is
+  # opt-in: nothing runs until a maintainer sets BENCHBOX_T3_CLOUD_ENABLED=true.
+  # The selected classes run trivial SELECT 1 queries only; never widen them to
+  # whole live modules, which load data and break the billing guardrails.
+  cloud:
+    name: "t3:cloud | live plan capture"
+    if: ${{ vars.BENCHBOX_T3_CLOUD_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
+      BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_PROJECT }}
+      BIGQUERY_DATASET: ${{ secrets.BIGQUERY_DATASET }}
+      REDSHIFT_HOST: ${{ secrets.REDSHIFT_HOST }}
+      REDSHIFT_PORT: ${{ secrets.REDSHIFT_PORT || 5439 }}
+      REDSHIFT_USER: ${{ secrets.REDSHIFT_USER }}
+      REDSHIFT_PASSWORD: ${{ secrets.REDSHIFT_PASSWORD }}
+      REDSHIFT_DATABASE: ${{ secrets.REDSHIFT_DATABASE }}
+      MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'benchbox_test' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev --extra snowflake --extra bigquery --extra redshift --extra duckdb
+
+      - name: Write GCP service account key to temp file
+        # BigQuery needs a file-based credential. The secret holds the raw JSON
+        # key (not base64). It is never echoed or uploaded; it lives only in a
+        # runner temp file with restrictive permissions for this run.
+        env:
+          GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+        run: |
+          if [ -n "${GCP_SERVICE_ACCOUNT_KEY}" ]; then
+            key_file="${RUNNER_TEMP}/gcp-service-account-key.json"
+            printf '%s' "${GCP_SERVICE_ACCOUNT_KEY}" > "${key_file}"
+            chmod 600 "${key_file}"
+            echo "GOOGLE_APPLICATION_CREDENTIALS=${key_file}" >> "${GITHUB_ENV}"
+          else
+            echo "No GCP service account key configured; BigQuery tests will skip."
+          fi
+
+      - name: Run Snowflake, BigQuery, Redshift, and MotherDuck plan-capture live tests
+        run: |
+          uv run -- python -m pytest \
+            "tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture" \
+            "tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture" \
+            "tests/integration/platforms/test_redshift_live.py::TestLiveRedshiftQueryPlanCapture" \
+            "tests/integration/platforms/test_motherduck_live.py::TestLiveMotherDuckQueryPlanCapture" \
+            -m "live_snowflake or live_bigquery or live_redshift or live_motherduck" --tb=short -v -p no:cacheprovider \
+            --junitxml=junit-cloud.xml
+
+      - name: Upload cloud artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-cloud
+          path: junit-cloud.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ------------------------------------------------------------------ t3:perf
+  # Ported from perf-smoke.yml: DuckDB TPC-H SF=0.01 power phase against the
+  # committed baseline, failing on a regression above 10%.
+  perf:
+    name: "t3:perf | DuckDB TPC-H SF=0.01"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run DuckDB TPC-H SF=0.01 power phase
+        run: |
+          mkdir -p perf-smoke-output
+          uv run benchbox run \
+            --platform duckdb \
+            --benchmark tpch \
+            --scale 0.01 \
+            --phases power \
+            --non-interactive \
+            --output perf-smoke-output
+
+      - name: Locate current result file
+        id: current
+        run: |
+          current=$(find benchmark_runs/results -name 'tpch_sf001_duckdb_sql_*.json' -print | sort | tail -1)
+          if [[ -z "$current" ]]; then
+            echo "No current result file produced by benchbox run." >&2
+            exit 1
+          fi
+          echo "path=$current" >> "$GITHUB_OUTPUT"
+
+      - name: Compare against baseline (fail on >10% regression)
+        run: |
+          uv run benchbox compare \
+            _project/baselines/perf_smoke_duckdb_tpch_001.json \
+            "${{ steps.current.outputs.path }}" \
+            --fail-on-regression 10%
+
+      - name: Upload result artifact
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-perf-result
+          path: |
+            ${{ steps.current.outputs.path }}
+            _project/baselines/perf_smoke_duckdb_tpch_001.json
+          retention-days: 14
+
+  # ---------------------------------------------------------------- t3:matrix
+  # Wheel build and install smoke across the supported Python versions and
+  # operating systems. The install check is the same minimal-surface gate as
+  # nightly.yml's test-package job; the generator step runs one bundled TPC-H
+  # dbgen and one TPC-DS dsdgen from the installed wheel on each runner.
+  matrix:
+    name: "t3:matrix | ${{ matrix.os }} py${{ matrix.python-version }}"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.11', '3.12', '3.13', '3.14']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Build package
+        run: uv build
+
+      - name: Test package installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          # Minimal-surface gate: a clean core install must import benchbox AND
+          # must not pull pandas (optional engine/DataFrame dep).
+          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
+          uv run --isolated --no-project --with "$wheel" -- benchbox --help
+
+      - name: Run bundled dbgen and dsdgen from the installed wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          uv run --isolated --no-project --with "$wheel" -- python - <<'PY'
+          import tempfile
+          from pathlib import Path
+
+          from benchbox import TPCDS, TPCH
+
+          with tempfile.TemporaryDirectory() as tmp:
+              for cls, table in ((TPCH, "nation.tbl"), (TPCDS, "call_center.dat")):
+                  out = Path(tmp) / cls.__name__.lower()
+                  cls(scale_factor=0.01, output_dir=out).generate_data()
+                  produced = out / table
+                  assert produced.is_file() and produced.stat().st_size > 0, f"{cls.__name__} produced no {table}"
+                  print(f"{cls.__name__}: {table} {produced.stat().st_size} bytes")
+          PY
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-matrix-dist-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dist/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # --------------------------------------------------------------- t3:browser
+  # Ported from results-explorer-browser.yml: the Firefox and WebKit `@smoke`
+  # subsets through the shared Playwright entrypoints.
+  browser:
+    name: "t3:browser | ${{ matrix.browser }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install Python dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('results-explorer/package-lock.json') }}
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+        working-directory: results-explorer
+
+      - name: Run browser smoke
+        # Shared deterministic entrypoint: regenerate fixtures, rebuild dist,
+        # then run the browser project scoped to the smoke subset by the
+        # Playwright config.
+        run: npm run test:e2e:${{ matrix.browser }}
+        working-directory: results-explorer
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-browser-${{ matrix.browser }}
+          path: |
+            results-explorer/playwright-report
+            results-explorer/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ------------------------------------------------------------- t3:extension
+  # Ported from extension-smoke.yml. Intentionally no extension cache: the
+  # point is to detect upstream community-extension rebuilds.
+  extension:
+    name: "t3:extension | duckdb-datasketches"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install duckdb only
+        run: uv sync --no-dev --no-install-project
+
+      - name: Run datasketches smoke
+        run: |
+          set -o pipefail
+          uv run -- python scripts/duckdb_datasketches_smoke.py 2>&1 | tee datasketches-smoke.txt
+
+      - name: Upload extension artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-extension
+          path: datasketches-smoke.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # --------------------------------------------------------------- t3:install
+  # Ported from release-canary.yml's pypi-latest-installability job.
+  install:
+    name: "t3:install | pypi-latest installability"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Deliberately no checkout step: the point is to install the published
+      # PyPI artifact, not build or import against local source.
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install and import PyPI-latest benchbox (no local source in sys.path)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Run from a scratch directory with no benchbox/ source tree nearby.
+          # Running inside a checkout would import the local source instead of
+          # the installed wheel and pass even when the PyPI artifact is broken.
+          # See docs/operations/release-guide.md "Recovering from a broken PyPI
+          # release".
+          workdir=$(mktemp -d)
+          cd "$workdir"
+          uv run --isolated --no-project --with benchbox -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print(f'PyPI-latest BenchBox {benchbox.__version__} installed successfully (minimal import surface)')" | tee "$GITHUB_WORKSPACE/pypi-latest-install.txt"
+
+      - name: Upload install artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-install
+          path: pypi-latest-install.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ----------------------------------------------------------------- t3:drift
+  # Scheduled drift canaries, ported from corpus-drift-check.yml,
+  # pricing-data-drift-check.yml, submission-validator-drift-check.yml, and
+  # cross-surface-baseline-autodetect.yml. They are report-only: nothing is
+  # pushed, and no PR is opened. Scheduled runs execute them on Mondays (UTC);
+  # a manual dispatch runs them unless `run_drift` is unchecked.
+  drift-gate:
+    name: "t3:drift | gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.select.outputs.run }}
+    steps:
+      - name: Decide whether to run drift checks
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          RUN_DRIFT: ${{ inputs.run_drift }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            run="$RUN_DRIFT"
+          elif [ "$(date -u +%u)" = "1" ]; then
+            run=true
+          else
+            run=false
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "Drift checks selected: $run"
+
+  drift:
+    name: "t3:drift | corpus, pricing, validator, baseline"
+    needs: [drift-gate]
+    if: ${{ needs.drift-gate.outputs.run == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SUMMARY_PATH: t3-drift/cross-surface-baseline-summary.json
+      BASELINE_PATH: benchbox/core/equivalence/cross_surface_baseline.yaml
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Fetch published-results
+        run: git fetch --no-tags --depth=1 origin published-results:refs/remotes/origin/published-results
+
+      # Every check below runs even when an earlier one failed, so one run
+      # reports all drift; the job still fails if any check failed.
+      - name: Corpus drift (develop vs published-results, directional)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          PUB=origin/published-results
+          DEV=HEAD
+
+          # Fail clearly rather than silently passing an empty comparison.
+          if ! git cat-file -e "${PUB}:results-data" 2>/dev/null; then
+            echo "::error::published-results has no results-data/ tree"
+            exit 2
+          fi
+
+          # Compare the shared corpus content, not the derived inventory. Two-tree
+          # compare (no dots): published-results is an orphan branch with no
+          # merge-base with develop.
+          PATHSPECS=(
+            'results-data/bundles'
+            'results-data/CORPUS_NOTES.md'
+            'results-data/SEED_CORPUS_SPEC.md'
+            'results-data/README.md'
+            'results-data/validate_corpus.py'
+          )
+
+          # A = published, B = develop. Diff filter is relative to A to B.
+          #  A: develop only, so develop is ahead.
+          #  D: published only, so a wipe-based mirror would delete public content.
+          #  M: content differs, so develop is ahead with updates.
+          DEVELOP_AHEAD=$(git diff --name-only --diff-filter=A "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
+          PUBLISHED_ONLY=$(git diff --name-only --diff-filter=D "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
+          CONTENT_CHANGED=$(git diff --name-only --diff-filter=M "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
+          STALE_PATHS=$(printf '%s\n%s\n' "${CONTENT_CHANGED}" "${DEVELOP_AHEAD}" | sed '/^$/d' || true)
+
+          if [[ -n "${PUBLISHED_ONLY}" ]]; then
+            PO_COUNT=$(printf '%s\n' "${PUBLISHED_ONLY}" | sed '/^$/d' | wc -l | tr -d ' ')
+            echo "::notice::published-results has ${PO_COUNT} path(s) not on develop (accepted archive submissions; not drift)."
+            printf '%s\n' "${PUBLISHED_ONLY}" | head -40
+          fi
+
+          if [[ -z "${STALE_PATHS}" ]]; then
+            echo "No develop-ahead corpus drift."
+            exit 0
+          fi
+
+          COUNT=$(printf '%s\n' "${STALE_PATHS}" | wc -l | tr -d ' ')
+          echo "::error::published-results corpus is ${COUNT} path(s) behind develop (develop-ahead or content-changed)."
+          printf '%s\n' "${STALE_PATHS}" | head -40
+          echo "Mirror develop-ahead paths with the non-destructive union overlay:"
+          echo "  gh workflow run sync-results-data-to-published.yml --ref develop"
+          echo "Never use a wipe-based full mirror: published-only community submissions would be deleted."
+          exit 1
+
+      - name: Corpus privacy scan (published-results tip)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          PUB=origin/published-results
+          if ! git cat-file -e "${PUB}:results-data/bundles" 2>/dev/null; then
+            echo "::error::published-results has no results-data/bundles tree"
+            exit 2
+          fi
+
+          uv run -- python - <<'PY'
+          from __future__ import annotations
+
+          import json
+          import subprocess
+          import sys
+
+          from benchbox.core.results.anonymization import find_public_path_leaks
+
+          pub = "origin/published-results"
+          listed = subprocess.check_output(
+              ["git", "ls-tree", "-r", "--name-only", pub, "results-data/"],
+              text=True,
+          )
+          json_paths = [p for p in listed.splitlines() if p.endswith(".json")]
+          if not json_paths:
+              print("::error::published-results results-data/ has no JSON files to scan", file=sys.stderr)
+              sys.exit(2)
+
+          offenders: list[str] = []
+          unreadable: list[str] = []
+          for path in json_paths:
+              try:
+                  raw = subprocess.check_output(["git", "show", f"{pub}:{path}"])
+                  payload = json.loads(raw)
+              except (subprocess.CalledProcessError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                  unreadable.append(f"{path}: {type(exc).__name__}")
+                  continue
+              leaks = find_public_path_leaks(payload)
+              if leaks:
+                  offenders.append(f"{path}: {', '.join(sorted(set(leaks))[:5])}")
+
+          if unreadable:
+              print(f"::error::{len(unreadable)} published corpus file(s) could not be parsed (failing closed):", file=sys.stderr)
+              print("\n".join(unreadable[:20]), file=sys.stderr)
+              sys.exit(1)
+          if offenders:
+              print(f"::error::{len(offenders)} published corpus file(s) expose private paths:", file=sys.stderr)
+              print("\n".join(offenders[:20]), file=sys.stderr)
+              sys.exit(1)
+          print(f"Privacy scan clean: {len(json_paths)} published JSON surface(s), 0 path leaks.")
+          PY
+
+      - name: Submission validator drift (develop vs published-results)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          PUB=origin/published-results
+          if ! git cat-file -e "${PUB}:.github/workflows/validate-submission.yml" 2>/dev/null; then
+            echo "::error::published-results has no .github/workflows/validate-submission.yml"
+            exit 2
+          fi
+          git show "${PUB}:.github/workflows/validate-submission.yml" > "${RUNNER_TEMP}/published-validate-submission.yml"
+          uv run -- python scripts/check_submission_validator_sync.py \
+            --develop .github/workflows/validate-submission.yml \
+            --published "${RUNNER_TEMP}/published-validate-submission.yml"
+
+      - name: Cross-surface baseline drift (resolved entries still listed)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "${SUMMARY_PATH}")"
+          # Same detector and writer as the weekly prune workflow, but report
+          # only: the writer edits the checkout, and any resulting diff means
+          # the baseline lists divergences that no longer reproduce.
+          uv run -- python _project/scripts/cross_surface_baseline_autodetect.py \
+            --json-out "${SUMMARY_PATH}"
+          if ! git diff --exit-code -- "${BASELINE_PATH}"; then
+            echo "::error::Resolved cross-surface baseline entries are still listed in ${BASELINE_PATH}. Run 'make cross-surface-update-baseline BENCHMARK=<gate>' and commit the pruned baseline."
+            exit 1
+          fi
+
+      - name: Restore checkout after baseline check
+        if: ${{ !cancelled() }}
+        run: git checkout -- "${BASELINE_PATH}"
+
+      - name: Pricing data drift (re-pull vendor APIs)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          uv run -- python scripts/generate_pricing_data.py --refresh
+          if git diff --exit-code -- benchbox/core/cost/pricing_data.yaml \
+              benchbox/core/cost/pricing_vendor_evidence.yaml; then
+            echo "Vendor pricing matches the recorded evidence."
+          else
+            echo "::error::Upstream vendor prices moved. Review the diff above, then run 'make pricing-data' locally after confirming the new list prices and commit the refreshed evidence and tables together."
+            exit 1
+          fi
+
+      - name: Upload drift artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-drift
+          path: ${{ env.SUMMARY_PATH }}
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # -------------------------------------------------------------- t3:quarantine
+  # Runs tests carrying the `quarantine` marker, which keeps them out of the
+  # per-PR tiers while still tracking them. Until the marker is registered in
+  # pytest.ini the job passes with a notice instead of failing on an unknown
+  # marker.
+  # TODO: drop the registration guard once the quarantine marker is registered
+  # on develop and every quarantined test carries owner, expiry, and issue
+  # metadata.
+  quarantine:
+    name: "t3:quarantine | quarantined tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BENCHBOX_TEST_TIER: t3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run quarantined tests
+        run: |
+          set -uo pipefail
+          mkdir -p t3-quarantine
+          uv run -- python -m pytest --markers > t3-quarantine/markers.txt
+          if ! grep -q '^@pytest.mark.quarantine' t3-quarantine/markers.txt; then
+            echo "::notice::The quarantine marker is not registered yet; nothing to run."
+            exit 0
+          fi
+          uv run -- python -m pytest tests -m quarantine -n 0 --tb=short --timeout=1200 \
+            --junitxml=t3-quarantine/junit-quarantine.xml
+          rc=$?
+          # Exit code 5 means no quarantined tests were collected, which is the healthy state.
+          if [ "$rc" = "5" ]; then
+            echo "No quarantined tests."
+            exit 0
+          fi
+          exit "$rc"
+
+      - name: Upload quarantine artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-quarantine
+          path: t3-quarantine/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ---------------------------------------------------------- t3:durations
+  # Measures per-test durations for the fast and slow non-credentialed tiers.
+  # Uploads the pytest --durations output and JUnit reports as artifacts. When
+  # the duration tooling is present, it also regenerates the duration file
+  # (into the artifact directory, never into the checkout) so a maintainer can
+  # commit it.
+  durations-refresh:
+    name: "t3:durations | duration refresh"
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BENCHBOX_TEST_TIER: t3
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Measure fast tier durations
+        run: |
+          set -uo pipefail
+          mkdir -p t3-durations
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" \
+            --tb=short --timeout=120 --durations=0 --junitxml=t3-durations/junit-fast.xml \
+            2>&1 | tee t3-durations/durations-fast.txt
+          rc=${PIPESTATUS[0]}
+          # Test failures are reported by the validation jobs; this job fails
+          # only when pytest itself could not produce a report.
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+
+      - name: Measure slow tier durations
+        run: |
+          set -uo pipefail
+          uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" \
+            -n 0 --tb=short --timeout=1200 --durations=0 --junitxml=t3-durations/junit-slow.xml \
+            2>&1 | tee t3-durations/durations-slow.txt
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+
+      - name: Regenerate duration file
+        run: |
+          set -euo pipefail
+          if [ ! -f _project/scripts/update_test_durations.py ]; then
+            echo "::notice::No duration tooling in this checkout; publishing raw --durations output only."
+            exit 0
+          fi
+          uv run -- python _project/scripts/update_test_durations.py \
+            --input t3-durations/junit-fast.xml \
+            --input t3-durations/junit-slow.xml \
+            --output t3-durations/test_durations.json
+
+      - name: Upload duration artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-durations
+          path: t3-durations/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # ------------------------------------------------------------------ report
+  # One issue per red domain label. Opens the issue when a domain fails,
+  # comments on it while the domain stays red, and closes it when the domain
+  # passes. Skipped domains (cloud disabled, drift off-day) change nothing.
+  report:
+    name: Report T3 results
+    needs:
+      - docker
+      - cloud
+      - perf
+      - matrix
+      - browser
+      - extension
+      - install
+      - drift
+      - quarantine
+      - durations-refresh
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      NEEDS_JSON: ${{ toJSON(needs) }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      DOC_URL: ${{ github.server_url }}/${{ github.repository }}/blob/develop/docs/operations/nightly-t3.md
+    steps:
+      - name: Open, update, or close one issue per domain
+        shell: bash
+        run: |
+          set -euo pipefail
+          for job in docker cloud perf matrix browser extension install drift quarantine durations-refresh; do
+            case "$job" in
+              durations-refresh) domain=durations ;;
+              *) domain="$job" ;;
+            esac
+            label="t3:${domain}"
+            result="$(printf '%s' "$NEEDS_JSON" | jq -r --arg j "$job" '.[$j].result')"
+            echo "${label}: ${result}"
+
+            existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label "$label" \
+              --limit 1 --json number --jq '.[0].number // empty')"
+
+            case "$result" in
+              failure)
+                comment="Nightly T3 run ${GITHUB_RUN_ID} failed for \`${label}\` on $(date -u +%F): ${RUN_URL}"
+                if [ -n "$existing" ]; then
+                  gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "$comment"
+                  echo "Updated issue #${existing}"
+                else
+                  gh label create "$label" --repo "$GITHUB_REPOSITORY" \
+                    --description "Nightly T3 ${domain} domain is red" --color B60205 >/dev/null 2>&1 || true
+                  body="The nightly T3 \`${domain}\` domain failed.
+
+          - Run: ${RUN_URL}
+          - Commit: ${GITHUB_SHA}
+          - Artifacts: attached to the run (names start with \`t3-${domain}\` where the domain uploads any)
+
+          The owner fixes or reverts within one working day. See ${DOC_URL} for the response policy. This issue stays open while the domain is red and closes when a nightly run passes."
+                  gh issue create --repo "$GITHUB_REPOSITORY" --label "$label" \
+                    --title "Nightly T3 ${domain} failing" --body "$body"
+                fi
+                ;;
+              success)
+                if [ -n "$existing" ]; then
+                  gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" \
+                    --body "Nightly T3 run ${GITHUB_RUN_ID} passed for \`${label}\`: ${RUN_URL}"
+                  gh issue close "$existing" --repo "$GITHUB_REPOSITORY" --reason completed
+                  echo "Closed issue #${existing}"
+                fi
+                ;;
+              *)
+                echo "No issue change for ${label} (${result})."
+                ;;
+            esac
+          done
