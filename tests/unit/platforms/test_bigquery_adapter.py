@@ -2250,6 +2250,34 @@ class TestConvertToBigqueryTable:
         assert result.rstrip().endswith("PRIMARY KEY (id) NOT ENFORCED)")
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_numeric_decimal_literals_skip_strings_and_identifiers(self, mock_bigquery):
+        """FLOAT64 literals cannot be inserted into NUMERIC columns (verified live)."""
+        sql = "UPDATE t SET p = p * 1.05, c = 'v1.5', q = 1000.0 * n WHERE k2 = 3 AND x = 0.02"
+        result = BigQueryAdapter._numeric_decimal_literals(sql)
+        assert result == (
+            "UPDATE t SET p = p * NUMERIC '1.05', c = 'v1.5', q = NUMERIC '1000.0' * n "
+            "WHERE k2 = 3 AND x = NUMERIC '0.02'"
+        )
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualify_leaves_script_temp_tables_bare(self, mock_bigquery):
+        """Script temp tables live outside the dataset; qualifying them fails with Not found."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = (
+            "BEGIN TRANSACTION;\n"
+            "CREATE TEMP TABLE IF NOT EXISTS temp_orders_1 AS SELECT * FROM orders WHERE 1=0;\n"
+            "INSERT INTO temp_orders_1 VALUES (1);\n"
+            "INSERT INTO txn_orders SELECT * FROM temp_orders_1;\n"
+            "DROP TABLE IF EXISTS temp_orders_1;\n"
+            "COMMIT;\n"
+        )
+        result = adapter._qualify_table_names(sql)
+        assert "`proj.ds.ORDERS`" in result
+        assert "INSERT INTO `proj.ds.TXN_ORDERS` SELECT * FROM temp_orders_1" in result
+        assert "TEMP_ORDERS_1" not in result
+        assert adapter._batch_temp_tables == frozenset()
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_preprocess_operation_sql_rewrites_bq_gaps(self, mock_bigquery):
         """CAST AS VARCHAR and quoted INTERVAL literals fail server-side."""
         from types import SimpleNamespace
