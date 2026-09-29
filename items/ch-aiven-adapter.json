@@ -8,6 +8,14 @@
       "op": "create",
       "op_id": "a13346baa10a4822b6264cf1763ce117",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:15:54Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "42d0f8d1a199406b8b027d76d8f5c787",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
 }
