@@ -1,9 +1,5 @@
 {
-<<<<<<< HEAD
-  "contract_sha256": "62aeb62a1156aa16017e07298d96d38f70aae1ee066024785d08eedf96aa2049",
-=======
-  "contract_sha256": "c7ff7bfd092e1edb71febd1bf060c1467bac69201919b276e1bd7821b4ef1b90",
->>>>>>> 490f2197d (ci: report six unit results from one workflow and retire the legacy PR gates)
+  "contract_sha256": "12d85484f388a72ba4329b43d9b18922b0d1bb560e54bf1fc68551182f356619",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -2143,11 +2139,7 @@
     ]
   },
   "schema_version": 2,
-<<<<<<< HEAD
-  "semantic_sha256": "e6d61f12907482937ee267d82243b6463844366b6dd51e13459a39c41bc1cbf5",
-=======
-  "semantic_sha256": "fa581b41256b6751e8b20ff934e072796c158e47dfcdd6948ac957b94c17c5db",
->>>>>>> 490f2197d (ci: report six unit results from one workflow and retire the legacy PR gates)
+  "semantic_sha256": "6687bc04a60393e7a0b9751bcddcb95aa541fba46bc70c86938d8e2b31c40dfb",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
