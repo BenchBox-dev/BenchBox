@@ -12,7 +12,7 @@
 # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
 #
 # Extracted verbatim (logic byte-equivalent) from the "Untracked skill-mirror
-# drift guard (cloud parity)" step in the `code-lint` (pr.yml `lint` job) job
+# drift guard (cloud parity)" step in the `code-lint` (ci.yml `lint` job) job
 # so the same guard runs both in CI and locally via `make ci-lint` /
 # `make pr-preflight` without drifting out of sync. See
 # docs/operations/ci-local-parity.md for the parity invariant this guard is

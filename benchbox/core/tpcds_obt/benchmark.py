@@ -128,6 +128,11 @@ class TPCDSOBTBenchmark(BaseBenchmark):
     while OBT-specific transformations are stored separately.
     """
 
+    # OBT generates its own output table from TPC-DS source data, so the CLI
+    # must not redirect its output_dir to the shared TPC-DS root: that would
+    # hide the generated OBT parquet from the cloud loader.
+    GENERATES_OWN_OUTPUT = True
+
     def __init__(
         self,
         scale_factor: float = 1.0,

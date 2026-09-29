@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 545
+**Total registered rules:** 556
 
 **Platforms covered:** 35
 
@@ -13,7 +13,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
-| bigquery | - | 2 | 25 | 2 | 1 | 2 | 32 |
+| bigquery | - | 2 | 25 | 2 | 1 | 8 | 38 |
 | clickhouse | - | 19 | 3 | 4 | 1 | - | 27 |
 | clickhouse-cloud | - | - | 2 | - | - | 21 | 23 |
 | clickhouse-local | 1 | - | 2 | - | - | 21 | 24 |
@@ -37,7 +37,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | questdb | 1 | - | - | - | 1 | - | 2 |
 | redshift | - | - | - | 2 | 1 | - | 3 |
 | singlestore | - | - | - | - | 4 | - | 4 |
-| snowflake | - | 7 | 2 | 2 | 1 | 2 | 14 |
+| snowflake | - | 7 | 2 | 2 | 1 | 7 | 19 |
 | spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
 | starrocks | - | 15 | 1 | 2 | 1 | - | 19 |
@@ -92,6 +92,12 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.bigquery.all.convert_to_bigquery_table` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=2_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.tpchavoc.2_v2` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_create_temp_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_create_temp_table` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_nested` |
 
 ### clickhouse
 
@@ -641,6 +647,11 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.snowflake.all.optimize_table_definition` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=2_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.tpchavoc.2_v2` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_nested` |
 
 ### spark
 

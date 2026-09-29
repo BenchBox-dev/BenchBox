@@ -1972,7 +1972,7 @@ class DatabricksAdapter(PlatformAdapter):
                         existing_tables,
                         data_source,
                     )
-                    table_stats[table_name.upper()] = row_count
+                    table_stats[table_name.lower()] = row_count
                     load_time = elapsed_seconds(load_start)
 
                     per_table_timings[table_name.upper()] = {
@@ -1986,7 +1986,7 @@ class DatabricksAdapter(PlatformAdapter):
 
                 except Exception as e:
                     self.logger.error(f"Failed to load {table_name}: {str(e)[:200]}")
-                    table_stats[table_name.upper()] = 0
+                    table_stats[table_name.lower()] = 0
                     per_table_timings[table_name.upper()] = {
                         "copy_into_ms": 0,
                         "optimize_ms": 0,
@@ -2529,7 +2529,7 @@ class DatabricksAdapter(PlatformAdapter):
                 cursor.execute(f"CREATE TABLE {table_name_upper} USING PARQUET LOCATION '{location}'")
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
                 result = cursor.fetchone()
-                table_stats[table_name_upper] = int(result[0]) if result else 0
+                table_stats[table_name_lower] = int(result[0]) if result else 0
 
         finally:
             cursor.close()

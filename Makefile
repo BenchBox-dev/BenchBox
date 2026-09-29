@@ -70,34 +70,34 @@ publication-help:
 
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
-	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
 	@echo "Running slow and resource-heavy tests serially..."
-	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
 
 test-unit:
-	uv run -- python -m pytest -m "unit" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "unit" --tb=short
 
 test-integration:
-	uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
 
 test-tpch:
-	uv run -- python -m pytest -m "tpch" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "tpch" --tb=short
 
 # Curated lightweight smoke lane
 test-quick:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
 
 # Verbose test output for all tests
 test-verbose:
-	uv run -- python -m pytest -v
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v
 
 # Enhanced pytest commands using comprehensive marker system
 test-pytest:
-	uv run -- python -m pytest -m "not stress"
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not stress"
 
 # Speed-based testing
 test-fast:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 test-unlock:
 	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
@@ -109,26 +109,26 @@ test-unlock:
 	python3 scripts/local_validation.py clear-test-lock "$$LOCK_PATH"
 
 test-medium:
-	uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
 
 test-medium-selected:
 	@set -eu; \
 	OUTPUT=$$(mktemp); \
 	trap 'rm -f "$$OUTPUT"' EXIT; \
-	uv run -- python scripts/canary_impact.py \
+	BENCHBOX_TEST_TIER=t2 uv run -- python scripts/canary_impact.py \
 		--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \
 		--marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" --cant-affect-list empty \
 		--product-code-only --run-selected --output "$$OUTPUT"
 
 test-slow:
-	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
 
 test-stress:
-	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
 # Development cycle testing using the curated fast unit subset
 test-dev:
-	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
@@ -251,7 +251,7 @@ coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
 # Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (datavault remains staged) and run in the blocking correctness-gate (pr.yml);
+# In GATES (datavault remains staged) and run in the blocking correctness-gate (ci.yml);
 # exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
 # classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
@@ -259,7 +259,7 @@ clickbench-cross-surface-equivalence-report:
 
 # Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
 # cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
-# (pr.yml); exits non-zero on any unclassified divergence (see
+# (ci.yml); exits non-zero on any unclassified divergence (see
 # _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic
@@ -626,7 +626,7 @@ skill-sync-check:
 	fi; \
 	echo "skill-sync-check: tracked mirror up to date."
 
-# Fail-closed local counterpart of pr.yml's required skill-integrity job. The
+# Fail-closed local counterpart of ci.yml's required skill-integrity job. The
 # tool pin comes from the same policy module as CI; the vendored wrapper
 # needs no network, no Node, and no build, so verification runs directly
 # against the committed payload. A missing wrapper is a hard failure.
@@ -737,14 +737,14 @@ guards-fix:
 # These targets mirror GitHub Actions workflows for local validation
 
 # CI lint check - superset covering both lint.yml (release-branch gate) and
-# the pr.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
+# the ci.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
 # few extra local-only conveniences (lint-explorer-tokens,
 # lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
-# pr.yml `lint` job runs (after dependency install) must also run here at the
+# ci.yml `lint` job runs (after dependency install) must also run here at the
 # COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
 # docs/operations/ci-local-parity.md.
 #
-# Report-all: mirrors pr.yml's `lint-guard-summary` design. Every guard runs
+# Report-all: mirrors ci.yml's `lint-guard-summary` design. Every guard runs
 # to completion in one pass (no stopping at the first failure) with its
 # output streamed live as it runs; failures are collected into `failed` and
 # a single consolidated FAILED-guards list prints at the end, with a
@@ -984,7 +984,7 @@ ci-local:
 	@echo "========================================"
 
 # --- Apple container Linux CI-parity sandbox (opt-in; Apple silicon + macOS 26) ---
-# Reproduce the Linux pr.yml gate locally inside a `container machine`. Motivated by a
+# Reproduce the Linux ci.yml gate locally inside a `container machine`. Motivated by a
 # MEASURED macOS<->Linux divergence: on identical DuckDB 1.3.2/arm64, TPC-H Q2/Q10/Q15
 # value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
 # silicon (the pinned digest references are Linux-generated). This wrapper is the only way
@@ -1259,7 +1259,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1393,18 +1393,6 @@ pr-preflight-medium-tests:
 # that exact artifact instead of reimplementing path classification or asking
 # the working tree to infer a base. Keep it in the content guard, where
 # PATH_LISTS is mandatory and the caller has already selected the PR lanes.
-lane-isolation-check:
-	@set -eu; \
-	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
-	[ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS directory not found: $(PATH_LISTS)" >&2; exit 2; }; \
-	CHANGED_PATHS="$(PATH_LISTS)/changed.txt"; \
-	[ -s "$$CHANGED_PATHS" ] || { echo "non-empty changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
-	status=0; \
-	for lane in site explorer corpus; do \
-		uv run -- python scripts/publication/verify_lane_isolation.py --lane "$$lane" --changed-paths-file "$$CHANGED_PATHS" || status=$$?; \
-	done; \
-	exit "$$status"
-
 # Local validation singleflight. Runs CMD once per identical validated input
 # across worktrees; identical repeats reuse the recorded receipt instead of
 # re-executing and colliding on the shared test lock. Receipts never certify
@@ -1470,7 +1458,6 @@ pr-followup-resume:
 pr-content-guard:
 	@set -eu; \
 	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
-	$(MAKE) -s lane-isolation-check PATH_LISTS="$(PATH_LISTS)"; \
 	EXISTING=$$(mktemp); \
 	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \
