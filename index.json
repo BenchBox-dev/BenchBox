@@ -18421,15 +18421,10 @@
       "title": "Revalidate postgres ambiguous-column tpchavoc skips"
     },
     "tpchavoc-pg-ambiguous-cols-deferral-1": {
-      "claim": {
-        "expires_at": "2026-09-30T15:15:22Z",
-        "generation": "7bdcdb69113b481cbd98ef3973185c07",
-        "renewals": 0,
-        "worker": "jcode-tpchavoc-closeout-recovery"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Run live PostgreSQL probe for qualified TPC-Havoc ambiguous-column queries"
     },
     "tpchavoc-pg-dual-rewrite": {

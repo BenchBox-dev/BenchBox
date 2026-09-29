@@ -30,6 +30,15 @@
       "op": "update",
       "op_id": "3bbbace2dedd41e5a36c74802e0e132c",
       "session_id": "52edd7f7638740259b3dcc97c8045eb5"
+    },
+    {
+      "actor": "jcode-tpchavoc-closeout-recovery",
+      "at": "2026-09-29T15:16:16Z",
+      "client": "jcode",
+      "generation": "7bdcdb69113b481cbd98ef3973185c07",
+      "op": "finish",
+      "op_id": "ba250a852d2c4a2ea52acaece439ac90",
+      "session_id": "52edd7f7638740259b3dcc97c8045eb5"
     }
   ]
 }
