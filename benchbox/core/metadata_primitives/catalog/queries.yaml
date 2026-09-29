@@ -108,7 +108,7 @@ queries:
   variants:
     duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    numeric_precision,\n    numeric_scale\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type IN ('INTEGER', 'BIGINT', 'SMALLINT', 'DECIMAL', 'DOUBLE', 'FLOAT', 'REAL', 'HUGEINT', 'UINTEGER', 'UBIGINT')\nORDER BY table_name, column_name;\n"
     clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    0 AS numeric_precision,\n    0 AS numeric_scale\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND (type LIKE 'Int%' OR type LIKE 'UInt%' OR type LIKE 'Float%' OR type LIKE 'Decimal%')\nORDER BY table, name;\n"
-    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    CAST(NULL AS INT64) AS numeric_precision,\n    CAST(NULL AS INT64) AS numeric_scale\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE data_type IN ('INT64', 'NUMERIC', 'BIGNUMERIC', 'FLOAT64')\nORDER BY table_name, column_name;\n"
+    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    CAST(NULL AS INT64) AS numeric_precision,\n    CAST(NULL AS INT64) AS numeric_scale\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE STARTS_WITH(data_type, 'INT64') OR STARTS_WITH(data_type, 'NUMERIC') OR STARTS_WITH(data_type, 'BIGNUMERIC') OR STARTS_WITH(data_type, 'FLOAT64')\nORDER BY table_name, column_name;\n"
 - id: column_string_columns
   category: column
   description: List all string/text columns
@@ -116,7 +116,7 @@ queries:
   variants:
     duckdb: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    character_maximum_length\nFROM information_schema.columns\nWHERE table_schema NOT IN ('information_schema', 'pg_catalog')\n  AND data_type = 'VARCHAR'\nORDER BY table_name, column_name;\n"
     clickhouse: "SELECT\n    table AS table_name,\n    name AS column_name,\n    type AS data_type,\n    0 AS character_maximum_length\nFROM system.columns\nWHERE database NOT IN ('system', 'INFORMATION_SCHEMA')\n  AND (type = 'String' OR type LIKE 'FixedString%')\nORDER BY table, name;\n"
-    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    CAST(NULL AS INT64) AS character_maximum_length\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE data_type = 'STRING'\nORDER BY table_name, column_name;\n"
+    bigquery: "SELECT\n    table_name,\n    column_name,\n    data_type,\n    CAST(NULL AS INT64) AS character_maximum_length\nFROM INFORMATION_SCHEMA.COLUMNS\nWHERE STARTS_WITH(data_type, 'STRING')\nORDER BY table_name, column_name;\n"
 - id: stats_row_counts
   category: stats
   description: Estimated row counts per table
