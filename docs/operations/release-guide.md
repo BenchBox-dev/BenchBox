@@ -364,15 +364,49 @@ See `release-recovery-v0-3-1` for the worked example of diagnosing a broken
 PyPI-latest release, confirming the fix on `develop`, and cutting the
 recovery version through this same flow.
 
+## Preparing and checking a release on develop
+
+`release-prep` and `release-check` support a flow where the release is an
+ordinary pull request against `develop` and the tag is cut from the merged
+commit. They do not replace `release-cut` and `release-finalize` above.
+
+```bash
+make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
+# hand-curate the [X.Y.Z] section of CHANGELOG.md, then
+make release-check VERSION=X.Y.Z
+```
+
+`release-prep` runs `scripts/update_version.py` (`pyproject.toml`,
+`benchbox/__init__.py`, the documentation release markers, and the landing-page
+badge), then `uv lock`, then `scripts/generate_changelog_entry.py`. The changelog
+lower bound defaults to the newest final `vX.Y.Z` tag; `SINCE_REF` overrides it.
+Commit the changed files as one PR.
+
+`release-check` (`scripts/release_flow.py check`) exits non-zero and lists every
+problem it finds. It verifies that:
+
+- the version in `pyproject.toml`, `benchbox/__init__.py`, the documentation
+  markers, the landing badge, and the `uv.lock` package entry equals `VERSION`;
+- `CHANGELOG.md` has a dated, hand-curated `## [X.Y.Z]` section;
+- the `uv.lock` schema revision was not downgraded
+  (`_project/scripts/check_uv_lock_revision.py`);
+- every top-level path is accounted for (`scripts/check_release_curation.py`);
+- no capped dependency reached its bound
+  (`scripts/check_dependency_bounds.py --fail-on=cap-reached`).
+
+Both targets need the full development tree, because the lock-revision check
+lives under `_project/`.
+
 ## Reference
 
-- Makefile targets: `release-cut`, `release-finalize`.
+- Makefile targets: `release-cut`, `release-finalize`, `release-prep`, `release-check`.
 - Workflow: `.github/workflows/release.yml`.
 - Canary workflow: `.github/workflows/release-canary.yml`.
 - Release-readiness gate: `scripts/release_readiness_check.py`.
 - Ruleset drift gate: `scripts/ruleset_drift_check.py`.
 - Curation drift guard: `scripts/check_release_curation.py` (runs in
   `lint.yml` on every PR).
+- Release preparation and pre-tag check: `scripts/release_flow.py`.
 - Version updater: `scripts/update_version.py`.
 - Changelog generator: `scripts/generate_changelog_entry.py`.
 - Architecture record: `_project/decisions/single-repo-migration.md`

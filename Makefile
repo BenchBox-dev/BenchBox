@@ -1252,6 +1252,20 @@ release-finalize:
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
+# Tag-on-develop release flow. release-prep produces one ordinary PR diff (version
+# markers, uv.lock, CHANGELOG draft); release-check verifies the pre-tag state and
+# runs unchanged in CI. Neither target touches the release-cut path above.
+# Usage: make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
+#        make release-check VERSION=X.Y.Z
+.PHONY: release-prep release-check
+release-prep:
+	@test -n "$(VERSION)" || (echo "Usage: make release-prep VERSION=X.Y.Z" && exit 1)
+	uv run -- python scripts/release_flow.py prep --version "$(VERSION)" $(if $(SINCE_REF),--since-ref "$(SINCE_REF)",)
+
+release-check:
+	@test -n "$(VERSION)" || (echo "Usage: make release-check VERSION=X.Y.Z" && exit 1)
+	uv run -- python scripts/release_flow.py check --version "$(VERSION)"
+
 # =============================================================================
 # PR + worktree workflow
 # Solo-dev develop is PR-gated (CI must be green; linear history; squash).
