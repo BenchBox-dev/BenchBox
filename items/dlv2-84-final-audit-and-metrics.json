@@ -2,7 +2,7 @@
   "acceptance": [
     "Sweep output attached with zero hits outside CHANGELOG/archives",
     "Ledger complete with proofs",
-    "30-day metrics report committed; any missed target has a follow-up item"
+    "Baseline-vs-now metrics snapshot committed (T1/T2 p95, runner queue-wait p95, queue wait, merges/day); the 30-day comparison is a follow-up item with not_before, not a gate"
   ],
   "context": "Use not_before on the metrics portion if the 30-day window has not elapsed.",
   "description": "DECISION GATE closing the program. Run one repository-wide sweep for every deleted workflow, job, script, Make target, label, secret, branch, and config name (list assembled from dlv2-40..83 PRs); confirm the property ledger has no uncovered property; commit the workflow inventory table. After 30 days, compare with the dlv2-01 baseline: T1 p95 <=7 min incl. setup; T2 p95 <=15 min; queue wait p50 <=20 min; develop-red incidents 0; dev-loop workflows reduced to ci, nightly, release (plus retained corpus/publication/todo workflows); Make targets <=90; flake retry rate <2%.",
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "e0e2744f34bc4c5fb0d0698f16e999eb",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:53:05Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "52f3b6c505914374aa422adeb07857f7",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
     }
   ]
 }
