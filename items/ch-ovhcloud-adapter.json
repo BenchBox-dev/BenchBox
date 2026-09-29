@@ -1,0 +1,13 @@
+{
+  "description": "Add the OVHcloud Managed ClickHouse native platform adapter, modeled on ch-altinity-adapter (OVHCloudAdapter(ClickHouseAdapter), key `ovhcloud-clickhouse`, experimental). Covers the European sovereign-cloud angle; OVH publishes provisioning, scaling, and querying guides.\n\nDECISION GATE: proceeds only after ch-tier2-spike records a go for OVHcloud AND wave 1 (Altinity adapter) has landed.\n\nGuardrails: same as Altinity adapter (manifest authority, lazy imports, compat-docs-check, no credentials, 7-10 files).",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:14:28Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "1cabdc50e1b9414e9cdd9417106c8ff3",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

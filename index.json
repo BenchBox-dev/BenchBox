@@ -1973,6 +1973,13 @@
       "status": "open",
       "title": "Add the DoubleCloud Managed ClickHouse native platform adapter"
     },
+    "ch-ovhcloud-adapter": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add the OVHcloud Managed ClickHouse native platform adapter"
+    },
     "ch-tier2-spike": {
       "claim": null,
       "needs": [],
