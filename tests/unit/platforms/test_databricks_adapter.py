@@ -548,8 +548,8 @@ class TestDatabricksAdapter:
             assert isinstance(table_stats, dict)
             assert isinstance(load_time, float)
             assert load_time >= 0
-            assert "TEST_TABLE" in table_stats
-            assert table_stats["TEST_TABLE"] == 100
+            assert "test_table" in table_stats
+            assert table_stats["test_table"] == 100
 
             # Should execute COPY INTO statements without temporary views or insert-select
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -590,7 +590,7 @@ class TestDatabricksAdapter:
 
             stats, load_time, _ = adapter.create_external_tables(benchmark, mock_connection, Path("dbfs:/tmp/data"))
 
-            assert stats["ORDERS"] == 123
+            assert stats["orders"] == 123
             assert load_time >= 0
 
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]

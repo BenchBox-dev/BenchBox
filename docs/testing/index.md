@@ -10,6 +10,7 @@ Documentation for testing BenchBox functionality, including live integration tes
 ## Test Documentation
 
 - [Pytest xdist Safety](../development/pytest-xdist-safety.md) - Why BenchBox caps local xdist workers and how to validate changes
+- [Test tiers and duration budgets](../development/test-tier-policy.md) - Measured T1/T2/T3 policy and quarantine markers
 - [Docker Integration Tests](docker-integration-tests.md) - Running real tests against database engines in Docker containers (free, no credentials)
 - [Live Integration Tests](live-integration-tests.md) - Running integration tests against live cloud database platforms
 

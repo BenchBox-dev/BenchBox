@@ -157,6 +157,7 @@ def test_green_at_is_the_last_required_context_to_finish() -> None:
     # is the maximum completed_at -- not the first context's.
     completed_at = {
         "ci-required-result": "2026-07-21T08:00:00Z",
+        "tooling": "2026-07-22T08:30:00Z",
         "Results Explorer browser gate": "2026-07-23T02:00:00Z",
         "ruleset-drift": "2026-07-22T08:00:00Z",
         "Public-site visual acceptance": "2026-07-22T09:00:00Z",
@@ -168,6 +169,7 @@ def test_green_at_is_the_last_required_context_to_finish() -> None:
 def test_green_at_is_order_independent() -> None:
     completed_at = {
         "ci-required-result": "2026-07-21T08:00:00Z",
+        "tooling": "2026-07-22T08:30:00Z",
         "Results Explorer browser gate": "2026-07-23T02:00:00Z",
         "ruleset-drift": "2026-07-22T08:00:00Z",
         "Public-site visual acceptance": "2026-07-22T09:00:00Z",
@@ -200,6 +202,7 @@ def test_park_time_anchors_on_the_last_required_context() -> None:
         "updated_at": "2026-07-23T02:30:00Z",
         "check_runs": [
             _run("ci-required-result", "success", completed_at="2026-07-21T08:00:00Z"),
+            _run("tooling", "success", completed_at="2026-07-22T08:30:00Z"),
             _run("Results Explorer browser gate", "success", completed_at="2026-07-23T02:00:00Z"),
             _run("ruleset-drift", "success", completed_at="2026-07-22T08:00:00Z"),
             _run("Public-site visual acceptance", "success", completed_at="2026-07-22T09:00:00Z"),

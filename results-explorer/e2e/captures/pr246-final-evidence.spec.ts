@@ -71,20 +71,20 @@ const ROUTES: CaptureRoute[] = [
   },
   ...WIDTHS.map((width) => ({
     baseline: `benchmark-tpch-${width}.png`,
-    url: "/results/tpch/?sf=0.01&phase=standard",
+    url: "/results/tpch/?sf=0.01&phase=power",
     width,
     readyText: /TPC-H Results/i,
     requireQueryNav: width <= 768,
   })),
   {
     baseline: "benchmark-tpch-list-1280.png",
-    url: "/results/tpch/?sf=0.01&phase=standard&view=list",
+    url: "/results/tpch/?sf=0.01&phase=power&view=list",
     width: 1280,
     readyText: /TPC-H Results/i,
   },
   {
     baseline: "benchmark-tpch-high-contrast-1280.png",
-    url: "/results/tpch/?sf=0.01&phase=standard",
+    url: "/results/tpch/?sf=0.01&phase=power",
     width: 1280,
     readyText: /TPC-H Results/i,
     highContrast: true,

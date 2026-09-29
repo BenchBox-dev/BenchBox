@@ -4,10 +4,20 @@ import { basename, join, resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { waitForDataLoaded, waitForShell } from "../support/fixtures";
 
+type BundleQuery = {
+  id?: string;
+  query_id?: string;
+  status?: string;
+  run_type?: string | null;
+  stream?: number | string | null;
+  test_type?: string | null;
+};
+
 type Bundle = {
-  benchmark?: { id?: string; name?: string; scale_factor?: number };
+  benchmark?: { id?: string; name?: string; scale_factor?: number; test_type?: string | null };
+  phases?: { power_test?: unknown; throughput_test?: unknown };
   platform?: { name?: string };
-  queries?: Array<{ id?: string; status?: string }>;
+  queries?: BundleQuery[];
 };
 
 type CorpusRouteSeed = {
@@ -17,6 +27,12 @@ type CorpusRouteSeed = {
   platformId: string;
   platformName: string;
   queryId?: string;
+  /** Bundle test_type ("power" | "throughput" | ...), mirroring the pipeline's _test_type inference. */
+  testType: string | null;
+  /** Distinct stream ids across execution rows; empty when the bundle records none. */
+  streamValues: string[];
+  /** Execution rows the explorer ingests (run_type measurement/warmup/unlabelled), mirroring _query_timings. */
+  executionRows: number;
 };
 
 test.describe("External corpus smoke", () => {
@@ -53,6 +69,43 @@ test.describe("External corpus smoke", () => {
     await waitForDataLoaded(page, /matching run/);
     await expect(page.getByRole("main").getByText(seed.platformName, { exact: true }).first()).toBeVisible();
   });
+
+  test("@uat-external-corpus renders throughput phase and stream data from mounted bundle", async ({ page }) => {
+    const maybeSeed = discoverThroughputSeed();
+    // Only throughput corpora (e.g. the throughput-phase explorer sweep) can
+    // exercise this path; other sweeps skip here and keep the generic route
+    // coverage above.
+    test.skip(maybeSeed === null, "mounted corpus has no throughput bundle");
+    const seed: CorpusRouteSeed = maybeSeed as CorpusRouteSeed;
+
+    await page.goto(`/results/r/${seed.resultId}`);
+    await waitForShell(page);
+    await waitForDataLoaded(
+      page,
+      new RegExp(`${escapeRe(seed.benchmarkName)} result:\\s+${escapeRe(seed.platformName)}`, "i"),
+    );
+
+    // The bundle's test_type must survive the pipeline onto the result page:
+    // subtitle names the phase and the run receipt records it.
+    await expect(page.getByText(/throughput phase/i)).toBeVisible();
+    const receipt = page.locator("#run-receipt");
+    await expect(receipt.getByText("throughput", { exact: true }).first()).toBeVisible();
+
+    // Every per-stream execution in the bundle must reach the page. The
+    // "Individual samples" disclosure counts detail.queries, which the
+    // pipeline fills from all measurement/warmup execution rows, so a dropped
+    // or misclassified stream changes the count. A throughput bundle with
+    // fewer than two recorded streams is a dropped-stream regression, not a
+    // reason to skip.
+    expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
+    await expect(page.getByText(`Individual samples (${seed.executionRows})`)).toBeVisible();
+    // Stream identity must survive onto the page: open the samples disclosure
+    // and require at least two recorded stream ids to appear as cell text.
+    await page.getByText(`Individual samples (${seed.executionRows})`).click();
+    for (const stream of seed.streamValues.slice(0, 2)) {
+      await expect(page.getByRole("cell", { name: stream, exact: true }).first()).toBeVisible();
+    }
+  });
 });
 
 function discoverExternalCorpusSeed(): CorpusRouteSeed {
@@ -69,25 +122,104 @@ function discoverExternalCorpusSeed(): CorpusRouteSeed {
     .sort();
   if (bundleFiles.length === 0) throw new Error(`external corpus has no bundle JSON files: ${bundlesDir}`);
 
+  let first: CorpusRouteSeed | undefined;
   for (const fileName of bundleFiles) {
     const bundle = JSON.parse(readFileSync(join(bundlesDir, fileName), "utf8")) as Bundle;
     const benchmarkId = bundle.benchmark?.id;
     const platformName = bundle.platform?.name;
     if (!benchmarkId || !platformName) continue;
+    const firstQuery = bundle.queries?.find((query) => (query.id ?? query.query_id) && query.status !== "FAILED");
+    const queryId = firstQuery?.id ?? firstQuery?.query_id;
+    const seed: CorpusRouteSeed = {
+      resultId: basename(fileName, ".json"),
+      benchmarkId,
+      benchmarkName: humanizeBenchmark(benchmarkId),
+      platformId: platformId(platformName),
+      platformName,
+      queryId,
+      testType: inferTestType(bundle),
+      streamValues: distinctStreams(bundle.queries),
+      executionRows: countExecutionRows(bundle.queries),
+    };
+    // Prefer a throughput bundle so the throughput-rendering test below has a
+    // seed; otherwise keep the first routable bundle for generic coverage.
+    // NOTE: the throughput test uses discoverThroughputSeed() so this
+    // preference only affects the generic route smoke above.
+    if (seed.testType === "throughput") return seed;
+    first ??= seed;
+  }
+  if (!first) throw new Error(`external corpus has no routable benchmark/platform bundles: ${bundlesDir}`);
+  return first;
+}
+
+/** Dedicated seed for the throughput-rendering test (A3): scans only for a
+ * throughput bundle and never disturbs the generic route smoke's seed
+ * choice. Returns null when no throughput bundle is mounted, letting the
+ * caller skip explicitly. */
+function discoverThroughputSeed(): CorpusRouteSeed | null {
+  const fixtureDir = resolve(
+    process.env.E2E_FIXTURE_DIR ?? join(process.cwd(), "test-fixtures", ".generated", "data"),
+  );
+  const bundlesDir = join(fixtureDir, "bundles");
+  if (!existsSync(bundlesDir)) return null;
+  for (const fileName of readdirSync(bundlesDir).filter((name) => name.endsWith(".json")).sort()) {
+    if (fileName.endsWith(".plans.json")) continue;
+    const bundle = JSON.parse(readFileSync(join(bundlesDir, fileName), "utf8")) as Bundle;
+    if (inferTestType(bundle) !== "throughput") continue;
+    const benchmarkId = bundle.benchmark?.id;
+    const platformName = bundle.platform?.name;
+    if (!benchmarkId || !platformName) continue;
+    const firstQuery = bundle.queries?.find((query) => (query.id ?? query.query_id) && query.status !== "FAILED");
     return {
       resultId: basename(fileName, ".json"),
       benchmarkId,
       benchmarkName: humanizeBenchmark(benchmarkId),
       platformId: platformId(platformName),
       platformName,
-      queryId: bundle.queries?.find((query) => query.id && query.status !== "FAILED")?.id,
+      queryId: firstQuery?.id ?? firstQuery?.query_id,
+      testType: "throughput",
+      streamValues: distinctStreams(bundle.queries),
+      executionRows: countExecutionRows(bundle.queries),
     };
   }
-  throw new Error(`external corpus has no routable benchmark/platform bundles: ${bundlesDir}`);
+  return null;
 }
 
 function platformId(raw: string): string {
   return raw.replace(/[-_]trust[-_](ci|community|local|unknown)/gi, "").trim().toLowerCase().replaceAll(" ", "-");
+}
+
+/** Mirror the explorer pipeline's `_test_type` inference (benchmark.test_type wins, then phases). */
+function inferTestType(bundle: Bundle): string | null {
+  const declared = bundle.benchmark?.test_type;
+  if (declared) return String(declared);
+  if (bundle.phases) {
+    if (bundle.phases.power_test) return "power";
+    if (bundle.phases.throughput_test) return "throughput";
+  }
+  return null;
+}
+
+/** Execution rows the pipeline ingests: measurement, warmup, or unlabelled legacy rows. */
+function isExecutionRow(query: BundleQuery): boolean {
+  return query.run_type === undefined || query.run_type === null || query.run_type === "measurement" ||
+    query.run_type === "warmup";
+}
+
+function distinctStreams(queries: BundleQuery[] | undefined): string[] {
+  const values = new Set<string>();
+  for (const query of queries ?? []) {
+    if (!isExecutionRow(query) || query.stream === undefined || query.stream === null) continue;
+    const text = String(query.stream).trim();
+    // Mirror the pipeline's int(stream) coercion: only numeric stream ids
+    // survive ingestion, so only they can prove multi-stream rendering.
+    if (text !== "" && Number.isInteger(Number(text))) values.add(String(Number(text)));
+  }
+  return [...values].sort();
+}
+
+function countExecutionRows(queries: BundleQuery[] | undefined): number {
+  return (queries ?? []).filter(isExecutionRow).length;
 }
 
 function humanizeBenchmark(raw: string): string {
