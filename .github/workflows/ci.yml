@@ -118,6 +118,12 @@ jobs:
           }
 
           if [ "${{ github.event_name }}" = "merge_group" ]; then
+            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
+              echo "soundness-flag: merge_group payload has no pull_requests; validating merged tree directly" >&2
+              printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+              check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
+              exit 0
+            fi
             printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
             if [ ! -s "$RUNNER_TEMP/merge-group-prs.txt" ]; then
               echo "soundness-flag: merge_group has no pull requests to validate" >&2

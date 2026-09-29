@@ -115,6 +115,7 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     assert "BASE_SHA" in soundness_step["env"]
     assert "gh api --paginate" in soundness_step["run"]
     assert "previous_filename" in soundness_step["run"]
+    assert '"$MERGE_GROUP_PRS" = "null"' in soundness_step["run"]
     assert "trusted-soundness" in soundness_step["run"]
     assert 'git show "${BASE_SHA}:_project/scripts/check_soundness_review.py"' in soundness_step["run"]
     assert "auto_merge_soundness_paths.py" in soundness_step["run"]
