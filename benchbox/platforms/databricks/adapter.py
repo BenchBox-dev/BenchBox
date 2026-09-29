@@ -893,6 +893,15 @@ class DatabricksAdapter(PlatformAdapter):
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
         compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
 
+        # Report the effective session state, not the warehouse default.
+        # The adapter disables the serverless result cache on every session
+        # (SET use_cached_result = false), but the warehouse describe path
+        # reports the account default (true). Override so the bundle label
+        # matches enforced behavior.
+        if isinstance(config, dict):
+            config = dict(config)
+            config["result_cache_enabled"] = not self.disable_result_cache
+
         metadata["platform_deployment"] = self._databricks_deployment_metadata(config, compute)
         metadata["platform_cloud"] = self._databricks_cloud_metadata(config)
         metadata["platform_compute"] = self._databricks_compute_metadata(config, compute)
