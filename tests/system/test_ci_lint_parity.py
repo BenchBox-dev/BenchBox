@@ -240,6 +240,12 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
         "Release parity's Node/npm suite is hosted in this workflow; it is not a "
         "silent omission because the exception names the exact runner surface."
     ),
+    ("ci.yml", "base-guard", "Check base branch"): (
+        "Branch-identity guard with no local equivalent: the check reads the "
+        "hosted PR base ref (`github.base_ref`), which has no meaning in a "
+        "local checkout. The policy itself is pinned by "
+        "tests/unit/workflows/test_stacked_pr_base_guard.py."
+    ),
     ("ci.yml", "skill-integrity", "Run skill policy and instruction audit contracts"): (
         "The hosted contract bundle runs the complete policy/audit test set; the "
         "same tests run as part of the local full preflight rather than a separate "
