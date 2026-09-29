@@ -15,14 +15,18 @@ This document defines the operational architecture, required status check contra
 
 ## 2. Required Status Checks Contract
 
-The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queue/develop/...`) and dispatches GitHub Actions runs under the `merge_group: [checks_requested]` event. Exactly four status checks are required on `develop`:
+The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queue/develop/...`) and dispatches GitHub Actions runs under the `merge_group: [checks_requested]` event. Exactly six status checks are required on `develop`. Each is one always-reporting unit job in `.github/workflows/ci.yml`; `.github/ci-units.yml` maps changed paths to units, an untouched unit reports success, and a touched unit succeeds only when every job it requires succeeded (a skipped required job fails the unit).
 
 | Required Context | Workflow Path | Trigger Events | Contract on `merge_group` |
 |---|---|---|---|
-| `ci-required-result` | `.github/workflows/pr.yml` | `pull_request`, `push`, `merge_group` | Aggregates fast/medium tests, lint, type checks, and parity gates for the speculative tree. The heavy tier (medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, integration samples) runs on `merge_group` for every code-routed tree; `pull_request` runs skip it unless a carve-out applies (soundness paths, packaging paths), and the umbrella models the skip explicitly (success when required, skipped when deferred). |
-| `Results Explorer browser gate` | `.github/workflows/results-explorer-browser.yml` | `pull_request`, `push`, `merge_group` | Always-reporting contract. Runs Chromium on explorer changes; posts success on unaffected paths. |
-| `ruleset-drift` | `.github/workflows/develop-ruleset-drift.yml` | `pull_request`, `push`, `merge_group`, `schedule` | Executes trusted base check to ensure no ruleset mutation occurs. |
-| `Public-site visual acceptance` | `.github/workflows/docs.yml` | `pull_request`, `merge_group` | Always reports. On changed public-site inputs, requires a successful assembled-site build and comparison against the exact protected base SHA. An absent baseline fails closed. |
+| `core` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Lint, type checks, fast tests, and parity gates for the speculative tree. The heavy tier (medium-test, correctness-gate, plan-capture-gate, DataFusion integration, and the macOS and Windows TPC-H binary-framing matrix) runs on `merge_group` for every code-routed tree; `pull_request` runs skip it unless a carve-out applies (soundness paths, packaging paths). The unit models the skip explicitly (success when required, skipped when deferred). |
+| `explorer` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Token scan, Vitest, CLI-versus-explorer parity, the blocking Chromium suite, and the public-site visual comparison on explorer changes. Reports success on unaffected paths. |
+| `results-data` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Corpus inventory and validation, submission validator sync, and corpus contract tests on results-data changes. |
+| `docs` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Sphinx build with warnings as errors, example validation, spell check, docstring coverage, and the visual comparison on docs changes. |
+| `landing` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Site theme token scan and the visual comparison on landing changes. |
+| `tooling` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Every event. Validates soundness review evidence from the immutable base revision and fails closed for malformed or missing review attestations. Also runs the base-branch guard, content guard, skill integrity, audit checks by path, and, in the merge queue, ruleset drift from the trusted base checkout. |
+
+The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA and fails closed when that baseline is absent (see the follower policy below). The baseline is captured by `.github/workflows/docs.yml` on every push to `develop`.
 
 ### Merge-queue follower visual baseline policy
 
@@ -46,10 +50,10 @@ The operator configures the merge queue within the `develop-squash-only` ruleset
   "parameters": {
     "merge_method": "SQUASH",
     "min_entries_to_merge": 1,
-    "max_entries_to_merge": 5,
+    "max_entries_to_merge": 3,
     "grouping_strategy": "ALLGREEN",
     "check_response_timeout_minutes": 60,
-    "max_entries_to_build": 5,
+    "max_entries_to_build": 2,
     "min_entries_to_merge_wait_minutes": 0
   }
 }
@@ -58,12 +62,12 @@ The operator configures the merge queue within the `develop-squash-only` ruleset
 - **`merge_method: SQUASH`**: Guarantees atomic, single-commit integration.
 - **`grouping_strategy: ALLGREEN`**: Groups only entries whose required checks are green.
 - **`check_response_timeout_minutes: 60`**: Provides the live queue timeout while preventing hung runners from stalling the queue.
-- **`max_entries_to_build: 5`** and **`max_entries_to_merge: 5`**: Bound speculative builds and queue merges at five entries each.
+- **`max_entries_to_build: 2`** and **`max_entries_to_merge: 3`**: Bound speculative builds at two entries and queue merges at three. Five parallel groups saturated the organization runner allowance and were ejected with `checks_timed_out`.
 - **`min_entries_to_merge: 1`** and **`min_entries_to_merge_wait_minutes: 0`**: Permit immediate single-entry merges without an artificial wait.
 
-Slow-marked reproducer jobs remain required PR CI through `ci-required-result`.
-Post-merge provides fast and medium lanes but no slow-signature lane, so these
-reproducers must remain in the required PR lane.
+Slow-marked reproducer jobs remain required PR CI through the `core` unit.
+There is no post-merge lane, so these reproducers must remain in the required
+PR lane.
 
 ---
 

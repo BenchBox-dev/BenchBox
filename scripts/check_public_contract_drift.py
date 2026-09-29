@@ -7,7 +7,7 @@ regressed to hand-maintained exact count claims that the contract doc is
 supposed to own instead.
 
 Extracted verbatim (logic byte-equivalent) from the "Public contract drift
-check" inline heredoc step in the `code-lint` (pr.yml `lint` job) job so the
+check" inline heredoc step in the `code-lint` (ci.yml `lint` job) job so the
 same guard can run both in CI and locally via `make ci-lint` /
 `make pr-preflight` without drifting out of sync. See
 docs/operations/ci-local-parity.md for the parity invariant this guard is

@@ -151,10 +151,14 @@ class BenchmarkOrchestrator:
         # the get_data_source_benchmark() instance method (no
         # DATA_SOURCE_BENCHMARK class attribute) were not resolved at
         # construction, so redirect them to the shared root now. Class-attr
-        # sharers were already constructed with it.
+        # sharers were already constructed with it. Benchmarks that generate
+        # their own output (e.g. tpcds_obt, which transforms source data into
+        # a separate OBT table) must keep their own output_dir: redirecting
+        # would hide their generated files from the loader.
         if getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None) is None:
             data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
-            if data_source and self.custom_output_dir is None:
+            generates_own_output = getattr(benchmark_instance, "GENERATES_OWN_OUTPUT", False)
+            if data_source and self.custom_output_dir is None and not generates_own_output:
                 shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
                 benchmark_instance.output_dir = shared_path
 

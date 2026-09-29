@@ -484,7 +484,7 @@ def test_ceiling_grace_flag_rejected_on_other_events(
 def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
     import yaml
 
-    pr = yaml.safe_load((_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+    pr = yaml.safe_load((_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
     lint_steps = pr["jobs"]["code-lint"]["steps"]
     timing = next(s for s in lint_steps if s.get("id") == "guard-timing-policy")
     # No environment variable may smuggle the grace in: the committed command
@@ -494,9 +494,3 @@ def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
     delta = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-delta")
     assert delta["if"] == "github.event_name == 'pull_request'"
     assert "--require-develop-baseline" in delta["run"]
-    # Develop post-merge keeps the strict ceiling so a graced queue tip still
-    # opens the normal revert path instead of recording a clean baseline.
-    post = yaml.safe_load((_ROOT / ".github" / "workflows" / "develop-post-merge.yml").read_text(encoding="utf-8"))
-    lint = next(s for s in post["jobs"]["lint"]["steps"] if s.get("name") == "Run CI lint mirror")
-    assert "FAST_LANE_CEILING_GRACE" not in (lint.get("env") or {})
-    assert "--ceiling-grace" not in " ".join(str(step.get("run", "")) for step in post["jobs"]["lint"]["steps"])

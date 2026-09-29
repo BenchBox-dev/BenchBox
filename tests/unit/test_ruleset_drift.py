@@ -48,10 +48,12 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
 
     assert expected["develop-squash-only"].ref == "refs/heads/develop"
     assert expected["develop-squash-only"].required_checks == (
-        "ci-required-result",
-        "Results Explorer browser gate",
-        "ruleset-drift",
-        "Public-site visual acceptance",
+        "core",
+        "explorer",
+        "results-data",
+        "docs",
+        "landing",
+        "tooling",
     )
     assert expected["develop-squash-only"].strict_required_status_checks_policy is True
     assert expected["release-only"].ref == "refs/heads/release"
@@ -206,7 +208,7 @@ def test_github_api_failure_is_reported_without_traceback(
 
 
 def _live_with_queue(params: dict | None) -> dict:
-    live = _live_ruleset("refs/heads/develop", ["ci-required-result"])
+    live = _live_ruleset("refs/heads/develop", ["core", "tooling"])
     live["name"] = "develop-squash-only"
     if params is not None:
         live["rules"].append({"type": "merge_queue", "parameters": dict(params)})
@@ -219,8 +221,8 @@ def test_merge_queue_approved_params_pass() -> None:
             "merge_method": "SQUASH",
             "grouping_strategy": "ALLGREEN",
             "min_entries_to_merge": 1,
-            "max_entries_to_build": 5,
-            "max_entries_to_merge": 5,
+            "max_entries_to_build": 2,
+            "max_entries_to_merge": 3,
             "check_response_timeout_minutes": 60,
             "min_entries_to_merge_wait_minutes": 0,
         }
@@ -251,7 +253,7 @@ def test_merge_queue_absent_is_warning_only_when_payload_empty() -> None:
 def _verified_develop_queue() -> dict:
     live = _live_ruleset(
         "refs/heads/develop",
-        ["ci-required-result", "Results Explorer browser gate", "ruleset-drift", "Public-site visual acceptance"],
+        ["core", "explorer", "results-data", "docs", "landing", "tooling"],
         strict=True,
     )
     live["name"] = "develop-squash-only"

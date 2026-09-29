@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "8ad3bb2e8670b481a6ebed8e5116a415201b1d7c2fa4673a0f06a2146185a30b",
+  "contract_sha256": "f11b33d531d5451eb8feb4532be42ab43e154c27507a1e24c29f200eb799876b",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -78,7 +78,6 @@
     "install",
     "joinorder-synthetic-cross-surface-equivalence-report",
     "joinorder-verify-reference-results",
-    "lane-isolation-check",
     "lint",
     "lint-explorer-tokens",
     "lint-imports",
@@ -180,7 +179,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 210,
+  "public_target_count": 209,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -247,7 +246,6 @@
     "install",
     "joinorder-synthetic-cross-surface-equivalence-report",
     "joinorder-verify-reference-results",
-    "lane-isolation-check",
     "lint",
     "lint-explorer-stale-theme",
     "lint-explorer-tokens",
@@ -935,8 +933,8 @@
     "help": [
       {
         "header": "help:",
-        "recipe": "\t@echo \"BenchBox Makefile\"\n\t@echo \"----------------\"\n\t@echo \"Available commands:\"\n\t@echo \"\"\n\t@echo \"Core Testing:\"\n\t@echo \"  make test            Run default test suite (fast tests)\"\n\t@echo \"  make test-all        Run all tests\"\n\t@echo \"  make test-unit       Run unit tests only\"\n\t@echo \"  make test-integration Run integration tests only\"\n\t@echo \"  make test-tpch       Run TPC-H tests only\"\n\t@echo \"  make test-quick      Run quick tests without slow operations\"\n\t@echo \"  make test-verbose    Run tests with verbose output\"\n\t@echo \"\"\n\t@echo \"Speed-Based Testing:\"\n\t@echo \"  make test-pytest     Run all tests with pytest\"\n\t@echo \"  make test-fast       Run fast tests (< 1 sec)\"\n\t@echo \"  make test-medium     Run medium speed tests (1-10 sec)\"\n\t@echo \"  make test-slow       Run slow tests (> 10 sec)\"\n\t@echo \"  make test-dev        Fast development cycle testing\"\n\t@echo \"  make test-smoke      Quick smoke testing\"\n\t@echo \"  make test-correctness-gate Run bounded real-result correctness gate\"\n\t@echo \"  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)\"\n\t@echo \"  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL\"\n\t@echo \"  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion\"\n\t@echo \"  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse\"\n\t@echo \"  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H\"\n\t@echo \"  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface\"\n\t@echo \"  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface\"\n\t@echo \"  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface\"\n\t@echo \"  make test-local-matrix Run real local benchmark matrix (stress)\"\n\t@echo \"  make test-ci         Maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"Database-Specific Testing:\"\n\t@echo \"  make test-duckdb     Run DuckDB-specific tests\"\n\t@echo \"  make test-sqlite     Run SQLite-specific tests\"\n\t@echo \"\"\n\t@echo \"Benchmark-Specific Testing:\"\n\t@echo \"  make test-read-primitives Run primitives benchmark tests\"\n\t@echo \"  make test-benchmarks Run all benchmark tests\"\n\t@echo \"  make test-tpcds      Run TPC-DS tests\"\n\t@echo \"\"\n\t@echo \"Feature-Specific Testing:\"\n\t@echo \"  make test-olap       Run OLAP functionality tests\"\n\t@echo \"  make test-window     Run window functions tests\"\n\t@echo \"\"\n\t@echo \"CI/CD Testing:\"\n\t@echo \"  make test-ci         Run maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"CI Local Equivalents (run before push):\"\n\t@echo \"  make ci-local        Run ALL CI checks locally (lint+test+docs+package)\"\n\t@echo \"  make ci-lint         Lint + format check + type check (matches lint.yml)\"\n\t@echo \"  make ci-test         Fast tests with coverage (matches test.yml)\"\n\t@echo \"  make ci-docs         Build documentation (matches docs.yml)\"\n\t@echo \"  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)\"\n\t@echo \"  make test-integration-smoke  Integration smoke tests\"\n\t@echo \"  make test-package    Build and test package installation\"\n\t@echo \"  make security-audit  Run pip-audit security check\"\n\t@echo \"  make spellcheck      Run codespell on codebase\"\n\t@echo \"  make docstring-coverage  Check docstring coverage with interrogate\"\n\t@echo \"  make complexity-check    Check cyclomatic complexity (fails on violations)\"\n\t@echo \"  make complexity-report   Report cyclomatic complexity (no failure)\"\n\t@echo \"\"\n\t@echo \"Parallel Testing:\"\n\t@echo \"  make test-parallel   Run tests in parallel\"\n\t@echo \"  make test-parallel-fast Run fast tests in parallel\"\n\t@echo \"\"\n\t@echo \"Live Integration Testing (requires cloud credentials):\"\n\t@echo \"  make test-live       Run all live integration tests\"\n\t@echo \"  make test-live-databricks Run Databricks live tests\"\n\t@echo \"  make test-live-snowflake  Run Snowflake live tests\"\n\t@echo \"  make test-live-bigquery   Run BigQuery live tests\"\n\t@echo \"  make test-live-all   Run all live tests (all platforms)\"\n\t@echo \"\"\n\t@echo \"Utility:\"\n\t@echo \"  make run-test TEST=path Run a specific test file\"\n\t@echo \"\"\n\t@echo \"UAT Operations:\"\n\t@echo \"  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands\"\n\t@echo \"  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers\"\n\t@echo \"  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store\"\n\t@echo \"\"\n\t@echo \"Coverage:\"\n\t@echo \"  make coverage-fast   Run fast-marked tests with coverage (quick feedback)\"\n\t@echo \"  make coverage-all    Run routine coverage (excludes stress/resource-heavy/live tests)\"\n\t@echo \"  make coverage-opt-in-all Run full tree incl. stress/resource-heavy/live (needs services+creds)\"\n\t@echo \"  make coverage-html   Generate HTML coverage report\"\n\t@echo \"  make coverage-report Generate comprehensive coverage reports\"\n\t@echo \"\"\n\t@echo \"Development:\"\n\t@echo \"  make lint            Check code style\"\n\t@echo \"  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)\"\n\t@echo \"  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)\"\n\t@echo \"  make typecheck       Run type checking with ty\"\n\t@echo \"  make typecheck-uv    Run type checking with uv (development)\"\n\t@echo \"  make validate-imports Validate import structure and detect circular dependencies\"\n\t@echo \"  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)\"\n\t@echo \"  make duplicate-check Detect duplicate code via AST structural hashing\"\n\t@echo \"  make duplicate-check-delta  Fail if duplicated lines rose vs merge-base\"\n\t@echo \"  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status\"\n\t@echo \"  make makefile-inventory-check Verify public Make contract inventory and ordering\"\n\t@echo \"  make mutation-test   Run mutation testing on critical modules (mutmut)\"\n\t@echo \"  make format          Format code with ruff\"\n\t@echo \"  make clean           Remove build artifacts\"\n\t@echo \"  make install         Install the package\"\n\t@echo \"  make develop         Install the package in development mode\"\n\t@echo \"  make dist            Create distribution packages\"\n\t@echo \"  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)\"\n\t@echo \"\"\n\t@echo \"Documentation:\"\n\t@echo \"  make docs-build      Build Sphinx documentation locally\"\n\t@echo \"  make docs-serve      Build and serve docs at http://localhost:8000\"\n\t@echo \"  make docs-clean      Clean documentation build artifacts\"\n\t@echo \"  make docs-linkcheck  Check for broken links in documentation\"\n\t@echo \"  make docs-validate   Validate example references, syntax, and screenshot sync\"\n\t@echo \"  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies\"\n\t@echo \"  make docs-check      Run all documentation checks (validate, linkcheck, build)\"\n\t@echo \"\"\n\t@echo \"PR Workflow & Worktrees:\"\n\t@echo \"  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden\"\n\t@echo \"  make pr-preflight    Run classifier-selected product/skill integrity checks (coverage remains CI-only)\"\n\t@echo \"  make pr-open [PR_BODY_FILE=path] [READY=1] [STALE=1]  Push branch + open PR vs develop (READY=1 arms only a reused reviewed PR; new PRs stay held)\"\n\t@echo \"  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)\"\n\t@echo \"  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))\"\n\t@echo \"  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop\"\n\t@echo \"  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (READY=1 arms only a reused reviewed PR)\"\n\t@echo \"  make pr-status       List your open PRs vs develop with CI + auto-merge state\"\n\t@echo \"  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs\"\n\t@echo \"  make pr-review-followups             Action each comment, reply with marker, submit PR\"\n\t@echo \"  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))\"\n\t@echo \"Disposable worktree lifecycle:\"\n\t@echo \"  make worktree-create BRANCH=name WORKTREE_PATH=path  Create from origin/develop; verify local/remote branch collisions\"\n\t@echo \"  make worktree-remove WORKTREE_PATH=path              Remove an exact clean, attached, unlocked worktree\"\n\t@echo \"  make worktree-release WORKTREE_PATH=path             Record manual owner release for caller-owned worktree (non-destructive)\"\n\t@echo \"  make worktree-finish WORKTREE_PATH=path EXPECTED_HEAD_OID=oid [FORMAT=json] [APPLY=1]  Preview single-target removal and ref deletion (APPLY=1 executes)\"\n\t@echo \"  make worktree-list                                   List registered worktrees\"\n\t@echo \"  make worktree-audit [FORMAT=json]                    Read-only inventory and lifecycle audit of worktrees and branches\"\n\t@echo \"  make branch-prune-merged [DRY_RUN=1]                 Delete worktree-less branches at a proven merge-time PR head (requires gh)\"\n\t@echo \"\"\n\t@echo \"Blind-Spot Findings (see _project/blind-spots/README.md):\"\n\t@echo \"  make blind-spots-list   List open findings (one row each)\"\n\t@echo \"  make blind-spots-report Counts by status + kind, oldest active first\"\n\t@echo \"  make blind-spots-sweep  Alias for blind-spots-report\"\n\t@echo \"\"\n\t@echo \"Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):\"\n\t@echo \"  make soundness-drain-report     Read-only local digest of parked soundness-path PRs\"\n\t@echo \"  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)\"\n\t@echo \"\"\n\t@echo \"Release Workflow (2-command flow; see docs/operations/release-guide.md):\"\n\t@echo \"  make release-cut VERSION=X.Y.Z      Cut v\\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)\"\n\t@echo \"  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\\$$VERSION cut and return to develop\"\n\t@echo \"  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag\"\n\t@echo \"\"\n\t@echo \"  make help            Show this help message\"",
-        "recipe_sha256": "c32184d5b6f02b6b5f99913789ef6b2c125ea19b49685829a9d46e64d8432069"
+        "recipe": "\t@echo \"BenchBox Makefile\"\n\t@echo \"----------------\"\n\t@echo \"Available commands:\"\n\t@echo \"\"\n\t@echo \"Core Testing:\"\n\t@echo \"  make test            Run default test suite (fast tests)\"\n\t@echo \"  make test-all        Run all tests\"\n\t@echo \"  make test-unit       Run unit tests only\"\n\t@echo \"  make test-integration Run integration tests only\"\n\t@echo \"  make test-tpch       Run TPC-H tests only\"\n\t@echo \"  make test-quick      Run quick tests without slow operations\"\n\t@echo \"  make test-verbose    Run tests with verbose output\"\n\t@echo \"\"\n\t@echo \"Speed-Based Testing:\"\n\t@echo \"  make test-pytest     Run all tests with pytest\"\n\t@echo \"  make test-fast       Run fast tests (< 1 sec)\"\n\t@echo \"  make test-medium     Run medium speed tests (1-10 sec)\"\n\t@echo \"  make test-slow       Run slow tests (> 10 sec)\"\n\t@echo \"  make test-dev        Fast development cycle testing\"\n\t@echo \"  make test-smoke      Quick smoke testing\"\n\t@echo \"  make test-correctness-gate Run bounded real-result correctness gate\"\n\t@echo \"  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)\"\n\t@echo \"  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL\"\n\t@echo \"  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion\"\n\t@echo \"  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse\"\n\t@echo \"  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H\"\n\t@echo \"  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface\"\n\t@echo \"  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface\"\n\t@echo \"  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface\"\n\t@echo \"  make test-local-matrix Run real local benchmark matrix (stress)\"\n\t@echo \"  make test-ci         Maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"Database-Specific Testing:\"\n\t@echo \"  make test-duckdb     Run DuckDB-specific tests\"\n\t@echo \"  make test-sqlite     Run SQLite-specific tests\"\n\t@echo \"\"\n\t@echo \"Benchmark-Specific Testing:\"\n\t@echo \"  make test-read-primitives Run primitives benchmark tests\"\n\t@echo \"  make test-benchmarks Run all benchmark tests\"\n\t@echo \"  make test-tpcds      Run TPC-DS tests\"\n\t@echo \"\"\n\t@echo \"Feature-Specific Testing:\"\n\t@echo \"  make test-olap       Run OLAP functionality tests\"\n\t@echo \"  make test-window     Run window functions tests\"\n\t@echo \"\"\n\t@echo \"CI/CD Testing:\"\n\t@echo \"  make test-ci         Run maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"CI Local Equivalents (run before push):\"\n\t@echo \"  make ci-local        Run ALL CI checks locally (lint+test+docs+package)\"\n\t@echo \"  make ci-lint         Lint + format check + type check (matches lint.yml)\"\n\t@echo \"  make ci-test         Fast tests with coverage (matches test.yml)\"\n\t@echo \"  make ci-docs         Build documentation (matches docs.yml)\"\n\t@echo \"  make ci-linux        Reproduce the Linux ci.yml gate in Apple container (Apple silicon, opt-in)\"\n\t@echo \"  make test-integration-smoke  Integration smoke tests\"\n\t@echo \"  make test-package    Build and test package installation\"\n\t@echo \"  make security-audit  Run pip-audit security check\"\n\t@echo \"  make spellcheck      Run codespell on codebase\"\n\t@echo \"  make docstring-coverage  Check docstring coverage with interrogate\"\n\t@echo \"  make complexity-check    Check cyclomatic complexity (fails on violations)\"\n\t@echo \"  make complexity-report   Report cyclomatic complexity (no failure)\"\n\t@echo \"\"\n\t@echo \"Parallel Testing:\"\n\t@echo \"  make test-parallel   Run tests in parallel\"\n\t@echo \"  make test-parallel-fast Run fast tests in parallel\"\n\t@echo \"\"\n\t@echo \"Live Integration Testing (requires cloud credentials):\"\n\t@echo \"  make test-live       Run all live integration tests\"\n\t@echo \"  make test-live-databricks Run Databricks live tests\"\n\t@echo \"  make test-live-snowflake  Run Snowflake live tests\"\n\t@echo \"  make test-live-bigquery   Run BigQuery live tests\"\n\t@echo \"  make test-live-all   Run all live tests (all platforms)\"\n\t@echo \"\"\n\t@echo \"Utility:\"\n\t@echo \"  make run-test TEST=path Run a specific test file\"\n\t@echo \"\"\n\t@echo \"UAT Operations:\"\n\t@echo \"  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands\"\n\t@echo \"  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers\"\n\t@echo \"  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store\"\n\t@echo \"\"\n\t@echo \"Coverage:\"\n\t@echo \"  make coverage-fast   Run fast-marked tests with coverage (quick feedback)\"\n\t@echo \"  make coverage-all    Run routine coverage (excludes stress/resource-heavy/live tests)\"\n\t@echo \"  make coverage-opt-in-all Run full tree incl. stress/resource-heavy/live (needs services+creds)\"\n\t@echo \"  make coverage-html   Generate HTML coverage report\"\n\t@echo \"  make coverage-report Generate comprehensive coverage reports\"\n\t@echo \"\"\n\t@echo \"Development:\"\n\t@echo \"  make lint            Check code style\"\n\t@echo \"  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)\"\n\t@echo \"  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)\"\n\t@echo \"  make typecheck       Run type checking with ty\"\n\t@echo \"  make typecheck-uv    Run type checking with uv (development)\"\n\t@echo \"  make validate-imports Validate import structure and detect circular dependencies\"\n\t@echo \"  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)\"\n\t@echo \"  make duplicate-check Detect duplicate code via AST structural hashing\"\n\t@echo \"  make duplicate-check-delta  Fail if duplicated lines rose vs merge-base\"\n\t@echo \"  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status\"\n\t@echo \"  make makefile-inventory-check Verify public Make contract inventory and ordering\"\n\t@echo \"  make mutation-test   Run mutation testing on critical modules (mutmut)\"\n\t@echo \"  make format          Format code with ruff\"\n\t@echo \"  make clean           Remove build artifacts\"\n\t@echo \"  make install         Install the package\"\n\t@echo \"  make develop         Install the package in development mode\"\n\t@echo \"  make dist            Create distribution packages\"\n\t@echo \"  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)\"\n\t@echo \"\"\n\t@echo \"Documentation:\"\n\t@echo \"  make docs-build      Build Sphinx documentation locally\"\n\t@echo \"  make docs-serve      Build and serve docs at http://localhost:8000\"\n\t@echo \"  make docs-clean      Clean documentation build artifacts\"\n\t@echo \"  make docs-linkcheck  Check for broken links in documentation\"\n\t@echo \"  make docs-validate   Validate example references, syntax, and screenshot sync\"\n\t@echo \"  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies\"\n\t@echo \"  make docs-check      Run all documentation checks (validate, linkcheck, build)\"\n\t@echo \"\"\n\t@echo \"PR Workflow & Worktrees:\"\n\t@echo \"  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden\"\n\t@echo \"  make pr-preflight    Run classifier-selected product/skill integrity checks (coverage remains CI-only)\"\n\t@echo \"  make pr-open [PR_BODY_FILE=path] [READY=1] [STALE=1]  Push branch + open PR vs develop (READY=1 arms only a reused reviewed PR; new PRs stay held)\"\n\t@echo \"  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)\"\n\t@echo \"  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))\"\n\t@echo \"  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop\"\n\t@echo \"  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (READY=1 arms only a reused reviewed PR)\"\n\t@echo \"  make pr-status       List your open PRs vs develop with CI + auto-merge state\"\n\t@echo \"  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs\"\n\t@echo \"  make pr-review-followups             Action each comment, reply with marker, submit PR\"\n\t@echo \"  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))\"\n\t@echo \"Disposable worktree lifecycle:\"\n\t@echo \"  make worktree-create BRANCH=name WORKTREE_PATH=path  Create from origin/develop; verify local/remote branch collisions\"\n\t@echo \"  make worktree-remove WORKTREE_PATH=path              Remove an exact clean, attached, unlocked worktree\"\n\t@echo \"  make worktree-release WORKTREE_PATH=path             Record manual owner release for caller-owned worktree (non-destructive)\"\n\t@echo \"  make worktree-finish WORKTREE_PATH=path EXPECTED_HEAD_OID=oid [FORMAT=json] [APPLY=1]  Preview single-target removal and ref deletion (APPLY=1 executes)\"\n\t@echo \"  make worktree-list                                   List registered worktrees\"\n\t@echo \"  make worktree-audit [FORMAT=json]                    Read-only inventory and lifecycle audit of worktrees and branches\"\n\t@echo \"  make branch-prune-merged [DRY_RUN=1]                 Delete worktree-less branches at a proven merge-time PR head (requires gh)\"\n\t@echo \"\"\n\t@echo \"Blind-Spot Findings (see _project/blind-spots/README.md):\"\n\t@echo \"  make blind-spots-list   List open findings (one row each)\"\n\t@echo \"  make blind-spots-report Counts by status + kind, oldest active first\"\n\t@echo \"  make blind-spots-sweep  Alias for blind-spots-report\"\n\t@echo \"\"\n\t@echo \"Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):\"\n\t@echo \"  make soundness-drain-report     Read-only local digest of parked soundness-path PRs\"\n\t@echo \"  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)\"\n\t@echo \"\"\n\t@echo \"Release Workflow (2-command flow; see docs/operations/release-guide.md):\"\n\t@echo \"  make release-cut VERSION=X.Y.Z      Cut v\\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)\"\n\t@echo \"  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\\$$VERSION cut and return to develop\"\n\t@echo \"  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag\"\n\t@echo \"\"\n\t@echo \"  make help            Show this help message\"",
+        "recipe_sha256": "f678f96836aa62a23f86a59ff6d5f8e65e28ba5f3a04d3c7ed4acd7b0eabfbac"
       }
     ],
     "install": [
@@ -963,13 +961,6 @@
         "header": "joinorder-verify-reference-results:",
         "recipe": "\t@[ -n \"$(JOINORDER_POSTGRES_CONTAINER)\" ] || { echo \"JOINORDER_POSTGRES_CONTAINER is required\"; exit 2; }\n\tuv run -- python _project/scripts/build_joinorder_data.py verify-reference-results \\\n\t\t--work-dir \"$(JOINORDER_BUILD_DIR)\" \\\n\t\t--container-name \"$(JOINORDER_POSTGRES_CONTAINER)\" \\\n\t\t--database \"$(JOINORDER_POSTGRES_DB)\" \\\n\t\t--user \"$(JOINORDER_POSTGRES_USER)\" \\\n\t\t--queries \"$(JOINORDER_QUERIES)\" \\\n\t\t--reference \"$(JOINORDER_REFERENCE)\"",
         "recipe_sha256": "87bbf7c5de6e22f6788e843d2951693a8111ccd18a251f10bfe869c3e0b74697"
-      }
-    ],
-    "lane-isolation-check": [
-      {
-        "header": "lane-isolation-check:",
-        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t[ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS directory not found: $(PATH_LISTS)\" >&2; exit 2; }; \\\n\tCHANGED_PATHS=\"$(PATH_LISTS)/changed.txt\"; \\\n\t[ -s \"$$CHANGED_PATHS\" ] || { echo \"non-empty changed paths artifact is required: $$CHANGED_PATHS\" >&2; exit 2; }; \\\n\tstatus=0; \\\n\tfor lane in site explorer corpus; do \\\n\t\tuv run -- python scripts/publication/verify_lane_isolation.py --lane \"$$lane\" --changed-paths-file \"$$CHANGED_PATHS\" || status=$$?; \\\n\tdone; \\\n\texit \"$$status\"",
-        "recipe_sha256": "b9651bb15acae4b71b0156017e73a1a628bc0e5cf5521bd0bf2129f3974dc957"
       }
     ],
     "lint": [
@@ -1155,8 +1146,8 @@
     "pr-content-guard": [
       {
         "header": "pr-content-guard:",
-        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\t$(MAKE) -s lane-isolation-check PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
-        "recipe_sha256": "cd02ad344fbfcce49a1e754474ebfc61c70564645e0a7a31d929a505f62307e1"
+        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
+        "recipe_sha256": "b9839e93c557002a76da26cfcb22f9135a30e5d87658a2728b2c44e9f44f7f20"
       }
     ],
     "pr-fanout": [
@@ -1475,8 +1466,8 @@
     "test-all": [
       {
         "header": "test-all:",
-        "recipe": "\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tuv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tuv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
-        "recipe_sha256": "934b5dd7638f8a21cf7288c27f2a3f06938b6ceba72e430214841e15771987fe"
+        "recipe": "\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
+        "recipe_sha256": "96fd11bcecfea74bbac47efb514a77c467c4585d0e15af3724ff3531032c7f9c"
       }
     ],
     "test-benchmarks": [
@@ -1503,8 +1494,8 @@
     "test-dev": [
       {
         "header": "test-dev:",
-        "recipe": "\tuv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3 --timeout=120",
-        "recipe_sha256": "cd32b99fb28399f0aa8eb9c52a749780d4f1f531c1750fdc3e49aed58419a860"
+        "recipe": "\tBENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3 --timeout=120",
+        "recipe_sha256": "12c58e69865fa1e285a556e8b2dec39d534fa5d3aa6520eac75f3f41e5025a35"
       }
     ],
     "test-docker-%": [
@@ -1599,8 +1590,8 @@
     "test-fast": [
       {
         "header": "test-fast:",
-        "recipe": "\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
-        "recipe_sha256": "c2436d9fab2248df50bc4e7eca6edd1fb84a00397b64591bae1e42cfebca4dd8"
+        "recipe": "\tBENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
+        "recipe_sha256": "4abff852f75829a969da6f3bc9729beaf5a83616d45f7c35d63a3e1aefdf56b7"
       }
     ],
     "test-full": [
@@ -1613,8 +1604,8 @@
     "test-integration": [
       {
         "header": "test-integration:",
-        "recipe": "\tuv run -- python -m pytest -m \"integration and not live_integration and not stress\" --tb=short",
-        "recipe_sha256": "6aeb6a82c0701ec87eeae39870faa3f9cc5eee8d9996d322eaad7fe359eaf6ab"
+        "recipe": "\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"integration and not live_integration and not stress\" --tb=short",
+        "recipe_sha256": "0e6d7f0528676b3c6d86a685e63bc65622e8fc9a4fcc3eb2032d8d055eec93aa"
       }
     ],
     "test-integration-smoke": [
@@ -1732,15 +1723,15 @@
     "test-medium": [
       {
         "header": "test-medium:",
-        "recipe": "\tuv run -- python -m pytest -m \"medium and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=60 -n 5",
-        "recipe_sha256": "c610a9c46bfb9d737421919e1f45f2fcced8fa1e60c360e453517bfab955b1cd"
+        "recipe": "\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"medium and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=60 -n 5",
+        "recipe_sha256": "3b86d9398e6438d45a0c10af765361b654501e53721a1b396ed9ffa1be6b8373"
       }
     ],
     "test-medium-selected": [
       {
         "header": "test-medium-selected:",
-        "recipe": "\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tuv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
-        "recipe_sha256": "b3ba910e659e37a1aca7b2efd7958c61194a3bb843b43395e8ee0f3e9ecbb232"
+        "recipe": "\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tBENCHBOX_TEST_TIER=t2 uv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
+        "recipe_sha256": "db51f76459d62659ddf513e9ad05500204d7edd30f5832d7526d5bf4ea216cb9"
       }
     ],
     "test-no-cloud": [
@@ -1788,15 +1779,15 @@
     "test-pytest": [
       {
         "header": "test-pytest:",
-        "recipe": "\tuv run -- python -m pytest -m \"not stress\"",
-        "recipe_sha256": "b3df72f3358d40a4eb99390b11499819ff01848480eafcd44f6eae02638c8ab7"
+        "recipe": "\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"not stress\"",
+        "recipe_sha256": "f655dd3a4377bab22b2e28ad75cbe71e99c9b8aced58cb400c693a40e948fa97"
       }
     ],
     "test-quick": [
       {
         "header": "test-quick:",
-        "recipe": "\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5 --timeout=120",
-        "recipe_sha256": "21c3ddb117a0f815c3505983a5d36f56d227274dfc4f7a87ca4ebdbb138f9bf9"
+        "recipe": "\tBENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5 --timeout=120",
+        "recipe_sha256": "cf684bae5951e5cc38e4a2dcdd87ee46c054ae5b07111d55a0c1942bc3dddec6"
       }
     ],
     "test-read-primitives": [
@@ -1809,8 +1800,8 @@
     "test-slow": [
       {
         "header": "test-slow:",
-        "recipe": "\tuv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
-        "recipe_sha256": "0b91dfe255f023f6d6b79e66f3bfc11da57e313726f4073bc91f7767df7e46db"
+        "recipe": "\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
+        "recipe_sha256": "1a0f161430cdc62dc500d57ed4e68cac1b110839c72ac0b14d613615381b1383"
       }
     ],
     "test-smoke": [
@@ -1830,8 +1821,8 @@
     "test-stress": [
       {
         "header": "test-stress:",
-        "recipe": "\tuv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v --timeout=1800",
-        "recipe_sha256": "45cccb9bf979749e2725426908e6fdc8c585a2d2de68b1c2c9aa191e286103a2"
+        "recipe": "\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v --timeout=1800",
+        "recipe_sha256": "5da6b42e86cc09acd0df75d2a4e38c74c440668804bc5cac7f65482baeaaab79"
       }
     ],
     "test-tpcds": [
@@ -1844,15 +1835,15 @@
     "test-tpch": [
       {
         "header": "test-tpch:",
-        "recipe": "\tuv run -- python -m pytest -m \"tpch\" --tb=short",
-        "recipe_sha256": "524715a0b4d554ccee6e1c72b20d6a1abbdc7ab71aff83abffaf487fe19472d6"
+        "recipe": "\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"tpch\" --tb=short",
+        "recipe_sha256": "c0cefc0157545e7a12a9598ceb33e4b2cd419e0471366cb3eb412722ca0df7ef"
       }
     ],
     "test-unit": [
       {
         "header": "test-unit:",
-        "recipe": "\tuv run -- python -m pytest -m \"unit\" --tb=short",
-        "recipe_sha256": "d75140ba122a2778d74869bba670f5bea4bfa9c1eab1217d40967fe030197425"
+        "recipe": "\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"unit\" --tb=short",
+        "recipe_sha256": "a2fbfbb37810be21f40992071eb5ab7c004b66a0ef6f31b59c05e01cc91aa832"
       }
     ],
     "test-unlock": [
@@ -1865,8 +1856,8 @@
     "test-verbose": [
       {
         "header": "test-verbose:",
-        "recipe": "\tuv run -- python -m pytest -v",
-        "recipe_sha256": "661ec6c246067e77a8378ea2d7b3b1f927c763a2ecb53da3e18c312ac79ce5b8"
+        "recipe": "\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v",
+        "recipe_sha256": "c0386ae81cadb4386663871f9c9580f66acfe0a7b039ac184989e07170243406"
       }
     ],
     "test-window": [
@@ -2148,7 +2139,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "d71ce55c15a691630f0c26963b743bba8ee55d2fba33dcc52bf742627e82f4d8",
+  "semantic_sha256": "f4dd69bf6348c3c4591343e56d8b62ad7fc5ed8298d708aa4f4dd24fdf8b28c6",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2377,65 +2368,65 @@
       ]
     },
     {
-      "body": "test-all:\n\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tuv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tuv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
+      "body": "test-all:\n\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
       "kind": "rule",
-      "sha256": "0ad0497cf5911710df528314fea71db989f8b7f469d823cad7aa52a11cc03d96",
+      "sha256": "1f50fbdfb13554b932637fc3cfc583e018967bb4b58d08a03a1e1c7d721ff727",
       "targets": [
         "test-all"
       ]
     },
     {
-      "body": "test-unit:\n\tuv run -- python -m pytest -m \"unit\" --tb=short",
+      "body": "test-unit:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"unit\" --tb=short",
       "kind": "rule",
-      "sha256": "d33ccf406d448e9e722ddfe33dae6973277fe9d4f3ebd525570861777f25eb3c",
+      "sha256": "352d4165c9ad3caf79de9f8e50de7b77748a3739f44d8285c1e360e6d4f2985f",
       "targets": [
         "test-unit"
       ]
     },
     {
-      "body": "test-integration:\n\tuv run -- python -m pytest -m \"integration and not live_integration and not stress\" --tb=short",
+      "body": "test-integration:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"integration and not live_integration and not stress\" --tb=short",
       "kind": "rule",
-      "sha256": "7ec856bdeb7b49633fb565e1d6a18a07da7c068f3e5506b6db5a60b6cc2a8804",
+      "sha256": "cf0b471bff195d054677ce571522bcdee0f582a20e8bf89b16fd9e75664f94f0",
       "targets": [
         "test-integration"
       ]
     },
     {
-      "body": "test-tpch:\n\tuv run -- python -m pytest -m \"tpch\" --tb=short",
+      "body": "test-tpch:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"tpch\" --tb=short",
       "kind": "rule",
-      "sha256": "7a9f1c1c5ed52464f2025822a3d1b9799944f095aa7a604135f3d43823abfa78",
+      "sha256": "a72715731f1fc5f8abb6de5375c561f13ab1dae46c392ed7f7084f61bc68cad9",
       "targets": [
         "test-tpch"
       ]
     },
     {
-      "body": "test-quick:\n\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5 --timeout=120",
+      "body": "test-quick:\n\tBENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=5 --timeout=120",
       "kind": "rule",
-      "sha256": "17951970b9098576d5878194b14fde3408c9aa27df9d45b8661f4cb8b3236eac",
+      "sha256": "7c10fa51eb7197835ea253249b02be9859d03bc749fae3708536ca0a52f567ad",
       "targets": [
         "test-quick"
       ]
     },
     {
-      "body": "test-verbose:\n\tuv run -- python -m pytest -v",
+      "body": "test-verbose:\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v",
       "kind": "rule",
-      "sha256": "97dbaced1657c22eef60c5139b2b965885a8b858aadf58c54c48ef39596f7645",
+      "sha256": "630acbee712791d114f9215ca3407b0b80c39b00015845245a1917f7499fd7a1",
       "targets": [
         "test-verbose"
       ]
     },
     {
-      "body": "test-pytest:\n\tuv run -- python -m pytest -m \"not stress\"",
+      "body": "test-pytest:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"not stress\"",
       "kind": "rule",
-      "sha256": "68ddbeccc25e4ed21ad106223afc1d46171b7b2210cc50f633ee97ce46e17bf4",
+      "sha256": "1cda8ae602e6c8631738f831db0562f40adf7ffbbf4d720778047bd5f435254c",
       "targets": [
         "test-pytest"
       ]
     },
     {
-      "body": "test-fast:\n\tuv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
+      "body": "test-fast:\n\tBENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m \"fast and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=120",
       "kind": "rule",
-      "sha256": "3ecb68d9907aaf8f74a4de8c75a26eef4f2286fba650f86f9546abfa110187c1",
+      "sha256": "ea5e4b06f40c73f1000e297e5f81fd2e58d0d58fa938dcf1ddd1d398620ab94d",
       "targets": [
         "test-fast"
       ]
@@ -2449,41 +2440,41 @@
       ]
     },
     {
-      "body": "test-medium:\n\tuv run -- python -m pytest -m \"medium and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=60 -n 5",
+      "body": "test-medium:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"medium and not (slow or stress or resource_heavy or live_integration)\" --tb=short --timeout=60 -n 5",
       "kind": "rule",
-      "sha256": "7837097eb06c892565227c26b6e69c3b46d35b4b00dccfa302fe4ac45b7f23f1",
+      "sha256": "927cf082fef746e5ec6932b6d74e2d0434b717f76678c62e99b6661ba07913fb",
       "targets": [
         "test-medium"
       ]
     },
     {
-      "body": "test-medium-selected:\n\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tuv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
+      "body": "test-medium-selected:\n\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tBENCHBOX_TEST_TIER=t2 uv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
       "kind": "rule",
-      "sha256": "4f6998072adf78ac6fd73ef16a46db4c1cb54834389057ab66caa7c62119ca72",
+      "sha256": "819553d0d8de41794f60d986e696b456cf43b5e20de9ee5771996ba3cdebb6ae",
       "targets": [
         "test-medium-selected"
       ]
     },
     {
-      "body": "test-slow:\n\tuv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
+      "body": "test-slow:\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
       "kind": "rule",
-      "sha256": "c3a76fa9345a30dc82fd6bd6da8aa6707117ec6004e2f616d1b48a465d1df254",
+      "sha256": "4efff690996db16af0169c51d4eee9279ad50eeedeae2ebb47de9fd5b39b04fd",
       "targets": [
         "test-slow"
       ]
     },
     {
-      "body": "test-stress:\n\tuv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v --timeout=1800",
+      "body": "test-stress:\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"stress\" -n 0 --tb=short -v --timeout=1800",
       "kind": "rule",
-      "sha256": "ede6d29ba1df45f7a2a058dbb13b4671608d6c4335ccc296daffa319889010cb",
+      "sha256": "2520b457bb97fc8dafa53eba7077776bbf9edc88c532675d9452df2afe8eee66",
       "targets": [
         "test-stress"
       ]
     },
     {
-      "body": "test-dev:\n\tuv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3 --timeout=120",
+      "body": "test-dev:\n\tBENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m \"fast and unit and not (slow or stress or resource_heavy or live_integration)\" --tb=short --maxfail=3 --timeout=120",
       "kind": "rule",
-      "sha256": "f1b41cd861c58b9da2a78867747a9389339fdc59a10a725c111999b6d14afeb4",
+      "sha256": "ebc07ad975d39e98472335887af855d29b1ff6feb7fba727ccb7e576511f0c3c",
       "targets": [
         "test-dev"
       ]
@@ -3793,9 +3784,9 @@
       ]
     },
     {
-      "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
+      "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
       "kind": "rule",
-      "sha256": "6e4887c6eac6f0aa82f4c14e8ace468283f28628b2e7ebebebaed67ab70c60b9",
+      "sha256": "63633fe7fabde38d081289a39c1e1775862d001bf95838ea64471dcb4381411d",
       "targets": [
         ".PHONY"
       ]
@@ -3854,14 +3845,6 @@
       "sha256": "eedd424355f6ac987f4edb9aa3cb10a95901dd09045c9604fbb0c7088c417459",
       "targets": [
         "pr-preflight-medium-tests"
-      ]
-    },
-    {
-      "body": "lane-isolation-check:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t[ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS directory not found: $(PATH_LISTS)\" >&2; exit 2; }; \\\n\tCHANGED_PATHS=\"$(PATH_LISTS)/changed.txt\"; \\\n\t[ -s \"$$CHANGED_PATHS\" ] || { echo \"non-empty changed paths artifact is required: $$CHANGED_PATHS\" >&2; exit 2; }; \\\n\tstatus=0; \\\n\tfor lane in site explorer corpus; do \\\n\t\tuv run -- python scripts/publication/verify_lane_isolation.py --lane \"$$lane\" --changed-paths-file \"$$CHANGED_PATHS\" || status=$$?; \\\n\tdone; \\\n\texit \"$$status\"",
-      "kind": "rule",
-      "sha256": "ec750f80a78d623936053242441c6c3aadf2eca4fd248f493c5a0285cf6562da",
-      "targets": [
-        "lane-isolation-check"
       ]
     },
     {
@@ -3941,9 +3924,9 @@
       ]
     },
     {
-      "body": "pr-content-guard:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\t$(MAKE) -s lane-isolation-check PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
+      "body": "pr-content-guard:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
       "kind": "rule",
-      "sha256": "30ec72b92cec94ce40cd73e10cdc5cd8333cbfe84f67a53cff2de7858512cc9a",
+      "sha256": "8ac2a80d32569e3cbddd446fa6971550960b71cab3b63119292d7b997fce57b7",
       "targets": [
         "pr-content-guard"
       ]
@@ -4375,15 +4358,15 @@
       ]
     },
     {
-      "body": "help:\n\t@echo \"BenchBox Makefile\"\n\t@echo \"----------------\"\n\t@echo \"Available commands:\"\n\t@echo \"\"\n\t@echo \"Core Testing:\"\n\t@echo \"  make test            Run default test suite (fast tests)\"\n\t@echo \"  make test-all        Run all tests\"\n\t@echo \"  make test-unit       Run unit tests only\"\n\t@echo \"  make test-integration Run integration tests only\"\n\t@echo \"  make test-tpch       Run TPC-H tests only\"\n\t@echo \"  make test-quick      Run quick tests without slow operations\"\n\t@echo \"  make test-verbose    Run tests with verbose output\"\n\t@echo \"\"\n\t@echo \"Speed-Based Testing:\"\n\t@echo \"  make test-pytest     Run all tests with pytest\"\n\t@echo \"  make test-fast       Run fast tests (< 1 sec)\"\n\t@echo \"  make test-medium     Run medium speed tests (1-10 sec)\"\n\t@echo \"  make test-slow       Run slow tests (> 10 sec)\"\n\t@echo \"  make test-dev        Fast development cycle testing\"\n\t@echo \"  make test-smoke      Quick smoke testing\"\n\t@echo \"  make test-correctness-gate Run bounded real-result correctness gate\"\n\t@echo \"  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)\"\n\t@echo \"  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL\"\n\t@echo \"  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion\"\n\t@echo \"  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse\"\n\t@echo \"  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H\"\n\t@echo \"  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface\"\n\t@echo \"  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface\"\n\t@echo \"  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface\"\n\t@echo \"  make test-local-matrix Run real local benchmark matrix (stress)\"\n\t@echo \"  make test-ci         Maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"Database-Specific Testing:\"\n\t@echo \"  make test-duckdb     Run DuckDB-specific tests\"\n\t@echo \"  make test-sqlite     Run SQLite-specific tests\"\n\t@echo \"\"\n\t@echo \"Benchmark-Specific Testing:\"\n\t@echo \"  make test-read-primitives Run primitives benchmark tests\"\n\t@echo \"  make test-benchmarks Run all benchmark tests\"\n\t@echo \"  make test-tpcds      Run TPC-DS tests\"\n\t@echo \"\"\n\t@echo \"Feature-Specific Testing:\"\n\t@echo \"  make test-olap       Run OLAP functionality tests\"\n\t@echo \"  make test-window     Run window functions tests\"\n\t@echo \"\"\n\t@echo \"CI/CD Testing:\"\n\t@echo \"  make test-ci         Run maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"CI Local Equivalents (run before push):\"\n\t@echo \"  make ci-local        Run ALL CI checks locally (lint+test+docs+package)\"\n\t@echo \"  make ci-lint         Lint + format check + type check (matches lint.yml)\"\n\t@echo \"  make ci-test         Fast tests with coverage (matches test.yml)\"\n\t@echo \"  make ci-docs         Build documentation (matches docs.yml)\"\n\t@echo \"  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)\"\n\t@echo \"  make test-integration-smoke  Integration smoke tests\"\n\t@echo \"  make test-package    Build and test package installation\"\n\t@echo \"  make security-audit  Run pip-audit security check\"\n\t@echo \"  make spellcheck      Run codespell on codebase\"\n\t@echo \"  make docstring-coverage  Check docstring coverage with interrogate\"\n\t@echo \"  make complexity-check    Check cyclomatic complexity (fails on violations)\"\n\t@echo \"  make complexity-report   Report cyclomatic complexity (no failure)\"\n\t@echo \"\"\n\t@echo \"Parallel Testing:\"\n\t@echo \"  make test-parallel   Run tests in parallel\"\n\t@echo \"  make test-parallel-fast Run fast tests in parallel\"\n\t@echo \"\"\n\t@echo \"Live Integration Testing (requires cloud credentials):\"\n\t@echo \"  make test-live       Run all live integration tests\"\n\t@echo \"  make test-live-databricks Run Databricks live tests\"\n\t@echo \"  make test-live-snowflake  Run Snowflake live tests\"\n\t@echo \"  make test-live-bigquery   Run BigQuery live tests\"\n\t@echo \"  make test-live-all   Run all live tests (all platforms)\"\n\t@echo \"\"\n\t@echo \"Utility:\"\n\t@echo \"  make run-test TEST=path Run a specific test file\"\n\t@echo \"\"\n\t@echo \"UAT Operations:\"\n\t@echo \"  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands\"\n\t@echo \"  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers\"\n\t@echo \"  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store\"\n\t@echo \"\"\n\t@echo \"Coverage:\"\n\t@echo \"  make coverage-fast   Run fast-marked tests with coverage (quick feedback)\"\n\t@echo \"  make coverage-all    Run routine coverage (excludes stress/resource-heavy/live tests)\"\n\t@echo \"  make coverage-opt-in-all Run full tree incl. stress/resource-heavy/live (needs services+creds)\"\n\t@echo \"  make coverage-html   Generate HTML coverage report\"\n\t@echo \"  make coverage-report Generate comprehensive coverage reports\"\n\t@echo \"\"\n\t@echo \"Development:\"\n\t@echo \"  make lint            Check code style\"\n\t@echo \"  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)\"\n\t@echo \"  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)\"\n\t@echo \"  make typecheck       Run type checking with ty\"\n\t@echo \"  make typecheck-uv    Run type checking with uv (development)\"\n\t@echo \"  make validate-imports Validate import structure and detect circular dependencies\"\n\t@echo \"  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)\"\n\t@echo \"  make duplicate-check Detect duplicate code via AST structural hashing\"\n\t@echo \"  make duplicate-check-delta  Fail if duplicated lines rose vs merge-base\"\n\t@echo \"  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status\"\n\t@echo \"  make makefile-inventory-check Verify public Make contract inventory and ordering\"\n\t@echo \"  make mutation-test   Run mutation testing on critical modules (mutmut)\"\n\t@echo \"  make format          Format code with ruff\"\n\t@echo \"  make clean           Remove build artifacts\"\n\t@echo \"  make install         Install the package\"\n\t@echo \"  make develop         Install the package in development mode\"\n\t@echo \"  make dist            Create distribution packages\"\n\t@echo \"  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)\"\n\t@echo \"\"\n\t@echo \"Documentation:\"\n\t@echo \"  make docs-build      Build Sphinx documentation locally\"\n\t@echo \"  make docs-serve      Build and serve docs at http://localhost:8000\"\n\t@echo \"  make docs-clean      Clean documentation build artifacts\"\n\t@echo \"  make docs-linkcheck  Check for broken links in documentation\"\n\t@echo \"  make docs-validate   Validate example references, syntax, and screenshot sync\"\n\t@echo \"  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies\"\n\t@echo \"  make docs-check      Run all documentation checks (validate, linkcheck, build)\"\n\t@echo \"\"\n\t@echo \"PR Workflow & Worktrees:\"\n\t@echo \"  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden\"\n\t@echo \"  make pr-preflight    Run classifier-selected product/skill integrity checks (coverage remains CI-only)\"\n\t@echo \"  make pr-open [PR_BODY_FILE=path] [READY=1] [STALE=1]  Push branch + open PR vs develop (READY=1 arms only a reused reviewed PR; new PRs stay held)\"\n\t@echo \"  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)\"\n\t@echo \"  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))\"\n\t@echo \"  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop\"\n\t@echo \"  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (READY=1 arms only a reused reviewed PR)\"\n\t@echo \"  make pr-status       List your open PRs vs develop with CI + auto-merge state\"\n\t@echo \"  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs\"\n\t@echo \"  make pr-review-followups             Action each comment, reply with marker, submit PR\"\n\t@echo \"  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))\"\n\t@echo \"Disposable worktree lifecycle:\"\n\t@echo \"  make worktree-create BRANCH=name WORKTREE_PATH=path  Create from origin/develop; verify local/remote branch collisions\"\n\t@echo \"  make worktree-remove WORKTREE_PATH=path              Remove an exact clean, attached, unlocked worktree\"\n\t@echo \"  make worktree-release WORKTREE_PATH=path             Record manual owner release for caller-owned worktree (non-destructive)\"\n\t@echo \"  make worktree-finish WORKTREE_PATH=path EXPECTED_HEAD_OID=oid [FORMAT=json] [APPLY=1]  Preview single-target removal and ref deletion (APPLY=1 executes)\"\n\t@echo \"  make worktree-list                                   List registered worktrees\"\n\t@echo \"  make worktree-audit [FORMAT=json]                    Read-only inventory and lifecycle audit of worktrees and branches\"\n\t@echo \"  make branch-prune-merged [DRY_RUN=1]                 Delete worktree-less branches at a proven merge-time PR head (requires gh)\"\n\t@echo \"\"\n\t@echo \"Blind-Spot Findings (see _project/blind-spots/README.md):\"\n\t@echo \"  make blind-spots-list   List open findings (one row each)\"\n\t@echo \"  make blind-spots-report Counts by status + kind, oldest active first\"\n\t@echo \"  make blind-spots-sweep  Alias for blind-spots-report\"\n\t@echo \"\"\n\t@echo \"Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):\"\n\t@echo \"  make soundness-drain-report     Read-only local digest of parked soundness-path PRs\"\n\t@echo \"  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)\"\n\t@echo \"\"\n\t@echo \"Release Workflow (2-command flow; see docs/operations/release-guide.md):\"\n\t@echo \"  make release-cut VERSION=X.Y.Z      Cut v\\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)\"\n\t@echo \"  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\\$$VERSION cut and return to develop\"\n\t@echo \"  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag\"\n\t@echo \"\"\n\t@echo \"  make help            Show this help message\"",
+      "body": "help:\n\t@echo \"BenchBox Makefile\"\n\t@echo \"----------------\"\n\t@echo \"Available commands:\"\n\t@echo \"\"\n\t@echo \"Core Testing:\"\n\t@echo \"  make test            Run default test suite (fast tests)\"\n\t@echo \"  make test-all        Run all tests\"\n\t@echo \"  make test-unit       Run unit tests only\"\n\t@echo \"  make test-integration Run integration tests only\"\n\t@echo \"  make test-tpch       Run TPC-H tests only\"\n\t@echo \"  make test-quick      Run quick tests without slow operations\"\n\t@echo \"  make test-verbose    Run tests with verbose output\"\n\t@echo \"\"\n\t@echo \"Speed-Based Testing:\"\n\t@echo \"  make test-pytest     Run all tests with pytest\"\n\t@echo \"  make test-fast       Run fast tests (< 1 sec)\"\n\t@echo \"  make test-medium     Run medium speed tests (1-10 sec)\"\n\t@echo \"  make test-slow       Run slow tests (> 10 sec)\"\n\t@echo \"  make test-dev        Fast development cycle testing\"\n\t@echo \"  make test-smoke      Quick smoke testing\"\n\t@echo \"  make test-correctness-gate Run bounded real-result correctness gate\"\n\t@echo \"  make tpchavoc-equivalence-report Gate: TPC-Havoc variant vs canonical TPC-H equivalence (DuckDB)\"\n\t@echo \"  make tpchavoc-equivalence-report-postgres Sample: TPC-Havoc variant equivalence on PostgreSQL\"\n\t@echo \"  make tpchavoc-equivalence-report-datafusion Sample: TPC-Havoc variant equivalence on DataFusion\"\n\t@echo \"  make tpchavoc-equivalence-report-clickhouse Sample: TPC-Havoc variant equivalence on ClickHouse\"\n\t@echo \"  make tpchavoc-dataframe-equivalence-report Gate: TPC-Havoc DataFrame variants vs canonical TPC-H\"\n\t@echo \"  make ssb-cross-surface-equivalence-report Gate: SSB DataFrame surface vs its own SQL surface\"\n\t@echo \"  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface\"\n\t@echo \"  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface\"\n\t@echo \"  make test-local-matrix Run real local benchmark matrix (stress)\"\n\t@echo \"  make test-ci         Maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"Database-Specific Testing:\"\n\t@echo \"  make test-duckdb     Run DuckDB-specific tests\"\n\t@echo \"  make test-sqlite     Run SQLite-specific tests\"\n\t@echo \"\"\n\t@echo \"Benchmark-Specific Testing:\"\n\t@echo \"  make test-read-primitives Run primitives benchmark tests\"\n\t@echo \"  make test-benchmarks Run all benchmark tests\"\n\t@echo \"  make test-tpcds      Run TPC-DS tests\"\n\t@echo \"\"\n\t@echo \"Feature-Specific Testing:\"\n\t@echo \"  make test-olap       Run OLAP functionality tests\"\n\t@echo \"  make test-window     Run window functions tests\"\n\t@echo \"\"\n\t@echo \"CI/CD Testing:\"\n\t@echo \"  make test-ci         Run maintained broad local CI profile\"\n\t@echo \"\"\n\t@echo \"CI Local Equivalents (run before push):\"\n\t@echo \"  make ci-local        Run ALL CI checks locally (lint+test+docs+package)\"\n\t@echo \"  make ci-lint         Lint + format check + type check (matches lint.yml)\"\n\t@echo \"  make ci-test         Fast tests with coverage (matches test.yml)\"\n\t@echo \"  make ci-docs         Build documentation (matches docs.yml)\"\n\t@echo \"  make ci-linux        Reproduce the Linux ci.yml gate in Apple container (Apple silicon, opt-in)\"\n\t@echo \"  make test-integration-smoke  Integration smoke tests\"\n\t@echo \"  make test-package    Build and test package installation\"\n\t@echo \"  make security-audit  Run pip-audit security check\"\n\t@echo \"  make spellcheck      Run codespell on codebase\"\n\t@echo \"  make docstring-coverage  Check docstring coverage with interrogate\"\n\t@echo \"  make complexity-check    Check cyclomatic complexity (fails on violations)\"\n\t@echo \"  make complexity-report   Report cyclomatic complexity (no failure)\"\n\t@echo \"\"\n\t@echo \"Parallel Testing:\"\n\t@echo \"  make test-parallel   Run tests in parallel\"\n\t@echo \"  make test-parallel-fast Run fast tests in parallel\"\n\t@echo \"\"\n\t@echo \"Live Integration Testing (requires cloud credentials):\"\n\t@echo \"  make test-live       Run all live integration tests\"\n\t@echo \"  make test-live-databricks Run Databricks live tests\"\n\t@echo \"  make test-live-snowflake  Run Snowflake live tests\"\n\t@echo \"  make test-live-bigquery   Run BigQuery live tests\"\n\t@echo \"  make test-live-all   Run all live tests (all platforms)\"\n\t@echo \"\"\n\t@echo \"Utility:\"\n\t@echo \"  make run-test TEST=path Run a specific test file\"\n\t@echo \"\"\n\t@echo \"UAT Operations:\"\n\t@echo \"  make uat-docker-cleanup        Report abandoned UAT Docker resources and non-UAT cleanup commands\"\n\t@echo \"  make uat-docker-cleanup APPLY=1 Remove only UAT-owned Docker leftovers\"\n\t@echo \"  make uat-docker-cleanup ENGINE=container [MODE=owned|images|max] Reclaim the Apple container store\"\n\t@echo \"\"\n\t@echo \"Coverage:\"\n\t@echo \"  make coverage-fast   Run fast-marked tests with coverage (quick feedback)\"\n\t@echo \"  make coverage-all    Run routine coverage (excludes stress/resource-heavy/live tests)\"\n\t@echo \"  make coverage-opt-in-all Run full tree incl. stress/resource-heavy/live (needs services+creds)\"\n\t@echo \"  make coverage-html   Generate HTML coverage report\"\n\t@echo \"  make coverage-report Generate comprehensive coverage reports\"\n\t@echo \"\"\n\t@echo \"Development:\"\n\t@echo \"  make lint            Check code style\"\n\t@echo \"  make lint-markers    Validate test marker annotations (catches speed-lane conflicts)\"\n\t@echo \"  make lint-imports    Enforce import-layering contracts (utils < core < platforms < cli; experimental/mcp isolation)\"\n\t@echo \"  make typecheck       Run type checking with ty\"\n\t@echo \"  make typecheck-uv    Run type checking with uv (development)\"\n\t@echo \"  make validate-imports Validate import structure and detect circular dependencies\"\n\t@echo \"  make dependency-check Validate lock file against pyproject specs (ARGS='--matrix' to show summary)\"\n\t@echo \"  make duplicate-check Detect duplicate code via AST structural hashing\"\n\t@echo \"  make duplicate-check-delta  Fail if duplicated lines rose vs merge-base\"\n\t@echo \"  make guards-fix      Regenerate every mechanical drift-guard artifact (inventory/oracle-map/parity/compat-docs/UAT-LOC/skill-sync), then print git status\"\n\t@echo \"  make makefile-inventory-check Verify public Make contract inventory and ordering\"\n\t@echo \"  make mutation-test   Run mutation testing on critical modules (mutmut)\"\n\t@echo \"  make format          Format code with ruff\"\n\t@echo \"  make clean           Remove build artifacts\"\n\t@echo \"  make install         Install the package\"\n\t@echo \"  make develop         Install the package in development mode\"\n\t@echo \"  make dist            Create distribution packages\"\n\t@echo \"  make compile-tpcds-binaries  Rebuild TPC-DS/TPC-H binaries from patched sources (no Docker)\"\n\t@echo \"\"\n\t@echo \"Documentation:\"\n\t@echo \"  make docs-build      Build Sphinx documentation locally\"\n\t@echo \"  make docs-serve      Build and serve docs at http://localhost:8000\"\n\t@echo \"  make docs-clean      Clean documentation build artifacts\"\n\t@echo \"  make docs-linkcheck  Check for broken links in documentation\"\n\t@echo \"  make docs-validate   Validate example references, syntax, and screenshot sync\"\n\t@echo \"  make docs-images     Refresh generated visualization screenshots and sync docs/blog copies\"\n\t@echo \"  make docs-check      Run all documentation checks (validate, linkcheck, build)\"\n\t@echo \"\"\n\t@echo \"PR Workflow & Worktrees:\"\n\t@echo \"  make agent-write-preflight  Refuse write work from the BenchBox primary clone unless explicitly overridden\"\n\t@echo \"  make pr-preflight    Run classifier-selected product/skill integrity checks (coverage remains CI-only)\"\n\t@echo \"  make pr-open [PR_BODY_FILE=path] [READY=1] [STALE=1]  Push branch + open PR vs develop (READY=1 arms only a reused reviewed PR; new PRs stay held)\"\n\t@echo \"  make pr-ready        Arm squash auto-merge for the open PR on this branch (when final)\"\n\t@echo \"  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))\"\n\t@echo \"  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop\"\n\t@echo \"  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (READY=1 arms only a reused reviewed PR)\"\n\t@echo \"  make pr-status       List your open PRs vs develop with CI + auto-merge state\"\n\t@echo \"  make pr-review-followups-list        List un-actioned bot/agent review comments on merged PRs\"\n\t@echo \"  make pr-review-followups             Action each comment, reply with marker, submit PR\"\n\t@echo \"  make dev-loop-metrics  Summarize recent develop post-merge metrics (DEV_LOOP_METRICS_DAYS=$(DEV_LOOP_METRICS_DAYS))\"\n\t@echo \"Disposable worktree lifecycle:\"\n\t@echo \"  make worktree-create BRANCH=name WORKTREE_PATH=path  Create from origin/develop; verify local/remote branch collisions\"\n\t@echo \"  make worktree-remove WORKTREE_PATH=path              Remove an exact clean, attached, unlocked worktree\"\n\t@echo \"  make worktree-release WORKTREE_PATH=path             Record manual owner release for caller-owned worktree (non-destructive)\"\n\t@echo \"  make worktree-finish WORKTREE_PATH=path EXPECTED_HEAD_OID=oid [FORMAT=json] [APPLY=1]  Preview single-target removal and ref deletion (APPLY=1 executes)\"\n\t@echo \"  make worktree-list                                   List registered worktrees\"\n\t@echo \"  make worktree-audit [FORMAT=json]                    Read-only inventory and lifecycle audit of worktrees and branches\"\n\t@echo \"  make branch-prune-merged [DRY_RUN=1]                 Delete worktree-less branches at a proven merge-time PR head (requires gh)\"\n\t@echo \"\"\n\t@echo \"Blind-Spot Findings (see _project/blind-spots/README.md):\"\n\t@echo \"  make blind-spots-list   List open findings (one row each)\"\n\t@echo \"  make blind-spots-report Counts by status + kind, oldest active first\"\n\t@echo \"  make blind-spots-sweep  Alias for blind-spots-report\"\n\t@echo \"\"\n\t@echo \"Soundness-PR Drain Digest (see docs/operations/soundness-drain.md):\"\n\t@echo \"  make soundness-drain-report     Read-only local digest of parked soundness-path PRs\"\n\t@echo \"  make soundness-drain-self-test  Run the fixture-based classifier self-test (no network)\"\n\t@echo \"\"\n\t@echo \"Release Workflow (2-command flow; see docs/operations/release-guide.md):\"\n\t@echo \"  make release-cut VERSION=X.Y.Z      Cut v\\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)\"\n\t@echo \"  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\\$$VERSION cut and return to develop\"\n\t@echo \"  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag\"\n\t@echo \"\"\n\t@echo \"  make help            Show this help message\"",
       "kind": "rule",
-      "sha256": "8266f77f35ebf5b87fbc38ec520d20dc334dfc1ad0d1f6e185febe99362c6e5f",
+      "sha256": "2bb518434893b092ba78784b38f153ac8e418fe228b4e55de0e2586f55d7da47",
       "targets": [
         "help"
       ]
     }
   ],
-  "target_count": 216,
+  "target_count": 215,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4453,7 +4436,6 @@
     "install",
     "joinorder-synthetic-cross-surface-equivalence-report",
     "joinorder-verify-reference-results",
-    "lane-isolation-check",
     "lint",
     "lint-explorer-stale-theme",
     "lint-explorer-tokens",

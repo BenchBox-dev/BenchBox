@@ -214,6 +214,44 @@ def test_ready_all_green(tmp_path: Path) -> None:
     assert landing.ready_failures(_identity(repo, head), head, _evidence(head), repo) == []
 
 
+def test_ready_allows_empty_review_decision_for_non_soundness_pr(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "docs").mkdir()
+    (repo / "docs" / "note.md").write_text("documentation")
+    subprocess.run(["git", "add", "docs/note.md"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "docs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    evidence = _evidence(head, review_decision="")
+
+    assert landing.ready_failures(_identity(repo, head, base), head, evidence, repo) == []
+
+
+def test_ready_rejects_empty_review_decision_for_soundness_pr(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "publication").mkdir()
+    (repo / "publication" / "policy.json").write_text("{}")
+    subprocess.run(["git", "add", "publication/policy.json"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "soundness"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    failures = landing.ready_failures(_identity(repo, head, base), head, _evidence(head, review_decision=""), repo)
+
+    assert any("not APPROVED" in failure for failure in failures)
+
+
 def test_batch_ready_requires_active_registered_runtime(tmp_path: Path) -> None:
     repo = _repo(tmp_path / "r")
     head = subprocess.run(
@@ -1374,19 +1412,3 @@ def test_makefile_has_separate_bounded_all_open_status_view() -> None:
     assert "ALL_OPEN" in status
     assert "PR_STATUS_ALL_OPEN_LIMIT" in status
     assert "All open develop PRs" in status
-
-
-def test_lane_isolation_make_target_rejects_empty_changed_paths(tmp_path: Path) -> None:
-    lists = tmp_path / "lists"
-    lists.mkdir()
-    (lists / "changed.txt").write_text("", encoding="utf-8")
-    result = subprocess.run(
-        ["make", "-s", "lane-isolation-check", f"PATH_LISTS={lists}"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode != 0
-    assert "non-empty changed paths artifact is required" in result.stderr

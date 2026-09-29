@@ -204,10 +204,14 @@ def test_landing_introduces_results_explorer_with_public_compare_and_local_workf
 
 def test_results_secondary_nav_remains_separate_from_global_header() -> None:
     layout = _read("results-explorer/src/components/Layout.tsx")
+    nav = _read("results-explorer/src/components/resultsNav.ts")
     contract = _read("results-explorer/src/components/headerContract.ts")
 
     assert 'export const HEADER_NAV_ARIA_LABEL = "BenchBox"' in contract
     assert "aria-label={HEADER_NAV_ARIA_LABEL}" in layout
     assert 'aria-label="Results Explorer"' in layout
+    # The secondary-nav labels live in the declared section table in
+    # resultsNav.ts; Layout.tsx renders that table instead of hardcoding them.
+    assert "RESULTS_NAV_SECTIONS" in layout
     for label in ["Overview", "Benchmarks", "Platforms", "Compare", "Find runs"]:
-        assert label in layout
+        assert f'label: "{label}"' in nav

@@ -111,8 +111,8 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 1. **Rulesets and merge queue:**
    - Add new required checks (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`).
    - Remove legacy checks after the transition window.
-   - Adjust merge queue parameters: `max_entries_to_build` 5 -> 3, `max_entries_to_merge` 5 -> 3,
-     timeout 60 min -> 30 min.
+   - Adjust merge queue parameters: `max_entries_to_build` 5 -> 2, `max_entries_to_merge` 5 -> 3;
+     the check timeout stays at 60 minutes.
    - Delete the obsolete `release-only` ruleset.
 
 2. **Branches:**
@@ -158,10 +158,16 @@ once corresponding preconditions and backups (per Guardrail G5) are satisfied:
 ## Guardrails
 
 - **G1 Replacement before removal:** A required check is removed only after its replacement
-  is required and green for >=20 consecutive queue runs AND the property ledger (G3) maps
-  every protected property to the replacement.
-- **G2 Shadow parity:** New workflows run non-required alongside old ones for >=5 working days
-  (nightly: >=7 nightly runs); every disagreement is explained.
+  has passed a canary set of throwaway pull requests (one change per unit, one cross-unit
+  change, one soundness-path change, and one deliberately broken change per unit) AND the
+  property ledger (G3) maps every protected property to the replacement. Three real queue
+  merges must then pass under the new checks before the flip is considered complete.
+  (Amended 2026-09-29: the earlier 20-run window assumed the old and new workflows could
+  run side by side; the merge groups already saturated the organization's runners, so
+  side-by-side operation is not possible and the cutover is a single flip.)
+- **G2 Shadow parity:** Superseded by the canary set in G1 for the pull-request and merge
+  queue workflow. Scheduled workflows (nightly) still validate with dispatched runs
+  before their predecessors retire.
 - **G3 Property ledger (`docs/development/dev-loop-property-ledger.md`):** Every safety
   property -> current guard -> new guard -> proof. Properties include: correctness oracle
   (digest arming, query discrimination, no-skip), SQL self-binding lint, monotonic-clock
