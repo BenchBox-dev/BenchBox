@@ -8,6 +8,15 @@
       "op": "promote",
       "op_id": "acc4a703e2334bceb8b3bdb895582b40",
       "session_id": "f6e5001c7ca74a74a8bc9315b62ca50b"
+    },
+    {
+      "actor": "jcode-tpchavoc-closeout-recovery",
+      "at": "2026-09-29T15:15:22Z",
+      "client": "jcode",
+      "generation": "7bdcdb69113b481cbd98ef3973185c07",
+      "op": "take",
+      "op_id": "8053445efc1547e9bd8654251c5024c8",
+      "session_id": "52edd7f7638740259b3dcc97c8045eb5"
     }
   ]
 }
