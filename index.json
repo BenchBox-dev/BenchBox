@@ -5052,7 +5052,7 @@
         "dlv2-01-baseline-and-backups"
       ],
       "priority": "critical",
-      "status": "open",
+      "status": "dropped",
       "title": "Add the six new unit checks as required contexts on develop (old checks stay required)"
     },
     "dlv2-32-codeowners-soundness-hold": {
