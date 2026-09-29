@@ -5171,9 +5171,7 @@
     "dlv2-60-publication-integration": {
       "claim": null,
       "needs": [
-        "dlv2-33-ruleset-remove-old-checks",
-        "dlv2-00-decisions-adr",
-        "dlv2-21-ci-yml-shadow"
+        "dlv2-00-decisions-adr"
       ],
       "priority": "high",
       "status": "open",
