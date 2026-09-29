@@ -5010,7 +5010,7 @@
         "dlv2-00-decisions-adr"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "Add the six-unit path map and extend path_filter_decision.py into the unit classifier"
     },
     "dlv2-21-ci-yml-shadow": {
