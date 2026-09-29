@@ -1983,7 +1983,10 @@
     },
     "ch-ovhcloud-adapter": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "ch-tier2-spike",
+        "ch-altinity-adapter"
+      ],
       "priority": "medium",
       "status": "open",
       "title": "Add the OVHcloud Managed ClickHouse native platform adapter"
