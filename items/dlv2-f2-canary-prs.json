@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Table of canary PRs with expected vs actual result per unit, all matching",
+    "T2 run on the flip branch: job count <=8, wall time recorded, artifacts uploaded with sha256",
+    "All canary PRs closed unmerged and their branches deleted"
+  ],
+  "description": "Replaces live dual-running. Open throwaway PRs based on the flip branch (ci.yml has no branch filter, so they get CI; close all unmerged afterwards):\n- one trivial change per unit (core, explorer, results-data, docs, landing, tooling) -> only that unit runs, other five pass as untouched;\n- one PR touching core + docs + explorer -> three units run;\n- one PR touching a soundness path -> soundness flag fails without the `Soundness review:` section, passes with it;\n- one deliberately broken change per unit (failing test, lint error, broken build, invalid bundle, broken docs build, broken landing link) -> that unit's result job fails.\nAlso run the flip branch's merge_group behavior once via workflow_dispatch or a test merge-group-equivalent run of T2 to confirm the job budget (<=8 jobs) and wall time.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:51:05Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "793091de80e041cfaa95424a729acbb4",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    }
+  ]
+}

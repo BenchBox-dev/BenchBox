@@ -5305,6 +5305,15 @@
       "status": "open",
       "title": "Build the flip branch: ci.yml with lean T2, and deletion of the legacy PR-gate and post-merge workflows"
     },
+    "dlv2-f2-canary-prs": {
+      "claim": null,
+      "needs": [
+        "dlv2-f1-build-flip-branch"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Prove the flip branch with a canary PR set before the flip"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],
