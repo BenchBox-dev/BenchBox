@@ -5034,7 +5034,7 @@
       ],
       "priority": "high",
       "status": "open",
-      "title": "Add the new T3 nightly workflow with per-domain jobs and run it in shadow for seven nights"
+      "title": "Add the new T3 nightly workflow with per-domain jobs and validate it with dispatched runs"
     },
     "dlv2-30-drift-settings-add-new-checks": {
       "claim": null,

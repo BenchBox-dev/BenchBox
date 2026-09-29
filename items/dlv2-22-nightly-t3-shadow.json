@@ -1,8 +1,9 @@
 {
   "acceptance": [
-    "nightly-v2 runs >=7 nights alongside the existing scheduled workflows with job-level parity report",
-    "Each domain has its own job conclusion, artifacts, and label",
-    "Durations file refreshed by the nightly run",
+    "nightly-v2 validated by 2-3 workflow_dispatch runs (off-peak where possible) with a job-level comparison to the old nightly/scheduled workflows' latest results; no 7-night shadow",
+    "Each domain has its own job conclusion, artifacts, and label; t3:cloud gated off by repo variable",
+    "Durations file refreshed by the run",
+    "macOS/Windows wheel install and Python 3.11-3.14 matrix included (moved out of T2)",
     "Owner response policy documented: fix or revert within one working day"
   ],
   "context": "Moved before any deletion per codex C6 / agy A5 / muse M11. Guardrails G2, G3. Owner decision: t3:cloud is wired but gated by a repo variable (e.g. BENCHBOX_T3_CLOUD_ENABLED) that defaults to off; the agent never runs live cloud tests. Parity for the cloud domain is by static comparison with the old nightly jobs, not execution.",
@@ -23,6 +24,14 @@
       "op": "update",
       "op_id": "873945ae905841279d943d7568cc5315",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:52:46Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a6e452a3b1f04490b471b10042805cd0",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
     }
   ]
 }
