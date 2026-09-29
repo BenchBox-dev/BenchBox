@@ -1987,6 +1987,13 @@
       "status": "open",
       "title": "Evaluate Aiven, DoubleCloud, and OVHcloud ClickHouse trials with per-vendor verdicts"
     },
+    "ch-tier3-decisions": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Record Tier 3 hosted-ClickHouse vendor decisions and explicit exclusions"
+    },
     "ch-tinybird-adapter": {
       "claim": null,
       "needs": [],

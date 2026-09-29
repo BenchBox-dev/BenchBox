@@ -1,0 +1,13 @@
+{
+  "description": "Record the Tier 3 vendor decisions so they are not re-researched: ChistaDATA Cloud (services-led, spike only if an enterprise user brings an account), Elestio (thin ops wrapper, cheap spike candidate if Tier 2 stalls), Yandex Cloud Managed ClickHouse (deprioritize: sanctions exposure, RU-region residency, declining Western trial access), Alibaba ApsaraDB for ClickHouse (deprioritize: Enterprise Edition diverges from open source, painful non-CN trial access). Also record the explicit exclusions: cloud marketplaces (billing channels, not endpoints), ManageStacks/MSP wrappers (stock ClickHouse, use clickhouse-server), Gigapipe/HyperDX/ClickStack (observability over your own ClickHouse, not hosts), Qryn (dormant), Clever Cloud (no ClickHouse add-on), OVH Logs Data Platform (OpenSearch, not ClickHouse).\n\nDECISION GATE: revisit any Tier 3 vendor only on explicit user demand with an account in hand. Revisit is a new spike item, not silent scope expansion.\n\nGuardrails: this item is documentation-only; it creates no adapters and changes no code.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:14:45Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "81ed93edb01d4b88bc897363ea7633d5",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}
