@@ -6,7 +6,7 @@
     "Provenance attestation verifiable with gh attestation verify",
     "pypi environment reviewers unchanged"
   ],
-  "context": "codex C3/C7, muse M6/M8, earlier-round C3. Artifact retention must cover the time between queue run and tag (set retention >= 90 days or re-upload to release storage).",
+  "context": "Build and test in parallel with the flip on its own branch; it consumes merge_group ci.yml artifacts, so its end-to-end test (TestPyPI) runs after dlv2-f3. codex C3/C7, muse M6/M8.",
   "description": "New release workflow (release-v2.yml until dlv2-53 replaces release.yml) on push of tags v*. No tag-signature requirement (owner decision); safety comes from:\n1. Tag creation restricted by ruleset v-tag-restricted; the tag must be annotated.\n2. Resolve the tag commit; require it is on develop and has a successful merge_group ci.yml run; download that run's wheel+sdist; verify sha256 equals the recorded hashes (no rebuild).\n3. T4: install+smoke on Python 3.11-3.14 x Linux/macOS/Windows (cross-OS correctness claims only after dlv2-defer-tpch-digest-darwin-arm64), UAT release-gate configs (tests/uat/configs/release-gate-*.yaml), _binaries hash manifest, make release-check (dlv2-50), ruleset drift (D7), no open release-blocking t3:* issue.\n4. Build provenance attestation; publish via environment test-pypi or pypi (pypi keeps required reviewers: the owner approves real releases); GitHub release.\nLegacy release.yml keeps working until dlv2-53 (G7).",
   "sessions": [
     {
@@ -24,6 +24,14 @@
       "op": "update",
       "op_id": "d0191df148974b79b3a9815945097a1d",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:51:39Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f57963c256444407bc99589d266ca946",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
     }
   ]
 }
