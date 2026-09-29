@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-28T18:04:32.506247+00:00",
+  "generated_at": "2026-09-29T12:44:42.252490+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -757,19 +757,6 @@
       "bundle_sha256": "e32c1ffc997c38d4bb23b2ca5996b466270e429408dfa9c57ec716fb602ea963"
     },
     {
-      "file": "flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json",
-      "benchmark": "flightdata",
-      "benchmark_name": "Flight Data OLAP",
-      "platform": "BigQuery",
-      "platform_version": "unknown",
-      "scale_factor": 10.0,
-      "timestamp": "2026-09-27T15:08:59.865093",
-      "query_count": 60,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "ed2dd0baaf3b8035da8dc6d8c0674a480c2a38adf2c0634296a6512f406f480b"
-    },
-    {
       "file": "flightdata_sf001_clickhouse_local_sql_20260826_172222_5f3f4c89.json",
       "benchmark": "flightdata",
       "benchmark_name": "Flight Data OLAP",
@@ -1197,32 +1184,6 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "4f7bae8e9dd4881d9ff3b6f28fc6bce26745e5f834b20246b47f5d26a2378cdf"
-    },
-    {
-      "file": "metadata_primitives_sf1_snowflake_sql_20260926_184459_04829f2d.json",
-      "benchmark": "metadata_primitives",
-      "benchmark_name": "Metadata Primitives",
-      "platform": "Snowflake",
-      "platform_version": "10.34.101",
-      "scale_factor": 1.0,
-      "timestamp": "2026-09-26T18:44:59.335948",
-      "query_count": 180,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "076e423d748ec2a53c5c057aefe200b804725bd125fcfad296c2fd8d4105c496"
-    },
-    {
-      "file": "nyctaxi_sf10_bigquery_sql_20260927_120407_fec02550.json",
-      "benchmark": "nyctaxi",
-      "benchmark_name": "NYC Taxi OLAP",
-      "platform": "BigQuery",
-      "platform_version": "unknown",
-      "scale_factor": 10.0,
-      "timestamp": "2026-09-27T12:04:07.234314",
-      "query_count": 75,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "585fa981bed9b2cfb967de19d7bca15c016a8f45135d5b5135699cf6abb4281d"
     },
     {
       "file": "nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
@@ -2941,19 +2902,6 @@
       "bundle_sha256": "88eb5edd3059dffe4b1c9bb2b26698e18acd807ec8146243b42689e27eab9d2e"
     },
     {
-      "file": "tpch_skew_sf10_bigquery_sql_20260927_104923_b3fc1da6.json",
-      "benchmark": "tpch_skew",
-      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
-      "platform": "BigQuery",
-      "platform_version": "unknown",
-      "scale_factor": 10.0,
-      "timestamp": "2026-09-27T10:49:22.998631",
-      "query_count": 66,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "df395339a592d9b8008d1a42fc95ac85ae6a9ef38ed2e2b5ec7daafa9036ca8e"
-    },
-    {
       "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -3264,19 +3212,6 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
-    },
-    {
-      "file": "transaction_primitives_sf001_databricks_sql_20260926_190222_859aeaa3.json",
-      "benchmark": "transaction_primitives",
-      "benchmark_name": "Transaction Primitives",
-      "platform": "Databricks",
-      "platform_version": "2026.36",
-      "scale_factor": 0.01,
-      "timestamp": "2026-09-26T19:02:22.306404",
-      "query_count": 69,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "63762010fbbb1a9408cf9d9082cb7c6155dd98150334ac9786f813183c119e78"
     }
   ],
   "cohorts": {
@@ -3371,9 +3306,6 @@
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
     ],
-    "flightdata@sf10.0": [
-      "BigQuery"
-    ],
     "h2odb@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -3405,9 +3337,6 @@
       "Polars v1.40.0",
       "SQLite v3.53.1"
     ],
-    "metadata_primitives@sf1.0": [
-      "Snowflake v10.34.101"
-    ],
     "nyctaxi@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -3422,9 +3351,6 @@
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
-    ],
-    "nyctaxi@sf10.0": [
-      "BigQuery"
     ],
     "read_primitives@sf0.01": [
       "ClickHouse Local",
@@ -3579,9 +3505,6 @@
       "Polars v1.40.0",
       "SQLite v3.53.1"
     ],
-    "tpch_skew@sf10.0": [
-      "BigQuery"
-    ],
     "tpchavoc@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
@@ -3596,40 +3519,35 @@
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
-    ],
-    "transaction_primitives@sf0.01": [
-      "Databricks v2026.36"
     ]
   },
   "summary": {
-    "total_bundles": 252,
+    "total_bundles": 247,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
       "coffeeshop": 17,
       "datavault": 8,
-      "flightdata": 10,
+      "flightdata": 9,
       "h2odb": 18,
       "joinorder": 6,
-      "metadata_primitives": 1,
-      "nyctaxi": 10,
+      "nyctaxi": 9,
       "read_primitives": 12,
       "ssb": 32,
       "tpcdi": 9,
       "tpcds": 22,
       "tpcds_obt": 4,
       "tpch": 44,
-      "tpch_skew": 16,
-      "tpchavoc": 9,
-      "transaction_primitives": 1
+      "tpch_skew": 15,
+      "tpchavoc": 9
     },
     "by_platform": {
-      "BigQuery": 4,
+      "BigQuery": 1,
       "CedarDB": 1,
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
       "DataFusion": 45,
-      "Databricks": 3,
+      "Databricks": 2,
       "DuckDB": 80,
       "DuckLake": 1,
       "LakeSail": 1,
@@ -3637,15 +3555,14 @@
       "Polars": 28,
       "PySpark": 2,
       "SQLite": 23,
-      "Snowflake": 1,
       "Spark": 6,
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 252
+      "maintainer-run": 247
     },
     "by_funding": {
-      "unspecified": 252
+      "unspecified": 247
     }
   }
 }
