@@ -5270,8 +5270,7 @@
     "dlv2-90-stacked-prs-pilot": {
       "claim": null,
       "needs": [
-        "dlv2-33-ruleset-remove-old-checks",
-        "dlv2-40-retire-pr-gate-workflows"
+        "dlv2-f3-flip-window"
       ],
       "priority": "low",
       "status": "open",
