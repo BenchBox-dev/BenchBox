@@ -131,10 +131,35 @@ jobs:
                 echo "soundness-flag: cannot resolve head of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
                 exit 1
               fi
-              if ! git merge-base --is-ancestor "$ANCHOR_HEAD" HEAD; then
-                echo "soundness-flag: anchor PR #$ANCHOR_NUMBER head $ANCHOR_HEAD is not an ancestor of group HEAD; failing closed" >&2
+              # The queue squashes the anchor PR onto the group base, so the
+              # anchor head is never an ancestor of the group HEAD. Verify the
+              # squash by content: every file the anchor PR changed (relative
+              # to its own base) must be byte-identical between the anchor
+              # head and the group HEAD. A mismatch means the queued content
+              # is not what reviewers approved. Files the group base changed
+              # identically do not matter; files only the group changed are
+              # covered by the group-base diff check below.
+              git fetch --no-tags --depth 50 origin "$ANCHOR_HEAD" 2>/dev/null || true
+              ANCHOR_BASE="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.base.sha')"
+              git fetch --no-tags --depth 50 origin "$ANCHOR_BASE" 2>/dev/null || true
+              ANCHOR_FILES="$(git diff --name-only --no-renames "$ANCHOR_BASE" "$ANCHOR_HEAD")"
+              if [ -z "$ANCHOR_FILES" ]; then
+                echo "soundness-flag: anchor #$ANCHOR_NUMBER changed no files; failing closed" >&2
                 exit 1
               fi
+              MISMATCH=0
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                if ! git diff --quiet "$ANCHOR_HEAD" HEAD -- "$f"; then
+                  echo "soundness-flag: anchor #$ANCHOR_NUMBER file differs in queue: $f" >&2
+                  MISMATCH=1
+                fi
+              done <<< "$ANCHOR_FILES"
+              if [ "$MISMATCH" != "0" ]; then
+                echo "soundness-flag: anchor #$ANCHOR_NUMBER content mismatch in queue; failing closed" >&2
+                exit 1
+              fi
+              echo "soundness-flag: anchor #$ANCHOR_NUMBER content verified in queue" >&2
               printf '%s\n' "$ANCHOR_NUMBER" > "$RUNNER_TEMP/merge-group-prs.txt"
               echo "soundness-flag: payload empty; validating anchor PR #$ANCHOR_NUMBER with group base diff" >&2
             else
