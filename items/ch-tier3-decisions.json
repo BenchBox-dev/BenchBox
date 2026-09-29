@@ -1,5 +1,5 @@
 {
-  "description": "Record the Tier 3 vendor decisions so they are not re-researched: ChistaDATA Cloud (services-led, spike only if an enterprise user brings an account), Elestio (thin ops wrapper, cheap spike candidate if Tier 2 stalls), Yandex Cloud Managed ClickHouse (deprioritize: sanctions exposure, RU-region residency, declining Western trial access), Alibaba ApsaraDB for ClickHouse (deprioritize: Enterprise Edition diverges from open source, painful non-CN trial access). Also record the explicit exclusions: cloud marketplaces (billing channels, not endpoints), ManageStacks/MSP wrappers (stock ClickHouse, use clickhouse-server), Gigapipe/HyperDX/ClickStack (observability over your own ClickHouse, not hosts), Qryn (dormant), Clever Cloud (no ClickHouse add-on), OVH Logs Data Platform (OpenSearch, not ClickHouse).\n\nDECISION GATE: revisit any Tier 3 vendor only on explicit user demand with an account in hand. Revisit is a new spike item, not silent scope expansion.\n\nGuardrails: this item is documentation-only; it creates no adapters and changes no code.",
+  "description": "Low-priority provider re-review log for deferred hosted-ClickHouse vendors, bootstrapped with the 2026-09-29 landscape review. Each entry records last verdict, revisit trigger, and evidence required for promotion to a spike. This item is documentation-only; it creates no adapters and changes no code.\n\nBootstrapped entries:\n- ChistaDATA Cloud: services-led managed ClickHouse. Verdict: park. Revisit trigger: enterprise user brings an account; then open a new spike item.\n- Elestio Managed ClickHouse: thin ops wrapper on dedicated VMs. Verdict: park. Revisit trigger: Tier 2 stalls and a cheap trial path is needed; then open a new spike item.\n- Yandex Cloud Managed ClickHouse: genuine managed service. Verdict: deprioritize (sanctions exposure, RU-region residency, declining Western trial access). Revisit trigger: explicit user demand with account in hand.\n- Alibaba ApsaraDB for ClickHouse: genuine service, actively versioned. Verdict: deprioritize (Enterprise Edition diverges from open source, painful non-CN trial access). Revisit trigger: explicit user demand with account in hand.\n\nExplicit exclusions (do not promote without new evidence they host endpoints): cloud marketplaces (billing channels, not endpoints), ManageStacks/MSP wrappers (stock ClickHouse, use clickhouse-server), Gigapipe/HyperDX/ClickStack (observability over your own ClickHouse, not hosts), Qryn (dormant), Clever Cloud (no ClickHouse add-on), OVH Logs Data Platform (OpenSearch, not ClickHouse).\n\nDECISION GATE: revisit any Tier 3 vendor only on its listed trigger. Revisit is a new spike item, not silent scope expansion and not a reopen of this log.",
   "sessions": [
     {
       "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
@@ -7,6 +7,14 @@
       "client": "jcode",
       "op": "create",
       "op_id": "81ed93edb01d4b88bc897363ea7633d5",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T17:37:32Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "d52cf366c4a54be8aa5ddf40dabe4366",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]

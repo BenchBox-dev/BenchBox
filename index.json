@@ -2003,7 +2003,7 @@
       "needs": [],
       "priority": "low",
       "status": "open",
-      "title": "Record Tier 3 hosted-ClickHouse vendor decisions and explicit exclusions"
+      "title": "Tier 3 hosted-ClickHouse provider re-review log"
     },
     "ch-tinybird-adapter": {
       "claim": null,
