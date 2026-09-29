@@ -76,10 +76,23 @@ def run(needs_json: object, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_cli_exit_codes() -> None:
-    ok = run(needs(classify="success", lint="success", test="skipped"), "--always", "classify", "--expect", "lint=true", "--expect", "test=false")
+    ok = run(
+        needs(classify="success", lint="success", test="skipped"),
+        "--always",
+        "classify",
+        "--expect",
+        "lint=true",
+        "--expect",
+        "test=false",
+    )
     assert ok.returncode == 0, ok.stdout
     bad = run(needs(classify="success", lint="skipped"), "--always", "classify", "--expect", "lint=true")
     assert bad.returncode == 1
     assert "lint=skipped" in bad.stdout
     assert run("not-an-object").returncode == 1
-    assert subprocess.run([sys.executable, str(SCRIPT), "--unit", "core", "--needs", "{"], capture_output=True, text=True).returncode == 1
+    assert (
+        subprocess.run(
+            [sys.executable, str(SCRIPT), "--unit", "core", "--needs", "{"], capture_output=True, text=True
+        ).returncode
+        == 1
+    )

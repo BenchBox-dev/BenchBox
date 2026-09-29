@@ -40,7 +40,7 @@ def needed(paths: list[str], rules: dict[str, list[str]]) -> set[str]:
         (["scripts/check_windows_antipatterns.py"], {"tooling"}),
         (["Makefile"], {"tooling"}),
         (["AGENTS.md"], {"tooling"}),
-        (["_project/decisions/x.md"], {"tooling"}),
+        (["_project/decisions/foo.md"], {"tooling"}),
     ],
 )
 def test_single_unit_ownership(paths: list[str], expected: set[str], rules: dict[str, list[str]]) -> None:
@@ -124,7 +124,14 @@ def test_cli_reads_changed_file_and_writes_json(tmp_path: Path) -> None:
     changed.write_text("docs/index.rst\n", encoding="utf-8")
     json_out = tmp_path / "decision.json"
     subprocess.run(
-        [sys.executable, str(REPO_ROOT / "scripts" / "ci_units.py"), "--changed-file", str(changed), "--json-out", str(json_out)],
+        [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "ci_units.py"),
+            "--changed-file",
+            str(changed),
+            "--json-out",
+            str(json_out),
+        ],
         check=True,
         cwd=REPO_ROOT,
     )

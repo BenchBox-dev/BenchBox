@@ -1570,7 +1570,13 @@ jobs:
       - name: Corpus validation
         run: uv run -- python results-data/validate_corpus.py
       - name: Submission validator stays in sync
-        run: uv run -- python scripts/check_submission_validator_sync.py
+        run: |
+          git fetch --no-tags --depth=1 origin published-results
+          git show FETCH_HEAD:.github/workflows/validate-submission.yml \
+            > /tmp/published-validate-submission.yml
+          uv run -- python scripts/check_submission_validator_sync.py \
+            --develop .github/workflows/validate-submission.yml \
+            --published /tmp/published-validate-submission.yml
       - name: Corpus, submission, and explorer-pipeline contract tests
         run: |
           uv run -- python -m pytest -p no:cacheprovider -o addopts='' -q \
