@@ -1,0 +1,13 @@
+{
+  "description": "Add BenchBox support for Tinybird as a native platform with its own `tinybird` key (not a gateway). Tinybird requires a dual-path adapter: schema/load go through the Data Source REST API (token auth, .tbl conversion, import-job polling) while queries go through the read-only ClickHouse HTTP interface.\n\nScope boundary: workspace-database prefixing, token scope requirements documented, no system-table parity claims, throughput streams only if the spike proves session independence. Docs must state the dual-path model and why Tinybird numbers are never comparable to native ClickHouse runs (different storage/ingest path, server-side materializations).\n\nDECISION GATE: proceeds only after ch-tinybird-spike records go on all four unknowns (query path, ingest path, schema translation, namespace reality). A no-go defers this item with the spike evidence as the record.\n\nGuardrails: manifest authority respected; lazy optional imports; compat-docs-check green; tokens in env only; read-only interface failures surfaced cleanly, never as false-success results.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:13:41Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "b685e6bc53604edf95209ade8f40c27d",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

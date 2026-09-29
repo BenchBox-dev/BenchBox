@@ -1966,6 +1966,13 @@
       "status": "open",
       "title": "Evaluate Aiven, DoubleCloud, and OVHcloud ClickHouse trials with per-vendor verdicts"
     },
+    "ch-tinybird-adapter": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Add the Tinybird dual-path native platform adapter"
+    },
     "ch-tinybird-spike": {
       "claim": null,
       "needs": [],
