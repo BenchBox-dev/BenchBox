@@ -52,73 +52,49 @@ Ruleset name: `develop-squash-only` (id `15611785`), targets
 Required status checks:
 
 ```text
-- ci-required-result
+- core
+- explorer
+- results-data
+- docs
+- landing
 - tooling
-- Results Explorer browser gate
-- ruleset-drift
-- Public-site visual acceptance
 ```
 
-Required-check activation is ordered because `ruleset-drift` runs from the
-trusted `develop` tree. Land the PR containing the tooling workflow, this
-expected list, and their drift/landing pins while the hosted ruleset still
-requires the existing four checks. After the merge, add `tooling` to ruleset
-`15611785` without changing strictness, review, queue, or bypass
-settings. The interval between merge and ruleset update is fail closed: the
-trusted drift check
-reports the missing hosted contexts. Read the live ruleset back and run
-`scripts/ruleset_drift_check.py` before claiming activation. Record a real
-develop PR and merge-group check run with the exact head SHA; a green PR run
-alone does not prove queue coverage.
+Each required context is one always-reporting result job in
+`.github/workflows/ci.yml`. The `ci-paths` job maps changed paths to units with
+`.github/ci-units.yml`; a unit no path touches reports success immediately, and
+a touched unit succeeds only when every job it requires succeeded. A required
+job that was skipped fails the unit, so a path filter or a broken `if:` can
+never read as a pass (`scripts/ci_unit_result.py` holds the rule). Because all
+six contexts report on every `pull_request` and `merge_group` event, no
+required check can stay pending forever on a change that does not touch it.
 
-A code-PR `synchronize` is not one Develop PR run. The same head SHA also
-starts Results Explorer browser tests, PR base guard, auto-merge revocation,
-the unconditional `develop-refresh-shadow` observational workflow, and
-ruleset-drift (plus path-filtered siblings such as extension-smoke and
-gitignore lint). Documentation (`docs.yml`) reports `Public-site visual
-acceptance` on every develop PR and merge group. Its input classifier skips
-the build and comparison only when the former documentation path filter is
-unaffected. Split runner minutes from wall minutes by workflow when judging
-savings; the next-slowest sibling can dominate remaining wall time after
-`pr.yml` jobs are skipped.
+| Context | Runs for | Jobs it requires |
+| --- | --- | --- |
+| `core` | `benchbox/`, `tests/`, packaging, executable docs code | lint, unit tests, and in the merge queue the heavy tier: medium tests, correctness gate, plan-capture gate, DataFusion integration; package smoke and dependency audit on packaging changes |
+| `explorer` | `results-explorer/`, explorer pipeline, `benchbox/core/results/`, `results-data/` | token scan, Vitest, CLI-versus-explorer parity, Chromium end-to-end suite, public-site visual comparison |
+| `results-data` | `results-data/`, submission validator, `benchbox/core/results/` | corpus inventory and validation, submission validator sync, corpus and explorer-pipeline contract tests |
+| `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check, docstring coverage, visual comparison |
+| `landing` | `landing/`, quickstart inputs | site theme token scan, visual comparison |
+| `tooling` | every event | soundness review flag; content guard, skill integrity, and audit checks by path; ruleset drift in the merge queue |
 
-`ci-required-result` is the umbrella job in `.github/workflows/pr.yml`
-that aggregates the jobs in its `needs` contract: `ci-paths`,
-`tpch-binary-framing`, `content-guard`, `skill-integrity`, `code-lint`,
-`code-test`, `correctness-gate`, `plan-capture-gate`, `medium-test`
-(added 2026-07-11, #1139 — the medium tier now gates code PRs pre-merge via
-the same umbrella, no ruleset change needed), `explorer-tokens`,
-`site-theme-tokens`, `explorer-vitest`, `audit-sha`, `package-smoke`,
-`dependency-audit`, `parity-check`, and `publication-reconciliation`. This list intentionally mirrors the
-`needs` list in `.github/workflows/pr.yml`; path-filtered jobs report as
-skipped where their classifier says they are not applicable. Since the
-heavy-tier queue-only change, the heavy tier (`medium-test`,
-`correctness-gate`, `plan-capture-gate`, `tpch-binary-framing`, and the
-integration samples) additionally reports skipped on `pull_request` runs
-unless the `heavy-needed` output fires (merge queue, soundness paths, or
-packaging paths); the umbrella requires success when the tier ran and
-skipped when it was deferred, so a silent skip can never read as a pass.
+The visual comparison runs only when a rendered public-site input changed
+(`render_changed` in the `visual-inputs` job). The site build keeps the broader
+input list so Sphinx warnings still fail before merge.
 
-Slow-marked reproducer jobs remain required PR CI through this umbrella. The
-post-merge workflow has fast and medium lanes but no slow-signature lane, so
-moving those reproducers out of required PR CI would remove their only
-required execution path.
+`ruleset-drift` runs inside the `tooling` unit on `merge_group` events only. It
+checks out the trusted base revision, so the script and this runbook are read
+from the base, never from the change under test, and pull-request events never
+receive the token it uses.
 
-`Results Explorer browser gate` (added 2026-08-03) is the umbrella job in
-`.github/workflows/results-explorer-browser.yml`. It is required because the
-Chromium full-suite job's own name has claimed to block since it was written,
-while the ruleset required only `ci-required-result` — so the full `e2e/` suite
-gated nothing. The gate job, not the Chromium job, holds the required context:
-the browser jobs are conditional, and GitHub keeps a PR unmergeable forever
-waiting on a required check that never reports. The gate runs `if: always()`,
-passes when Chromium succeeded or when no explorer-relevant path changed, and
-fails closed if change detection itself broke. Firefox and WebKit stay advisory
-and are deliberately absent from its `needs`.
-Branch protection deliberately keys off the umbrella so the path-aware
-classifier can skip subordinate jobs without making the protected check
-disappear. The classifier fails closed: any path not on the
-`safe-content` allowlist in `.github/path-filters.yml` (including unknown
-top-level paths) routes through `code-lint` + `code-test`.
+Required-check changes are ordered because the drift check reads this runbook
+from the trusted base revision. Change this list and
+`APPROVED_MERGE_QUEUE_CONTEXTS` in `scripts/ruleset_drift_check.py` in the same
+PR that changes the workflow, then update the hosted ruleset in one API call
+immediately after that PR merges; the interval is fail closed. Read the live
+ruleset back and run `scripts/ruleset_drift_check.py` before claiming
+activation, and record a merge-group run for the exact head SHA. A green
+pull-request run alone does not prove queue coverage.
 
 Other ruleset properties to preserve:
 
@@ -188,8 +164,8 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
   "parameters": {
     "check_response_timeout_minutes": 60,
     "grouping_strategy": "ALLGREEN",
-    "max_entries_to_build": 5,
-    "max_entries_to_merge": 5,
+    "max_entries_to_build": 2,
+    "max_entries_to_merge": 3,
     "merge_method": "SQUASH",
     "min_entries_to_merge": 1,
     "min_entries_to_merge_wait_minutes": 0
@@ -197,9 +173,9 @@ When Native Merge Queue is activated on `develop-squash-only` (ruleset id `15611
 }
 ```
 
-- **Speculative Integration:** `max_entries_to_build: 5` evaluates up to 5 concurrent pull requests speculatively without serializing check waits.
+- **Speculative Integration:** `max_entries_to_build: 2` builds at most two merge groups at once. Each group launches several runner jobs, so a higher value saturates the organization's runner allowance and ejects groups with `checks_timed_out`.
 - **Atomic Squash:** `merge_method: SQUASH` preserves the single-commit linear history invariant.
-- **Soundness Gate:** Soundness PRs are withheld from auto-enqueue by `auto_merge_soundness_paths.py` and require CODEOWNERS approval before entry.
+- **Soundness Gate:** the `soundness-flag` job in the `tooling` unit fails a PR that touches a path in `.github/soundness-paths.txt` unless its body carries a `Soundness review:` section that names an external reviewer, links the review comment, and states that all Critical and High findings are resolved.
 - **Rollback:** Disable the `merge_queue` rule object in ruleset `15611785` to immediately revert to standard squash merges.
 
 ### Soundness-path review enforcement (enforced; operational caution)

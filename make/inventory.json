@@ -1,5 +1,9 @@
 {
+<<<<<<< HEAD
   "contract_sha256": "62aeb62a1156aa16017e07298d96d38f70aae1ee066024785d08eedf96aa2049",
+=======
+  "contract_sha256": "c7ff7bfd092e1edb71febd1bf060c1467bac69201919b276e1bd7821b4ef1b90",
+>>>>>>> 490f2197d (ci: report six unit results from one workflow and retire the legacy PR gates)
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -78,7 +82,6 @@
     "install",
     "joinorder-synthetic-cross-surface-equivalence-report",
     "joinorder-verify-reference-results",
-    "lane-isolation-check",
     "lint",
     "lint-explorer-tokens",
     "lint-imports",
@@ -180,7 +183,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 210,
+  "public_target_count": 209,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -247,7 +250,6 @@
     "install",
     "joinorder-synthetic-cross-surface-equivalence-report",
     "joinorder-verify-reference-results",
-    "lane-isolation-check",
     "lint",
     "lint-explorer-stale-theme",
     "lint-explorer-tokens",
@@ -965,13 +967,6 @@
         "recipe_sha256": "87bbf7c5de6e22f6788e843d2951693a8111ccd18a251f10bfe869c3e0b74697"
       }
     ],
-    "lane-isolation-check": [
-      {
-        "header": "lane-isolation-check:",
-        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t[ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS directory not found: $(PATH_LISTS)\" >&2; exit 2; }; \\\n\tCHANGED_PATHS=\"$(PATH_LISTS)/changed.txt\"; \\\n\t[ -s \"$$CHANGED_PATHS\" ] || { echo \"non-empty changed paths artifact is required: $$CHANGED_PATHS\" >&2; exit 2; }; \\\n\tstatus=0; \\\n\tfor lane in site explorer corpus; do \\\n\t\tuv run -- python scripts/publication/verify_lane_isolation.py --lane \"$$lane\" --changed-paths-file \"$$CHANGED_PATHS\" || status=$$?; \\\n\tdone; \\\n\texit \"$$status\"",
-        "recipe_sha256": "b9651bb15acae4b71b0156017e73a1a628bc0e5cf5521bd0bf2129f3974dc957"
-      }
-    ],
     "lint": [
       {
         "header": "lint:",
@@ -1155,8 +1150,8 @@
     "pr-content-guard": [
       {
         "header": "pr-content-guard:",
-        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\t$(MAKE) -s lane-isolation-check PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
-        "recipe_sha256": "cd02ad344fbfcce49a1e754474ebfc61c70564645e0a7a31d929a505f62307e1"
+        "recipe": "\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
+        "recipe_sha256": "b9839e93c557002a76da26cfcb22f9135a30e5d87658a2728b2c44e9f44f7f20"
       }
     ],
     "pr-fanout": [
@@ -2148,7 +2143,11 @@
     ]
   },
   "schema_version": 2,
+<<<<<<< HEAD
   "semantic_sha256": "e6d61f12907482937ee267d82243b6463844366b6dd51e13459a39c41bc1cbf5",
+=======
+  "semantic_sha256": "fa581b41256b6751e8b20ff934e072796c158e47dfcdd6948ac957b94c17c5db",
+>>>>>>> 490f2197d (ci: report six unit results from one workflow and retire the legacy PR gates)
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3793,9 +3792,9 @@
       ]
     },
     {
-      "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
+      "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
       "kind": "rule",
-      "sha256": "6e4887c6eac6f0aa82f4c14e8ace468283f28628b2e7ebebebaed67ab70c60b9",
+      "sha256": "63633fe7fabde38d081289a39c1e1775862d001bf95838ea64471dcb4381411d",
       "targets": [
         ".PHONY"
       ]
@@ -3854,14 +3853,6 @@
       "sha256": "eedd424355f6ac987f4edb9aa3cb10a95901dd09045c9604fbb0c7088c417459",
       "targets": [
         "pr-preflight-medium-tests"
-      ]
-    },
-    {
-      "body": "lane-isolation-check:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\" >&2; exit 2; }; \\\n\t[ -d \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS directory not found: $(PATH_LISTS)\" >&2; exit 2; }; \\\n\tCHANGED_PATHS=\"$(PATH_LISTS)/changed.txt\"; \\\n\t[ -s \"$$CHANGED_PATHS\" ] || { echo \"non-empty changed paths artifact is required: $$CHANGED_PATHS\" >&2; exit 2; }; \\\n\tstatus=0; \\\n\tfor lane in site explorer corpus; do \\\n\t\tuv run -- python scripts/publication/verify_lane_isolation.py --lane \"$$lane\" --changed-paths-file \"$$CHANGED_PATHS\" || status=$$?; \\\n\tdone; \\\n\texit \"$$status\"",
-      "kind": "rule",
-      "sha256": "ec750f80a78d623936053242441c6c3aadf2eca4fd248f493c5a0285cf6562da",
-      "targets": [
-        "lane-isolation-check"
       ]
     },
     {
@@ -3941,9 +3932,9 @@
       ]
     },
     {
-      "body": "pr-content-guard:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\t$(MAKE) -s lane-isolation-check PATH_LISTS=\"$(PATH_LISTS)\"; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
+      "body": "pr-content-guard:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
       "kind": "rule",
-      "sha256": "30ec72b92cec94ce40cd73e10cdc5cd8333cbfe84f67a53cff2de7858512cc9a",
+      "sha256": "8ac2a80d32569e3cbddd446fa6971550960b71cab3b63119292d7b997fce57b7",
       "targets": [
         "pr-content-guard"
       ]
@@ -4383,7 +4374,7 @@
       ]
     }
   ],
-  "target_count": 216,
+  "target_count": 215,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4453,7 +4444,6 @@
     "install",
     "joinorder-synthetic-cross-surface-equivalence-report",
     "joinorder-verify-reference-results",
-    "lane-isolation-check",
     "lint",
     "lint-explorer-stale-theme",
     "lint-explorer-tokens",

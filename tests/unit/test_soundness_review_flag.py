@@ -105,12 +105,18 @@ def test_ci_workflow_exposes_soundness_flag_in_tooling() -> None:
     assert "merge_group" in triggers
     assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "edited"]
 
-    tooling = workflow["jobs"]["tooling"]
-    assert tooling["name"] == "tooling"
-    assert any(step.get("name") == "soundness-flag" for step in tooling["steps"])
-    soundness_step = next(step for step in tooling["steps"] if step.get("name") == "soundness-flag")
+    jobs = workflow["jobs"]
+    flag = jobs["soundness-flag"]
+    assert flag["name"] == "soundness-flag"
+    soundness_step = next(step for step in flag["steps"] if step.get("name") == "soundness-flag")
     assert "check_soundness_review.py" in soundness_step["run"]
-    assert "if" not in tooling
+    assert "if" not in flag
+    # The always-reporting `tooling` unit result must require the flag on every run.
+    tooling = jobs["tooling"]
+    assert tooling["name"] == "tooling"
+    assert "soundness-flag" in tooling["needs"]
+    assert tooling["if"] == "always()"
+    assert "--always soundness-flag" in next(step for step in tooling["steps"] if "run" in step)["run"]
     assert "MERGE_GROUP_PRS" in soundness_step["env"]
     assert "BASE_SHA" in soundness_step["env"]
     assert "gh api --paginate" in soundness_step["run"]
