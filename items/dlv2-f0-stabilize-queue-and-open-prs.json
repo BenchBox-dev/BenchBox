@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Ruleset before/after JSON archived; queue builds=2, timeout=120",
+    "#2439, #2441, #2443 enqueued with all checks green (or merged); #2444 lint green",
+    "No merge-group ejection with checks_timed_out in the next 2 hours (or the cause recorded)"
+  ],
+  "context": "Part of the stop-the-world flip restructure (2026-09-29). Dual-running old and new CI is untenable on this runner budget.",
+  "description": "Do first, in minutes. Standing approval covers queue changes (G5 backup first).\n1. Ruleset develop-squash-only (15611785) merge_queue: max_entries_to_build 5->2, check_response_timeout_minutes 60->120. Evidence (2026-09-29): each merge group launches 26 jobs (~100 runner-minutes) on a Free-plan org; 5 parallel builds waited up to 78 min for runners, exceeded the 60 min timeout, and were ejected with checks_timed_out hourly (#2439 twice, #2441, #2444); >=109 merge-group run sets produced 16 merges in ~24h.\n2. Re-arm auto-merge on green dev-loop PRs that were ejected and left idle: #2439 (ledger), #2441 (chdb guard).\n3. Fix #2443 (dlv2-13, marked done while failing: test (ubuntu-latest, 3.12), ci-required-result) and #2444's lint failure; enqueue both when green.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:50:39Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "20577103d9e74f058869f92d08cd40a0",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    }
+  ]
+}
