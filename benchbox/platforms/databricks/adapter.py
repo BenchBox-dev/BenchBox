@@ -1206,6 +1206,20 @@ class DatabricksAdapter(PlatformAdapter):
                 cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
 
+            # Disable the serverless result cache on every connection so
+            # recorded timings reflect execution, not cache hits. This is
+            # the live call site for the cache control previously owned
+            # only by configure_for_benchmark(), which the runner never
+            # invokes on this path (verified: no Databricks run log shows
+            # the disable taking effect, and recorded iterations collapse
+            # ~10x after warmup).
+            if self.disable_result_cache:
+                try:
+                    cursor.execute("SET use_cached_result = false")
+                    self.log_very_verbose("Disabled Databricks result cache (use_cached_result = false)")
+                except Exception as e:
+                    self.logger.warning(f"Failed to disable Databricks result cache: {e}")
+
             self.log_operation_complete(
                 "Databricks connection",
                 details=f"Connected to {params['server_hostname']}, catalog: {self.catalog}",
@@ -2598,6 +2612,28 @@ class DatabricksAdapter(PlatformAdapter):
             # Schema context is already set in create_connection() and persists for the session
             # No need to set USE <catalog>.<schema> before every query - it adds unnecessary overhead
             # (Each USE statement = 1 extra round-trip to Databricks)
+
+            # Result cache control is per-session on serverless: pooled or
+            # per-stream sessions never pass through create_connection(),
+            # so enforce it on each session the first time it executes a
+            # query here. Verified live 2026-09-29: SET use_cached_result =
+            # false takes a COUNT(*) from 0.28s (cached) to 1.01s (fresh);
+            # without this, recorded iterations collapse ~10x after warmup.
+            if self.disable_result_cache:
+                cache_flag = getattr(cursor, "_benchbox_cache_disabled", False)
+                if not cache_flag:
+                    try:
+                        cursor.execute("SET use_cached_result = false")
+                        try:
+                            cursor.fetchall()
+                        except Exception:
+                            pass
+                        try:
+                            cursor._benchbox_cache_disabled = True
+                        except Exception:
+                            pass
+                    except Exception as e:
+                        self.logger.warning(f"Failed to disable Databricks result cache: {e}")
 
             # Execute the query
             # Note: Query dialect translation is now handled automatically by the base adapter.
