@@ -5201,7 +5201,7 @@
       "claim": null,
       "needs": [
         "dlv2-22-nightly-t3-shadow",
-        "dlv2-52-release-rehearsal-and-first-release"
+        "dlv2-f3-flip-window"
       ],
       "priority": "medium-high",
       "status": "open",

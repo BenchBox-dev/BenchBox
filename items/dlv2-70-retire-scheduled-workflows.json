@@ -1,6 +1,6 @@
 {
   "acceptance": [
-    "Job-level parity evidence for each deleted workflow",
+    "nightly-v2 has passed its dispatched validation plus one scheduled run; job-level parity recorded per deleted workflow",
     "G4 sweep clean",
     "Workflow inventory table (kept vs deleted, with owner and purpose) committed in the ledger"
   ],
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "b27142823f9d4079933356785fe38cfb",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:52:56Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "35199ae78fe341fa98b39a28b3af982c",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
     }
   ]
 }
