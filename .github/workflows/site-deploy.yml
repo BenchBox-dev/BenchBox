@@ -1,0 +1,489 @@
+# Site deploy: the single serialized writer for benchbox.dev.
+#
+# One run pins the inputs, builds every route from its pinned commit, runs the
+# pre-deploy gates, deploys the exact assembled bytes, probes what the public
+# origin serves, and leaves a durable receipt. A rollback run redeploys the exact
+# artifact of an earlier, probed-green run.
+#
+# Trigger discipline: workflow_dispatch only. `target=preview` assembles, gates, and
+# probes a local static server and never touches Pages. `target=production` is the
+# only path that reaches the deploy jobs, and only from `develop`; the
+# `github-pages` environment reviewers still approve every Pages write.
+#
+# Serialization: production and rollback runs share the `site-deploy` concurrency
+# group with cancel-in-progress disabled, so the plan job of a run reads the
+# deployed generation only after the previous run has finished and recorded its
+# receipt. A queued run replaced by a newer queued run is dropped by GitHub; the
+# generation check refuses any candidate older than what is deployed either way.
+#
+# Operating notes are in docs/operations/site-deploy.md.
+
+name: Site Deploy
+
+"on":
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "preview: assemble, gate, and probe locally (no Pages write). production: deploy to benchbox.dev."
+        required: true
+        default: preview
+        type: choice
+        options: [preview, production]
+      operation:
+        description: "deploy a newly built candidate, or roll back to the artifact of an earlier run"
+        required: true
+        default: deploy
+        type: choice
+        options: [deploy, rollback]
+      source_sha:
+        description: "Trunk commit to deploy (40-hex). Empty selects the newest develop commit that passed the merge queue."
+        required: false
+        default: ""
+        type: string
+      release_tag:
+        description: "Release tag for / and /docs/ (vX.Y.Z). Empty selects the latest release tag."
+        required: false
+        default: ""
+        type: string
+      rollback_run_id:
+        description: "Rollback only: run id of the earlier site-deploy run whose artifact is restored"
+        required: false
+        default: ""
+        type: string
+      waive_cache_window:
+        description: "Accept a UI/snapshot read-model change that briefly leaves cached pages unreadable (recorded in the receipt)"
+        required: false
+        default: false
+        type: boolean
+      allow_foreign_writer:
+        description: "Continue although another writer deployed since the last site-deploy receipt"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ inputs.target == 'production' && 'site-deploy' || format('site-deploy-preview-{0}', github.run_id) }}
+  cancel-in-progress: false
+
+env:
+  UV_FROZEN: "1"
+
+jobs:
+  plan:
+    name: Plan and generation check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+    outputs:
+      allowed: ${{ steps.decide.outputs.allowed || steps.rollback.outputs.allowed }}
+      verdict: ${{ steps.decide.outputs.verdict || steps.rollback.outputs.verdict }}
+      trunk_sha: ${{ steps.decide.outputs.trunk_sha }}
+      release_tag: ${{ steps.decide.outputs.release_tag }}
+      corpus_sha: ${{ steps.decide.outputs.corpus_sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET: ${{ inputs.target }}
+      OPERATION: ${{ inputs.operation }}
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      ROLLBACK_RUN_ID: ${{ inputs.rollback_run_id }}
+      ALLOW_FOREIGN_WRITER: ${{ inputs.allow_foreign_writer }}
+    steps:
+      - name: Validate dispatch inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = "production" ] && [ "$GITHUB_REF" != "refs/heads/develop" ]; then
+            echo "::error::production runs must be dispatched from develop, got $GITHUB_REF"
+            exit 1
+          fi
+          if [ -n "$SOURCE_SHA" ] && ! printf '%s' "$SOURCE_SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "::error::source_sha must be a 40-hex commit"
+            exit 1
+          fi
+          if [ -n "$RELEASE_TAG" ] && ! printf '%s' "$RELEASE_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::release_tag must look like vX.Y.Z"
+            exit 1
+          fi
+          if [ "$OPERATION" = "rollback" ]; then
+            printf '%s' "$ROLLBACK_RUN_ID" | grep -qE '^[0-9]+$' || {
+              echo "::error::rollback needs a numeric rollback_run_id"
+              exit 1
+            }
+          fi
+
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch corpus branch
+        run: git fetch --no-tags origin published-results:refs/remotes/origin/published-results
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Read the deployed generation
+        id: previous
+        shell: bash
+        run: |
+          set -euo pipefail
+          FLAGS=""
+          if [ "$TARGET" = "preview" ] || [ "$ALLOW_FOREIGN_WRITER" = "true" ]; then
+            FLAGS="--allow-foreign-writer"
+          fi
+          mkdir -p plan
+          uv run python -m scripts.site_deploy previous --github-output --out plan/previous.json $FLAGS
+
+      - name: Decide (deploy)
+        id: decide
+        if: inputs.operation == 'deploy'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(--target "$TARGET" --github-output --out plan/plan.json)
+          if [ -f plan/previous.json ]; then ARGS+=(--previous-receipt plan/previous.json); fi
+          if [ -n "$SOURCE_SHA" ]; then ARGS+=(--trunk-sha "$SOURCE_SHA"); fi
+          if [ -n "$RELEASE_TAG" ]; then ARGS+=(--release-tag "$RELEASE_TAG"); fi
+          uv run python -m scripts.site_deploy plan "${ARGS[@]}"
+
+      - name: Decide (rollback)
+        id: rollback
+        if: inputs.operation == 'rollback'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f plan/previous.json || {
+            echo "::error::no deployed site-deploy receipt to roll back from"
+            exit 1
+          }
+          ARGS=(--target-run-id "$ROLLBACK_RUN_ID" --previous-receipt plan/previous.json --github-output)
+          ARGS+=(--out plan/rollback.json --target-receipt-out plan/target-receipt.json)
+          if [ "$ALLOW_FOREIGN_WRITER" = "true" ]; then ARGS+=(--live-unconfirmed); fi
+          uv run python -m scripts.site_deploy rollback-plan "${ARGS[@]}"
+
+      - name: Upload plan
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-deploy-plan-${{ github.run_id }}
+          path: plan/
+          retention-days: 30
+
+  build:
+    name: Build, gate, and package candidate
+    needs: plan
+    if: inputs.operation == 'deploy' && (needs.plan.outputs.allowed == 'true' || inputs.target == 'preview')
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET: ${{ inputs.target }}
+      WAIVE_CACHE_WINDOW: ${{ inputs.waive_cache_window }}
+      TRUNK_SHA: ${{ needs.plan.outputs.trunk_sha }}
+      RELEASE_TAG: ${{ needs.plan.outputs.release_tag }}
+      CORPUS_SHA: ${{ needs.plan.outputs.corpus_sha }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch corpus branch
+        run: git fetch --no-tags origin published-results:refs/remotes/origin/published-results
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "20"
+
+      - name: Install tooling dependencies
+        run: uv sync --group dev
+
+      - name: Download plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-deploy-plan-${{ github.run_id }}
+          path: plan
+
+      - name: Assemble, gate, and package (production)
+        if: inputs.target == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(prepare --target production --out-dir out --work-dir "$RUNNER_TEMP/site-work")
+          ARGS+=(--trunk-sha "$TRUNK_SHA" --release-tag "$RELEASE_TAG" --corpus-ref "$CORPUS_SHA" --github-output)
+          if [ -f plan/previous.json ]; then ARGS+=(--previous-receipt plan/previous.json); fi
+          if [ "$WAIVE_CACHE_WINDOW" = "true" ]; then ARGS+=(--waive-cache-window); fi
+          uv run python -m scripts.site_deploy "${ARGS[@]}"
+
+      - name: Assemble, gate, and probe locally (preview)
+        if: inputs.target == 'preview'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(dry-run --target preview --out-dir out --work-dir "$RUNNER_TEMP/site-work")
+          ARGS+=(--trunk-sha "$TRUNK_SHA" --release-tag "$RELEASE_TAG" --corpus-ref "$CORPUS_SHA")
+          if [ -f plan/previous.json ]; then ARGS+=(--previous-receipt plan/previous.json); fi
+          if [ "$WAIVE_CACHE_WINDOW" = "true" ]; then ARGS+=(--waive-cache-window); fi
+          uv run python -m scripts.site_deploy "${ARGS[@]}"
+
+      - name: Retain the artifact and candidate receipt
+        if: inputs.target == 'production'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-deploy-artifact-${{ github.run_id }}
+          path: |
+            out/site-artifact.tar
+            out/receipt.json
+            out/gates.json
+          retention-days: 90
+
+      - name: Upload Pages artifact
+        if: inputs.target == 'production'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: out/site
+          include-hidden-files: true
+
+      - name: Upload preview evidence
+        if: inputs.target == 'preview' && always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-deploy-preview-${{ github.run_id }}
+          path: |
+            out/receipt.json
+            out/receipt.final.json
+            out/gates.json
+          retention-days: 30
+
+  rollback-stage:
+    name: Verify and stage rollback artifact
+    needs: plan
+    if: inputs.operation == 'rollback' && needs.plan.outputs.allowed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      TARGET: ${{ inputs.target }}
+      WAIVE_CACHE_WINDOW: ${{ inputs.waive_cache_window }}
+      ROLLBACK_RUN_ID: ${{ inputs.rollback_run_id }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling dependencies
+        run: uv sync --group dev
+
+      - name: Download plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-deploy-plan-${{ github.run_id }}
+          path: plan
+
+      - name: Download the retained artifact of the rollback target
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-deploy-artifact-${{ inputs.rollback_run_id }}
+          path: target-artifact
+          run-id: ${{ inputs.rollback_run_id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify the archive against its receipt and stage it
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(rollback-stage --target "$TARGET" --github-output)
+          ARGS+=(--target-receipt plan/target-receipt.json --previous-receipt plan/previous.json)
+          ARGS+=(--archive target-artifact/site-artifact.tar --out-dir out)
+          if [ "$WAIVE_CACHE_WINDOW" = "true" ]; then ARGS+=(--waive-cache-window); fi
+          uv run python -m scripts.site_deploy "${ARGS[@]}"
+
+      - name: Keep the archive beside the receipt
+        shell: bash
+        run: cp target-artifact/site-artifact.tar out/site-artifact.tar
+
+      - name: Probe the staged rollback locally (preview)
+        if: inputs.target == 'preview'
+        run: uv run python -m scripts.site_deploy probe --serve out/site --receipt out/receipt.json --out out/probes.json
+
+      - name: Retain the rollback candidate receipt
+        if: inputs.target == 'production'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-deploy-artifact-${{ github.run_id }}
+          path: |
+            out/receipt.json
+            out/site-artifact.tar
+          retention-days: 90
+
+      - name: Upload Pages artifact
+        if: inputs.target == 'production'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: out/site
+          include-hidden-files: true
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: [plan, build]
+    # The only job that can publish a newly built candidate. It cannot run from a
+    # pull request or a schedule, and it requires an explicit production target.
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'production' && inputs.operation == 'deploy' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  rollback-deploy:
+    name: Deploy rollback to GitHub Pages
+    needs: [plan, rollback-stage]
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'production' && inputs.operation == 'rollback' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  verify:
+    name: Probe the public origin and record the receipt
+    needs: [plan, build, deploy, rollback-stage, rollback-deploy]
+    if: always() && (needs.deploy.result == 'success' || needs.rollback-deploy.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PAGES_URL: ${{ needs.deploy.outputs.page_url || needs.rollback-deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install tooling dependencies
+        run: uv sync --group dev
+
+      - name: Download the candidate receipt
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: site-deploy-artifact-${{ github.run_id }}
+          path: candidate
+
+      - name: Probe every route
+        id: probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pages can keep serving the previous site for a short time after the
+          # deployment reports success, so allow a bounded propagation window.
+          uv run python -m scripts.site_deploy probe \
+            --base-url "$PAGES_URL" --receipt candidate/receipt.json \
+            --attempts 12 --delay 20 --out probes.json --github-output
+
+      - name: Finalize the receipt
+        id: finalize
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f probes.json || echo '{"ok": false, "errors": ["probes did not run"], "checked": 0, "matched": 0}' > probes.json
+          set +e
+          uv run python -m scripts.site_deploy finalize \
+            --receipt candidate/receipt.json --probes probes.json \
+            --deployment-confirmed --pages-url "$PAGES_URL" --out final/receipt.json --github-output
+          echo "exit=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Upload the durable receipt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: site-deploy-receipt-${{ github.run_id }}
+          path: |
+            final/receipt.json
+            probes.json
+          retention-days: 90
+
+      - name: Record the receipt on the Pages Deployment
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          RUN_STARTED=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}" \
+            --jq '.run_started_at // .created_at')
+          uv run python -m scripts.site_deploy record \
+            --receipt final/receipt.json --sha "${{ github.sha }}" --run-started-at "$RUN_STARTED" \
+            --log-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Fail the run when the served site does not match the artifact
+        if: steps.probe.outcome != 'success' || steps.finalize.outputs.exit != '0'
+        run: |
+          echo "::error::post-deploy probes did not confirm the deployed artifact; the live site is unverified. Roll back with operation=rollback."
+          exit 1

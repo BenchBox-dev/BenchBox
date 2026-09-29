@@ -1,0 +1,40 @@
+# Route manifest for benchbox.dev.
+#
+# Each route is built from the commit its ref pins. `release` is the highest
+# final vX.Y.Z tag; `trunk` is the tip of develop (or the eligible develop commit
+# the deploy run selected). scripts/assemble_public_site.py --manifest reads this
+# file; docs/operations/site-deploy.md describes how the pins are used.
+schema_version: 1
+
+refs:
+  release:
+    kind: latest-tag
+    pattern: "v[0-9]*.[0-9]*.[0-9]*"
+  trunk:
+    kind: branch
+    branch: develop
+
+routes:
+  - id: landing
+    mount: /
+    ref: release
+    kind: landing
+  - id: docs
+    mount: /docs/
+    ref: release
+    kind: docs
+  - id: docs-dev
+    mount: /docs/dev/
+    ref: trunk
+    kind: docs
+  - id: blog
+    mount: /blog/
+    ref: trunk
+    kind: blog
+  - id: results
+    mount: /results/
+    ref: trunk
+    kind: explorer
+    # Deep links under /results/ are handled by the Explorer SPA through the
+    # site 404 fallback, so they are not files on disk.
+    spa: true
