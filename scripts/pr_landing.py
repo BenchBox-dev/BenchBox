@@ -1259,7 +1259,10 @@ def ready_failures(
     if remote_head != expected_head:
         failures.append(f"remote head {remote_head[:12]} != expected {expected_head[:12]}")
     failures.extend(f"unpublished work: {problem}" for problem in unpublished_work(repo))
-    if evidence.review_decision != "APPROVED":
+    # GitHub leaves reviewDecision empty when the branch-wide ruleset needs no formal approval.
+    # Non-soundness PRs still require complete review dispositions; soundness paths require approval.
+    soundness_changed = head_valid and soundness_paths_changed(repo, identity.base, expected_head)
+    if evidence.review_decision != "APPROVED" and (evidence.review_decision != "" or soundness_changed):
         failures.append(f"review decision is {evidence.review_decision!r}, not APPROVED")
     if not evidence.dispositions_complete:
         failures.append("review dispositions incomplete (every top-level finding needs evidence)")
@@ -1268,7 +1271,7 @@ def ready_failures(
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
     failures.extend(batch_mode_failures(evidence, repo))
-    if head_valid and soundness_paths_changed(repo, identity.base, expected_head):
+    if soundness_changed:
         failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
     if head_valid and evidence.batch is not None:
         if evidence.batch.get("repository") != evidence.repository:
