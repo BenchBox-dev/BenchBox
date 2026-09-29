@@ -5314,6 +5314,17 @@
       "status": "open",
       "title": "Prove the flip branch with a canary PR set before the flip"
     },
+    "dlv2-f3-flip-window": {
+      "claim": null,
+      "needs": [
+        "dlv2-f2-canary-prs",
+        "dlv2-f0-stabilize-queue-and-open-prs",
+        "dlv2-32-codeowners-soundness-hold"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Run the stop-the-world flip: swap required checks and merge the flip PR"
+    },
     "docs-browser-duckdb-schema-column-drift-20260724": {
       "claim": null,
       "needs": [],

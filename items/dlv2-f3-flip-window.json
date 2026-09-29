@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Ruleset before/after JSON archived",
+    "Flip PR merged; 3 subsequent PRs merged green under the six new checks",
+    "No legacy PR-gate/post-merge workflow runs on develop after the flip",
+    "Open PRs updated in batches; count of PRs with ci.yml results recorded"
+  ],
+  "description": "Standing approvals cover every step. Window ~2-3 hours.\n1. Stop enqueueing; let in-flight merge groups finish or clear the queue (clearing is acceptable; PRs re-enqueue after).\n2. One API call on ruleset develop-squash-only (15611785): remove required ci-required-result, Results Explorer browser gate, ruleset-drift, Public-site visual acceptance; add core, explorer, results-data, docs, landing, tooling; queue builds 2, timeout 60. Doing it in one call avoids the old drift check deadlocking. This also freezes the queue naturally: PRs without ci.yml results cannot enqueue.\n3. Open the flip PR from dlv2-f1's branch (if not already open), confirm its ci.yml checks are green, enqueue, and watch it merge.\n4. Watch 3 more real PRs merge green under the new checks (update/enqueue green dev-loop or other PRs).\n5. Unfreeze: update the remaining open PRs' branches about 5 at a time (gh pr update-branch) so they get ci.yml results without stampeding runners.\nRollback if step 3 or 4 fails in a way not fixable in minutes: restore the saved ruleset JSON, merge the prepared revert (it restores the old workflows and passes under them), record the cause, STOP.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:7abe71c750e372b01241a99e",
+      "at": "2026-09-29T11:51:15Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "349a7335321f4daeab898d952571a094",
+      "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    }
+  ]
+}
