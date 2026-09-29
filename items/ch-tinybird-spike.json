@@ -1,0 +1,13 @@
+{
+  "description": "Validate the four Tinybird unknowns before any adapter code: (1) query path via clickhouse-connect against clickhouse.<region>.tinybird.co:443 with workspace name + token; (2) ingest path: create a Data Source from BenchBox .tbl data via the Data Source API and measure import latency; (3) schema translation: BenchBox DDL to Tinybird-inferred schema, including TPC-H trailing delimiters and null markers; (4) namespace reality: queries must target the workspace database, only 4 databases visible, subset of system tables.\n\nDECISION GATE: end of item records go/no-go for the adapter. Go requires all four unknowns resolved with evidence. No-go records the blocking fact and defers the adapter, same as the GizmoSQL pattern of documenting negatives.\n\nGuardrails: tokens in env only, never committed; no production workspace writes; read-only query probing plus one scratch Data Source for ingest.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:12:47Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "4a8393d2830f42458aa50ca18c1ea096",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

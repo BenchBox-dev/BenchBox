@@ -1952,6 +1952,13 @@
       "status": "open",
       "title": "Evaluate Altinity Cloud locally and record driver, SQL, and connection-limit facts"
     },
+    "ch-tinybird-spike": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Tinybird dual-path spike: ClickHouse-interface query plus Data Source ingest"
+    },
     "check-scope-reports-ok-when-no-scope-rules-exist": {
       "claim": null,
       "needs": [],
