@@ -5210,7 +5210,7 @@
     "dlv2-80-github-cleanup": {
       "claim": null,
       "needs": [
-        "dlv2-41-retire-post-merge-workflows",
+        "dlv2-f3-flip-window",
         "dlv2-53-retire-legacy-release-path",
         "dlv2-70-retire-scheduled-workflows",
         "dlv2-01-baseline-and-backups",
