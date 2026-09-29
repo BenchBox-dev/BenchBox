@@ -1,4 +1,4 @@
-/* Base layout variables; site-theme.css supplies semantic color tokens. */
+/* Base layout variables; site-theme.css supplies semantic color tokens (canary). */
 :root {
     /* Typography */
     --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Fira Code', monospace;
