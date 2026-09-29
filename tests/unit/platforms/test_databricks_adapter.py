@@ -727,7 +727,9 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.side_effect = [[], [(60,)]]
+        # Fresh sessions first emit SET use_cached_result = false (session
+        # cache disable), then the batch statements in order.
+        mock_cursor.fetchall.side_effect = [[], [], [(60,)]]
 
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
@@ -745,6 +747,7 @@ class TestDatabricksAdapter:
         assert result["rows_returned"] == 1
         executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
         assert executed == [
+            "SET use_cached_result = false",
             "DELETE FROM t WHERE k BETWEEN 1 AND 10",
             "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
         ]
