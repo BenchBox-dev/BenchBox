@@ -17,7 +17,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -29,19 +29,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -66,7 +72,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -78,19 +84,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -120,7 +132,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -132,19 +144,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -165,7 +183,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -177,19 +195,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -214,7 +238,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "failure",
           "started_at": "2026-07-23T08:10:00Z"
@@ -226,19 +250,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -263,7 +293,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T11:35:00Z"
@@ -275,19 +305,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -315,7 +351,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "failure",
           "started_at": "2026-07-23T07:00:00Z"
@@ -327,7 +363,13 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "ci-required-result",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -339,19 +381,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -376,7 +424,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -388,19 +436,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -428,7 +482,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -440,19 +494,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -473,7 +533,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "failure",
           "started_at": "2026-07-23T07:00:00Z"
@@ -485,7 +545,13 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "ci-required-result",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -497,19 +563,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -534,7 +606,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -546,7 +618,13 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -571,7 +649,7 @@
       ],
       "check_runs": [
         {
-          "name": "ci-required-result",
+          "name": "core",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:10:00Z"
@@ -583,19 +661,25 @@
           "started_at": "2026-07-23T08:11:00Z"
         },
         {
-          "name": "Results Explorer browser gate",
+          "name": "landing",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-07-23T08:11:00Z"
+        },
+        {
+          "name": "explorer",
           "status": "completed",
           "conclusion": "failure",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "ruleset-drift",
+          "name": "results-data",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
         },
         {
-          "name": "Public-site visual acceptance",
+          "name": "docs",
           "status": "completed",
           "conclusion": "success",
           "started_at": "2026-07-23T08:12:00Z"
@@ -618,11 +702,5 @@
     "2007": "no_arm_intent",
     "2011": "not_green",
     "2012": "not_green"
-  },
-  "post_merge_run": {
-    "status": "completed",
-    "conclusion": "failure",
-    "html_url": "https://github.com/joeharris76/BenchBox/actions/runs/999999"
-  },
-  "expected_post_merge_red": true
+  }
 }

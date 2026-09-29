@@ -20,11 +20,12 @@ from typing import Any
 # Pin must match docs/operations/repo-admin-settings.md and the live
 # ruleset (id 15611785). Partial membership is incomplete green.
 REQUIRED_CHECK_NAMES: tuple[str, ...] = (
-    "ci-required-result",
+    "core",
+    "explorer",
+    "results-data",
+    "docs",
+    "landing",
     "tooling",
-    "Results Explorer browser gate",
-    "ruleset-drift",
-    "Public-site visual acceptance",
 )
 
 
@@ -76,10 +77,9 @@ def is_check_run_success(run: dict[str, Any] | None) -> bool:
 def is_required_lane_green(check_runs: list[dict[str, Any]]) -> bool:
     """True when every develop-ruleset required context is latest-success.
 
-    Partial green (e.g. ``ci-required-result`` success but browser gate
-    missing or red) returns False. Missing runs are fail-closed not-green;
-    the browser gate always reports on develop PRs (success when the explorer
-    suite is not needed).
+    Partial green (e.g. ``core`` success but ``explorer`` missing or red)
+    returns False. Missing runs are fail-closed not-green; every unit always
+    reports on develop PRs (success when no path touches it).
     """
     if not REQUIRED_CHECK_NAMES:
         return False

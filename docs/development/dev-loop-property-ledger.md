@@ -66,6 +66,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `docker-integration.yml` | product-safety | Container integration coverage |
 | `docs.yml` | product-safety | Public-site build, privacy scan, visual acceptance |
 | `extension-smoke.yml` | product-safety | Extension smoke coverage |
+| `fast-lane-baseline.yml` | tooling | Develop-tip fast-lane count that the ci.yml delta guard restores |
 | `gitignore-lint.yml` | tooling | Hygiene; standalone, not part of the ci.yml units |
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3 |
