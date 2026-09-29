@@ -5042,7 +5042,7 @@
         "dlv2-21-ci-yml-shadow"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "Update the ruleset drift expected settings to include the six new required checks before any ruleset change"
     },
     "dlv2-31-ruleset-add-new-checks": {
