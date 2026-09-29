@@ -1,0 +1,13 @@
+{
+  "description": "Add end-to-end BenchBox support for Altinity Cloud as a native platform (not a gateway). Altinity exposes its own ClickHouse clusters on standard native TCP :9440 and HTTPS :8443 endpoints; results live under a new `altinity` key, so there is no same-key baseline contamination risk.\n\nDeliver one coherent platform addition: manifest registration (key `altinity`, platform_family clickhouse, inherits_from clickhouse, experimental, next contiguous registration order at implementation time, clickhouse-connect driver package and extra), AltinityAdapter(ClickHouseAdapter) forcing a managed deployment mode, host/password/user config with ALTINITY_* env fallback, credential redaction, S3/GCS staging options only if the spike shows they work, SQL-compat exemption or reuse per spike findings, mock-only unit tests, docs/platforms/altinity.md with an Altinity Shield hop-latency note, and SF 0.01 TPC-H parity UAT against the trial cluster.\n\nDECISION GATE: proceeds only after ch-altinity-spike records a go (zero SQL-compat rewrites needed, both transports confirmed).\n\nGuardrails: manifest authority respected (no parallel registries); lazy optional imports; compat-docs-check green; no credentials in git; target 7-10 durable files per the new-platform acceptance checklist.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:13:22Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "7efa6fccf59c4972aa61be7d37081cbd",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

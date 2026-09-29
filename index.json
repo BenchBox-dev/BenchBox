@@ -1945,6 +1945,13 @@
       "status": "done",
       "title": "Certify BenchBox package-only TODO runtime and remove fallback paths"
     },
+    "ch-altinity-adapter": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Add the Altinity Cloud native platform adapter"
+    },
     "ch-altinity-spike": {
       "claim": null,
       "needs": [],
