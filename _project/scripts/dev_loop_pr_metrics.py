@@ -102,6 +102,7 @@ REFRESH_REASON_TIMING = "prior_check_not_success"
 REFRESH_REASON_IDENTITY = "prior_check_unbound"
 REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "ci-required-result",
+    "tooling",
     "Results Explorer browser gate",
     "ruleset-drift",
     "Public-site visual acceptance",

@@ -1,0 +1,187 @@
+name: CI v2
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  merge_group:
+
+concurrency:
+  group: ci-v2-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  tooling:
+    name: tooling
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch pull request base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: git fetch --no-tags origin "${BASE_SHA}:refs/remotes/origin/ci-v2-base"
+
+      - name: Collect changed paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/changed-paths.txt"
+
+      - name: soundness-flag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+          MERGE_GROUP_PRS: ${{ toJson(github.event.merge_group.pull_requests) }}
+        run: |
+          set -euo pipefail
+
+          check_one() {
+            local paths_file="$1"
+            local body_file="$2"
+            local trusted_root="$RUNNER_TEMP/trusted-soundness"
+            local result
+            rm -rf "$trusted_root"
+            mkdir -p "$trusted_root/_project/scripts"
+            mkdir -p "$trusted_root/.github"
+
+            # After this rollout lands, the base revision contains the checker
+            # and manifest. Execute those immutable base files, never the PR
+            # checkout, so a PR cannot narrow its own soundness predicate.
+            if git cat-file -e "${BASE_SHA}:_project/scripts/check_soundness_review.py" 2>/dev/null \
+              && git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null \
+              && git cat-file -e "${BASE_SHA}:.github/soundness-paths.txt" 2>/dev/null; then
+              git show "${BASE_SHA}:_project/scripts/check_soundness_review.py" \
+                > "$trusted_root/_project/scripts/check_soundness_review.py"
+              git show "${BASE_SHA}:_project/scripts/soundness_paths.py" \
+                > "$trusted_root/_project/scripts/soundness_paths.py"
+              git show "${BASE_SHA}:.github/soundness-paths.txt" \
+                > "$trusted_root/.github/soundness-paths.txt"
+              python "$trusted_root/_project/scripts/check_soundness_review.py" \
+                --paths-file "$paths_file" \
+                --body-file "$body_file"
+              return
+            fi
+
+            # Bootstrap compatibility for this first rollout: develop does not
+            # yet contain the new checker. Use the immutable legacy predicate
+            # plus the fixed gate-file list, then validate the required body
+            # fields without executing any PR-side path predicate. Once this
+            # workflow is on develop, this branch is unreachable.
+            git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" \
+              > "$trusted_root/auto_merge_soundness_paths.py"
+            result="$(python "$trusted_root/auto_merge_soundness_paths.py" \
+              --paths-file "$paths_file" --format github-output)"
+            case "$result" in
+              soundness_path=true|soundness_path=false) ;;
+              *)
+                echo "soundness-flag: trusted bootstrap predicate returned an invalid result" >&2
+                return 1
+                ;;
+            esac
+
+            for protected_path in \
+              "AGENTS.md" \
+              ".github/CODEOWNERS" \
+              ".github/PULL_REQUEST_TEMPLATE.md" \
+              ".github/soundness-paths.txt" \
+              ".github/workflows/ci.yml" \
+              "_project/scripts/auto_merge_soundness_paths.py" \
+              "_project/scripts/check_soundness_review.py" \
+              "_project/scripts/soundness_paths.py"; do
+              if ! grep -qxF "$protected_path" "$paths_file"; then
+                continue
+              fi
+              result="soundness_path=true"
+              break
+            done
+            if [ "$result" = "soundness_path=false" ]; then
+              return
+            fi
+
+            grep -Eiq '^[[:space:]]*(#{1,6}[[:space:]]+)?Soundness review:[[:space:]]*$' "$body_file" \
+              || { echo "soundness-flag: missing Soundness review section" >&2; return 1; }
+            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?(External[[:space:]]+)?reviewer:[[:space:]]*(codex|muse|agy)\b' "$body_file" \
+              || { echo "soundness-flag: missing approved external reviewer" >&2; return 1; }
+            grep -Eiq 'https://github\.com/[^/[:space:])]+/[^/[:space:])]+/pull/[0-9]+#issuecomment-[0-9]+' "$body_file" \
+              || { echo "soundness-flag: missing external review PR comment link" >&2; return 1; }
+            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?all[[:space:]]+(critical/high|critical[[:space:]]+and[[:space:]]+high)[[:space:]]+findings[[:space:]]+(are[[:space:]]+)?resolved[.!]?[[:space:]]*$' "$body_file" \
+              || { echo "soundness-flag: missing resolved Critical/High finding statement" >&2; return 1; }
+            echo "soundness-flag: passed (trusted bootstrap path)"
+          }
+
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
+              echo "soundness-flag: merge_group payload has no pull_requests; resolving anchor from queue ref" >&2
+              QUEUE_REF="${{ github.ref }}"
+              ANCHOR_NUMBER="$(printf '%s' "$QUEUE_REF" | grep -oE 'pr-[0-9]+' | head -1 | cut -d- -f2)"
+              if [ -z "$ANCHOR_NUMBER" ]; then
+                echo "soundness-flag: cannot parse anchor PR from queue ref $QUEUE_REF; failing closed" >&2
+                exit 1
+              fi
+              ANCHOR_HEAD="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.head.sha')"
+              if [ -z "$ANCHOR_HEAD" ]; then
+                echo "soundness-flag: cannot resolve head of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
+                exit 1
+              fi
+              # The queue squashes the anchor PR onto the group base, so the
+              # anchor head is never an ancestor of the group HEAD. Verify the
+              # squash by content: every file the anchor PR changed (relative
+              # to its own base) must be byte-identical between the anchor
+              # head and the group HEAD. A mismatch means the queued content
+              # is not what reviewers approved. Files the group base changed
+              # identically do not matter; files only the group changed are
+              # covered by the group-base diff check below.
+              git fetch --no-tags --depth 50 origin "$ANCHOR_HEAD" 2>/dev/null || true
+              ANCHOR_BASE="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.base.sha')"
+              git fetch --no-tags --depth 50 origin "$ANCHOR_BASE" 2>/dev/null || true
+              ANCHOR_FILES="$(git diff --name-only --no-renames "$ANCHOR_BASE" "$ANCHOR_HEAD")"
+              if [ -z "$ANCHOR_FILES" ]; then
+                echo "soundness-flag: anchor #$ANCHOR_NUMBER changed no files; failing closed" >&2
+                exit 1
+              fi
+              MISMATCH=0
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                if ! git diff --quiet "$ANCHOR_HEAD" HEAD -- "$f"; then
+                  echo "soundness-flag: anchor #$ANCHOR_NUMBER file differs in queue: $f" >&2
+                  MISMATCH=1
+                fi
+              done <<< "$ANCHOR_FILES"
+              if [ "$MISMATCH" != "0" ]; then
+                echo "soundness-flag: anchor #$ANCHOR_NUMBER content mismatch in queue; failing closed" >&2
+                exit 1
+              fi
+              echo "soundness-flag: anchor #$ANCHOR_NUMBER content verified in queue" >&2
+              printf '%s\n' "$ANCHOR_NUMBER" > "$RUNNER_TEMP/merge-group-prs.txt"
+              echo "soundness-flag: payload empty; validating anchor PR #$ANCHOR_NUMBER with group base diff" >&2
+            else
+              printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
+            fi
+            if [ ! -s "$RUNNER_TEMP/merge-group-prs.txt" ]; then
+              echo "soundness-flag: merge_group has no pull requests to validate" >&2
+              exit 1
+            fi
+            while IFS= read -r pr_number; do
+              gh api "repos/$REPO/pulls/$pr_number" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
+              gh api --paginate "repos/$REPO/pulls/$pr_number/files" \
+                --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
+              check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
+            done < "$RUNNER_TEMP/merge-group-prs.txt"
+            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
+              echo "soundness-flag: also validating full group base diff for soundness paths" >&2
+              git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/group-diff-paths.txt"
+              gh api "repos/$REPO/pulls/$(head -1 "$RUNNER_TEMP/merge-group-prs.txt")" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
+              check_one "$RUNNER_TEMP/group-diff-paths.txt" "$RUNNER_TEMP/pr-body.md"
+            fi
+            exit 0
+          fi
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"

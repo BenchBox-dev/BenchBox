@@ -93,9 +93,11 @@ a PR's mergeability — both only alert.
   auto-merge is still off more than 2 hours after the head commit, **and**
   the PR timeline shows prior arm intent that was lost. "Required lane
   green" means **every** `develop-squash-only` required context is
-  latest-success — today both `ci-required-result` and `Results Explorer
-  browser gate` — so a PR that is green on one and red or silent on the
-  other is not green and is not alerted. `--apply` only
+  latest-success — the documented required contexts are
+  `ci-required-result`, `tooling`, `Results Explorer browser gate`,
+  `ruleset-drift`, and `Public-site visual acceptance` — so a PR that is
+  green on one and red or silent on the other is not green and is not alerted.
+  `--apply` only
   upserts the digest issue; it **never** enables auto-merge and must not
   re-arm a hold it did not set.
 

@@ -49,6 +49,7 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
     assert expected["develop-squash-only"].ref == "refs/heads/develop"
     assert expected["develop-squash-only"].required_checks == (
         "ci-required-result",
+        "tooling",
         "Results Explorer browser gate",
         "ruleset-drift",
         "Public-site visual acceptance",
@@ -206,7 +207,7 @@ def test_github_api_failure_is_reported_without_traceback(
 
 
 def _live_with_queue(params: dict | None) -> dict:
-    live = _live_ruleset("refs/heads/develop", ["ci-required-result"])
+    live = _live_ruleset("refs/heads/develop", ["ci-required-result", "tooling"])
     live["name"] = "develop-squash-only"
     if params is not None:
         live["rules"].append({"type": "merge_queue", "parameters": dict(params)})
@@ -251,7 +252,13 @@ def test_merge_queue_absent_is_warning_only_when_payload_empty() -> None:
 def _verified_develop_queue() -> dict:
     live = _live_ruleset(
         "refs/heads/develop",
-        ["ci-required-result", "Results Explorer browser gate", "ruleset-drift", "Public-site visual acceptance"],
+        [
+            "ci-required-result",
+            "tooling",
+            "Results Explorer browser gate",
+            "ruleset-drift",
+            "Public-site visual acceptance",
+        ],
         strict=True,
     )
     live["name"] = "develop-squash-only"

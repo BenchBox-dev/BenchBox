@@ -241,7 +241,7 @@ so the metric and the budget it measures cannot drift apart.
 ## Required-gate versus whole-event fan-out
 
 Merge-unblock latency is the last **required** context (`ci-required-result`,
-`Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`).
+`tooling`, `Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`).
 The remaining documentation, integration samples, and other synchronize jobs
 are all-workflow fan-out: they consume runner-minutes and can extend wall time
 after the PR is already mergeable.

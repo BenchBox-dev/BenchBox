@@ -53,6 +53,7 @@ from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # no
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
     "ci-required-result",
+    "tooling",
     "Results Explorer browser gate",
     "ruleset-drift",
     "Public-site visual acceptance",

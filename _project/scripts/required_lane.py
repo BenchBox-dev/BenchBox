@@ -21,6 +21,7 @@ from typing import Any
 # ruleset (id 15611785). Partial membership is incomplete green.
 REQUIRED_CHECK_NAMES: tuple[str, ...] = (
     "ci-required-result",
+    "tooling",
     "Results Explorer browser gate",
     "ruleset-drift",
     "Public-site visual acceptance",

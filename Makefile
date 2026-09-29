@@ -70,34 +70,34 @@ publication-help:
 
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
-	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
 	@echo "Running slow and resource-heavy tests serially..."
-	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
 
 test-unit:
-	uv run -- python -m pytest -m "unit" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "unit" --tb=short
 
 test-integration:
-	uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
 
 test-tpch:
-	uv run -- python -m pytest -m "tpch" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "tpch" --tb=short
 
 # Curated lightweight smoke lane
 test-quick:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
 
 # Verbose test output for all tests
 test-verbose:
-	uv run -- python -m pytest -v
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v
 
 # Enhanced pytest commands using comprehensive marker system
 test-pytest:
-	uv run -- python -m pytest -m "not stress"
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not stress"
 
 # Speed-based testing
 test-fast:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 test-unlock:
 	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
@@ -109,26 +109,26 @@ test-unlock:
 	python3 scripts/local_validation.py clear-test-lock "$$LOCK_PATH"
 
 test-medium:
-	uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
 
 test-medium-selected:
 	@set -eu; \
 	OUTPUT=$$(mktemp); \
 	trap 'rm -f "$$OUTPUT"' EXIT; \
-	uv run -- python scripts/canary_impact.py \
+	BENCHBOX_TEST_TIER=t2 uv run -- python scripts/canary_impact.py \
 		--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \
 		--marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" --cant-affect-list empty \
 		--product-code-only --run-selected --output "$$OUTPUT"
 
 test-slow:
-	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
 
 test-stress:
-	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
 # Development cycle testing using the curated fast unit subset
 test-dev:
-	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
