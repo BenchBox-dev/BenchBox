@@ -1,0 +1,13 @@
+{
+  "description": "Evaluate Altinity Cloud as a BenchBox platform target and record driver, SQL, and connection-limit facts.\n\nProvision a trial Altinity Cloud cluster. Confirm clickhouse-connect over HTTPS :8443 and clickhouse-driver over native TCP :9440 against the trial endpoints. Record SELECT version() output, Altinity Stable Build version, auth model (user/password), and any DDL/DML deviation from open-source ClickHouse. Test Altinity Shield on/off behavior and record the added hop latency effect qualitatively. Confirm standard ClickHouse settings behavior (no gateway-style query rewriting).\n\nGuardrails: trial credentials stay in env only, never committed; no benchmark data beyond SF 0.01 probe tables; read-only recon where possible.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-29T16:12:29Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "66c036e16c82444884fb7f58fe05f80f",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

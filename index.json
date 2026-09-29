@@ -1945,6 +1945,13 @@
       "status": "done",
       "title": "Certify BenchBox package-only TODO runtime and remove fallback paths"
     },
+    "ch-altinity-spike": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Evaluate Altinity Cloud locally and record driver, SQL, and connection-limit facts"
+    },
     "check-scope-reports-ok-when-no-scope-rules-exist": {
       "claim": null,
       "needs": [],
