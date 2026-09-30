@@ -5,7 +5,7 @@
     "Skipping any required case fails the T2 job (demonstrated in a test)",
     "Correctness gate NOT required on macOS until dlv2-defer-tpch-digest-darwin-arm64 is done"
   ],
-  "context": "Measured locally (clean env, 3 workers): duckdb tpch+tpcds + datafusion tpch 75 s; polars-df tpch 32 s; correctness gate 23 s.",
+  "context": "Measured locally (clean env, 3 workers): duckdb tpch+tpcds + datafusion tpch 75 s; polars-df tpch 32 s; correctness gate 23 s.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN/notready, needs11 unmet. No Task15 WT/branch/source/tests/claim. Approved independent first slice: single tests/required_local_cases.py exact4existing matrix node IDs plusSQLite SF.01/fixedseedQ1,Q6,Q14; extend existing matrix with freshSQLite DB/all8TABLES positivecounts, exact successful measurement-ID multiset, reopen generatedDB and compare actualSQLiteAdapter fullrows to DuckDB loadedsamefiles via existing TPCHavoc ResultValidator(tolerance1e-10), with same-cardinality wrong-result negative. Existing4workload bodies unchanged. Later reuse accepted T2 scripts/pytest_shard_evidence.py opt-in required-pass collection/threephase/wasxfail checks and existingconsumer; do not copy pending feature code or invent parallelframework. Preserve12literalcommands/18Linuxoracle/10payloadrunners/20minbudget and fresh queue proof. Required-mode BENCHBOX_OUTPUT_DIR per-case isolation remains unresolved; root never approved agent proposal before stop. Create fix/required-local-engine-cases only after resume; sharedtestslot and externaloutput stress announcement required. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
   "description": "tests/integration/test_local_platform_benchmark_matrix.py:39-43 has LOCAL_SQL_STABLE_MATRIX duckdb {tpch,tpcds}, datafusion {tpch}, sqlite set() and skips excluded cases (line ~457). Define the required T2 set explicitly: duckdb tpch + tpcds, datafusion tpch (tpcds when stable), polars-df tpch, and a new SQLite subset. A required case that skips or is deselected fails T2 (generalize the JUnit guard used by the Makefile test-correctness-gate target). Keep the 18-query correctness gate (CORRECTNESS_GATE_QUERY_IDS) and its oracle checks in T2 on Linux.",
   "sessions": [
     {
@@ -15,6 +15,14 @@
       "op": "create",
       "op_id": "4835de5e18144a6e94352d5074bf2736",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T12:23:51Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "67a78f5e635f40e6bde5ca42da3d0673",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
