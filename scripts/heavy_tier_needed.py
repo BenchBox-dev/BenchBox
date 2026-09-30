@@ -51,7 +51,7 @@ class HeavyTierError(RuntimeError):
 
 def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -> bool:
     """Evaluate one complete policy snapshot in an isolated interpreter."""
-    if PREDICATE_REPO_PATH not in sources or set(sources) - set(POLICY_PATHS):
+    if set(sources) not in ({PREDICATE_REPO_PATH}, set(POLICY_PATHS)):
         raise HeavyTierError(f"predicate copy {name!r} has an invalid file set")
     if any("\n" in path or "\r" in path for path in paths):
         raise HeavyTierError("changed paths contain ambiguous line separators")
@@ -86,12 +86,23 @@ def _read_base_copy(base_ref: str, repo_root: Path) -> dict[str, str]:
     """Read every present policy file from one pinned base commit."""
     try:
         commit = subprocess.check_output(
-            ["git", "-C", str(repo_root), "rev-parse", "--verify", f"{base_ref}^{{commit}}"],
+            ["git", "--no-replace-objects", "-C", str(repo_root), "rev-parse", "--verify", f"{base_ref}^{{commit}}"],
             text=True,
             stderr=subprocess.DEVNULL,
         ).strip()
         present = subprocess.check_output(
-            ["git", "-C", str(repo_root), "ls-tree", "-z", "--name-only", commit, "--", *POLICY_PATHS],
+            [
+                "git",
+                "--no-replace-objects",
+                "-C",
+                str(repo_root),
+                "ls-tree",
+                "-z",
+                "--name-only",
+                commit,
+                "--",
+                *POLICY_PATHS,
+            ],
             text=True,
             stderr=subprocess.DEVNULL,
         ).split("\0")
@@ -99,7 +110,7 @@ def _read_base_copy(base_ref: str, repo_root: Path) -> dict[str, str]:
         # Read errors never count as absence; ls-tree must have succeeded.
         return {
             path: subprocess.check_output(
-                ["git", "-C", str(repo_root), "show", f"{commit}:{path}"],
+                ["git", "--no-replace-objects", "-C", str(repo_root), "show", f"{commit}:{path}"],
                 text=True,
                 stderr=subprocess.DEVNULL,
             )

@@ -74,7 +74,7 @@ def test_ambient_imports_and_manifest_cannot_replace_either_policy(
     assert result["heavy_needed"] is False, result["reason"]
 
 
-def test_installed_helper_cannot_fill_a_missing_snapshot_file(
+def test_installed_startup_hook_cannot_replace_the_snapshot_helper(
     policy_sources: dict[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     environment = tmp_path / "interpreter"
@@ -91,12 +91,77 @@ def test_installed_helper_cannot_fill_a_missing_snapshot_file(
     hostile = original.replace("return any(is_soundness_path(path) for path in paths)", "return False")
     assert hostile != original
     (site_packages / "soundness_paths.py").write_text(hostile, encoding="utf-8")
-    base = {path: source for path, source in policy_sources.items() if path != POLICY_FILES[1]}
+    (site_packages / "policy-startup.pth").write_text("import soundness_paths\n", encoding="utf-8")
     pr = {**policy_sources, POLICY_FILES[2]: policy_sources[POLICY_FILES[2]].replace("file\tAGENTS.md\n", "")}
     monkeypatch.setattr(heavy.sys, "executable", str(interpreter))
-    result = _classify(["AGENTS.md"], base, pr)
+    result = _classify(["AGENTS.md"], policy_sources, pr)
     assert result["heavy_needed"] is True, result["reason"]
-    assert "failed closed" in result["reason"]
+    assert "soundness path touched" in result["reason"]
+
+
+@pytest.mark.parametrize("present", [(0, 1), (0, 2)])
+@pytest.mark.parametrize("bad_copy", ["base", "pr"])
+def test_partial_modern_snapshot_cannot_emit_a_valid_false_verdict(
+    policy_sources: dict[str, str], present: tuple[int, ...], bad_copy: str
+) -> None:
+    partial = {POLICY_FILES[index]: policy_sources[POLICY_FILES[index]] for index in present}
+    partial[POLICY_FILES[0]] = "print('soundness_path=false')\n"
+    result = _classify(
+        ["ordinary.py"],
+        partial if bad_copy == "base" else policy_sources,
+        partial if bad_copy == "pr" else policy_sources,
+    )
+    assert result["heavy_needed"] is True
+    assert "invalid file set" in result["reason"]
+
+
+def _snapshot_repo(tmp_path: Path) -> tuple[Path, str, str]:
+    repo = tmp_path / "policy-repo"
+    repo.mkdir()
+
+    def git(*args: str) -> str:
+        return subprocess.check_output(["git", "-C", str(repo), *args], text=True).strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Test")
+    git("config", "user.email", "test@example.invalid")
+    git("config", "commit.gpgsign", "false")
+    heads = []
+    for label in ("base", "pr"):
+        for relative in POLICY_FILES:
+            path = repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(f"{label}:{relative}\n", encoding="utf-8")
+        git("add", "--", *POLICY_FILES)
+        git("commit", "-m", label)
+        heads.append(git("rev-parse", "HEAD"))
+    git("branch", "policy-base", heads[0])
+    return repo, heads[0], heads[1]
+
+
+def test_base_reader_pins_all_files_before_a_ref_moves(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, _, pr_head = _snapshot_repo(tmp_path)
+    for relative in POLICY_FILES:
+        (repo / relative).write_text("dirty worktree contents\n", encoding="utf-8")
+    original = subprocess.check_output
+
+    def read_and_move(cmd: list[str], *, text: bool, stderr: int) -> str:
+        assert text is True
+        result = original(cmd, text=True, stderr=stderr)
+        if "rev-parse" in cmd:
+            subprocess.run(["git", "-C", str(repo), "update-ref", "refs/heads/policy-base", pr_head], check=True)
+        return result
+
+    monkeypatch.setattr(heavy.subprocess, "check_output", read_and_move)
+    sources = heavy._read_base_copy("policy-base", repo)
+    assert sources == {relative: f"base:{relative}\n" for relative in POLICY_FILES}
+
+
+def test_base_reader_ignores_git_replacement_trees(tmp_path: Path) -> None:
+    repo, base_head, pr_head = _snapshot_repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "replace", base_head, pr_head], check=True)
+    sources = heavy._read_base_copy("policy-base", repo)
+    assert sources == {relative: f"base:{relative}\n" for relative in POLICY_FILES}
 
 
 @pytest.mark.parametrize("bad_copy", ["base", "pr"])
