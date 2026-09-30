@@ -149,10 +149,11 @@ def test_checker_cli_reports_failure_and_success(tmp_path: Path) -> None:
     assert CHECKER.main(["--paths-file", str(paths), "--body-file", str(body)]) == 1
 
 
-def _git(repo: Path, *args: str) -> str:
+def _git(repo: Path, *args: str, input: str | None = None) -> str:
     result = subprocess.run(
         ["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", *args],
         cwd=repo,
+        input=input,
         capture_output=True,
         text=True,
         check=True,
