@@ -2961,6 +2961,15 @@
       "status": "open",
       "title": "Migrate shared comment consumers and enforce policy in CI and build configuration"
     },
+    "comment-cleanup-tpcds-stream-decision": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-scope-policy"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Decide remaining TPC-DS legacy stream and RNG migration"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],
