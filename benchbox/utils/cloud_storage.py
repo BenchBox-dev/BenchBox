@@ -775,6 +775,28 @@ def create_path_handler(path: Union[str, Path]) -> Union[Path, CloudPath, Databr
         raise ValueError(f"Invalid cloud path format '{path}': {e}") from e
 
 
+def normalize_output_dir(
+    path: Union[str, Path, None],
+) -> Union[Path, CloudPath, DatabricksPath, CloudStagingPath, None]:
+    """Coerce a benchmark output directory without dropping cloud staging wrappers.
+
+    Several benchmarks historically stored ``output_dir`` via ``Path(...)``,
+    which stringifies a ``CloudStagingPath``/``DatabricksPath`` down to its
+    local cache directory and silently discards the cloud upload target the
+    orchestrator resolved at construction time. Route those assignments
+    through here (or :func:`create_path_handler` directly) so an already-built
+    handler passes through untouched while plain strings still become
+    :class:`Path` and ``None`` stays ``None``.
+    """
+    if path is None:
+        return None
+    if isinstance(path, (DatabricksPath, CloudStagingPath)):
+        return path
+    if isinstance(path, Path):
+        return path
+    return create_path_handler(path)
+
+
 def get_remote_fs_adapter(remote_path: str) -> RemoteFileSystemAdapter:
     """Create a RemoteFileSystemAdapter for a remote path.
 

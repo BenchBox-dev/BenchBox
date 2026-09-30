@@ -695,6 +695,7 @@ class BigQueryAdapter(PlatformAdapter):
             flags=re.IGNORECASE,
         )
         rewritten = re.sub(r"\bINTERVAL\s+'(\d+)'\s+([A-Za-z]+)", r"INTERVAL \1 \2", rewritten)
+        rewritten = self._numeric_decimal_literals(rewritten)
         statements = split_sql_statements(rewritten)
         parts = []
         changed = False
@@ -714,6 +715,25 @@ class BigQueryAdapter(PlatformAdapter):
         if bare_insert:
             rewritten = rewritten[: bare_insert.start()] + bare_insert.group(1) + "INSERT ROW" + bare_insert.group(2)
         return rewritten
+
+    @staticmethod
+    def _numeric_decimal_literals(sql: str) -> str:
+        """Type bare decimal literals in operation SQL as NUMERIC.
+
+        BigQuery types ``1000.0`` as FLOAT64 and refuses to insert FLOAT64 into
+        the NUMERIC money and discount columns of the TPC-H staging tables
+        (verified live: "Query column 4 has type FLOAT64 which cannot be
+        inserted into column o_totalprice, which has type NUMERIC"). Every
+        decimal literal in the write catalogs targets those columns, so
+        ``NUMERIC '1000.0'`` keeps the arithmetic exact and the insert legal.
+        String literals and identifiers are left untouched.
+        """
+        import re
+
+        parts = re.split(r"('(?:[^'\\]|\\.|'')*')", sql)
+        for index in range(0, len(parts), 2):
+            parts[index] = re.sub(r"(?<![\w.'])(\d+\.\d+)(?![\w.])", r"NUMERIC '\1'", parts[index])
+        return "".join(parts)
 
     def _get_connection_params(self, **connection_config) -> dict[str, Any]:
         """Get standardized connection parameters."""
@@ -2307,6 +2327,8 @@ class BigQueryAdapter(PlatformAdapter):
             if not allow_fallback:
                 return statement
             table_names = list(self._FALLBACK_QUALIFY_TABLES)
+        if self._batch_temp_tables:
+            table_names = [name for name in table_names if name not in self._batch_temp_tables]
 
         # Blank string literals and comments length-preservingly so matches
         # found in the masked copy align with the original statement.
@@ -2403,7 +2425,27 @@ class BigQueryAdapter(PlatformAdapter):
         if not statements:
             return query
 
-        qualified_parts = [self._qualify_single_statement(stmt, allow_fallback=allow_fallback) for stmt in statements]
+        # Script-scoped temporary tables live outside the dataset, so their
+        # names must stay bare everywhere in the batch (verified live: a
+        # qualified temp-table name fails "Not found: Table ...TEMP_...").
+        import re
+
+        temp_tables = {
+            m.group(1).upper()
+            for stmt in statements
+            for m in re.finditer(
+                r"(?i)\bCREATE\s+(?:OR\s+REPLACE\s+)?TEMP(?:ORARY)?\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?(\w+)`?",
+                stmt,
+            )
+        }
+        previous_temp_tables = self._batch_temp_tables
+        self._batch_temp_tables = temp_tables
+        try:
+            qualified_parts = [
+                self._qualify_single_statement(stmt, allow_fallback=allow_fallback) for stmt in statements
+            ]
+        finally:
+            self._batch_temp_tables = previous_temp_tables
         result = ";\n".join(qualified_parts)
         if query.rstrip().endswith(";"):
             result += ";"
@@ -2412,6 +2454,8 @@ class BigQueryAdapter(PlatformAdapter):
         return result
 
     _FROM_SCAN_TOKEN = None
+    # Temp-table names created in the batch currently being qualified.
+    _batch_temp_tables: frozenset[str] | set[str] = frozenset()
 
     @staticmethod
     def _from_scan_token():
