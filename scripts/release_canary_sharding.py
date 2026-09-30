@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
+MEDIUM_MARKER_EXPRESSION = "medium and not (slow or stress or resource_heavy or live_integration)"
 DEFAULT_SHARD_COUNT = 6
 
 
@@ -82,6 +83,9 @@ def collect_node_ids(
     checked_ref: str = "",
     checked_sha: str = "",
     github_output: Path | None = None,
+    workflow: str = "release-canary.yml",
+    job: str = "collect-credential-free-non-fast",
+    marker_expression: str = MARKER_EXPRESSION,
 ) -> int:
     """Create the canonical node-id artifact and collection manifest."""
     if expected_count < 1:
@@ -101,11 +105,11 @@ def collect_node_ids(
     _write_json(
         summary_output,
         {
-            "workflow": "release-canary.yml",
-            "job": "collect-credential-free-non-fast",
+            "workflow": workflow,
+            "job": job,
             "checked_ref": checked_ref,
             "commit_sha": checked_sha,
-            "marker_expression": MARKER_EXPRESSION,
+            "marker_expression": marker_expression,
             "total_count": len(node_ids),
             "shard_count": shard_count,
             "shard_counts": shard_counts,
@@ -125,17 +129,38 @@ def write_shard(
     *,
     shard_index: int,
     shard_count: int,
+    workflow: str = "release-canary.yml",
+    job: str = "credential-free-non-fast",
+    marker_expression: str = MARKER_EXPRESSION,
+    collection_summary: Path | None = None,
+    checked_sha: str | None = None,
 ) -> int:
     """Write one shard file and its manifest from the collection artifact."""
     node_ids = read_node_ids(input_path)
+    if collection_summary is not None or checked_sha is not None:
+        if collection_summary is None or not checked_sha:
+            raise ValueError("collection summary and checked SHA must be supplied together")
+        collection = json.loads(collection_summary.read_text(encoding="utf-8"))
+        expected = {
+            "workflow": workflow,
+            "commit_sha": checked_sha,
+            "marker_expression": marker_expression,
+            "total_count": len(node_ids),
+            "shard_count": shard_count,
+            "node_ids_sha256": _node_ids_sha256(node_ids),
+            "shard_counts": [len(partition_node_ids(node_ids, index, shard_count)) for index in range(shard_count)],
+        }
+        if not isinstance(collection, dict) or any(collection.get(key) != value for key, value in expected.items()):
+            raise ValueError("collection evidence does not match the checkout, selector or node IDs")
     shard_node_ids = partition_node_ids(node_ids, shard_index, shard_count)
     _write_node_ids(nodeids_output, shard_node_ids)
     _write_json(
         summary_output,
         {
-            "workflow": "release-canary.yml",
-            "job": "credential-free-non-fast",
-            "marker_expression": MARKER_EXPRESSION,
+            "workflow": workflow,
+            "job": job,
+            "marker_expression": marker_expression,
+            **({"commit_sha": checked_sha} if checked_sha else {}),
             "shard_index": shard_index,
             "shard_count": shard_count,
             "assigned_count": len(shard_node_ids),
@@ -145,6 +170,45 @@ def write_shard(
         },
     )
     return len(shard_node_ids)
+
+
+def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
+    """Prove both medium shards executed the exact collected set once."""
+    collection_root = artifact_root / f"t2-medium-nodeids-{checked_sha}"
+    node_ids = read_node_ids(collection_root / "medium-nodeids.txt")
+    collection = json.loads((collection_root / "medium-collection.json").read_text(encoding="utf-8"))
+    expected = {
+        "workflow": "ci.yml",
+        "job": "medium-collect",
+        "commit_sha": checked_sha,
+        "marker_expression": MEDIUM_MARKER_EXPRESSION,
+        "shard_count": 2,
+        "total_count": len(node_ids),
+        "node_ids_sha256": _node_ids_sha256(node_ids),
+        "shard_counts": [len(partition_node_ids(node_ids, index, 2)) for index in range(2)],
+    }
+    if not isinstance(collection, dict) or any(collection.get(key) != value for key, value in expected.items()):
+        raise ValueError("medium collection does not match the checked SHA or selected node IDs")
+    executed = []
+    for index in range(2):
+        assigned = partition_node_ids(node_ids, index, 2)
+        if not assigned:
+            raise ValueError("medium shard assignment is empty")
+        shard_root = artifact_root / f"t2-medium-shard-{index}-{checked_sha}"
+        evidence = json.loads((shard_root / f"shard-{index}-execution.json").read_text(encoding="utf-8"))
+        if not isinstance(evidence, dict) or (
+            evidence.get("commit_sha") != checked_sha
+            or evidence.get("complete") is not True
+            or evidence.get("pytest_exit_status") != 0
+            or evidence.get("assigned_node_ids") != assigned
+            or evidence.get("executed_node_ids") != assigned
+            or not evidence.get("collected_node_ids")
+            or any(ids != assigned for ids in evidence["collected_node_ids"])
+        ):
+            raise ValueError(f"medium shard {index} did not execute its exact assignment successfully")
+        executed.extend(evidence["executed_node_ids"])
+    if sorted(executed) != node_ids:
+        raise ValueError("medium shard execution does not conserve the collected node IDs")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -160,6 +224,9 @@ def _build_parser() -> argparse.ArgumentParser:
     collect_parser.add_argument("--checked-ref", default="")
     collect_parser.add_argument("--checked-sha", default="")
     collect_parser.add_argument("--github-output", type=Path)
+    collect_parser.add_argument("--workflow", default="release-canary.yml")
+    collect_parser.add_argument("--job", default="collect-credential-free-non-fast")
+    collect_parser.add_argument("--marker-expression", default=MARKER_EXPRESSION)
 
     shard_parser = subparsers.add_parser("shard", help="write one deterministic node-id shard")
     shard_parser.add_argument("--input", type=Path, required=True)
@@ -167,6 +234,14 @@ def _build_parser() -> argparse.ArgumentParser:
     shard_parser.add_argument("--summary-output", type=Path, required=True)
     shard_parser.add_argument("--shard-index", type=int, required=True)
     shard_parser.add_argument("--shard-count", type=int, required=True)
+    shard_parser.add_argument("--workflow", default="release-canary.yml")
+    shard_parser.add_argument("--job", default="credential-free-non-fast")
+    shard_parser.add_argument("--marker-expression", default=MARKER_EXPRESSION)
+    shard_parser.add_argument("--collection-summary", type=Path)
+    shard_parser.add_argument("--checked-sha")
+    verify_parser = subparsers.add_parser("verify-medium", help="verify exact medium shard coverage")
+    verify_parser.add_argument("--artifacts", type=Path, required=True)
+    verify_parser.add_argument("--checked-sha", required=True)
     return parser
 
 
@@ -183,15 +258,25 @@ def main(argv: list[str] | None = None) -> int:
                 checked_ref=args.checked_ref,
                 checked_sha=args.checked_sha,
                 github_output=args.github_output,
+                workflow=args.workflow,
+                job=args.job,
+                marker_expression=args.marker_expression,
             )
-        else:
+        elif args.command == "shard":
             write_shard(
                 args.input,
                 args.nodeids_output,
                 args.summary_output,
                 shard_index=args.shard_index,
                 shard_count=args.shard_count,
+                workflow=args.workflow,
+                job=args.job,
+                marker_expression=args.marker_expression,
+                collection_summary=args.collection_summary,
+                checked_sha=args.checked_sha,
             )
+        else:
+            verify_medium_shards(args.artifacts, args.checked_sha)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"release-canary sharding error: {exc}", file=sys.stderr)
         return 1

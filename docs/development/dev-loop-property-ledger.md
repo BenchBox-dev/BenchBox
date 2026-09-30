@@ -104,6 +104,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
 | `test_docs_skip_marker.py` | pure-process | Docs skip mechanics |
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
+| `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
 | `test_publication_canaries.py` | product-safety | Publication canaries |
 | `test_publication_preview.py` | product-safety | Preview deployment |
@@ -180,6 +181,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
+| `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
@@ -288,6 +290,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `check_duplicate_code.py` | tooling | Hygiene |
 | `check_windows_antipatterns.py` | tooling | Hygiene |
 | `path_filter_decision.py` | tooling | Path classifier shared with ci.yml units |
+| `pytest_shard_evidence.py` | product-safety | Exact assigned, collected, and executed medium test evidence |
 | `pr_landing.py` | pure-process | PR-loop mechanics |
 | `pr_refresh_certification.py` | pure-process | Refresh mechanics |
 | `pr_refresh_replay.py` | pure-process | Refresh mechanics |

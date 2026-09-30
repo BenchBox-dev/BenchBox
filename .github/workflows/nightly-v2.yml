@@ -316,6 +316,14 @@ jobs:
                   print(f"{cls.__name__}: {table} {produced.stat().st_size} bytes")
           PY
 
+      - name: Install raw binary framing test dependencies
+        if: matrix.python-version == '3.12'
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        if: matrix.python-version == '3.12'
+        run: uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m slow -v
+
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
