@@ -2923,6 +2923,15 @@
       "status": "open",
       "title": "Build grammar-aware comment policy checks and safe deletion comparisons"
     },
+    "comment-cleanup-compilation": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove prose from first-party compilation scripts and framing tools"
+    },
     "comment-cleanup-contracts-gate": {
       "claim": null,
       "needs": [
