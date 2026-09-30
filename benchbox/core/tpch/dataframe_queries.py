@@ -901,20 +901,25 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Calculate average quantity per part
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    # Main query. SQL SUM over an empty set returns NULL, not 0: when the
-    # small-quantity filter matches nothing, emit a single NULL row so the
-    # gate compares NULL-vs-NULL instead of manufacturing 0.0. Emptiness is
-    # detected through the backend's scalar aggregation, including inputs
-    # with no non-NULL prices. Keep the NULL result on the same backend.
+    # SQL SUM over an empty or all-NULL input returns NULL. Aggregate first,
+    # then project the conditional result so every backend infers its type
+    # from the native sum without constructing a NULL-only DataFrame.
     filtered = (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
     )
-    if ctx.scalar(filtered.select(col("l_extendedprice").count())) == 0:
-        return ctx.scalar_to_df({"avg_yearly": None})
-    return filtered.select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
+    totals = filtered.select(
+        col("l_extendedprice").count().alias("__q17_price_count"),
+        col("l_extendedprice").sum().alias("__q17_price_sum"),
+    )
+    return totals.select(
+        ctx.when(col("__q17_price_count") > lit(0))
+        .then(col("__q17_price_sum") / lit(7.0))
+        .otherwise(lit(None))
+        .alias("avg_yearly")
+    )
 
 
 def q20_expression_impl(ctx: DataFrameContext) -> Any:
