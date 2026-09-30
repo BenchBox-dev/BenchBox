@@ -2914,6 +2914,15 @@
       "status": "done",
       "title": "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
     },
+    "comment-cleanup-analysis-comparison": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from analysis and comparison modules"
+    },
     "comment-cleanup-checker": {
       "claim": null,
       "needs": [
