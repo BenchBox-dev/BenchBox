@@ -493,6 +493,7 @@ clean:
 # Linting (ruff + explorer token scan)
 lint:
 	uv run ruff check .
+	$(MAKE) comment-policy-check
 	$(MAKE) windows-antipatterns-check
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
@@ -538,6 +539,16 @@ audit-sha-check:
 .PHONY: windows-antipatterns-check
 windows-antipatterns-check:
 	uv run -- python scripts/check_windows_antipatterns.py
+
+.PHONY: comment-policy-check comment-policy-strict comment-policy-report
+comment-policy-check:
+	uv run -- python scripts/run_comment_policy.py
+
+comment-policy-strict:
+	uv run -- python scripts/check_comment_policy.py --mode strict
+
+comment-policy-report:
+	uv run -- python scripts/check_comment_policy.py --mode report
 
 # Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
@@ -845,6 +856,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed lint-imports"; \
 	$(MAKE) windows-antipatterns-check; \
 	[ $$? -eq 0 ] || failed="$$failed windows-antipatterns"; \
+	$(MAKE) comment-policy-check; \
+	[ $$? -eq 0 ] || failed="$$failed comment-policy"; \
 	$(MAKE) lint-explorer-tokens; \
 	[ $$? -eq 0 ] || failed="$$failed lint-explorer-tokens"; \
 	$(MAKE) lint-site-theme-tokens; \

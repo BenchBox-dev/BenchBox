@@ -476,6 +476,7 @@ dev = [
     "opentelemetry-sdk>=1.44,<2",
     "opentelemetry-exporter-otlp-proto-http>=1.44,<2",
     "pytest-json-report>=1.5.0",
+    "pygments>=2.18.0",
 ]
 
 [tool.mutmut]

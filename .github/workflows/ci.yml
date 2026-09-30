@@ -24,6 +24,41 @@ permissions:
   pull-requests: read
 
 jobs:
+  comment-policy:
+    name: comment-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+      - name: Install Python dependencies
+        run: uv sync --group dev
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '20'
+      - name: Install TypeScript parser
+        run: npm ci --prefix results-explorer --ignore-scripts --no-audit --no-fund
+      - name: Enforce comment and docstring policy
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          if git cat-file -e "${BASE_REF}:scripts/run_comment_policy.py" 2>/dev/null; then
+            git show "${BASE_REF}:scripts/run_comment_policy.py" > "$RUNNER_TEMP/comment-policy-runner.py"
+          elif [ "$BASE_REF" = "8fbad03469746539959af14e865a19c53fab68f5" ]; then
+            cp scripts/run_comment_policy.py "$RUNNER_TEMP/comment-policy-runner.py"
+          else
+            echo "Trusted comment-policy launcher is missing" >&2
+            exit 1
+          fi
+          uv run -- python "$RUNNER_TEMP/comment-policy-runner.py"
+
   # Base guard: stacked PRs get CI from this workflow (no branch filter),
   # so an unsupported feature-branch base must fail loudly here instead of
   # sliding into develop unvalidated under a parent PR.
@@ -2424,7 +2459,7 @@ jobs:
   # Unit result: tooling.
   tooling:
     name: tooling
-    needs: [ci-paths, base-guard, soundness-flag, content-guard, skill-integrity, audit-sha, ruleset-drift]
+    needs: [ci-paths, base-guard, soundness-flag, content-guard, skill-integrity, audit-sha, ruleset-drift, comment-policy]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2447,6 +2482,7 @@ jobs:
             --needs "$NEEDS_JSON" \
             --always ci-paths \
             --always soundness-flag \
+            --always comment-policy \
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \

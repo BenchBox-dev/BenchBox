@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "external": [
+    {
+      "path": "_sources/tpc-h/dbgen/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_sources/tpc-ds/tools/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_sources/tpc-ds/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_sources/tpc-ds/query_variants/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "benchbox/_binaries/tpc-ds/templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "benchbox/_binaries/tpc-h/templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": ".claude/skills/",
+      "owner": "skill-sync catalog",
+      "provenance": "skill-sync.conf"
+    },
+    {
+      "path": "tools/skill-sync",
+      "owner": "skill-sync",
+      "provenance": "skill-sync.conf"
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-arm64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-x86_64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-arm64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-x86_64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-arm64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-x86_64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    }
+  ],
+  "completed": [
+    "scripts/check_comment_policy.py",
+    "scripts/comment_syntax.py",
+    "scripts/comment_syntax_js.cjs",
+    "scripts/run_comment_policy.py",
+    "tests/unit/scripts/test_comment_policy.py",
+    "scripts/comment_payloads.py"
+  ],
+  "exceptions": [
+    {
+      "path": "tests/unit/scripts/test_comment_policy.py",
+      "symbol": "test_sql_array_and_operator_contexts",
+      "text": "SELECT ARRAY[1 /* explanation */];",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_comment_policy.py",
+      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
+      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the corresponding parser regression case is retired."
+    },
+    {
+      "path": "tests/unit/scripts/test_comment_policy.py",
+      "symbol": "test_sql_literals_and_nested_comments",
+      "text": "SELECT $tag$/*payload*/$tag$; /* outer /* inner */ end */",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_comment_policy.py",
+      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
+      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the corresponding parser regression case is retired."
+    },
+    {
+      "path": "tests/unit/scripts/test_comment_policy.py",
+      "symbol": "test_sql_literals_and_nested_comments",
+      "text": "SELECT '-- payload', \"-- name\", `#name`, [--name], $$--data$$; -- comment",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_comment_policy.py",
+      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
+      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the corresponding parser regression case is retired."
+    },
+    {
+      "path": "tests/unit/scripts/test_comment_policy.py",
+      "symbol": "test_sql_literals_and_nested_comments",
+      "text": "SELECT 1 # comment",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_comment_policy.py",
+      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
+      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the corresponding parser regression case is retired."
+    },
+    {
+      "path": "tests/unit/scripts/test_comment_policy.py",
+      "symbol": "test_sql_unterminated_constructs_fail",
+      "text": "SELECT $$unterminated",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_comment_policy.py",
+      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
+      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the corresponding parser regression case is retired."
+    },
+    {
+      "path": "tests/unit/scripts/test_comment_policy.py",
+      "symbol": "test_sql_unterminated_constructs_fail",
+      "text": "SELECT 'unterminated",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_comment_policy.py",
+      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
+      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the corresponding parser regression case is retired."
+    }
+  ]
+}
