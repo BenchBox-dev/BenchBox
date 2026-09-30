@@ -2978,6 +2978,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from ClickBench modules"
     },
+    "comment-cleanup-coffeeshop": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from CoffeeShop modules"
+    },
     "comment-cleanup-compilation": {
       "claim": null,
       "needs": [
