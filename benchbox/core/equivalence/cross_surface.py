@@ -62,11 +62,9 @@ flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
 ``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
 .. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
 ``"Q1"`` .. ``"Q22"``). Staged (registered in :data:`STAGED_GATES`, runnable
-in report mode, not CI-enforced): ``tpch`` (22 queries, unseeded-vs-unseeded
-at ``SF=0.01``; a fixed-stream gate needs seeded DF overrides first) and
-``tpcds`` (full 99 staged, ~13s wall at ``SF=0.01``; 146 of 198 cells are
-discriminating and 52 bounded empty cells are explicitly classified, with only
-the two strict Q90 NaN cells still unclassified).
+in report mode, not CI-enforced): ``tpch``, ``tpcds``, ``nyctaxi``,
+``tpch_skew``, and ``tsbs_devops``. TPC-DS runs the full 99-query matrix at
+``SF=0.01`` with bounded empty cells explicitly classified.
 Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
@@ -1694,10 +1692,8 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
         scale_factor=_TPCH_SCALE,
     ),
     # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q99"). The full SF=0.01 matrix runs in
-    # about 13 seconds, with bounded empty cells classified explicitly. The
-    # gate remains staged until the strict Q90 NaN cells have a query-local
-    # resolution that does not weaken the shared comparator.
+    # mechanical Q prefix ("Q1".."Q99"). Bounded empty cells at SF=0.01
+    # are classified explicitly. Registration remains distinct from CI enforcement.
     "tpcds": CrossSurfaceGate(
         name="tpcds",
         build=build_tpcds_duckdb,

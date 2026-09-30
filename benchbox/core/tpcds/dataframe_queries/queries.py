@@ -3534,7 +3534,7 @@ def q90_expression_impl(ctx: DataFrameContext) -> Any:
     )
     am_val = base.filter(col("t_hour").is_between(hour_am, hour_am + 1)).select(ctx.count().alias("amc")).scalar(0, 0)
     pm_val = base.filter(col("t_hour").is_between(hour_pm, hour_pm + 1)).select(ctx.count().alias("pmc")).scalar(0, 0)
-    return ctx.create_dataframe({"am_pm_ratio": [am_val / pm_val if pm_val and pm_val > 0 else float("nan")]})
+    return ctx.create_dataframe({"am_pm_ratio": [am_val / pm_val if pm_val and pm_val > 0 else None]})
 
 
 def q90_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -3549,7 +3549,7 @@ def q90_pandas_impl(ctx: DataFrameContext) -> Any:
     ]
     am_count = len(base[(base["t_hour"] >= hour_am) & (base["t_hour"] <= hour_am + 1)])
     pm_count = len(base[(base["t_hour"] >= hour_pm) & (base["t_hour"] <= hour_pm + 1)])
-    return pd.DataFrame({"am_pm_ratio": [am_count / pm_count if pm_count > 0 else float("nan")]})
+    return pd.DataFrame({"am_pm_ratio": [am_count / pm_count if pm_count > 0 else None]})
 
 
 # =============================================================================
