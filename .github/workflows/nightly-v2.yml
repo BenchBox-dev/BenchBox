@@ -816,8 +816,8 @@ jobs:
             2>&1 | tee t3-durations/durations-fast.txt || statuses=("${PIPESTATUS[@]}")
           if [ "${statuses[1]}" != "0" ]; then exit "${statuses[1]}"; fi
           rc=${statuses[0]}
-          # Test failures are reported by the validation jobs; this job fails
-          # only when pytest itself could not produce a report.
+          # Keep both samples and their artifacts before reporting failed tests.
+          printf '%s\n' "$rc" > t3-durations/pytest-fast.exit
           if [ "$rc" -gt 1 ]; then exit "$rc"; fi
 
       - name: Measure slow tier durations
@@ -829,6 +829,7 @@ jobs:
             2>&1 | tee t3-durations/durations-slow.txt || statuses=("${PIPESTATUS[@]}")
           if [ "${statuses[1]}" != "0" ]; then exit "${statuses[1]}"; fi
           rc=${statuses[0]}
+          printf '%s\n' "$rc" > t3-durations/pytest-slow.exit
           if [ "$rc" -gt 1 ]; then exit "$rc"; fi
 
       - name: Regenerate duration file
@@ -851,6 +852,20 @@ jobs:
           path: t3-durations/
           if-no-files-found: ignore
           retention-days: 30
+
+      - name: Require successful sampled tests
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for tier in fast slow; do
+            verdict="t3-durations/pytest-${tier}.exit"
+            if [ ! -f "$verdict" ] || [ "$(cat "$verdict")" != "0" ]; then
+              echo "::error::${tier} duration sample failed or has no successful pytest verdict."
+              failed=1
+            fi
+          done
+          exit "$failed"
 
   # ------------------------------------------------------------------ report
   # One issue per red domain label. Opens the issue when a domain fails,
