@@ -380,8 +380,10 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     assert 'git show "${BASE_REF}:scripts/run_comment_policy.py"' in step["run"]
     assert 'python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests' in step["run"]
     assert ': "${BASE_REF:?' in step["run"]
-    for trusted in (*TRUSTED_FILES, "quality/comment-policy.json"):
-        assert trusted in step["run"]
+    listing = step["run"].split('installed="$(git ls-tree -r --name-only "$BASE_REF" --', 1)[1].split(')"', 1)[0]
+    assert set(listing.replace("\\", " ").split()) == {*TRUSTED_FILES, "quality/comment-policy.json"}
+    assert step["run"].index('installed="$(') < step["run"].index("git cat-file -e")
+    assert 'elif [ -z "$installed" ] && git merge-base --is-ancestor' in step["run"]
     assert "git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
     assert "merge_group.base_sha" in step["env"]["BASE_REF"]
