@@ -187,6 +187,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             result.append(Finding(path, node.lineno, "docstring", node.value.value, symbol))
         if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and any(
             (isinstance(child, ast.Attribute) and child.attr == "__doc__" and isinstance(child.ctx, ast.Store))
+            or (isinstance(child, ast.Name) and child.id == "__doc__" and isinstance(child.ctx, ast.Store))
             or (
                 isinstance(child, ast.Subscript)
                 and isinstance(child.ctx, ast.Store)

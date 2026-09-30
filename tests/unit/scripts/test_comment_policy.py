@@ -31,6 +31,7 @@ def policy(**changes: object) -> dict:
         ('def f():\n    x = 1\n    "inert prose"\n', "docstring", "f"),
         ('def f():\n    "a" "b"\n', "docstring", "f"),
         ('f.__doc__ = "prose"\n', "runtime-docstring", ""),
+        ('__doc__ = "prose"\n', "runtime-docstring", ""),
         ('f.__doc__: str = "prose"\n', "runtime-docstring", ""),
         ('setattr(f, "__doc__", "prose")\n', "runtime-docstring", ""),
         ('f.__dict__["__doc__"] = "prose"\n', "runtime-docstring", ""),
