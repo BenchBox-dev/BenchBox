@@ -4,7 +4,7 @@
     "release-check fails on each missing element (tests per element)",
     "docs/operations/release-guide.md draft section describes prep -> queue -> signed tag"
   ],
-  "context": "codex C9. Guardrail G7: legacy release-cut stays working until dlv2-53.",
+  "context": "Implementation is published in PR #2466, exact head e536c89b4fdc245edcf5744e30d9c0ba2277138c, worktree /Users/joe/Developer/BenchBox.wt-release-prep-develop. 74 related tests and native read-only review passed; full canonical preflight completed at 2026-09-30T03:48:12Z with exact clean required receipt 9238763f2502df8cd6b1f3924292e1384c95d7ad1f642bc6fa9f1380e2a31b39. Actual locked 0.4.1 release-check passed. Hosted checks, serial queue merge, and live merged-tool verification remain pending. No version prep or TestPyPI publication yet. ADR annotated tag decision supersedes the item's old signed-tag wording; no signature requirement added. Keep legacy release-cut until replacement accepted.",
   "description": "Retiring release-cut needs a replacement that synchronizes everything a release touches. `make release-prep VERSION=X.Y.Z` (via scripts/update_version.py and scripts/generate_changelog_entry.py) updates pyproject version, uv.lock, CHANGELOG.md, documentation version markers, and the landing badge, producing one normal PR through the queue. `make release-check VERSION=X.Y.Z` verifies that complete state locally and in release.yml (version equality everywhere, changelog entry present, lock revision, curation rules from check_release_curation.py, dependency bounds with --fail-on=cap-reached).",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "op": "take",
       "op_id": "6ede3a7efb6e4245853b3ac2690244ae",
       "session_id": "b84e6974f6364093b7d673b0ae188ede"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T03:56:26Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "1b95762e53db4e31a0cb0b974e614b5e",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
