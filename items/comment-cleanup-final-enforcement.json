@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Every task's live implementation/merge/CI evidence is reconciled with current source; final ownership map has no omitted, multiply owned or unexplained maintained first-party paths.",
+    "Whole-scope strict blocking checks cover all declared languages, embedded SQL, notebooks, config, executable docs and first-party generated output; no broad exclusions or unknown parse passes.",
+    "Final scan finds zero discretionary source comments/docstrings or known obsolete __doc__ producers/consumers. Every retained minimum directive or required notice has current exact-form/consumer/provenance proof.",
+    "Regeneration cannot restore prohibited text; API references, CLI help, MCP discovery, benchmark display and effective contract/rejection cases remain useful, complete and nonvacuous.",
+    "All required knowledge/TODO obligations and active navigation have reviewed owning destinations; unsupported claims are gone, and historical citations/baselines/result bundles are unchanged.",
+    "SQL/output identity migrations have disclosed raw-hash changes and correctness/plan/timing evidence. Source-only slices preserved payload bytes and never normalized identity to hide differences.",
+    "Required soundness/manifest external reviews and exact-head CI/merge evidence exist; separate algorithm/policy decisions have explicit outcomes and any further implementation still requires authorization.",
+    "Final report clearly limits completion to declared first-party scope, lists exact external ownership exclusions, checker limits and unresolved operator-only work, with no claim of live UAT/publication certification."
+  ],
+  "context": "Planning basis: the aggressive comment/docstring-removal plan revised after external Claude Opus 5.5, medium-effort review. The reviewer originally rejected the draft; all 18 findings received dispositions (12 accepted, five narrowed, one rebutted). The updated plan has not received a second external review. Original source baseline 0697891d449b1e31f22e4842169f3b2e743337fb; planning worktree was created at newer origin/develop c7bcdb9bc1d713a0c616969b2eb3f19f3d1d86a1. Refresh all facts at implementation start.",
+  "description": "Singleton integration/closeout task after every module and decision task. Own final shared navigation/index updates, completed-scope manifest rollup and strict whole-scope CI activation; no authority to redo module files without handoff. Target: zero discretionary explanatory comments and authored explanatory docstrings in maintained first-party code. Only proven minimum machine directives and unavoidable provenance-bound required notices remain. Useful product strings must have an actual consumer; no inert constants, unused strings, fake metadata or dynamic __doc__ replacements. Never broaden lint/type/coverage ignores, weaken assertions, or turn unknown ownership/parser coverage into an exclusion.\n\nReconcile live merged source and exact heads for every manifest, not tracker 'done' labels. Rescan all declared code/config/payload/generator/consumer surfaces, including newly added paths. Unknown ownership/parser classes and unresolved actual docstring/prose consumers fail. Check generator reintroduction, actual help/discovery/API contract content and active symbol/section navigation. Preserve historical evidence and output bundles. Review all remaining exact machine directives/notices against current consumers/requirements and obsolete triggers; semantic checker limits remain explicit.\n\nRecord accepted/rejected/no-change dispositions of mechanism/algorithm/policy candidates and all external plan-review findings. An unresolved approved required cleanup does not disappear into an appendix or exclusion. Report local checks, exact-head hosted CI, independent review, merges and any operator-controlled acceptance separately. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Obtain later implementation authorization. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Freeze nonoverlapping code/test/doc paths with the integrator before dispatch. Ordinary independent PRs target develop; serialize shared test-lock checks and integration, not module edits. Required native/external soundness review remains mandatory, with no auto-merge bypass. No live cloud/stress, deployment, publication, historical-result rewriting, or unapproved external-repository writes.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:924862285c38b4eb8a4845a5",
+      "at": "2026-09-30T00:37:30Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "e522f52d6cfd44c8b57755fac6d0e2a2",
+      "session_id": "d556ff7c801a4c8bbdaa2a235fa9bff5"
+    }
+  ]
+}
