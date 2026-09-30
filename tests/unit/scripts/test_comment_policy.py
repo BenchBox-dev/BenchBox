@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-from check_comment_policy import allowed, check_ratchet, introduced, load_policy, main, scan_sources
+from check_comment_policy import allowed, check_ratchet, introduced, load_policy, main, scan_sources, source_paths
 from comment_syntax import Finding, javascript_requests, python_findings, scan, sql_comments
-from run_comment_policy import resolve_base
+from run_comment_policy import TRUSTED_FILES, parser_environment, resolve_base
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
@@ -68,7 +68,7 @@ def test_python_syntax_failure_is_visible(source: str) -> None:
     ],
 )
 def test_sql_literals_and_nested_comments(source: str, expected: list[str]) -> None:
-    assert [text for _, text in sql_comments(source)] == expected
+    assert [text for _, text in sql_comments(source, "tsql")] == expected
 
 
 @pytest.mark.parametrize("source", ["SELECT 'unterminated", "SELECT $$unterminated", "/* unterminated"])
@@ -93,25 +93,26 @@ def test_lexers_preserve_data_and_find_comments(lang: str, source: str, text: st
     assert [(f.kind, f.text) for f in findings] == [("comment", text)]
 
 
-@pytest.mark.parametrize(
-    "path,source,text",
-    [
-        ("a.ts", 'const x = /https?:\\/\\//; const y = "// data"; // explanation', "// explanation"),
-        ("a.ts", "const x = `// data ${1 /* explanation */}`;", "/* explanation */"),
-        ("a.tsx", "const x = <div>https://host # data{/* explanation */}</div>;", "/* explanation */"),
-        ("a.tsx", "const x = <div>\n// data\n<span /></div>; // explanation", "// explanation"),
-        ("a.ts", "const x = 1; /* explanation */", "/* explanation */"),
-    ],
-)
-def test_typescript_contexts(path: str, source: str, text: str) -> None:
-    findings = scan_sources(ROOT, {path: source.encode()}, policy())
-    assert [(f.kind, f.text) for f in findings] == [("comment", text)]
-
-
-def test_nested_javascript_requests_and_html() -> None:
+def test_native_request_and_payload_response_contract(monkeypatch: pytest.MonkeyPatch) -> None:
     source = '<script>const x = "// data"; // explanation\n</script>'
-    assert len(javascript_requests("a.html", source, "html")) == 1
-    assert [f.text for f in scan_sources(ROOT, {"a.html": source.encode()}, policy())] == ["// explanation"]
+    requests = javascript_requests("a.html", source, "html")
+    assert len(requests) == 1
+
+    def native_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        assert command[0] == "node"
+        assert json.loads(str(kwargs["input"])) == requests
+        rows = [
+            {"line": 1, "kind": "comment", "text": "// explanation", "symbol": "f"},
+            {"line": 1, "kind": "payload", "text": "# executable prose", "symbol": "f", "language": "python"},
+        ]
+        return subprocess.CompletedProcess(command, 0, json.dumps(dict.fromkeys(requests, rows)))
+
+    monkeypatch.setattr("check_comment_policy.subprocess.run", native_run)
+    findings = scan_sources(ROOT, {"a.html": source.encode()}, policy())
+    assert [(f.kind, f.text, f.symbol) for f in findings] == [
+        ("comment", "// explanation", "script:0:f"),
+        ("comment", "# executable prose", "script:0:f:payload:"),
+    ]
 
 
 def test_yaml_run_and_notebook_cells() -> None:
@@ -279,7 +280,7 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     assert "if" not in job
     step = next(step for step in job["steps"] if step.get("name") == "Enforce comment and docstring policy")
     assert 'git show "${BASE_REF}:scripts/run_comment_policy.py"' in step["run"]
-    assert 'uv run -- python "$RUNNER_TEMP/comment-policy-runner.py"' in step["run"]
+    assert 'python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests' in step["run"]
     assert "8fbad03469746539959af14e865a19c53fab68f5" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
     assert "merge_group.base_sha" in step["env"]["BASE_REF"]
@@ -357,3 +358,177 @@ def test_removing_exception_revokes_permission(tmp_path: Path) -> None:
     base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
     registry.write_text(json.dumps(policy()), encoding="utf-8")
     assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base]) == 1
+
+
+@pytest.mark.parametrize("source", ['__doc__: str = "prose"', '__doc__ += "prose"', 'f"inert {value}"'])
+def test_other_python_prose_forms(source: str) -> None:
+    assert python_findings("a.py", source)
+
+
+def test_python_sql_context_avoids_docstrings_and_fstring_fragments() -> None:
+    assert [f.kind for f in python_findings("a.py", '"Show plan evolution -- details"')] == ["docstring"]
+    assert not python_findings("a.py", "sql = f\"SELECT * FROM t WHERE x = '{value}'\"")
+    assert [f.text for f in python_findings("a.py", 'conn.execute("PRAGMA foreign_keys=ON; -- explanation")')] == [
+        "-- explanation"
+    ]
+
+
+@pytest.mark.parametrize(
+    "source", ["SELECT [1 /* explanation */, 2];", "SELECT 1 FROM t WHERE x = 1 AND [--flag] = 1;"]
+)
+def test_ambiguous_sql_brackets_require_dialect(source: str) -> None:
+    assert scan("a.sql", source, "sql")[0].kind == "coverage-error"
+    assert [text for _, text in sql_comments(source, "duckdb")] or not sql_comments(source, "tsql")
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "results-explorer/a.mts",
+        "docker/a.java",
+        "benchbox/a.properties",
+        ".github/CODEOWNERS",
+        "scripts/a.zsh",
+        "scripts/new-format.xyz",
+    ],
+)
+def test_closed_inventory_discovers_maintained_sources(tmp_path: Path, path: str) -> None:
+    git_repo(tmp_path, "x=1")
+    target = tmp_path / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("# explanation", encoding="utf-8")
+    assert path in source_paths(tmp_path, False)
+    subprocess.run(["git", "-C", str(tmp_path), "add", path], check=True)
+    assert path in source_paths(tmp_path, True)
+
+
+def test_zsh_shebang_is_minimum_directive() -> None:
+    assert [f.kind for f in scan("a.zsh", "#!/bin/zsh\n# explanation\n", "bash")] == ["comment", "comment"]
+
+
+@pytest.mark.parametrize(
+    "source", ["printf python <<'EOF'\necho ok\nEOF\n", "python script.py <<'EOF'\n# input data\nEOF\n"]
+)
+def test_heredoc_arguments_and_script_input_are_data(source: str) -> None:
+    assert not scan("a.sh", source, "bash")
+
+
+def test_multiple_heredocs_and_continued_header() -> None:
+    source = "python - \\\n <<'A' <<'B'\n# unused input\nA\n# explanation\nB\n"
+    assert [f.text for f in scan("a.sh", source, "bash")] == ["# explanation"]
+
+
+def test_piped_heredoc_is_executable() -> None:
+    source = "cat <<'JS' | node\n// explanation\nJS\n"
+    assert javascript_requests("a.sh", source, "bash")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "write_sql: 'SELECT 1 -- explanation'",
+        "cleanup_sql: 'DELETE FROM t -- explanation'",
+        "platform_overrides:\n  duckdb: 'SELECT 1 -- explanation'",
+    ],
+)
+def test_repository_sql_carriers_are_routed(source: str) -> None:
+    assert [f.text for f in scan("a.yaml", source, "yaml")] == ["-- explanation"]
+
+
+def test_github_script_routes_native_request() -> None:
+    source = "steps:\n- uses: actions/github-script@sha\n  with:\n    script: |\n      // explanation\n"
+    assert list(javascript_requests("ci.yaml", source, "yaml").values()) == ["// explanation\n"]
+
+
+def test_myst_metadata_and_nested_examples() -> None:
+    source = "```{tags}\npython\n```\n```{toctree}\nindex\n```\n````{note}\n```python\n# explanation\n```\n````\n"
+    assert [(f.line, f.text) for f in scan("docs/a.md", source, "examples")] == [(9, "# explanation")]
+    source = "  ```python\n  # explanation\n  ```\n"
+    assert [(f.line, f.text) for f in scan("docs/a.md", source, "examples")] == [(2, "# explanation")]
+
+
+def test_rst_nested_code_is_dedented() -> None:
+    source = "   .. code-block:: python\n      :linenos:\n\n      # explanation\n      x=1\n"
+    assert [(f.line, f.text) for f in scan("docs/a.rst", source, "examples")] == [(4, "# explanation")]
+
+
+def test_exception_budget_and_completed_external_overlap() -> None:
+    registered = load_policy(json.dumps(policy(exceptions=[exception()])).encode())
+    assert len(scan_sources(ROOT, {"a.py": b"x=1 # noqa: F401\ny=2 # noqa: F401\n"}, registered)) == 1
+    with pytest.raises(ValueError, match="overlap"):
+        load_policy(
+            json.dumps(
+                policy(
+                    completed=["vendor/"],
+                    external=[{"path": "vendor/a.py", "owner": "upstream", "provenance": "README.md"}],
+                )
+            ).encode()
+        )
+
+
+def test_fixture_exception_binds_payload_kind_text_and_count() -> None:
+    entry = exception("-- explanation", kind="fixture", payload="SELECT 1 -- explanation", finding_kind="comment")
+    registered = load_policy(json.dumps(policy(exceptions=[entry])).encode())
+    finding = Finding("a.py", 1, "comment", "-- explanation", payload="SELECT 1 -- explanation")
+    assert allowed(finding, registered, "")
+    assert not allowed(
+        Finding("a.py", 1, "comment", "-- explanation", payload="SELECT 2 -- explanation"), registered, ""
+    )
+
+
+def test_report_handles_provenance_excluded_vendor_binary(tmp_path: Path) -> None:
+    git_repo(tmp_path, "# legacy\n")
+    path = "_project/scripts/vendor/package.whl"
+    binary = tmp_path / path
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"PK\x03\x04\xff")
+    (tmp_path / "quality/comment-policy.json").write_text(
+        json.dumps(policy(external=[{"path": path, "owner": "upstream", "provenance": "a.py"}])), encoding="utf-8"
+    )
+    assert path in source_paths(tmp_path, False)
+    assert main(["--root", str(tmp_path), "--mode", "report"]) == 0
+
+
+def test_parser_environment_installs_only_trusted_material(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("comment-policy-package.json", "comment-policy-package-lock.json"):
+        (tmp_path / name).write_text("{}", encoding="utf-8")
+    commands = []
+    monkeypatch.setenv("PYTHONPATH", "candidate")
+    monkeypatch.setenv("NODE_OPTIONS", "--require=candidate")
+    monkeypatch.setenv("COMMENT_POLICY_TYPESCRIPT", "candidate")
+
+    def install(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        commands.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("run_comment_policy.subprocess.run", install)
+    python, env = parser_environment(tmp_path)
+    assert str(python).startswith(str(tmp_path))
+    assert "PYTHONPATH" not in env and "NODE_OPTIONS" not in env
+    assert env["COMMENT_POLICY_TYPESCRIPT"] == str(tmp_path / "node_modules/typescript")
+    assert "--require-hashes" in commands[1][0]
+    assert "--ignore-scripts" in commands[2][0]
+    assert str(tmp_path / "comment-policy-requirements.txt") in commands[1][0]
+    assert commands[2][1]["cwd"] == tmp_path
+
+
+def test_comment_policy_trust_roots_require_soundness_review() -> None:
+    routes = (ROOT / ".github/soundness-paths.txt").read_text().splitlines()
+    owners = (ROOT / ".github/CODEOWNERS").read_text().splitlines()
+    for path in (*TRUSTED_FILES, "scripts/run_comment_policy.py", "quality/comment-policy.json"):
+        assert "file\t" + path in routes
+        assert path + " @joeharris76" in owners
+
+
+def test_new_files_do_not_inherit_vendor_directory_exclusion() -> None:
+    registered = policy(external=[{"path": "vendor/", "owner": "upstream", "provenance": "README.md"}])
+    registered["external_members"] = {"vendor/old.py"}
+    findings = scan_sources(ROOT, {"vendor/old.py": b"# upstream\n", "vendor/new.py": b"# explanation\n"}, registered)
+    assert [(f.path, f.text) for f in findings] == [("vendor/new.py", "# explanation")]
+
+
+def test_invalid_source_encoding_is_inventory_debt_in_report(tmp_path: Path) -> None:
+    git_repo(tmp_path, "x=1")
+    (tmp_path / "a.py").write_bytes(b"\xff")
+    assert main(["--root", str(tmp_path), "--mode", "report"]) == 0
+    assert main(["--root", str(tmp_path), "--mode", "strict"]) == 1

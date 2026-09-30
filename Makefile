@@ -542,7 +542,7 @@ windows-antipatterns-check:
 
 .PHONY: comment-policy-check comment-policy-strict comment-policy-report
 comment-policy-check:
-	uv run -- python scripts/run_comment_policy.py
+	uv run -- python scripts/run_comment_policy.py --native-tests
 
 comment-policy-strict:
 	uv run -- python scripts/check_comment_policy.py --mode strict

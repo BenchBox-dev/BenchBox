@@ -101,7 +101,6 @@ MERGE_GATE_WORKFLOWS = {
 }
 MERGE_GATE_SETUP_NAMES = {
     "Install Python dependencies",
-    "Install TypeScript parser",
     "Checkout code",
     "Checkout repository",
     "Install dependencies",

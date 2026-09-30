@@ -24,7 +24,7 @@ DIRECTIVES = (
     r"# type: ignore\[[a-z0-9_-]+(?:, ?[a-z0-9_-]+)*\]",
     r"# pragma: no (?:cover|branch)",
     r"# fmt: (?:off|on|skip)",
-    r"# (?:ruff|flake8): noqa(?:: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*)?",
+    r"# (?:ruff|flake8): noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
     r"# shellcheck (?:disable=SC[0-9]+(?:,SC[0-9]+)*|shell=(?:bash|sh|dash|ksh))",
     r"/// <reference (?:types|path)=\"[^\"\n]+\" ?/>",
     r"// @ts-(?:expect-error|ignore|check|nocheck)",
@@ -60,10 +60,19 @@ def load_policy(raw: bytes) -> dict:
         validate_path(entry["path"])
     for path in policy["completed"]:
         validate_path(path)
+        if any(matches(path, entry["path"]) or matches(entry["path"], path) for entry in policy["external"]):
+            raise ValueError("completed and external scopes cannot overlap")
     identities = set()
     for entry in policy["exceptions"]:
         required = {"path", "symbol", "text", "kind", "consumer", "necessity", "alternative", "owner", "removal"}
-        if set(entry) not in (required, required | {"expires"}) or not all(isinstance(v, str) for v in entry.values()):
+        fixture_fields = {"payload", "finding_kind"} if entry.get("kind") == "fixture" else set()
+        required |= fixture_fields
+        if (
+            set(entry) - {"expires", "count"} != required
+            or not all(isinstance(v, str) for k, v in entry.items() if k != "count")
+            or type(entry.get("count", 1)) is not int
+            or entry.get("count", 1) < 1
+        ):
             raise ValueError(
                 "exception requires an exact identity, consumer, necessity, alternative, owner and removal"
             )
@@ -73,6 +82,8 @@ def load_policy(raw: bytes) -> dict:
         validate_path(entry["consumer"])
         if entry["kind"] not in {"directive", "notice", "fixture"}:
             raise ValueError("explanatory comment and docstring exceptions are prohibited")
+        if entry["kind"] == "fixture" and entry["finding_kind"] not in {"comment", "payload-error"}:
+            raise ValueError("fixture must identify an actual comment or malformed parser input")
         if entry["kind"] == "directive":
             if not any(re.fullmatch(pattern, entry["text"]) for pattern in DIRECTIVES):
                 raise ValueError("directive must match an exact registered grammar without explanatory suffixes")
@@ -84,7 +95,14 @@ def load_policy(raw: bytes) -> dict:
                 "expires" in entry and date.fromisoformat(entry["expires"]) < date.today()
             ):
                 raise ValueError("directive exception needs an unexpired review date")
-        identity = (entry["path"], entry["symbol"], entry["text"])
+        identity = (
+            entry["path"],
+            entry["symbol"],
+            entry["text"],
+            entry["kind"],
+            entry.get("payload", ""),
+            entry.get("finding_kind", "comment"),
+        )
         if identity in identities:
             raise ValueError("duplicate exception identity")
         identities.add(identity)
@@ -102,14 +120,15 @@ def matches(path: str, scope: str) -> bool:
     return path.startswith(scope) if scope.endswith("/") else path == scope
 
 
-def allowed(finding: Finding, policy: dict, source: str) -> bool:
+def allowed(finding: Finding, policy: dict, source: str, budget: Counter | None = None) -> bool:
     text = finding.text
     if finding.kind == "comment" and not finding.symbol:
         if (
             source_language(finding.path, source) in {"python", "bash", "javascript", "unsupported"}
             and finding.line == 1
             and re.fullmatch(
-                r"#!(?:/usr/bin/env (?:bash|sh|python3|node)|/(?:bin|usr/bin)/(?:bash|sh|python3|node))", text
+                r"#!(?:/usr/bin/env (?:bash|sh|zsh|ksh|python3|node)|/(?:bin|usr/bin)/(?:bash|sh|zsh|ksh|python3|node))",
+                text,
             )
         ):
             return True
@@ -121,15 +140,19 @@ def allowed(finding: Finding, policy: dict, source: str) -> bool:
             and (finding.line == 1 or not source.splitlines()[0].strip() or source.splitlines()[0].startswith("#"))
         ):
             return codecs.lookup(cookie.group(1)).name != "utf-8"
-    return any(
-        finding.path == entry["path"]
-        and finding.symbol == entry["symbol"]
-        and (
-            (entry["kind"] == "fixture" and finding.payload and finding.payload == entry["text"])
-            or (entry["kind"] != "fixture" and finding.kind == "comment" and text == entry["text"])
-        )
-        for entry in policy["exceptions"]
-    )
+    for index, entry in enumerate(policy["exceptions"]):
+        if (
+            finding.path == entry["path"]
+            and finding.symbol == entry["symbol"]
+            and text == entry["text"]
+            and finding.kind == entry.get("finding_kind", "comment")
+            and (entry["kind"] != "fixture" or finding.payload == entry["payload"])
+            and (budget is None or budget[index] > 0)
+        ):
+            if budget is not None:
+                budget[index] -= 1
+            return True
+    return False
 
 
 def decode(path: str, raw: bytes) -> str:
@@ -140,11 +163,17 @@ def decode(path: str, raw: bytes) -> str:
 
 
 def scan_sources(root: Path, sources: dict[str, bytes], policy: dict) -> list[Finding]:
-    decoded = {
-        path: decode(path, raw)
-        for path, raw in sources.items()
-        if (language(path) or raw.startswith(b"#!")) and not any(matches(path, e["path"]) for e in policy["external"])
-    }
+    decoded = {}
+    errors = []
+    for path, raw in sources.items():
+        excluded = any(matches(path, e["path"]) for e in policy["external"])
+        if excluded and ("external_members" not in policy or path in policy["external_members"]):
+            continue
+        if language(path) or raw.startswith(b"#!"):
+            try:
+                decoded[path] = decode(path, raw)
+            except (UnicodeError, SyntaxError) as exc:
+                errors.append(Finding(path, 1, "coverage-error", str(exc)))
     requests = {
         key: text
         for path, source in decoded.items()
@@ -161,11 +190,12 @@ def scan_sources(root: Path, sources: dict[str, bytes], policy: dict) -> list[Fi
             env={**os.environ, "COMMENT_POLICY_ROOT": str(root)},
         )
         js_results = json.loads(result.stdout)
-    return [
+    budget = Counter({index: entry.get("count", 1) for index, entry in enumerate(policy["exceptions"])})
+    return errors + [
         finding
         for path, text in decoded.items()
         for finding in scan(path, text, source_language(path, text), js_results)
-        if not allowed(finding, policy, text)
+        if not allowed(finding, policy, text, budget)
     ]
 
 
@@ -211,6 +241,16 @@ def source_paths(root: Path, staged: bool) -> list[str]:
                 selected.append(path)
     paths = selected
     return paths
+
+
+def validate_consumers(root: Path, policy: dict) -> None:
+    for entry in policy["exceptions"]:
+        if not (root / entry["consumer"]).is_file():
+            raise ValueError(f"exception consumer missing: {entry['consumer']}")
+    for entry in policy["external"]:
+        validate_path(entry["provenance"])
+        if not (root / entry["provenance"]).is_file():
+            raise ValueError(f"external provenance missing: {entry['provenance']}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -270,17 +310,18 @@ def main(argv: list[str] | None = None) -> int:
             for path in paths
             if args.staged or (root / path).is_file()
         }
-        for entry in policy["exceptions"]:
-            if not (root / entry["consumer"]).is_file():
-                raise ValueError(f"exception consumer missing: {entry['consumer']}")
+        validate_consumers(root, policy)
         effective_policy = {
             **policy,
             "exceptions": [e for e in policy["exceptions"] if e in baseline_policy["exceptions"]],
         }
+        base_paths = []
+        if args.mode == "transition":
+            base_paths = git(root, "ls-tree", "-r", "--name-only", "-z", args.base).decode().split("\0")
+            effective_policy["external_members"] = set(base_paths)
         current = scan_sources(root, sources, effective_policy)
         failed = current
         if args.mode == "transition":
-            base_paths = git(root, "ls-tree", "-r", "--name-only", "-z", args.base).decode().split("\0")
             base_sources = {path: git(root, "show", f"{args.base}:{path}") for path in base_paths if path in sources}
             baseline = scan_sources(root, base_sources, baseline_policy)
             failed = introduced(current, baseline, policy["completed"])

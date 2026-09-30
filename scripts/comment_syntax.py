@@ -4,12 +4,13 @@ import ast
 import hashlib
 import io
 import re
+import shlex
 import tokenize
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 import yaml
-from comment_payloads import nested_sources
+from comment_payloads import nested_sources, shell_payloads
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Error
 
@@ -52,6 +53,8 @@ LANGUAGES = {
     ".jsx": "javascript",
     ".ts": "javascript",
     ".tsx": "javascript",
+    ".mts": "javascript",
+    ".cts": "javascript",
     ".ipynb": "notebook",
     ".c": "c",
     ".h": "c",
@@ -60,6 +63,13 @@ LANGUAGES = {
     ".rs": "rust",
     ".go": "go",
     ".ps1": "powershell",
+    ".psm1": "powershell",
+    ".ksh": "bash",
+    ".fish": "unsupported",
+    ".bat": "bat",
+    ".java": "java",
+    ".properties": "properties",
+    ".json": "json",
     ".tf": "terraform",
     ".r": "r",
     ".tpl": "unsupported",
@@ -70,11 +80,62 @@ LANGUAGES = {
     ".svelte": "unsupported",
     ".vue": "unsupported",
 }
+OWNED_ROOTS = (
+    "benchbox/",
+    "tests/",
+    "scripts/",
+    "tools/",
+    "_project/scripts/",
+    "results-explorer/",
+    "docker/",
+    "make/",
+    ".github/",
+    "docs/",
+    "examples/",
+    "_sources/compilation/",
+)
+DATA_SUFFIXES = {
+    ".lock",
+    ".md",
+    ".rst",
+    ".txt",
+    ".csv",
+    ".tsv",
+    ".svg",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".ico",
+    ".webp",
+    ".pdf",
+    ".parquet",
+    ".arrow",
+    ".db",
+    ".duckdb",
+    ".gz",
+    ".zip",
+    ".gitkeep",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".map",
+    ".snap",
+}
 
 
 def language(path: str) -> str | None:
     name = PurePosixPath(path).name
-    if name in {".gitignore", ".gitattributes", ".dockerignore"}:
+    if (
+        name in {".gitignore", ".gitattributes", ".dockerignore", "CODEOWNERS", "MANIFEST.in"}
+        or path == ".github/soundness-paths.txt"
+    ):
+        return "line-config"
+    if name.endswith(".py.backup"):
+        return "python"
+    if name == "CMakeLists.txt" or name.endswith(".cmake"):
+        return "cmake"
+    if path == "quality/comment-policy-requirements.txt" or name.startswith("requirements") and name.endswith(".txt"):
         return "line-config"
     if name == ".importlinter":
         return "ini"
@@ -90,30 +151,52 @@ def language(path: str) -> str | None:
         return "docker"
     if path.endswith((".md", ".rst")) and not path.startswith(("_project/", "_blog/")):
         return "examples"
-    if not PurePosixPath(path).suffix and path.startswith(("scripts/", "tools/", "_project/scripts/")):
+    if not PurePosixPath(path).suffix and path.startswith(OWNED_ROOTS):
         return "unsupported"
     suffix = PurePosixPath(path).suffix.lower()
-    if (
-        suffix not in LANGUAGES
-        and suffix not in {".json", ".lock", ".md", ".txt", ".csv", ".svg", ".png", ".gitkeep"}
-        and path.startswith(("scripts/", "tools/", "_project/scripts/"))
-    ):
+    if suffix not in LANGUAGES and suffix not in DATA_SUFFIXES and path.startswith(OWNED_ROOTS):
         return "unsupported"
     return LANGUAGES.get(suffix)
 
 
 def source_language(path: str, source: str) -> str | None:
     if source.startswith("#!"):
-        interpreter = source.splitlines()[0].split()[-1].split("/")[-1]
+        words = shlex.split(source.splitlines()[0][2:])
+        if not words:
+            return "unsupported"
+        interpreter = words[0].split("/")[-1]
+        if interpreter == "env":
+            commands = [word for word in words[1:] if not word.startswith("-") and "=" not in word]
+            interpreter = commands[0] if commands else ""
         return (
             "python"
             if interpreter.startswith("python")
-            else {"sh": "bash", "bash": "bash", "node": "javascript"}.get(interpreter, "unsupported")
+            else {"sh": "bash", "bash": "bash", "zsh": "bash", "ksh": "bash", "node": "javascript"}.get(
+                interpreter, "unsupported"
+            )
         )
     return language(path)
 
 
-def sql_comments(source: str) -> list[tuple[int, str]]:
+def sql_quoted_end(source: str, pos: int) -> int:
+    char = source[pos]
+    closing = "]" if char == "[" else char
+    pos += 1
+    while pos < len(source):
+        if source[pos] == "\\" and char != "[":
+            pos += 2
+        elif source[pos] == closing:
+            pos += 1
+            if pos < len(source) and source[pos] == closing:
+                pos += 1
+            else:
+                return pos
+        else:
+            pos += 1
+    raise ValueError("unterminated SQL quoted value")
+
+
+def sql_comments(source: str, dialect: str | None = None) -> list[tuple[int, str]]:
     result: list[tuple[int, str]] = []
     pos = 0
     while pos < len(source):
@@ -126,26 +209,20 @@ def sql_comments(source: str) -> list[tuple[int, str]]:
             if end < 0:
                 raise ValueError("unterminated SQL dollar string")
             pos = end + len(marker)
-        elif char in "'\"`[" and not (
-            char == "["
-            and re.search(r"(?:\bARRAY|[\w)\]])\s*$", source[:pos], re.I)
-            and not re.search(r"\b(?:SELECT|FROM|JOIN|AS|BY|WHERE)\s*$", source[:pos], re.I)
-        ):
-            closing = "]" if char == "[" else char
-            pos += 1
-            while pos < len(source):
-                if source[pos] == "\\" and char != "[":
-                    pos += 2
-                elif source[pos] == closing:
-                    pos += 1
-                    if pos < len(source) and source[pos] == closing:
-                        pos += 1
-                    else:
-                        break
-                else:
-                    pos += 1
+        elif char == "[" and dialect != "tsql" and not re.search(r"\bARRAY\s*$", source[:pos], re.I):
+            end = source.find("]", pos + 1)
+            if dialect is None and end >= 0 and re.search(r"--|/\*|#", source[pos + 1 : end]):
+                raise ValueError("SQL bracket syntax containing comment delimiters requires a declared dialect")
+            if dialect in {"duckdb", "bigquery"} or re.search(r"[\w)\]]\s*$", source[:pos]):
+                pos += 1
+            elif end >= 0:
+                pos = end + 1
             else:
-                raise ValueError("unterminated SQL quoted value")
+                raise ValueError("unterminated SQL bracket")
+        elif char == "[" and dialect != "tsql":
+            pos += 1
+        elif char in "'\"`[":
+            pos = sql_quoted_end(source, pos)
         elif source.startswith("--", pos) or (
             char == "#"
             and not source.startswith(("#>", "#-", "##"), pos)
@@ -179,12 +256,37 @@ def python_findings(path: str, source: str) -> list[Finding]:
     result: list[Finding] = []
     scopes: list[tuple[int, int, str]] = []
 
-    def visit(node: ast.AST, symbol: str) -> None:
+    def sql_context(node: ast.AST, parent: ast.AST | None) -> bool:
+        if isinstance(parent, ast.Call) and node in parent.args:
+            func = parent.func
+            return (
+                isinstance(func, ast.Attribute)
+                and func.attr in {"execute", "executemany", "sql", "query", "prepare", "read_sql", "read_sql_query"}
+            ) or (isinstance(func, ast.Name) and func.id in {"text", "read_sql", "read_sql_query"})
+        if isinstance(parent, (ast.Assign, ast.AnnAssign)):
+            targets = parent.targets if isinstance(parent, ast.Assign) else [parent.target]
+            names = [
+                child.id.lower() for target in targets for child in ast.walk(target) if isinstance(child, ast.Name)
+            ]
+            return any(name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")) for name in names)
+        if isinstance(parent, ast.Dict):
+            return any(
+                value is node
+                and isinstance(key, ast.Constant)
+                and isinstance(key.value, str)
+                and (key.value in {"sql", "query"} or key.value.endswith("_sql"))
+                for key, value in zip(parent.keys, parent.values)
+            )
+        return False
+
+    def visit(node: ast.AST, symbol: str, parent: ast.AST | None = None) -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             symbol = f"{symbol}.{node.name}".strip(".")
             scopes.append((node.lineno, node.end_lineno or node.lineno, symbol))
         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
             result.append(Finding(path, node.lineno, "docstring", node.value.value, symbol))
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.JoinedStr):
+            result.append(Finding(path, node.lineno, "inert-string", ast.unparse(node.value), symbol))
         if isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and any(
             (isinstance(child, ast.Attribute) and child.attr == "__doc__" and isinstance(child.ctx, ast.Store))
             or (isinstance(child, ast.Name) and child.id == "__doc__" and isinstance(child.ctx, ast.Store))
@@ -213,11 +315,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             sql_text = "".join(
                 str(value.value) if isinstance(value, ast.Constant) else "__expression__" for value in node.values
             )
-        if re.match(
-            r"\s*(?:--[^\n]*\n|/\*.*?\*/\s*)*(?:SELECT|WITH|CREATE|INSERT|UPDATE|DELETE|ALTER|DROP|VALUES|EXPLAIN|MERGE|COPY|SHOW|DESCRIBE|TRUNCATE|GRANT|REVOKE)\b",
-            sql_text,
-            re.I | re.S,
-        ):
+        if sql_text and sql_context(node, parent) and re.search(r"--|/\*|#", sql_text):
             try:
                 result.extend(
                     Finding(path, node.lineno + sql_text[:offset].count("\n"), "comment", text, symbol, sql_text)
@@ -226,7 +324,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             except ValueError as exc:
                 result.append(Finding(path, node.lineno, "payload-error", str(exc), symbol, sql_text))
         for child in ast.iter_child_nodes(node):
-            visit(child, symbol)
+            visit(child, symbol, node)
 
     visit(tree, "")
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
@@ -255,6 +353,29 @@ def javascript_requests(path: str, source: str, lang: str) -> dict[str, str]:
     return result
 
 
+def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]] | None) -> list[Finding]:
+    key = javascript_key(path, source)
+    if js_results is None or key not in js_results:
+        raise ValueError("TypeScript parser result missing")
+    result = []
+    for row in js_results[key]:
+        if row["kind"] == "payload":
+            result.extend(
+                Finding(
+                    path,
+                    row["line"] + f.line - 1,
+                    f.kind,
+                    f.text,
+                    f"{row.get('symbol', '')}:payload:{f.symbol}",
+                    f.payload,
+                )
+                for f in scan(path + "." + row["language"], row["text"], row["language"], js_results)
+            )
+        else:
+            result.append(Finding(path, row["line"], row["kind"], row["text"], row.get("symbol", "")))
+    return result
+
+
 def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     try:
         if source.startswith("#!"):
@@ -266,17 +387,20 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
                 Finding(path, source[:offset].count("\n") + 1, "comment", text) for offset, text in sql_comments(source)
             ]
         if lang == "javascript":
-            key = javascript_key(path, source)
-            if js_results is None or key not in js_results:
-                raise ValueError("TypeScript parser result missing")
-            return [Finding(path, row["line"], row["kind"], row["text"]) for row in js_results[key]]
+            return javascript_findings(path, source, js_results)
         nested = [
-            Finding(path, start + f.line - 1, f.kind, f.text, f"{symbol}:{f.symbol}")
+            Finding(path, start + f.line - 1, f.kind, f.text, f"{symbol}:{f.symbol}", f.payload)
             for start, child_path, text, child_lang, symbol in nested_sources(path, source, lang)
             for f in scan(child_path, text, child_lang, js_results)
         ]
         if lang in {"notebook", "examples"}:
             return nested
+        if lang == "bash":
+            lines = source.splitlines(keepends=True)
+            for start, _, text, _, _ in shell_payloads(path, source, include_data=True):
+                for index in range(start - 1, start - 1 + len(text.splitlines())):
+                    lines[index] = re.sub(r"[^\n]", " ", lines[index])
+            source = "".join(lines)
         if lang in {"html", "html+jinja"}:
             source = re.sub(
                 r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)",

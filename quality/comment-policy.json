@@ -70,6 +70,11 @@
       "path": "_binaries/tpc-ds/windows-x86_64/query_templates/",
       "owner": "TPC",
       "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_project/scripts/vendor/todo_db-0.8.1-py3-none-any.whl",
+      "owner": "todo-db",
+      "provenance": "_project/scripts/pyproject.toml"
     }
   ],
   "completed": [
@@ -78,74 +83,9 @@
     "scripts/comment_syntax_js.cjs",
     "scripts/run_comment_policy.py",
     "tests/unit/scripts/test_comment_policy.py",
-    "scripts/comment_payloads.py"
+    "scripts/comment_payloads.py",
+    "tests/unit/scripts/test_comment_syntax_js.cjs",
+    "quality/comment-policy-requirements.txt"
   ],
-  "exceptions": [
-    {
-      "path": "tests/unit/scripts/test_comment_policy.py",
-      "symbol": "test_sql_array_and_operator_contexts",
-      "text": "SELECT ARRAY[1 /* explanation */];",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_comment_policy.py",
-      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
-      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the corresponding parser regression case is retired."
-    },
-    {
-      "path": "tests/unit/scripts/test_comment_policy.py",
-      "symbol": "test_sql_literals_and_nested_comments",
-      "text": "SELECT $tag$/*payload*/$tag$; /* outer /* inner */ end */",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_comment_policy.py",
-      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
-      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the corresponding parser regression case is retired."
-    },
-    {
-      "path": "tests/unit/scripts/test_comment_policy.py",
-      "symbol": "test_sql_literals_and_nested_comments",
-      "text": "SELECT '-- payload', \"-- name\", `#name`, [--name], $$--data$$; -- comment",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_comment_policy.py",
-      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
-      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the corresponding parser regression case is retired."
-    },
-    {
-      "path": "tests/unit/scripts/test_comment_policy.py",
-      "symbol": "test_sql_literals_and_nested_comments",
-      "text": "SELECT 1 # comment",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_comment_policy.py",
-      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
-      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the corresponding parser regression case is retired."
-    },
-    {
-      "path": "tests/unit/scripts/test_comment_policy.py",
-      "symbol": "test_sql_unterminated_constructs_fail",
-      "text": "SELECT $$unterminated",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_comment_policy.py",
-      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
-      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the corresponding parser regression case is retired."
-    },
-    {
-      "path": "tests/unit/scripts/test_comment_policy.py",
-      "symbol": "test_sql_unterminated_constructs_fail",
-      "text": "SELECT 'unterminated",
-      "kind": "fixture",
-      "consumer": "tests/unit/scripts/test_comment_policy.py",
-      "necessity": "This exact SQL input exercises the comment scanner, including deliberately malformed SQL.",
-      "alternative": "Removing the input would remove the regression case; it is test data with an actual reader.",
-      "owner": "BenchBox maintainers",
-      "removal": "Remove when the corresponding parser regression case is retired."
-    }
-  ]
+  "exceptions": []
 }
