@@ -177,18 +177,17 @@ host the same mix of `maintainer-run` (seed corpus, no sidecar) and
 
 ### Vendored scripts: source of truth and divergence detection
 
-`validate_submission.py` and `generate_corpus_inventory.py` exist on
-`develop` (the canonical home) and are vendored to `published-results`
-for self-contained CI. Sync is automated by
+The complete six-file runtime listed below exists on `develop` (the canonical
+home) and is vendored to `published-results` for self-contained CI. Sync is automated by
 [`.github/workflows/sync-results-data-to-published.yml`](../../../.github/workflows/sync-results-data-to-published.yml):
-when develop's copy of either script changes, the workflow opens a
+when develop's copy of any runtime file changes, the workflow opens a
 draft mirror PR vs `published-results` carrying the change. Maintainers
 review and flip ready when the develop change is intended to surface on
 the public corpus branch.
 
 This means `published-results` will normally be at most one mirror PR
-behind develop on the vendored scripts. If a develop PR modifies one
-of the scripts but the mirror PR is left as a draft (e.g. waiting on a
+behind develop on the vendored runtime. If a develop PR modifies one
+of these files but the mirror PR is left as a draft (e.g. waiting on a
 matching slim-branch contributor PR), divergence is bounded and visible
 in the open-PR list against `published-results`.
 
@@ -202,11 +201,16 @@ not make `develop` authoritative for published-only archive bundles.
 
 ### The workflow file itself is NOT auto-mirrored — this is permanent, not a gap to close
 
-`sync-results-data-to-published.yml`'s automated mirror only covers
-`scripts/validate_submission.py`, `benchbox/validation/bundle.py`,
-`benchbox/core/results/query_status.py`, and
-`scripts/generate_corpus_inventory.py` (the vendored validation surface). It
-deliberately does **not** include
+`sync-results-data-to-published.yml`'s automated mirror covers these six files:
+
+- `scripts/validate_submission.py`
+- `scripts/generate_corpus_inventory.py`
+- `scripts/publication/validator_parity.py`
+- `benchbox/validation/bundle.py`
+- `benchbox/core/results/query_status.py`
+- `benchbox/core/results/schema_policy.py`
+
+It deliberately does **not** include
 `.github/workflows/validate-submission.yml` itself, and never will:
 `GITHUB_TOKEN` cannot push changes under `.github/workflows/` regardless
 of the `permissions:` block granted to it — this is a hard-coded GitHub
