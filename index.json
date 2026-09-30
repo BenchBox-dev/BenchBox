@@ -6230,10 +6230,10 @@
     },
     "dlv2-50-release-prep-targets": {
       "claim": {
-        "expires_at": "2026-10-01T01:20:53Z",
-        "generation": "e92131975fd8428bbab445cb9eab9622",
+        "expires_at": "2026-10-01T05:44:11Z",
+        "generation": "2a9c1106a1d84331ad26493356b9d583",
         "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bfd5c7954eba099bd7f79237"
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c"
       },
       "needs": [
         "dlv2-00-decisions-adr"

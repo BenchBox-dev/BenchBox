@@ -39,6 +39,17 @@
       "op": "update",
       "op_id": "8f8138187b2d4551b15ce3a4ae9ae1b8",
       "session_id": "3596d314cb5a4d6d9a30621673dff602"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T05:44:11Z",
+      "client": "codex-mcp-client",
+      "displaced": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bfd5c7954eba099bd7f79237",
+      "generation": "2a9c1106a1d84331ad26493356b9d583",
+      "op": "takeover",
+      "op_id": "11c53e8df4364003bdb62077ad79ddcd",
+      "reason": "Resumed task uses MCP session3596d314; holder b84e6974 claimed at01:20:53UTC. Live process inventory shows all Codex-owned todo-db servers started afterward; the holder's isolated server is gone. Transfer the inspected claim without impersonating it.",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
