@@ -2941,6 +2941,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from analysis and comparison modules"
     },
+    "comment-cleanup-aws-cloud": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from AWS adapters and support"
+    },
     "comment-cleanup-checker": {
       "claim": null,
       "needs": [
