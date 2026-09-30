@@ -323,6 +323,7 @@ class TestDatabricksDataFrameAdapterQueryExecution:
         # Mock connection and cursor
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = [(1, "test")]
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_connection = MagicMock()
         mock_connection.cursor.return_value = mock_cursor
 
@@ -333,7 +334,8 @@ class TestDatabricksDataFrameAdapterQueryExecution:
         )
 
         assert result["query_id"] == "TEST1"
-        mock_cursor.execute.assert_called_once()
+        executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert executed.count("SELECT 1, 'test'") == 1
 
     def test_execute_query_with_callable_uses_dataframe_mode(self, mock_databricks_sql):
         """Test execute_query() with callable dispatches to DataFrame mode."""

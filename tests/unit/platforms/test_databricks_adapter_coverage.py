@@ -345,7 +345,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["min_cluster_count"] == 1
         assert metadata["platform_compute"]["max_cluster_count"] == 3
         assert metadata["platform_compute"]["spot_instance_policy"] == "COST_OPTIMIZED"
-        assert metadata["platform_compute"]["result_cache_enabled"] is True
+        assert "result_cache_enabled" not in metadata["platform_compute"]
         assert metadata["platform_compute"]["collection_status"] == "available"
         assert metadata["platform_storage"]["table_format"] == "delta"
         assert metadata["platform_storage"]["staging_location"] == "dbfs:/Volumes/main/bench/stage"
@@ -378,7 +378,7 @@ class TestNormalizedResultMetadata:
         assert metadata["platform_compute"]["warehouse_size"] == "Large"
         assert "serverless" not in metadata["platform_compute"]
         assert metadata["platform_compute"]["auto_stop_mins"] == 45
-        assert metadata["platform_compute"]["result_cache_enabled"] is False
+        assert "result_cache_enabled" not in metadata["platform_compute"]
         assert metadata["platform_compute"]["warehouse_metadata_collection_status"] == "unavailable"
         assert metadata["platform_compute"]["collection_status"] == "partial"
         assert metadata["platform_cloud"]["region_collection_status"] == "unavailable"
@@ -775,6 +775,7 @@ class TestConfigureForBenchmark:
         cursor = MagicMock()
         connection = MagicMock()
         connection.cursor.return_value = cursor
+        cursor.fetchone.return_value = ("use_cached_result", "false")
 
         adapter.configure_for_benchmark(connection=connection, benchmark_type="tpch")
 
@@ -813,7 +814,8 @@ class TestExecuteQueryFailurePath:
 
         assert result["status"] == "FAILED"
         assert "error" in result
-        assert "query execution error" in result["error"]
+        assert "Databricks session cache control failed" in result["error"]
+        assert result["execution_time_seconds"] == 0.0
         assert result["query_id"] == "Q1"
 
 
@@ -2446,6 +2448,7 @@ class TestCreateConnection:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -2465,6 +2468,7 @@ class TestCreateConnection:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -2486,6 +2490,7 @@ class TestCreateConnection:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         with patch.object(adapter, "_create_admin_connection", return_value=mock_conn):
@@ -2601,6 +2606,7 @@ class TestExecuteQuerySuccessPath:
         cursor.fetchall.return_value = [(1, "data")]
         connection = MagicMock()
         connection.cursor.return_value = cursor
+        cursor.fetchone.return_value = ("use_cached_result", "false")
 
         with patch("benchbox.platforms.databricks.adapter.mono_time", return_value=0.0):
             with patch("benchbox.platforms.databricks.adapter.elapsed_seconds", return_value=0.1):
@@ -2625,6 +2631,7 @@ class TestExecuteQuerySuccessPath:
         cursor.fetchall.return_value = [(42,)]
         connection = MagicMock()
         connection.cursor.return_value = cursor
+        cursor.fetchone.return_value = ("use_cached_result", "false")
 
         with patch("benchbox.platforms.databricks.adapter.mono_time", return_value=0.0):
             with patch("benchbox.platforms.databricks.adapter.elapsed_seconds", return_value=0.2):
