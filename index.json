@@ -2933,6 +2933,17 @@
       "status": "open",
       "title": "Replace docstring presence coverage with explicit API contracts and content checks"
     },
+    "comment-cleanup-pilot-budget": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-checker",
+        "comment-cleanup-contracts-gate",
+        "comment-cleanup-shared-infrastructure"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Pilot safe deletion and approve module batch and review budgets"
+    },
     "comment-cleanup-scope-policy": {
       "claim": null,
       "needs": [],

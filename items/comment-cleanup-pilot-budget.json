@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Pilot package, assigned tests and examples reach zero discretionary comments/docstrings, preserving actual runtime strings and raw SQL payloads; new and completed-scope checks plus narrow AST parity pass.",
+    "Pilot records elapsed authoring, review and required-check cost and any false positives/consumer omissions, then adjusts checker/ownership before broad rollout.",
+    "Fresh baseline counts distinguish owned removable text, required notices/directives, upstream material, parsed fixtures and generated payloads.",
+    "Concrete module file/batch/PR/reviewer/CI budget is approved in a later operator message before broad deletion; estimated counts are not presented as delivery commitments.",
+    "Soundness paths have explicit reviewer and verification requirements. Pilot success is not UAT, publication or production certification."
+  ],
+  "context": "Planning basis: the aggressive comment/docstring-removal plan revised after external Claude Opus 5.5, medium-effort review. The reviewer originally rejected the draft; all 18 findings received dispositions (12 accepted, five narrowed, one rebutted). The updated plan has not received a second external review. Original source baseline 0697891d449b1e31f22e4842169f3b2e743337fb; planning worktree was created at newer origin/develop c7bcdb9bc1d713a0c616969b2eb3f19f3d1d86a1. Refresh all facts at implementation start.",
+  "description": "Own benchbox/examples/ and its specifically assigned tests/reference pages as the initial low-risk pilot; the later examples task excludes this package. Use the checker and API-contract replacement already delivered. Apply the full strict target, preserve actually consumed example help and SQL bytes, and compare source AST plus relevant execution behavior. Target: zero discretionary explanatory comments and authored explanatory docstrings in maintained first-party code. Only proven minimum machine directives and unavoidable provenance-bound required notices remain. Useful product strings must have an actual consumer; no inert constants, unused strings, fake metadata or dynamic __doc__ replacements. Never broaden lint/type/coverage ignores, weaken assertions, or turn unknown ownership/parser coverage into an exclusion.\n\nMeasure deletion/review/CI cost and choose module-specific batch sizes before broad sweeps. Earlier inventory: 55,003 tracked Python comment tokens; 12,100 benchbox docstrings (~65,946 cleaned content lines), 2,925 Python files with comments/docstrings and 292 sole-docstring bodies, before ownership classification. At 20–40 files/batch this suggests 74–147 Python batches, not an approved PR count. Refresh counts and include non-Python surfaces. Decide an explicit file/PR/review/check budget and soundness review allocation; no skipped gates or use of comment shrink as goal credit. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Obtain later implementation authorization. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Freeze nonoverlapping code/test/doc paths with the integrator before dispatch. Ordinary independent PRs target develop; serialize shared test-lock checks and integration, not module edits. Required native/external soundness review remains mandatory, with no auto-merge bypass. No live cloud/stress, deployment, publication, historical-result rewriting, or unapproved external-repository writes.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:d448b08be5b969faae2e2a3d",
+      "at": "2026-09-30T00:04:19Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "6a66e6a92bbe465c966de382d6dd7015",
+      "session_id": "ad486d2419af432fa889205fbc465e0c"
+    }
+  ]
+}
