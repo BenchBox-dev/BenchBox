@@ -2923,6 +2923,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from AI primitives modules"
     },
+    "comment-cleanup-amplab": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from AMPLab modules"
+    },
     "comment-cleanup-analysis-comparison": {
       "claim": null,
       "needs": [
