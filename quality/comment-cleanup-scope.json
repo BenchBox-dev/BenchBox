@@ -1227,6 +1227,62 @@
       "owner": "comment-cleanup-contracts-gate",
       "state": "blocked",
       "blocking_disposition": "Replace the coverage job and badge generation atomically."
+    },
+    {
+      "id": "joinorder-synthetic-generated-docstring-writer",
+      "path": "benchbox/core/joinorder_synthetic/dataframe_queries.py",
+      "carrier": "_impl.__doc__",
+      "owner": "comment-cleanup-joinorder-synthetic",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writer; do not replace it with inert data."
+    },
+    {
+      "id": "read-primitives-generated-docstring-writer",
+      "path": "benchbox/core/read_primitives/dataframe_queries.py",
+      "carrier": "impl.__doc__",
+      "owner": "comment-cleanup-read-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writer; do not replace it with inert data."
+    },
+    {
+      "id": "ssb-generated-docstring-writer",
+      "path": "benchbox/core/ssb/dataframe_queries/queries.py",
+      "carrier": "impl.__doc__ and globals() docstring writes",
+      "owner": "comment-cleanup-ssb",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writers; do not replace them with inert data."
+    },
+    {
+      "id": "platform-config-builder-docstring-writer",
+      "path": "benchbox/platforms/base/config_utils.py",
+      "carrier": "_builder.__doc__",
+      "owner": "comment-cleanup-platform-base",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writer; do not replace it with inert data."
+    },
+    {
+      "id": "windows-noqa-source-reader",
+      "path": "scripts/check_windows_antipatterns.py",
+      "carrier": "_has_noqa source-line scan",
+      "owner": "comment-cleanup-windows-consumer",
+      "state": "blocked",
+      "blocking_disposition": "Preserve or replace the suppression rule before any noqa directive is deleted."
+    },
+    {
+      "id": "pricing-section-marker-reader",
+      "path": "scripts/generate_pricing_data.py",
+      "carrier": "BEGIN_PREFIX and END_PREFIX section markers in the pricing text",
+      "owner": "comment-cleanup-pricing-consumer",
+      "state": "blocked",
+      "blocking_disposition": "Migrate the section markers to structured data before their comments are deleted."
+    },
+    {
+      "id": "ci-units-comment-delimiter-reader",
+      "path": "scripts/ci_units.py",
+      "carrier": "text after a hash in unit rule files",
+      "owner": "comment-cleanup-shared-infrastructure",
+      "state": "blocked",
+      "blocking_disposition": "Replace the delimiter convention before any rule-file comment is deleted."
     }
   ],
   "derived_rules": [
@@ -1426,6 +1482,17 @@
       "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-x86_64/NOTICE.txt",
       "owner": "comment-cleanup-scope-policy",
       "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_sources/tpc-h/PATCHES.md",
+      "blob_sha256": "f02a3e3126a2f2e65c0d31dbcd9d7180f35b7a6dcb730934c2e46904a04be203",
+      "byte_start": 0,
+      "byte_end": 5991,
+      "retained_sha256": "f02a3e3126a2f2e65c0d31dbcd9d7180f35b7a6dcb730934c2e46904a04be203",
+      "governing_requirement": "The patch record accompanies the TPC-H tool source, but no independent governing-notice obligation is established.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-h/PATCHES.md",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Classify separately from required notices; preserve exact bytes until provenance is resolved."
     },
     {
       "path": "_sources/tpc-ds/PATCHES.md",

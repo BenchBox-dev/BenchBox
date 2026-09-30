@@ -34,6 +34,21 @@ different owner, which is a finding. A payload record names the single region of
 a file that an earlier task may edit; the file's rule still names the later
 owner.
 
+The validator also scans every tracked Python source at the base for docstring
+carriers and lists them in the local manifest with the owner of each path. A
+carrier is a read of a module or object docstring, a `getdoc`, `getsource` or
+`getcomments` call, or a write to `__doc__`. A module docstring passed to a
+command-line parser is a reader, so that text must move into an explicit
+constant before the docstring is deleted. Every runtime docstring write must
+have a payload record for its file, otherwise validation reports it. An exact
+path rule that a derived rule could override is invalid.
+
+The scan finds only explicit references. It does not see readers that take a
+docstring implicitly, such as Click and FastMCP command decorators, nor
+assignments through `vars`, tuple targets, class bodies, `functools.wraps`, or a
+variable attribute name. Owners of those modules must inventory them by hand
+before deleting a docstring.
+
 The policy does not create a permanent path ledger. Before dispatch, run the
 validator against the immutable source commit and write the resolved manifest to
 an ignored local path:

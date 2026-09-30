@@ -519,3 +519,57 @@ def test_notice_owner_claims_an_unowned_path_and_reports_conflicts() -> None:
     assert resolved[0]["rule"] == "notice"
     assert resolved[1]["owner"] == "comment-cleanup-other"
     assert [finding.code for finding in findings] == ["SCOPE005"]
+
+
+def test_doc_carriers_classify_docstring_readers_and_writers() -> None:
+    source = b"""
+import inspect
+
+def f():
+    parser = P(description=__doc__)
+    text = inspect.getsource(f)
+    a = getattr(f, "__doc__", "")
+    b = f.__doc__
+    f.__doc__ = "x"
+    setattr(f, "__doc__", "y")
+    globals()["g"].__doc__ = "z"
+"""
+    found = {(role, form) for _, role, form in scope.doc_carriers(source)}
+    assert found == {
+        ("reader", "module-docstring-read"),
+        ("reader", "getsource"),
+        ("reader", "getattr"),
+        ("reader", "attribute-read"),
+        ("writer", "attribute-assignment"),
+        ("writer", "setattr"),
+    }
+    assert scope.doc_carriers(b"def (:\n") == []
+
+
+def test_unregistered_docstring_writer_is_a_finding(policy: dict) -> None:
+    carriers = [
+        {"path": "src/a.py", "line": 3, "role": "writer", "form": "attribute-assignment", "owner": "o"},
+        {"path": "src/b.py", "line": 4, "role": "reader", "form": "getsource", "owner": "o"},
+    ]
+    findings = scope.carrier_findings(carriers, policy)
+    assert [(finding.code, finding.subject) for finding in findings] == [("SCOPE006", "src/a.py")]
+    policy["payloads"] = [
+        {
+            "id": "a",
+            "path": "src/a.py",
+            "carrier": "x",
+            "owner": "comment-cleanup-x",
+            "state": "blocked",
+            "blocking_disposition": "d",
+        }
+    ]
+    assert scope.carrier_findings(carriers, policy) == []
+
+
+def test_exact_rule_must_outrank_the_derived_rule() -> None:
+    rule = {"id": "exact", "priority": 20, "selectors": [{"path": "tests/unit/test_x.py"}]}
+    derived = [{"id": "d", "priority": 20, "selectors": [{"prefix": "tests/unit/"}]}]
+    with pytest.raises(scope.PolicyError):
+        scope.validate_rule_priorities([rule], derived)
+    scope.validate_rule_priorities([{**rule, "priority": 30}], derived)
+    scope.validate_rule_priorities([{**rule, "selectors": [{"prefix": "tests/unit/"}], "priority": 5}], derived)

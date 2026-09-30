@@ -360,6 +360,21 @@ def validate_derived_rules(policy: dict[str, Any], task_ids: set[str] | None = N
     return result
 
 
+def validate_rule_priorities(rules: list[dict[str, Any]], derived: list[dict[str, Any]]) -> None:
+    for rule in rules:
+        for selector in rule["selectors"]:
+            if "path" not in selector:
+                continue
+            for derived_rule in derived:
+                if rule["priority"] <= derived_rule["priority"] and any(
+                    matches(selector["path"], candidate) for candidate in derived_rule["selectors"]
+                ):
+                    raise PolicyError(
+                        f"rule {rule['id']} names {selector['path']} at priority {rule['priority']}, "
+                        f"which derived rule {derived_rule['id']} would override"
+                    )
+
+
 def read_blobs(root: Path, base: str, paths: list[str]) -> dict[str, bytes]:
     if not paths:
         return {}
@@ -469,6 +484,61 @@ def apply_notice_owners(resolved: list[dict[str, Any]], notices: list[dict[str, 
             owner=notice["owner"], state="blocked", blocking_disposition=notice["blocking_disposition"], rule="notice"
         )
         record.pop("competing_owners", None)
+    return findings
+
+
+def doc_carriers(source: bytes) -> list[tuple[int, str, str]]:
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError, MemoryError, RecursionError):
+        return []
+    found = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            found.extend(
+                (target.lineno, "writer", "attribute-assignment")
+                for target in targets
+                if isinstance(target, ast.Attribute) and target.attr == "__doc__"
+            )
+        elif isinstance(node, ast.Attribute) and node.attr == "__doc__" and isinstance(node.ctx, ast.Load):
+            found.append((node.lineno, "reader", "attribute-read"))
+        elif isinstance(node, ast.Name) and node.id == "__doc__" and isinstance(node.ctx, ast.Load):
+            found.append((node.lineno, "reader", "module-docstring-read"))
+        elif isinstance(node, ast.Call):
+            name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
+            arguments = [argument.value for argument in node.args if isinstance(argument, ast.Constant)]
+            if name == "setattr" and "__doc__" in arguments:
+                found.append((node.lineno, "writer", "setattr"))
+            elif name == "getattr" and "__doc__" in arguments:
+                found.append((node.lineno, "reader", "getattr"))
+            elif name in {"getdoc", "getsource", "getcomments", "getsourcelines"}:
+                found.append((node.lineno, "reader", name))
+    return sorted(found)
+
+
+def detect_carriers(resolved: list[dict[str, Any]], root: Path, base: str) -> list[dict[str, Any]]:
+    by_path = {record["path"]: record for record in resolved if record["path"].endswith(".py")}
+    blobs = read_blobs(root, base, sorted(by_path))
+    carriers = []
+    for path, record in by_path.items():
+        for line, role, form in doc_carriers(blobs[path]):
+            carriers.append({"path": path, "line": line, "role": role, "form": form, "owner": record["owner"]})
+    return carriers
+
+
+def carrier_findings(carriers: list[dict[str, Any]], policy: dict[str, Any]) -> list[Finding]:
+    registered = {payload["path"] for payload in policy["payloads"]}
+    findings = []
+    for carrier in carriers:
+        if carrier["role"] == "writer" and carrier["path"] not in registered:
+            findings.append(
+                Finding(
+                    "SCOPE006",
+                    carrier["path"],
+                    f"runtime docstring write at line {carrier['line']} has no payload record",
+                )
+            )
     return findings
 
 
@@ -589,6 +659,7 @@ def main(argv: list[str] | None = None) -> int:
         roots = validate_roots(policy)
         rules = validate_rules(policy, task_ids)
         derived = validate_derived_rules(policy)
+        validate_rule_priorities(rules, derived)
         validate_evidence(policy, root, args.base, path_set, task_ids)
         validate_payloads_and_edges(policy, path_set, task_ids)
         validate_dispositions(policy, task_ids)
@@ -599,19 +670,26 @@ def main(argv: list[str] | None = None) -> int:
         owned = {record["path"] for record in resolved if record["owner"]}
         findings = [finding for finding in findings if finding.subject not in owned]
         findings.extend(notice_findings)
+        carriers = detect_carriers(resolved, root, args.base)
+        findings.extend(carrier_findings(carriers, policy))
         findings.extend(dependency_findings(policy, resolved))
         output = output_path(root, args.output)
         report = {
             "base": args.base,
             "paths": resolved,
             "sha256": hashlib.sha256(json.dumps(resolved, sort_keys=True).encode()).hexdigest(),
+            "carriers": carriers,
+            "carriers_sha256": hashlib.sha256(json.dumps(carriers, sort_keys=True).encode()).hexdigest(),
         }
         if output:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         for finding in findings:
             print(finding, file=sys.stderr)
-        print(f"comment-cleanup-scope: {len(resolved)} resolved paths, {len(findings)} ownership findings")
+        print(
+            f"comment-cleanup-scope: {len(resolved)} resolved paths, {len(carriers)} docstring carriers, "
+            f"{len(findings)} findings"
+        )
         return int(bool(findings))
     except (OSError, UnicodeError, json.JSONDecodeError, PolicyError, subprocess.CalledProcessError) as error:
         print(f"comment-cleanup-scope: configuration failure: {error}", file=sys.stderr)
