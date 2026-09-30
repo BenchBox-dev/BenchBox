@@ -3199,6 +3199,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from tuning generators, templates and profiles"
     },
+    "comment-cleanup-utilities": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from utility and format conversion modules"
+    },
     "comment-cleanup-validation": {
       "claim": null,
       "needs": [
