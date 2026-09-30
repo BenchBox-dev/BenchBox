@@ -3163,6 +3163,15 @@
       "status": "open",
       "title": "Migrate shared comment consumers and enforce policy in CI and build configuration"
     },
+    "comment-cleanup-sql-compat": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from SQL compatibility rules and decisions"
+    },
     "comment-cleanup-tpcds-stream-decision": {
       "claim": null,
       "needs": [
