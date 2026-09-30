@@ -108,6 +108,22 @@ def resolve_base(root: Path, requested: str | None) -> str:
     return base
 
 
+def bootstrap_base_allowed(root: Path, base: str) -> bool:
+    contains_rollout = (
+        subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", BOOTSTRAP_BASE, base], capture_output=True
+        ).returncode
+        == 0
+    )
+    launcher_present = (
+        subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", f"{base}:scripts/run_comment_policy.py"], capture_output=True
+        ).returncode
+        == 0
+    )
+    return contains_rollout and not launcher_present
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the comment policy with immutable base parsers.")
     parser.add_argument("--base", default=os.environ.get("BASE_REF"))
@@ -128,8 +144,10 @@ def main(argv: list[str] | None = None) -> int:
                     (trusted / Path(name).name).write_bytes(result.stdout)
             bootstrap = bool(missing)
             if bootstrap:
-                if base != BOOTSTRAP_BASE or len(missing) != len(TRUSTED_FILES):
-                    raise ValueError("trusted checker missing outside the pinned initial rollout")
+                if not bootstrap_base_allowed(root, base) or len(missing) != len(TRUSTED_FILES):
+                    raise ValueError(
+                        "trusted checker missing on a base that does not contain the initial rollout commit"
+                    )
                 for name in TRUSTED_FILES:
                     (trusted / Path(name).name).write_bytes((root / name).read_bytes())
             python, env = parser_environment(trusted)

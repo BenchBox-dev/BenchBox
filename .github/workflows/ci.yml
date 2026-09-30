@@ -45,9 +45,10 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
         run: |
           set -euo pipefail
+          : "${BASE_REF:?BASE_REF is required}"
           if git cat-file -e "${BASE_REF}:scripts/run_comment_policy.py" 2>/dev/null; then
             git show "${BASE_REF}:scripts/run_comment_policy.py" > "$RUNNER_TEMP/comment-policy-runner.py"
-          elif [ "$BASE_REF" = "ed5c263c513ba65499f4918d3a7de607f280c65b" ]; then
+          elif git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b "$BASE_REF"; then
             cp scripts/run_comment_policy.py "$RUNNER_TEMP/comment-policy-runner.py"
           else
             echo "Trusted comment-policy launcher is missing" >&2

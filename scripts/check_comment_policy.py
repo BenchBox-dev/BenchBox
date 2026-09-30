@@ -120,6 +120,22 @@ def matches(path: str, scope: str) -> bool:
     return path.startswith(scope) if scope.endswith("/") else path == scope
 
 
+def bootstrap_base_allowed(root: Path, base: str) -> bool:
+    contains_rollout = (
+        subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", BOOTSTRAP_BASE, base], capture_output=True
+        ).returncode
+        == 0
+    )
+    launcher_present = (
+        subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", f"{base}:scripts/run_comment_policy.py"], capture_output=True
+        ).returncode
+        == 0
+    )
+    return contains_rollout and not launcher_present
+
+
 def allowed(finding: Finding, policy: dict, source: str, budget: Counter | None = None) -> bool:
     text = finding.text
     if finding.kind == "comment" and not finding.symbol:
@@ -290,8 +306,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("transition requires an explicit immutable base SHA")
         if args.base and not re.fullmatch(r"[a-f0-9]{40}", args.base):
             raise ValueError("base must be a full commit SHA")
-        if args.bootstrap and (args.mode != "transition" or args.base != BOOTSTRAP_BASE):
-            raise ValueError("bootstrap is restricted to the initial rollout base")
+        if args.bootstrap and (args.mode != "transition" or not bootstrap_base_allowed(root, args.base or "")):
+            raise ValueError("bootstrap requires a base that contains the initial rollout commit")
         baseline_policy = policy
         if args.base and not args.bootstrap:
             baseline_policy = load_policy(git(root, "show", f"{args.base}:{POLICY_PATH}"))
