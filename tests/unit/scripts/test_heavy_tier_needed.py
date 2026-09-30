@@ -42,10 +42,12 @@ def _classify(paths: list[str], base: dict[str, str], pr: dict[str, str]) -> dic
     )
 
 
-def test_real_base_policy_does_not_expand_an_ordinary_code_change() -> None:
-    result = heavy.heavy_needed(
-        _decision(["benchbox/core/platform_registry.py"]), "pull_request", "origin/develop", REPO_ROOT
-    )
+def test_real_base_policy_does_not_expand_an_ordinary_code_change(
+    tmp_path: Path, policy_sources: dict[str, str]
+) -> None:
+    repo, base_head, _pr_head = _snapshot_repo(tmp_path, policy_sources)
+    assert subprocess.check_output(["git", "-C", str(repo), "remote"], text=True) == ""
+    result = heavy.heavy_needed(_decision(["benchbox/core/platform_registry.py"]), "pull_request", base_head, repo)
     assert result["heavy_needed"] is False, result["reason"]
 
 
@@ -115,7 +117,7 @@ def test_partial_modern_snapshot_cannot_emit_a_valid_false_verdict(
     assert "invalid file set" in result["reason"]
 
 
-def _snapshot_repo(tmp_path: Path) -> tuple[Path, str, str]:
+def _snapshot_repo(tmp_path: Path, sources: dict[str, str] | None = None) -> tuple[Path, str, str]:
     repo = tmp_path / "policy-repo"
     repo.mkdir()
 
@@ -131,9 +133,9 @@ def _snapshot_repo(tmp_path: Path) -> tuple[Path, str, str]:
         for relative in POLICY_FILES:
             path = repo / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(f"{label}:{relative}\n", encoding="utf-8")
+            path.write_text(sources[relative] if sources is not None else f"{label}:{relative}\n", encoding="utf-8")
         git("add", "--", *POLICY_FILES)
-        git("commit", "-m", label)
+        git("commit", "--allow-empty", "-m", label)
         heads.append(git("rev-parse", "HEAD"))
     git("branch", "policy-base", heads[0])
     return repo, heads[0], heads[1]
