@@ -281,3 +281,101 @@ def test_unsupported_session_identity_refuses_before_measurement(adapter):
 def test_metadata_never_labels_intent_as_observed_disabled(adapter):
     metadata = adapter.get_normalized_result_metadata(platform_info={"configuration": {"result_cache_enabled": False}})
     assert "result_cache_enabled" not in metadata["platform_compute"]
+
+
+@pytest.mark.parametrize("cache_state", ["disabled", "enabled", "rejected", "invalid", "malformed", "legacy"])
+@pytest.mark.parametrize("has_client_link", [False, True])
+def test_timeout_preserves_receipt_through_actual_adapter_export(adapter, tmp_path, cache_state, has_client_link):
+    from contextlib import ExitStack
+
+    from benchbox.core.benchmark_result_validation import BenchmarkResultValidationMixin
+    from benchbox.core.results.models import DataGenerationPhase, DataLoadingPhase, SchemaCreationPhase, ValidationPhase
+    from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+    from benchbox.validation.bundle import _validate_bundle
+
+    class Benchmark(BenchmarkResultValidationMixin):
+        scale_factor = 1.0
+        output_dir = tmp_path
+        _name = "tpch"
+
+    class PoisonableSession(Session):
+        poisoned = False
+
+        def __getattribute__(self, name):
+            if object.__getattribute__(self, "poisoned"):
+                raise AssertionError(f"tainted connection accessed: {name}")
+            return super().__getattribute__(name)
+
+    session = PoisonableSession(reject="SET use_cached_result = false" if cache_state == "rejected" else None)
+    adapter.disable_result_cache = cache_state != "enabled"
+    collected_receipt = []
+
+    def execute_workload(benchmark, connection, run_config):
+        result = adapter.execute_query(connection, "SELECT 1", "1")
+        if cache_state == "invalid":
+            adapter._cache_control_receipt = {"validated": "true", "cache_disabled": "false"}
+        elif cache_state == "malformed":
+            adapter._cache_control_receipt = "invalid"
+        elif cache_state == "legacy":
+            adapter._cache_control_receipt = None
+        collected_receipt.append(adapter._cache_control_receipt)
+        return [result]
+
+    def timeout_after_measurement(connection, run_config):
+        adapter._link_probe_timed_out = True
+        adapter._client_link_metadata = (
+            {"collection_status": "unavailable", "source": "unavailable"} if has_client_link else None
+        )
+        object.__setattr__(connection, "poisoned", True)
+        return 0.0
+
+    generation = DataGenerationPhase(0, "SKIPPED", 0, 0, 0, {})
+    schema = SchemaCreationPhase(0, "SKIPPED", 0, 0, 0, {})
+    loading = DataLoadingPhase(0, "SKIPPED", 1, 1, {})
+    validation = ValidationPhase(0, "PASSED", "PASSED", "PASSED", {})
+    with ExitStack() as stack:
+        patches = {
+            "create_connection": {"return_value": session},
+            "_create_enhanced_data_generation_phase": {"return_value": generation},
+            "get_effective_tuning_configuration": {"return_value": None},
+            "_setup_fresh_database_phases": {"return_value": (0.0, schema, 0.0, {"t": 1}, loading, False)},
+            "_create_enhanced_validation_phase": {"return_value": validation},
+            "configure_for_benchmark": {"return_value": None},
+            "_execute_queries_by_type": {"side_effect": execute_workload},
+            "_collect_post_measurement_metadata": {"side_effect": timeout_after_measurement},
+            "_get_dialect_queries": {"return_value": {"1": "SELECT 1"}},
+            "_build_execution_metadata": {"return_value": ({}, {}, None)},
+            "_collect_resource_utilization": {"return_value": {}},
+            "_close_run_connection": {"return_value": None},
+            "get_platform_info": {"side_effect": AssertionError("live platform metadata must not be queried")},
+            "get_normalized_result_metadata": {"side_effect": AssertionError("normal metadata path must not run")},
+        }
+        for name, kwargs in patches.items():
+            stack.enter_context(patch.object(adapter, name, **kwargs))
+        exported = adapter.run_enhanced_benchmark(Benchmark(), benchmark_name="tpch", link_probe=True)
+
+    assert adapter._link_probe_timed_out is True
+    payload = json.loads(json.dumps(build_result_payload(exported)))
+    compute = payload["platform"].get("compute", {})
+    gate = ValidationResult("timeout-receipt")
+    _validate_cache_control_section(payload["platform"], gate)
+    full_validation = ValidationResult("timeout-bundle")
+    _validate_bundle(payload, full_validation)
+    cache_errors = [error for error in full_validation.errors if "cache_control" in error or "result cache" in error]
+    assert bool(cache_errors) is (cache_state not in {"disabled", "legacy"})
+    if cache_state == "invalid":
+        assert collected_receipt[0] == {"validated": "true", "cache_disabled": "false"}
+    if cache_state == "legacy":
+        assert "cache_control" not in compute
+        assert gate.ok
+    else:
+        receipt = compute["cache_control"]
+        assert receipt["validated"] is (cache_state in {"disabled", "enabled"})
+        assert receipt["cache_disabled"] is (cache_state == "disabled")
+        assert gate.ok is (cache_state == "disabled")
+        if cache_state not in {"disabled", "enabled", "malformed"}:
+            assert sanitize_cache_control_receipt(receipt) == sanitize_cache_control_receipt(collected_receipt[0])
+        if cache_state == "malformed":
+            assert "unsupported shape" in receipt["errors"][0]
+    if has_client_link:
+        assert payload["environment"]["client_link"]["collection_status"] == "unavailable"
