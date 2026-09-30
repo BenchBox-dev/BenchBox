@@ -379,3 +379,14 @@ def test_review_dispositions_preserve_original_verdict_and_rationale() -> None:
         assert item["original_verdict"] == item["disposition"]
         assert item["rationale"]
         assert item["acceptance_refs"]
+
+
+def test_every_tracked_eula_and_notice_file_has_a_notice_entry() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    listed = {entry["path"] for entry in policy["notices"]}
+    tracked = scope.git(ROOT, "ls-files", "-z", "--", "_binaries", "_sources").decode().split("\0")
+    notice_files = {
+        path for path in tracked if path and Path(path).name in {"EULA.txt", "NOTICE.txt"} and (ROOT / path).exists()
+    }
+    assert notice_files
+    assert notice_files <= listed
