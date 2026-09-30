@@ -3708,7 +3708,8 @@
     "comment-cleanup-sql-compat": {
       "claim": null,
       "needs": [
-        "comment-cleanup-pilot-budget"
+        "comment-cleanup-pilot-budget",
+        "comment-cleanup-generators"
       ],
       "priority": "medium",
       "status": "open",
