@@ -119,7 +119,7 @@ class BenchmarkSpec:
 
 ### Coverage
 
-Specs exist for 20 of 22 registered benchmarks: `tpch`, `tpcds`, `tpchavoc`, `tpch_skew`, `ssb`, `clickbench`, `nyctaxi`, `h2odb`, `amplab`, `joinorder`, `flightdata`, `datavault`, `coffeeshop`, `tpcdi`, `tsbs_devops`, `tpcds_obt`, `read_primitives`, `write_primitives`, `metadata_primitives`, `transaction_primitives`. `ai_primitives` and `vector_search` do not yet have integrity specs.
+Specs exist for 21 of 22 registered benchmarks: `tpch`, `tpcds`, `tpchavoc`, `tpch_skew`, `ssb`, `clickbench`, `nyctaxi`, `h2odb`, `amplab`, `joinorder`, `flightdata`, `datavault`, `coffeeshop`, `tpcdi`, `tsbs_devops`, `tpcds_obt`, `read_primitives`, `write_primitives`, `metadata_primitives`, `transaction_primitives`, `vector_search`. `ai_primitives` does not yet have an integrity spec.
 
 8 legacy aliases are mapped automatically (e.g., `star_schema` -> `ssb`, `amplab_big_data` -> `amplab`).
 
