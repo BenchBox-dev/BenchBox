@@ -6,6 +6,10 @@ import os
 import sys
 from typing import Optional
 
+import pytest
+
+from tests.utilities import session_isolation
+
 
 def _safe_worker_count() -> int:
     """Return a safe pytest-xdist worker count for local development."""
@@ -81,15 +85,17 @@ def _rewrite_numprocesses_args(args: list[str], safe: int) -> str | None:
     return value
 
 
-def pytest_load_initial_conftests(early_config, parser, args: list[str]) -> None:
-    """Cap xdist workers before pytest/xdist creates any worker plan."""
+@pytest.hookimpl(wrapper=True, tryfirst=True)
+def pytest_load_initial_conftests(early_config, parser, args: list[str]):
+    """Own lock and HOME before collection, then cap xdist's worker plan."""
+    if session_isolation.start():
+        early_config.add_cleanup(session_isolation.finish)
     safe = _safe_worker_count()
     requested = _rewrite_numprocesses_args(args, safe)
-    if requested is None:
-        return
-
-    os.environ["BENCHBOX_XDIST_CAP_REQUESTED"] = requested
-    os.environ["BENCHBOX_XDIST_CAP_EFFECTIVE"] = str(safe)
+    if requested is not None:
+        os.environ["BENCHBOX_XDIST_CAP_REQUESTED"] = requested
+        os.environ["BENCHBOX_XDIST_CAP_EFFECTIVE"] = str(safe)
+    return (yield)
 
 
 def pytest_xdist_auto_num_workers(config) -> int:

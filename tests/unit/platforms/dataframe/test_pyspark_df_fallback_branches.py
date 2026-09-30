@@ -87,12 +87,18 @@ def test_module_fallback_aliases_without_pyspark(monkeypatch: pytest.MonkeyPatch
 
 
 @pytest.mark.skipif(_REQUIRES_JAVA, reason="window spec starts a real Spark session")
-def test_window_count_star_uses_lit_one():
+def test_window_count_star_uses_lit_one(monkeypatch):
     """COUNT(*) renders F.count(F.lit(1)) over the window spec."""
     pytest.importorskip("pyspark")
     from pyspark.sql.column import Column
 
+    from tests.utilities.session_isolation import own_environment
+
+    own_environment(monkeypatch, ["SPARK_AUTH_SOCKET_TIMEOUT", "SPARK_BUFFER_SIZE"])
     adapter = _adapter_without_session()
-    expr = adapter.window_count(None, partition_by=["g"])
-    assert isinstance(expr, Column)
-    assert "count(1)" in str(expr)
+    try:
+        expr = adapter.window_count(None, partition_by=["g"])
+        assert isinstance(expr, Column)
+        assert "count(1)" in str(expr)
+    finally:
+        adapter.close()

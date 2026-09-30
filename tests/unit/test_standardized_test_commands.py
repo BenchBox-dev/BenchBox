@@ -116,7 +116,7 @@ class TestStandardizedTestCommands:
     """Test the standardized test command system."""
 
     def test_pytest_marker_system_works(self):
-        env = {**subprocess.os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
+        env = dict(subprocess.os.environ)
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "--collect-only", "-q"],
             cwd=REPO_ROOT,
@@ -130,7 +130,7 @@ class TestStandardizedTestCommands:
         assert "test_" in result.stdout or "collected" in result.stdout.lower()
 
     def test_fast_marker_functionality(self):
-        env = {**subprocess.os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
+        env = dict(subprocess.os.environ)
         result = subprocess.run(
             [
                 sys.executable,
@@ -152,7 +152,7 @@ class TestStandardizedTestCommands:
         assert "test_" in result.stdout or "collected" in result.stdout.lower()
 
     def test_unit_marker_functionality(self):
-        env = {**subprocess.os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
+        env = dict(subprocess.os.environ)
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "-m", "unit", "--collect-only", "-q"],
             cwd=REPO_ROOT,

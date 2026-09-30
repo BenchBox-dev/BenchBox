@@ -17,7 +17,7 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _provide_fake_duckdb(monkeypatch):
+def _provide_fake_duckdb(_hermetic_state, monkeypatch):
     """Provide a lightweight duckdb stub when the optional dependency is missing."""
     from benchbox.platforms import duckdb as duckdb_module  # import late to honour patching
 
@@ -67,7 +67,7 @@ def duckdb_memory_db():
 
 
 @pytest.fixture(autouse=True)
-def mock_platform_dependency_checks():
+def mock_platform_dependency_checks(_hermetic_state):
     """Provide default dependency stubs for cloud adapters in unit tests."""
 
     targets = [

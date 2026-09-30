@@ -700,7 +700,9 @@ class TestExtendedManifestFields:
         assert transformer.to_manifest_entry(bundle_file).tuning_validation_status is None
         assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_validation_status is None
 
-    def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(self, tmp_path: Path) -> None:
+    def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A real tuned DataFrame run's exported bundle carries its applied-ledger
         hash in platform.tuning, and the explorer ingests it verbatim.
 
@@ -716,7 +718,9 @@ class TestExtendedManifestFields:
         from benchbox.core.schemas import BenchmarkConfig
         from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
         from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+        from tests.utilities.session_isolation import own_environment
 
+        own_environment(monkeypatch, ["POLARS_MAX_THREADS"])
         cfg = DataFrameTuningConfiguration()
         cfg.parallelism.thread_count = 4
         cfg.execution.streaming_mode = True
