@@ -428,7 +428,14 @@ def test_bigquery_cap_overflow_is_capped_not_missing(monkeypatch: pytest.MonkeyP
     assert len(clustered) == 4
 
 
-def test_redshift_sorting_is_not_capped_by_the_distkey_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    ("second_distribution", "include_sort"),
+    [(False, True), (True, True), (True, False)],
+    ids=["locality-only", "distribution-capped", "capped-with-missing-sort"],
+)
+def test_redshift_sorting_is_not_capped_by_the_distkey_limit(
+    monkeypatch: pytest.MonkeyPatch, second_distribution: bool, include_sort: bool
+) -> None:
     """Redshift's single-key limit governs DISTKEY alone, not SORTKEY.
 
     A synthetic two-candidate profile (one distribution-plus-locality
@@ -468,7 +475,7 @@ def test_redshift_sorting_is_not_capped_by_the_distkey_limit(monkeypatch: pytest
                     table="ORDERS",
                     column="O_CUSTKEY",
                     type="INTEGER",
-                    roles=("join_locality",),
+                    roles=(("distribution_candidate",) if second_distribution else ()) + ("join_locality",),
                     query_count=3,
                     query_ids=("Q3", "Q5", "Q10"),
                     status=ACCEPTED,
@@ -496,6 +503,8 @@ def test_redshift_sorting_is_not_capped_by_the_distkey_limit(monkeypatch: pytest
         "_rendering_verified_tuning_types",
         lambda _platform, _config: frozenset({"distribution", "sorting"}),
     )
+    if not include_sort:
+        tuning_config.table_tunings["ORDERS"].sorting.pop()
     result = validate_tuning_template(
         profile=profile,
         benchmark="tpch",
@@ -503,8 +512,24 @@ def test_redshift_sorting_is_not_capped_by_the_distkey_limit(monkeypatch: pytest
         tuning_config=tuning_config,
     )
 
-    assert result.is_valid, [issue.to_dict() for issue in result.issues]
-    assert result.mapped_count == result.required_count
     custkey = next(m for m in result.mappings if m.candidate_key == "tpch.ORDERS.O_CUSTKEY")
-    assert custkey.mapped
-    assert custkey.mapped_tuning_types == ("sorting",)
+    if not include_sort:
+        assert not result.is_valid
+        assert any("sorting" in issue.message for issue in result.issues)
+        metadata = result.to_metadata()
+        assert metadata["logical_profile_coverage"]["unmapped_count"] == 1
+        assert metadata["logical_profile_coverage"]["capped_count"] == 0
+        assert metadata["unmapped_logical_candidates"][0]["candidate"] == custkey.candidate_key
+        assert metadata["unmapped_logical_candidates"][0]["missing_tuning_types"] == ["sorting"]
+        assert not custkey.capped
+    elif second_distribution:
+        assert result.is_valid, [issue.to_dict() for issue in result.issues]
+        assert result.mapped_count + result.capped_count == result.required_count
+        assert custkey.capped
+        assert custkey.mapped_tuning_types == ("sorting",)
+        assert result.to_metadata()["unmapped_logical_candidates"] == []
+    else:
+        assert result.is_valid, [issue.to_dict() for issue in result.issues]
+        assert result.mapped_count == result.required_count
+        assert custkey.mapped
+        assert custkey.mapped_tuning_types == ("sorting",)

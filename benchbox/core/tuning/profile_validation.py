@@ -77,8 +77,9 @@ class CandidateTemplateMapping:
 
     @property
     def capped(self) -> bool:
-        """Whether the candidate was excluded by a platform column cap, not by omission."""
-        return bool(self.capped_tuning_types)
+        """Whether a platform cap accounts for every missing mechanism."""
+        missing = set(self.missing_tuning_types)
+        return bool(missing) and missing.issubset(self.capped_tuning_types)
 
     @property
     def missing_tuning_types(self) -> tuple[str, ...]:
@@ -160,7 +161,11 @@ class TuningProfileValidationResult:
                 "reason": mapping.platform_mapping.reason or "required candidate was not mapped to the template",
             }
             if mapping.missing_tuning_types:
-                entry["missing_tuning_types"] = list(mapping.missing_tuning_types)
+                entry["missing_tuning_types"] = [
+                    tuning_type
+                    for tuning_type in mapping.missing_tuning_types
+                    if tuning_type not in mapping.capped_tuning_types
+                ]
             unmapped.append(entry)
         return tuple(unmapped)
 
