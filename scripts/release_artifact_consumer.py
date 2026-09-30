@@ -7,15 +7,19 @@ without a producer receipt are deliberately unsupported.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import importlib.util
 import json
 import os
+import queue
 import re
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import tomllib
 import zipfile
 from collections.abc import Callable
@@ -28,6 +32,7 @@ WORKFLOW = ".github/workflows/ci.yml"
 JOB_NAME = "dist-artifact"
 PRODUCER_RECEIPT = "producer-receipt.json"
 MAX_PAYLOAD_BYTES = 256 * 1024 * 1024
+DOWNLOAD_TIMEOUT_SECONDS = 60.0
 Api = Callable[[str], dict[str, Any]]
 
 
@@ -58,7 +63,9 @@ def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 def github_json(path: str) -> dict[str, Any]:
     """Read a constructed repository API path using gh's credential handling."""
     endpoint = f"repos/{REPOSITORY}" + (f"/{path}" if path else "")
-    result = subprocess.run(["gh", "api", endpoint], capture_output=True, check=True, timeout=60)
+    result = subprocess.run(
+        ["gh", "api", "--hostname", "github.com", endpoint], capture_output=True, check=True, timeout=60
+    )
     value = json.loads(result.stdout, object_pairs_hook=_object)
     _require(isinstance(value, dict), "API response is not an object")
     return value
@@ -275,42 +282,257 @@ def resolve_tag(root: Path, tag: str, develop_ref: str = "refs/remotes/origin/de
     _require(bool(re.fullmatch(r"v[0-9][A-Za-z0-9.+-]*", tag)), "invalid version tag")
 
     def git(*args: str) -> str:
-        return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
+        return subprocess.check_output(["git", "--no-replace-objects", "-C", str(root), *args], text=True).strip()
 
     ref = f"refs/tags/{tag}"
     _require(git("cat-file", "-t", ref) == "tag", "lightweight tags are unsupported")
     commit = git("rev-parse", f"{ref}^{{commit}}")
     _require(git("rev-parse", "HEAD") == commit, "checkout differs from tagged source")
     _require(not git("status", "--porcelain", "--untracked-files=all"), "tagged source checkout is dirty")
-    subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", commit, develop_ref], check=True)
+    subprocess.run(
+        ["git", "--no-replace-objects", "-C", str(root), "merge-base", "--is-ancestor", commit, develop_ref], check=True
+    )
     spec = importlib.util.spec_from_file_location("_release_version", Path(__file__).with_name("release_flow.py"))
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    version = tomllib.loads((root / "pyproject.toml").read_text())["project"]["version"]
+    version = tomllib.loads(git("show", f"{commit}:pyproject.toml"))["project"]["version"]
     _require(module.normalize_version(tag[1:]) == module.normalize_version(version) is not None, "tag/version mismatch")
     return {"tag": tag, "tag_object": git("rev-parse", ref), "head_sha": commit, "version": version}
 
 
-def _download(artifact_id: int, archive: Path) -> None:
-    """Stream the constructed artifact endpoint, refusing more than the payload bound."""
-    total = 0
-    with archive.open("xb") as stream:
-        process = subprocess.Popen(
-            ["gh", "api", f"repos/{REPOSITORY}/actions/artifacts/{artifact_id}/zip"], stdout=subprocess.PIPE
+def _committed_snapshot(root: Path, commit: str, destination: Path) -> None:
+    """Materialize regular Git blobs, not worktree bytes or attribute-filtered archives.
+
+    The duplicate-check archive helper uses extractall and permits links. This
+    execution boundary instead reads exact object IDs and rejects all links.
+    """
+    _require(bool(re.fullmatch(r"[0-9a-f]{40}", commit)), "invalid snapshot commit")
+    entries = subprocess.check_output(
+        [
+            "git",
+            "--no-replace-objects",
+            "-C",
+            str(root),
+            "ls-tree",
+            "-rz",
+            commit,
+            "--",
+            "benchbox",
+            "scripts",
+            "pyproject.toml",
+        ],
+        timeout=60,
+    )
+    files = []
+    for entry in entries.split(b"\0"):
+        if not entry:
+            continue
+        identity, raw_name = entry.split(b"\t", 1)
+        mode, kind, oid = identity.split()
+        name = raw_name.decode("utf-8")
+        path = PurePosixPath(name)
+        _require(
+            mode in {b"100644", b"100755"}
+            and kind == b"blob"
+            and not path.is_absolute()
+            and all(part not in {".", ".."} for part in path.parts)
+            and not any(char in name for char in "\\:\0"),
+            "unsafe committed snapshot member",
         )
-        assert process.stdout is not None
+        files.append((name, mode, oid))
+    _require(len(files) <= 10000, "committed snapshot has too many files")
+    with tempfile.TemporaryFile() as batch:
+        subprocess.run(
+            ["git", "--no-replace-objects", "-C", str(root), "cat-file", "--batch"],
+            input=b"".join(oid + b"\n" for _, _, oid in files),
+            stdout=batch,
+            check=True,
+            timeout=60,
+        )
+        batch.seek(0)
+        total = 0
+        for name, mode, oid in files:
+            header = batch.readline().split()
+            _require(len(header) == 3 and header[:2] == [oid, b"blob"], "snapshot object identity differs")
+            size = int(header[2])
+            total += size
+            _require(size >= 0 and total <= MAX_PAYLOAD_BYTES, "committed snapshot exceeds size limit")
+            target = destination / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("xb") as stream:
+                remaining = size
+                while remaining:
+                    chunk = batch.read(min(remaining, 1024 * 1024))
+                    _require(bool(chunk), "truncated snapshot object")
+                    stream.write(chunk)
+                    remaining -= len(chunk)
+            _require(batch.read(1) == b"\n", "malformed snapshot object boundary")
+            target.chmod(0o755 if mode == b"100755" else 0o644)
+
+
+def _verify_committed_binaries(root: Path, commit: str, distributions: list[Path]) -> None:
+    """Run only committed verifier bytes in a private, isolated source snapshot."""
+    with tempfile.TemporaryDirectory(prefix="release-source-") as temporary:
+        snapshot = Path(temporary)
+        _committed_snapshot(root, commit, snapshot)
+        verifier = snapshot / "scripts/verify_distribution_binaries.py"
+        _require(verifier.is_file(), "tagged source lacks required distribution binary verifier")
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.upper().startswith("PYTHON") and key not in {"VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT"}
+        }
+        subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-B",
+                str(verifier),
+                *[str(path.resolve()) for path in distributions],
+                "--source-root",
+                str(snapshot / "benchbox/_binaries"),
+            ],
+            cwd=snapshot,
+            env=environment,
+            check=True,
+            timeout=120,
+        )
+
+
+def _publish_output(stage: Path, output: Path) -> None:
+    """Atomically rename a directory without replacing even an empty destination."""
+    if os.name == "nt":
+        # Windows os.rename fails if the destination already exists.
+        os.rename(stage, output)
+        return
+    library = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        operation = getattr(library, "renamex_np", None)
+        _require(operation is not None, "atomic no-replace publication is unsupported")
+        operation.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        operation.restype = ctypes.c_int
+        result = operation(os.fsencode(stage), os.fsencode(output), 0x4)  # RENAME_EXCL
+    elif sys.platform.startswith("linux"):
+        operation = getattr(library, "renameat2", None)
+        _require(operation is not None, "atomic no-replace publication is unsupported")
+        operation.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+        operation.restype = ctypes.c_int
+        result = operation(-100, os.fsencode(stage), -100, os.fsencode(output), 1)  # RENAME_NOREPLACE
+    else:
+        raise ValueError("atomic no-replace publication is unsupported")
+    if result != 0:
+        code = ctypes.get_errno()
+        raise OSError(code, os.strerror(code), str(output))
+
+
+def _reap_download(process: subprocess.Popen[bytes], reader: threading.Thread | None, stop: threading.Event) -> None:
+    """Terminate only the download's owned tree and close its unbuffered pipe."""
+    stop.set()
+    try:
+        if os.name != "nt":
+            # Popen created this private session. The captured group ID remains
+            # valid even if gh exited while a descendant retained stdout.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        elif process.poll() is None:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+    finally:
+        if process.poll() is None:
+            process.kill()
         try:
-            while chunk := process.stdout.read(1024 * 1024):
-                total += len(chunk)
-                if total > MAX_PAYLOAD_BYTES:
-                    process.kill()
-                    raise ValueError("archive exceeds size limit")
-                stream.write(chunk)
+            process.wait(timeout=5)
         finally:
+            assert process.stdout is not None
+            # Raw FileIO.close does not wait for a buffered reader lock.
             process.stdout.close()
-            code = process.wait(timeout=60)
-    _require(code == 0, "artifact download failed")
+            if reader is not None and reader.ident is not None:
+                reader.join(timeout=0.2)
+
+
+def _download(artifact_id: int, archive: Path) -> None:
+    """Bound the entire stream, including blocked reads, and always reap our child."""
+    # Load the canonical clock without importing the optional SDK/package graph.
+    spec = importlib.util.spec_from_file_location(
+        "_release_clock", Path(__file__).resolve().parents[1] / "benchbox/utils/clock.py"
+    )
+    assert spec is not None and spec.loader is not None
+    clock = importlib.util.module_from_spec(spec)
+    previous_clock = sys.modules.get(spec.name)
+    sys.modules[spec.name] = clock
+    try:
+        spec.loader.exec_module(clock)
+    finally:
+        if previous_clock is None:
+            sys.modules.pop(spec.name, None)
+        else:
+            sys.modules[spec.name] = previous_clock
+    started = clock.mono_time()
+    chunks: queue.Queue[bytes | Exception] = queue.Queue(maxsize=1)
+    stop = threading.Event()
+    total = 0
+    created = False
+    try:
+        with archive.open("xb") as stream:
+            created = True
+            process = subprocess.Popen(
+                ["gh", "api", "--hostname", "github.com", f"repos/{REPOSITORY}/actions/artifacts/{artifact_id}/zip"],
+                stdout=subprocess.PIPE,
+                bufsize=0,
+                start_new_session=os.name != "nt",
+            )
+            assert process.stdout is not None
+
+            def read() -> None:
+                assert process.stdout is not None
+                while not stop.is_set():
+                    try:
+                        chunk: bytes | Exception = process.stdout.read(1024 * 1024)
+                    except Exception as exc:
+                        chunk = exc
+                    while not stop.is_set():
+                        try:
+                            chunks.put(chunk, timeout=0.05)
+                            break
+                        except queue.Full:
+                            continue
+                    if not chunk or isinstance(chunk, Exception):
+                        return
+
+            reader: threading.Thread | None = None
+            try:
+                reader = threading.Thread(target=read, daemon=True)
+                reader.start()
+                while True:
+                    remaining = DOWNLOAD_TIMEOUT_SECONDS - clock.elapsed_seconds(started)
+                    _require(remaining > 0, "artifact download deadline exceeded")
+                    try:
+                        chunk = chunks.get(timeout=remaining)
+                    except queue.Empty as exc:
+                        raise ValueError("artifact download deadline exceeded") from exc
+                    if isinstance(chunk, Exception):
+                        raise chunk
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    _require(total <= MAX_PAYLOAD_BYTES, "archive exceeds size limit")
+                    stream.write(chunk)
+                remaining = DOWNLOAD_TIMEOUT_SECONDS - clock.elapsed_seconds(started)
+                _require(remaining > 0, "artifact download deadline exceeded")
+                _require(process.wait(timeout=remaining) == 0, "artifact download failed")
+            finally:
+                _reap_download(process, reader, stop)
+    except BaseException:
+        if created:
+            archive.unlink(missing_ok=True)
+        raise
 
 
 def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[str, Any]:
@@ -336,19 +558,7 @@ def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[st
             _require(
                 package == "benchbox" and version == Version(source["version"]), "distribution package/version mismatch"
             )
-        verifier = root / "scripts/verify_distribution_binaries.py"
-        _require(verifier.is_file(), "tagged source lacks required distribution binary verifier")
-        subprocess.run(
-            [
-                sys.executable,
-                str(verifier),
-                *[str(stage / name) for name in receipt["files"]],
-                "--source-root",
-                str(root / "benchbox/_binaries"),
-            ],
-            cwd=root,
-            check=True,
-        )
+        _verify_committed_binaries(root, source["head_sha"], [stage / name for name in receipt["files"]])
         current = select_producer(source["head_sha"], api)
         _require(current == (run, job, artifact), "producer changed during admission")
         _require(resolve_tag(root, tag) == source, "tagged source changed during admission")
@@ -361,7 +571,7 @@ def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[st
         }
         (stage / "admission-receipt.json").write_text(json.dumps(summary, indent=2) + "\n")
         _require(not output.exists(), "output appeared during admission")
-        stage.rename(output)
+        _publish_output(stage, output)
     return summary
 
 
@@ -394,7 +604,7 @@ def main(argv: list[str] | None = None) -> int:
             (args.dist / PRODUCER_RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n")
         else:
             subprocess.run(["git", "-C", str(args.source), "fetch", "--no-tags", "origin", "develop"], check=True)
-            print(json.dumps(admit(args.source.resolve(), args.tag, args.output.resolve()), indent=2))
+            print(json.dumps(admit(args.source.resolve(), args.tag, args.output.absolute()), indent=2))
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
         parser.exit(1, f"Release artifact admission failed: {exc}\n")
     return 0

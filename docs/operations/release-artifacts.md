@@ -51,6 +51,23 @@ checks package/version identity. The exact tagged source's distribution binary
 verifier must exist and pass. Metadata is read again before an admission receipt
 and verified files appear in the new output directory.
 
+API reads and downloads explicitly use `github.com`, regardless of `GH_HOST`.
+Downloads have a 60-second whole-stream deadline, including blocked reads.
+Failed downloads reap their child process and remove only their owned partial
+file. Verification reads regular files from a private snapshot of the exact
+Git commit, not mutable checkout bytes or Git archive export filters. Git
+identity, ancestry, and object reads disable replacement objects. Downloads
+use an unbuffered pipe so closing a timed-out stream cannot wait on a reader's
+buffered lock. POSIX download processes own a separate session whose remaining
+pipe writers are terminated during cleanup. The
+verifier runs with isolated Python and without inherited Python configuration.
+The checkout is checked again before output publication.
+
+Output publication uses an atomic no-replace directory rename: `renameat2` on
+Linux, `renamex_np` on macOS, and `os.rename` on Windows. An existing or racing
+destination, including an empty directory or dangling symlink, is never
+replaced. Platforms without the required operation fail closed.
+
 An admission receipt is byte and producer evidence. It is not a cryptographic
 attestation or permission to release. Admission does not change hosted tag
 rules, environments, or publishing workflows.
