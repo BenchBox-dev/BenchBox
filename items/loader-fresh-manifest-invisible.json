@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Repro script or log evidence showing a run with --force datagen (or fresh datagen in-phase) produces a manifest the load phase resolves to zero valid files",
+    "Fix verified by a live or integration run where same-invocation datagen loads all tables without a warm rerun",
+    "No shared datagen cache clobbered by the fix verification"
+  ],
+  "context": "Observed 2026-09-29/30 on cloud BigQuery runs: an isolated gzip datagen dir held a fresh v2 manifest plus valid .gz shards (manifest compression gzip, files present with size), yet the load phase logged 'Skipping <table> - no valid data files' for every multi-file table while single-file tables (nation, region) loaded. A warm rerun against the same cache loaded all tables (CUSTOMER 15000 rows from 10 files). Same pattern on read_primitives SF0.01 2026-09-30: fresh-cache run failed validation with empty tables, warm rerun loaded in 57s and passed validation. Static probes of ManifestFileSource, get_table_files, DataSourceResolver, and BenchmarkTablesSource all resolved correctly outside the run, so the defect is in run-time sequencing or state, not path resolution. BigQuery lane only so far; unknown whether other adapters share it. Workaround documented: two-phase runs (generate, then warm rerun) with isolated BENCHBOX_OUTPUT_DIR for gzip.",
+  "description": "A benchmark run that generates datagen files in-phase (fresh cache, --force datagen, or first run into an empty dir) can reach the load phase with a manifest the loader does not resolve: BigQuery logs 'Skipping <table> - no valid data files' for multi-file tables and validation fails on empty tables, even though the manifest and shard files are valid on disk. A warm rerun against the same cache loads correctly. Investigate the generate-to-load handoff (manifest re-read timing, benchmark.tables population vs data_dir resolution, DataSourceResolver provider ordering at load time), reproduce with a minimal local case if possible, fix so same-invocation datagen loads, and add a regression test.",
+  "sessions": [
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-30T12:22:59Z",
+      "client": "jcode",
+      "op": "create",
+      "op_id": "ae70cddd8c8a40b48b6b28bc1ac38d2d",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    }
+  ]
+}

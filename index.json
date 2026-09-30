@@ -10545,6 +10545,13 @@
       "status": "done",
       "title": "Single CSV dialect source plus pandas NULL group keys"
     },
+    "loader-fresh-manifest-invisible": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Loader ignores freshly generated datagen manifest in same run"
+    },
     "local-ci-equivalents": {
       "claim": null,
       "needs": [
