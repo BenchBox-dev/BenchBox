@@ -44,6 +44,17 @@
       "op": "update",
       "op_id": "dabae5bfdbf24c579157aa62cc0e6ede",
       "session_id": "452ce7ddde32453ba87d89c279fd1029"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:08eade2b384c32b2ed4f2a38",
+      "at": "2026-09-30T18:28:40Z",
+      "client": "claude-code",
+      "displaced": "jcode-comment-cleanup-scope-20260930",
+      "generation": "48f2d5c4602b44b69da7e6653c3c20f1",
+      "op": "takeover",
+      "op_id": "43ff2209e8e74843bdc6901116f6ef9d",
+      "reason": "User stopped holder session 452ce7dd (last activity 13:27Z, agents stopped) and confirmed it is abandoned; its MCP server is idle with no driving agent.",
+      "session_id": "8fd03255e94f4e3fa00f4b772a0a98cb"
     }
   ]
 }
