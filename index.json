@@ -5445,18 +5445,13 @@
       "title": "Stabilize the merge queue now and unstick the open dev-loop PRs"
     },
     "dlv2-f1-build-flip-branch": {
-      "claim": {
-        "expires_at": "2026-10-01T00:05:37Z",
-        "generation": "082442403b1d40689cd3daaabfcb15a5",
-        "renewals": 1,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
-      },
+      "claim": null,
       "needs": [
         "dlv2-00-decisions-adr",
         "dlv2-02-property-ledger"
       ],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Build the flip branch: ci.yml with lean T2, and deletion of the legacy PR-gate and post-merge workflows"
     },
     "dlv2-f2-canary-prs": {
