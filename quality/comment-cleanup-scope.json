@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "maintained_roots": [
+    {"id": "package", "selector": {"prefix": "benchbox/"}, "kind": "source"},
+    {"id": "tests", "selector": {"prefix": "tests/"}, "kind": "test"},
+    {"id": "docs", "selector": {"prefix": "docs/"}, "kind": "reference"},
+    {"id": "scripts", "selector": {"prefix": "scripts/"}, "kind": "source"},
+    {"id": "tools", "selector": {"prefix": "tools/"}, "kind": "source"},
+    {"id": "project-scripts", "selector": {"prefix": "_project/scripts/"}, "kind": "source"},
+    {"id": "explorer", "selector": {"prefix": "results-explorer/"}, "kind": "source"},
+    {"id": "docker", "selector": {"prefix": "docker/"}, "kind": "config"},
+    {"id": "make", "selector": {"prefix": "make/"}, "kind": "config"},
+    {"id": "github", "selector": {"prefix": ".github/"}, "kind": "config"},
+    {"id": "examples", "selector": {"prefix": "examples/"}, "kind": "reference"},
+    {"id": "compilation", "selector": {"prefix": "_sources/compilation/"}, "kind": "source"},
+    {"id": "repository", "selector": {"prefix": ""}, "kind": "unclassified"}
+  ],
+  "ownership_rules": [
+    {
+      "id": "scope-policy-integration",
+      "owner": "comment-cleanup-scope-policy",
+      "state": "blocked",
+      "blocking_disposition": "Validate draft artifacts against the post-commit immutable snapshot before dispatch.",
+      "priority": 100,
+      "selectors": [
+        {"path": "quality/comment-cleanup-scope.json"},
+        {"path": "scripts/check_comment_cleanup_scope.py"},
+        {"path": "tests/unit/scripts/test_comment_cleanup_scope.py"},
+        {"path": "docs/development/comment-cleanup-scope.md"},
+        {"path": "docs/index.rst"}
+      ]
+    }
+  ],
+  "external_entries": [],
+  "payloads": [
+    {
+      "id": "benchmark-class-docstring-reader",
+      "path": "benchbox/core/results/display.py",
+      "carrier": "benchmark_class.__doc__",
+      "owner": "comment-cleanup-results",
+      "state": "blocked",
+      "blocking_disposition": "Map every benchmark-class producer before changing the display reader."
+    },
+    {
+      "id": "sphinx-autodoc-reader",
+      "path": "docs/conf.py",
+      "carrier": "sphinx.ext.autodoc",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Preserve useful interface reference content before source docstring deletion."
+    },
+    {
+      "id": "pricing-runtime-docstring-writer",
+      "path": "benchbox/core/cost/pricing.py",
+      "carrier": "_resolve.__doc__",
+      "owner": "comment-cleanup-cost",
+      "state": "blocked",
+      "blocking_disposition": "Identify a real consumer or remove the writer without inert replacement data."
+    },
+    {
+      "id": "tpcds-generated-docstring-writer",
+      "path": "benchbox/core/tpcds/dataframe_queries/queries.py",
+      "carrier": "impl.__doc__",
+      "owner": "comment-cleanup-tpcds-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Preserve runtime behavior and resolve readers without changing stream, RNG, timing, or query semantics."
+    },
+    {
+      "id": "joinorder-generated-docstring-writer",
+      "path": "benchbox/core/joinorder/dataframe_queries.py",
+      "carrier": "_impl.__doc__",
+      "owner": "comment-cleanup-joinorder",
+      "state": "blocked",
+      "blocking_disposition": "Identify real consumers before producer deletion."
+    },
+    {
+      "id": "query-catalog-source-reader",
+      "path": "benchbox/core/query_catalog.py",
+      "carrier": "inspect.getsource(impl)",
+      "owner": "comment-cleanup-core-catalogs",
+      "state": "blocked",
+      "blocking_disposition": "Inventory implementations consumed as source text before editing producers."
+    },
+    {
+      "id": "mcp-source-reader",
+      "path": "benchbox/mcp/tools/benchmark.py",
+      "carrier": "inspect.getsource(impl)",
+      "owner": "comment-cleanup-mcp-interaction",
+      "state": "blocked",
+      "blocking_disposition": "Inventory implementations consumed as source text before editing producers."
+    },
+    {
+      "id": "dry-run-source-reader",
+      "path": "benchbox/core/dryrun.py",
+      "carrier": "inspect.getsource(impl)",
+      "owner": "comment-cleanup-core-execution",
+      "state": "blocked",
+      "blocking_disposition": "Inventory implementations consumed as source text before editing producers."
+    }
+  ],
+  "consumer_edges": [
+    {
+      "producer": "benchbox/core/tpcds_obt/dataframe_queries.py",
+      "consumer": "scripts/generate_query_docs.py",
+      "owner": "comment-cleanup-tpcds-obt",
+      "state": "blocked",
+      "blocking_disposition": "Preserve useful nonempty SQL and DataFrame references without asserting equivalence or changing algorithms.",
+      "proof": "_query_page calls query_description, get_sql_render, and get_dataframe_render."
+    }
+  ],
+  "directives": [],
+  "notices": [
+    {
+      "path": "LICENSE",
+      "blob_sha256": "8a051ce0007bd890d5268188bcfd5eabd5a648b6824ec51dcad54fd0f3c9e4ec",
+      "byte_start": 0,
+      "byte_end": 1086,
+      "retained_sha256": "8a051ce0007bd890d5268188bcfd5eabd5a648b6824ec51dcad54fd0f3c9e4ec",
+      "governing_requirement": "The immutable license text expressly requires inclusion in copies or substantial portions; retain exact bytes pending per-artifact provenance decisions.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:LICENSE",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Retain exact immutable bytes; do not infer which derived artifacts are covered without provenance evidence."
+    },
+    {
+      "path": "_binaries/tpc-ds/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "The distribution notice references the TPC End User License Agreement and platform EULA files; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-arm64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/darwin-arm64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-x86_64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/darwin-x86_64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-arm64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/linux-arm64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-x86_64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/linux-x86_64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-arm64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-arm64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-x86_64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-x86_64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_sources/tpc-ds/PATCHES.md",
+      "blob_sha256": "a8143165f64c4327931c79e656cd2732c7ae56675e2c3ff549b3190fc74ca290",
+      "byte_start": 0,
+      "byte_end": 14788,
+      "retained_sha256": "a8143165f64c4327931c79e656cd2732c7ae56675e2c3ff549b3190fc74ca290",
+      "governing_requirement": "The distribution notice points to patch context, but no independent governing-notice obligation is established.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-ds/PATCHES.md",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Classify separately from required notices; preserve exact bytes until provenance is resolved."
+    },
+    {
+      "path": "COPYRIGHT.md",
+      "blob_sha256": "5a58d51af167ced82fa2f9d8de1c03a8ad14cd3842ca24c0becdca2e0cf5e935",
+      "byte_start": 0,
+      "byte_end": 6262,
+      "retained_sha256": "5a58d51af167ced82fa2f9d8de1c03a8ad14cd3842ca24c0becdca2e0cf5e935",
+      "governing_requirement": "This authored summary repeats legal and benchmark acknowledgements but is not independently established as a governing instrument.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:COPYRIGHT.md",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Keep distinct from governing license files; do not infer blanket retention or removal."
+    }
+  ],
+  "obligations": [],
+  "review_dispositions": [
+    {"id": "R1", "disposition": "accepted", "requirements": ["individual-notice-provenance"], "owner": "comment-cleanup-scope-policy"},
+    {"id": "R2", "disposition": "accepted", "requirements": ["consumer-before-producer"], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R3", "disposition": "accepted", "requirements": ["source-text-reader-inventory"], "owner": "comment-cleanup-shared-infrastructure"},
+    {"id": "R4", "disposition": "accepted", "requirements": ["useful-reference-content"], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R5", "disposition": "narrowed", "requirements": ["payload-identity-by-slice"], "owner": "comment-cleanup-generators"},
+    {"id": "R6", "disposition": "rebutted", "requirements": ["remove-unsupported-claims"], "owner": "comment-cleanup-tpch"},
+    {"id": "R7", "disposition": "accepted", "requirements": ["defer-stream-rng-migration"], "owner": "comment-cleanup-tpcds-stream-decision"},
+    {"id": "R8", "disposition": "narrowed", "requirements": ["repair-active-references-only"], "owner": "comment-cleanup-final-enforcement"},
+    {"id": "R9", "disposition": "accepted", "requirements": ["exact-directive-grammar"], "owner": "comment-cleanup-checker"},
+    {"id": "R10", "disposition": "accepted", "requirements": ["control-file-inventory"], "owner": "comment-cleanup-shared-infrastructure"},
+    {"id": "R11", "disposition": "accepted", "requirements": ["safe-deletion-comparator"], "owner": "comment-cleanup-checker"},
+    {"id": "R12", "disposition": "accepted", "requirements": ["measured-batch-budget"], "owner": "comment-cleanup-pilot-budget"},
+    {"id": "R13", "disposition": "narrowed", "requirements": ["demonstrated-regression-gaps"], "owner": "comment-cleanup-validation"},
+    {"id": "R14", "disposition": "narrowed", "requirements": ["missing-count-behavior-proof"], "owner": "comment-cleanup-missing-count-decision"},
+    {"id": "R15", "disposition": "accepted", "requirements": ["expected-wrapper-use-proof"], "owner": "comment-cleanup-expected-wrapper"},
+    {"id": "R16", "disposition": "accepted", "requirements": ["datafusion-boundary-typing-proof"], "owner": "comment-cleanup-datafusion-typing"},
+    {"id": "R17", "disposition": "narrowed", "requirements": ["obsolete-consumer-proof"], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R18", "disposition": "accepted", "requirements": ["consumer-generator-dependency"], "owner": "comment-cleanup-scope-policy"}
+  ]
+}

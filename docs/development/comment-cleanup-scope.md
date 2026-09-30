@@ -1,0 +1,76 @@
+# Comment cleanup scope policy
+
+The scope policy freezes ownership before comment cleanup begins. It does not scan
+comment syntax, decide whether a deletion is safe, or replace the checker.
+Those remain separate prerequisites.
+
+## Policy and evidence
+
+`quality/comment-cleanup-scope.json` holds reusable classifications:
+
+- maintained roots and file classes;
+- ordered ownership rules and explicit shared overrides;
+- external, notice, directive, and TODO/FIXME evidence requirements;
+- known runtime and source-text carriers;
+- consumer-to-producer dependencies; and
+- the accepted, narrowed, or rebutted dispositions for R1 through R18.
+
+Rules classify a path as `ready` or `blocked`. A blocked entry has an owner and
+specific disposition. An unclassified maintained path is reported as blocked
+without an owner and fails validation. A same-priority ownership collision also
+remains in the local manifest with every competing rule and owner, then fails.
+When roots overlap, the most specific selector wins; equal-specificity roots are
+invalid. An unclassified path is not an external exclusion.
+
+The policy does not create a permanent path ledger. Before dispatch, run the
+validator against the immutable source commit and write the resolved manifest to
+an ignored local path:
+
+```console
+uv run -- python scripts/check_comment_cleanup_scope.py \
+  --base <40-character-commit> \
+  --task-set .todo-batch/comment-cleanup-task-set.txt \
+  --output .todo-batch/comment-cleanup-scope-<commit>.json
+```
+
+The output includes every classified maintained path, its owner, state, rule,
+and blocking disposition with a digest. Freeze that ignored output before
+parallel work. Run it again after integration and allow only authorized path or
+dependency changes. The policy, validator, focused test, dispatch page, and
+index link are a singleton scope-policy slice. The pre-change base proves the
+starting tree; run a second immutable snapshot after that slice is committed so
+those artifacts receive the same ownership check before dispatch.
+
+## Evidence rules
+
+An ignored local task-set file freezes the live task IDs used by this run. The
+validator rejects any owner outside that set, without querying the tracker at
+runtime. An external entry names the exact path, provenance source, governing
+requirement, owner, and blocking disposition. A notice records the immutable
+blob SHA-256, retained byte range, retained-byte SHA-256, source identity,
+governing requirement, owner, and blocking disposition. Do not infer either
+from a vendor directory or replace it with a blanket SPDX label.
+
+A directive records its exact token, actual consumer, necessity, smaller
+alternative considered, owner, and removal trigger. A TODO or FIXME records its
+path, token, owner, blocking disposition, and an existing tracker reference or
+approved destination. Deletion alone does not satisfy the obligation.
+
+Known runtime and source-text carriers are recorded only with source proof. New
+or unresolved carriers stay blocked until their owner establishes the necessary
+reader, producer, and behavior evidence. This policy does not claim parser,
+syntax, safe-deletion, strict/report, raw-payload parity, or algorithmic
+assurance.
+
+## Dispatch boundaries
+
+Consumer migration precedes deletion of its producer. An edge with a blocked
+consumer blocks the producer. Scope validation is limited to ownership, evidence,
+and dependency data. The checker owns deletion comparison, syntax and parser
+coverage, directive grammar, and strict/report enforcement. Shared tooling owns
+public command and CI wiring.
+
+Do not change TPC-DS stream ordering, RNG, timing, missing-count behavior, query
+algorithms, or payload identity under this policy. Do not rewrite historical
+results. Preserve useful nonempty query references, and record unsupported
+assurance as a blocker rather than adding inert replacement prose.
