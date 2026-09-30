@@ -1309,6 +1309,7 @@ def enqueue_pr(
     *,
     expected_branch: str | None = None,
     expected_node_id: str | None = None,
+    expected_review_decision: str = "APPROVED",
 ) -> dict:
     """Arm queue enrollment after a final expected-head check.
 
@@ -1319,6 +1320,8 @@ def enqueue_pr(
     """
     repo_full = normalize_github_repository(repo_full)
     _require_revision(expected_head, "expected head")
+    if expected_review_decision not in {"", "APPROVED"}:
+        raise LandingError("expected review decision is not ready for enqueue")
     if remote_head != expected_head:
         raise LandingError(
             f"remote head moved to {remote_head[:12]} during enqueue; "
@@ -1349,7 +1352,7 @@ def enqueue_pr(
             )
         if state != "OPEN":
             raise LandingError(f"PR #{pr_number} state {state!r} is not OPEN; readiness is invalid")
-        if current.get("reviewDecision") != "APPROVED":
+        if str(current.get("reviewDecision") or "") != expected_review_decision:
             raise LandingError("PR review disposition changed before enqueue; readiness is invalid")
         if unresolved_review_threads(run, repo_full, pr_number):
             raise LandingError("PR review threads changed before enqueue; unresolved, non-outdated threads remain")
@@ -2095,6 +2098,7 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
             str(pr.get("headRefOid") or ""),
             expected_branch=branch,
             expected_node_id=node_id,
+            expected_review_decision=evidence.review_decision,
         )
         print(json.dumps(result, indent=2))
     else:
