@@ -9,7 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-BOOTSTRAP_BASE = "92d8dbd5c864b9ce3789afabf26b18bbb0500360"
+BOOTSTRAP_BASE = "e2035160eeab3826065daab3b97d25bba59091d1"
 TRUSTED_FILES = (
     "scripts/check_comment_policy.py",
     "scripts/comment_syntax.py",
