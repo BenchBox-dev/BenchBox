@@ -3208,6 +3208,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from SQL compatibility rules and decisions"
     },
+    "comment-cleanup-tpcds-dataframe": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from TPC-DS DataFrame queries"
+    },
     "comment-cleanup-tpcds-generation": {
       "claim": null,
       "needs": [
