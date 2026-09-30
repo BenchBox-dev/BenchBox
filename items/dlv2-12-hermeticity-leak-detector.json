@@ -4,7 +4,7 @@
     "Leak detector enabled in T1; a deliberately leaking test fails it; test_tpch_generator.py cwd test passes",
     "No test derives repo root from cwd (grep evidence in PR)"
   ],
-  "context": "Codex C8: rule targets leaks, not legitimate in-test cwd use. Guardrail G3.",
+  "context": "Codex C8: rule targets leaks, not legitimate in-test cwd use. Guardrail G3.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN, no claim/implementation. Fresh worktree /Users/joe/Developer/BenchBox.wt-unit-test-state-isolation branchfix/unit-test-state-isolation, cleanheade95063c7b556ff529bc76b66c60be29a2b35c24d, lifecycle7b94b5c723e849fda297751027b9a683, agent-write-preflightPASS. No edits/tests/venv/publication. Oldhermetic WT14aba preserved (13priorunmergedcommits, do not reapply blindly). Investigated file-derived shared tests/utilities/paths.py helper and actual cwd-root assumptions in standardized commands, agent-write-preflight tests, TPCDS resource resolution, UAT CLI dispatch, test_runner and performance_profiler. Full home/wallclock injection and after-all-teardown cwd/env/registered-global leak detector remain required; keep reset safety nets without masking leaks. Negative leaked state must restore then fail; legitimate generator chdir/restoration must pass. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
   "description": "Clean develop gave 93 local unit failures, many from environment coupling. Fix at source:\n1. Enumerate Path.cwd()/os.getcwd() repo-root assumptions in tests (grep -rnE \"Path\\.cwd\\(\\)|os\\.getcwd\\(\\)\" tests) and derive repo root from the test file location (one shared helper).\n2. Tests must not read the real home directory (~/.benchbox) or wall clock; inject them.\n3. Replace process-global mutable state (benchbox.utils.printing _QUIET, utils.config_interface provider) with injection where practical; keep the autouse reset fixtures in tests/conftest.py as a safety net.\n4. Add an autouse leak detector that fails a test only when cwd, os.environ, or registered globals differ after teardown. Tests that legitimately chdir (e.g. tests/unit/generators/test_tpch_generator.py:910) must restore via fixture and pass.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "852da3ce97ee4bbd98e288889c8279a1",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T12:23:30Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "5fe5914785c74ba0a03a6f148fa22810",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
