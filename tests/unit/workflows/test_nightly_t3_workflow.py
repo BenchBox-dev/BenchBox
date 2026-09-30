@@ -8,7 +8,9 @@ issue-write permission held by the reporting job only, and SHA-pinned actions.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,7 @@ DOMAIN_JOBS = {
     "install": "t3:install",
     "drift": "t3:drift",
     "quarantine": "t3:quarantine",
+    "linkcheck": "t3:linkcheck",
     "durations-refresh": "t3:durations",
 }
 
@@ -134,6 +137,99 @@ def test_quarantine_job_tolerates_unregistered_marker() -> None:
     text = _run_text(_load()["jobs"]["quarantine"])
     assert "-m quarantine" in text
     assert "pytest.mark.quarantine" in text, "job must check marker registration before selecting it"
+
+
+@pytest.mark.parametrize("pytest_exit, expected", [(0, 0), (1, 1), (2, 2), (5, 0)])
+def test_quarantine_exit_codes_under_runner_shell(tmp_path: Path, pytest_exit: int, expected: int) -> None:
+    stub = tmp_path / "uv"
+    stub.write_text(
+        '#!/usr/bin/env bash\nif [[ "$*" == *--markers* ]]; then\n'
+        '  echo "@pytest.mark.quarantine: quarantined tests"\nelse\n'
+        f"  exit {pytest_exit}\nfi\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    step = next(step for step in _steps(_load()["jobs"]["quarantine"]) if step.get("name") == "Run quarantined tests")
+    result = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == expected, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("result_count", [0, 1, 2])
+def test_perf_comparison_uses_only_the_current_job_result(tmp_path: Path, result_count: int) -> None:
+    runner_temp = tmp_path / "job output"
+    output_root = runner_temp / "perf-smoke"
+    results = output_root / "results"
+    results.mkdir(parents=True)
+    for index in range(result_count):
+        (results / f"tpch_sf001_duckdb_sql_{index}.json").write_text("{}", encoding="utf-8")
+    job = _load()["jobs"]["perf"]
+    setup = next(step for step in _steps(job) if step.get("name") == "Set isolated benchmark output")
+    github_env = tmp_path / "github-env"
+    subprocess.run(
+        ["bash", "-e", "-o", "pipefail", "-c", setup["run"]],
+        cwd=tmp_path,
+        env={**os.environ, "RUNNER_TEMP": str(runner_temp), "GITHUB_ENV": str(github_env)},
+        check=True,
+    )
+    key, _, configured_root = github_env.read_text().strip().partition("=")
+    assert key == "BENCHBOX_OUTPUT_DIR" and Path(configured_root) == output_root
+    step = next(step for step in _steps(job) if step.get("id") == "current")
+    github_output = tmp_path / "github-output"
+    result = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
+        cwd=tmp_path,
+        env={**os.environ, key: configured_root, "GITHUB_OUTPUT": str(github_output)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert (result.returncode == 0) == (result_count == 1), result.stdout + result.stderr
+    if result_count == 1:
+        assert github_output.read_text().strip() == f"path={results / 'tpch_sf001_duckdb_sql_0.json'}"
+
+
+@pytest.mark.parametrize("tier", ["fast", "slow"])
+@pytest.mark.parametrize("pytest_exit, tee_exit, expected", [(0, 0, 0), (1, 0, 0), (2, 0, 2), (5, 0, 5), (0, 1, 1)])
+def test_duration_measurement_keeps_assertion_reports_and_rejects_runner_failures(
+    tmp_path: Path, tier: str, pytest_exit: int, tee_exit: int, expected: int
+) -> None:
+    (tmp_path / "t3-durations").mkdir()
+    stub = tmp_path / "uv"
+    stub.write_text(
+        '#!/usr/bin/env bash\nfor arg in "$@"; do\n'
+        '  if [[ "$arg" == --junitxml=* ]]; then\n'
+        '    printf "<testsuite tests=\\"1\\"/>" > "${arg#--junitxml=}"\n'
+        "  fi\ndone\necho 'measurement output'\n"
+        f"exit {pytest_exit}\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    if tee_exit:
+        tee = tmp_path / "tee"
+        tee.write_text(f"#!/usr/bin/env bash\ncat >/dev/null\nexit {tee_exit}\n", encoding="utf-8")
+        tee.chmod(0o755)
+    step = next(
+        step
+        for step in _steps(_load()["jobs"]["durations-refresh"])
+        if step.get("name") == f"Measure {tier} tier durations"
+    )
+    result = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
+        cwd=tmp_path,
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == expected, result.stdout + result.stderr
+    assert (tmp_path / "t3-durations" / f"junit-{tier}.xml").read_text() == '<testsuite tests="1"/>'
 
 
 def test_durations_job_emits_pytest_durations_artifact() -> None:
