@@ -4,7 +4,7 @@
     "T2 run on the flip branch: job count <=8, wall time recorded, artifacts uploaded with sha256",
     "All canary PRs closed unmerged and their branches deleted"
   ],
-  "context": "Canaries #2451-#2456 (drafts against feat/dev-loop-v2-flip, closed unmerged, branches deleted):\n- #2451 failing unit test: core FAILURE (test job), other units green.\n- #2452 failing vitest: explorer FAILURE (explorer-vitest).\n- #2454 invalid bundle: results-data FAILURE (results-data-check).\n- #2455 landing comment, #2456 unowned top-level file: routed as designed; #2456 routed to core (fail-closed).\n- tooling red on all six by design (base-guard: non-develop base).\n- Gap found: #2453 broken :doc: link did NOT fail docs-build (ref.doc suppressed, no -W). Fixed in https://github.com/BenchBox-dev/BenchBox/pull/2457 .\n- docs/landing/explorer also red on canaries because no visual baseline exists for a feature-branch base (expected; develop bases have baselines).\n- Soundness flag proven post-flip on real PRs: #2382 and #2381 (touch soundness paths, no section) -> tooling red; #2448 with section -> tooling green.\n- Merge-group T2 run on the flip itself: https://github.com/BenchBox-dev/BenchBox/actions/runs/36640375588",
+  "context": "Canaries #2451-#2456 (drafts against feat/dev-loop-v2-flip, closed unmerged, branches deleted):\n- #2451 failing unit test: core FAILURE (test job), other units green.\n- #2452 failing vitest: explorer FAILURE (explorer-vitest).\n- #2454 invalid bundle: results-data FAILURE (results-data-check).\n- #2455 landing comment, #2456 unowned top-level file: routed as designed; #2456 routed to core (fail-closed).\n- tooling red on all six by design (base-guard: non-develop base).\n- Gap found: #2453 broken :doc: link did NOT fail docs-build (ref.doc suppressed, no -W). Fixed in https://github.com/BenchBox-dev/BenchBox/pull/2457 .\n- docs/landing/explorer also red on canaries because no visual baseline exists for a feature-branch base (expected; develop bases have baselines).\n- Soundness flag proven post-flip on real PRs: #2382 and #2381 (touch soundness paths, no section) -> tooling red; #2448 with section -> tooling green.\n- Merge-group T2 run on the flip itself: https://github.com/BenchBox-dev/BenchBox/actions/runs/36640375588\n\n2026-09-30 02:05 UTC takeover reconciliation: the historical done label does not establish the full acceptance matrix. Live run evidence confirms bootstrap merge-group run36640375588 failed, not green. The initial canaries did not prove a healthy positive case per all six units, deliberate broken landing/tooling, a controlled same-head soundness missing-section then valid-section transition, or the explicit core+docs+explorer composition. The docs broken-link canary passed its build and failed unrelated feature-base visual baseline. Develop-base canaries are still required after the warning/browser repairs merge. Queue36648412308 passed after #2449; its correctness job took23m09s and medium22m02s, so T2 wall-time acceptance remains unmet. New queue36657515220 for dependency PR2458 is pending; no merge claim. Preserve all guards and full coverage.",
   "description": "Replaces live dual-running. Open throwaway PRs based on the flip branch (ci.yml has no branch filter, so they get CI; close all unmerged afterwards):\n- one trivial change per unit (core, explorer, results-data, docs, landing, tooling) -> only that unit runs, other five pass as untouched;\n- one PR touching core + docs + explorer -> three units run;\n- one PR touching a soundness path -> soundness flag fails without the `Soundness review:` section, passes with it;\n- one deliberately broken change per unit (failing test, lint error, broken build, invalid bundle, broken docs build, broken landing link) -> that unit's result job fails.\nAlso run the flip branch's merge_group behavior once via workflow_dispatch or a test merge-group-equivalent run of T2 to confirm the job budget (<=8 jobs) and wall time.",
   "sessions": [
     {
@@ -40,6 +40,14 @@
       "op": "finish",
       "op_id": "0ba4d62483b646cf85f2b1d7b2fd978b",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bfd5c7954eba099bd7f79237",
+      "at": "2026-09-30T01:59:40Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "a497bf040f6d4188a459a5b462076e8d",
+      "session_id": "b84e6974f6364093b7d673b0ae188ede"
     }
   ]
 }
