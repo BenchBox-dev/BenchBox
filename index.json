@@ -3287,6 +3287,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from Synthetic JoinOrder modules"
     },
+    "comment-cleanup-lifecycle-tooling": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from worktree, PR and agent lifecycle tooling"
+    },
     "comment-cleanup-local-native-adapters": {
       "claim": null,
       "needs": [
