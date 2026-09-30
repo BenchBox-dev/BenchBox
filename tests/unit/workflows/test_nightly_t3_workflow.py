@@ -225,6 +225,30 @@ def test_duration_measurement_keeps_assertion_reports_and_rejects_runner_failure
     assert (tmp_path / "t3-durations" / f"junit-{tier}.xml").read_text() == '<testsuite tests="1"/>'
 
 
+@pytest.mark.parametrize("compare_exit", [0, 1])
+def test_perf_comparison_preserves_threshold_and_failure(tmp_path: Path, compare_exit: int) -> None:
+    current = tmp_path / "perf-smoke" / "results" / "tpch_sf001_duckdb_sql_current.json"
+    arguments = tmp_path / "compare-arguments"
+    step = next(
+        step
+        for step in _steps(_load()["jobs"]["perf"])
+        if step.get("name") == "Compare against baseline (fail on >10% regression)"
+    )
+    script = step["run"].replace("${{ steps.current.outputs.path }}", str(current))
+    script = 'uv() { printf "%s\\n" "$@" > "$ARGUMENTS"; return "$COMPARE_EXIT"; }\n' + script
+    result = _run_workflow_script(script, tmp_path, {"ARGUMENTS": str(arguments), "COMPARE_EXIT": str(compare_exit)})
+    assert result.returncode == compare_exit, result.stdout + result.stderr
+    assert arguments.read_text().splitlines() == [
+        "run",
+        "benchbox",
+        "compare",
+        "_project/baselines/perf_smoke_duckdb_tpch_001.json",
+        str(current),
+        "--fail-on-regression",
+        "10%",
+    ]
+
+
 def test_durations_job_emits_pytest_durations_artifact() -> None:
     job = _load()["jobs"]["durations-refresh"]
     assert "--durations=0" in _run_text(job)
