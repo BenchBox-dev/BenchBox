@@ -3289,6 +3289,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from skewed TPC-H modules"
     },
+    "comment-cleanup-tpchavoc-dataframe": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from TPC-Havoc DataFrame variants"
+    },
     "comment-cleanup-tpchavoc-runtime": {
       "claim": null,
       "needs": [
