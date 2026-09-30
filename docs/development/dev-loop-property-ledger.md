@@ -170,6 +170,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_explorer_receipt_ui_contract.py` | product-safety |
 | `test_fast_lane_ratchet_check.py` | pure-process |
 | `test_generate_changelog_entry.py` | product-safety |
+| `test_heavy_tier_needed.py` | product-safety |
 | `test_generate_corpus_inventory.py` | product-safety |
 | `test_guard_messages.py` | tooling |
 | `test_inline_applied_ledger_bounds.py` | product-safety |

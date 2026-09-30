@@ -11,9 +11,11 @@ samples) runs only when needed:
                         OR packaging-needed)
 
 Soundness uses the UNION of the base-ref copy and the PR (working tree)
-copy of ``_project/scripts/auto_merge_soundness_paths.py``: a PR that
-rewrites the predicate itself must not silently narrow what counts as a
-soundness path. Both copies are stdlib-only.
+copy of the soundness policy: a PR that rewrites the predicate or manifest
+must not silently narrow what counts as a soundness path. Each snapshot
+contains its wrapper, helper, and manifest from the same revision and runs
+in an isolated stdlib-only interpreter. Historical standalone predicates
+remain supported.
 
 Fail-closed: any lookup error, missing input, ambiguous match, or
 classification failure reports ``heavy-needed=true`` so the tier runs.
@@ -30,14 +32,16 @@ job's outputs do not evaluate reliably. Non-code-routed trees report
 from __future__ import annotations
 
 import argparse
-import importlib.util
 import json
 import os
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
 PREDICATE_REPO_PATH = "_project/scripts/auto_merge_soundness_paths.py"
+POLICY_PATHS = (PREDICATE_REPO_PATH, "_project/scripts/soundness_paths.py", ".github/soundness-paths.txt")
 MERGE_GROUP_EVENT = "merge_group"
 
 
@@ -45,55 +49,92 @@ class HeavyTierError(RuntimeError):
     """The lookup could not complete; the caller must fail closed."""
 
 
-def _load_predicate_copy(name: str, source: str) -> Any:
-    """Load one predicate copy from source text under a unique module name."""
-    spec = importlib.util.spec_from_loader(name, loader=None)
-    if spec is None:
-        raise HeavyTierError(f"could not build a module spec for predicate copy {name!r}")
-    module = importlib.util.module_from_spec(spec)
+def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -> bool:
+    """Evaluate one complete policy snapshot in an isolated interpreter."""
+    if PREDICATE_REPO_PATH not in sources or set(sources) - set(POLICY_PATHS):
+        raise HeavyTierError(f"predicate copy {name!r} has an invalid file set")
+    if any("\n" in path or "\r" in path for path in paths):
+        raise HeavyTierError("changed paths contain ambiguous line separators")
     try:
-        exec(compile(source, f"<{name}>", "exec"), module.__dict__)
-    except Exception as exc:
-        raise HeavyTierError(f"predicate copy {name!r} failed to execute: {exc}") from exc
-    if not callable(getattr(module, "any_soundness_path", None)):
-        raise HeavyTierError(f"predicate copy {name!r} exposes no any_soundness_path")
-    return module
+        with tempfile.TemporaryDirectory(prefix=f"{name}-") as directory:
+            root = Path(directory)
+            for relative, source in sources.items():
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(source, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-I", str(root / PREDICATE_REPO_PATH), "--stdin", "--format", "github-output"],
+                input="\n".join(paths),
+                cwd=root,
+                env={**os.environ, "SOUNDNESS_PATH_MANIFEST": str(root / POLICY_PATHS[2])},
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise HeavyTierError(f"predicate copy {name!r} could not execute: {exc}") from exc
+    if result.returncode != 0:
+        raise HeavyTierError(f"predicate copy {name!r} exited {result.returncode}")
+    verdict = result.stdout.strip()
+    if verdict not in {"soundness_path=true", "soundness_path=false"}:
+        raise HeavyTierError(f"predicate copy {name!r} returned an invalid verdict")
+    return verdict == "soundness_path=true"
 
 
-def _read_base_copy(base_ref: str, repo_root: Path) -> str:
+def _read_base_copy(base_ref: str, repo_root: Path) -> dict[str, str]:
+    """Read every present policy file from one pinned base commit."""
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(repo_root), "show", f"{base_ref}:{PREDICATE_REPO_PATH}"],
+        commit = subprocess.check_output(
+            ["git", "-C", str(repo_root), "rev-parse", "--verify", f"{base_ref}^{{commit}}"],
             text=True,
             stderr=subprocess.DEVNULL,
-        )
+        ).strip()
+        present = subprocess.check_output(
+            ["git", "-C", str(repo_root), "ls-tree", "-z", "--name-only", commit, "--", *POLICY_PATHS],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).split("\0")
+        # Old standalone predicates legitimately lack a helper and manifest.
+        # Read errors never count as absence; ls-tree must have succeeded.
+        return {
+            path: subprocess.check_output(
+                ["git", "-C", str(repo_root), "show", f"{commit}:{path}"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
+            for path in POLICY_PATHS
+            if path in present
+        }
     except (subprocess.SubprocessError, OSError) as exc:
         raise HeavyTierError(f"could not read base-ref copy of the predicate: {exc}") from exc
 
 
-def _read_pr_copy(repo_root: Path) -> str:
-    path = repo_root / PREDICATE_REPO_PATH
-    try:
-        return path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise HeavyTierError(f"could not read PR copy of the predicate: {exc}") from exc
+def _read_pr_copy(repo_root: Path) -> dict[str, str]:
+    sources: dict[str, str] = {}
+    for relative in POLICY_PATHS:
+        try:
+            sources[relative] = (repo_root / relative).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise HeavyTierError(f"could not read PR policy file {relative}: {exc}") from exc
+    return sources
 
 
 def soundness_touched(
     changed_paths: Iterable[str],
     base_ref: str,
     repo_root: Path,
-    read_base: Callable[[str, Path], str] | None = None,
-    read_pr: Callable[[Path], str] | None = None,
+    read_base: Callable[[str, Path], dict[str, str]] | None = None,
+    read_pr: Callable[[Path], dict[str, str]] | None = None,
 ) -> tuple[bool, str]:
     """Return ``(touched, reason)`` over the union of both predicate copies."""
     paths = [str(path) for path in changed_paths]
     base_source = (read_base or _read_base_copy)(base_ref, repo_root)
     pr_source = (read_pr or _read_pr_copy)(repo_root)
-    base_module = _load_predicate_copy("soundness_base_copy", base_source)
-    pr_module = _load_predicate_copy("soundness_pr_copy", pr_source)
-    base_hit = bool(base_module.any_soundness_path(paths))
-    pr_hit = bool(pr_module.any_soundness_path(paths))
+    base_hit = _load_predicate_copy("soundness_base_copy", base_source, paths)
+    pr_hit = _load_predicate_copy("soundness_pr_copy", pr_source, paths)
     if base_hit or pr_hit:
         which = "+".join(name for name, hit in (("base", base_hit), ("pr", pr_hit)) if hit)
         return True, f"soundness path touched (predicate copies: {which})"
@@ -105,8 +146,8 @@ def heavy_needed(
     event: str,
     base_ref: str,
     repo_root: Path,
-    read_base: Callable[[str, Path], str] | None = None,
-    read_pr: Callable[[Path], str] | None = None,
+    read_base: Callable[[str, Path], dict[str, str]] | None = None,
+    read_pr: Callable[[Path], dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Return ``{heavy_needed, reason}``; lookup failure fails closed to true."""
     try:
@@ -152,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as exc:
             decision = None
             result = {"heavy_needed": True, "reason": f"lookup failed closed: unreadable decision: {exc}"}
-        if decision is not None:
+        else:
             if not isinstance(decision, dict):
                 result = {"heavy_needed": True, "reason": "lookup failed closed: decision is not an object"}
             else:
