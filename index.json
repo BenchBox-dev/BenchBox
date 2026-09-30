@@ -2923,6 +2923,16 @@
       "status": "open",
       "title": "Build grammar-aware comment policy checks and safe deletion comparisons"
     },
+    "comment-cleanup-contracts-gate": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-scope-policy",
+        "comment-cleanup-checker"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Replace docstring presence coverage with explicit API contracts and content checks"
+    },
     "comment-cleanup-scope-policy": {
       "claim": null,
       "needs": [],
