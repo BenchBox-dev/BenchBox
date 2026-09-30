@@ -104,7 +104,7 @@ code-ci:
 
 # Extra path-filter groups (beyond the three core buckets above). Each key
 # here becomes a `<group>-needed` boolean output from ci-paths, computed by
-# path_filter_decision.py, so a pr.yml job can gate on
+# path_filter_decision.py, so a ci.yml job can gate on
 # `needs.ci-paths.outputs.<group>-needed == 'true'` without inventing a
 # second classifier. Most extra groups only select an additional job. The
 # skill-integrity group is also a first-class specialized class: when no
@@ -117,7 +117,7 @@ skill-integrity:
   - "tools/skill-sync"
 
 # Packaging-metadata changes: build/install/audit signal (package-smoke,
-# dependency-audit jobs in pr.yml) only needs to run when one of these
+# dependency-audit jobs in ci.yml) only needs to run when one of these
 # changed. See tracker item `pr-gate-package-and-audit-promotion`.
 packaging:
   - "pyproject.toml"
@@ -128,7 +128,7 @@ packaging:
   - "uv.lock"
 
 # Results-explorer visualization / CLI<->explorer parity source changes:
-# gates the parity-check job in pr.yml. See
+# gates the parity-check job in ci.yml. See
 # tracker item `parity-check-develop-ring`.
 viz:
   - "results-explorer/**"
@@ -146,8 +146,7 @@ explorer-vitest:
   - "scripts/generate_corpus_inventory.py"
   - "tests/parity/fixtures/**"
   - "tests/unit/core/tuning/fixtures/**"
-  - ".github/workflows/results-explorer-browser.yml"
-  - ".github/workflows/pr.yml"
+  - ".github/workflows/ci.yml"
   - ".github/path-filters.yml"
   - "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml"
   - "tests/parity/fixtures/chart_ids.json"

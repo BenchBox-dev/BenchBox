@@ -261,6 +261,21 @@ class TestConstructionBoundaryInjection:
         expected = orchestrator.directory_manager.get_datagen_path("tpch", 1.0)
         assert Path(str(benchmark.output_dir)) == Path(str(expected))
 
+    def test_own_output_benchmark_keeps_constructed_output_dir(self):
+        """Benchmarks generating their own output (tpcds_obt) keep it."""
+
+        class _OwnOutputBenchmark(_MethodOnlySharingBenchmark):
+            GENERATES_OWN_OUTPUT = True
+
+        orchestrator = BenchmarkOrchestrator()
+        config = BenchmarkConfig(name="tpcds_obt", display_name="Stub", scale_factor=1.0, compress_data=False)
+
+        with patch.object(orchestrator, "_get_benchmark_class", return_value=_OwnOutputBenchmark):
+            benchmark = orchestrator._get_benchmark_instance(config, None)
+
+        expected = orchestrator.directory_manager.get_datagen_path("tpcds_obt", 1.0)
+        assert Path(str(benchmark.output_dir)) == Path(str(expected))
+
     def test_cloud_custom_output_defers_resolution(self):
         orchestrator = BenchmarkOrchestrator()
         orchestrator.set_custom_output_dir("s3://bucket/prefix")

@@ -59,8 +59,9 @@ test.describe("compare entrypoint happy paths", () => {
     await waitForDataLoaded(page, /matching run/);
 
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
-    // The additive zero-timing and Pandas honesty fixtures are TPC-H bundles too.
-    await expect(page.getByTestId("query-result-summary")).toContainText("14 matching runs");
+    // The curated August corpus seeds 17 TPC-H bundles (five-platform power
+    // cohort plus tuned, partial, community, cloud, and honesty variants).
+    await expect(page.getByTestId("query-result-summary")).toContainText("17 matching runs");
     await expect(page.getByRole("button", { name: /Download CSV/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Download JSON/ })).toBeVisible();
 

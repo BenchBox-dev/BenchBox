@@ -447,6 +447,17 @@ class TestSQLiteSharedCursorConcurrentUse:
             barrier = threading.Barrier(2)
             errors: dict[str, BaseException] = {}
             counts: dict[str, list[int]] = {}
+            # One sqlite3 connection serves both streams, and concurrent
+            # executes on one such connection race at the driver level
+            # (observed as empty reads and swallowed-execution failure dicts,
+            # e.g. fetchone() -> None on SELECT COUNT(*)). The shared tier
+            # guarantees overlapping stream lifetimes and close isolation, not
+            # lock-free concurrent executes on drivers without cursor-level
+            # thread safety (DuckDB documents it; sqlite3 does not). So the
+            # executes serialize here while the barrier still forces both
+            # streams alive at once and the closes below still run
+            # concurrently, which is exactly the isolation surface owned.
+            execute_lock = threading.Lock()
 
             def run(name: str) -> None:
                 try:
@@ -456,7 +467,12 @@ class TestSQLiteSharedCursorConcurrentUse:
                         # the reads below overlap instead of running
                         # sequentially.
                         barrier.wait(timeout=30)
-                        counts[name] = [wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()[0] for _ in range(5)]
+                        row_counts = []
+                        for _ in range(5):
+                            with execute_lock:
+                                row = wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()
+                            row_counts.append(row[0])
+                        counts[name] = row_counts
                     finally:
                         # Closing one stream's cursor must not disturb the
                         # sibling stream (dimension 6 for the shared tier).
@@ -475,6 +491,60 @@ class TestSQLiteSharedCursorConcurrentUse:
             # The shared connection survives both stream closes and still
             # serves the same data (one shared session).
             assert shared_connection.execute("SELECT COUNT(*) FROM probe").fetchone()[0] == 10
+        finally:
+            shared_connection.close()
+
+    def test_identical_concurrent_reads_never_share_a_prepared_statement(self, tmp_path) -> None:
+        """Streams issuing the SAME SQL must not share sqlite3's cached statement.
+
+        With the default per-connection statement cache, concurrent cursors
+        running identical SQL can receive one prepared statement, so one
+        stream's execute resets another's result set and it reads a wrong or
+        missing row. This drives the same `_stream_wrapper` validation-mode
+        path the throughput entry points use, and asserts on the wrapper's own
+        `fetchall()` accessor, where the missing-row symptom surfaced.
+        """
+        adapter = SQLiteAdapter(database_path=str(tmp_path / "shared.db"))
+        shared_connection = adapter.create_connection()
+        try:
+            setup = _stream_wrapper(adapter, shared_connection)
+            try:
+                setup.execute("CREATE TABLE probe (value INTEGER)")
+                for value in range(10):
+                    setup.execute(f"INSERT INTO probe VALUES ({value})")
+            finally:
+                setup.close()
+
+            barrier = threading.Barrier(4)
+            lock = threading.Lock()
+            errors: dict[str, BaseException] = {}
+            wrong: list[Any] = []
+
+            def run(name: str) -> None:
+                try:
+                    barrier.wait(timeout=30)
+                    for _ in range(500):
+                        wrapper = _stream_wrapper(adapter, shared_connection)
+                        try:
+                            rows = wrapper.execute("SELECT COUNT(*) FROM probe").fetchall()
+                        finally:
+                            wrapper.close()
+                        if rows != [(10,)]:
+                            with lock:
+                                wrong.append(rows)
+                except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                    with lock:
+                        errors[name] = exc
+
+            threads = [threading.Thread(target=run, args=(f"stream-{index}",)) for index in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=120)
+            assert not any(thread.is_alive() for thread in threads), "shared-cursor read streams hung"
+
+            assert not errors, f"concurrent shared-cursor read streams raised: {errors}"
+            assert not wrong, f"{len(wrong)} shared-cursor reads saw another stream's statement state: {wrong[:3]}"
         finally:
             shared_connection.close()
 

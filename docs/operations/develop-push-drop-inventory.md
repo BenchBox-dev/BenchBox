@@ -6,13 +6,12 @@
 ```
 
 Companion to [`develop-post-merge-gaps.md`](develop-post-merge-gaps.md).
-That doc explains the **class** (GitHub can drop `push` delivery for consecutive
-develop merges) and the **backstop already installed for
-`develop-post-merge.yml`** (hourly slim schedule + daily gap detector).
-
-This inventory answers the next question: **which other workflows share the
-same silent push-drop risk**, and for each, is the residual risk accepted or
-does it still need a follow-up?
+That doc explains the **class**: GitHub can drop `push` delivery for
+consecutive develop merges. Required checks no longer depend on develop push
+events, because the merge queue runs the six units on the exact tree that
+lands. This inventory answers the remaining question: **which workflows still
+fire only on a develop push**, and for each, is the residual risk accepted or
+does it need a follow-up?
 
 ## Inventory method
 
@@ -22,42 +21,45 @@ does it still need a follow-up?
    with no branch filter (all branches, including develop).
 2. Record whether `on.schedule` and `on.workflow_dispatch` are present.
 3. Classify **role**:
-   - **Safety-critical** — failure or silence can leave develop tip ungated,
-     public corpus stale, merge hygiene broken, or a required integrity signal
-     missing.
+   - **Safety-critical** — failure or silence can leave a required input
+     missing, the public corpus stale, or a required integrity signal absent.
    - **Advisory / metrics** — observability, hygiene, or secondary signals
-     that do not alone bound develop tip or public publication safety.
+     that do not alone bound merge safety or public publication safety.
 4. For each safety-critical row **without** a schedule: either document
    **accepted risk** (with the compensating control) or mark **follow-up
-   needed**. Prefer documentation over adding expensive hourly full suites.
+   needed**. Prefer documentation over adding expensive scheduled suites.
 
-Snapshot date: **2026-08-15** (workflow tree on `develop` at inventory time).
+Snapshot date: **2026-09-29** (workflow tree of the six-unit CI change).
 Re-run the method when adding a new develop-push workflow.
 
 ## Inventory table
 
 | Workflow | Push scope | Schedule | Dispatch | Role | Push-drop residual | Disposition |
 | --- | --- | --- | --- | --- | --- | --- |
-| `develop-post-merge.yml` | `develop`, all paths | hourly `17 * * * *` (slim gates only) | yes | Safety-critical — lint / fast-test / explorer-tokens / medium-test + mutation jobs | Tip re-gated ≤~1h via schedule; per-SHA gaps instrumented daily | **Covered** — see [`develop-post-merge-gaps.md`](develop-post-merge-gaps.md) |
-| `orphaned-commit-detector.yml` | bare `push:` (every branch, including develop) | daily `0 7 * * *` | yes | Safety-critical — stranded post-merge commits never reach develop | Schedule is the true backstop (push alone is structurally too early for the race); daily bounds detection | **Covered** — schedule primary; push is secondary/early signal |
-| `pricing-data-drift-check.yml` | `develop` + pricing generator/inputs path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — regenerated pricing tables vs vendor APIs | Weekly schedule + dispatch bound drift even if path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
-| `submission-validator-drift-check.yml` | `develop` + validator path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — develop vs `published-results` validator copy | Weekly schedule + dispatch bound drift even if path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
-| `sync-results-data-to-published.yml` | `develop` + `results-data/**` (and related validator paths) | **none** | yes | Safety-critical — only automated mirror of develop corpus → `published-results` | Dropped path-matched push leaves public corpus stale until human recovery | **Accepted risk** — daily `corpus-drift-check.yml` canary detects develop-ahead drift and recommends `gh workflow run sync-results-data-to-published.yml`; workflow retains write-heavy mirror on push/dispatch only (no schedule mutation of public branch) |
-| `results-explorer-browser.yml` | `release` + `develop` + explorer/`results-data` path filter | **none** | yes | Mixed — required PR gate (`Results Explorer browser gate`); develop push is post-merge tip re-build for path-matched merges | Dropped develop push can leave tip without a post-merge browser rebuild until the next matching push or dispatch | **Accepted risk** — pre-merge required check on every PR into develop is the primary safety property; develop push is additive tip verification; suite is expensive (Chromium full + smoke browsers) so no hourly schedule; recover with `gh workflow run results-explorer-browser.yml --ref develop` |
-| `docs.yml` | `develop`, all paths | **none** | yes | Mixed — assembles the Pages-shaped site and produces the SHA-bound public-site visual baseline | A dropped push leaves the exact base SHA without a baseline; affected PR and merge-group checks fail closed | Dispatch on `develop` with `baseline_source_sha=<exact-protected-base-sha>` to rebuild that ancestor's baseline, then rerun the failed visual check; see `docs/development/results-explorer-browser-testing.md` |
-| `publication-lane-explorer.yml` | `release` + `develop` + `results-explorer/**`/`scripts/publication/**` path filter | **none** | yes | Advisory — builds/typechecks the Explorer SPA, runs unit and contract tests, and validates the compatibility manifest; lane is **not** a required status check and does not block merges (primary required gate remains `Results Explorer browser gate`) | Dropped develop push delays tip re-verification of the Explorer build and manifest until the next matching push or dispatch; job holds no deploy or write credentials (`permissions: contents: read` only; output is a CI artifact upload, not a publish step) | **Accepted risk** — lane is advisory; pre-merge validation does not gate merges; develop push is additive tip verification with no elevated permissions or external publish surface; recover with `gh workflow run publication-lane-explorer.yml --ref develop` |
-| `publication-lane-docs.yml` | `develop` + `release` + docs/landing/blog/`benchbox/**` path filter | **none** | yes | Mixed — builds decoupled prose-site and API-docs artifacts independent of the package release lane | A dropped path-matched push delays the standalone docs-lane artifact build until the next matching push or dispatch; it does not gate develop tip or package release | **Accepted risk** — this lane only produces build artifacts (no deploy/write credentials); recover with `gh workflow run publication-lane-docs.yml --ref develop` |
+| `fast-lane-baseline.yml` | `develop`, all paths | **none** | yes | Safety-critical input — records the fast-lane test count that the `guard-fast-lane-delta` step in `ci.yml` restores by exact base SHA | A dropped push leaves that commit without a baseline, so PRs cut from it fail the delta guard closed | **Accepted risk** — the failure is loud and self-describing (`DELTA_CHECK_BASELINE_ERROR`); recover with `gh workflow run fast-lane-baseline.yml --ref develop`, then re-run the PR |
+| `docs.yml` | `develop` and `release`, all paths | **none** | yes | Safety-critical input — captures the SHA-bound public-site visual baseline and, on `release` pushes, runs the Pages deploy | A dropped develop push leaves the exact base SHA without a baseline; an affected PR or merge-group visual comparison fails closed | Dispatch on `develop` with `baseline_source_sha=<exact-protected-base-sha>` to rebuild that ancestor's baseline, then re-run the failed check; see `docs/development/results-explorer-browser-testing.md` |
+| `pricing-data-drift-check.yml` | `develop` + pricing generator/inputs path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — regenerated pricing tables vs vendor APIs | Weekly schedule + dispatch bound drift even if a path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
+| `submission-validator-drift-check.yml` | `develop` + validator path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — develop vs `published-results` validator copy | Weekly schedule + dispatch bound drift even if a path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
+| `sync-results-data-to-published.yml` | `develop` + `results-data/**` (and related validator paths) | **none** | yes | Safety-critical — only automated mirror of the develop corpus to `published-results` | A dropped path-matched push leaves the public corpus stale until human recovery | **Accepted risk** — the daily `corpus-drift-check.yml` canary detects develop-ahead drift and recommends `gh workflow run sync-results-data-to-published.yml`; the workflow keeps the write-heavy mirror on push and dispatch only (no scheduled mutation of a public branch) |
 
 ### Explicit non-entries (push, but not develop)
 
-These fire on `push` but **not** for develop tip, so they are out of this
+These fire on `push` but **not** for the develop tip, so they are out of this
 inventory's risk class:
 
 | Workflow | Why excluded |
 | --- | --- |
-| `docs.yml` `deploy` job only | Legacy release-to-Pages deploy runs only on `release` pushes and is skipped while a recent independent publication owns Pages; the workflow's `develop` push behavior is baseline production and is included above |
+| `docs.yml` `deploy` job only | The release-to-Pages deploy runs only on `release` pushes and is skipped while a recent independent publication owns Pages. The workflow's `develop` push behavior is baseline capture and is included above. |
 | `lint.yml` / `test.yml` | `push.branches: [release]` only |
 | `release.yml` | tag push `v*` only |
+
+### Retired entries
+
+The previous snapshot also listed `develop-post-merge.yml`,
+`orphaned-commit-detector.yml`, `results-explorer-browser.yml`, and
+`publication-lane-explorer.yml`. They were retired with the six-unit CI. The
+Chromium suite now runs before merge in the `explorer` unit and again on the
+composed tree in the merge queue, so a dropped develop push no longer skips it.
 
 ### Related scheduled canaries (no develop push)
 
@@ -65,14 +67,13 @@ Not push-drop *subjects*, but they **mitigate** the class for other workflows:
 
 | Workflow | Cadence | Role relative to push-drop |
 | --- | --- | --- |
-| `develop-post-merge-gap-detector.yml` | daily `47 7 * * *` | Instruments missing `develop-post-merge` runs for recent develop SHAs (read-only) |
 | `corpus-drift-check.yml` | daily `37 6 * * *` | Detects develop-ahead / content-changed corpus drift when the mirror push path was silent (incident class of 2026-08-03) |
 
 ## Classification notes
 
 ### Safety-critical without schedule
 
-Only two develop-push workflows lack a schedule:
+Three develop-push workflows lack a schedule:
 
 1. **`sync-results-data-to-published.yml`** — The 2026-08-03 incident was
    exactly this failure mode: three consecutive develop merges got no push
@@ -85,28 +86,20 @@ Only two develop-push workflows lack a schedule:
    `workflow_dispatch` of the mirror. That is an accepted residual risk with a
    bounded detection window (≤ ~1 day), not an untracked gap.
 
-2. **`results-explorer-browser.yml`** — Develop inclusion exists so a
-   squash-merge combination no PR exercised still rebuilds the browser lane
-   on tip (see workflow header comment and
-   [`browser-ci.md`](browser-ci.md)). The **merge gate** is the ruleset
-   required check on PRs; that does not depend on develop push delivery.
-   Adding an hourly (or even daily) full browser suite would be the expensive
-   medium-tier pattern this inventory deliberately rejects for cost. Residual
-   tip drift after a dropped path-matched push is accepted; recovery is
-   dispatch or the next explorer-touching PR. No follow-up TODO filed: if a
-   future tip-only browser regression becomes a real incident class, prefer a
-   **cheap liveness** signal (did a push event create a run for path-matching
-   SHAs?) over re-running Playwright on a schedule.
+2. **`fast-lane-baseline.yml`** — A missing baseline blocks PRs rather than
+   letting them through, so the risk is friction, not an unsafe merge. The
+   failure names its own cause and the recovery is one dispatch.
+
+3. **`docs.yml`** — The same fail-closed shape for the visual baseline. The
+   dispatch input `baseline_source_sha` exists for exactly this recovery.
 
 ### Covered rows (schedule present)
 
-- **`develop-post-merge.yml`** — model solution for the class: additive slim
-  schedule, mutation/medium excluded from schedule, separate gap detector.
-  Do not copy the full medium suite onto hourly schedules elsewhere.
-- **`orphaned-commit-detector.yml`** — daily schedule is required for the
-  stranding race; bare push covers all branches cheaply (~1 min, read-only).
 - **`submission-validator-drift-check.yml`** — weekly is enough for a rarely
-  changing dual-branch validator sync; path-filtered push is an early signal.
+  changing dual-branch validator sync; the path-filtered push is an early
+  signal.
+- **`pricing-data-drift-check.yml`** — weekly schedule plus dispatch bound
+  drift; the push path only adds an early signal for generator edits.
 
 ## Cost and policy constraints (standing)
 
@@ -115,7 +108,7 @@ When extending this inventory or adding backstops:
 | Do | Do not |
 | --- | --- |
 | Prefer schedule + `workflow_dispatch` as additive coverage | Replace the `push` trigger |
-| Keep schedule paths slim / read-only when possible | Add ~24× daily full medium or full browser suites on tip |
+| Keep schedule paths slim / read-only when possible | Add ~24× daily full test suites on tip |
 | Keep write/mutation jobs push + dispatch only | Give scheduled jobs new permission classes without review |
 | Document accepted risk with the compensating canary | Paper over drops with `pull_request` / `workflow_run` spam |
 
@@ -126,10 +119,10 @@ one other develop-push subject:
 
 ```bash
 test -f docs/operations/develop-push-drop-inventory.md
-rg -q "develop-post-merge" docs/operations/develop-push-drop-inventory.md
-rg -q "sync-results-data-to-published|results-explorer-browser|orphaned-commit-detector" \
+rg -q "fast-lane-baseline" docs/operations/develop-push-drop-inventory.md
+rg -q "sync-results-data-to-published|submission-validator-drift-check" \
   docs/operations/develop-push-drop-inventory.md
-rg -q "push-drop|schedule" docs/operations/develop-post-merge-gaps.md
+rg -q "push-drop|push gaps" docs/operations/develop-post-merge-gaps.md
 ```
 
 Re-enumerate develop-push workflows (must match the table's subject set):
@@ -167,21 +160,15 @@ PY
 ```
 
 Expected subject set (names only):
-`develop-post-merge.yml`, `docs.yml`, `orphaned-commit-detector.yml`,
-`pricing-data-drift-check.yml`, `publication-lane-docs.yml`, `publication-lane-explorer.yml`,
-`results-explorer-browser.yml`, `submission-validator-drift-check.yml`,
-`sync-results-data-to-published.yml`.
+`docs.yml`, `fast-lane-baseline.yml`, `pricing-data-drift-check.yml`,
+`submission-validator-drift-check.yml`, `sync-results-data-to-published.yml`.
 
 ## Manual recovery cheatsheet
 
 | If this is silent / red after a develop burst | Recover |
 | --- | --- |
-| Post-merge gates | `gh workflow run develop-post-merge.yml --ref develop` |
-| Gap class instrumentation | `gh workflow run develop-post-merge-gap-detector.yml --ref develop` |
+| Fast-lane delta guard reports a missing baseline | `gh workflow run fast-lane-baseline.yml --ref develop` |
+| Visual comparison reports a missing baseline | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
 | Corpus mirror lag | `gh workflow run corpus-drift-check.yml` then, if develop-ahead, `gh workflow run sync-results-data-to-published.yml --ref develop` |
-| Browser tip rebuild | `gh workflow run results-explorer-browser.yml --ref develop` |
-| Explorer publication lane artifact | `gh workflow run publication-lane-explorer.yml --ref develop` |
-| Docs-lane artifact rebuild | `gh workflow run publication-lane-docs.yml --ref develop` |
-| Orphan scan | `gh workflow run orphaned-commit-detector.yml --ref develop` |
 | Validator drift | `gh workflow run submission-validator-drift-check.yml --ref develop` |
 | Pricing data drift | `gh workflow run pricing-data-drift-check.yml --ref develop` |
