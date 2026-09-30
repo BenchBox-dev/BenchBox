@@ -80,8 +80,12 @@ class ReadPrimitivesDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         # shares TPC-H data. Validation engines should accept TPC-H manifests
         # for Read Primitives benchmarks since they use the same data.
 
-        # Convert Path objects to strings for compatibility
-        return {k: str(v) for k, v in result.items()}
+        # Convert Path objects to strings for compatibility. Sharded tables
+        # map to lists of Paths, so stringify each entry: str() on the list
+        # itself would store a repr string no loader can resolve (fresh
+        # datagen invisible to the load phase; warm reruns worked only
+        # because _populate_tables_from_manifest rebuilds real lists).
+        return {k: [str(path) for path in v] if isinstance(v, list) else str(v) for k, v in result.items()}
 
     def _generate_data_local(self, output_dir: Path, tables: Optional[list[str]] = None) -> dict[str, TablePaths]:
         """Generate Read Primitives data files locally using TPC-H data generator."""

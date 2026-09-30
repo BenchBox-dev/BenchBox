@@ -547,18 +547,27 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
                 logger.warning(f"Skipping {table_name} - no data file found")
                 continue
 
-            data_file = Path(self.tables[table_name])
-            # For TPC-H data, prefer .tbl files over .csv files due to embedded commas
-            tbl_file = data_file.with_suffix(".tbl")
-            if tbl_file.exists():
-                data_file = tbl_file
-            elif not data_file.exists():
-                logger.warning(f"Skipping {table_name} - data file does not exist: {data_file}")
+            raw_value = self.tables[table_name]
+            # Fresh parallel datagen maps sharded tables to lists of files;
+            # normalize to a list so every shard loads, not just the first.
+            candidates = list(raw_value) if isinstance(raw_value, list) else [raw_value]
+            data_files = []
+            for candidate in candidates:
+                data_file = candidate if isinstance(candidate, Path) else Path(candidate)
+                # For TPC-H data, prefer .tbl files over .csv files due to embedded commas
+                tbl_file = data_file.with_suffix(".tbl")
+                if tbl_file.exists():
+                    data_file = tbl_file
+                if data_file.exists():
+                    data_files.append(data_file)
+            if not data_files:
+                first = candidates[0] if candidates else None
+                logger.warning(f"Skipping {table_name} - data file does not exist: {first}")
                 continue
 
             try:
                 logger.info(f"Loading data for {table_name.upper()}...")
-                rows_loaded = self._load_table_data(connection, table_name, data_file)
+                rows_loaded = sum(self._load_table_data(connection, table_name, data_file) for data_file in data_files)
 
                 total_rows += rows_loaded
                 loaded_tables += 1

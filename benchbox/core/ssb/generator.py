@@ -143,8 +143,10 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             verbose=True,  # SSB doesn't have self.verbose, so use True
         )
 
-        # Convert Path objects to strings for compatibility
-        return {k: str(v) for k, v in result.items()}
+        # Convert Path objects to strings for compatibility. Preserve sharded
+        # (list) values entry-wise: str() on the list itself would store a
+        # repr string no loader can resolve (see loader-fresh-manifest).
+        return {k: [str(path) for path in v] if isinstance(v, list) else str(v) for k, v in result.items()}
 
     def _generate_data_local(self, output_dir: Path, tables: list[str] | None = None) -> dict[str, Path]:
         """Generate SSB data files locally (original implementation)."""
