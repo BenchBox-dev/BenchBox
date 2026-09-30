@@ -3153,6 +3153,15 @@
       "status": "open",
       "title": "Decide remaining TPC-DS legacy stream and RNG migration"
     },
+    "comment-cleanup-tuning": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from tuning generators, templates and profiles"
+    },
     "comment-cleanup-validation": {
       "claim": null,
       "needs": [
