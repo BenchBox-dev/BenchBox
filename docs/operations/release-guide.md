@@ -366,9 +366,13 @@ recovery version through this same flow.
 
 ## Preparing and checking a release on develop
 
-`release-prep` and `release-check` support a flow where the release is an
-ordinary pull request against `develop` and the tag is cut from the merged
-commit. They do not replace `release-cut` and `release-finalize` above.
+`release-prep` and `release-check` prepare release content in an ordinary pull
+request against `develop`. They do not replace `release-cut` and
+`release-finalize` above. Do not tag the merged develop commit until the
+replacement publisher has passed its exact merge-group artifact, attestation,
+installed-artifact matrix, and release acceptance checks. The legacy
+`release.yml` publisher requires `origin/release` ancestry and rejects develop
+tags. Passing the content check alone does not authorize tagging or publication.
 
 ```bash
 make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
@@ -398,8 +402,11 @@ Both targets need the full development tree, because the lock-revision check
 lives under `_project/`.
 The check uses a locked environment and leaves `uv.lock` unchanged. Its revision
 baseline defaults to the newest final release tag older than `VERSION`; that
-tag is resolved once to a commit. CI should supply the exact event base SHA
-with `BASE_REF` to also catch revision decreases since the last release.
+tag is resolved once to a commit. CI selects changes to managed release markers,
+the current version's changelog section, the lock schema, or release enforcement
+inputs. Its always-required `ci-paths` job runs the check with the immutable
+pull-request or merge-group event base SHA as `BASE_REF`; a failed check blocks
+`core`. Unchanged release identity avoids the dependency installation and check.
 Missing baseline history fails the check. Preparation uses a frozen environment
 until its explicit `uv lock` step. It validates the date and changelog lower
 bound before changing version markers; a later command failure can leave

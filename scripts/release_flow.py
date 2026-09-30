@@ -40,8 +40,6 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from pathlib import Path
 
-from packaging.version import InvalidVersion, Version
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # A subprocess runner: (argv, cwd) -> (returncode, combined output). Injectable
@@ -70,6 +68,8 @@ def run_command(argv: Sequence[str], cwd: Path) -> tuple[int, str]:
 
 def normalize_version(value: str) -> str | None:
     """PEP 440 form of ``value`` (``0.4.2-rc.1`` -> ``0.4.2rc1``), or None."""
+    from packaging.version import InvalidVersion, Version
+
     try:
         return str(Version(value))
     except InvalidVersion:
@@ -203,7 +203,7 @@ def check_dependency_bounds(root: Path, runner: Runner) -> list[str]:
 
 
 def run_checks(root: Path, version: str, runner: Runner = run_command, *, baseline_ref: str | None = None) -> list[str]:
-    """Return every problem found; an empty list means the tree is ready to tag."""
+    """Return every release-content problem; publication acceptance is a separate check."""
     problems: list[str] = []
     if normalize_version(version) is None:
         return [f"version {version!r} is not a valid version"]
@@ -222,6 +222,8 @@ def run_checks(root: Path, version: str, runner: Runner = run_command, *, baseli
 
 def latest_release_tag(root: Path, *, before_version: str | None = None) -> str | None:
     """Newest final ``vX.Y.Z`` tag, as a full ref so a same-named branch cannot shadow it."""
+    from packaging.version import Version
+
     code, output = run_command(["git", "tag", "--list", "v[0-9]*", "--sort=-v:refname"], root)
     if code != 0:
         return None
@@ -290,6 +292,84 @@ def prep(root: Path, version: str, since_ref: str | None, release_date: str | No
     return 0
 
 
+def select_candidate(root: Path, base_sha: str) -> tuple[bool, str]:
+    """Compare release identity against an immutable event base without third-party imports."""
+    if re.fullmatch(r"[0-9a-f]{40}", base_sha) is None:
+        raise ValueError("release selection requires the full immutable event base SHA")
+    code, resolved = run_command(
+        ["git", "--no-replace-objects", "rev-parse", "--verify", f"{base_sha}^{{commit}}"], root
+    )
+    if code != 0 or resolved != base_sha:
+        raise ValueError("release selection cannot resolve the exact event base")
+    update_version = _load_script("update_version", root)
+    paths = [
+        "pyproject.toml",
+        "benchbox/__init__.py",
+        "uv.lock",
+        "CHANGELOG.md",
+        *(p.as_posix() for p in update_version.DOCUMENTATION_PATHS),
+        update_version.LANDING_PAGE_PATH.as_posix(),
+    ]
+
+    def signature(contents: dict[str, str]) -> tuple:
+        project_version = tomllib.loads(contents["pyproject.toml"])["project"]["version"]
+        if not isinstance(project_version, str) or not re.fullmatch(r"[0-9][A-Za-z0-9.+-]*", project_version):
+            raise ValueError("release selection found an invalid project version")
+        lock = tomllib.loads(contents["uv.lock"])
+        packages = [p for p in lock.get("package", []) if p.get("name") == "benchbox"]
+        if len(packages) != 1 or not isinstance(packages[0].get("version"), str):
+            raise ValueError("release selection requires exactly one lock package version")
+        if type(lock.get("version")) is not int or type(lock.get("revision")) is not int:
+            raise ValueError("release selection found an invalid lock schema")
+        init = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', contents["benchbox/__init__.py"])
+        docs = [
+            update_version.DOC_RELEASE_PATTERN.search(contents[p.as_posix()])
+            for p in update_version.DOCUMENTATION_PATHS
+        ]
+        badge = update_version.LANDING_VERSION_PATTERN.search(contents[update_version.LANDING_PAGE_PATH.as_posix()])
+        if init is None or badge is None or any(match is None for match in docs):
+            raise ValueError("release selection found a missing managed version marker")
+        section = re.search(
+            rf"^## \[{re.escape(project_version)}\][^\n]*\n.*?(?=^## |\Z)",
+            contents["CHANGELOG.md"],
+            re.MULTILINE | re.DOTALL,
+        )
+        return (
+            project_version,
+            init[1],
+            *(match.group("version").rstrip(".") for match in docs),
+            badge.group("version"),
+            packages[0]["version"],
+            lock["version"],
+            lock["revision"],
+            section[0] if section else None,
+        )
+
+    baseline = {}
+    for path in paths:
+        code, content = run_command(["git", "--no-replace-objects", "show", f"{base_sha}:{path}"], root)
+        if code != 0:
+            raise ValueError(f"release selection cannot read baseline {path}")
+        baseline[path] = content
+    current = {path: (root / path).read_text(encoding="utf-8").strip() for path in paths}
+    before, after = signature(baseline), signature(current)
+    code, changed = run_command(["git", "--no-replace-objects", "diff", "--name-only", base_sha, "HEAD", "--"], root)
+    if code != 0:
+        raise ValueError("release selection cannot read changed enforcement inputs")
+    enforcement = {
+        "scripts/release_flow.py",
+        "scripts/update_version.py",
+        "scripts/generate_changelog_entry.py",
+        "scripts/check_release_curation.py",
+        "scripts/check_dependency_bounds.py",
+        "_project/scripts/check_uv_lock_revision.py",
+        "_project/decisions/single-repo-migration.md",
+        "Makefile",
+        ".github/workflows/ci.yml",
+    }
+    return before != after or bool(enforcement.intersection(changed.splitlines())), after[0]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -303,8 +383,22 @@ def main(argv: list[str] | None = None) -> int:
     sub.choices["check"].add_argument(
         "--baseline-ref", help="Lock revision baseline (default: prior final release tag)"
     )
+    select = sub.add_parser("select", help="Select release candidates using the immutable CI event base")
+    select.add_argument("--base-sha", required=True)
+    select.add_argument("--github-output", type=Path, required=True)
+    select.add_argument("--root", type=Path, default=REPO_ROOT, help=argparse.SUPPRESS)
 
     args = parser.parse_args(argv)
+    if args.command == "select":
+        try:
+            selected, version = select_candidate(args.root, args.base_sha)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            print(f"release selection FAILED: {exc}", file=sys.stderr)
+            return 1
+        with args.github_output.open("a", encoding="utf-8") as output:
+            output.write(f"release-check-needed={str(selected).lower()}\nrelease-version={version}\n")
+        print(f"release selection: {'check required' if selected else 'unchanged release identity'}")
+        return 0
     version = args.version.removeprefix("v")
 
     if args.command == "prep":
@@ -316,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return 1
-    print(f"release-check OK: {version} is ready to tag")
+    print(f"release-check OK: release content for {version} passed")
     return 0
 
 

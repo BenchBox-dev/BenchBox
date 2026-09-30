@@ -1254,7 +1254,8 @@ release-finalize:
 
 # Tag-on-develop release flow. release-prep produces one ordinary PR diff (version
 # markers, uv.lock, CHANGELOG draft); release-check verifies the pre-tag state and
-# runs unchanged in CI. Neither target touches the release-cut path above.
+# runs in the required CI classifier for release-content changes. Neither target
+# touches the release-cut path above or enables develop-tag publication.
 # Usage: make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
 #        make release-check VERSION=X.Y.Z
 .PHONY: release-prep release-check

@@ -376,6 +376,159 @@ def test_prep_passes_the_requested_lower_bound_to_the_changelog_step(tree: Path)
     assert any(argv[:2] == ["uv", "lock"] for argv in calls)
 
 
+@pytest.fixture
+def candidate_tree(tmp_path: Path) -> tuple[Path, str]:
+    root = write_tree(tmp_path)
+    git(root, "init", "-q")
+    paths = [str(path.relative_to(root)) for path in root.rglob("*") if path.is_file() and ".git" not in path.parts]
+    git(root, "add", "--", *paths)
+    git(root, "commit", "-q", "-m", "Initial release contents")
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    return root, base
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "pyproject.toml",
+        "benchbox/__init__.py",
+        "uv.lock",
+        "README.md",
+        "docs/README.md",
+        "benchbox/utils/VERSION_MANAGEMENT.md",
+        "landing/index.html",
+    ],
+)
+def test_candidate_selection_catches_each_split_version_bump(candidate_tree: tuple[Path, str], path: str) -> None:
+    root, base = candidate_tree
+    file = root / path
+    file.write_text(file.read_text().replace(VERSION, "1.2.4"))
+    selected, _version = release_flow.select_candidate(root, base)
+    assert selected
+    assert release_flow.run_checks(root, _version, ok_runner, baseline_ref=base)
+
+
+@pytest.mark.parametrize(
+    ("path", "old", "new"),
+    [
+        ("CHANGELOG.md", "A hand-curated entry", "Updated release note"),
+        ("uv.lock", "revision = 3", "revision = 2"),
+        ("uv.lock", "version = 1\n", "version = 2\n"),
+    ],
+)
+def test_candidate_selection_catches_release_section_and_lock_schema(
+    candidate_tree: tuple[Path, str],
+    path: str,
+    old: str,
+    new: str,
+) -> None:
+    root, base = candidate_tree
+    file = root / path
+    file.write_text(file.read_text().replace(old, new))
+    assert release_flow.select_candidate(root, base)[0]
+
+
+def test_candidate_selection_preserves_ordinary_prose_dependency_and_source_edits(
+    candidate_tree: tuple[Path, str],
+) -> None:
+    root, base = candidate_tree
+    readme = root / "README.md"
+    readme.write_text(readme.read_text() + "\nInstallation instructions improved.\n")
+    project = root / "pyproject.toml"
+    project.write_text(project.read_text().replace("[tool.ruff]", 'dependencies = ["packaging>=24"]\n\n[tool.ruff]'))
+    (root / "benchbox/new_module.py").write_text('"""Ordinary module."""\n')
+    changelog = root / "CHANGELOG.md"
+    changelog.write_text(changelog.read_text().replace("Earlier entry.", "Clarified older entry."))
+    assert release_flow.select_candidate(root, base) == (False, VERSION)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "scripts/release_flow.py",
+        "scripts/check_dependency_bounds.py",
+        "_project/decisions/single-repo-migration.md",
+        ".github/workflows/ci.yml",
+    ],
+)
+def test_candidate_selection_includes_committed_enforcement_changes(
+    candidate_tree: tuple[Path, str], path: str
+) -> None:
+    root, base = candidate_tree
+    file = root / path
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(file.read_text() + "\n# Updated enforcement.\n" if file.exists() else "# Updated enforcement.\n")
+    git(root, "add", "--", path)
+    git(root, "commit", "-q", "-m", "Update release enforcement")
+    assert release_flow.select_candidate(root, base) == (True, VERSION)
+
+
+@pytest.mark.parametrize("base", ["HEAD", "", "0" * 40])
+def test_candidate_selection_rejects_missing_or_moving_baseline(candidate_tree: tuple[Path, str], base: str) -> None:
+    with pytest.raises(ValueError, match="event base"):
+        release_flow.select_candidate(candidate_tree[0], base)
+
+
+def test_candidate_selection_rejects_missing_baseline_contents(candidate_tree: tuple[Path, str]) -> None:
+    root, _base = candidate_tree
+    git(root, "rm", "--", "README.md")
+    git(root, "commit", "-q", "-m", "Remove baseline marker")
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+    (root / "README.md").write_text(f"Current release: v{VERSION}.\n")
+    with pytest.raises(ValueError, match="baseline README"):
+        release_flow.select_candidate(root, base)
+
+
+def test_candidate_selection_cli_is_stdlib_only_and_preserves_lock(
+    candidate_tree: tuple[Path, str], tmp_path: Path
+) -> None:
+    root, base = candidate_tree
+    original = (root / "uv.lock").read_bytes()
+    output = tmp_path / "output.txt"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-S",
+            str(root / "scripts/release_flow.py"),
+            "select",
+            "--base-sha",
+            base,
+            "--github-output",
+            str(output),
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert output.read_text() == f"release-check-needed=false\nrelease-version={VERSION}\n"
+    assert (root / "uv.lock").read_bytes() == original
+
+
+def test_candidate_check_is_required_on_both_event_types_without_changing_legacy_publisher() -> None:
+    import yaml
+
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text())
+    classifier = workflow["jobs"]["ci-paths"]
+    assert "if" not in classifier
+    steps = classifier["steps"]
+    selection = next(step for step in steps if step.get("id") == "release")
+    assert (
+        selection["env"]["EVENT_BASE_SHA"]
+        == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
+    )
+    assert 'git fetch --no-tags origin "$EVENT_BASE_SHA"' in selection["run"]
+    check = next(step for step in steps if step.get("name") == "Check release content")
+    assert check["if"] == "steps.release.outputs.release-check-needed == 'true'"
+    assert check["run"] == 'make release-check VERSION="$RELEASE_VERSION" BASE_REF="$EVENT_BASE_SHA"'
+    core = workflow["jobs"]["core"]
+    assert "ci-paths" in core["needs"]
+    assert "--always ci-paths" in core["steps"][-1]["run"]
+    assert "origin/release" in (REPO_ROOT / ".github/workflows/release.yml").read_text()
+    assert "Do not tag the merged develop commit" in (REPO_ROOT / "docs/operations/release-guide.md").read_text()
+
+
 def test_make_targets_exist_and_legacy_release_targets_are_kept() -> None:
     def dry_run(target: str, version: str = VERSION) -> str:
         return subprocess.run(

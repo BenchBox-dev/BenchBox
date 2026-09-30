@@ -60,6 +60,7 @@ file	.github/workflows/ci.yml
 file	.github/ci-units.yml
 file	scripts/ci_units.py
 file	scripts/ci_unit_result.py
+file	scripts/release_flow.py
 file	.github/workflows/release.yml
 file	_project/decisions/independent-publication-a0-freeze-2026-08-31.md
 file	docs/development/adr/adr-independent-publication-authorities.md
