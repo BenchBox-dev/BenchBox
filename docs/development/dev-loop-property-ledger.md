@@ -70,6 +70,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `gitignore-lint.yml` | tooling | Hygiene; standalone, not part of the ci.yml units |
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3 |
+| `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -102,6 +103,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_corpus_trust_boundary.py` | product-safety | Corpus trust boundary |
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
 | `test_docs_skip_marker.py` | pure-process | Docs skip mechanics |
+| `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
 | `test_publication_canaries.py` | product-safety | Publication canaries |
 | `test_publication_preview.py` | product-safety | Preview deployment |
