@@ -3024,6 +3024,15 @@
       "status": "open",
       "title": "Resolve the deferred DataFusion filter typing boundary"
     },
+    "comment-cleanup-equivalence": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from equivalence and soundness code"
+    },
     "comment-cleanup-expected-wrapper": {
       "claim": null,
       "needs": [
