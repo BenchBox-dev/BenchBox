@@ -35,6 +35,7 @@ def policy() -> dict:
         ],
         "external_entries": [],
         "payloads": [],
+        "derived_rules": [],
         "consumer_edges": [],
         "directives": [],
         "notices": [],
@@ -390,3 +391,78 @@ def test_every_tracked_eula_and_notice_file_has_a_notice_entry() -> None:
     }
     assert notice_files
     assert notice_files <= listed
+
+
+def _derived_rule(priority: int = 20) -> dict:
+    return {
+        "id": "test-import-owner",
+        "method": "python-imports",
+        "state": "blocked",
+        "blocking_disposition": "Derived from imports.",
+        "priority": priority,
+        "selectors": [{"prefix": "tests/"}],
+    }
+
+
+def _resolved(path: str, owner: str | None) -> dict:
+    return {"path": path, "kind": "x", "owner": owner, "state": "blocked", "blocking_disposition": "b", "rule": "r"}
+
+
+def _git_repo_with(tmp_path: Path, files: dict[str, str]) -> tuple[Path, str]:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    for name, content in files.items():
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "--", *files], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "x"],
+        check=True,
+    )
+    base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"]).decode().strip()
+    return tmp_path, base
+
+
+def test_derived_rule_assigns_single_import_owner_and_falls_back_otherwise(tmp_path: Path) -> None:
+    root, base = _git_repo_with(
+        tmp_path,
+        {
+            "benchbox/__init__.py": "",
+            "benchbox/a.py": "",
+            "benchbox/b.py": "",
+            "tests/test_a.py": "from benchbox.a import thing\n",
+            "tests/test_ab.py": "import benchbox.a\nimport benchbox.b\n",
+            "tests/test_facade.py": "from benchbox import thing\n",
+            "tests/test_none.py": "import os\n",
+            "tests/broken.py": "def (:\n",
+        },
+    )
+    resolved = [
+        _resolved("benchbox/a.py", "comment-cleanup-a"),
+        _resolved("benchbox/b.py", "comment-cleanup-b"),
+        _resolved("benchbox/__init__.py", "comment-cleanup-boot"),
+        *(
+            _resolved(f"tests/{n}.py", "comment-cleanup-fallback")
+            for n in ("test_a", "test_ab", "test_facade", "test_none", "broken")
+        ),
+    ]
+    scope.apply_derived_rules(resolved, [_derived_rule()], root, base, {})
+    owners = {record["path"]: record["owner"] for record in resolved}
+    assert owners["tests/test_a.py"] == "comment-cleanup-a"
+    assert owners["tests/test_ab.py"] == "comment-cleanup-fallback"
+    assert owners["tests/test_facade.py"] == "comment-cleanup-fallback"
+    assert owners["tests/test_none.py"] == "comment-cleanup-fallback"
+    assert owners["tests/broken.py"] == "comment-cleanup-fallback"
+
+
+def test_derived_rule_does_not_override_a_higher_priority_rule(tmp_path: Path) -> None:
+    root, base = _git_repo_with(tmp_path, {"benchbox/a.py": "", "tests/test_a.py": "import benchbox.a\n"})
+    resolved = [_resolved("benchbox/a.py", "comment-cleanup-a"), _resolved("tests/test_a.py", "comment-cleanup-exact")]
+    scope.apply_derived_rules(resolved, [_derived_rule()], root, base, {"tests/test_a.py": 30})
+    assert resolved[1]["owner"] == "comment-cleanup-exact"
+
+
+def test_derived_rule_rejects_unknown_method(policy: dict) -> None:
+    policy["derived_rules"] = [{**_derived_rule(), "method": "guess-from-names"}]
+    with pytest.raises(scope.PolicyError):
+        scope.validate_derived_rules(policy)

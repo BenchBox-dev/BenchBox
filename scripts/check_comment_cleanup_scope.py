@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import json
 import subprocess
@@ -108,6 +109,7 @@ def load_policy(path: Path) -> dict[str, Any]:
             "ownership_rules",
             "external_entries",
             "payloads",
+            "derived_rules",
             "consumer_edges",
             "directives",
             "notices",
@@ -328,6 +330,112 @@ def validate_dispositions(policy: dict[str, Any], task_ids: set[str] | None = No
         raise PolicyError(f"review dispositions must be exactly {sorted(expected)}")
 
 
+def validate_derived_rules(policy: dict[str, Any], task_ids: set[str] | None = None) -> list[dict[str, Any]]:
+    result = []
+    ids = set()
+    for index, rule in enumerate(policy["derived_rules"]):
+        if not isinstance(rule, dict):
+            raise PolicyError(f"derived_rules[{index}] must be an object")
+        require_fields(
+            rule, {"id", "method", "state", "blocking_disposition", "priority", "selectors"}, f"derived {index}"
+        )
+        rule_id = check_string(rule["id"], f"derived {index}.id")
+        if rule_id in ids:
+            raise PolicyError(f"duplicate derived rule: {rule_id}")
+        ids.add(rule_id)
+        if rule["method"] != "python-imports":
+            raise PolicyError(f"derived {rule_id}.method must be python-imports")
+        if rule["state"] not in {"ready", "blocked"}:
+            raise PolicyError(f"derived {rule_id}.state must be ready or blocked")
+        check_string(rule["blocking_disposition"], f"derived {rule_id}.blocking_disposition")
+        if not isinstance(rule["priority"], int):
+            raise PolicyError(f"derived {rule_id}.priority must be an integer")
+        if not isinstance(rule["selectors"], list) or not rule["selectors"]:
+            raise PolicyError(f"derived {rule_id}.selectors must be a non-empty list")
+        for selector in rule["selectors"]:
+            if not valid_selector(selector):
+                raise PolicyError(f"derived {rule_id} has an invalid selector")
+        result.append(rule)
+    return result
+
+
+def read_blobs(root: Path, base: str, paths: list[str]) -> dict[str, bytes]:
+    if not paths:
+        return {}
+    request = "".join(f"{base}:{path}\n" for path in paths).encode()
+    output = subprocess.run(
+        ["git", "-C", str(root), "cat-file", "--batch"], input=request, capture_output=True, check=True
+    ).stdout
+    blobs = {}
+    offset = 0
+    for path in paths:
+        end = output.index(b"\n", offset)
+        header = output[offset:end].split()
+        if len(header) != 3 or header[1] != b"blob":
+            raise PolicyError(f"cannot read {path} at the immutable base")
+        size = int(header[2])
+        blobs[path] = output[end + 1 : end + 1 + size]
+        offset = end + 1 + size + 1
+    return blobs
+
+
+def imported_modules(source: bytes) -> set[str]:
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return set()
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            modules.update(alias.name for alias in node.names if alias.name.split(".")[0] == "benchbox")
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            if node.module.split(".")[0] == "benchbox":
+                modules.add(node.module)
+                modules.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return modules
+
+
+def import_owner(source: bytes, path_owners: dict[str, str | None]) -> str | None:
+    owners = set()
+    for module in imported_modules(source):
+        stem = module.replace(".", "/")
+        for candidate in (f"{stem}.py", f"{stem}/__init__.py"):
+            if candidate in path_owners:
+                if candidate != "benchbox/__init__.py" and path_owners[candidate]:
+                    owners.add(path_owners[candidate])
+                break
+    return owners.pop() if len(owners) == 1 else None
+
+
+def apply_derived_rules(
+    resolved: list[dict[str, Any]],
+    rules: list[dict[str, Any]],
+    root: Path,
+    base: str,
+    priorities: dict[str, int],
+) -> None:
+    if not rules:
+        return
+    path_owners = {record["path"]: record["owner"] for record in resolved if record["path"].startswith("benchbox/")}
+    for rule in rules:
+        eligible = [
+            record
+            for record in resolved
+            if record["path"].endswith(".py")
+            and priorities.get(record["path"], -1) < rule["priority"]
+            and any(matches(record["path"], selector) for selector in rule["selectors"])
+        ]
+        blobs = read_blobs(root, base, [record["path"] for record in eligible])
+        for record in eligible:
+            owner = import_owner(blobs[record["path"]], path_owners)
+            if owner is None:
+                continue
+            record.update(
+                owner=owner, state=rule["state"], blocking_disposition=rule["blocking_disposition"], rule=rule["id"]
+            )
+            priorities[record["path"]] = rule["priority"]
+
+
 def selected_root(path: str, roots: list[dict[str, Any]]) -> dict[str, Any] | None:
     candidates = [root for root in roots if matches(path, root["selector"])]
     if not candidates:
@@ -341,7 +449,10 @@ def selected_root(path: str, roots: list[dict[str, Any]]) -> dict[str, Any] | No
 
 
 def owned_paths(
-    paths: list[str], roots: list[dict[str, Any]], rules: list[dict[str, Any]]
+    paths: list[str],
+    roots: list[dict[str, Any]],
+    rules: list[dict[str, Any]],
+    priorities: dict[str, int] | None = None,
 ) -> tuple[list[dict[str, Any]], list[Finding]]:
     results = []
     findings = []
@@ -381,6 +492,8 @@ def owned_paths(
             )
             continue
         rule = selected[0]
+        if priorities is not None:
+            priorities[path] = priority
         results.append(
             {
                 "path": path,
@@ -439,10 +552,15 @@ def main(argv: list[str] | None = None) -> int:
         task_ids = frozen_task_ids(root, args.task_set)
         roots = validate_roots(policy)
         rules = validate_rules(policy, task_ids)
+        derived = validate_derived_rules(policy)
         validate_evidence(policy, root, args.base, path_set, task_ids)
         validate_payloads_and_edges(policy, path_set, task_ids)
         validate_dispositions(policy, task_ids)
-        resolved, findings = owned_paths(paths, roots, rules)
+        priorities: dict[str, int] = {}
+        resolved, findings = owned_paths(paths, roots, rules, priorities)
+        apply_derived_rules(resolved, derived, root, args.base, priorities)
+        owned = {record["path"] for record in resolved if record["owner"]}
+        findings = [finding for finding in findings if finding.subject not in owned]
         findings.extend(dependency_findings(policy, resolved))
         output = output_path(root, args.output)
         report = {
