@@ -17,6 +17,8 @@ from typing import Any
 import pytest
 import yaml
 
+from tests.utilities.posix_shell import posix_shell, skip_without_posix_shell
+
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -58,6 +60,20 @@ def _steps(job: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _run_text(job: dict[str, Any]) -> str:
     return "\n".join(str(step.get("run", "")) for step in _steps(job))
+
+
+def _run_workflow_script(script: str, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    skip_without_posix_shell()
+    shell = posix_shell()
+    assert shell is not None
+    return subprocess.run(
+        [shell, "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", 'export PATH="$PWD:$PATH"\n' + script],
+        cwd=cwd,
+        env={**os.environ, **(env or {})},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def test_triggers_are_schedule_and_dispatch_without_branch_filters() -> None:
@@ -150,14 +166,7 @@ def test_quarantine_exit_codes_under_runner_shell(tmp_path: Path, pytest_exit: i
     )
     stub.chmod(0o755)
     step = next(step for step in _steps(_load()["jobs"]["quarantine"]) if step.get("name") == "Run quarantined tests")
-    result = subprocess.run(
-        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
-        cwd=tmp_path,
-        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_workflow_script(step["run"], tmp_path)
     assert result.returncode == expected, result.stdout + result.stderr
 
 
@@ -172,24 +181,15 @@ def test_perf_comparison_uses_only_the_current_job_result(tmp_path: Path, result
     job = _load()["jobs"]["perf"]
     setup = next(step for step in _steps(job) if step.get("name") == "Set isolated benchmark output")
     github_env = tmp_path / "github-env"
-    subprocess.run(
-        ["bash", "-e", "-o", "pipefail", "-c", setup["run"]],
-        cwd=tmp_path,
-        env={**os.environ, "RUNNER_TEMP": str(runner_temp), "GITHUB_ENV": str(github_env)},
-        check=True,
+    setup_result = _run_workflow_script(
+        setup["run"], tmp_path, {"RUNNER_TEMP": str(runner_temp), "GITHUB_ENV": str(github_env)}
     )
+    assert setup_result.returncode == 0, setup_result.stdout + setup_result.stderr
     key, _, configured_root = github_env.read_text().strip().partition("=")
     assert key == "BENCHBOX_OUTPUT_DIR" and Path(configured_root) == output_root
     step = next(step for step in _steps(job) if step.get("id") == "current")
     github_output = tmp_path / "github-output"
-    result = subprocess.run(
-        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
-        cwd=tmp_path,
-        env={**os.environ, key: configured_root, "GITHUB_OUTPUT": str(github_output)},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_workflow_script(step["run"], tmp_path, {key: configured_root, "GITHUB_OUTPUT": str(github_output)})
     assert (result.returncode == 0) == (result_count == 1), result.stdout + result.stderr
     if result_count == 1:
         assert github_output.read_text().strip() == f"path={results / 'tpch_sf001_duckdb_sql_0.json'}"
@@ -220,14 +220,7 @@ def test_duration_measurement_keeps_assertion_reports_and_rejects_runner_failure
         for step in _steps(_load()["jobs"]["durations-refresh"])
         if step.get("name") == f"Measure {tier} tier durations"
     )
-    result = subprocess.run(
-        ["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", step["run"]],
-        cwd=tmp_path,
-        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_workflow_script(step["run"], tmp_path)
     assert result.returncode == expected, result.stdout + result.stderr
     assert (tmp_path / "t3-durations" / f"junit-{tier}.xml").read_text() == '<testsuite tests="1"/>'
 
