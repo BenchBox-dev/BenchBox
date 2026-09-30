@@ -184,6 +184,15 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "tpch-binary-framing", "Verify bundled dbgen binaries emit clean framing"): (
         "Cross-platform macOS/Windows binary smoke; the local macOS checkout has no Windows runner equivalent."
     ),
+    ("ci.yml", "medium-collect", "Collect the complete medium tier"): (
+        "Hosted exact-SHA medium collection is consumed by both shards; local test-medium runs the same selector unsplit."
+    ),
+    ("ci.yml", "medium-test", "Partition the complete medium tier"): (
+        "Hosted partitioning binds the shared collection artifact to this SHA; local test-medium runs the full set."
+    ),
+    ("ci.yml", "core", "Verify complete medium shard coverage"): (
+        "Hosted evidence proves both medium shard assignments executed once; local test-medium runs the full set."
+    ),
     ("ci.yml", "skill-integrity", "Clone skill sources to the configured checkout paths"): (
         "Hosted provenance step; it clones published skill sources into a fresh "
         "runner home, which a local checkout must not overwrite."

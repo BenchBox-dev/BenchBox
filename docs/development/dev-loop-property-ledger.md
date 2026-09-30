@@ -28,7 +28,7 @@ Classification values:
 | Publication rollback and transactions | `.github/workflows/publication-transaction.yml`, `.github/workflows/publication-recover.yml`, `.github/workflows/publication-soak-monitor.yml`, `tests/unit/workflows/test_publication_transaction.py`, `tests/unit/workflows/test_publication_recover.py`, `tests/unit/workflows/test_publication_rollback.py` | site-deploy rollback with last-known-good validation | pending | open |
 | Explorer snapshot and UI compatibility | `results-explorer/src/db.ts` read-model version gate, `tests/unit/scripts/test_results_explorer_snapshot_invariants.py` | ci.yml `explorer` | pending | open |
 | Public-site visual acceptance | `Public-site visual acceptance` required check from `.github/workflows/docs.yml` | site-deploy route and digest probes | pending | open |
-| Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` | pending | open |
+| Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` hash checks and required macOS/Windows dbgen framing; nightly-v2.yml matrix dbgen framing on all three OS at Python 3.12 | pending | open |
 | Wheel installability | `package-smoke` job, release workflow build | release workflow artifact verification | pending | open |
 | Shipped bundled generator integrity | `benchbox/_binaries/SHA256MANIFEST.json`, `tests/unit/utils/test_binary_manifest.py` | ci.yml `dist-artifact` verifies source, wheel, and sdist membership and hashes; installed-package verifier for release checks | pending | open |
 | Dependency bounds | `scripts/check_dependency_bounds.py`, `tests/unit/scripts/test_check_dependency_bounds.py` | ci.yml `tooling` | pending | open |
@@ -106,6 +106,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
 | `test_docs_skip_marker.py` | pure-process | Docs skip mechanics |
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
+| `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
 | `test_publication_canaries.py` | product-safety | Publication canaries |
 | `test_publication_preview.py` | product-safety | Preview deployment |
@@ -182,6 +183,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
+| `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
@@ -291,6 +293,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `check_duplicate_code.py` | tooling | Hygiene |
 | `check_windows_antipatterns.py` | tooling | Hygiene |
 | `path_filter_decision.py` | tooling | Path classifier shared with ci.yml units |
+| `pytest_shard_evidence.py` | product-safety | Exact assigned, collected, and executed medium test evidence |
 | `pr_landing.py` | pure-process | PR-loop mechanics |
 | `pr_refresh_certification.py` | pure-process | Refresh mechanics |
 | `pr_refresh_replay.py` | pure-process | Refresh mechanics |

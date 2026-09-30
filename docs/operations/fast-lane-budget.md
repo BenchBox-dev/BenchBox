@@ -237,6 +237,28 @@ per the rule above, or split the tier. `MEDIUM_TEST_TIMEOUT_MINUTES` in
 `_project/scripts/dev_loop_pr_metrics.py` must be updated with the workflow
 so the metric and the budget it measures cannot drift apart.
 
+## Linux queue partitions
+
+The medium tier collects its complete marker-selected test set once at the
+checked commit, then splits sorted node IDs across two standard Linux runners.
+Each shard preserves the medium timeout and worker limits. Pytest records its
+actual collection and execution; the core result rejects missing, duplicate,
+deselected, failed, or stale evidence before accepting the combined set.
+`make test-medium` remains the full local suite.
+
+The correctness tier also uses two Linux runners. Every existing Make command
+belongs to exactly one partition, including the value, digest, query-set, and
+no-skip checks. Raw bundled dbgen framing remains a required pre-merge check on
+macOS and Windows. It also runs in the nightly Python 3.12 cells on Linux,
+macOS, and Windows, alongside the installed-wheel generator smoke.
+
+At maximum packaging coverage, the heavy payload uses ten standard Linux
+runners, including the shared collector. This follows the approved sharding
+allowance in [the development-loop ADR](../development/adr/adr-dev-loop-v2.md).
+Classifier, aggregate, fast-tier, and other merge-unit jobs are counted
+separately. Hosted shard timings must establish the queue wall-time budget;
+equal node counts alone do not prove balanced duration.
+
 ## Required-gate versus whole-event fan-out
 
 Merge-unblock latency is the last **required** context (`core`, `explorer`,
