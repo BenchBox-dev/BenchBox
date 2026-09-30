@@ -4,7 +4,7 @@
     "release-check fails on each missing element (tests per element)",
     "docs/operations/release-guide.md draft section describes prep -> queue -> signed tag"
   ],
-  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2466 now publishes 62c77a19482371aa8b97e062e5ef6e94114add22. The missing Check release content local parity registration is fixed without an exemption; 74 parity/release-flow tests pass. Full and incremental external Muse soundness reviews have no unresolved Critical/Required findings; latest review https://github.com/BenchBox-dev/BenchBox/pull/2466#issuecomment-5905877846. Current-base ordered canonical preflight passed at06:57:50UTC, required receipt df4d5dfbb10a0aaaab56520764f58d2d973476f5ef9cd6e16add74080e5d5cfa. make pr-open completed. Exact source CI https://github.com/BenchBox-dev/BenchBox/actions/runs/36681235695 remains IN_PROGRESS on the07:26UTC live read; older same-head canceled run is stale, not acceptance evidence. No enrollment while serial queue contains another PR. Root claim generation2a9c1106a1d84331ad26493356b9d583 remains live. Owner closeout requires PR open, every newest exact-head check completed green, and serial ENQUEUED; do not wait for merge. Legacy release publisher/cut/finalize preserved. No version prep, tag, or TestPyPI publication. Develop tags remain withheld until publisher acceptance; annotated tags supersede signed-tag wording.",
+  "context": "Owner closeout reached: PR https://github.com/BenchBox-dev/BenchBox/pull/2466 publishes exact62c77a19482371aa8b97e062e5ef6e94114add22; current source CI https://github.com/BenchBox-dev/BenchBox/actions/runs/36681235695 is completedSUCCESS and all its jobs success/skipped, with latest Auto-merge revocation alsoSUCCESS. Older canceled CI36681234196 and its unresolved matrix placeholder are superseded by the complete newer run, not counted as acceptance. Both hosted review threads are resolved; no draft/hold. Actual external Muse review linked https://github.com/BenchBox-dev/BenchBox/pull/2466#issuecomment-5905877846; all Critical/Required resolved.74 focused tests and clean ordered canonical preflight passed, requiredreceipt df4d5dfbb10a0aaaab56520764f58d2d973476f5ef9cd6e16add74080e5d5cfa. Source match and empty queue re-read before native maintainer enqueue. Live07:49UTC queue confirms2466 alone, synthetic e95063c7b556ff529bc76b66c60be29a2b35c24d. ENQUEUED is not MERGED; owner specifically permits tracker closeout at this boundary. Remaining queue verification belongs to continued rollout. Root claim generation2a9c1106a1d84331ad26493356b9d583. Legacy release-cut/finalize/publisher intact; no version prep, tag or TestPyPI publication. Publisher51 must consume successful immutable merge-group artifacts without rebuilding before tag-policy transition. Annotated tags supersede signed-tag wording.",
   "description": "Retiring release-cut needs a replacement that synchronizes everything a release touches. `make release-prep VERSION=X.Y.Z` (via scripts/update_version.py and scripts/generate_changelog_entry.py) updates pyproject version, uv.lock, CHANGELOG.md, documentation version markers, and the landing badge, producing one normal PR through the queue. `make release-check VERSION=X.Y.Z` verifies that complete state locally and in release.yml (version equality everywhere, changelog entry present, lock revision, curation rules from check_release_curation.py, dependency bounds with --fail-on=cap-reached).",
   "sessions": [
     {
@@ -65,6 +65,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "6481c40db8e44d208fab620874fb4c5e",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T07:51:06Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "accf5a45f318449387bbf7b5579dda2e",
       "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
