@@ -901,25 +901,25 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Calculate average quantity per part
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    # Main query. The backend's SUM scalar returns 0.0 on empty input, but
-    # SQL SUM over an empty set is NULL: probe emptiness once via a row
-    # count and emit a single native NULL row so the gate compares
-    # NULL-vs-NULL instead of manufacturing 0.0. The count probe reads one
-    # integer (no row materialization); the NULL row stays in the active
-    # expression backend so adapters never see a foreign frame.
+    # SQL SUM over an empty or all-NULL input returns NULL. Aggregate first,
+    # then project the conditional result so every backend infers its type
+    # from the native sum without constructing a NULL-only DataFrame.
     filtered = (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
     )
-    empty_probe = filtered.select(col("l_extendedprice").count().alias("__n"))
-    from benchbox.core.equivalence.dataframe_surface import materialize_rows as _probe_rows
-
-    (row_count,) = _probe_rows(empty_probe)[0]
-    if not row_count:
-        return filtered.limit(0).select(lit(None).alias("avg_yearly"))
-    return filtered.select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
+    totals = filtered.select(
+        col("l_extendedprice").count().alias("__q17_price_count"),
+        col("l_extendedprice").sum().alias("__q17_price_sum"),
+    )
+    return totals.select(
+        ctx.when(col("__q17_price_count") > lit(0))
+        .then(col("__q17_price_sum") / lit(7.0))
+        .otherwise(lit(None))
+        .alias("avg_yearly")
+    )
 
 
 def q20_expression_impl(ctx: DataFrameContext) -> Any:
