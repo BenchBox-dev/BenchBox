@@ -3081,6 +3081,16 @@
       "status": "open",
       "title": "Replace pricing comment delimiters and clean generated pricing records"
     },
+    "comment-cleanup-results": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget",
+        "comment-cleanup-core-registries"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from result models, policy and serialization"
+    },
     "comment-cleanup-scope-policy": {
       "claim": null,
       "needs": [],
