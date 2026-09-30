@@ -2970,6 +2970,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from core benchmark bootstrap"
     },
+    "comment-cleanup-core-configuration": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from core configuration"
+    },
     "comment-cleanup-datafusion-typing": {
       "claim": null,
       "needs": [
