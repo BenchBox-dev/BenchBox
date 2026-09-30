@@ -854,7 +854,9 @@ class TestReleaseInfrastructure:
             "tests/unit/scripts/test_results_explorer_snapshot_invariants.py",
             "tests/unit/scripts/test_skill_sync_ci_policy.py",
             "tests/unit/scripts/test_soundness_drain_report.py",
-            "tests/unit/scripts/test_timing_policy_modes.py",
+            # test_timing_policy_modes.py was split into these two project-dependent tests.
+            "tests/unit/scripts/test_fast_lane_ceiling_check.py",
+            "tests/unit/scripts/test_timing_policy_check.py",
             "tests/unit/scripts/test_todo_db_shadow.py",
             "tests/unit/scripts/test_todo_db_standalone_compat.py",
             "tests/unit/scripts/test_todo_schema_migration_check.py",
