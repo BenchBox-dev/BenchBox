@@ -287,7 +287,7 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     step = next(step for step in job["steps"] if step.get("name") == "Enforce comment and docstring policy")
     assert 'git show "${BASE_REF}:scripts/run_comment_policy.py"' in step["run"]
     assert 'python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests' in step["run"]
-    assert "bb6dd5e990ef7996f8a06dca305aa2e2ba1596b7" in step["run"]
+    assert "89a0f3fdd6d111712774db1095e84ca52d6b31a6" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
     assert "merge_group.base_sha" in step["env"]["BASE_REF"]
     tooling = workflow["jobs"]["tooling"]
@@ -579,6 +579,9 @@ def test_candidate_native_execution_cannot_replace_checker(
         return real_run(command, **kwargs)
 
     monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
     monkeypatch.setattr(policy_runner, "parser_environment", lambda trusted: (Path(sys.executable), dict(os.environ)))
     monkeypatch.setattr(policy_runner.subprocess, "run", execute)
     assert policy_runner.main(["--base", base, "--native-tests"]) == (1 if prose else 2 if native_failure else 0)
