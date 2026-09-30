@@ -2961,6 +2961,15 @@
       "status": "open",
       "title": "Replace docstring presence coverage with explicit API contracts and content checks"
     },
+    "comment-cleanup-mcp-infrastructure": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from MCP infrastructure"
+    },
     "comment-cleanup-missing-count-decision": {
       "claim": null,
       "needs": [
