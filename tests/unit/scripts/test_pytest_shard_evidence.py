@@ -13,23 +13,14 @@ import pytest
 
 from scripts.release_canary_sharding import collect_node_ids, partition_node_ids, verify_medium_shards
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ROOT = Path(__file__).resolve().parents[3]
 
 
 @pytest.mark.parametrize("workers", [0, 2])
 @pytest.mark.parametrize(
     "case",
-    [
-        pytest.param("complete", marks=pytest.mark.fast),
-        pytest.param("missing", marks=pytest.mark.fast),
-        pytest.param("failure", marks=pytest.mark.fast),
-        pytest.param("skip", marks=pytest.mark.fast),
-        pytest.param("call-skip", marks=pytest.mark.medium),
-        pytest.param("xfail", marks=pytest.mark.medium),
-        pytest.param("xpass", marks=pytest.mark.medium),
-        pytest.param("teardown-failure", marks=pytest.mark.medium),
-    ],
+    ["complete", "missing", "failure", "skip", "call-skip", "xfail", "xpass", "teardown-failure"],
 )
 def test_actual_pytest_shard_execution(tmp_path: Path, workers: int, case: str) -> None:
     tests = tmp_path / "tests"
@@ -121,7 +112,6 @@ def test_actual_pytest_shard_execution(tmp_path: Path, workers: int, case: str) 
             assert reports["call"]["xfail_reason"] == "known limitation"
 
 
-@pytest.mark.medium
 @pytest.mark.parametrize("workers", [0, 2])
 @pytest.mark.parametrize("case", ["skip", "xfail-no-reason", "xfail-whitespace", "xpass-no-reason"])
 def test_real_medium_receipts_reject_missing_or_inconsistent_outcomes(tmp_path: Path, workers: int, case: str) -> None:
