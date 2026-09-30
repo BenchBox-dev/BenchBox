@@ -3261,6 +3261,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from Metadata primitives modules"
     },
+    "comment-cleanup-microsoft-cloud": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from Microsoft cloud adapters"
+    },
     "comment-cleanup-missing-count-decision": {
       "claim": null,
       "needs": [
