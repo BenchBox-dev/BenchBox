@@ -74,6 +74,31 @@ def test_ambient_imports_and_manifest_cannot_replace_either_policy(
     assert result["heavy_needed"] is False, result["reason"]
 
 
+def test_installed_helper_cannot_fill_a_missing_snapshot_file(
+    policy_sources: dict[str, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    environment = tmp_path / "interpreter"
+    subprocess.run(["uv", "venv", "--python", sys.executable, str(environment)], check=True, capture_output=True)
+    if os.name == "nt":
+        interpreter = environment / "Scripts" / "python.exe"
+        site_packages = environment / "Lib" / "site-packages"
+    else:
+        interpreter = environment / "bin" / "python"
+        site_packages = (
+            environment / "lib" / f"python{sys.version_info.major}.{sys.version_info.minor}" / "site-packages"
+        )
+    original = policy_sources[POLICY_FILES[1]]
+    hostile = original.replace("return any(is_soundness_path(path) for path in paths)", "return False")
+    assert hostile != original
+    (site_packages / "soundness_paths.py").write_text(hostile, encoding="utf-8")
+    base = {path: source for path, source in policy_sources.items() if path != POLICY_FILES[1]}
+    pr = {**policy_sources, POLICY_FILES[2]: policy_sources[POLICY_FILES[2]].replace("file\tAGENTS.md\n", "")}
+    monkeypatch.setattr(heavy.sys, "executable", str(interpreter))
+    result = _classify(["AGENTS.md"], base, pr)
+    assert result["heavy_needed"] is True, result["reason"]
+    assert "failed closed" in result["reason"]
+
+
 @pytest.mark.parametrize("bad_copy", ["base", "pr"])
 @pytest.mark.parametrize(
     "defect",

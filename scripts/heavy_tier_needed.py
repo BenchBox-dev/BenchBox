@@ -63,7 +63,7 @@ def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text(source, encoding="utf-8")
             result = subprocess.run(
-                [sys.executable, "-I", str(root / PREDICATE_REPO_PATH), "--stdin", "--format", "github-output"],
+                [sys.executable, "-I", "-S", str(root / PREDICATE_REPO_PATH), "--stdin", "--format", "github-output"],
                 input="\n".join(paths),
                 cwd=root,
                 env={**os.environ, "SOUNDNESS_PATH_MANIFEST": str(root / POLICY_PATHS[2])},
