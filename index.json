@@ -2923,6 +2923,15 @@
       "status": "open",
       "title": "Build grammar-aware comment policy checks and safe deletion comparisons"
     },
+    "comment-cleanup-cli-foundation": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from CLI foundation and presentation"
+    },
     "comment-cleanup-compilation": {
       "claim": null,
       "needs": [
