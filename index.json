@@ -3142,6 +3142,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from H2O db benchmark modules"
     },
+    "comment-cleanup-joinorder": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from JoinOrder modules"
+    },
     "comment-cleanup-manifest": {
       "claim": null,
       "needs": [
