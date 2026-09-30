@@ -3226,6 +3226,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from TPC-DS data generation and schema"
     },
+    "comment-cleanup-tpcds-obt": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from TPC-DS OBT modules"
+    },
     "comment-cleanup-tpcds-runtime": {
       "claim": null,
       "needs": [
