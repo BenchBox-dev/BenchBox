@@ -10541,10 +10541,15 @@
       "title": "Single CSV dialect source plus pandas NULL group keys"
     },
     "loader-fresh-manifest-invisible": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-01T12:31:09Z",
+        "generation": "985d10f1883b4de482b91b0e8d40bd07",
+        "renewals": 0,
+        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Loader ignores freshly generated datagen manifest in same run"
     },
     "local-ci-equivalents": {
