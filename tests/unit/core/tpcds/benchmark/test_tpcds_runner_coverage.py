@@ -116,6 +116,38 @@ def test_quoted_duckdb_q90_rewrite_defaults_to_nullif_zero_denominator(tpcds_ben
     assert '/CAST(NULLIF("pmc", 0) AS DECIMAL(15, 4))' in rewritten
 
 
+@pytest.mark.parametrize("pmc,expected", [(0, None), (2, 0.5)])
+def test_translated_tsql_q90_guards_zero_without_changing_nonzero_ratio(tpcds_benchmark, pmc, expected):
+    import duckdb
+    import sqlglot
+
+    query = 'SELECT CAST("amc" AS DECIMAL(15, 4))/CAST("pmc" AS DECIMAL(15, 4)) AS am_pm_ratio FROM counts'
+    translated = tpcds_benchmark.translate_query_text(query, "duckdb", "tsql")
+    assert "CAST([pmc] AS NUMERIC(15, 4))" in translated
+
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, translated, "tsql")
+    assert "CAST(NULLIF([pmc], 0) AS NUMERIC(15, 4))" in rewritten
+    executable = sqlglot.transpile(rewritten, read="tsql", write="duckdb")[0]
+    with duckdb.connect() as connection:
+        connection.execute("CREATE TABLE counts (amc INTEGER, pmc INTEGER)")
+        connection.execute("INSERT INTO counts VALUES (1, ?)", [pmc])
+        assert connection.execute(executable).fetchone()[0] == expected
+
+
+@pytest.mark.parametrize("identifier", ["pmc", "`pmc`", '"pmc"', "[pmc]"])
+@pytest.mark.parametrize("type_name", ["DECIMAL", "NUMERIC"])
+def test_default_q90_guard_preserves_identifier_and_cast(tpcds_benchmark, identifier, type_name):
+    query = f"SELECT amc / CAST({identifier} AS {type_name}(15, 4)) FROM counts"
+    rewritten = tpcds_benchmark._apply_target_dialect_overrides(90, query, "tsql")
+    assert f"CAST(NULLIF({identifier}, 0) AS {type_name}(15, 4))" in rewritten
+    assert tpcds_benchmark._apply_target_dialect_overrides(90, rewritten, "tsql") == rewritten
+
+
+def test_default_q90_guard_leaves_other_denominators_unchanged(tpcds_benchmark):
+    query = "SELECT amc / CAST([other_pmc] AS NUMERIC(15, 4)) FROM counts"
+    assert tpcds_benchmark._apply_target_dialect_overrides(90, query, "tsql") == query
+
+
 def test_postgres_rollup_order_alias_rewrite_repeats_grouping_expression(tpcds_benchmark):
     query = (
         "SELECT GROUPING(i_category) + GROUPING(i_class) AS lochierarchy "

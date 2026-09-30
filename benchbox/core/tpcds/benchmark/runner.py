@@ -356,20 +356,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         engines error). Default every remaining dialect to NULLIF(pmc, 0) so the
         zero-denominator result is consistently SQL NULL.
         """
-        rewritten = re.sub(
-            r"/\s*CAST\(pmc\s+AS\s+DECIMAL\(15,\s*4\)\)",
-            "/CAST(NULLIF(pmc, 0) AS DECIMAL(15, 4))",
-            query,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-        if rewritten != query:
-            return rewritten
         return re.sub(
-            r"/\s*CAST\((?P<quote>[`\"])(?P<name>pmc)(?P=quote)\s+AS\s+DECIMAL\(15,\s*4\)\)",
-            lambda match: (
-                f"/CAST(NULLIF({match.group('quote')}{match.group('name')}{match.group('quote')}, 0) AS DECIMAL(15, 4))"
-            ),
+            r'/\s*CAST\(\s*(?P<denominator>pmc|`pmc`|"pmc"|\[pmc\])\s+AS\s+'
+            r"(?P<type>(?:DECIMAL|NUMERIC)\s*\(\s*15\s*,\s*4\s*\))\s*\)",
+            lambda match: f"/CAST(NULLIF({match.group('denominator')}, 0) AS {match.group('type')})",
             query,
             count=1,
             flags=re.IGNORECASE,
