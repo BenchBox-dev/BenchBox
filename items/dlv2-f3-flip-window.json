@@ -5,7 +5,7 @@
     "No legacy PR-gate/post-merge workflow runs on develop after the flip",
     "Open PRs updated in batches; count of PRs with ci.yml results recorded"
   ],
-  "context": "Ordering subtlety: while the old `ruleset-drift` context is still required, it runs from trusted develop and compares develop's pins to the live ruleset. The one-call swap removes `ruleset-drift` from required checks, so a transient pin mismatch cannot block the flip PR; after the flip PR merges, develop's pins (updated in f1) must equal the swapped ruleset, verified by running scripts/ruleset_drift_check.py (now inside ci.yml tooling) immediately after the merge.",
+  "context": "Ordering subtlety: while the old `ruleset-drift` context is still required, it runs from trusted develop and compares develop's pins to the live ruleset. The one-call swap removes `ruleset-drift` from required checks, so a transient pin mismatch cannot block the flip PR; after the flip PR merges, develop's pins (updated in f1) must equal the swapped ruleset, verified by running scripts/ruleset_drift_check.py (now inside ci.yml tooling) immediately after the merge.\n\nLive continuation evidence, 2026-09-30 02:50 UTC: flip #2450 merged c7bcdb9bc1d713a0c616969b2eb3f19f3d1d86a1. Two subsequent real queue merges are proven: #2449 at 8fbad03469746539959af14e865a19c53fab68f5 (CI run 36648412308 success), and #2458 at 0fb305028f108627f81c091c7eccaab10511a35c (merged 02:27:46Z; CI run 36657515220 completed success at that exact SHA). #2458 postmerge docs, linkcheck, visual aggregate and fast-lane baseline succeeded, and its merge is an ancestor of fetched origin/develop. Third postflip green merge and controlled open-PR refresh batches remain required. Timing/docs repairs and the complete canary matrix remain pending; this record does not close those gates.",
   "description": "Standing approvals cover every step. Window ~2-3 hours.\n1. Stop enqueueing; let in-flight merge groups finish or clear the queue (clearing is acceptable; PRs re-enqueue after).\n2. One API call on ruleset develop-squash-only (15611785): remove required ci-required-result, Results Explorer browser gate, ruleset-drift, Public-site visual acceptance; add core, explorer, results-data, docs, landing, tooling; queue builds 2, timeout 60. Doing it in one call avoids the old drift check deadlocking. This also freezes the queue naturally: PRs without ci.yml results cannot enqueue.\n3. Open the flip PR from dlv2-f1's branch (if not already open), confirm its ci.yml checks are green, enqueue, and watch it merge.\n4. Watch 3 more real PRs merge green under the new checks (update/enqueue green dev-loop or other PRs).\n5. Unfreeze: update the remaining open PRs' branches about 5 at a time (gh pr update-branch) so they get ci.yml results without stampeding runners.\nRollback if step 3 or 4 fails in a way not fixable in minutes: restore the saved ruleset JSON, merge the prepared revert (it restores the old workflows and passes under them), record the cause, STOP.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "op": "update",
       "op_id": "ac7cc564d77d4593a25d4c59ad59c591",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T02:52:14Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "6b0a299c1a5846c4a5c7c366ef4d5fae",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
