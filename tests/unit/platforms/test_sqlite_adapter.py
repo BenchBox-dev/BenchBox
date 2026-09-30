@@ -144,7 +144,9 @@ class TestSQLiteAdapter:
         connection = adapter.create_connection()
 
         assert connection == mock_connection
-        mock_sqlite3.connect.assert_called_once_with(":memory:", timeout=30.0, check_same_thread=False)
+        mock_sqlite3.connect.assert_called_once_with(
+            ":memory:", timeout=30.0, check_same_thread=False, cached_statements=0
+        )
 
         # Check PRAGMA statements were executed
         expected_pragmas = [
@@ -168,7 +170,9 @@ class TestSQLiteAdapter:
         connection = adapter.create_connection()
 
         assert connection == mock_connection
-        mock_sqlite3.connect.assert_called_once_with("/tmp/test.db", timeout=30.0, check_same_thread=False)
+        mock_sqlite3.connect.assert_called_once_with(
+            "/tmp/test.db", timeout=30.0, check_same_thread=False, cached_statements=0
+        )
 
     @patch("benchbox.platforms.sqlite.sqlite3")
     def test_create_connection_with_overrides(self, mock_sqlite3):
@@ -181,7 +185,12 @@ class TestSQLiteAdapter:
 
         assert connection == mock_connection
         # Should use override path but adapter's timeout (overrides not fully applied)
-        mock_sqlite3.connect.assert_called_once()
+        mock_sqlite3.connect.assert_called_once_with(
+            "/tmp/override.db",
+            timeout=30.0,
+            check_same_thread=False,
+            cached_statements=0,
+        )
 
     @patch("benchbox.platforms.sqlite.sqlite3")
     def test_create_connection_failure(self, mock_sqlite3):

@@ -20,7 +20,9 @@ tier model directly. When an external harness is selected, take its exact
 harness-specific identifier from
 [references/external-harnesses.md](references/external-harnesses.md). Default
 reasoning effort to `medium`. Use maximum effort only for Tier 1 adversarial
-review; use `low` for mechanical bulk work.
+review; use `low` for mechanical bulk work. For `agy`, effort is the
+`-low` / `-medium` / `-high` model suffix: Tier 1 takes the `-high` model with
+no `--effort` flag.
 
 - **Tier 1: Strategic**
   - Models: `gpt-5.6-sol`, `claude-fable-5`, `grok-4.6`, `gemini-3.7-flash-high`
@@ -39,7 +41,7 @@ review; use `low` for mechanical bulk work.
 | **pi** | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 | **claude** | `--effort <level>` | `low`, `medium`, `high`, `xhigh`, `max` |
 | **muse** | `--reasoning-effort <EFFORT>` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `ultra` |
-| **agy** | `--effort <level>` | `low`, `medium`, `high` |
+| **agy** | model suffix `-low` / `-medium` / `-high` (omit `--effort`) | tier is the model variant; `--effort` with a suffixed model is rejected |
 | **grok** | `--reasoning-effort <EFFORT>` | `low`, `medium`, `high`, `xhigh` |
 | **codex** | `-c model_reasoning_effort="<level>"` | `low`, `medium`, `high`, `xhigh`, `max`, `ultra` |
 | **prime-agent** | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |

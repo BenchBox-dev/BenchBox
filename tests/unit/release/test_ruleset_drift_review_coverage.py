@@ -81,10 +81,12 @@ def _live_develop_ruleset(*, review_count: int = 0, code_owner_review: bool = Tr
                     # fixtures report check drift and mask the review-rule
                     # behaviour they exist to cover.
                     "required_status_checks": [
-                        {"context": "ci-required-result"},
-                        {"context": "Results Explorer browser gate"},
-                        {"context": "ruleset-drift"},
-                        {"context": "Public-site visual acceptance"},
+                        {"context": "core"},
+                        {"context": "explorer"},
+                        {"context": "results-data"},
+                        {"context": "docs"},
+                        {"context": "landing"},
+                        {"context": "tooling"},
                     ],
                 },
             },
