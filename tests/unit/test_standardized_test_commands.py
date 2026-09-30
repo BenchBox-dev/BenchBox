@@ -165,7 +165,7 @@ class TestStandardizedTestCommands:
         assert "test_" in result.stdout or "collected" in result.stdout.lower()
 
     def test_makefile_commands_exist(self):
-        makefile_path = Path.cwd() / "Makefile"
+        makefile_path = Path(__file__).resolve().parent.parent.parent / "Makefile"
         assert makefile_path.exists(), "Makefile should exist"
 
         makefile_content = makefile_path.read_text()
@@ -177,11 +177,11 @@ class TestStandardizedTestCommands:
         assert "run_tests.py" not in makefile_content
 
     def test_no_legacy_run_tests_references(self):
-        run_tests_path = Path.cwd() / "run_tests.py"
+        run_tests_path = Path(__file__).resolve().parent.parent.parent / "run_tests.py"
         assert not run_tests_path.exists(), "run_tests.py should not exist in project root"
 
     def test_pytest_configuration_is_valid(self):
-        pytest_ini_path = Path.cwd() / "pytest.ini"
+        pytest_ini_path = Path(__file__).resolve().parent.parent.parent / "pytest.ini"
         assert pytest_ini_path.exists(), "pytest.ini should exist"
 
         pytest_ini_content = pytest_ini_path.read_text()
@@ -192,7 +192,7 @@ class TestStandardizedTestCommands:
         assert "not slow and not stress and not live_integration and not resource_heavy" in pytest_ini_content
 
     def test_coverage_commands_use_pytest(self):
-        makefile_path = Path.cwd() / "Makefile"
+        makefile_path = Path(__file__).resolve().parent.parent.parent / "Makefile"
         makefile_content = makefile_path.read_text()
 
         coverage_section = False
@@ -210,7 +210,7 @@ class TestMakefileCommands:
     """Test that Makefile commands work as expected."""
 
     def test_makefile_test_targets_defined(self):
-        makefile_path = Path.cwd() / "Makefile"
+        makefile_path = Path(__file__).resolve().parent.parent.parent / "Makefile"
         makefile_content = makefile_path.read_text()
 
         expected_targets = [
@@ -259,20 +259,20 @@ class TestMakefileCommands:
         assert lock_path.read_text(encoding="utf-8") == ""
 
     def test_makefile_test_all_splits_parallel_and_serial_lanes_explicitly(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
 
         assert "test-all:" in makefile_content
         assert '-m "not (slow or stress or resource_heavy or live_integration)"' in makefile_content
         assert '-m "(slow or resource_heavy) and not (stress or live_integration)" -n 0' in makefile_content
 
     def test_makefile_test_fast_excludes_heavy_and_opt_in_lanes(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
 
         assert "test-fast:" in makefile_content
         assert '-m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short' in makefile_content
 
     def test_default_test_lanes_arm_explicit_timeouts(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
         expected = {
             "test-fast": "--timeout=120",
             "test-medium": "--timeout=60",
@@ -290,7 +290,7 @@ class TestMakefileCommands:
         assert "--timeout=1200" in test_all
 
     def test_pytest_ini_declares_baseline_timeout(self):
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         pytest_ini = (repo_root / "pytest.ini").read_text(encoding="utf-8")
         pytest_ci_ini = (repo_root / "pytest-ci.ini").read_text(encoding="utf-8")
 
@@ -513,7 +513,7 @@ class TestMakefileCommands:
         assert "No code changes detected; skipping fast tests." in result.stdout
 
     def test_skill_integrity_preflight_consumes_one_classifier_artifact_without_path_globs(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text(encoding="utf-8")
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text(encoding="utf-8")
         preflight_body = _makefile_target_body(makefile_content, "pr-preflight")
         uncached_body = _makefile_target_body(makefile_content, "pr-preflight-uncached")
         route_body = _makefile_target_body(makefile_content, ".pr-preflight-route")
@@ -530,10 +530,10 @@ class TestMakefileCommands:
         assert "scripts/path_filter_decision.py --base-ref origin/develop" in fast_tests_body
 
     def test_pr_preflight_fast_tests_uses_required_ci_marker_expression(self):
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         makefile_content = (repo_root / "Makefile").read_text()
         preflight_body = _makefile_target_body(makefile_content, "pr-preflight-fast-tests")
-        develop_pr_run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "pr.yml", "code-test")
+        develop_pr_run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "ci.yml", "code-test")
         main_pr_run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "test.yml", "test")
 
         assert f'-m "{CI_FAST_EXPRESSION}"' in preflight_body
@@ -547,7 +547,7 @@ class TestMakefileCommands:
         assert "coverage remains CI-only" in makefile_content
 
     def test_test_ci_is_maintained_broad_local_profile(self):
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         makefile_content = (repo_root / "Makefile").read_text()
         pytest_ci_config = ConfigParser()
         pytest_ci_config.read(repo_root / "pytest-ci.ini")
@@ -579,9 +579,9 @@ class TestMakefileCommands:
         )
 
     def test_coverage_threshold_policy_distinguishes_blocking_and_advisory_thresholds(self):
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         makefile_content = (repo_root / "Makefile").read_text()
-        pr_workflow = (repo_root / ".github" / "workflows" / "pr.yml").read_text()
+        pr_workflow = (repo_root / ".github" / "workflows" / "ci.yml").read_text()
         test_workflow = (repo_root / ".github" / "workflows" / "test.yml").read_text()
         conftest_content = (repo_root / "tests" / "conftest.py").read_text()
 
@@ -594,7 +594,7 @@ class TestMakefileCommands:
         assert "pytest.fail" not in conftest_content.split("def pytest_terminal_summary", maxsplit=1)[1]
 
     def test_makefile_test_medium_uses_five_workers(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
 
         assert "test-medium:" in makefile_content
         assert (
@@ -603,11 +603,11 @@ class TestMakefileCommands:
         )
 
     def test_medium_marker_policy_is_documented_with_pr_routing(self):
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         readme_content = (repo_root / "tests" / "README.md").read_text()
         makefile_content = (repo_root / "Makefile").read_text()
 
-        assert "The `medium-test` job in `.github/workflows/pr.yml` runs `make test-medium`" in readme_content
+        assert "The `medium-test` job in `.github/workflows/ci.yml` runs `make test-medium`" in readme_content
         assert "only when the heavy tier is needed" in readme_content
         assert "Ordinary\ncode-change PRs skip it" in readme_content
         assert "Product-critical tests that need a different" in readme_content
@@ -629,12 +629,11 @@ class TestMakefileCommands:
         from tests.unit.test_marker_strategy import _E2E_QUICK_INCOMPATIBLE, _SPEED_MARKERS
 
         known_markers = sorted(_SPEED_MARKERS | _E2E_QUICK_INCOMPATIBLE)
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         workflow_paths = [
-            repo_root / ".github" / "workflows" / "pr.yml",
+            repo_root / ".github" / "workflows" / "ci.yml",
             repo_root / ".github" / "workflows" / "test.yml",
             repo_root / ".github" / "workflows" / "nightly.yml",
-            repo_root / ".github" / "workflows" / "develop-post-merge.yml",
         ]
         combined_text = "\n".join(path.read_text(encoding="utf-8") for path in workflow_paths)
 
@@ -647,7 +646,7 @@ class TestMakefileCommands:
         )
 
     def test_makefile_correctness_gate_runs_expected_results_backed_matrix_slice(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
         gate_body = _makefile_target_body(makefile_content, "test-correctness-gate")
 
         assert "BENCHBOX_STRICT_EXPECTED_RESULTS=1" in gate_body
@@ -675,7 +674,7 @@ class TestMakefileCommands:
         cardinality answer cannot hide behind a digest reference generated from a
         different query set than the gate validates.
         """
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
         regen_body = _makefile_target_body(makefile_content, "correctness-gate-digests-regen")
         assert "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS)" in regen_body
         assert "regenerate_correctness_gate_digests.py" in regen_body
@@ -719,23 +718,23 @@ class TestMakefileCommands:
         assert CORRECTNESS_GATE_NODEID in proc.stdout, f"Gate node-id not present in collection output:\n{proc.stdout}"
 
     def test_develop_pr_invokes_bounded_correctness_gate(self):
-        repo_root = Path.cwd()
-        workflow = yaml.safe_load((repo_root / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        workflow = yaml.safe_load((repo_root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
         job = workflow["jobs"]["correctness-gate"]
-        aggregate = workflow["jobs"]["ci-required-result"]
+        aggregate = workflow["jobs"]["core"]
 
         assert job["needs"] == "ci-paths"
         # Heavy-tier queue-only: correctness-gate is in the moved set, so it
         # gates on heavy-needed (merge queue or carve-out), not needs-code-ci.
         assert "heavy-needed == 'true'" in job["if"]
         assert "make test-correctness-gate" in _workflow_job_run_text(
-            repo_root / ".github" / "workflows" / "pr.yml",
+            repo_root / ".github" / "workflows" / "ci.yml",
             "correctness-gate",
         )
         assert "correctness-gate" in aggregate["needs"]
-        assert "CORRECTNESS_RESULT" in _workflow_job_run_text(
-            repo_root / ".github" / "workflows" / "pr.yml",
-            "ci-required-result",
+        assert "needs" in _workflow_job_run_text(
+            repo_root / ".github" / "workflows" / "ci.yml",
+            "core",
         )
 
     def test_correctness_gate_job_runs_value_level_equivalence_steps(self):
@@ -747,8 +746,8 @@ class TestMakefileCommands:
         SQL<->DataFrame equivalence gates, all of which compare full result VALUES.
         Pin that composition so dropping a value-level step is caught.
         """
-        repo_root = Path.cwd()
-        run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "pr.yml", "correctness-gate")
+        repo_root = Path(__file__).resolve().parent.parent.parent
+        run_text = _workflow_job_run_text(repo_root / ".github" / "workflows" / "ci.yml", "correctness-gate")
 
         # Row-count + value-digest TPC-H gate.
         assert "make test-correctness-gate" in run_text
@@ -772,10 +771,10 @@ class TestMakefileCommands:
         """
         from benchbox.core.equivalence.cross_surface import GATES
 
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         makefile_content = (repo_root / "Makefile").read_text()
         correctness_gate_run_text = _workflow_job_run_text(
-            repo_root / ".github" / "workflows" / "pr.yml",
+            repo_root / ".github" / "workflows" / "ci.yml",
             "correctness-gate",
         )
         missing_make_targets: list[str] = []
@@ -798,7 +797,7 @@ class TestMakefileCommands:
         assert not missing_ci_steps, f"GATES entries missing correctness-gate CI steps: {missing_ci_steps}"
 
     def test_main_release_required_includes_bounded_correctness_gate(self):
-        repo_root = Path.cwd()
+        repo_root = Path(__file__).resolve().parent.parent.parent
         workflow = yaml.safe_load((repo_root / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8"))
         job = workflow["jobs"]["correctness-gate"]
         aggregate = workflow["jobs"]["release-required-result"]
@@ -811,24 +810,28 @@ class TestMakefileCommands:
         assert "correctness-gate" in aggregate["needs"]
 
     def test_lint_markers_runs_marker_strategy_policy_explicitly(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
         lint_body = _makefile_target_body(makefile_content, "lint-markers")
 
         assert "--collect-only" in lint_body
         assert "tests/unit/test_marker_strategy.py -q" in lint_body
 
     def test_makefile_test_slow_runs_serially(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
 
         assert "test-slow:" in makefile_content
         assert '-m "slow and not (stress or live_integration)" -n 0 --tb=short -v' in makefile_content
 
     def test_runtime_no_longer_depends_on_generated_bucket_files(self):
-        assert not (Path.cwd() / "_project" / "config" / "test_speed_buckets.json").exists()
-        assert not (Path.cwd() / "_project" / "scripts" / "generate_test_speed_buckets.py").exists()
+        assert not (
+            Path(__file__).resolve().parent.parent.parent / "_project" / "config" / "test_speed_buckets.json"
+        ).exists()
+        assert not (
+            Path(__file__).resolve().parent.parent.parent / "_project" / "scripts" / "generate_test_speed_buckets.py"
+        ).exists()
 
     def test_makefile_uses_pytest_consistently(self):
-        makefile_content = (Path.cwd() / "Makefile").read_text()
+        makefile_content = (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text()
 
         test_lines = [line for line in makefile_content.split("\n") if line.startswith("\tuv run -- python -m pytest")]
 
@@ -853,7 +856,7 @@ class TestCorrectnessGateOracle:
     These guard the *oracle* (query-set discrimination, strict-mode arming, no-skip), not
     just the command spelling. They stay in the module-default ``unit``/``medium`` tier:
     the correctness gate itself runs as a dedicated required CI job (``correctness-gate`` in
-    ``.github/workflows/pr.yml``) on every code-impacting PR, so these meta-guards do not
+    ``.github/workflows/ci.yml``) on every code-impacting PR, so these meta-guards do not
     also need the fast lane -- they prevent local config regression and run via the medium
     lane and the explicit gate verification command.
     """
@@ -910,7 +913,9 @@ class TestCorrectnessGateOracle:
         pass without running anything. The target must emit a JUnit report and assert exactly
         one test ran with zero skips/errors/failures.
         """
-        gate_body = _makefile_target_body((Path.cwd() / "Makefile").read_text(), "test-correctness-gate")
+        gate_body = _makefile_target_body(
+            (Path(__file__).resolve().parent.parent.parent / "Makefile").read_text(), "test-correctness-gate"
+        )
         assert "--junitxml=" in gate_body, "gate must emit a JUnit report to verify the node actually ran"
         # The guard parses that report (no brittle stdout scraping) and must assert the exact
         # ran/skip condition. Pin the condition tokens so a disarmed guard (e.g. relaxing to

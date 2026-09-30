@@ -105,12 +105,12 @@ class TestClassificationTable:
     def test_skill_sync_skip_reason_names_a_real_required_ci_job(self) -> None:
         gate = _load_gate()
         should_run, reason = gate.runs_on_runner("skill-sync-check", github_actions=True)
-        workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "pr.yml").read_text(encoding="utf-8"))
+        workflow = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
 
         assert should_run is False
         assert reason is not None and "skill-integrity" in reason
         assert "skill-integrity" in workflow["jobs"]
-        assert "skill-integrity" in workflow["jobs"]["ci-required-result"]["needs"]
+        assert "skill-integrity" in workflow["jobs"]["tooling"]["needs"]
 
     def test_ci_lint_environment_boundary_never_gates_the_commit_range_control(self) -> None:
         """agent-commit-range-check is the real merge-time authorship control

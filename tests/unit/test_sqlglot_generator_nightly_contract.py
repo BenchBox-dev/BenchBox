@@ -8,7 +8,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NIGHTLY = REPO_ROOT / ".github/workflows/nightly.yml"
-PR_WORKFLOW = REPO_ROOT / ".github/workflows/pr.yml"
+PR_WORKFLOW = REPO_ROOT / ".github/workflows/ci.yml"
 
 
 def _job_block(workflow: str, job: str, next_job: str) -> str:

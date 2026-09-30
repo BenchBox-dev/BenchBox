@@ -206,15 +206,26 @@ def test_public_results_capture_waits_for_data_before_digesting() -> None:
     assert "coldResultsLoad" not in source
 
 
-def test_every_develop_pr_and_merge_group_reports_the_required_context() -> None:
+def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
+    """docs.yml captures protected-develop baselines on push; ci.yml runs the comparison."""
     workflow = _workflow()
     triggers = workflow.get("on", workflow.get(True))
-    assert "paths" not in triggers["pull_request"]
-    assert triggers["merge_group"]["types"] == ["checks_requested"]
+    assert "pull_request" not in triggers
+    assert "merge_group" not in triggers
+    assert set(triggers) >= {"push", "workflow_dispatch"}
     gate = workflow["jobs"]["public-site-visual-required"]
     assert gate["name"] == "Public-site visual acceptance"
     assert gate["if"] == "always()"
     assert set(gate["needs"]) == {"visual-inputs", "build", "public-site-visual-regression"}
+
+    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    ci_triggers = ci.get("on", ci.get(True))
+    assert "paths" not in ci_triggers["pull_request"]
+    assert "merge_group" in ci_triggers
+    visual = ci["jobs"]["public-site-visual-regression"]
+    assert visual["name"] == "Public-site visual regression"
+    assert "render_changed" in visual["if"]
+    assert "merge_group" in visual["if"]
 
 
 @pytest.mark.parametrize(
