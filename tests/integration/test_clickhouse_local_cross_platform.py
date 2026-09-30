@@ -12,7 +12,7 @@ import pytest
 
 from benchbox.core.clickbench.benchmark import ClickBenchBenchmark
 from benchbox.platforms.clickhouse import ClickHouseAdapter
-from benchbox.platforms.clickhouse._dependencies import import_chdb
+from tests.utilities.optional_engines import require_chdb
 
 pytestmark = [
     pytest.mark.integration,
@@ -21,10 +21,7 @@ pytestmark = [
 
 
 # Skip all tests if chdb is not available.
-try:
-    chdb = import_chdb()
-except ImportError as exc:
-    pytest.skip(f"chDB not installed: {exc}", allow_module_level=True)
+chdb = require_chdb()
 
 
 class TestClickHouseLocalCrossPlatform:

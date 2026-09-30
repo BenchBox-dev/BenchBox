@@ -36,7 +36,7 @@ def _write_sample_tbl(file_path: Path) -> None:
     file_path.write_text("0|ALGERIA|\n1|ARGENTINA|\n", encoding="utf-8")
 
 
-def test_select_one(tmp_path):
+def test_select_one(tmp_path, pyspark_test_environment):
     """Ensure adapter can execute simple SELECT 1 when Spark is available."""
     adapter = PySparkSQLAdapter(master="local[1]", database="pyspark_sql_tests", warehouse_dir=str(tmp_path))
     connection = adapter.create_connection()
@@ -47,7 +47,7 @@ def test_select_one(tmp_path):
     adapter.close()
 
 
-def test_schema_creation_and_loading(tmp_path):
+def test_schema_creation_and_loading(tmp_path, pyspark_test_environment):
     """Validate schema creation and data loading end-to-end."""
     table_dir = tmp_path / "data"
     table_dir.mkdir()

@@ -19,15 +19,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 import benchbox.platforms.dataframe.pyspark_df as mod
-from benchbox.platforms.pyspark import ensure_compatible_java, is_java_compatible
+from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
 
-_java_version, _ = ensure_compatible_java()
-_REQUIRES_JAVA = not is_java_compatible(_java_version)
+_REQUIRES_PYSPARK_SESSION = not pyspark_usable()
+_SESSION_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 
 def _adapter_without_session():
@@ -86,13 +86,16 @@ def test_module_fallback_aliases_without_pyspark(monkeypatch: pytest.MonkeyPatch
     assert mod.F is not None
 
 
-@pytest.mark.skipif(_REQUIRES_JAVA, reason="window spec starts a real Spark session")
-def test_window_count_star_uses_lit_one():
+@pytest.mark.skipif(_REQUIRES_PYSPARK_SESSION, reason=_SESSION_SKIP_REASON)
+def test_window_count_star_uses_lit_one(pyspark_test_environment):
     """COUNT(*) renders F.count(F.lit(1)) over the window spec."""
     pytest.importorskip("pyspark")
     from pyspark.sql.column import Column
 
     adapter = _adapter_without_session()
-    expr = adapter.window_count(None, partition_by=["g"])
-    assert isinstance(expr, Column)
-    assert "count(1)" in str(expr)
+    try:
+        expr = adapter.window_count(None, partition_by=["g"])
+        assert isinstance(expr, Column)
+        assert "count(1)" in str(expr)
+    finally:
+        adapter.close()
