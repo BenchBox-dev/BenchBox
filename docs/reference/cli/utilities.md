@@ -162,7 +162,7 @@ The validator runs 20 checks in three tiers. See the [Result Integrity Validatio
 
 **Notes:**
 - Automatically excludes `.plans.json` and `.tuning.json` companion files
-- Specs cover 20 of 22 benchmarks with 8 legacy alias mappings (e.g., `star_schema` → `ssb`); `ai_primitives` and `vector_search` are not yet covered
+- Specs cover 21 of 22 benchmarks with 8 legacy alias mappings (e.g., `star_schema` → `ssb`); `ai_primitives` is not yet covered
 
 ## Related
 

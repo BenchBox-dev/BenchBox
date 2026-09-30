@@ -22,6 +22,7 @@ red domain does not hide the others, and each domain uploads its own artifacts.
 | `t3:install` | `install` | Installs the latest PyPI release outside the checkout and imports it. |
 | `t3:drift` | `drift` | Corpus drift and privacy scan, submission-validator drift, cross-surface baseline drift, and vendor pricing drift. Scheduled runs execute it on Mondays (UTC); a manual run executes it unless `run_drift` is cleared. |
 | `t3:quarantine` | `quarantine` | Runs tests marked `quarantine`. It passes with a notice until the marker is registered in `pytest.ini`. |
+| `t3:linkcheck` | `linkcheck` | Checks external documentation links with Sphinx and uploads the linkcheck report. |
 | `t3:durations` | `durations-refresh` | Records pytest `--durations` and JUnit reports for the fast and slow tiers in the `t3-durations` artifact. It also regenerates the duration file there when the tooling is present. |
 
 ## Live cloud tests are opt-in

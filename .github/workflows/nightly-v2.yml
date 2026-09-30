@@ -209,26 +209,30 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Set isolated benchmark output
+        run: echo "BENCHBOX_OUTPUT_DIR=$RUNNER_TEMP/perf-smoke" >> "$GITHUB_ENV"
+
       - name: Run DuckDB TPC-H SF=0.01 power phase
         run: |
-          mkdir -p perf-smoke-output
           uv run benchbox run \
             --platform duckdb \
             --benchmark tpch \
             --scale 0.01 \
             --phases power \
-            --non-interactive \
-            --output perf-smoke-output
+            --non-interactive
 
       - name: Locate current result file
         id: current
         run: |
-          current=$(find benchmark_runs/results -name 'tpch_sf001_duckdb_sql_*.json' -print | sort | tail -1)
-          if [[ -z "$current" ]]; then
-            echo "No current result file produced by benchbox run." >&2
+          results=()
+          while IFS= read -r result; do
+            results+=("$result")
+          done < <(find "$BENCHBOX_OUTPUT_DIR/results" -maxdepth 1 -name 'tpch_sf001_duckdb_sql_*.json' -print)
+          if [[ "${#results[@]}" != "1" ]]; then
+            echo "Expected one current result file, found ${#results[@]}." >&2
             exit 1
           fi
-          echo "path=$current" >> "$GITHUB_OUTPUT"
+          echo "path=${results[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Compare against baseline (fail on >10% regression)
         run: |
@@ -243,7 +247,7 @@ jobs:
         with:
           name: t3-perf-result
           path: |
-            ${{ steps.current.outputs.path }}
+            ${{ env.BENCHBOX_OUTPUT_DIR }}/results/*.json
             _project/baselines/perf_smoke_duckdb_tpch_001.json
           retention-days: 14
 
@@ -315,6 +319,14 @@ jobs:
                   assert produced.is_file() and produced.stat().st_size > 0, f"{cls.__name__} produced no {table}"
                   print(f"{cls.__name__}: {table} {produced.stat().st_size} bytes")
           PY
+
+      - name: Install raw binary framing test dependencies
+        if: matrix.python-version == '3.12'
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        if: matrix.python-version == '3.12'
+        run: uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m slow -v
 
       - name: Upload build artifacts
         if: always()
@@ -725,9 +737,9 @@ jobs:
             echo "::notice::The quarantine marker is not registered yet; nothing to run."
             exit 0
           fi
+          rc=0
           uv run -- python -m pytest tests -m quarantine -n 0 --tb=short --timeout=1200 \
-            --junitxml=t3-quarantine/junit-quarantine.xml
-          rc=$?
+            --junitxml=t3-quarantine/junit-quarantine.xml || rc=$?
           # Exit code 5 means no quarantined tests were collected, which is the healthy state.
           if [ "$rc" = "5" ]; then
             echo "No quarantined tests."
@@ -741,6 +753,37 @@ jobs:
         with:
           name: t3-quarantine
           path: t3-quarantine/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  linkcheck:
+    name: "t3:linkcheck | external documentation links"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Check documentation links
+        run: uv run -- sphinx-build -b linkcheck docs docs/_build/linkcheck
+
+      - name: Upload linkcheck report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t3-linkcheck
+          path: docs/_build/linkcheck/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -775,10 +818,12 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p t3-durations
+          statuses=(0 0)
           uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" \
             --tb=short --timeout=120 --durations=0 --junitxml=t3-durations/junit-fast.xml \
-            2>&1 | tee t3-durations/durations-fast.txt
-          rc=${PIPESTATUS[0]}
+            2>&1 | tee t3-durations/durations-fast.txt || statuses=("${PIPESTATUS[@]}")
+          if [ "${statuses[1]}" != "0" ]; then exit "${statuses[1]}"; fi
+          rc=${statuses[0]}
           # Test failures are reported by the validation jobs; this job fails
           # only when pytest itself could not produce a report.
           if [ "$rc" -gt 1 ]; then exit "$rc"; fi
@@ -786,10 +831,12 @@ jobs:
       - name: Measure slow tier durations
         run: |
           set -uo pipefail
+          statuses=(0 0)
           uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" \
             -n 0 --tb=short --timeout=1200 --durations=0 --junitxml=t3-durations/junit-slow.xml \
-            2>&1 | tee t3-durations/durations-slow.txt
-          rc=${PIPESTATUS[0]}
+            2>&1 | tee t3-durations/durations-slow.txt || statuses=("${PIPESTATUS[@]}")
+          if [ "${statuses[1]}" != "0" ]; then exit "${statuses[1]}"; fi
+          rc=${statuses[0]}
           if [ "$rc" -gt 1 ]; then exit "$rc"; fi
 
       - name: Regenerate duration file
@@ -829,6 +876,7 @@ jobs:
       - install
       - drift
       - quarantine
+      - linkcheck
       - durations-refresh
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
@@ -846,7 +894,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for job in docker cloud perf matrix browser extension install drift quarantine durations-refresh; do
+          for job in docker cloud perf matrix browser extension install drift quarantine linkcheck durations-refresh; do
             case "$job" in
               durations-refresh) domain=durations ;;
               *) domain="$job" ;;

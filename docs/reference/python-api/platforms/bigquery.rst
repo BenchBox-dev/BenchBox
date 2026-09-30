@@ -725,7 +725,7 @@ Platform Documentation
 - :doc:`/platforms/platform-selection-guide` - Choosing BigQuery vs other platforms
 - :doc:`/platforms/quick-reference` - Quick setup for all platforms
 - :doc:`/platforms/comparison-matrix` - Feature comparison
-- :doc:`/cloud-storage` - GCS, S3, Azure Blob Storage integration
+- :doc:`/guides/cloud-storage` - GCS, S3, Azure Blob Storage integration
 
 Benchmark Guides
 ~~~~~~~~~~~~~~~~

@@ -52,12 +52,17 @@ import difflib
 import json
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 import yaml
+
+from benchbox.utils.clock import elapsed_seconds, mono_time
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COST_DIR = REPO_ROOT / "benchbox" / "core" / "cost"
@@ -66,6 +71,9 @@ PRICING_PATH = COST_DIR / "pricing_data.yaml"
 
 EVIDENCE_VERSION = 1
 REQUEST_TIMEOUT_SECONDS = 60
+HTTP_ATTEMPTS = 3
+HTTP_RETRY_BUDGET_SECONDS = 120
+RETRYABLE_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
 USER_AGENT = "BenchBox-pricing-generator"
 
 # Tables whose provenance is hand-maintained. Each must carry a
@@ -526,16 +534,60 @@ def run_regenerate(evidence_path: Path = EVIDENCE_PATH, pricing_path: Path = PRI
 # ---------------------------------------------------------------------------
 
 
-def _http_get_json(url: str) -> dict:
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+def _retry_after_seconds(value: str | None, *, now: _datetime.datetime | None = None) -> float | None:
+    """Interpret a vendor's Retry-After header; malformed values use backoff."""
+    if value is None:
+        return None
+    value = value.strip()
+    if value.isascii() and value.isdecimal():
+        return float(value)
     try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
-            payload = json.load(response)
-    except Exception as exc:
-        raise PricingGeneratorError(f"GET {url} failed: {exc}") from exc
-    if not isinstance(payload, dict):
-        raise PricingGeneratorError(f"GET {url} returned a non-object payload")
-    return payload
+        retry_at = parsedate_to_datetime(value)
+        if retry_at.tzinfo is None:
+            return None
+        # HTTP dates are wall timestamps; the retry budget below is monotonic.
+        observed_at = now if now is not None else _datetime.datetime.now(_datetime.timezone.utc)
+        return max(0.0, (retry_at - observed_at).total_seconds())
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def _http_get_json(url: str) -> dict:
+    """Fetch fresh evidence with a per-URL retry admission budget.
+
+    Socket timeouts bound blocking operations, not total streaming time.
+    Reject late evidence after reading it and admit no retry past the budget.
+    """
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    started = mono_time()
+    for attempt in range(1, HTTP_ATTEMPTS + 1):
+        remaining = HTTP_RETRY_BUDGET_SECONDS - elapsed_seconds(started)
+        if remaining <= 0:
+            raise PricingGeneratorError(f"GET {url} exhausted its HTTP retry budget")
+        try:
+            with urllib.request.urlopen(request, timeout=min(REQUEST_TIMEOUT_SECONDS, remaining)) as response:
+                payload = json.load(response)
+        except urllib.error.HTTPError as exc:
+            retry_after = exc.headers.get("Retry-After") if exc.headers is not None else None
+            exc.close()
+            if exc.code not in RETRYABLE_HTTP_STATUSES or attempt == HTTP_ATTEMPTS:
+                raise PricingGeneratorError(f"GET {url} failed after {attempt} attempt(s): {exc}") from exc
+            delay = _retry_after_seconds(retry_after)
+            if delay is None:
+                delay = float(2**attempt)
+            remaining = HTTP_RETRY_BUDGET_SECONDS - elapsed_seconds(started)
+            if delay >= remaining:
+                raise PricingGeneratorError(f"GET {url} cannot honor Retry-After within its HTTP retry budget") from exc
+            time.sleep(delay)
+            continue
+        except Exception as exc:
+            raise PricingGeneratorError(f"GET {url} failed: {exc}") from exc
+        if elapsed_seconds(started) >= HTTP_RETRY_BUDGET_SECONDS:
+            raise PricingGeneratorError(f"GET {url} exhausted its HTTP retry budget")
+        if not isinstance(payload, dict):
+            raise PricingGeneratorError(f"GET {url} returned a non-object payload")
+        return payload
+    raise PricingGeneratorError(f"GET {url} exhausted its HTTP attempts")
 
 
 def fetch_aws_region_offer(url_template: str, region: str) -> tuple[str, dict, dict]:

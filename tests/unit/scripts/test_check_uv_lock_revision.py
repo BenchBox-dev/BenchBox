@@ -75,7 +75,7 @@ class TestRevisionParsing:
 
         monkeypatch.setattr(guard.subprocess, "run", fake_run)
         assert guard._committed_lock_text(tmp_path, "origin/develop") == "revision = 3\n"
-        assert calls == [["git", "show", "origin/develop:uv.lock"]]
+        assert calls == [["git", "--no-replace-objects", "show", "origin/develop:uv.lock"]]
 
     def test_explicit_missing_baseline_fails_closed(self, monkeypatch, capsys):
         monkeypatch.setattr(guard, "_committed_lock_text", lambda _root, _ref: None)

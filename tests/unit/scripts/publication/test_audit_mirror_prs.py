@@ -183,6 +183,28 @@ def test_validator_only_mirror_is_mutating_not_empty(capsys):
     assert p["retire_able"] is False
 
 
+@pytest.mark.parametrize("path", ["scripts/publication/validator_parity.py", "benchbox/core/results/schema_policy.py"])
+@pytest.mark.parametrize(
+    ("status", "sha", "verdict"),
+    [
+        ("added", "newsha", "ADDITIVE"),
+        ("modified", "newsha", "MUTATING"),
+        ("removed", "", "MUTATING"),
+        ("modified", "original", "NOOP"),
+    ],
+)
+def test_shared_runtime_only_mirror_is_classified_by_content(capsys, path, status, sha, verdict):
+    fake = _FakeRunner(
+        prs=[_pr(15)],
+        tree={**BASE_TREE, **({path: "original"} if status != "added" else {})},
+        pr_files={15: [_pr_file(path, sha, status=status)]},
+    )
+    assert _run_main(["--repo", CID, "--base", BASE, "--json"], fake) == 0
+    (result,) = json.loads(capsys.readouterr().out)["prs"]
+    assert result["verdict"] == verdict
+    assert result["retire_able"] is (verdict == "NOOP")
+
+
 def test_bundle_impl_path_is_mirrored(capsys):
     fake = _FakeRunner(
         prs=[_pr(16)],
