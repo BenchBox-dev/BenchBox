@@ -3162,6 +3162,15 @@
       "status": "open",
       "title": "Define comment-removal scope, provenance, ownership and exception policy"
     },
+    "comment-cleanup-security-credentials": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from security and credential services"
+    },
     "comment-cleanup-shared-infrastructure": {
       "claim": null,
       "needs": [
