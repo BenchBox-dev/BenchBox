@@ -3079,6 +3079,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from data acquisition and organization"
     },
+    "comment-cleanup-dataframe-adapters": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from concrete DataFrame adapters"
+    },
     "comment-cleanup-dataframe-expressions": {
       "claim": null,
       "needs": [
