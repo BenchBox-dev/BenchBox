@@ -248,8 +248,9 @@ deselected, failed, or stale evidence before accepting the combined set.
 
 The correctness tier also uses two Linux runners. Every existing Make command
 belongs to exactly one partition, including the value, digest, query-set, and
-no-skip checks. Raw bundled dbgen framing runs in the nightly Python 3.12 cells
-on Linux, macOS, and Windows, alongside the installed-wheel generator smoke.
+no-skip checks. Raw bundled dbgen framing remains a required pre-merge check on
+macOS and Windows. It also runs in the nightly Python 3.12 cells on Linux,
+macOS, and Windows, alongside the installed-wheel generator smoke.
 
 At maximum packaging coverage, the heavy payload uses ten standard Linux
 runners, including the shared collector. This follows the approved sharding

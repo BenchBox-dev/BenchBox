@@ -83,7 +83,30 @@ def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
         matrix = jobs[name].get("strategy", {}).get("matrix", {})
         count += prod(len(values) for values in matrix.values())
     assert count == 10
-    assert "tpch-binary-framing" not in jobs
+
+
+def test_native_binary_framing_remains_required_before_merge() -> None:
+    jobs = _jobs("ci.yml")
+    native = jobs["tpch-binary-framing"]
+    assert native["needs"] == "ci-paths"
+    assert native["if"] == "${{ needs.ci-paths.outputs.heavy-needed == 'true' }}"
+    assert native["runs-on"] == "${{ matrix.os }}"
+    assert native["timeout-minutes"] == 15
+    assert native["strategy"] == {
+        "fail-fast": False,
+        "matrix": {"os": ["macos-latest", "windows-latest"]},
+    }
+    framing = next(
+        step for step in native["steps"] if step["name"] == "Verify bundled dbgen binaries emit clean framing"
+    )
+    assert framing["run"] == (
+        "uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -v"
+    )
+    assert not native.get("continue-on-error")
+    assert not framing.get("continue-on-error")
+    assert "tpch-binary-framing" in jobs["core"]["needs"]
+    core_text = "\n".join(step.get("run", "") for step in jobs["core"]["steps"])
+    assert "--expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }}" in core_text
 
 
 def test_three_os_nightly_cells_retain_raw_framing_guard() -> None:

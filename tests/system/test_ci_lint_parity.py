@@ -140,6 +140,7 @@ MERGE_GATE_GUARD_TOKENS = (
 # parity for code-lint remains owned by _guard_commands() above, while these
 # entries pin the other merge-gate surfaces to their local entry points.
 MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
+    ("ci.yml", "ci-paths", "Check release content"): "release-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
@@ -177,6 +178,9 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
         "Hosted classifier bootstrap; it runs before dependency installation and "
         "has no standalone Make target. The local preflight consumes the same "
         "classifier through pr-preflight."
+    ),
+    ("ci.yml", "tpch-binary-framing", "Verify bundled dbgen binaries emit clean framing"): (
+        "Cross-platform macOS/Windows binary smoke; the local macOS checkout has no Windows runner equivalent."
     ),
     ("ci.yml", "medium-collect", "Collect the complete medium tier"): (
         "Hosted exact-SHA medium collection is consumed by both shards; local test-medium runs the same selector unsplit."
