@@ -51,9 +51,9 @@ Only three exception kinds exist:
 - **Notice:** retain only the exact required text, with its governing source
   named as the consumer. Do not substitute a shorter notice without checking
   that governing source.
-- **Fixture:** exact comment tokens deliberately read by a parser test. Record
-  the test consumer, complete `payload`, `finding_kind`, and exact comment
-  `text`; ordinary test explanations do not qualify.
+- **Fixture:** exact parser inputs or tokens deliberately consumed by a test. Record
+  the test consumer, complete `payload` or consumer AST digest, `finding_kind`,
+  and exact token or parser-error `text`; ordinary test explanations do not qualify.
 
 A first-line interpreter shebang is accepted without registry metadata. A
 valid encoding cookie is accepted only in the first two lines and only for a
@@ -61,7 +61,11 @@ non-UTF-8 Python source encoding. UTF-8 cookies are unnecessary.
 
 New exceptions cannot authorize source in the same change: transition checks
 use the base policy. Introduce and review the evidence first, then use the
-approved exception in a later change. The initial registry contains no discretionary allowances.
+approved exception in a later change. The initial registry contains one mechanical fixture permission: a test executes
+conditions derived from the checked Makefile to prove a broken gate still runs
+the guard. Its unresolved program argument is bound to the entire consumer AST
+digest. Changing any contributing consumer code invalidates that permission.
+It permits no comment or docstring text.
 Unused and unnecessary exceptions must be removed during module review.
 
 ## Transition and ownership
@@ -108,7 +112,10 @@ Unknown formats in maintained code roots fail coverage; named configuration
 files and interpreter scripts are included.
 
 This is a syntax rule, not proof that arbitrary strings have readers or that code
-is simple. Dynamic SQL construction, notebook magics, custom template languages,
+is simple. Direct JavaScript `eval`/`Function`, known Node command-execution imports,
+Python `exec`/`eval`/`compile`, and supported subprocess or shell command strings
+are routed too. Unknown executable strings produce errors.
+Dynamic SQL construction, notebook magics, custom template languages,
 and unusual shell or Make constructs require module review and adapter work.
 An unsupported or malformed source produces a coverage error. Changed files and
 completed scopes always reject these errors; report mode exposes inherited

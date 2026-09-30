@@ -9,12 +9,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-BOOTSTRAP_BASE = "8fbad03469746539959af14e865a19c53fab68f5"
+BOOTSTRAP_BASE = "0fb305028f108627f81c091c7eccaab10511a35c"
 TRUSTED_FILES = (
     "scripts/check_comment_policy.py",
     "scripts/comment_syntax.py",
     "scripts/comment_syntax_js.cjs",
     "scripts/comment_payloads.py",
+    "scripts/comment_execution.py",
+    "scripts/comment_policy_entry.py",
     "quality/comment-policy-requirements.txt",
     "quality/comment-policy-package.json",
     "quality/comment-policy-package-lock.json",
@@ -141,9 +143,7 @@ def main(argv: list[str] | None = None) -> int:
             command = [
                 str(python),
                 "-I",
-                "-c",
-                "import runpy,sys; from pathlib import Path; target=sys.argv.pop(1); sys.path.insert(0,str(Path(target).parent)); runpy.run_path(target,run_name='__main__')",
-                str(trusted / "check_comment_policy.py"),
+                str(trusted / "comment_policy_entry.py"),
                 "--root",
                 str(root),
                 "--mode",

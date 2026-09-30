@@ -51,3 +51,25 @@ test('stdio request contract and parse errors', () => {
   assert.equal(JSON.parse(result.stdout)['a.ts'][0].text, '// text');
   assert.equal(scan('a.ts', 'function broken(')[0].kind, 'coverage-error');
 });
+test('builtin JavaScript compilation checks function parameters and bodies', () => {
+  for (const source of ['eval("// explanation")', 'new Function("// explanation")', 'Function("value /* explanation */", "return value")']) {
+    assert.equal(scan('a.ts', source)[0].kind, 'comment');
+  }
+  assert.equal(scan('a.ts', 'eval(source)')[0].kind, 'coverage-error');
+  assert.equal(scan('a.ts', 'function eval(value){ return value; } eval("// data");').length, 0);
+});
+test('known child_process exec bindings route shell source, local exec stays data', () => {
+  const sources = [
+    'import {execSync} from "node:child_process"; execSync("python -c \'# explanation\'");',
+    'import {exec as run} from "child_process"; run("echo ok # explanation");',
+    'const cp = require("node:child_process"); cp.execSync("echo ok # explanation");',
+    'const {execSync: run} = require("node:child_process"); run("echo ok # explanation");',
+  ];
+  for (const source of sources) {
+    const result = scan('a.mjs', source);
+    assert.equal(result[0].language, 'bash');
+    assert.equal(result[0].kind, 'payload');
+  }
+  assert.equal(scan('a.ts', 'function exec(value){ return value; } exec("Q1",20);').length, 0);
+  assert.equal(scan('a.ts', 'const match = /text/.exec("// data");').length, 0);
+});

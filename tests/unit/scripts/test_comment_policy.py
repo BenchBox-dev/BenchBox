@@ -281,7 +281,7 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     step = next(step for step in job["steps"] if step.get("name") == "Enforce comment and docstring policy")
     assert 'git show "${BASE_REF}:scripts/run_comment_policy.py"' in step["run"]
     assert 'python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests' in step["run"]
-    assert "8fbad03469746539959af14e865a19c53fab68f5" in step["run"]
+    assert "0fb305028f108627f81c091c7eccaab10511a35c" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
     assert "merge_group.base_sha" in step["env"]["BASE_REF"]
     tooling = workflow["jobs"]["tooling"]
@@ -532,3 +532,95 @@ def test_invalid_source_encoding_is_inventory_debt_in_report(tmp_path: Path) -> 
     (tmp_path / "a.py").write_bytes(b"\xff")
     assert main(["--root", str(tmp_path), "--mode", "report"]) == 0
     assert main(["--root", str(tmp_path), "--mode", "strict"]) == 1
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'exec("# explanation")',
+        'eval("1 # explanation")',
+        'compile("# explanation", "generated", "exec")',
+        'code = "# explanation"\nexec(code)',
+        'code = "# " + "explanation"\nexec(code)',
+        'import builtins as bi\nbi.exec("# explanation")',
+        'from builtins import exec as run\nrun("# explanation")',
+        'exec(compile("# explanation", "generated", "exec"))',
+        'import subprocess\nsubprocess.run(["python3", "-c", "# explanation"])',
+        'import subprocess, sys\nsubprocess.run([sys.executable, "-c", "# explanation"])',
+        "import subprocess\nsubprocess.run(\"python3 -c '# explanation'\", shell=True)",
+    ],
+)
+def test_python_executable_strings_reach_scanner(source: str) -> None:
+    assert [f.text for f in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source", ["exec(source)", 'code = code + "text"\nexec(code)', 'code = "before"\ncode = "after"\nexec(code)']
+)
+def test_python_unresolved_execution_fails_visibly(source: str) -> None:
+    assert python_findings("a.py", source)[0].kind == "payload-error"
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'def exec(value):\n    return value\nexec("# data")',
+        'def f(exec):\n    return exec("# data")',
+        'text = "# data"',
+    ],
+)
+def test_local_execution_names_and_ordinary_strings_are_data(source: str) -> None:
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source", ['python3 -c "# explanation"', "eval 'echo ok # explanation'", "bash -lc 'echo ok # explanation'"]
+)
+def test_shell_executable_arguments_are_routed(source: str) -> None:
+    assert [f.text for f in scan("a.sh", source, "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize("source", ["# explanation", "echo ok # explanation", "echo ok # explanation\n"])
+def test_shell_comments_at_end_of_input(source: str) -> None:
+    findings = scan("a.sh", source, "bash")
+    assert [(finding.line, finding.text) for finding in findings] == [(1, "# explanation")]
+    assert not scan("a.sh", 'printf "%s" "# data"', "bash")
+
+
+def test_shell_dynamic_execution_requires_adapter() -> None:
+    assert scan("a.sh", 'python -c "$code"', "bash")[0].kind == "coverage-error"
+    assert not scan("a.sh", 'printf "%s" "eval # input data"', "bash")
+
+
+def test_opaque_fixture_permission_changes_with_contributing_consumer_code() -> None:
+    source = "code = input()\nexec(code)"
+    finding = python_findings("a.py", source)[0]
+    registered = policy(
+        exceptions=[exception(finding.text, kind="fixture", payload=finding.payload, finding_kind="payload-error")]
+    )
+    assert allowed(finding, registered, source)
+    changed = python_findings("a.py", source + '\ncode_input = "# new explanation"')[0]
+    assert changed.text == finding.text
+    assert changed.payload != finding.payload
+    assert not allowed(changed, registered, source)
+
+
+def test_native_payload_batches_include_nested_shell_javascript(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = 'import {execSync} from "node:child_process"; execSync("node -e \'// explanation\'");'
+    batches = []
+
+    def native_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        requests = json.loads(str(kwargs["input"]))
+        batches.append(requests)
+        row = (
+            {"kind": "payload", "language": "bash", "line": 1, "symbol": "", "text": "node -e '// explanation'"}
+            if len(batches) == 1
+            else {"kind": "comment", "line": 1, "text": "// explanation", "symbol": ""}
+        )
+        return subprocess.CompletedProcess(command, 0, json.dumps({key: [row] for key in requests}))
+
+    monkeypatch.setattr("check_comment_policy.subprocess.run", native_run)
+    findings = scan_sources(ROOT, {"a.ts": source.encode()}, policy())
+    assert [(f.kind, f.text) for f in findings] == [("comment", "// explanation")]
+    assert len(batches) == 2
+    assert list(batches[1].values()) == ["// explanation"]

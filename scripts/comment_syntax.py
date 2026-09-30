@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 import yaml
+from comment_execution import PythonBindings
 from comment_payloads import nested_sources, shell_payloads
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Error
@@ -331,6 +332,53 @@ def python_findings(path: str, source: str) -> list[Finding]:
         if token.type == tokenize.COMMENT:
             symbol = next((name for start, end, name in reversed(scopes) if start <= token.start[0] <= end), "")
             result.append(Finding(path, token.start[0], "comment", token.string, symbol))
+    result.extend(python_executable_findings(path, tree, scopes))
+    return result
+
+
+def python_executable_findings(path: str, tree: ast.AST, scopes: list[tuple[int, int, str]]) -> list[Finding]:
+    result = []
+    bindings = PythonBindings(tree)
+    for node in ast.walk(tree):
+        payload = bindings.payload(node) if isinstance(node, ast.Call) else None
+        if payload is None:
+            continue
+        expression, lang, text = payload
+        symbol = next((name for start, end, name in reversed(scopes) if start <= node.lineno <= end), "")
+        if text is None or lang == "unsupported":
+            result.append(
+                Finding(
+                    path,
+                    node.lineno,
+                    "payload-error",
+                    "unresolved executable source: " + ast.unparse(expression),
+                    symbol,
+                    "sha256:" + hashlib.sha256(ast.dump(tree).encode()).hexdigest(),
+                )
+            )
+        elif lang == "javascript":
+            result.append(
+                Finding(
+                    path,
+                    node.lineno,
+                    "coverage-error",
+                    "Python-to-JavaScript process payload requires an adapter",
+                    symbol,
+                    text,
+                )
+            )
+        else:
+            result.extend(
+                Finding(
+                    path,
+                    node.lineno + finding.line - 1,
+                    finding.kind,
+                    finding.text,
+                    f"{symbol}:payload:{finding.symbol}",
+                    text,
+                )
+                for finding in scan(path + "." + lang, text, lang)
+            )
     return result
 
 
@@ -367,12 +415,14 @@ def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]
                     f.kind,
                     f.text,
                     f"{row.get('symbol', '')}:payload:{f.symbol}",
-                    f.payload,
+                    f.payload or row["text"],
                 )
                 for f in scan(path + "." + row["language"], row["text"], row["language"], js_results)
             )
         else:
-            result.append(Finding(path, row["line"], row["kind"], row["text"], row.get("symbol", "")))
+            result.append(
+                Finding(path, row["line"], row["kind"], row["text"], row.get("symbol", ""), row.get("payload", ""))
+            )
     return result
 
 
@@ -389,7 +439,7 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
         if lang == "javascript":
             return javascript_findings(path, source, js_results)
         nested = [
-            Finding(path, start + f.line - 1, f.kind, f.text, f"{symbol}:{f.symbol}", f.payload)
+            Finding(path, start + f.line - 1, f.kind, f.text, f"{symbol}:{f.symbol}", f.payload or text)
             for start, child_path, text, child_lang, symbol in nested_sources(path, source, lang)
             for f in scan(child_path, text, child_lang, js_results)
         ]
@@ -400,7 +450,7 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             for start, _, text, _, _ in shell_payloads(path, source, include_data=True):
                 for index in range(start - 1, start - 1 + len(text.splitlines())):
                     lines[index] = re.sub(r"[^\n]", " ", lines[index])
-            source = "".join(lines)
+            source = "".join(lines) + "\n"
         if lang in {"html", "html+jinja"}:
             source = re.sub(
                 r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)",

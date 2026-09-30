@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from comment_syntax import Finding, javascript_requests, language, scan, source_language
 
 POLICY_PATH = "quality/comment-policy.json"
-BOOTSTRAP_BASE = "8fbad03469746539959af14e865a19c53fab68f5"
+BOOTSTRAP_BASE = "0fb305028f108627f81c091c7eccaab10511a35c"
 DIRECTIVES = (
     r"# noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
     r"# type: ignore\[[a-z0-9_-]+(?:, ?[a-z0-9_-]+)*\]",
@@ -162,6 +162,33 @@ def decode(path: str, raw: bytes) -> str:
     return raw.decode("utf-8-sig")
 
 
+def native_results(root: Path, requests: dict[str, str]) -> dict[str, list[dict]]:
+    results = {}
+    pending = requests
+    while pending:
+        response = subprocess.run(
+            ["node", str(Path(__file__).with_name("comment_syntax_js.cjs"))],
+            input=json.dumps(pending),
+            text=True,
+            capture_output=True,
+            check=True,
+            env={**os.environ, "COMMENT_POLICY_ROOT": str(root)},
+        )
+        batch = json.loads(response.stdout)
+        if set(batch) != set(pending):
+            raise ValueError("native parser returned a different request set")
+        results.update(batch)
+        pending = {
+            key: text
+            for rows in batch.values()
+            for row in rows
+            if row["kind"] == "payload"
+            for key, text in javascript_requests("payload." + row["language"], row["text"], row["language"]).items()
+            if key not in results
+        }
+    return results
+
+
 def scan_sources(root: Path, sources: dict[str, bytes], policy: dict) -> list[Finding]:
     decoded = {}
     errors = []
@@ -179,17 +206,7 @@ def scan_sources(root: Path, sources: dict[str, bytes], policy: dict) -> list[Fi
         for path, source in decoded.items()
         for key, text in javascript_requests(path, source, language(path)).items()
     }
-    js_results = {}
-    if requests:
-        result = subprocess.run(
-            ["node", str(Path(__file__).with_name("comment_syntax_js.cjs"))],
-            input=json.dumps(requests),
-            text=True,
-            capture_output=True,
-            check=True,
-            env={**os.environ, "COMMENT_POLICY_ROOT": str(root)},
-        )
-        js_results = json.loads(result.stdout)
+    js_results = native_results(root, requests)
     budget = Counter({index: entry.get("count", 1) for index, entry in enumerate(policy["exceptions"])})
     return errors + [
         finding

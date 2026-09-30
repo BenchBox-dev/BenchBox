@@ -204,9 +204,69 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
     return result
 
 
+def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
+    if not re.search(r"\beval\b|\b(?:python[0-9.]*|node|bash|sh|zsh)\b[^\n]*\s(?:-[A-Za-z]*[ce]|--eval)\b", source):
+        return []
+    try:
+        trees = bashlex.parse(source)
+    except (bashlex.errors.ParsingError, NotImplementedError) as exc:
+        raise ValueError("shell command source requires an executable-payload adapter") from exc
+    result = []
+
+    def visit(node: bashlex.ast.node, symbol: str = "") -> None:
+        if node.kind == "function":
+            symbol = f"{symbol}.{node.name.word}".strip(".")
+        if node.kind == "command":
+            words = [part for part in node.parts if part.kind == "word"]
+            if words:
+                command = words[0].word.rsplit("/", 1)[-1]
+                if command in {"env", "uv"}:
+                    interpreter = next(
+                        (
+                            index
+                            for index, word in enumerate(words[1:], 1)
+                            if re.fullmatch(r"python[0-9.]*|node|bash|sh|zsh", word.word)
+                        ),
+                        None,
+                    )
+                    if interpreter is not None:
+                        words = words[interpreter:]
+                        command = words[0].word
+                language = (
+                    "python"
+                    if re.fullmatch(r"python[0-9.]*", command)
+                    else {"node": "javascript", "sh": "bash", "bash": "bash", "zsh": "bash", "eval": "bash"}.get(
+                        command
+                    )
+                )
+                flag = next(
+                    (index for index, word in enumerate(words[1:], 1) if word.word in {"-c", "-e", "--eval", "-lc"}),
+                    None,
+                )
+                payload_words = (
+                    words[1:] if command == "eval" else words[flag + 1 : flag + 2] if flag is not None else []
+                )
+                if language and payload_words:
+                    if any(word.parts for word in payload_words):
+                        raise ValueError("unresolved executable shell argument: " + source[node.pos[0] : node.pos[1]])
+                    text = " ".join(word.word for word in payload_words)
+                    line = source[: payload_words[0].pos[0]].count("\n") + 1
+                    result.append((line, path + "." + language, text, language, f"{symbol}:command:{command}"))
+        for child in getattr(node, "parts", []):
+            visit(child, symbol)
+        for child in getattr(node, "list", []):
+            visit(child, symbol)
+        if node.kind in {"commandsubstitution", "processsubstitution"}:
+            visit(node.command, symbol)
+
+    for tree in trees:
+        visit(tree)
+    return result
+
+
 def nested_sources(path: str, source: str, lang: str) -> list[tuple[int, str, str, str, str]]:
     if lang == "bash":
-        return shell_payloads(path, source)
+        return shell_payloads(path, source) + shell_command_payloads(path, source)
     if lang == "examples":
         return [
             (start, path + "." + tag, text, FENCE_LANGUAGES.get(tag, "unsupported"), symbol)

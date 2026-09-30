@@ -85,7 +85,23 @@
     "tests/unit/scripts/test_comment_policy.py",
     "scripts/comment_payloads.py",
     "tests/unit/scripts/test_comment_syntax_js.cjs",
-    "quality/comment-policy-requirements.txt"
+    "quality/comment-policy-requirements.txt",
+    "scripts/comment_execution.py",
+    "scripts/comment_policy_entry.py"
   ],
-  "exceptions": []
+  "exceptions": [
+    {
+      "path": "tests/unit/scripts/test_ci_lint_environment_boundary.py",
+      "symbol": "TestGateFailsClosed.test_ci_lint_environment_boundary_runs_the_guard_when_the_gate_is_broken",
+      "text": "unresolved executable source: f'{broken} echo RAN; else echo SKIPPED; fi'",
+      "payload": "sha256:95dbde4551c0a103d2a6360dfa1f85934e6a007b50b927068c9a7e6d52c3a220",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_ci_lint_environment_boundary.py",
+      "necessity": "The test executes conditions extracted from the checked Makefile against a deliberately broken gate to prove the guard still runs. Its executable argument is derived test input, bound to the complete consumer AST digest.",
+      "alternative": "Replacing execution with a text assertion would miss a condition that silently skips the guard. Literal duplication would stop testing the actual recipe.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the Make recipe extraction can be reconstructed by the executable-payload adapter without granting arbitrary input."
+    }
+  ]
 }

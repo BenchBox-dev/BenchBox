@@ -14,6 +14,10 @@ function scan(name, source) {
   const scopes = [];
   const declarations = [];
   const calls = [];
+  const imports = new Map();
+  const namespaces = new Set();
+  const bindings = [];
+  const childProcess = value => ['node:child_process', 'child_process'].includes(value);
   const findings = [];
   function visit(node, symbol = '') {
     if (ts.isFunctionLike(node) || ts.isClassLike(node)) {
@@ -23,7 +27,24 @@ function scan(name, source) {
       scopes.push({start: node.getStart(tree), end: node.end, symbol});
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) declarations.push(node);
-    if (ts.isCallExpression(node)) calls.push(node);
+    if ((ts.isVariableDeclaration(node) || ts.isParameter(node) || ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) && node.name && ts.isIdentifier(node.name)) bindings.push(node);
+    if (ts.isImportDeclaration(node) && childProcess(node.moduleSpecifier.text) && node.importClause) {
+      const clause = node.importClause;
+      if (clause.name) namespaces.add(clause.name.text);
+      if (clause.namedBindings && ts.isNamespaceImport(clause.namedBindings)) namespaces.add(clause.namedBindings.name.text);
+      if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
+        for (const element of clause.namedBindings.elements) imports.set(element.name.text, (element.propertyName || element.name).text);
+      }
+    }
+    if (ts.isVariableDeclaration(node) && node.initializer && ts.isCallExpression(node.initializer)
+        && node.initializer.expression.getText(tree) === 'require' && node.initializer.arguments.length === 1
+        && ts.isStringLiteral(node.initializer.arguments[0]) && childProcess(node.initializer.arguments[0].text)) {
+      if (ts.isIdentifier(node.name)) namespaces.add(node.name.text);
+      if (ts.isObjectBindingPattern(node.name)) {
+        for (const element of node.name.elements) imports.set(element.name.getText(tree), (element.propertyName || element.name).getText(tree));
+      }
+    }
+    if (ts.isCallExpression(node) || ts.isNewExpression(node)) calls.push(node);
     if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isJsxText(node)
         || node.kind === ts.SyntaxKind.TemplateHead || node.kind === ts.SyntaxKind.TemplateMiddle
         || node.kind === ts.SyntaxKind.TemplateTail) protectedRanges.push([node.getStart(tree), node.end]);
@@ -33,7 +54,7 @@ function scan(name, source) {
   const symbolAt = pos => [...scopes].reverse().find(scope => scope.start <= pos && pos < scope.end)?.symbol || '';
   function enclosingScope(node) {
     for (let current = node.parent; current; current = current.parent) {
-      if (ts.isBlock(current) || ts.isSourceFile(current)) return current;
+      if (ts.isBlock(current) || ts.isSourceFile(current) || ts.isFunctionLike(current)) return current;
     }
   }
   function resolve(node, seen = new Set()) {
@@ -70,24 +91,47 @@ function scan(name, source) {
     }
     return null;
   }
+  function shadowed(name, node, imported = false) {
+    for (let scope = enclosingScope(node); scope; scope = enclosingScope(scope)) {
+      if (imported && ts.isSourceFile(scope)) return false;
+      if (bindings.some(binding => binding.name.text === name && enclosingScope(binding) === scope)) return true;
+    }
+    return false;
+  }
   const emitted = new Set();
-  function payload(node, language) {
+  function payload(node, language, supplied) {
     const key = `${node.getStart(tree)}:${language}`;
     if (emitted.has(key)) return;
     emitted.add(key);
-    const text = resolve(node);
+    const text = supplied === undefined ? resolve(node) : supplied;
     if (language === 'javascript' && text !== null) {
       findings.push(...scan(name, text).map(f => ({...f, line: line(node.getStart(tree)) + f.line - 1,
-        symbol: `${symbolAt(node.getStart(tree))}:payload:${f.symbol || ''}`})));
+        symbol: `${symbolAt(node.getStart(tree))}:payload:${f.symbol || ''}`, payload: f.payload || text})));
       return;
     }
     findings.push({kind: text === null ? 'coverage-error' : 'payload', line: line(node.getStart(tree)),
       symbol: symbolAt(node.getStart(tree)), language,
-      text: text === null ? `unresolved executable ${language} payload; use a separately checked source file` : text});
+      text: text === null ? `unresolved executable ${language} payload: ${node.getText(tree)}` : text});
   }
   for (const call of calls) {
     const target = call.expression;
-    const method = ts.isPropertyAccessExpression(target) ? target.name.text : target.getText(tree);
+    const localName = ts.isPropertyAccessExpression(target) ? target.name.text : target.getText(tree);
+    let method = localName;
+    let processImport = false;
+    if (ts.isIdentifier(target) && imports.has(target.text) && !shadowed(target.text, call, true)) {
+      method = imports.get(target.text);
+      processImport = true;
+    }
+    if (ts.isPropertyAccessExpression(target) && ts.isIdentifier(target.expression)
+        && namespaces.has(target.expression.text) && !shadowed(target.expression.text, call, true)) processImport = true;
+    const args = call.arguments || [];
+    if (ts.isIdentifier(target) && target.text === 'eval' && !shadowed('eval', call) && args[0]) payload(args[0], 'javascript');
+    if (ts.isIdentifier(target) && target.text === 'Function' && !shadowed('Function', call) && args.length) {
+      const parts = [...args].map(argument => resolve(argument));
+      const text = parts.includes(null) ? null : `function __generated__(${parts.slice(0, -1).join(',')}) {\n${parts.at(-1)}\n}`;
+      payload(args.at(-1), 'javascript', text);
+    }
+    if (processImport && ['exec', 'execSync'].includes(method) && args[0]) payload(args[0], 'bash');
     if (['query', 'prepare', 'execute', 'executemany', 'sql'].includes(method) && call.arguments[0]) {
       const value = resolve(call.arguments[0]);
       if (value !== null) payload(call.arguments[0], 'sql');

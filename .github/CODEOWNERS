@@ -116,3 +116,5 @@ scripts/comment_syntax.py @joeharris76
 scripts/comment_syntax_js.cjs @joeharris76
 scripts/run_comment_policy.py @joeharris76
 scripts/comment_payloads.py @joeharris76
+scripts/comment_execution.py @joeharris76
+scripts/comment_policy_entry.py @joeharris76
