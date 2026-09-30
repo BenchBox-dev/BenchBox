@@ -88,6 +88,15 @@
       "op": "release",
       "op_id": "7e775f5b639e45c1a2d8b22038ff5bfe",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:opencode:joe@joe-mac-mini.local:f22ca8037e78131372fd9481",
+      "at": "2026-09-30T15:47:12Z",
+      "client": "opencode",
+      "generation": "aff9273f85b84a7984f2afb505153668",
+      "op": "take",
+      "op_id": "81bceafd080d482a82e01031f105ffdd",
+      "session_id": "eccb1149a7b54c54a1f2f83d29cc85a6"
     }
   ]
 }
