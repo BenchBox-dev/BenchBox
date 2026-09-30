@@ -3191,6 +3191,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from expected-results and validation"
     },
+    "comment-cleanup-visualization": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from visualization and ASCII charts"
+    },
     "comment-cleanup-windows-consumer": {
       "claim": null,
       "needs": [
