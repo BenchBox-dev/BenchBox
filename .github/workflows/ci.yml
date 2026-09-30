@@ -46,9 +46,14 @@ jobs:
         run: |
           set -euo pipefail
           : "${BASE_REF:?BASE_REF is required}"
+          installed="$(git ls-tree -r --name-only "$BASE_REF" -- \
+            scripts/check_comment_policy.py scripts/comment_syntax.py scripts/comment_syntax_js.cjs \
+            scripts/comment_payloads.py scripts/comment_execution.py scripts/comment_policy_entry.py \
+            quality/comment-policy.json quality/comment-policy-requirements.txt \
+            quality/comment-policy-package.json quality/comment-policy-package-lock.json)"
           if git cat-file -e "${BASE_REF}:scripts/run_comment_policy.py" 2>/dev/null; then
             git show "${BASE_REF}:scripts/run_comment_policy.py" > "$RUNNER_TEMP/comment-policy-runner.py"
-          elif git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b "$BASE_REF"; then
+          elif [ -z "$installed" ] && git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b "$BASE_REF"; then
             cp scripts/run_comment_policy.py "$RUNNER_TEMP/comment-policy-runner.py"
           else
             echo "Trusted comment-policy launcher is missing" >&2

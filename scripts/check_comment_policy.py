@@ -127,13 +127,12 @@ def bootstrap_base_allowed(root: Path, base: str) -> bool:
         ).returncode
         == 0
     )
-    launcher_present = (
-        subprocess.run(
-            ["git", "-C", str(root), "cat-file", "-e", f"{base}:scripts/run_comment_policy.py"], capture_output=True
-        ).returncode
+    installed = any(
+        subprocess.run(["git", "-C", str(root), "cat-file", "-e", f"{base}:{path}"], capture_output=True).returncode
         == 0
+        for path in ("scripts/run_comment_policy.py", "quality/comment-policy.json")
     )
-    return contains_rollout and not launcher_present
+    return contains_rollout and not installed
 
 
 def allowed(finding: Finding, policy: dict, source: str, budget: Counter | None = None) -> bool:

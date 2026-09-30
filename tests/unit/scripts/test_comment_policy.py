@@ -262,6 +262,20 @@ def test_missing_base_and_unpinned_bootstrap_fail(tmp_path: Path) -> None:
     assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base, "--bootstrap"]) == 2
 
 
+def test_bootstrap_base_is_refused_when_a_policy_registry_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pin = plain_repo(tmp_path, "x = 1\n")
+    (tmp_path / "quality").mkdir()
+    (tmp_path / "quality/comment-policy.json").write_text("{}", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "quality/comment-policy.json"], check=True)
+    with_registry = commit_change(tmp_path, "x = 2\n")
+    monkeypatch.setattr("check_comment_policy.BOOTSTRAP_BASE", pin)
+    monkeypatch.setattr("run_comment_policy.BOOTSTRAP_BASE", pin)
+    assert not check_comment_policy.bootstrap_base_allowed(tmp_path, with_registry)
+    assert not policy_runner.bootstrap_base_allowed(tmp_path, with_registry)
+
+
 def test_local_default_base_is_the_branch_point_when_develop_moved_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -302,10 +316,16 @@ def commit_change(tmp_path: Path, source: str) -> str:
     return subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
 
 
+def plain_repo(tmp_path: Path, source: str) -> str:
+    (tmp_path / "a.py").write_text(source, encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    return commit_change(tmp_path, source)
+
+
 def test_bootstrap_base_allows_only_descendants_of_the_initial_rollout_commit(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    pin = git_repo(tmp_path, "x = 1\n")
+    pin = plain_repo(tmp_path, "x = 1\n")
     descendant = commit_change(tmp_path, "x = 2\n")
     monkeypatch.setattr("check_comment_policy.BOOTSTRAP_BASE", pin)
     monkeypatch.setattr("run_comment_policy.BOOTSTRAP_BASE", pin)
@@ -321,7 +341,7 @@ def test_bootstrap_base_allows_only_descendants_of_the_initial_rollout_commit(
 def test_bootstrap_base_is_refused_once_the_trusted_launcher_exists(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    pin = git_repo(tmp_path, "x = 1\n")
+    pin = plain_repo(tmp_path, "x = 1\n")
     (tmp_path / "scripts").mkdir()
     (tmp_path / "scripts/run_comment_policy.py").write_text("", encoding="utf-8")
     subprocess.run(["git", "-C", str(tmp_path), "add", "scripts/run_comment_policy.py"], check=True)
@@ -360,6 +380,8 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     assert 'git show "${BASE_REF}:scripts/run_comment_policy.py"' in step["run"]
     assert 'python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests' in step["run"]
     assert ': "${BASE_REF:?' in step["run"]
+    for trusted in (*TRUSTED_FILES, "quality/comment-policy.json"):
+        assert trusted in step["run"]
     assert "git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
     assert "merge_group.base_sha" in step["env"]["BASE_REF"]
