@@ -4,7 +4,7 @@
     "In an env with chdb removed and an unsupported Java, the listed tests skip with explicit reasons and none fail",
     "Required T2 cases (dlv2-15) are NOT affected: a required case that would skip fails T2 instead"
   ],
-  "context": "Root owns generation4ba7990f995d4d1492b4a9e374550d93 until2026-10-01T07:52:41Z. Worktree /Users/joe/Developer/BenchBox.wt-optional-engine-usability-and-isolation based4026d6c1ac263d42fd8fed47c75f64fc36a185c9; transferred only top19-file delta from3f2e966, preserved old worktree. Added pure cached JAVA_HOME probe and opt-in module Spark environment fixture; all mapped runtime consumers including SQL smoke and four Delta fixtures adopted it, offline/mock tests unaffected. chDB probes actual connection/SELECT/DDL/INSERT then closes, with explicit usability reasons. Native independent read-only review found no Critical/Required; accepted scoped Spark cleanup and prerequisite-comment nits. Actual current helper41PASS; old helper14regressionFAIL; affected local consumers562PASS29explicit optionalSKIP93opt-inDESELECT; fresh-process missing-chDB/injectedJava26 case167PASS118explicitSKIP and exact cwd/JAVA_HOME/PYSPARK_PYTHON restoration; finalfocused101PASS including cleanup and existing no-skip gate checks. Ruff/typecheck/diff clean. Commit/canonical started08:25UTC, not yet PR/hosted acceptance. Required engine policy, oracle commands, Makefile and gates unchanged; no skip weakening. Task15 explicit required matrix remains separate work.",
+  "context": "Root owns generation4ba7990f995d4d1492b4a9e374550d93 until2026-10-01T07:52:41Z. Worktree /Users/joe/Developer/BenchBox.wt-optional-engine-usability-and-isolation, exactlocal+remote950c3a7b37b847298f63031e477641da9af48eb0, PR https://github.com/BenchBox-dev/BenchBox/pull/2477 published08:41UTC; not enqueued/merged/hosted accepted. Canonical18633EXIT0 finalbasee95063c7b556ff529bc76b66c60be29a2b35c24d, required57eec5471b31d5e9826ad168a42ee1737e10233097c96b96080b3e38d8051a7e at08:39:04, ordered08:39:05/event56658-1790757545080262000, /tmp/dlv2-optional-engine-final-receipt.json; makepr-open80330EXIT0 /tmp/dlv2-optional-engine-pr-open.log. Only top19filedelta from3f2e966 transferred, oldworktree preserved. Final25paths include purecachedJAVA_HOME probe/actualchDBSQLconnection probe/opt-in scopedSpark envfixture and mappedruntimeconsumers includingSQLsmoke/fourDeltafixtures. Offline/mocked tests unaffected; actual any_soundness_path(False). Independentread-onlySHIP0CriticalRequired; acceptedrealwindow-countadapterclose and prerequisitescomments. Currenthelper41PASS; oldhelper14regressionFAIL; consumers562PASS29explicitoptionalSKIP93opt-inDESELECT; deterministicfreshprocessmissingchDBimports/Java26injection167PASS118explicitSKIP and exactenv/cwdrestoration; finalfocused101PASS includingexistingno-skipguardchecks. Ruff25/format/ty/diffclean. Requiredenginepolicy/Makefile/oraclecommands/gates unchanged; explicitrequired15matrix remains separate. Wait freshallhostedchecks and approvedcloseoutcriteria before finish, retainclaim.",
   "description": "In a clean env without a loadable chdb and with Java 26 (unsupported by PySpark), 66 unit tests failed instead of skipping: tests/unit/platforms/dataframe/test_pyspark_df.py (37), test_pyspark_df_session_branches.py (2), tests/unit/platforms/test_clickhouse_local.py (14, \"module 'chdb' has no attribute 'connect'\"), test_clickhouse_adapter.py (1), tests/unit/test_import_isolation.py (8), plus integration test_dataframe_adapter_smoke.py (10), test_ssb_clickhouse_integration.py (3), test_clickhouse_local_cross_platform.py (1), test_clickhouse_applied_ledger_live.py (6 errors), validation/test_read_primitives_variant_parity.py (17 errors). Availability probes must test usability (native load succeeds; supported Java version) not just importability, and skip with a reason.",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "d1500c4b8f2f49f59ba21cb12de0c3e8",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T08:43:49Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "ff8a6099fc364cc3810ea467a9eba818",
       "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
