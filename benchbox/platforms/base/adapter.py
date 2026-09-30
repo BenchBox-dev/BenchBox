@@ -281,6 +281,7 @@ class PlatformAdapter(
 
         # Track latest throughput metrics for phase construction
         self._last_throughput_test_result = None
+        self._last_power_workload_timing: tuple[str, str, int] | None = None
         # Latest per-table load timings for result construction (reset per run)
         self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables: list[str] = []
@@ -295,6 +296,7 @@ class PlatformAdapter(
         self.database_was_reused = False
         self._last_power_test_result = None
         self._last_throughput_test_result = None
+        self._last_power_workload_timing = None
         self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables = []
         self._sorted_ingestion_total_apply_seconds = 0.0
@@ -1094,7 +1096,11 @@ class PlatformAdapter(
             )
 
             execution_phases, total_exec_time, power_test_phase, throughput_test_phase = self._build_execution_phases(
-                query_results, query_executions, run_config, setup_phase
+                query_results,
+                query_executions,
+                run_config,
+                setup_phase,
+                power_workload_timing=self._last_power_workload_timing,
             )
 
             platform_info, normalized_metadata = self._collect_platform_metadata(
