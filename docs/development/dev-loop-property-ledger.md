@@ -30,6 +30,7 @@ Classification values:
 | Public-site visual acceptance | `Public-site visual acceptance` required check from `.github/workflows/docs.yml` | site-deploy route and digest probes | pending | open |
 | Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` | pending | open |
 | Wheel installability | `package-smoke` job, release workflow build | release workflow artifact verification | pending | open |
+| Shipped bundled generator integrity | `benchbox/_binaries/SHA256MANIFEST.json`, `tests/unit/utils/test_binary_manifest.py` | ci.yml `dist-artifact` verifies source, wheel, and sdist membership and hashes; installed-package verifier for release checks | pending | open |
 | Dependency bounds | `scripts/check_dependency_bounds.py`, `tests/unit/scripts/test_check_dependency_bounds.py` | ci.yml `tooling` | pending | open |
 | Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml` | release workflow | pending | open |
 | Ruleset and settings drift | `scripts/ruleset_drift_check.py`, `.github/workflows/develop-ruleset-drift.yml`, `tests/unit/workflows/test_develop_ruleset_drift.py`, `tests/unit/release/test_ruleset_drift_review_coverage.py`, `tests/unit/release/test_ruleset_review_enforcement.py` | ci.yml `tooling` | pending | open |
@@ -98,6 +99,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
+| `test_binary_manifest_workflow.py` | product-safety | Queue artifact verifies source-bound bundled generator hashes before upload |
 | `test_corpus_cutover.py` | product-safety | Corpus cutover |
 | `test_corpus_event_bridge.py` | product-safety | Corpus event integrity |
 | `test_corpus_trust_boundary.py` | product-safety | Corpus trust boundary |
@@ -294,6 +296,8 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `post_merge_signature.py` | pure-process | Post-merge mechanics |
 | `local_validation.py` | pure-process | PR-loop mechanics |
 | `phase2_metrics.py` | pure-process | Legacy metrics mechanics |
+| `bundled_binary_manifest.py` | product-safety | Deterministic hashes of the shipped generator tree |
+| `verify_distribution_binaries.py` | product-safety | Distribution membership, archive safety, and source-bound generator hashes |
 | Remaining scripts (ledger-catch-all: scripts/) | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
 
 ### `_project/scripts/`
