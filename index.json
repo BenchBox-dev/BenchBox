@@ -3569,6 +3569,15 @@
       "status": "open",
       "title": "Migrate shared comment consumers and enforce policy in CI and build configuration"
     },
+    "comment-cleanup-site-assets": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from maintained site and container assets"
+    },
     "comment-cleanup-spark-family": {
       "claim": null,
       "needs": [
