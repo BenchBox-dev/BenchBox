@@ -147,6 +147,74 @@ def test_head_vs_merge_real_payloads_agree_when_identical(tmp_path: Path, monkey
     assert message.startswith("Parity OK")
 
 
+@pytest.mark.parametrize("case", ["identical", "invalid_head", "missing_head", "missing_runtime"])
+def test_parity_executes_real_payloads_in_an_isolated_slim_checkout(tmp_path: Path, case: str) -> None:
+    """The mirrored runtime must validate payloads without the installed package."""
+    repo = tmp_path / "slim"
+    rel = "results-data/bundles/tpch_result.json"
+    base = _init_fixture_repo(repo, rel)
+    payload = _minimal_bundle_dict()
+    payload["queries"][0]["ms"] += 1
+    (repo / rel).write_text(json.dumps(payload), encoding="utf-8")
+    _git(repo, "add", rel)
+    _git(repo, "commit", "-m", "update bundle")
+    merge = _git(repo, "rev-parse", "HEAD")
+    head = merge
+    if case == "missing_head":
+        _git(repo, "rm", rel)
+        _git(repo, "commit", "-m", "remove head payload")
+        head = _git(repo, "rev-parse", "HEAD")
+    elif case == "invalid_head":
+        payload["summary"]["validation"] = "failed"
+        (repo / rel).write_text(json.dumps(payload), encoding="utf-8")
+        _git(repo, "add", rel)
+        _git(repo, "commit", "-m", "invalid head payload")
+        head = _git(repo, "rev-parse", "HEAD")
+
+    runtime = [
+        "scripts/validate_submission.py",
+        "scripts/generate_corpus_inventory.py",
+        "scripts/publication/validator_parity.py",
+        "benchbox/validation/bundle.py",
+        "benchbox/core/results/query_status.py",
+        "benchbox/core/results/schema_policy.py",
+    ]
+    for path in runtime:
+        destination = repo / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((REPO_ROOT / path).read_bytes())
+    if case == "missing_runtime":
+        (repo / "benchbox/validation/bundle.py").unlink()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-S",
+            str(repo / "scripts/publication/validator_parity.py"),
+            "--base-sha",
+            base,
+            "--merge-sha",
+            merge,
+            "--head-sha",
+            head,
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if case == "identical":
+        assert result.returncode == 0, result.stdout + result.stderr
+        assert "Changed bundles (1):" in result.stdout
+        assert "Parity OK" in result.stdout
+    else:
+        assert result.returncode != 0, result.stdout + result.stderr
+        if case in {"invalid_head", "missing_head"}:
+            assert "diverged" in result.stderr
+        else:
+            assert "bundle.py" in result.stderr
+
+
 def test_missing_payload_at_requested_sha_fails_closed(tmp_path: Path, monkeypatch) -> None:
     """Non-empty bundle list with nothing extractable is rc 1, not a silent pass."""
     parity = _load_parity_module()

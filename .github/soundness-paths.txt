@@ -60,6 +60,13 @@ file	.github/workflows/ci.yml
 file	.github/ci-units.yml
 file	scripts/ci_units.py
 file	scripts/ci_unit_result.py
+file	scripts/release_flow.py
+file	scripts/update_version.py
+file	scripts/generate_changelog_entry.py
+file	scripts/check_release_curation.py
+file	scripts/check_dependency_bounds.py
+file	_project/scripts/check_uv_lock_revision.py
+file	_project/decisions/single-repo-migration.md
 file	.github/workflows/release.yml
 file	_project/decisions/independent-publication-a0-freeze-2026-08-31.md
 file	docs/development/adr/adr-independent-publication-authorities.md
@@ -73,3 +80,7 @@ file	docs/operations/results-phase-3-runbook.md
 file	docs/reference/hosted-results-contract.md
 file	docs/reference/threat-model.md
 file	scripts/check_decision_records.py
+prefix	benchbox/_binaries/
+file	benchbox/utils/binary_manifest.py
+file	scripts/bundled_binary_manifest.py
+file	scripts/verify_distribution_binaries.py

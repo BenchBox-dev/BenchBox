@@ -59,14 +59,14 @@ class ReadPrimitives(QueryCategoryFacadeMixin, QueryFacadeMixin, BaseBenchmark):
             scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **kwargs
         )
 
-    def generate_data(self, tables: Optional[list[str]] = None) -> dict[str, str]:
+    def generate_data(self, tables: Optional[list[str]] = None) -> dict[str, str | list[str]]:
         """Generate Read Primitives benchmark data.
 
         Args:
             tables: Optional list of table names to generate. If None, generates all.
 
         Returns:
-            A dictionary mapping table names to file paths
+            A dictionary mapping table names to a file path or an ordered list of shard paths.
         """
         # Call the implementation to generate data
         self._impl.generate_data(tables)

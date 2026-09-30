@@ -628,7 +628,7 @@ See Also
 - :doc:`../base` - Base benchmark interface
 - :doc:`../results` - Results API
 - :doc:`/benchmarks/clickbench` - ClickBench guide
-- :doc:`/benchmarks/README` - Benchmark catalog
+- :doc:`/benchmarks/index` - Benchmark catalog
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

@@ -28,7 +28,9 @@ name: Sync results-data to published-results
 # `benchbox/validation/bundle.py` implementation plus the stdlib-only
 # `benchbox/core/results/query_status.py` failure policy and the stdlib-only
 # `benchbox/core/results/schema_policy.py` version-key policy it loads the
-# version helpers from (no inline duplicate lives in bundle.py).
+# version helpers from (no inline duplicate lives in bundle.py). The shared
+# scripts/publication/validator_parity.py entry point uses that same runtime
+# to compare head and merge payloads without installing the full package.
 #
 # The mirror PR's author is this workflow's own GITHUB_TOKEN identity
 # (github-actions[bot]). GitHub does not start `pull_request`-triggered workflow
@@ -58,6 +60,7 @@ on:
       - "results-data/README.md"
       - "results-data/validate_corpus.py"
       - "scripts/validate_submission.py"
+      - "scripts/publication/validator_parity.py"
       - "benchbox/validation/bundle.py"
       - "benchbox/core/results/query_status.py"
       - "benchbox/core/results/schema_policy.py"
@@ -125,7 +128,8 @@ jobs:
             'benchbox/validation/bundle.py' \
             'benchbox/core/results/query_status.py' \
             'benchbox/core/results/schema_policy.py' \
-            'scripts/validate_submission.py' 'scripts/generate_corpus_inventory.py')
+            'scripts/validate_submission.py' 'scripts/publication/validator_parity.py' \
+            'scripts/generate_corpus_inventory.py')
 
           if [[ ${#DIFFED[@]} -eq 0 ]]; then
             echo "No drift between develop and published-results in mirrored paths."
@@ -268,6 +272,7 @@ jobs:
             'benchbox/core/results/query_status.py'
             'benchbox/core/results/schema_policy.py'
             'scripts/validate_submission.py'
+            'scripts/publication/validator_parity.py'
             'scripts/generate_corpus_inventory.py'
           )
 
