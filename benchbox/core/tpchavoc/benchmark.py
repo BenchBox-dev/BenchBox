@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any, Union
 
 from benchbox.core.tpch.benchmark import TPCHBenchmark
-from benchbox.core.tpchavoc.cloud_compat import rewrite_cloud_variant
+from benchbox.core.tpchavoc.dialect_compat import rewrite_dialect_variant
 from benchbox.core.tpchavoc.queries import TPCHavocQueryManager
 from benchbox.core.tpchavoc.validation import ResultValidator, ValidationReport
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
@@ -146,12 +146,10 @@ class TPCHavocBenchmark(TPCHBenchmark):
         return []
 
     def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
-        """Return variants with cloud rewrites after the shared SQL translation."""
+        """Return variants with target rewrites after the shared SQL translation."""
         queries = super().get_queries(dialect=dialect, base_dialect=base_dialect)
         target = (dialect or "").lower()
-        if target not in {"bigquery", "snowflake", "databricks"}:
-            return queries
-        return {query_id: rewrite_cloud_variant(query_id, query, target) for query_id, query in queries.items()}
+        return {query_id: rewrite_dialect_variant(query_id, query, target) for query_id, query in queries.items()}
 
     def get_query(
         self,
@@ -191,7 +189,7 @@ class TPCHavocBenchmark(TPCHBenchmark):
             return query
         target = dialect.lower()
         translated = self.translate_query_text(query, (base_dialect or "netezza").lower(), target)
-        return rewrite_cloud_variant(str(query_id), translated, target)
+        return rewrite_dialect_variant(str(query_id), translated, target)
 
     def get_query_variant(self, query_id: int, variant_id: int, params: dict[str, Any] | None = None) -> str:
         """Get a specific TPC-Havoc query variant.

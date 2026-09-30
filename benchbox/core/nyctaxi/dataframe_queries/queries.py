@@ -135,7 +135,14 @@ def _expr_derive(ctx: DataFrameContext, frame: Any, names: str) -> Any:
         elif name == "month":
             frame = frame.with_columns(col("pickup_datetime").dt.truncate("1mo").alias("month"))
         elif name == "day_of_week":
-            frame = frame.with_columns(col("pickup_datetime").dt.weekday().alias("day_of_week"))
+            # Postgres DOW: Sunday=0..Saturday=6. ISO weekday: Monday=1..Sunday=7,
+            # so DOW = weekday mod 7.
+            frame = frame.with_columns(
+                (
+                    col("pickup_datetime").dt.weekday()
+                    - (col("pickup_datetime").dt.weekday() / lit(7)).floor() * lit(7)
+                ).alias("day_of_week")
+            )
         elif name == "tip_pct_nonzero":
             frame = frame.with_columns(
                 ctx.when(col("fare_amount") != lit(0))
@@ -170,12 +177,10 @@ def _expr_derive(ctx: DataFrameContext, frame: Any, names: str) -> Any:
                 ((col("duration_sec") / lit(60) / lit(5)).floor() * lit(5)).alias("duration_bucket_min")
             )
         elif name == "day_type":
+            dow = col("pickup_datetime").dt.weekday() - (col("pickup_datetime").dt.weekday() / lit(7)).floor() * lit(7)
             frame = frame.with_columns(
                 col("pickup_datetime").dt.hour().alias("hour"),
-                ctx.when(col("pickup_datetime").dt.weekday().is_in([5, 6]))
-                .then(lit("weekend"))
-                .otherwise(lit("weekday"))
-                .alias("day_type"),
+                ctx.when(dow.is_in([0, 6])).then(lit("weekend")).otherwise(lit("weekday")).alias("day_type"),
             )
         elif name == "period":
             frame = frame.with_columns(
@@ -208,7 +213,8 @@ def _pandas_derive(frame: Any, names: str) -> Any:
         elif name == "month":
             frame["month"] = frame["pickup_datetime"].dt.to_period("M").dt.to_timestamp()
         elif name == "day_of_week":
-            frame["day_of_week"] = frame["pickup_datetime"].dt.dayofweek
+            # Postgres DOW: Sunday=0..Saturday=6. Pandas dayofweek: Monday=0..Sunday=6.
+            frame["day_of_week"] = (frame["pickup_datetime"].dt.dayofweek + 1) % 7
         elif name == "tip_pct_nonzero":
             frame["tip_pct"] = np.where(
                 frame["fare_amount"] != 0, frame["tip_amount"] / frame["fare_amount"] * 100, np.nan
@@ -232,7 +238,9 @@ def _pandas_derive(frame: Any, names: str) -> Any:
             frame["duration_bucket_min"] = np.floor(frame["duration_sec"] / 60 / 5) * 5
         elif name == "day_type":
             frame["hour"] = frame["pickup_datetime"].dt.hour
-            frame["day_type"] = np.where(frame["pickup_datetime"].dt.dayofweek.isin([5, 6]), "weekend", "weekday")
+            frame["day_type"] = np.where(
+                ((frame["pickup_datetime"].dt.dayofweek + 1) % 7).isin([0, 6]), "weekend", "weekday"
+            )
         elif name == "period":
             frame["hour"] = frame["pickup_datetime"].dt.hour
             frame["duration_min"] = (frame["dropoff_datetime"] - frame["pickup_datetime"]).dt.total_seconds() / 60

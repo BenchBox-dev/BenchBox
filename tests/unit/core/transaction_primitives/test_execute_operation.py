@@ -238,6 +238,33 @@ class TestPlatformKeyDispatch:
         assert "FROM (SELECT generate_series(1, 100) AS n) t" in executed_sql
         assert "unnest(generate_series" not in executed_sql
 
+    @pytest.mark.parametrize(
+        ("platform_key", "expected"),
+        [
+            ("snowflake", "FROM (SELECT value::INT AS n FROM TABLE(FLATTEN(ARRAY_GENERATE_RANGE(1, 100 + 1)))) t"),
+            ("bigquery", "FROM (SELECT n FROM UNNEST(GENERATE_ARRAY(1, 100)) AS n) t"),
+        ],
+    )
+    def test_rewrites_generate_series_for_cloud_dialects(self, tmp_path: Path, platform_key: str, expected: str):
+        """Snowflake and BigQuery have neither unnest nor generate_series (verified live)."""
+        bench = _make_benchmark(tmp_path)
+        bench.operations_manager.get_operation.return_value = _make_operation(
+            write_sql="""
+                BEGIN TRANSACTION;
+                INSERT INTO txn_orders
+                SELECT 9200000 + n, 1
+                FROM (SELECT unnest(generate_series(1, 100)) AS n) t;
+                COMMIT;
+            """,
+        )
+        conn = _make_connection()
+
+        bench.execute_operation("op1", conn, platform_key=platform_key)
+
+        executed_sql = conn.execute.call_args.args[0]
+        assert expected in executed_sql
+        assert "generate_series" not in executed_sql
+
     def test_rewrites_isolation_level_begin_for_postgres(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(

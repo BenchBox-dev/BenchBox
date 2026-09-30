@@ -12,6 +12,7 @@ import pytest
 
 from benchbox.core.ssb.benchmark import SSBBenchmark
 from benchbox.platforms.clickhouse import ClickHouseAdapter
+from benchbox.platforms.clickhouse._dependencies import import_chdb
 
 pytestmark = [
     pytest.mark.integration,
@@ -19,8 +20,11 @@ pytestmark = [
 ]
 
 
-# Skip all tests if chdb is not available
-chdb = pytest.importorskip("chdb", exc_type=ImportError)
+# Skip all tests if chdb is not available.
+try:
+    chdb = import_chdb()
+except ImportError as exc:
+    pytest.skip(f"chDB not installed: {exc}", allow_module_level=True)
 
 
 class TestSSBClickHouseIntegration:
@@ -71,12 +75,11 @@ class TestSSBClickHouseIntegration:
         """Test that SSB tables can be created in ClickHouse without explicit ENGINE clauses."""
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
-        # Create a temporary database
-        temp_dir = tempfile.mkdtemp(suffix=".db.chdb")
-        temp_path = Path(temp_dir)
+        # chDB pins one EmbeddedServer path per worker process. Use the default
+        # in-memory path so this file composes with other chDB tests under xdist.
+        client = ClickHouseLocalClient()
 
         try:
-            client = ClickHouseLocalClient(db_path=temp_dir)
             adapter = ClickHouseAdapter(deployment_mode="local")
             # Use compression_type="none" to avoid zstd dependency
             benchmark = SSBBenchmark(scale_factor=0.01, compress_data=False, compression_type="none")
@@ -97,25 +100,17 @@ class TestSSBClickHouseIntegration:
 
             for name, engine in engine_result:
                 assert engine == "MergeTree", f"Table {name} should use MergeTree engine, got {engine}"
-
-            client.close()
-
         finally:
-            # Clean up
-            if temp_path.exists():
-                shutil.rmtree(temp_path)
+            client.close()
 
     def test_ssb_data_loading_with_clickhouse(self):
         """Test complete SSB data generation and loading with ClickHouse."""
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
-        # Create a temporary database
-        temp_dir = tempfile.mkdtemp(suffix=".db.chdb")
-        temp_path = Path(temp_dir)
         data_dir = Path(tempfile.mkdtemp(prefix="ssb-data-"))
+        client = ClickHouseLocalClient()
 
         try:
-            client = ClickHouseLocalClient(db_path=temp_dir)
             adapter = ClickHouseAdapter(deployment_mode="local")
             benchmark = SSBBenchmark(
                 scale_factor=0.01,
@@ -149,13 +144,8 @@ class TestSSBClickHouseIntegration:
                 count_result = client.execute(f"SELECT COUNT(*) FROM {table_name}")
                 row_count = count_result[0][0]
                 assert row_count > 0, f"Table {table_name} should have data"
-
-            client.close()
-
         finally:
-            # Clean up
-            if temp_path.exists():
-                shutil.rmtree(temp_path)
+            client.close()
             if data_dir.exists():
                 shutil.rmtree(data_dir)
 
@@ -163,13 +153,10 @@ class TestSSBClickHouseIntegration:
         """Test that SSB queries can execute on ClickHouse (basic smoke test)."""
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
-        # Create a temporary database
-        temp_dir = tempfile.mkdtemp(suffix=".db.chdb")
-        temp_path = Path(temp_dir)
         data_dir = Path(tempfile.mkdtemp(prefix="ssb-data-"))
+        client = ClickHouseLocalClient()
 
         try:
-            client = ClickHouseLocalClient(db_path=temp_dir)
             adapter = ClickHouseAdapter(deployment_mode="local")
             benchmark = SSBBenchmark(
                 scale_factor=0.01,
@@ -198,13 +185,8 @@ class TestSSBClickHouseIntegration:
             result = client.execute(simple_query)
             # Should have some results for the date range
             assert len(result) > 0
-
-            client.close()
-
         finally:
-            # Clean up
-            if temp_path.exists():
-                shutil.rmtree(temp_path)
+            client.close()
             if data_dir.exists():
                 shutil.rmtree(data_dir)
 

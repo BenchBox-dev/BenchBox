@@ -1497,18 +1497,24 @@ export async function getExistingResultIds(
   onInitialExistingIds?.(existing);
   // A non-empty batch is only a positive hint: one readable row can make
   // `queryRows` return while another requested row group is still cold.
-  // Confirm every omission separately so each zero-row answer gets the normal
-  // cold-read retries. Compare caps this fan-out at four candidate IDs.
+  // Confirm omissions against a complete scan. An incomplete scan returns no
+  // rows and keeps the normal cold-read retries; a complete scan returns one
+  // nullable row so a genuinely absent ID does not consume that retry budget.
+  // Compare caps this fan-out at four candidate IDs.
   const confirmedRows = await Promise.all(
     resultIds.filter((resultId) => !existing.has(resultId)).map((resultId) =>
-      queryRows<{ result_id: string }>(
-        "SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?",
+      queryRows<{ result_id: string | null }>(
+        `SELECT MAX(CASE WHEN result_id = ? THEN result_id END) AS result_id
+         FROM bench.result_detail_metrics
+         HAVING COUNT(DISTINCT result_id) = (SELECT COUNT(*) FROM bench.results)`,
         [resultId],
       ),
     ),
   );
   for (const rows of confirmedRows) {
-    for (const row of rows) existing.add(row.result_id);
+    for (const row of rows) {
+      if (row.result_id !== null) existing.add(row.result_id);
+    }
   }
   return existing;
 }

@@ -9,14 +9,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import click
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
 
 # Import DryRunExecutor from core module
-from benchbox.core.dryrun import DryRunExecutor as CoreDryRunExecutor
-from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, DryRunResult
+from benchbox.core.dryrun import DryRunExecutor as CoreDryRunExecutor, DryRunQueryExtractionError
+from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig, DryRunResult, SystemProfile
 from benchbox.utils.printing import quiet_console
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -932,6 +933,18 @@ class DryRunExecutor(CoreDryRunExecutor):
         super().__init__(output_dir)
         self.console = quiet_console
         self.display = DryRunDisplay(self.console)
+
+    def execute_dry_run(
+        self,
+        benchmark_config: BenchmarkConfig,
+        system_profile: SystemProfile,
+        database_config: DatabaseConfig | None,
+    ) -> DryRunResult:
+        """Execute a dry run and translate rendering failures into clean CLI errors."""
+        try:
+            return super().execute_dry_run(benchmark_config, system_profile, database_config)
+        except DryRunQueryExtractionError as exc:
+            raise click.ClickException(str(exc)) from exc
 
     def display_dry_run_results(self, result: DryRunResult):
         """Display dry run results using the display component."""

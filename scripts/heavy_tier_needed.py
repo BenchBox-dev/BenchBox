@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Decide whether a pr.yml run needs the heavy test tier.
+"""Decide whether a ci.yml run needs the heavy test tier.
 
 The heavy tier (medium-test, correctness-gate, plan-capture-gate,
 tpch-binary-framing, and the postgres/datafusion/clickhouse integration
