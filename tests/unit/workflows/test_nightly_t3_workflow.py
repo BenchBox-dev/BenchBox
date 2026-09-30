@@ -8,12 +8,16 @@ issue-write permission held by the reporting job only, and SHA-pinned actions.
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+
+from tests.utilities.posix_shell import posix_shell, skip_without_posix_shell
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -32,6 +36,7 @@ DOMAIN_JOBS = {
     "install": "t3:install",
     "drift": "t3:drift",
     "quarantine": "t3:quarantine",
+    "linkcheck": "t3:linkcheck",
     "durations-refresh": "t3:durations",
 }
 
@@ -55,6 +60,20 @@ def _steps(job: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _run_text(job: dict[str, Any]) -> str:
     return "\n".join(str(step.get("run", "")) for step in _steps(job))
+
+
+def _run_workflow_script(script: str, cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    skip_without_posix_shell()
+    shell = posix_shell()
+    assert shell is not None
+    return subprocess.run(
+        [shell, "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", 'export PATH="$PWD:$PATH"\n' + script],
+        cwd=cwd,
+        env={**os.environ, **(env or {})},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def test_triggers_are_schedule_and_dispatch_without_branch_filters() -> None:
@@ -134,6 +153,100 @@ def test_quarantine_job_tolerates_unregistered_marker() -> None:
     text = _run_text(_load()["jobs"]["quarantine"])
     assert "-m quarantine" in text
     assert "pytest.mark.quarantine" in text, "job must check marker registration before selecting it"
+
+
+@pytest.mark.parametrize("pytest_exit, expected", [(0, 0), (1, 1), (2, 2), (5, 0)])
+def test_quarantine_exit_codes_under_runner_shell(tmp_path: Path, pytest_exit: int, expected: int) -> None:
+    stub = tmp_path / "uv"
+    stub.write_text(
+        '#!/usr/bin/env bash\nif [[ "$*" == *--markers* ]]; then\n'
+        '  echo "@pytest.mark.quarantine: quarantined tests"\nelse\n'
+        f"  exit {pytest_exit}\nfi\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    step = next(step for step in _steps(_load()["jobs"]["quarantine"]) if step.get("name") == "Run quarantined tests")
+    result = _run_workflow_script(step["run"], tmp_path)
+    assert result.returncode == expected, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("result_count", [0, 1, 2])
+def test_perf_comparison_uses_only_the_current_job_result(tmp_path: Path, result_count: int) -> None:
+    runner_temp = tmp_path / "job output"
+    output_root = runner_temp / "perf-smoke"
+    results = output_root / "results"
+    results.mkdir(parents=True)
+    for index in range(result_count):
+        (results / f"tpch_sf001_duckdb_sql_{index}.json").write_text("{}", encoding="utf-8")
+    job = _load()["jobs"]["perf"]
+    setup = next(step for step in _steps(job) if step.get("name") == "Set isolated benchmark output")
+    github_env = tmp_path / "github-env"
+    setup_result = _run_workflow_script(
+        setup["run"], tmp_path, {"RUNNER_TEMP": str(runner_temp), "GITHUB_ENV": str(github_env)}
+    )
+    assert setup_result.returncode == 0, setup_result.stdout + setup_result.stderr
+    key, _, configured_root = github_env.read_text().strip().partition("=")
+    assert key == "BENCHBOX_OUTPUT_DIR" and Path(configured_root) == output_root
+    step = next(step for step in _steps(job) if step.get("id") == "current")
+    github_output = tmp_path / "github-output"
+    result = _run_workflow_script(step["run"], tmp_path, {key: configured_root, "GITHUB_OUTPUT": str(github_output)})
+    assert (result.returncode == 0) == (result_count == 1), result.stdout + result.stderr
+    if result_count == 1:
+        assert github_output.read_text().strip() == f"path={results / 'tpch_sf001_duckdb_sql_0.json'}"
+
+
+@pytest.mark.parametrize("tier", ["fast", "slow"])
+@pytest.mark.parametrize("pytest_exit, tee_exit, expected", [(0, 0, 0), (1, 0, 0), (2, 0, 2), (5, 0, 5), (0, 1, 1)])
+def test_duration_measurement_keeps_assertion_reports_and_rejects_runner_failures(
+    tmp_path: Path, tier: str, pytest_exit: int, tee_exit: int, expected: int
+) -> None:
+    (tmp_path / "t3-durations").mkdir()
+    stub = tmp_path / "uv"
+    stub.write_text(
+        '#!/usr/bin/env bash\nfor arg in "$@"; do\n'
+        '  if [[ "$arg" == --junitxml=* ]]; then\n'
+        '    printf "<testsuite tests=\\"1\\"/>" > "${arg#--junitxml=}"\n'
+        "  fi\ndone\necho 'measurement output'\n"
+        f"exit {pytest_exit}\n",
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    if tee_exit:
+        tee = tmp_path / "tee"
+        tee.write_text(f"#!/usr/bin/env bash\ncat >/dev/null\nexit {tee_exit}\n", encoding="utf-8")
+        tee.chmod(0o755)
+    step = next(
+        step
+        for step in _steps(_load()["jobs"]["durations-refresh"])
+        if step.get("name") == f"Measure {tier} tier durations"
+    )
+    result = _run_workflow_script(step["run"], tmp_path)
+    assert result.returncode == expected, result.stdout + result.stderr
+    assert (tmp_path / "t3-durations" / f"junit-{tier}.xml").read_text() == '<testsuite tests="1"/>'
+
+
+@pytest.mark.parametrize("compare_exit", [0, 1])
+def test_perf_comparison_preserves_threshold_and_failure(tmp_path: Path, compare_exit: int) -> None:
+    current = tmp_path / "perf-smoke" / "results" / "tpch_sf001_duckdb_sql_current.json"
+    arguments = tmp_path / "compare-arguments"
+    step = next(
+        step
+        for step in _steps(_load()["jobs"]["perf"])
+        if step.get("name") == "Compare against baseline (fail on >10% regression)"
+    )
+    script = step["run"].replace("${{ steps.current.outputs.path }}", str(current))
+    script = 'uv() { printf "%s\\n" "$@" > "$ARGUMENTS"; return "$COMPARE_EXIT"; }\n' + script
+    result = _run_workflow_script(script, tmp_path, {"ARGUMENTS": str(arguments), "COMPARE_EXIT": str(compare_exit)})
+    assert result.returncode == compare_exit, result.stdout + result.stderr
+    assert arguments.read_text().splitlines() == [
+        "run",
+        "benchbox",
+        "compare",
+        "_project/baselines/perf_smoke_duckdb_tpch_001.json",
+        str(current),
+        "--fail-on-regression",
+        "10%",
+    ]
 
 
 def test_durations_job_emits_pytest_durations_artifact() -> None:

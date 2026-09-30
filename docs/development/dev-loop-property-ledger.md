@@ -31,7 +31,7 @@ Classification values:
 | Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` | pending | open |
 | Wheel installability | `package-smoke` job, release workflow build | release workflow artifact verification | pending | open |
 | Dependency bounds | `scripts/check_dependency_bounds.py`, `tests/unit/scripts/test_check_dependency_bounds.py` | ci.yml `tooling` | pending | open |
-| Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml` | release workflow | pending | open |
+| Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml`, `scripts/release_flow.py`, `tests/unit/scripts/test_release_flow.py` | ci.yml always-required `ci-paths` selects release identity changes and checks them against the immutable event base; release workflow | pending | open |
 | Ruleset and settings drift | `scripts/ruleset_drift_check.py`, `.github/workflows/develop-ruleset-drift.yml`, `tests/unit/workflows/test_develop_ruleset_drift.py`, `tests/unit/release/test_ruleset_drift_review_coverage.py`, `tests/unit/release/test_ruleset_review_enforcement.py` | ci.yml `tooling` | pending | open |
 | Soundness-path owner hold | `_project/scripts/auto_merge_soundness_paths.py`, `tests/unit/test_auto_merge_soundness_paths.py`, `tests/unit/test_auto_merge_hold_is_durable.py` | ci.yml `tooling` soundness flag plus external adversarial review | pending | open |
 | Workflow context validity | `tests/unit/workflows/test_workflow_expression_contexts.py` | ci.yml `tooling` | pending | open |
@@ -70,7 +70,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `gitignore-lint.yml` | tooling | Hygiene; standalone, not part of the ci.yml units |
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3 |
-| `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift |
+| `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -187,6 +187,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_reference_usage_audit.py` | tooling |
 | `test_release_cut_start.py` | product-safety |
 | `test_release_finalize.py` | product-safety |
+| `test_release_flow.py` | product-safety |
 | `test_results_explorer_corpus_migrate.py` | product-safety |
 | `test_results_explorer_cpu_attestation_backfill.py` | product-safety |
 | `test_results_explorer_snapshot_invariants.py` | product-safety |
