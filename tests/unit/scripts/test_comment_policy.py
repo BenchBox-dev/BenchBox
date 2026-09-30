@@ -287,7 +287,7 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     step = next(step for step in job["steps"] if step.get("name") == "Enforce comment and docstring policy")
     assert 'git show "${BASE_REF}:scripts/run_comment_policy.py"' in step["run"]
     assert 'python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests' in step["run"]
-    assert "89a0f3fdd6d111712774db1095e84ca52d6b31a6" in step["run"]
+    assert "ed5c263c513ba65499f4918d3a7de607f280c65b" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
     assert "merge_group.base_sha" in step["env"]["BASE_REF"]
     tooling = workflow["jobs"]["tooling"]
