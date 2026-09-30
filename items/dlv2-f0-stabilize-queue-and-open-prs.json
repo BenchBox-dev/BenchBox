@@ -4,7 +4,7 @@
     "#2439, #2441, #2443 merged or enqueued with all checks green",
     "Ruleset before/after JSON archived for the tooling addition"
   ],
-  "context": "Part of the stop-the-world flip restructure (2026-09-29). Dual-running old and new CI is untenable on this runner budget.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN; original2h03restoration deviation must stayhonest. Guard2478 actualMERGED517 at11:56:10/all6merge_groupSUCCESS resolvestrunk-only two-dot+shallowancestryfalsechecks. Stop queuehasexisting2447 position1; do not cancel/reorder/enqueuewhile handingoff. COI2470 next afterexistingqueue completes, then normalmergeacceptedworkflowchanges intoT22464/freshcanonical/serialqueue proof. Preparedsource-green2392/2395/2396/2408/2411/2468/2477 remain unmerged; Q17/timingnewlocalincrements unpublished. FullallPRconflicts/threadpages/exactsourceCI/currentreceipt/serialmergeproof and broadf2matrix remain. No ownerheldvisualapproval; no cloud/destructivecleanup/prodPyPI. Allworkersstopped/goalPAUSED. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
+  "context": "Part of the stop-the-world flip restructure (2026-09-29). Dual-running old and new CI is untenable on this runner budget.\n\nResumed by explicit user request on 2026-09-30. Original 2h03 restoration deviation remains unresolved/honest. Guard #2478 actually merged as517aebe/all6 merge_group SUCCESS, resolving trunk-only two-dot and shallow-ancestry false checks. #2447 now actually MERGED at12:38:04Z as89a0f3fdd6d111712774db1095e84ca52d6b31a6; run36712824662 SUCCESS with all six required units. COI2470 canonical passed clean head e3b7463cdee1f169fe67e9cbb145e63ef7137637/current base89a0, ordered55119-1790772795646943000 at12:53:15Z. make pr-ready enqueued it at12:54:59Z after live readiness verification. Scheduled observation13:05:27Z: still OPEN, merge_group36717960272 in_progress/headed5c263c513ba65499f4918d3a7de607f280c65b, not acceptance yet. Next after COI actual merge: normal merge accepted develop into T22464, fresh canonical and serial queue runtime/coverage proof.\n\nFresh read-only backlog sweep found33 open develop PRs; readiness snapshot /tmp/dlv2-backlog-sweep-1250.json/.md. Exact-head latest-run search and fully paginated threads/files. Only2470/2472/2473/2475/2477 looked ready, other28 blocked. Older-source workflow differences remain historical, not proof of missing original CI. Current holds2392/2395/2396/2408/2411 and exact held visual heads2385/2382/2381 stay untouched. No cloud, production PyPI, destructive cleanup or unproven retirement.\n\nRoot claim generation5c9257d0718447ea87fd5ea8f10b834c. Five Sonnet workers failed429 and were terminal before replacement. Current user requested all subagents GPT-6.1-Sol low effort. Six fresh workers own separate worktrees for hermetic12, adapter14, required15 first slice, release51 draft, timing2448 refresh, and Q17 publication preparation. Workers commit locally only, coordinator alone publishes/enqueues. Shared test lock remains enforced. No unfinished item marked done. Authoritative earlier checkpoint /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md remains scope and prior evidence.",
   "description": "Unstick the open dev-loop PRs. The queue retune (builds 5->2, timeout) is MOVED INTO the flip (dlv2-f3): scripts/ruleset_drift_check.py pins APPROVED_MERGE_QUEUE (ALLGREEN, 60 min, build 5, merge 5) in code on develop, and ruleset-drift is required, so changing live queue parameters before develop's pinned values change fails every PR closed (G11). A 15-second attempt at 12:04:56-12:05:11Z on 2026-09-29 was reverted from backup; no drift run overlapped it.\nSteps: (1) #2444 (dlv2-32) green, enqueued ALONE, merged; then immediately add `tooling` to ruleset 15611785 required checks (its drift contract documents `tooling`; the gap is fail-closed until added). (2) Then enqueue green #2439 (ledger) and #2441 (chdb guard). (3) #2443 (tiering) is green and was in the queue at 12:04Z. Stale-base PRs (>~1 day behind develop) fail the fast-lane baseline guard because the exact-SHA cache key expired: rebase before enqueueing.",
   "sessions": [
     {
@@ -38,6 +38,14 @@
       "generation": "5c9257d0718447ea87fd5ea8f10b834c",
       "op": "take",
       "op_id": "7a5bdca3153c4838a3290271090a29af",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-30T13:09:49Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "8cebb784e85148b4a504a4ce6936d85c",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
