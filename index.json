@@ -3206,6 +3206,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from experimental code"
     },
+    "comment-cleanup-explorer-build": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from Explorer build, browser tests and configuration"
+    },
     "comment-cleanup-explorer-data": {
       "claim": null,
       "needs": [
