@@ -205,7 +205,22 @@ def test_unreadable_base_ref_fails_closed() -> None:
     assert "failed closed" in result["reason"]
 
 
-@pytest.mark.parametrize("raw", ["null", "[]", "not json"])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "null",
+        "[]",
+        "not json",
+        "{}",
+        '{"needs_code_ci": null, "packaging_needed": false, "changed_paths": []}',
+        '{"needs_code_ci": 0, "packaging_needed": false, "changed_paths": []}',
+        '{"needs_code_ci": false, "packaging_needed": null, "changed_paths": []}',
+        '{"needs_code_ci": false, "changed_paths": []}',
+        '{"needs_code_ci": false, "packaging_needed": false}',
+        '{"needs_code_ci": false, "packaging_needed": false, "changed_paths": [42]}',
+        '{"needs_code_ci": false, "packaging_needed": false, "changed_paths": [""]}',
+    ],
+)
 def test_invalid_cli_decisions_publish_the_safe_direction(tmp_path: Path, raw: str) -> None:
     decision = tmp_path / "decision.json"
     decision.write_text(raw, encoding="utf-8")
@@ -232,4 +247,9 @@ def test_event_and_packaging_carve_outs_preserve_the_full_tier() -> None:
     assert heavy.heavy_needed(_decision([]), "merge_group", "absent", REPO_ROOT)["heavy_needed"] is True
     decision = {**_decision([]), "packaging_needed": True}
     assert heavy.heavy_needed(decision, "pull_request", "absent", REPO_ROOT)["heavy_needed"] is True
-    assert heavy.heavy_needed({"needs_code_ci": False}, "pull_request", "absent", REPO_ROOT)["heavy_needed"] is False
+    assert (
+        heavy.heavy_needed({**_decision([]), "needs_code_ci": False}, "pull_request", "absent", REPO_ROOT)[
+            "heavy_needed"
+        ]
+        is False
+    )

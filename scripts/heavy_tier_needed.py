@@ -162,16 +162,21 @@ def heavy_needed(
 ) -> dict[str, Any]:
     """Return ``{heavy_needed, reason}``; lookup failure fails closed to true."""
     try:
-        needs_code_ci = bool(decision.get("needs_code_ci"))
+        for flag in ("needs_code_ci", "packaging_needed"):
+            if not isinstance(decision.get(flag), bool):
+                raise HeavyTierError(f"decision has no boolean {flag}")
+        changed = decision.get("changed_paths")
+        if not isinstance(changed, list) or any(
+            not isinstance(path, str) or not path or "\n" in path or "\r" in path for path in changed
+        ):
+            raise HeavyTierError("decision has no unambiguous changed_paths list of strings")
+        needs_code_ci = decision["needs_code_ci"]
         if not needs_code_ci:
             return {"heavy_needed": False, "reason": "not a code-routed tree; the light lane already covers it"}
         if event == MERGE_GROUP_EVENT:
             return {"heavy_needed": True, "reason": "merge_group runs keep the full tier on every code-routed tree"}
-        if bool(decision.get("packaging_needed")):
+        if decision["packaging_needed"]:
             return {"heavy_needed": True, "reason": "packaging paths touched (packaging carve-out)"}
-        changed = decision.get("changed_paths")
-        if not isinstance(changed, list):
-            raise HeavyTierError("decision has no changed_paths list")
         touched, reason = soundness_touched(changed, base_ref, repo_root, read_base, read_pr)
         if touched:
             return {"heavy_needed": True, "reason": f"{reason} (soundness carve-out)"}
