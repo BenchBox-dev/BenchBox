@@ -19,6 +19,7 @@ from tests.integration.test_local_platform_benchmark_matrix import (
     LOCAL_SQL_STABLE_MATRIX,
     _validate_against_expected_results,
 )
+from tests.utilities.paths import REPO_ROOT
 
 pytestmark = [
     pytest.mark.unit,
@@ -83,7 +84,7 @@ def _run_skill_integrity_preflight_route(
             f"PATH_LISTS={lists_path}",
             f"MAKE={fake_make}",
         ],
-        cwd=Path.cwd(),
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=60,
@@ -118,7 +119,7 @@ class TestStandardizedTestCommands:
         env = {**subprocess.os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "--collect-only", "-q"],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=120,
@@ -140,7 +141,7 @@ class TestStandardizedTestCommands:
                 "--collect-only",
                 "-q",
             ],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=120,
@@ -154,7 +155,7 @@ class TestStandardizedTestCommands:
         env = {**subprocess.os.environ, "BENCHBOX_SKIP_TEST_LOCK": "1"}
         result = subprocess.run(
             [sys.executable, "-m", "pytest", "-m", "unit", "--collect-only", "-q"],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=120,
@@ -243,7 +244,7 @@ class TestMakefileCommands:
 
         result = subprocess.run(
             ["make", "--no-print-directory", "test-unlock"],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=30,
@@ -408,7 +409,7 @@ class TestMakefileCommands:
 
         result = subprocess.run(
             [make, "--no-print-directory", "skill-integrity-check"],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=60,
@@ -443,7 +444,7 @@ class TestMakefileCommands:
 
         result = subprocess.run(
             [make, "--no-print-directory", "pr-preflight-uncached", f"MAKE={fake_make}"],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=60,
@@ -499,7 +500,7 @@ class TestMakefileCommands:
 
         result = subprocess.run(
             [make, "--no-print-directory", "pr-preflight-fast-tests", f"MAKE={fake_make}"],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=60,
@@ -705,7 +706,7 @@ class TestMakefileCommands:
                 "stress",
                 CORRECTNESS_GATE_NODEID,
             ],
-            cwd=Path.cwd(),
+            cwd=REPO_ROOT,
             capture_output=True,
             text=True,
             timeout=300,

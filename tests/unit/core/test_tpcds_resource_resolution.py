@@ -12,6 +12,7 @@ from benchbox.core.tpcds.c_tools import (
 )
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.utils.tpc_compilation import get_precompiled_bundle_root
+from tests.utilities.paths import REPO_ROOT
 
 pytestmark = [
     pytest.mark.unit,
@@ -75,14 +76,14 @@ def test_sample_dataset_detected_for_fractional_scale(tmp_path) -> None:
     sample_dir = bundle_root / "samples" / "tpcds_sf001"
 
     if not sample_dir.exists():
-        sample_dir = Path.cwd() / "examples/data/tpcds_sf001"
+        sample_dir = REPO_ROOT / "examples" / "data" / "tpcds_sf001"
     if not sample_dir.exists():
         pytest.skip("No sample dataset available for scale factor 0.01")
 
     # Build a minimal generator instance without invoking scale-factor validation.
     generator = object.__new__(TPCDSDataGenerator)
     generator.scale_factor = 0.01
-    generator._package_root = Path.cwd()
+    generator._package_root = REPO_ROOT
     generator.should_use_compression = lambda: True
     detected = TPCDSDataGenerator._get_sample_data_dir(generator)
 

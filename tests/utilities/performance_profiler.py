@@ -30,6 +30,8 @@ from typing import Any, Optional
 
 import psutil
 
+from tests.utilities.paths import REPO_ROOT
+
 
 @dataclass
 class PerformanceMetrics:
@@ -521,7 +523,7 @@ def profile_pytest_run(test_command: list[str], output_file: Optional[Path] = No
 
     with profiler.profile_test("pytest_run"):
         # Run pytest with monitoring
-        result = subprocess.run(test_command, capture_output=True, text=True, cwd=Path.cwd())
+        result = subprocess.run(test_command, capture_output=True, text=True, cwd=REPO_ROOT)
 
     # Generate report
     report = profiler.generate_performance_report()
