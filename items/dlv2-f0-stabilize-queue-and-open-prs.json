@@ -97,6 +97,17 @@
       "op": "take",
       "op_id": "81bceafd080d482a82e01031f105ffdd",
       "session_id": "eccb1149a7b54c54a1f2f83d29cc85a6"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:7c837248ce5f53beb41a048e",
+      "at": "2026-09-30T22:55:35Z",
+      "client": "antigravity-client",
+      "displaced": "mcp:opencode:joe@joe-mac-mini.local:f22ca8037e78131372fd9481",
+      "generation": "0bc17cdc976347798a267cd3ead39976",
+      "op": "takeover",
+      "op_id": "299bacc3d4814eb6a25a7bf9c3112a99",
+      "reason": "Interrupted Claude session 3931bf2a-d2fa-419f-84d1-0b420d82c12d hit rate limit; taking over per user instruction",
+      "session_id": "689c42d34d544d54b2f313cec2a2e296"
     }
   ]
 }
