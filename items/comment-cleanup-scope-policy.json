@@ -55,6 +55,17 @@
       "op_id": "43ff2209e8e74843bdc6901116f6ef9d",
       "reason": "User stopped holder session 452ce7dd (last activity 13:27Z, agents stopped) and confirmed it is abandoned; its MCP server is idle with no driving agent.",
       "session_id": "8fd03255e94f4e3fa00f4b772a0a98cb"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:7a192fede8100d9e3805747d",
+      "at": "2026-09-30T22:53:00Z",
+      "client": "antigravity-client",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:08eade2b384c32b2ed4f2a38",
+      "generation": "03d491aa243c499eadc30289e77c3a7c",
+      "op": "takeover",
+      "op_id": "2638000e3ece47579662977445ceeb31",
+      "reason": "Claude session 278c5f7f-fe02-4e67-9f6d-b035c95ca36b hit session limit and was interrupted; taking over per user instruction",
+      "session_id": "3b9fbb9580624290ac8efc508b354318"
     }
   ]
 }
