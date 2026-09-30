@@ -3206,6 +3206,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from equivalence and soundness code"
     },
+    "comment-cleanup-examples": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from runnable examples and notebooks"
+    },
     "comment-cleanup-expected-wrapper": {
       "claim": null,
       "needs": [
