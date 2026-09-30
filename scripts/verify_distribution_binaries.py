@@ -39,7 +39,7 @@ def _member_name(raw_name: str, seen: dict[str, bool], binary_prefix: str, direc
 
 
 def verify_distribution_binaries(distribution: Path, source_root: Path = DEFAULT_ROOT) -> None:
-    """Reject missing, extra, replaced, or linked bundled files in a distribution."""
+    """Reject bundled file changes, including lost POSIX execute permissions."""
     verify_binary_tree(source_root)
     trusted_manifest = (source_root / MANIFEST_NAME).read_bytes()
     source_files = {
@@ -47,12 +47,15 @@ def verify_distribution_binaries(distribution: Path, source_root: Path = DEFAULT
         for path in source_root.rglob("*")
         if path.is_file()
     }
+    source_execute_modes = {name: (source_root / name).stat().st_mode & 0o111 for name in source_files}
     payloads: dict[str, bytes] = {}
     seen: dict[str, bool] = {}
 
-    def store(name: str, size: int, payload: bytes) -> None:
+    def store(name: str, size: int, mode: int, payload: bytes) -> None:
         if name not in source_files or name in payloads or size != source_files[name]:
             raise ValueError(f"distribution bundled binary membership or size differs: {name}")
+        if mode & 0o111 != source_execute_modes[name]:
+            raise ValueError(f"distribution bundled binary execute permissions differ: {name}")
         payloads[name] = payload
 
     if distribution.name.endswith(".whl"):
@@ -69,7 +72,7 @@ def verify_distribution_binaries(distribution: Path, source_root: Path = DEFAULT
                 name = member.removeprefix(prefix)
                 if name not in source_files or entry.file_size != source_files[name]:
                     raise ValueError(f"distribution bundled binary membership or size differs: {name}")
-                store(name, entry.file_size, archive.read(entry))
+                store(name, entry.file_size, mode, archive.read(entry))
     elif distribution.name.endswith(".tar.gz"):
         with tarfile.open(distribution, "r:gz") as archive:
             prefix = distribution.name.removesuffix(".tar.gz") + "/benchbox/_binaries/"
@@ -86,7 +89,7 @@ def verify_distribution_binaries(distribution: Path, source_root: Path = DEFAULT
                 if stream is None:
                     raise ValueError(f"distribution bundled binary cannot be read: {name}")
                 with stream:
-                    store(name, entry.size, stream.read())
+                    store(name, entry.size, entry.mode, stream.read())
     else:
         raise ValueError("distribution must be a wheel or .tar.gz sdist")
     manifest = payloads.pop(MANIFEST_NAME, None)

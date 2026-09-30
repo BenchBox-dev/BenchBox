@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import stat
 import tarfile
 import zipfile
@@ -103,13 +104,16 @@ def _write_distribution(
     extra_name: str | None = None,
     extra_type: int = stat.S_IFREG,
     extra_payload: bytes = b"evil",
+    binary_mode: int = 0o644,
 ) -> None:
     if destination.suffix == ".whl":
         with zipfile.ZipFile(destination, "w") as archive:
             for name, payload in files.items():
                 entry = zipfile.ZipInfo("benchbox/_binaries/" + name)
                 entry.create_system = 3
-                entry.external_attr = (stat.S_IFLNK if link and name == "linux/dbgen" else stat.S_IFREG) << 16
+                file_type = stat.S_IFLNK if link and name == "linux/dbgen" else stat.S_IFREG
+                mode = binary_mode if name == "linux/dbgen" else 0o644
+                entry.external_attr = (file_type | mode) << 16
                 archive.writestr(entry, payload)
             if duplicate:
                 with pytest.warns(UserWarning, match="Duplicate name"):
@@ -125,6 +129,7 @@ def _write_distribution(
             for name, payload in files.items():
                 entry = tarfile.TarInfo(prefix + name)
                 entry.size = len(payload)
+                entry.mode = binary_mode if name == "linux/dbgen" else 0o644
                 if link and name == "linux/dbgen":
                     entry.type = tarfile.SYMTYPE
                     entry.linkname = "/outside"
@@ -165,6 +170,26 @@ def test_distribution_uses_trusted_source_manifest(
         verify_distribution_binaries(distribution, binary_root)
     else:
         with pytest.raises(ValueError):
+            verify_distribution_binaries(distribution, binary_root)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX executable permissions require a POSIX source filesystem")
+@pytest.mark.parametrize("extension", ["whl", "tar.gz"])
+@pytest.mark.parametrize("mode", [0o755, 0o644, 0o654])
+def test_distribution_preserves_generator_execute_permissions(
+    binary_root: Path, tmp_path: Path, extension: str, mode: int
+) -> None:
+    binary = binary_root / "linux" / "dbgen"
+    binary.chmod(0o755)
+    files = {
+        path.relative_to(binary_root).as_posix(): path.read_bytes() for path in binary_root.rglob("*") if path.is_file()
+    }
+    distribution = tmp_path / ("benchbox-1.2.3." + extension)
+    _write_distribution(distribution, files, binary_mode=mode)
+    if mode == 0o755:
+        verify_distribution_binaries(distribution, binary_root)
+    else:
+        with pytest.raises(ValueError, match="execute permissions"):
             verify_distribution_binaries(distribution, binary_root)
 
 
