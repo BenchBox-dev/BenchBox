@@ -3215,6 +3215,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from monitoring and profiling"
     },
+    "comment-cleanup-nyctaxi": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from NYC Taxi modules"
+    },
     "comment-cleanup-pilot-budget": {
       "claim": null,
       "needs": [
