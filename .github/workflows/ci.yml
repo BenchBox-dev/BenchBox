@@ -830,6 +830,11 @@ jobs:
       - name: Timing policy (wall-clock allowlist)
         id: guard-timing-policy
         continue-on-error: true
+        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+
+      - name: Fast lane ceiling
+        id: guard-fast-lane-ceiling
+        continue-on-error: true
         # A merge group composes independently green PRs, so an overage of up
         # to one delta limit per possible queued entry warns instead of
         # ejecting the group. The script grants the grace only when the runner's own event file
@@ -844,7 +849,7 @@ jobs:
             # every independently compliant composition from being ejected.
             args+=(--ceiling-grace 750)
           fi
-          uv run -- python _project/scripts/timing_policy_check.py "${args[@]}"
+          uv run -- python _project/scripts/fast_lane_ceiling_check.py "${args[@]}"
 
       - name: Restore fast-lane develop baseline count
         # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
@@ -862,7 +867,7 @@ jobs:
         # Pull requests only: in a merge group the delta is the sum of every
         # composed PR, so it would eject groups whose members each fit.
         if: github.event_name == 'pull_request'
-        # Additive to guard-timing-policy above, never a replacement: that
+        # Additive to guard-fast-lane-ceiling above, never a replacement: that
         # step enforces the absolute max_fast_tests ceiling unconditionally.
         # The pull-request lane requires the exact develop baseline so every
         # queued member proves its +150 per-PR delta before composition grace
@@ -870,7 +875,7 @@ jobs:
         # prerequisite.
         id: guard-fast-lane-delta
         continue-on-error: true
-        run: uv run -- python _project/scripts/timing_policy_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
+        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
 
       - name: UAT spec LOC table drift check
         # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
@@ -1932,9 +1937,12 @@ jobs:
             ${{ runner.os }}-sphinx-
 
       - name: Build documentation
+        # -W turns every Sphinx warning into a failure, including unknown
+        # :doc: targets, so a broken cross-reference fails the docs unit
+        # instead of shipping. --keep-going still reports every warning.
         run: |
           cd docs
-          uv run sphinx-build -b html --keep-going . _build/html
+          uv run sphinx-build -b html -W --keep-going . _build/html
 
       # --- Results Explorer ---
       # Steps gate on package.json as a sentinel so the workflow degrades

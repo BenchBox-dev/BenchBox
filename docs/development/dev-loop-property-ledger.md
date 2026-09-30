@@ -171,6 +171,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_e2e_specs_have_no_hardcoded_ids.py` | tooling |
 | `test_explorer_build_contract.py` | product-safety |
 | `test_explorer_receipt_ui_contract.py` | product-safety |
+| `test_fast_lane_ceiling_check.py` | pure-process |
 | `test_fast_lane_ratchet_check.py` | pure-process |
 | `test_generate_changelog_entry.py` | product-safety |
 | `test_generate_corpus_inventory.py` | product-safety |
@@ -202,7 +203,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_sqlglot_generator_known_failures.py` | product-safety |
 | `test_sqlite_extract_repro.py` | product-safety |
 | `test_submission_workflow_waiver.py` | product-safety |
-| `test_timing_policy_modes.py` | product-safety |
+| `test_timing_policy_check.py` | product-safety |
 | `test_todo_review_own_edit_freshness.py` | tooling |
 | `test_todo_state_contract_check.py` | tooling |
 | `test_todo_state_workflow.py` | tooling |
@@ -311,7 +312,8 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `detect_self_binding.py` | product-safety | SQL self-binding lint (KEEP trap) |
 | `rp_scoped_check.py` | product-safety | read_primitives cross-surface check (KEEP trap) |
 | `timing_audit.py` | product-safety | Timing audit (KEEP trap) |
-| `timing_policy_check.py` | product-safety | Monotonic-clock policy; fast-lane ceiling retires separately (KEEP trap on wall-clock part) |
+| `timing_policy_check.py` | product-safety | Monotonic-clock policy (KEEP trap) |
+| `fast_lane_ceiling_check.py` | pure-process | Fast-lane ceiling and delta; retires with the fast lane |
 | `auto_merge_soundness_paths.py` | product-safety | Soundness path manifest |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
