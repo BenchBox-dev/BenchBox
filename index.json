@@ -5492,17 +5492,12 @@
       "title": "Build the flip branch: ci.yml with lean T2, and deletion of the legacy PR-gate and post-merge workflows"
     },
     "dlv2-f2-canary-prs": {
-      "claim": {
-        "expires_at": "2026-10-01T00:06:19Z",
-        "generation": "c0f0a754f84146feb1c55062a1f177d9",
-        "renewals": 0,
-        "worker": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef"
-      },
+      "claim": null,
       "needs": [
         "dlv2-f1-build-flip-branch"
       ],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Prove the flip branch with a canary PR set before the flip"
     },
     "dlv2-f3-flip-window": {
