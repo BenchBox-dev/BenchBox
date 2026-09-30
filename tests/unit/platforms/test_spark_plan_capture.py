@@ -48,6 +48,9 @@ class _FakeCursor:
     def execute(self, sql, *a, **k):
         self.last = sql
 
+    def fetchone(self):
+        return ("use_cached_result", "false") if self.last.strip().lower() == "set use_cached_result" else None
+
     def fetchall(self):
         return [(_PLAN_TEXT,)] if self.last.strip().upper().startswith("EXPLAIN") else [(1,)]
 

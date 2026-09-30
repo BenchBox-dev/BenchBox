@@ -1174,7 +1174,7 @@ def _warn_cross_bundle_timing(entries: list[tuple[dict[str, Any], ValidationResu
 #: ``platform.compute.cache_control``. Only these platforms can produce an
 #: absent receipt that contradicts a declared cache state; every other
 #: platform keeps the legacy absent-receipt exemption.
-_CACHE_RECEIPT_PLATFORMS = frozenset({"snowflake", "redshift"})
+_CACHE_RECEIPT_PLATFORMS = frozenset({"snowflake", "redshift", "databricks"})
 
 
 def _platform_records_cache_receipt(platform: dict) -> bool:

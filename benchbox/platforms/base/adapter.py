@@ -1350,7 +1350,7 @@ class PlatformAdapter(
         When the statement overhead probe timed out, its abandoned worker may
         still hold the connection: any further use (even driver-level locks)
         can hang or crash this completed run, so collect nothing more from it
-        and degrade to the safely collected client_link block.
+        and retain only safely cached evidence without touching the connection.
         """
         if self._link_probe_timed_out:
             self.logger.warning(
@@ -1364,12 +1364,23 @@ class PlatformAdapter(
     def _client_link_only_metadata(self) -> dict[str, Any]:
         """Degraded normalized metadata for a probe-tainted connection.
 
-        Carries only the safely collected ``client_link`` block so a timed-out
-        probe degrades the bundle instead of risking the completed run.
+        Retains safely cached client-link and cache-control evidence without
+        driver calls. Failed cache receipts must survive degradation so they
+        cannot become legacy receiptless evidence during bundle validation.
         """
+        from benchbox.platforms.cloud_shared import empty_cache_control_receipt, sanitize_cache_control_receipt
+
+        metadata: dict[str, Any] = {}
         if self._client_link_metadata:
-            return {"execution_environment": {"client_link": dict(self._client_link_metadata)}}
-        return {}
+            metadata["execution_environment"] = {"client_link": dict(self._client_link_metadata)}
+        cached_receipt = getattr(self, "_cache_control_receipt", None)
+        if cached_receipt is not None:
+            receipt = sanitize_cache_control_receipt(cached_receipt)
+            if receipt is None:
+                receipt = empty_cache_control_receipt()
+                receipt["errors"].append("Cached cache-control receipt has an unsupported shape")
+            metadata["platform_compute"] = {"cache_control": receipt}
+        return metadata
 
     def _resolve_normalized_metadata(self, connection: Any, platform_info: Mapping[str, Any] | None) -> dict[str, Any]:
         """Obtain normalized metadata and ensure run-scoped client_link metadata is included."""
