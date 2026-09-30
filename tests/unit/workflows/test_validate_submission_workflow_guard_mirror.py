@@ -19,6 +19,7 @@ rejected exactly as before.
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import pytest
@@ -51,17 +52,33 @@ def test_guard_step_binds_the_same_trust_signals_as_the_vendor_gate() -> None:
     assert env.get("PR_AUTHOR") == "${{ github.event.pull_request.user.login }}"
 
 
-def test_guard_step_still_covers_all_six_files() -> None:
-    script = _guard_step()["run"]
+def _guarded_paths(script: str) -> list[str]:
+    command = script.split("CHANGED_GUARD=$(", 1)[1].split("|| true)", 1)[0].replace("\\\n", "")
+    arguments = shlex.split(command)
+    return arguments[arguments.index("--") + 1 :]
+
+
+def test_guard_step_covers_the_validator_runtime_and_workflow() -> None:
+    paths = _guarded_paths(_guard_step()["run"])
     for f in [
         "scripts/validate_submission.py",
+        "scripts/publication/validator_parity.py",
         "benchbox/validation/bundle.py",
         "benchbox/core/results/query_status.py",
         "benchbox/core/results/schema_policy.py",
         "scripts/generate_corpus_inventory.py",
         ".github/workflows/validate-submission.yml",
     ]:
-        assert f in script
+        assert f in paths
+
+
+def test_comment_only_helper_path_cannot_satisfy_executable_guard_membership() -> None:
+    helper = "scripts/publication/validator_parity.py"
+    script = _guard_step()["run"]
+    executable_line = next(line for line in script.splitlines(keepends=True) if line.strip() == f"{helper} \\")
+    comment_only = script.replace(executable_line, "", 1)
+    assert helper in comment_only
+    assert helper not in _guarded_paths(comment_only)
 
 
 def _run_guard_body(*, changed_guard: str, is_fork: str, base_ref: str, head_ref: str, pr_author: str):
@@ -95,9 +112,10 @@ def _run_guard_body(*, changed_guard: str, is_fork: str, base_ref: str, head_ref
     )
 
 
-def test_trusted_mirror_pr_touching_guarded_files_passes() -> None:
+@pytest.mark.parametrize("changed_guard", ["scripts/validate_submission.py", "scripts/publication/validator_parity.py"])
+def test_trusted_mirror_pr_touching_guarded_files_passes(changed_guard: str) -> None:
     result = _run_guard_body(
-        changed_guard="scripts/validate_submission.py\nbenchbox/validation/bundle.py",
+        changed_guard=changed_guard,
         is_fork="false",
         base_ref="published-results",
         head_ref="auto/results-mirror-deadbeef",
@@ -122,11 +140,12 @@ def test_trusted_mirror_pr_touching_guarded_files_passes() -> None:
     ],
     ids=["fork-pr", "wrong-base", "non-matching-branch", "non-bot-author"],
 )
+@pytest.mark.parametrize("changed_guard", ["scripts/validate_submission.py", "scripts/publication/validator_parity.py"])
 def test_untrusted_shapes_touching_guarded_files_are_still_rejected(
-    is_fork: str, base_ref: str, head_ref: str, pr_author: str
+    is_fork: str, base_ref: str, head_ref: str, pr_author: str, changed_guard: str
 ) -> None:
     result = _run_guard_body(
-        changed_guard="scripts/validate_submission.py",
+        changed_guard=changed_guard,
         is_fork=is_fork,
         base_ref=base_ref,
         head_ref=head_ref,
