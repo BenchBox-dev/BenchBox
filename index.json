@@ -3133,6 +3133,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from FlightData modules"
     },
+    "comment-cleanup-h2odb": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from H2O db benchmark modules"
+    },
     "comment-cleanup-manifest": {
       "claim": null,
       "needs": [
