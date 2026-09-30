@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Comment-based workflow/Make extraction tests use stable structural/executable boundaries, preserving the original fragment and rejected trust behavior; no test becomes vacuous.",
+    "Gitignore waiver records and consuming workflow migrate atomically or retain only proven minimum consumed forms with exact pattern/owner/trigger.",
+    "Advertised platform/options and experimental support checks use authoritative metadata/docs, exercise nonempty valid and rejected cases, and preserve support boundaries.",
+    "New-comment and completed-scope checks plus scope/pinning guard land in required CI together; legacy is reported without silently allowing new content.",
+    "All owned maintained configuration/workflows lose discretionary comments and generator reintroduction; relevant policy prose is external and no lint/type/coverage gate is weakened.",
+    "Current Make inventory/receipts are legitimately regenerated and reviewed; historical monolith baseline and migration proof remain unchanged.",
+    "Shared paths/test ownership are published before module dispatch; unknown shared edits require integrator coordination rather than unilateral worker scope expansion."
+  ],
+  "context": "Planning basis: the aggressive comment/docstring-removal plan revised after external Claude Opus 5.5, medium-effort review. The reviewer originally rejected the draft; all 18 findings received dispositions (12 accepted, five narrowed, one rebutted). The updated plan has not received a second external review. Original source baseline 0697891d449b1e31f22e4842169f3b2e743337fb; planning worktree was created at newer origin/develop c7bcdb9bc1d713a0c616969b2eb3f19f3d1d86a1. Refresh all facts at implementation start.",
+  "description": "Singleton owner after contracts-gate finishes: Makefile/make current files, .github workflows, root quality/test/config files, .gitignore/.gitattributes/.dockerignore, pyproject remaining settings and owned instruction files. Own dedicated cross-module consumer tests including test_mirror_partial_validation_policy.py, test_release_infrastructure.py, test_advertised_platform_options.py and UAT test_cli_dispatch.py; other tasks explicitly exclude these files. Checker implementation stays with checker owner. Target: zero discretionary explanatory comments and authored explanatory docstrings in maintained first-party code. Only proven minimum machine directives and unavoidable provenance-bound required notices remain. Useful product strings must have an actual consumer; no inert constants, unused strings, fake metadata or dynamic __doc__ replacements. Never broaden lint/type/coverage ignores, weaken assertions, or turn unknown ownership/parser coverage into an exclusion.\n\nReplace prose-based workflow/Make extraction boundaries before deletion; preserve fragment scope and rejected trust cases. Migrate gitignore waiver reader atomically with exact structured waivers if a non-comment alternative is sound. Preserve Windows WA suppressions until their dedicated reader task resolves them. Advertising/support guards must inspect actual advertised metadata or authoritative external contracts, with nonempty accepted/rejected coverage; no unsupported product expansion. Reconcile policies that currently require inline explanations, including read-primitives catalog guidance. Wire new-content/completed-scope checks into always-reporting appropriate required CI with scope/pinning guards in the same change. Regenerate current Make inventory only through supported tooling; no edits to historical baseline/proofs. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Obtain later implementation authorization. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Freeze nonoverlapping code/test/doc paths with the integrator before dispatch. Ordinary independent PRs target develop; serialize shared test-lock checks and integration, not module edits. Required native/external soundness review remains mandatory, with no auto-merge bypass. No live cloud/stress, deployment, publication, historical-result rewriting, or unapproved external-repository writes.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:d448b08be5b969faae2e2a3d",
+      "at": "2026-09-30T00:04:09Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "7d5c93abf5224e4289adc18fa7229b8e",
+      "session_id": "ad486d2419af432fa889205fbc465e0c"
+    }
+  ]
+}

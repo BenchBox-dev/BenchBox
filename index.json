@@ -2940,6 +2940,16 @@
       "status": "open",
       "title": "Define comment-removal scope, provenance, ownership and exception policy"
     },
+    "comment-cleanup-shared-infrastructure": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-checker",
+        "comment-cleanup-contracts-gate"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Migrate shared comment consumers and enforce policy in CI and build configuration"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],
