@@ -3433,6 +3433,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from TPC-Havoc variant catalogs"
     },
+    "comment-cleanup-transaction-primitives": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from Transaction primitives modules"
+    },
     "comment-cleanup-tuning": {
       "claim": null,
       "needs": [
