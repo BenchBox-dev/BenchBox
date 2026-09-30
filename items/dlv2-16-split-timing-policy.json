@@ -4,7 +4,7 @@
     "Fast-lane ceiling code, its JSON policy, ceiling log, and the timing-policy-fast-lane pre-push hook are isolated so dlv2-42/dlv2-44 can delete them without touching (a)",
     "Property ledger row for monotonic-clock policy points at the new location"
   ],
-  "context": "agy A2 (verified): R1 wrongly deleted both.",
+  "context": "agy A2 (verified): R1 wrongly deleted both.\n\nStop checkpoint 2026-09-30 12:20 UTC: PR2448 remotea0d6098be65c880d6d316ba47a48e6f3ab6c5a13; clean LOCALe2c33d575614011df4601e58d49281f8ac5d7073 aftere950 merge/inventory217targets211public and acceptedP1 release-curation lists use both newproject-dependent tests. Meaningful isolatedgit-rm+actualpytestcollection OLD3FAIL1PASS→new100PASSzeroSKIP; Ruff/ty/hooksPASS, Tier2MuseSHIP0CriticalRequired/tmp/dlv2-2448-muse-review.log. Canonical not started; unpublished increment, P1thread stillunresolved. Must incorporate acceptedguard/currentdevelop, canonical/currentidentity/review/body thenmakepr-open and publishedfix reply/resolution. Existingclock/ceiling thresholds preserved. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
   "description": "_project/scripts/timing_policy_check.py enforces two unrelated things: (a) the product invariant that benchmark code uses benchbox.utils.clock.mono_time() rather than wall clocks (with timing_audit.py and a wall-clock allowlist; AGENTS.md documents it), and (b) the fast-lane test-count ceiling (_check_fast_lane_policy, _project/config/fast_lane_ceiling_log.md). (a) is product safety and stays as a pre-commit hook and T1 check. (b) is dev-loop machinery replaced by dlv2-13 duration tiering.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "760429b23ade4590858c11f7034786ae",
       "session_id": "d7561c70ac5a46c283d466ebfc7123ec"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T12:24:12Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "977b478bcd0445e6b0482463f26a4f94",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
