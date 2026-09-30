@@ -3269,6 +3269,15 @@
       "status": "open",
       "title": "Remove comments from Explorer pages and components"
     },
+    "comment-cleanup-external-ownership": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-scope-policy"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Resolve external tools and skill mirrors in comment-removal scope"
+    },
     "comment-cleanup-flightdata": {
       "claim": null,
       "needs": [
