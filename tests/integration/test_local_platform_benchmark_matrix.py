@@ -27,6 +27,7 @@ from benchbox.core.validation.query_validation import QueryValidator
 from tests.e2e.utils import is_dataframe_available, is_gpu_available, is_platform_available
 from tests.integration._cli_e2e_utils import run_cli_command
 from tests.required_local_cases import (
+    SQLITE_CASE_ITERATIONS,
     SQLITE_CASE_QUERY_IDS,
     SQLITE_CASE_SCALE_FACTOR,
     SQLITE_CASE_SEED,
@@ -561,6 +562,10 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
     if not is_platform_available("sqlite"):
         pytest.fail("sqlite is required for this case and must not be skipped")
 
+    checkout = Path(__file__).resolve().parents[2]
+    assert not tmp_path.resolve().is_relative_to(checkout), (
+        "SQLite case outputs must be outside the checkout; use an external --basetemp"
+    )
     case_dir = tmp_path / "sqlite_tpch_value_parity"
     case_dir.mkdir()
     output_dir = case_dir / "benchmark_runs"
@@ -583,6 +588,8 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
             ",".join(SQLITE_CASE_QUERY_IDS),
             "--seed",
             str(SQLITE_CASE_SEED),
+            "--iterations",
+            str(SQLITE_CASE_ITERATIONS),
             "--non-interactive",
         ],
         cwd=case_dir,
@@ -593,6 +600,7 @@ def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
     assert result.returncode == 0, f"CLI failed\nstdout:\n{result.stdout}\n\nstderr:\n{result.stderr}"
 
     _, payload = _load_result_payload(case_dir, "tpch")
+    _validate_phase_coverage(payload, ["generate", "load", "power"])
     check_measurement_multiset(payload.get("queries", []), expected_measurement_multiset())
 
     # Reopen the generated database and prove every table was populated.

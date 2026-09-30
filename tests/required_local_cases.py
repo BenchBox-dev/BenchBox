@@ -41,8 +41,8 @@ REQUIRED_LOCAL_CASES: tuple[str, ...] = (
 SQLITE_CASE_SCALE_FACTOR = 0.01
 SQLITE_CASE_SEED = 42
 SQLITE_CASE_QUERY_IDS: tuple[str, ...] = ("1", "6", "14")
-# The power phase records one measurement row per query per iteration; the
-# CLI default is three iterations.
+# The power phase records one measurement row per query per iteration.
+# The case passes this count explicitly rather than relying on a CLI default.
 SQLITE_CASE_ITERATIONS = 3
 VALUE_TOLERANCE = 1e-10
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections import Counter
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
@@ -35,6 +36,49 @@ def test_sqlite_node_exists_in_matrix_module() -> None:
 
     name = required.SQLITE_VALUE_PARITY_NODE.split("::", 1)[1]
     assert callable(getattr(matrix, name))
+
+
+def test_sqlite_case_rejects_checkout_owned_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.integration import test_local_platform_benchmark_matrix as matrix
+
+    monkeypatch.setattr(matrix, "is_platform_available", lambda platform: True)
+    checkout = Path(matrix.__file__).resolve().parents[2]
+    with pytest.raises(AssertionError, match="outside the checkout"):
+        matrix.test_sqlite_tpch_fixed_seed_value_parity(checkout)
+
+
+def test_sqlite_case_pins_workload_and_owns_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from tests.integration import test_local_platform_benchmark_matrix as matrix
+
+    class CapturedCommand(Exception):
+        pass
+
+    captured: dict = {}
+
+    def capture(args, **kwargs):
+        captured.update(args=args, **kwargs)
+        raise CapturedCommand
+
+    monkeypatch.setattr(matrix, "is_platform_available", lambda platform: True)
+    monkeypatch.setattr(matrix, "run_cli_command", capture)
+    monkeypatch.setenv("BENCHBOX_OUTPUT_DIR", str(tmp_path / "unrelated"))
+    with pytest.raises(CapturedCommand):
+        matrix.test_sqlite_tpch_fixed_seed_value_parity(tmp_path)
+    args = captured["args"]
+    for flag, value in {
+        "--platform": "sqlite",
+        "--benchmark": "tpch",
+        "--scale": "0.01",
+        "--phases": "generate,load,power",
+        "--queries": "1,6,14",
+        "--seed": "42",
+        "--iterations": "3",
+    }.items():
+        assert args[args.index(flag) + 1] == value
+    case_dir = tmp_path / "sqlite_tpch_value_parity"
+    assert captured["cwd"] == case_dir
+    assert captured["env"]["BENCHBOX_OUTPUT_DIR"] == str(case_dir / "benchmark_runs")
+    assert not (case_dir / "benchmark_runs").exists()
 
 
 @pytest.mark.parametrize(
