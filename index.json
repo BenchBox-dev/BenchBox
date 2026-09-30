@@ -2961,6 +2961,15 @@
       "status": "open",
       "title": "Replace docstring presence coverage with explicit API contracts and content checks"
     },
+    "comment-cleanup-expected-wrapper": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove or justify the unused expected-results delegation wrapper"
+    },
     "comment-cleanup-mcp-infrastructure": {
       "claim": null,
       "needs": [
