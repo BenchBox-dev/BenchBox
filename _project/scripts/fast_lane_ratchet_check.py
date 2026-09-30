@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Nightly auto-ratchet signal for the fast-lane test-count ceiling.
 
-Companion to `_project/scripts/timing_policy_check.py`'s fast-lane check and
+Companion to `_project/scripts/fast_lane_ceiling_check.py` and
 `_project/config/fast_lane_ceiling_log.md`'s +500 quantum / >=250 headroom
 bump convention (see `fast-lane-decouple-ceiling-contention-2` and
 docs/operations/fast-lane-budget.md for the full history/rationale). This
@@ -15,7 +15,7 @@ authored PR. The only mutation this script ever performs (and only under
 read that script first if extending this one.
 
 What it checks: collects the fast lane (`pytest -m fast --collect-only`,
-same mechanism `timing_policy_check.py` uses) and compares it against the
+same mechanism `fast_lane_ceiling_check.py` uses) and compares it against the
 current `max_fast_tests` ceiling in `_project/config/fast_test_lane_policy.json`.
 An optional named `reservation` in that policy raises the nightly action
 threshold above `WARN_THRESHOLD` (100), so consuming reserved headroom files
@@ -63,7 +63,7 @@ CEILING_LOG_PATH = "_project/config/fast_lane_ceiling_log.md"
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 API_ROOT = "https://api.github.com"
 
-# Same threshold timing_policy_check.py's FAST_LANE_WARNING uses -- this
+# Same threshold fast_lane_ceiling_check.py's FAST_LANE_WARNING uses -- this
 # script is the nightly, always-runs echo of that PR-time warning, not an
 # independent policy.
 WARN_THRESHOLD = 100

@@ -3,8 +3,8 @@
 The "fast lane" is every test collected under `pytest -m fast` (excluding
 `slow`/`stress`/`resource_heavy`/`live_integration`) -- the required,
 sub-few-minutes suite every develop PR runs in `code-test`
-(`.github/workflows/ci.yml`). `_project/scripts/timing_policy_check.py`'s
-fast-lane check enforces a hard ceiling on how many tests that lane may
+(`.github/workflows/ci.yml`). `_project/scripts/fast_lane_ceiling_check.py`
+enforces a hard ceiling on how many tests that lane may
 collect, `max_fast_tests` in `_project/config/fast_test_lane_policy.json`.
 
 ## Why this file exists (fast-lane-decouple-ceiling-contention-2)
@@ -39,7 +39,7 @@ of relying on whoever happens to hit the wall.
 
 **1. Quantum ceiling -- coarse backstop, everywhere, every phase.**
 `max_fast_tests` in `fast_test_lane_policy.json` remains the absolute,
-always-enforced limit: PR lane (`guard-timing-policy` in `ci.yml`) and the
+always-enforced limit: PR lane (`guard-fast-lane-ceiling` in `ci.yml`) and the
 release lane (`lint.yml`). This is a **backstop**,
 never a delta-only check -- a fast lane growing by small increments across
 many PRs still eventually needs a real ceiling, and this is it.
@@ -71,7 +71,7 @@ own collect count against it:
 PR collides with it.** `_project/scripts/fast_lane_ratchet_check.py` runs
 nightly (`fast-lane-ratchet-check` job, `nightly.yml`), collects the fast
 lane fresh, and -- if headroom drops below the same 100-test warning
-threshold `timing_policy_check.py`'s own `FAST_LANE_WARNING` uses --
+threshold `fast_lane_ceiling_check.py`'s own `FAST_LANE_WARNING` uses --
 files/updates ONE marker-tagged tracking issue ("Fast-lane ceiling needs a
 quantum bump") naming the current numbers and the exact edit to make. It
 never pushes a branch or opens a PR itself: `GITHUB_TOKEN`-authored PRs get
@@ -101,14 +101,14 @@ pointer string.
 
 ## What to do when each guard fires
 
-- **`FAST_LANE_WARNING` (advisory, `timing_policy_check.py`, any lane
+- **`FAST_LANE_WARNING` (advisory, `fast_lane_ceiling_check.py`, any lane
   that runs it):** headroom is below 100. Not a failure by itself, but the
   next test-adding PR may hit the ceiling. Bump `max_fast_tests` by +500
   (or the smallest multiple of 500 that restores >= 250 headroom -- see
   `suggested_next_ceiling` in `fast_lane_ratchet_check.py` for the exact
   rule) and add a dated entry to `fast_lane_ceiling_log.md`.
 - **`FAST_LANE_VIOLATION: fast lane count N exceeds limit M`
-  (`guard-timing-policy`, blocking):** the absolute ceiling backstop
+  (`guard-fast-lane-ceiling`, blocking):** the absolute ceiling backstop
   tripped. Bump per the convention above; this is the hard stop, not a
   suggestion.
 - **`FAST_LANE_WARNING: composed tree collects N, K over the M ceiling but
