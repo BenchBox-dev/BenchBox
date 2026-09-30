@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Current verdict/warning/publication behavior is traced across intentional absence, lookup miss, known expectations, mismatch, failure and timeout; callers and contracts are named.",
+    "Decision assesses fail-closed choices without conflating intentional unsupported validation with actual lookup failure or expanding support.",
+    "Compatibility and publishability impacts, schema/output changes and meaningful positive/rejected cases are explicit; no empty mismatch set can satisfy acceptance.",
+    "Decision has an explicit accepted/no-change/rejected outcome. Approved behavior changes are separately authorized and routed; comment cleanup cannot alter verdicts.",
+    "Existing invariants for classified failures, single-flight publication and timeout are preserved in every proposed option."
+  ],
+  "context": "Planning basis: the aggressive comment/docstring-removal plan revised after external Claude Opus 5.5, medium-effort review. The reviewer originally rejected the draft; all 18 findings received dispositions (12 accepted, five narrowed, one rebutted). The updated plan has not received a second external review. Original source baseline 0697891d449b1e31f22e4842169f3b2e743337fb; planning worktree was created at newer origin/develop c7bcdb9bc1d713a0c616969b2eb3f19f3d1d86a1. Refresh all facts at implementation start.",
+  "description": "Read-only decision task for current EXACT missing-count SKIP/is_valid behavior. Distinguish intentional absent reference answers from variant/lookup errors, classified loader failures/timeouts and publication consumers. Examine compatibility, supported benchmarks, validation/publication policy and existing tests.\n\nThe cleanup task must preserve current verdicts while replacing prose-source guards with effective current-behavior coverage; that coverage is not endorsement of fail-open policy. Choose the smallest sound policy and migration boundary. Any behavior change requires a later explicit approval and a separate soundness-reviewed implementation, not this planning item or a text deletion. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Obtain later implementation authorization. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Freeze nonoverlapping code/test/doc paths with the integrator before dispatch. Ordinary independent PRs target develop; serialize shared test-lock checks and integration, not module edits. Required native/external soundness review remains mandatory, with no auto-merge bypass. No live cloud/stress, deployment, publication, historical-result rewriting, or unapproved external-repository writes.",
+  "sessions": [
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:d448b08be5b969faae2e2a3d",
+      "at": "2026-09-30T00:05:19Z",
+      "client": "codex-mcp-client",
+      "op": "create",
+      "op_id": "a9573f404e6742ccbd02a47ed1540a2b",
+      "session_id": "ad486d2419af432fa889205fbc465e0c"
+    }
+  ]
+}

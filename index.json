@@ -2933,6 +2933,15 @@
       "status": "open",
       "title": "Replace docstring presence coverage with explicit API contracts and content checks"
     },
+    "comment-cleanup-missing-count-decision": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-scope-policy"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Decide fail-closed policy for missing expected query counts"
+    },
     "comment-cleanup-pilot-budget": {
       "claim": null,
       "needs": [
