@@ -6229,12 +6229,17 @@
       "title": "Trim pre-commit hooks to product and hygiene checks"
     },
     "dlv2-50-release-prep-targets": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-01T01:20:53Z",
+        "generation": "e92131975fd8428bbab445cb9eab9622",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:bfd5c7954eba099bd7f79237"
+      },
       "needs": [
         "dlv2-00-decisions-adr"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Add release-prep and release-check targets that produce and verify the complete pre-tag trunk state"
     },
     "dlv2-51-release-yml-v2": {
