@@ -47,7 +47,7 @@ jobs:
           set -euo pipefail
           if git cat-file -e "${BASE_REF}:scripts/run_comment_policy.py" 2>/dev/null; then
             git show "${BASE_REF}:scripts/run_comment_policy.py" > "$RUNNER_TEMP/comment-policy-runner.py"
-          elif [ "$BASE_REF" = "0fb305028f108627f81c091c7eccaab10511a35c" ]; then
+          elif [ "$BASE_REF" = "92d8dbd5c864b9ce3789afabf26b18bbb0500360" ]; then
             cp scripts/run_comment_policy.py "$RUNNER_TEMP/comment-policy-runner.py"
           else
             echo "Trusted comment-policy launcher is missing" >&2

@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from comment_syntax import Finding, javascript_requests, language, scan, source_language
 
 POLICY_PATH = "quality/comment-policy.json"
-BOOTSTRAP_BASE = "0fb305028f108627f81c091c7eccaab10511a35c"
+BOOTSTRAP_BASE = "92d8dbd5c864b9ce3789afabf26b18bbb0500360"
 DIRECTIVES = (
     r"# noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
     r"# type: ignore\[[a-z0-9_-]+(?:, ?[a-z0-9_-]+)*\]",
