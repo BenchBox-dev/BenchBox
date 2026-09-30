@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "f503c643a95e1eb28d31a016b1d1d94042bc6656fb2c33cb8c0ee5c7ff03a881",
+  "contract_sha256": "3c0dd7c6b9e46d968686dc3985a584a5a85bce216f9e5d3dafb69ca455572eef",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -575,8 +575,8 @@
     "ci-docs": [
       {
         "header": "ci-docs:",
-        "recipe": "\t@echo \"Running CI docs checks...\"\n\t@$(MAKE) docs-validate\n\t@cd docs && uv run sphinx-build -b html --keep-going . _build/html\n\t@echo \"\u2705 CI docs build passed\"",
-        "recipe_sha256": "d07ade5ff1c65006e8241caa17a7a52f14447c5f86f986d6dddfc9acdebc5939"
+        "recipe": "\t@echo \"Running CI docs checks...\"\n\t@$(MAKE) docs-validate\n\t@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html\n\t@echo \"\u2705 CI docs build passed\"",
+        "recipe_sha256": "f35a8c3921b5be56bc71c147ef359490614de4b9a8820269e52d67f67169f34f"
       }
     ],
     "ci-linkcheck": [
@@ -2157,7 +2157,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "676370f5c2edacb89622328ed2f8090915254da572bf4990feddcf6d5c907f0f",
+  "semantic_sha256": "0729970a761d139e3b1baa965e99e0c12b86b2faec816b18e9805ceca3ef2b14",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3436,9 +3436,9 @@
       ]
     },
     {
-      "body": "ci-docs:\n\t@echo \"Running CI docs checks...\"\n\t@$(MAKE) docs-validate\n\t@cd docs && uv run sphinx-build -b html --keep-going . _build/html\n\t@echo \"\u2705 CI docs build passed\"",
+      "body": "ci-docs:\n\t@echo \"Running CI docs checks...\"\n\t@$(MAKE) docs-validate\n\t@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html\n\t@echo \"\u2705 CI docs build passed\"",
       "kind": "rule",
-      "sha256": "891d14738ac20ea1955e2a3e6e7548632a538244760b78d62288b6f02d6ac27b",
+      "sha256": "f41ad8893d3dc408d72519c15b3ec00bb8970495b845161a0f2a01d1d7a7a1bb",
       "targets": [
         "ci-docs"
       ]

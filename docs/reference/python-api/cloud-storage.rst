@@ -903,7 +903,7 @@ Network Timeouts
 See Also
 --------
 
-- :doc:`/cloud-storage` - Cloud storage usage guide
+- :doc:`/guides/cloud-storage` - Cloud storage usage guide
 - :doc:`/usage/configuration` - Configuration options
 - :doc:`utilities` - Other utility functions
 - :doc:`/usage/troubleshooting` - Troubleshooting guide

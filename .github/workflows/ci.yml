@@ -1933,9 +1933,12 @@ jobs:
             ${{ runner.os }}-sphinx-
 
       - name: Build documentation
+        # -W turns every Sphinx warning into a failure, including unknown
+        # :doc: targets, so a broken cross-reference fails the docs unit
+        # instead of shipping. --keep-going still reports every warning.
         run: |
           cd docs
-          uv run sphinx-build -b html --keep-going . _build/html
+          uv run sphinx-build -b html -W --keep-going . _build/html
 
       # --- Results Explorer ---
       # Steps gate on package.json as a sentinel so the workflow degrades
