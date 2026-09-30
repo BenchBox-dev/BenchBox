@@ -6060,15 +6060,10 @@
       "title": "Guard every chdb import so a failed native load cannot leave the process cwd in site-packages/chdb"
     },
     "dlv2-11-optional-engine-clean-skips": {
-      "claim": {
-        "expires_at": "2026-10-01T07:52:41Z",
-        "generation": "4ba7990f995d4d1492b4a9e374550d93",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "open",
       "title": "Make optional-engine tests skip cleanly when the engine is installed but unusable"
     },
     "dlv2-12-hermeticity-leak-detector": {
