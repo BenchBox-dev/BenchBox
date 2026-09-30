@@ -3034,6 +3034,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from cost estimation"
     },
+    "comment-cleanup-data-fetch-organization": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from data acquisition and organization"
+    },
     "comment-cleanup-datafusion-typing": {
       "claim": null,
       "needs": [
