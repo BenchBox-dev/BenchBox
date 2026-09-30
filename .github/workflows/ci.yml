@@ -289,10 +289,14 @@ jobs:
               # is not what reviewers approved. Files the group base changed
               # identically do not matter; files only the group changed are
               # covered by the group-base diff check below.
-              git fetch --no-tags --depth 50 origin "$ANCHOR_HEAD" 2>/dev/null || true
+              git fetch --no-tags origin "$ANCHOR_HEAD" 2>/dev/null || true
               ANCHOR_BASE="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.base.sha')"
-              git fetch --no-tags --depth 50 origin "$ANCHOR_BASE" 2>/dev/null || true
-              ANCHOR_FILES="$(git diff --name-only --no-renames "$ANCHOR_BASE" "$ANCHOR_HEAD")"
+              if [ -z "$ANCHOR_BASE" ]; then
+                echo "soundness-flag: cannot resolve base of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
+                exit 1
+              fi
+              git fetch --no-tags origin "$ANCHOR_BASE" 2>/dev/null || true
+              ANCHOR_FILES="$(git diff --name-only --no-renames "${ANCHOR_BASE}...${ANCHOR_HEAD}")"
               if [ -z "$ANCHOR_FILES" ]; then
                 echo "soundness-flag: anchor #$ANCHOR_NUMBER changed no files; failing closed" >&2
                 exit 1
