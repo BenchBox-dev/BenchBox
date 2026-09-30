@@ -3107,6 +3107,15 @@
       "status": "open",
       "title": "Decide fail-closed policy for missing expected query counts"
     },
+    "comment-cleanup-monitoring": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from monitoring and profiling"
+    },
     "comment-cleanup-pilot-budget": {
       "claim": null,
       "needs": [
