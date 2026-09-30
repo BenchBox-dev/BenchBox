@@ -4,7 +4,7 @@
     "release-check fails on each missing element (tests per element)",
     "docs/operations/release-guide.md draft section describes prep -> queue -> signed tag"
   ],
-  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2466 currently publishes 4ebe20c375f9ff098ca03eb27195258bb523a0ed. Independent full and incremental Muse soundness reviews found all Critical/Required findings resolved; review https://github.com/BenchBox-dev/BenchBox/pull/2466#issuecomment-5904671026. Both accepted hosted threads are resolved. Latest exact source CI https://github.com/BenchBox-dev/BenchBox/actions/runs/36675553004 FAILED: 2148 medium tests passed, one parity-inventory test rejects the newly introduced Check release content step because its existing make release-check equivalent is not registered. No rerun or queue enrollment; add the actual local equivalent and retain fail-closed guard discovery, then review, fresh canonical preflight and publish. Current-base preflight is pending under the shared lock; earlier exact-head local preflight passed but missed this system-test case. Root claim was transferred through audited takeover, generation 2a9c1106a1d84331ad26493356b9d583. Owner closeout remains PR open+every current hosted check completed green+serial enqueued, not merged. Legacy release publisher/cut/finalize intact; no version preparation, tag or TestPyPI publication. Develop tags withheld until publisher acceptance. Annotated tags supersede prior signed-tag wording.",
+  "context": "PR https://github.com/BenchBox-dev/BenchBox/pull/2466 now publishes 62c77a19482371aa8b97e062e5ef6e94114add22. The missing Check release content local parity registration is fixed without an exemption; 74 parity/release-flow tests pass. Full and incremental external Muse soundness reviews have no unresolved Critical/Required findings; latest review https://github.com/BenchBox-dev/BenchBox/pull/2466#issuecomment-5905877846. Current-base ordered canonical preflight passed at06:57:50UTC, required receipt df4d5dfbb10a0aaaab56520764f58d2d973476f5ef9cd6e16add74080e5d5cfa. make pr-open completed. Exact source CI https://github.com/BenchBox-dev/BenchBox/actions/runs/36681235695 remains IN_PROGRESS on the07:26UTC live read; older same-head canceled run is stale, not acceptance evidence. No enrollment while serial queue contains another PR. Root claim generation2a9c1106a1d84331ad26493356b9d583 remains live. Owner closeout requires PR open, every newest exact-head check completed green, and serial ENQUEUED; do not wait for merge. Legacy release publisher/cut/finalize preserved. No version prep, tag, or TestPyPI publication. Develop tags remain withheld until publisher acceptance; annotated tags supersede signed-tag wording.",
   "description": "Retiring release-cut needs a replacement that synchronizes everything a release touches. `make release-prep VERSION=X.Y.Z` (via scripts/update_version.py and scripts/generate_changelog_entry.py) updates pyproject version, uv.lock, CHANGELOG.md, documentation version markers, and the landing badge, producing one normal PR through the queue. `make release-check VERSION=X.Y.Z` verifies that complete state locally and in release.yml (version equality everywhere, changelog entry present, lock revision, curation rules from check_release_curation.py, dependency bounds with --fail-on=cap-reached).",
   "sessions": [
     {
@@ -57,6 +57,14 @@
       "client": "codex-mcp-client",
       "op": "update",
       "op_id": "9bd9f3acef4e4c78b0be23ef49b8002b",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T07:28:43Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "6481c40db8e44d208fab620874fb4c5e",
       "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
