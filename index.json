@@ -3316,6 +3316,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from SQL compatibility rules and decisions"
     },
+    "comment-cleanup-ssb": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from Star Schema Benchmark modules"
+    },
     "comment-cleanup-tpcdi-generation": {
       "claim": null,
       "needs": [
