@@ -3226,6 +3226,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from TPC-H benchmark modules"
     },
+    "comment-cleanup-tpch-skew": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from skewed TPC-H modules"
+    },
     "comment-cleanup-tuning": {
       "claim": null,
       "needs": [
