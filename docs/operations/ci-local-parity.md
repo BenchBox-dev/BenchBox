@@ -298,6 +298,17 @@ hosted-only exception.
 
 ### Hosted-only guard inventory
 
+Bundled generator integrity has local equivalents. Run
+`uv run -- python scripts/bundled_binary_manifest.py` to check the shipped
+source tree. After `uv build --out-dir /tmp/benchbox-dist`, run
+`uv run -- python scripts/verify_distribution_binaries.py /tmp/benchbox-dist/*.whl /tmp/benchbox-dist/*.tar.gz`
+to compare both distributions with the source manifest. The queue artifact
+job runs the same checks before uploading distributions. An installed wheel
+can check its own file membership and hashes with
+`python -m benchbox.utils.binary_manifest` from outside the checkout.
+Release authenticity still requires the exact trusted queue artifact and its
+attestation; a manifest consistency check alone does not establish provenance.
+
 The explicit exceptions cover inputs that only exist in their hosted gate:
 
 - cross-platform binary smoke tests and promoted slow/medium regression nodes;
