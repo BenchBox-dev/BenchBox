@@ -289,6 +289,13 @@ exception in the test's `MERGE_GATE_EXEMPTIONS` table. This keeps a new
 failure. A strict local superset is acceptable; an unclassified hosted guard
 is not.
 
+The conditional `ci-paths` release-content check uses the same `make
+release-check VERSION=X.Y.Z BASE_REF=<immutable-base-sha>` entry point available
+locally. It verifies the prepared version, changelog, lockfile, generator
+markers, and release curation against the specified base. It is a local
+equivalent, so the parity inventory records `release-check` rather than a
+hosted-only exception.
+
 ### Hosted-only guard inventory
 
 Bundled generator integrity has local equivalents. Run

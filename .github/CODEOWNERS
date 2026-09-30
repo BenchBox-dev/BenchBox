@@ -76,6 +76,13 @@ _project/scripts/check_soundness_review.py @joeharris76
 .github/ci-units.yml @joeharris76
 scripts/ci_units.py @joeharris76
 scripts/ci_unit_result.py @joeharris76
+scripts/release_flow.py @joeharris76
+scripts/update_version.py @joeharris76
+scripts/generate_changelog_entry.py @joeharris76
+scripts/check_release_curation.py @joeharris76
+scripts/check_dependency_bounds.py @joeharris76
+_project/scripts/check_uv_lock_revision.py @joeharris76
+_project/decisions/single-repo-migration.md @joeharris76
 _project/scripts/auto_merge_soundness_paths.py @joeharris76
 .github/workflows/release.yml @joeharris76
 # Independent-publication authority and trust-policy surfaces. These exact
