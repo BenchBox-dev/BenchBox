@@ -3662,10 +3662,15 @@
       "title": "Remove comments and docstrings from result models, policy and serialization"
     },
     "comment-cleanup-scope-policy": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-01T12:52:50Z",
+        "generation": "998ef9c953964744966dc30eb89cde63",
+        "renewals": 0,
+        "worker": "jcode-comment-cleanup-scope-20260930"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Define comment-removal scope, provenance, ownership and exception policy"
     },
     "comment-cleanup-security-credentials": {
