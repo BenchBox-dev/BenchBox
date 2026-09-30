@@ -794,7 +794,8 @@ class JoinOrderGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             if offset % 3 == 0:
                 title_row[9] = 50 + (offset % 50)
             titles.append(tuple(title_row))
-            name_row = [golden_names[offset], "Robert Downey" if offset % 2 == 0 else "Angelina Smith"]
+            # Canonical JOB requires Downey before Robert in its LIKE pattern.
+            name_row = [golden_names[offset], "Downey Robert" if offset % 2 == 0 else "Angelina Smith"]
             name_row += [None] * (name_cols - len(name_row))
             names.append(tuple(name_row))
             company_row = [golden_companies[offset], "Warner Films" if offset % 2 == 0 else "Universal Films", "[us]"]

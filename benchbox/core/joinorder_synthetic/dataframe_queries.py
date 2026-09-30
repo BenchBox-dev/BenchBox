@@ -11,7 +11,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import re
 from csv import reader
 from typing import TYPE_CHECKING, Any
 
@@ -39,36 +38,12 @@ from benchbox.core.joinorder_synthetic.queries import JoinOrderQueryManager
 if TYPE_CHECKING:
     import pandas as pd
 
-_QUERY_MANAGERS: dict[str | None, JoinOrderQueryManager] = {}
+_QUERY_MANAGER = JoinOrderQueryManager()
 
 
-def _manager_for(queries_dir: str | None) -> JoinOrderQueryManager:
-    """One cached query manager per queries_dir (F4).
-
-    A module-global singleton silently runs different queries than a
-    benchmark instance configured with a custom queries_dir. Cache per
-    directory so the DataFrame surface always reads what the SQL surface
-    reads.
-    """
-    if queries_dir not in _QUERY_MANAGERS:
-        _QUERY_MANAGERS[queries_dir] = JoinOrderQueryManager(queries_dir)
-    return _QUERY_MANAGERS[queries_dir]
-
-
-_QUERY_MANAGER = _manager_for(None)
-_PARENTHESIZED_LIKE_PATTERN = re.compile(r"(NOT\s+LIKE|LIKE)\s+'%\(([^%()]+)\)%'", re.IGNORECASE)
-_Q6A_ACTOR_NAME_PATTERN = re.compile(r"n\.name\s+LIKE\s+'%Downey%Robert%'", re.IGNORECASE)
-
-
-def _query_sql(query_id: str, queries_dir: str | None = None) -> str:
-    sql = _PARENTHESIZED_LIKE_PATTERN.sub(
-        lambda match: f"{match.group(1)} '%{match.group(2)}%'", _manager_for(queries_dir).get_query(query_id)
-    )
-    # Canonical JOB spells the actor predicate as LIKE '%Downey%Robert%',
-    # which only matches "Downey ... Robert" order. Real names ("Robert
-    # Downey Jr.") need both orders; apply to every query carrying the
-    # pattern, not just 6a.
-    return _Q6A_ACTOR_NAME_PATTERN.sub("n.name LIKE '%Downey%' AND n.name LIKE '%Robert%'", sql)
+def _query_sql(query_id: str, query_manager: JoinOrderQueryManager | None = None) -> str:
+    """Translate the same predicates the SQL benchmark executes."""
+    return (query_manager or _QUERY_MANAGER).get_query(query_id)
 
 
 def _join_predicates(tree: exp.Select) -> tuple[list[tuple[str, str]], list[exp.Expression], list[exp.Expression]]:
@@ -105,8 +80,10 @@ def _prefixed_expression_frame(
     return frame
 
 
-def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str, queries_dir: str | None = None) -> Any:
-    tree = parse_one(_query_sql(query_id, queries_dir), read="duckdb")
+def _execute_joinorder_expression_query(
+    ctx: DataFrameContext, query_id: str, query_manager: JoinOrderQueryManager | None = None
+) -> Any:
+    tree = parse_one(_query_sql(query_id, query_manager), read="duckdb")
     tables, predicates, join_predicates = _join_predicates(tree)
     join_key_columns: dict[str, list[tuple[str, int]]] = {alias: [] for alias, _table in tables}
     for index, predicate in enumerate(join_predicates):
@@ -160,11 +137,11 @@ def _execute_joinorder_expression_query(ctx: DataFrameContext, query_id: str, qu
 
 
 def _execute_joinorder_pandas_query(
-    ctx: DataFrameContext, query_id: str, queries_dir: str | None = None
+    ctx: DataFrameContext, query_id: str, query_manager: JoinOrderQueryManager | None = None
 ) -> pd.DataFrame:
     import pandas as pd
 
-    tree = parse_one(_query_sql(query_id, queries_dir), read="duckdb")
+    tree = parse_one(_query_sql(query_id, query_manager), read="duckdb")
     tables, predicates, join_predicates = _join_predicates(tree)
     local_predicates = {
         alias: [
@@ -206,18 +183,18 @@ def _execute_joinorder_pandas_query(
     )
 
 
-def _make_expression_impl(query_id: str, queries_dir: str | None = None) -> Any:
+def _make_expression_impl(query_id: str, query_manager: JoinOrderQueryManager | None = None) -> Any:
     def _impl(ctx: DataFrameContext) -> Any:
-        return _execute_joinorder_expression_query(ctx, query_id, queries_dir)
+        return _execute_joinorder_expression_query(ctx, query_id, query_manager)
 
     _impl.__name__ = f"q{query_id}_expression_impl"
     _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder DataFrame translation."
     return _impl
 
 
-def _make_pandas_impl(query_id: str, queries_dir: str | None = None) -> Any:
+def _make_pandas_impl(query_id: str, query_manager: JoinOrderQueryManager | None = None) -> Any:
     def _impl(ctx: DataFrameContext) -> Any:
-        return _execute_joinorder_pandas_query(ctx, query_id, queries_dir)
+        return _execute_joinorder_pandas_query(ctx, query_id, query_manager)
 
     _impl.__name__ = f"q{query_id}_pandas_impl"
     _impl.__doc__ = f"{query_id}: generated synthetic JoinOrder pandas translation."
@@ -292,14 +269,14 @@ _QUERIES = [
 
 
 def _categories_for(query_id: str, query_sql: str) -> list[QueryCategory]:
-    """Classify a canonical query by joined-table count (F8).
+    """Classify a query by its parsed table aliases.
 
     BenchBox convention: plain JOIN below 6 tables, MULTI_JOIN at 6+.
     Every JOB query aggregates and filters.
     """
-    tables = len(re.findall(r"\b(?:FROM|JOIN)\b", query_sql, flags=re.IGNORECASE))
+    tables = len(_sql_tables(parse_one(query_sql, read="duckdb")))
     join_category = QueryCategory.MULTI_JOIN if tables >= 6 else QueryCategory.JOIN
-    return [join_category, QueryCategory.AGGREGATE, QueryCategory.FILTER]
+    return ([join_category] if tables > 1 else []) + [QueryCategory.AGGREGATE, QueryCategory.FILTER]
 
 
 _QUERIES.extend(
@@ -307,7 +284,7 @@ _QUERIES.extend(
         query_id=query_id,
         query_name=f"JOB {query_id}",
         description=f"Canonical JOB query {query_id}; generated synthetic DataFrame translation.",
-        categories=_categories_for(query_id, _manager_for(None).get_query(query_id)),
+        categories=_categories_for(query_id, _QUERY_MANAGER.get_query(query_id)),
         expression_impl=_IMPLS[f"q{query_id}_expression_impl"],
         pandas_impl=_IMPLS[f"q{query_id}_pandas_impl"],
     )
@@ -319,6 +296,21 @@ for _query in _QUERIES:
     JOINORDER_DATAFRAME_QUERIES.register(_query)
 
 
-def get_dataframe_queries() -> QueryRegistry:
-    """Get the JoinOrder DataFrame query registry."""
-    return JOINORDER_DATAFRAME_QUERIES
+def get_dataframe_queries(query_manager: JoinOrderQueryManager | None = None) -> QueryRegistry:
+    """Get the shared canonical registry or bind a custom SQL snapshot."""
+    if query_manager is None:
+        return JOINORDER_DATAFRAME_QUERIES
+    registry = QueryRegistry("JoinOrder DataFrame")
+    for query_id, sql in query_manager.get_all_queries().items():
+        registry.register(
+            DataFrameQuery(
+                query_id=query_id,
+                query_name=f"JOB {query_id}",
+                description=f"JoinOrder query {query_id} from the benchmark's query directory.",
+                categories=_categories_for(query_id, sql),
+                expression_impl=_make_expression_impl(query_id, query_manager),
+                pandas_impl=_make_pandas_impl(query_id, query_manager),
+                sql_equivalent=sql,
+            )
+        )
+    return registry

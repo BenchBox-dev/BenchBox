@@ -97,6 +97,7 @@ class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         self.queries_dir = queries_dir
         self._schema = JoinOrderSchema()
         self._query_manager = JoinOrderQueryManager(queries_dir)
+        self._dataframe_registry: QueryRegistry | None = None
 
         # Pass all kwargs through to generator (includes compression params)
         generator_kwargs: dict[str, Any] = {
@@ -224,7 +225,9 @@ class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         Args:
             queries_dir: Path to directory containing Join Order Benchmark .sql files
         """
+        self.queries_dir = queries_dir
         self._query_manager = JoinOrderQueryManager(queries_dir)
+        self._dataframe_registry = None
 
     def get_table_info(self, table_name: str) -> dict[str, Any]:
         """Get information about a specific table.
@@ -316,15 +319,19 @@ class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def get_dataframe_queries(self) -> QueryRegistry:
         """Get DataFrame query implementations for JoinOrder.
 
-        Returns the QueryRegistry containing DataFrame implementations of all
-        113 JoinOrder queries for both expression-family and pandas-family platforms.
+        The default registry contains all 113 canonical queries. A custom
+        directory uses the instance's replacement SQL set for both families.
 
         Returns:
-            QueryRegistry with all 113 JoinOrder DataFrame queries
+            QueryRegistry matching this benchmark's SQL query set
         """
         from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
 
-        return get_dataframe_queries()
+        if self.queries_dir is None:
+            return get_dataframe_queries()
+        if self._dataframe_registry is None:
+            self._dataframe_registry = get_dataframe_queries(self._query_manager)
+        return self._dataframe_registry
 
     def __repr__(self) -> str:
         """String representation of the benchmark.

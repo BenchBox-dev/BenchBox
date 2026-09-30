@@ -15,6 +15,91 @@ pytestmark = [
 ]
 
 
+def _assert_both_families_match_sql(benchmark, query_id, tables) -> None:
+    """Execute the public registry against the instance's unchanged SQL."""
+    from types import SimpleNamespace
+
+    import duckdb
+    import pandas as pd
+    import polars as pl
+
+    from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+    frames = {name: pd.DataFrame(data) for name, data in tables.items()}
+    with duckdb.connect() as connection:
+        for name, frame in frames.items():
+            connection.register(name, frame)
+        expected = connection.execute(benchmark.get_query(query_id)).fetchall()
+    query = benchmark.get_dataframe_queries().get_or_raise(query_id)
+    assert query.pandas_impl is not None
+    assert query.expression_impl is not None
+    pandas_result = query.pandas_impl(SimpleNamespace(get_table=frames.__getitem__))
+    assert list(pandas_result.itertuples(index=False, name=None)) == expected
+    ctx = PolarsDataFrameAdapter().create_context()
+    for name, frame in frames.items():
+        ctx.register_table(name, pl.from_pandas(frame).lazy())
+    assert query.expression_impl(ctx).collect().rows() == expected
+
+
+def test_public_custom_registries_use_instance_sql_and_reload(tmp_path) -> None:
+    from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
+
+    benchmarks = []
+    for value in (1, 2):
+        directory = tmp_path / f"queries-{value}"
+        directory.mkdir()
+        (directory / "1a.sql").write_text(
+            f"SELECT MIN(t.title) AS title FROM title AS t WHERE t.id = {value};", encoding="utf-8"
+        )
+        if value == 2:
+            (directory / "custom.sql").write_text(
+                "SELECT MIN(t.title) AS title FROM title AS t WHERE t.id = 3;", encoding="utf-8"
+            )
+        benchmarks.append(
+            JoinOrderSyntheticBenchmark(queries_dir=str(directory), output_dir=tmp_path / f"data-{value}")
+        )
+    tables = {"title": {"id": [1, 2, 3], "title": ["First", "Second", "Third"]}}
+    first, second = benchmarks
+    assert first.get_dataframe_queries().get_query_ids() == ["1a"]
+    assert second.get_dataframe_queries().get_query_ids() == ["1a", "custom"]
+    for benchmark in benchmarks:
+        for query_id in benchmark.get_queries():
+            _assert_both_families_match_sql(benchmark, query_id, tables)
+    original = first.get_dataframe_queries()
+    first.load_queries_from_directory(second.queries_dir)
+    assert first.get_dataframe_queries() is not original
+    assert first.get_dataframe_queries().get_query_ids() == ["1a", "custom"]
+    _assert_both_families_match_sql(first, "1a", tables)
+    _assert_both_families_match_sql(first, "custom", tables)
+    previous = first.get_dataframe_queries()
+    (tmp_path / "queries-2" / "1a.sql").write_text(
+        "SELECT MIN(t.title) AS title FROM title AS t WHERE t.id = 3;", encoding="utf-8"
+    )
+    first.load_queries_from_directory(first.queries_dir)
+    assert first.get_dataframe_queries() is not previous
+    _assert_both_families_match_sql(first, "1a", tables)
+
+
+@pytest.mark.parametrize("operator", ["LIKE", "NOT LIKE"])
+@pytest.mark.parametrize("text", ["voice", "(voice)"])
+def test_public_custom_query_preserves_literal_like_parentheses(tmp_path, operator, text) -> None:
+    from benchbox.core.joinorder_synthetic.benchmark import JoinOrderSyntheticBenchmark
+
+    (tmp_path / "literal.sql").write_text(
+        f"SELECT MIN(n.name) AS name FROM name AS n WHERE n.name {operator} '%(voice)%';", encoding="utf-8"
+    )
+    benchmark = JoinOrderSyntheticBenchmark(queries_dir=str(tmp_path), output_dir=tmp_path / "data")
+    _assert_both_families_match_sql(benchmark, "literal", {"name": {"id": [1], "name": [text]}})
+
+
+@pytest.mark.parametrize("query_id", ["13b", "31a"])
+def test_large_comma_join_query_category_counts_actual_tables(query_id) -> None:
+    from benchbox.core.dataframe.query import QueryCategory
+    from benchbox.core.joinorder_synthetic.dataframe_queries import get_dataframe_queries
+
+    assert QueryCategory.MULTI_JOIN in get_dataframe_queries().get_or_raise(query_id).categories
+
+
 class TestQueryRegistration:
     """Tests for query registration and metadata."""
 
@@ -330,10 +415,12 @@ class TestPandasImplExecute:
         assert "marvel_movie" in result
 
     @pytest.mark.parametrize("actor_name", ["Robert Downey Jr.", "Downey Robert"])
-    def test_q6a_pandas_actor_filter_matches_name_parts_in_any_order(self, actor_name):
+    def test_q6a_pandas_actor_filter_preserves_sql_order(self, actor_name):
+        import duckdb
         import pandas as pd
 
         from benchbox.core.joinorder_synthetic.dataframe_queries import q6a_pandas_impl
+        from benchbox.core.joinorder_synthetic.queries import JoinOrderQueryManager
 
         class MinimalPandasContext:
             def __init__(self):
@@ -354,9 +441,12 @@ class TestPandasImplExecute:
             def lit(self, value):
                 raise NotImplementedError("Expression API not available in pandas context")
 
-        assert q6a_pandas_impl(MinimalPandasContext()).to_dict("records") == [
-            {"movie_keyword": "marvel-cinematic-universe", "actor_name": actor_name, "marvel_movie": "Iron Man"}
-        ]
+        ctx = MinimalPandasContext()
+        with duckdb.connect() as connection:
+            for name, frame in ctx.tables.items():
+                connection.register(name, frame)
+            expected = connection.execute(JoinOrderQueryManager().get_query("6a")).fetchall()
+        assert list(q6a_pandas_impl(ctx).itertuples(index=False, name=None)) == expected
 
     def test_q7a_pandas(self, pandas_ctx):
         from benchbox.core.joinorder_synthetic.dataframe_queries import q7a_pandas_impl
