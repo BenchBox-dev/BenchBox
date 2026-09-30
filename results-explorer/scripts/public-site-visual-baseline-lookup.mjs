@@ -108,7 +108,26 @@ async function trustedFromCandidates(github, repository, sha, candidates) {
     if (!Number.isInteger(runId)) continue;
     if (candidate.name === LEGACY_BASELINE_NAME && candidate.workflow_run.head_sha !== sha) continue;
     const run = await github(`/repos/${repository}/actions/runs/${runId}`);
-    const source = trustedBaselineSource(run, { repository, baseSha: sha });
+    let source = trustedBaselineSource(run, { repository, baseSha: sha });
+    if (
+      !source &&
+      run &&
+      run.path === DOCS_WORKFLOW_PATH &&
+      run.status === "completed" &&
+      run.head_branch === "develop" &&
+      (run.event === "push" || run.event === "workflow_dispatch") &&
+      run.repository?.full_name === repository
+    ) {
+      try {
+        const jobsData = await github(`/repos/${repository}/actions/runs/${runId}/jobs`);
+        const visualJob = jobsData?.jobs?.find((j) => j.name === "Public-site visual regression");
+        if (visualJob && visualJob.status === "completed" && visualJob.conclusion === "success") {
+          source = "develop";
+        }
+      } catch {
+        // Fall back to undefined if jobs cannot be fetched
+      }
+    }
     if (source === "develop") return { artifact: candidate, source, baselineSha: sha };
     if (source === "merge-queue" && !queueCandidate) queueCandidate = { artifact: candidate, source, baselineSha: sha };
   }

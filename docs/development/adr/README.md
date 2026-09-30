@@ -23,3 +23,4 @@ Architecture Decision Records
 - [ADR: TPC-DI Enhanced Parallel Surface — Remove the Second Scheduler](adr-tpcdi-enhanced-parallel-support-decision.md)
 - [ADR: Prove FlightData Source Months Before Reusing a Corpus](adr-flightdata-month-source-policy.md)
 - [ADR: Preserve Read-Primitives Capabilities Across Cloud Dialects](adr-read-primitives-cloud-variants.md)
+- [ADR: Development Loop Architecture (v2)](adr-dev-loop-v2.md)

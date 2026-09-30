@@ -28,7 +28,7 @@ invoking the existing writer, but reimplements neither:
   a still-reproducing divergence elsewhere on the same gate blocks the prune
   entirely; this module adds no separate safety logic of its own here either.
 
-The upshot: the blocking gate run (``pr.yml``'s ``correctness-gate`` job,
+The upshot: the blocking gate run (``ci.yml``'s ``correctness-gate`` job,
 ``make <gate>-cross-surface-equivalence-report``) is completely unmodified and
 never prunes. Only THIS script, run by the scheduled workflow, ever calls
 ``run_gate(..., update_baseline=True)``.
@@ -184,7 +184,7 @@ def run_autodetect(gate_names: Iterable[str] | None = None) -> list[GatePruneOut
 
     Defaults to every gate in :data:`benchbox.core.equivalence.cross_surface.GATES`
     -- the SAME set the blocking ``correctness-gate`` CI job runs on every PR
-    (see ``pr.yml``) -- sorted for a deterministic report. A second run over an
+    (see ``ci.yml``) -- sorted for a deterministic report. A second run over an
     already-pruned baseline is a true no-op per gate: phase 1 finds nothing
     resolved (the entry is simply gone), so phase 2 never runs and nothing is
     written.

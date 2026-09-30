@@ -718,7 +718,7 @@ exclusions = []
 # identifiers). The threshold is a ceiling on total duplicated lines; raise it
 # only when intentional duplication is added and lower it as clones are removed.
 #
-# PR gate: `make duplicate-check-delta` / pr.yml `guard-duplicate-delta` compares
+# PR gate: `make duplicate-check-delta` / ci.yml `guard-duplicate-delta` compares
 # duplicated lines against the merge-base of the PR base (or origin/develop) and
 # fails only when the change *increases* the count. Absolute `threshold` below
 # remains for local/campaign use (`make duplicate-check`), not the PR delta path.
@@ -1020,6 +1020,16 @@ ignore_rules = [
         "benchbox/core/clickbench/queries.py",
         "benchbox/core/tpcdi/source_generators.py",
         "benchbox/core/tpchavoc/queries.py",
+    ] },
+
+    # Cross-surface gate builders - thin per-benchmark delegations over
+    # _assemble_simple_duckdb_cell that must remain distinct public names for
+    # gate wiring. Shared assembly lives in the helper; residual similarity
+    # is benchmark binding arity, not logic.
+    { function_names = ["build_tpcds_duckdb", "build_tpch_duckdb", "build_tpch_skew_duckdb"], path_contains = [
+        "benchbox/core/equivalence/builders/tpcds.py",
+        "benchbox/core/equivalence/builders/tpch.py",
+        "benchbox/core/equivalence/builders/tpch_skew.py",
     ] },
 
     # --- Boilerplate ignore rules added 2026-03-12 (wave-2 triage) ---
