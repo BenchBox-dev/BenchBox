@@ -4,7 +4,7 @@
     "#2439, #2441, #2443 merged or enqueued with all checks green",
     "Ruleset before/after JSON archived for the tooling addition"
   ],
-  "context": "Part of the stop-the-world flip restructure (2026-09-29). Dual-running old and new CI is untenable on this runner budget.",
+  "context": "Part of the stop-the-world flip restructure (2026-09-29). Dual-running old and new CI is untenable on this runner budget.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN; original2h03restoration deviation must stayhonest. Guard2478 actualMERGED517 at11:56:10/all6merge_groupSUCCESS resolvestrunk-only two-dot+shallowancestryfalsechecks. Stop queuehasexisting2447 position1; do not cancel/reorder/enqueuewhile handingoff. COI2470 next afterexistingqueue completes, then normalmergeacceptedworkflowchanges intoT22464/freshcanonical/serialqueue proof. Preparedsource-green2392/2395/2396/2408/2411/2468/2477 remain unmerged; Q17/timingnewlocalincrements unpublished. FullallPRconflicts/threadpages/exactsourceCI/currentreceipt/serialmergeproof and broadf2matrix remain. No ownerheldvisualapproval; no cloud/destructivecleanup/prodPyPI. Allworkersstopped/goalPAUSED. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
   "description": "Unstick the open dev-loop PRs. The queue retune (builds 5->2, timeout) is MOVED INTO the flip (dlv2-f3): scripts/ruleset_drift_check.py pins APPROVED_MERGE_QUEUE (ALLGREEN, 60 min, build 5, merge 5) in code on develop, and ruleset-drift is required, so changing live queue parameters before develop's pinned values change fails every PR closed (G11). A 15-second attempt at 12:04:56-12:05:11Z on 2026-09-29 was reverted from backup; no drift run overlapped it.\nSteps: (1) #2444 (dlv2-32) green, enqueued ALONE, merged; then immediately add `tooling` to ruleset 15611785 required checks (its drift contract documents `tooling`; the gap is fail-closed until added). (2) Then enqueue green #2439 (ledger) and #2441 (chdb guard). (3) #2443 (tiering) is green and was in the queue at 12:04Z. Stale-base PRs (>~1 day behind develop) fail the fast-lane baseline guard because the exact-SHA cache key expired: rebase before enqueueing.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "op": "update",
       "op_id": "39585486238a431eab32bf885e18a0cb",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T12:24:35Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "e92621d38319410691f75cabe0c6d546",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
