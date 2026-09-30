@@ -202,6 +202,43 @@ def test_check_pins_an_explicit_lock_baseline(tree: Path) -> None:
     assert len(seen) == 1
 
 
+def test_lock_baseline_cannot_be_replaced_to_hide_a_committed_downgrade(tree: Path) -> None:
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tree, text=True).strip()
+    scripts = tree / "_project/scripts"
+    scripts.mkdir(parents=True)
+    shutil.copy(REPO_ROOT / "_project/scripts/check_uv_lock_revision.py", scripts)
+    (tree / "uv.lock").write_text(LOCK.format(version=VERSION).replace("revision = 3", "revision = 2"))
+    git(tree, "add", "--", "uv.lock")
+    git(tree, "commit", "-q", "-m", "Downgrade lock revision")
+    git(tree, "replace", base, "HEAD")
+    problems = release_flow.check_uv_lock_revision(tree, release_flow.run_command, base)
+    assert any("DOWNGRADE" in problem for problem in problems), problems
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "scripts/release_flow.py",
+        "scripts/update_version.py",
+        "scripts/generate_changelog_entry.py",
+        "scripts/check_release_curation.py",
+        "scripts/check_dependency_bounds.py",
+        "_project/scripts/check_uv_lock_revision.py",
+        "_project/decisions/single-repo-migration.md",
+    ],
+)
+def test_release_enforcement_requires_external_review_for_each_dependency(path: str) -> None:
+    spec = importlib.util.spec_from_file_location(
+        "release_soundness_paths", REPO_ROOT / "_project/scripts/soundness_paths.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    assert module.is_soundness_path(path)
+    assert f"{path} @joeharris76" in (REPO_ROOT / ".github/CODEOWNERS").read_text()
+
+
 @pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")
 def test_make_release_check_refuses_stale_lock_without_modifying_it(
     tree: Path, monkeypatch: pytest.MonkeyPatch

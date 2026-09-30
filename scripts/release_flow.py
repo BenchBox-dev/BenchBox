@@ -185,7 +185,9 @@ def _delegated(label: str, argv: Sequence[str], root: Path, runner: Runner) -> l
 def check_uv_lock_revision(root: Path, runner: Runner, baseline_ref: str | None) -> list[str]:
     if baseline_ref is None:
         return ["uv.lock revision: no prior final release tag; provide --baseline-ref"]
-    code, commit = run_command(["git", "rev-parse", "--verify", f"{baseline_ref}^{{commit}}"], root)
+    code, commit = run_command(
+        ["git", "--no-replace-objects", "rev-parse", "--verify", f"{baseline_ref}^{{commit}}"], root
+    )
     if code != 0 or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
         return [f"uv.lock revision: baseline {baseline_ref!r} cannot be resolved to a commit"]
     script = root / "_project" / "scripts" / "check_uv_lock_revision.py"
