@@ -80,6 +80,15 @@ tree cannot pass without that comparison. `Public-site visual acceptance`
 reports on every develop PR and merge group; it skips the build only when
 the former documentation input paths are unaffected.
 
+A merge group that passes its comparison also uploads a candidate baseline for
+its own `merge_group.head_sha`. The next queue group uses that head as its base,
+so the candidate is the capture of the exact tree that group merges onto. The
+download script accepts a candidate only from a `merge_group` Documentation run
+on this repository's `gh-readonly-queue/develop/*` branch at that SHA, and it
+prefers a protected `develop` artifact when both exist. Merge groups capture
+their own tree first, then wait up to 30 minutes for the exact-base artifact
+before failing closed. Pull requests keep a short retry.
+
 If a protected `develop` push was dropped or its baseline expired, dispatch
 Documentation on `develop` with `baseline_source_sha` set to the exact base
 SHA shown by the failing PR or merge group:
@@ -109,19 +118,18 @@ digests and unexpected new captures, but it never accepts a capture missing
 from the current matrix. Clear both variables after the approved run so only
 one reviewed head occupies the repository-wide approval slot.
 
-This approval does not create or replace a baseline. Only the protected
-`develop` push or its validated `workflow_dispatch` run uploads the next SHA-bound
-baseline after the reviewed PR merges; PR diagnostic artifacts remain
-short-lived and non-promotable.
+This approval does not replace a baseline. The protected `develop` push or its
+validated `workflow_dispatch` run uploads the SHA-bound baseline after the
+reviewed PR merges. An approved merge group also uploads a candidate for its own
+head, which only the queue group stacked on that exact head consumes. PR
+diagnostic artifacts remain short-lived and non-promotable.
 
 ## What CI gates
 
-[`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
-runs on **pull requests** (to `release` or `develop`) across all paths (with no top-level paths
-filter so the required status check always reports; the `explorer-changes` job skips browser runs
-when no relevant files change), and on **pushes to `release` or `develop`** that touch
-`results-explorer/`, `_project/scripts/explorer_pipeline/`, `_project/scripts/explorer_publish.py`,
-`results-data/`, or the workflow file itself.
+The `explorer-e2e` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+(Chromium full suite, blocking) runs on **pull requests** and **merge groups**
+when the change touches the explorer unit (with the `explorer` unit result
+always reporting; the job is skipped when no relevant files change).
 
 - **Blocking:** `chromium` job - full suite must pass.
 - **Non-blocking:** `firefox-smoke` and `webkit-smoke` jobs - `@smoke`-tagged

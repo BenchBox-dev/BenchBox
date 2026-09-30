@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-/** Download the baseline artifact produced by the exact protected-develop SHA. */
+/** Download the visual baseline for the exact base SHA or a site-equivalent ancestor. */
 
 import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
+
+import { waitForTrustedBaseline } from "./public-site-visual-baseline-lookup.mjs";
 
 const execFileAsync = promisify(execFile);
 const token = process.env.GITHUB_TOKEN;
@@ -11,13 +13,21 @@ const repository = process.env.GITHUB_REPOSITORY;
 const baseSha = process.env.PUBLIC_SITE_VISUAL_BASE_SHA;
 const output = process.env.PUBLIC_SITE_VISUAL_BASELINE;
 const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
-const BASELINE_LOOKUP_ATTEMPTS = 6;
-const BASELINE_LOOKUP_DELAY_MS = 2_000;
-const ARTIFACT_PAGE_SIZE = 100;
-const BASELINE_NAMES = [`public-site-visual-baseline-${baseSha}`, "public-site-visual-baseline"];
+// Space-separated first-parent ancestors of the base whose public-site inputs
+// are byte-identical to it, nearest first. The workflow classifier computes
+// them; they render the same site as the base.
+const candidateShas = (process.env.PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES ?? "").split(/\s+/).filter(Boolean);
+// Optional bounded wait for a leader group or develop push to publish the base.
+const waitSeconds = Number(process.env.PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS ?? "0");
 
-if (!token || !repository || !baseSha || !output) {
-  throw new Error("GITHUB_TOKEN, GITHUB_REPOSITORY, PUBLIC_SITE_VISUAL_BASE_SHA, and PUBLIC_SITE_VISUAL_BASELINE are required");
+if (!/^[0-9a-f]{40}$/.test(baseSha ?? "")) {
+  throw new Error("PUBLIC_SITE_VISUAL_BASE_SHA must be a 40-character lowercase SHA");
+}
+if (!token || !repository || !output) {
+  throw new Error("GITHUB_TOKEN, GITHUB_REPOSITORY, and PUBLIC_SITE_VISUAL_BASELINE are required");
+}
+if (!Number.isFinite(waitSeconds) || waitSeconds < 0) {
+  throw new Error("PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS must be a non-negative number");
 }
 
 const headers = {
@@ -32,56 +42,17 @@ async function github(path) {
   return response.json();
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const { artifact, source, baselineSha } = await waitForTrustedBaseline({
+  github,
+  repository,
+  baseSha,
+  candidateShas,
+  waitMs: waitSeconds * 1000,
+  log: (message) => console.log(message),
+});
 
-async function listValidArtifacts(name) {
-  const validArtifacts = [];
-  for (let page = 1; ; page += 1) {
-    const data = await github(
-      `/repos/${repository}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=${ARTIFACT_PAGE_SIZE}&page=${page}`,
-    );
-    if (!Array.isArray(data.artifacts)) {
-      throw new Error("GitHub API returned an invalid artifact list");
-    }
-    validArtifacts.push(...data.artifacts.filter((candidate) => !candidate.expired && candidate.name === name));
-    if (data.artifacts.length < ARTIFACT_PAGE_SIZE) break;
-  }
-  return validArtifacts;
-}
-
-let artifact;
-let lastLookupError;
-for (let attempt = 1; attempt <= BASELINE_LOOKUP_ATTEMPTS; attempt += 1) {
-  try {
-    const candidates = (await Promise.all(BASELINE_NAMES.map((name) => listValidArtifacts(name)))).flat();
-    lastLookupError = undefined;
-    for (const candidate of candidates) {
-      const runId = candidate.workflow_run?.id;
-      if (!Number.isInteger(runId)) continue;
-      if (candidate.name === "public-site-visual-baseline" && candidate.workflow_run.head_sha !== baseSha) continue;
-      // Artifact names alone are untrusted: PR runs can upload the same name.
-      const run = await github(`/repos/${repository}/actions/runs/${runId}`);
-      if (run.head_branch !== "develop" || !["push", "workflow_dispatch"].includes(run.event)) continue;
-      if (run.path !== ".github/workflows/docs.yml") continue;
-      artifact = candidate;
-      break;
-    }
-    if (artifact) break;
-  } catch (error) {
-    lastLookupError = error;
-  }
-  if (attempt < BASELINE_LOOKUP_ATTEMPTS) await sleep(BASELINE_LOOKUP_DELAY_MS);
-}
-
-if (!artifact && lastLookupError) {
-  throw new Error(`Unable to list protected public-site visual baselines after ${BASELINE_LOOKUP_ATTEMPTS} attempts`, {
-    cause: lastLookupError,
-  });
-}
 if (!artifact) {
-  throw new Error(`No unexpired protected public-site visual baseline is bound to base SHA ${baseSha}; dispatch Documentation on develop with baseline_source_sha=${baseSha}`);
+  throw new Error(`No unexpired protected public-site visual baseline is bound to base SHA ${baseSha} or a site-equivalent ancestor; dispatch Documentation on develop with baseline_source_sha=${baseSha}`);
 }
 
 const response = await fetch(artifact.archive_download_url, { headers });
@@ -91,7 +62,13 @@ const archive = `${output}.zip`;
 await writeFile(archive, Buffer.from(await response.arrayBuffer()));
 await execFileAsync("unzip", ["-q", archive, "-d", output]);
 const manifest = JSON.parse(await readFile(`${output}/manifest.json`, "utf8"));
-if (manifest.source_sha !== baseSha) {
-  throw new Error(`Baseline artifact ${artifact.id} has source SHA ${manifest.source_sha}, expected ${baseSha}`);
+if (manifest.source_sha !== baselineSha) {
+  throw new Error(`Baseline artifact ${artifact.id} has source SHA ${manifest.source_sha}, expected ${baselineSha}`);
 }
-console.log(`Downloaded baseline artifact ${artifact.id} for ${baseSha} to ${output}`);
+if (process.env.GITHUB_OUTPUT) {
+  await appendFile(process.env.GITHUB_OUTPUT, `baseline_sha=${baselineSha}\n`);
+}
+const equivalence = baselineSha === baseSha ? "exact base" : `site-equivalent ancestor of ${baseSha}`;
+console.log(
+  `Downloaded baseline artifact ${artifact.id} for ${baselineSha} (${equivalence}) to ${output} (source: ${source}, run ${artifact.workflow_run.id})`,
+);

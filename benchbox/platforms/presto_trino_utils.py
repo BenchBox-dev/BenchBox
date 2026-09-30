@@ -36,12 +36,19 @@ def escape_insert_value(value: str) -> str:
         return "'" + str(value).replace("'", "''") + "'"
 
 
-def load_file_batches(cursor: Any, file_path: Path, qualified_table: str) -> int:
-    """Load one file into a Presto/Trino table using batched INSERT VALUES."""
+def load_file_batches(cursor: Any, file_path: Path, qualified_table: str, *, delimiter: str | None = None) -> int:
+    """Load one file into a Presto/Trino table using batched INSERT VALUES.
+
+    ``delimiter`` carries the resolver-derived dialect when the caller has
+    DataSource context (manifest metadata, then benchmark attributes); when
+    absent, the historical file-extension heuristic applies so standalone
+    callers keep working.
+    """
     from benchbox.platforms.base.data_loading import FileFormatRegistry
     from benchbox.utils.file_format import get_delimiter_for_file
 
-    delimiter = get_delimiter_for_file(file_path)
+    if delimiter is None:
+        delimiter = get_delimiter_for_file(file_path)
     compression_handler = FileFormatRegistry.get_compression_handler(file_path)
     rows_loaded = 0
 
@@ -188,6 +195,8 @@ def execute_schema_statements(
                         log_notice(f"Dropping existing table before recreate: {table_name}")
                         cursor.execute(f"DROP TABLE IF EXISTS {table_name}")
                         cursor.execute(statement)
+                    else:
+                        raise
                 else:
                     raise
 

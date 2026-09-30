@@ -1077,6 +1077,9 @@ class DatabricksAdapter(PlatformAdapter):
         - ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)`` (Databricks
           VARCHAR requires a length parameter; verified live with
           DATATYPE_MISSING_SIZE on batch inserts)
+        - ``unnest(generate_series(a, b))`` -> ``explode(sequence(a, b))``
+          (Databricks has neither function; verified live with
+          UNRESOLVED_ROUTINE ``unnest``)
         """
         import re
 
@@ -1087,6 +1090,12 @@ class DatabricksAdapter(PlatformAdapter):
                 return None
         else:
             base = operation.write_sql
+        base = re.sub(
+            r"\bunnest\(\s*generate_series\(([^()]*)\)\s*\)",
+            r"explode(sequence(\1))",
+            base,
+            flags=re.IGNORECASE,
+        )
         return re.sub(
             r"\bCAST\(([^()]+?)\s+AS\s+VARCHAR\s*\)",
             r"CAST(\1 AS STRING)",
@@ -1963,7 +1972,7 @@ class DatabricksAdapter(PlatformAdapter):
                         existing_tables,
                         data_source,
                     )
-                    table_stats[table_name.upper()] = row_count
+                    table_stats[table_name.lower()] = row_count
                     load_time = elapsed_seconds(load_start)
 
                     per_table_timings[table_name.upper()] = {
@@ -1977,7 +1986,7 @@ class DatabricksAdapter(PlatformAdapter):
 
                 except Exception as e:
                     self.logger.error(f"Failed to load {table_name}: {str(e)[:200]}")
-                    table_stats[table_name.upper()] = 0
+                    table_stats[table_name.lower()] = 0
                     per_table_timings[table_name.upper()] = {
                         "copy_into_ms": 0,
                         "optimize_ms": 0,
@@ -2223,29 +2232,70 @@ class DatabricksAdapter(PlatformAdapter):
         """
         return self._resolve_copy_dialect(data_source, table_name, file_path, benchmark).null_marker
 
-    def _get_column_list_for_table(self, benchmark, table_name: str) -> str:
-        """Get explicit column mapping from benchmark schema for COPY INTO."""
-        if not hasattr(benchmark, "get_schema"):
+    def _get_column_list_for_table(self, benchmark, table_name: str, cursor: Any | None = None) -> str:
+        """Get the explicit column list for a headerless COPY INTO.
+
+        Without a column list COPY INTO maps CSV fields by position against
+        the Delta schema and rejects the load with
+        COPY_INTO_SCHEMA_MISMATCH_WITH_TARGET_TABLE. Columns come from the
+        benchmark schema when it describes the table (dict entries or schema
+        objects with a ``columns`` attribute). Benchmarks also load tables
+        their ``get_schema()`` omits, such as the TPC-H base tables behind
+        Transaction Primitives or the TPC-DS sources behind TPC-DS OBT, so
+        the target table's own DESCRIBE output is the fallback.
+        """
+        table_name_upper = table_name.upper()
+        columns = self._schema_columns_for_table(benchmark, table_name)
+        if not columns and cursor is not None:
+            columns = self._describe_table_columns(cursor, table_name_upper)
+        if not columns:
+            self.logger.warning(
+                f"No column list resolved for {table_name_upper}; COPY INTO will map CSV fields by position"
+            )
             return ""
+        self.log_very_verbose(f"Using explicit column mapping for {table_name_upper}: {len(columns)} columns")
+        return f" ({', '.join(columns)})"
+
+    def _schema_columns_for_table(self, benchmark, table_name: str) -> list[str]:
+        """Return column names for a table from ``benchmark.get_schema()``, or []."""
+        if not hasattr(benchmark, "get_schema"):
+            return []
         try:
             schema = benchmark.get_schema()
-            table_name_upper = table_name.upper()
-            table_schema = schema.get(table_name.lower())
-            if not table_schema:
-                table_schema = schema.get(table_name_upper.lower())
-            if not table_schema:
-                table_schema = schema.get(table_name)
-
-            if table_schema and "columns" in table_schema:
-                columns = [col["name"] for col in table_schema["columns"]]
-                if columns:
-                    self.log_very_verbose(
-                        f"Using explicit column mapping for {table_name_upper}: {len(columns)} columns"
-                    )
-                    return f" ({', '.join(columns)})"
         except Exception as e:
-            self.log_very_verbose(f"Could not get column list for {table_name}: {e}")
-        return ""
+            self.logger.warning(f"Could not read benchmark schema for {table_name}: {e}")
+            return []
+        if not isinstance(schema, dict):
+            return []
+        table_schema = schema.get(table_name.lower()) or schema.get(table_name)
+        if table_schema is None:
+            return []
+        raw_columns = (
+            table_schema.get("columns") if isinstance(table_schema, dict) else getattr(table_schema, "columns", None)
+        )
+        names = []
+        for col in raw_columns or []:
+            name = col.get("name") if isinstance(col, dict) else getattr(col, "name", None)
+            if name:
+                names.append(str(name))
+        return names
+
+    def _describe_table_columns(self, cursor: Any, table_name_upper: str) -> list[str]:
+        """Return the target table's column names in declaration order, or []."""
+        try:
+            cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
+            rows = list(cursor.fetchall() or [])
+        except Exception as e:
+            self.logger.warning(f"DESCRIBE TABLE {table_name_upper} failed while resolving COPY columns: {e}")
+            return []
+        names = []
+        for row in rows:
+            col = str(row[0]).strip() if len(row) > 0 and row[0] is not None else ""
+            # DESCRIBE appends partition/metadata sections after a blank or '#' row.
+            if not col or col.startswith("#"):
+                break
+            names.append(col)
+        return names
 
     def _target_cast_select(self, cursor: Any, table_name_upper: str) -> str:
         """Build a SELECT list casting source fields to the Delta column types.
@@ -2302,7 +2352,6 @@ class DatabricksAdapter(PlatformAdapter):
             data_source=data_source,
             benchmark=benchmark,
         )
-        column_list = self._get_column_list_for_table(benchmark, table_name)
         # Mirror the dialect-path derivation in _resolve_file_uri_and_delimiter so
         # the null marker resolves for the same file the delimiter came from.
         if isinstance(file_path, list) and file_path:
@@ -2338,9 +2387,12 @@ class DatabricksAdapter(PlatformAdapter):
         is_parquet = copy_sources[0].lower().split("?")[0].endswith(".parquet") if copy_sources else False
         use_cast_select = is_parquet or copy_dialect.has_header
         cast_select = ""
+        column_list = ""
         if use_cast_select:
             self.log_very_verbose(f"Using cast SELECT load for {table_name_upper}")
             cast_select = self._target_cast_select(cursor, table_name_upper)
+        else:
+            column_list = self._get_column_list_for_table(benchmark, table_name, cursor)
 
         copy_time = 0.0
         for source_uri in copy_sources:
@@ -2477,7 +2529,7 @@ class DatabricksAdapter(PlatformAdapter):
                 cursor.execute(f"CREATE TABLE {table_name_upper} USING PARQUET LOCATION '{location}'")
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
                 result = cursor.fetchone()
-                table_stats[table_name_upper] = int(result[0]) if result else 0
+                table_stats[table_name_lower] = int(result[0]) if result else 0
 
         finally:
             cursor.close()

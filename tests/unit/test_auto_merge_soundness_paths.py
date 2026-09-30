@@ -63,6 +63,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "_project/scripts/explorer_publish.py",
         "scripts/generate_corpus_inventory.py",
         "scripts/validate_submission.py",
+        ".github/CODEOWNERS",
         # Committed plausibility override artifacts waive validator findings.
         "results-data/bundles/tpch/duckdb/sf1.override.json",
         "results-data/bundles/sf1.override.json",
@@ -79,7 +80,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         # workflow. In-workflow checks are attacker-controlled for same-repo
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
         "_project/scripts/auto_merge_soundness_paths.py",
-        ".github/workflows/auto-merge-on-open.yml",
         ".github/workflows/release.yml",
         # Independent-publication authority and trust-policy contract.
         "_project/decisions/independent-publication-a0-freeze-2026-08-31.md",
@@ -131,10 +131,40 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "results-data/bundles/tpch/duckdb/sf1.json",
         "results-data/bundles/tpch/duckdb/sf1.plans.json",
         "results-data/corpus-inventory.json",
+        # A sibling directory that merely starts with a gated prefix is not
+        # gated: prefixes are directory prefixes ending in "/".
+        "publicationx",
+        "publicationx/notes.md",
+        "scripts/publicationx/check.py",
+        "benchbox/core/equivalencex",
+        "benchbox/core/equivalencex/helpers.py",
+        "benchbox/core/query_plans/parsersx/spark.py",
+        "benchbox/core/expected_resultsx/loader.py",
     ],
 )
 def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
     assert soundness.is_soundness_path(path) is False
+
+
+def test_soundness_prefixes_are_directory_prefixes() -> None:
+    """SOUNDNESS_PREFIXES must hold directory prefixes only.
+
+    An exact-file entry here would over-match siblings that merely start
+    with it, while CODEOWNERS matches the exact path: the mirror claim
+    would silently break. Exact files belong in SOUNDNESS_FILES.
+    """
+    assert soundness.surface_invariant_violations() == []
+
+
+def test_soundness_files_glob_duality_stays_pinned() -> None:
+    """The override glob is a CODEOWNERS mirror spelling, not a matcher.
+
+    Exact membership can never match it; the override regex is the operative
+    gate. Both spellings must cover the same artifact shape.
+    """
+    assert soundness.OVERRIDE_FILES_GLOB in soundness.SOUNDNESS_FILES
+    assert soundness.is_soundness_path("results-data/bundles/tpch/duckdb/sf1.override.json") is True
+    assert soundness.is_soundness_path("results-data/bundles/x.override.json.bak") is False
 
 
 def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
@@ -149,41 +179,6 @@ def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
     helper = (ROOT / "scripts/pr_landing.py").read_text(encoding="utf-8")
     assert "soundness_paths_changed" in helper
     assert "auto-enqueue is forbidden" in helper
-
-
-def test_backstop_workflow_uses_shared_predicate_and_skips_auto_merge() -> None:
-    workflow = (ROOT / ".github/workflows/auto-merge-on-open.yml").read_text(encoding="utf-8")
-
-    # Diff via git with --no-renames (gh pr diff --name-only drops rename sources).
-    assert "git diff --name-only --no-renames" in workflow
-    # Revoke-only workflow (D2): the disable step is the only consumer of the
-    # predicate output; no enable step exists to pin.
-    assert "if: steps.soundness.outputs.soundness_path == 'true'" in workflow
-    assert "gh pr merge --auto" not in workflow.replace("gh pr merge --disable-auto", "")
-    # A soundness-touching push must re-evaluate and clear any stale auto-merge.
-    assert "synchronize" in workflow
-    assert "gh pr merge --disable-auto" in workflow
-
-    # auto-merge-predicate-base-ref-execution: base-ref copy must still run so
-    # a PR that narrows the predicate can't judge its own diff by its own rules.
-    assert (
-        "git show \"origin/${{ github.base_ref || 'develop' }}:_project/scripts/auto_merge_soundness_paths.py\" > /tmp/predicate_base.py"
-        in workflow
-    )
-    assert "python3 /tmp/predicate_base.py --stdin --format github-output" in workflow
-    # PR checkout copy is evaluated alongside base-ref (union/OR) so a gate
-    # *widened* mid-flight still revokes, and the PR copy cannot weaken the
-    # gate by narrowing rules (union means either copy saying true wins).
-    assert "python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output" in workflow
-    assert '[ "$base_result" = "soundness_path=true" ] || [ "$pr_result" = "soundness_path=true" ]' in workflow
-
-    # A PR touching the predicate or this workflow itself must be forced to
-    # soundness_path=true, regardless of what either predicate says about the
-    # rest of the diff (closes the "edit the predicate to make future PRs
-    # unsafe" gap that predicate evaluation alone doesn't cover).
-    assert 'grep -qxF "_project/scripts/auto_merge_soundness_paths.py"' in workflow
-    assert 'grep -qxF ".github/workflows/auto-merge-on-open.yml"' in workflow
-    assert 'result="soundness_path=true"' in workflow
 
 
 def _assert_git_index_executable(path: Path, *, env: dict[str, str] | None = None) -> None:
@@ -261,9 +256,18 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "scripts/generate_corpus_inventory.py @joeharris76" in codeowners
     assert "scripts/validate_submission.py @joeharris76" in codeowners
     assert "results-data/bundles/**/*.override.json @joeharris76" in codeowners
+    assert "AGENTS.md @joeharris76" in codeowners
+    assert ".github/CODEOWNERS @joeharris76" in codeowners
+    assert ".github/PULL_REQUEST_TEMPLATE.md @joeharris76" in codeowners
+    assert ".github/soundness-paths.txt @joeharris76" in codeowners
+    assert "_project/scripts/soundness_paths.py @joeharris76" in codeowners
+    assert "_project/scripts/check_soundness_review.py @joeharris76" in codeowners
+    assert ".github/workflows/ci.yml @joeharris76" in codeowners
     assert ".github/workflows/validate-submission.yml @joeharris76" in codeowners
     assert "_project/scripts/auto_merge_soundness_paths.py @joeharris76" in codeowners
-    assert ".github/workflows/auto-merge-on-open.yml @joeharris76" in codeowners
+    assert ".github/ci-units.yml @joeharris76" in codeowners
+    assert "scripts/ci_units.py @joeharris76" in codeowners
+    assert "scripts/ci_unit_result.py @joeharris76" in codeowners
     assert ".github/workflows/release.yml @joeharris76" in codeowners
     assert "docs/development/adr/adr-independent-publication-authorities.md @joeharris76" in codeowners
     assert "docs/development/independent-publication-threat-model.md @joeharris76" in codeowners

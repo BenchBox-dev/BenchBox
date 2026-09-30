@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ._dependencies import import_chdb
 from .deployment_mode import resolve_clickhouse_deployment_mode
 
 
@@ -175,9 +176,7 @@ class ClickHouseMetadataMixin:
     def _detect_clickhouse_client_version(self) -> str | None:
         try:
             if self.deployment_mode == "local":
-                import chdb
-
-                return getattr(chdb, "__version__", None)
+                return getattr(import_chdb(), "__version__", None)
             from clickhouse_driver import __version__ as ch_version
 
             return ch_version

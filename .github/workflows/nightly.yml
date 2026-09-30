@@ -2,6 +2,7 @@ name: Nightly Validation
 
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+  BENCHBOX_TEST_TIER: t1
 
 on:
   workflow_dispatch:
@@ -64,7 +65,15 @@ jobs:
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
-          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70 --junitxml=junit-fast.xml
+
+      - name: Upload fast test duration report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: fast-junit-report
+          path: junit-fast.xml
+          if-no-files-found: ignore
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -76,9 +85,13 @@ jobs:
 
   slow-tier-observation:
     name: Slow tier observation
+    needs: test
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 90
     continue-on-error: true
+    env:
+      BENCHBOX_TEST_TIER: t3
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -99,7 +112,34 @@ jobs:
 
       - name: Observe non-credentialed slow tests
         run: |
-          uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" -n 0 --tb=short --timeout=1200 --durations=20
+          uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" -n 0 --tb=short --timeout=1200 --durations=20 --junitxml=junit-t3-slow.xml
+
+      - name: Download fast test duration report
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: fast-junit-report
+          path: duration-inputs
+        continue-on-error: true
+
+      - name: Refresh test duration artifact
+        if: success()
+        run: |
+          test -f duration-inputs/junit-fast.xml
+          test -f junit-t3-slow.xml
+          uv run -- python _project/scripts/update_test_durations.py \
+            --input duration-inputs/junit-fast.xml \
+            --input junit-t3-slow.xml
+
+      - name: Upload duration report and artifact
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: t3-test-durations
+          path: |
+            junit-t3-slow.xml
+            duration-inputs/junit-fast.xml
+            tests/fixtures/test_durations.json
+          if-no-files-found: ignore
 
   duckdb-preview:
     name: DuckDB 2.0 preview compatibility
@@ -312,6 +352,8 @@ jobs:
 
   integration-smoke:
     runs-on: ${{ matrix.os }}
+    env:
+      BENCHBOX_TEST_TIER: t2
     strategy:
       fail-fast: false
       matrix:
@@ -343,6 +385,8 @@ jobs:
   integration-table-formats:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      BENCHBOX_TEST_TIER: t2
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -366,6 +410,8 @@ jobs:
   postgres-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      BENCHBOX_TEST_TIER: t3
     services:
       postgres:
         image: postgres:17
@@ -436,7 +482,7 @@ jobs:
     # compute on Redshift and MotherDuck), so this job stays inside free-tier /
     # trial budgets. Unlike the postgres-integration gate above, an all-skipped
     # run stays green: until the cloud secrets below are configured, there are
-    # no credentials and every test skips. Never move this to pr.yml:
+    # no credentials and every test skips. Never move this to ci.yml:
     # PR-triggered cloud queries from arbitrary branches incur uncontrolled
     # billing.
     # Expected secret names match the env vars the conftest fixtures read:
@@ -448,6 +494,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      BENCHBOX_TEST_TIER: t3
       SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
       SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
       SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
@@ -517,6 +564,8 @@ jobs:
   integration:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      BENCHBOX_TEST_TIER: t2
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -673,7 +722,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Bare python3 is intentional: stdlib-only, no uv sync needed for a
-        # pure API check (same precedent as pr.yml's path classifier). The
+        # pure API check (same precedent as ci.yml's path classifier). The
         # schedule detection regex is scoped to the `on:` block to stay
         # stdlib-only without a YAML parser.
         run: |
@@ -880,7 +929,10 @@ jobs:
     # cell managing its own compose stack
     # (see tests/uat/configs/uat-throughput-postgresql-nightly.yaml).
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # Cell budgets: DuckDB 900s + Postgres 2400s = 55 min worst case, plus
+    # ~25 min headroom for checkout, deps, integration tests, Docker
+    # startup/cleanup, and both assert steps.
+    timeout-minutes: 80
     env:
       # Throughput@Size floor activation: repository configuration variables
       # flow into the DuckDB assert step below. Unset vars evaluate to empty,
@@ -1120,11 +1172,9 @@ jobs:
       pull-requests: read
       issues: write
       # green_unmerged_sweep.py lists check runs (commits/{sha}/check-runs) for
-      # every candidate PR, and with --check-post-merge also lists workflow runs
-      # (actions/workflows/develop-post-merge.yml/runs). A job-level permissions
-      # map sets every unlisted scope to "no access", so without these two the
-      # scheduled sweep 403s before it can classify PRs or update its tracking
-      # issue.
+      # every candidate PR. A job-level permissions map sets every unlisted
+      # scope to "no access", so without these two the scheduled sweep 403s
+      # before it can classify PRs or update its tracking issue.
       checks: read
       actions: read
     steps:
@@ -1142,13 +1192,13 @@ jobs:
       - name: Run green-unmerged sweep
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply --check-post-merge
+        run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply
 
   fast-lane-ratchet-check:
     # Auto-ratchet signal for the fast-lane test-count ceiling (see
     # fast-lane-decouple-ceiling-contention-2 and
     # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
-    # pr.yml's guard-timing-policy step uses and, when headroom drops below
+    # ci.yml's guard-timing-policy step uses and, when headroom drops below
     # the warning threshold, files/updates ONE marker-tagged tracking issue
     # with the current numbers and the exact edit to make -- it does NOT
     # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no

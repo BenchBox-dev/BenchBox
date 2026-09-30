@@ -513,8 +513,12 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         file_paths: Any,
         target_catalog: str,
         target_schema: str,
+        benchmark: Any | None = None,
+        data_source: Any | None = None,
     ) -> tuple[int, int] | None:
         """Load one table and return (rows_loaded, valid_file_count)."""
+        from benchbox.platforms.base.data_loading import resolve_csv_dialect
+
         valid_files = normalize_existing_files(file_paths)
         table_name_lower = table_name.lower()
 
@@ -529,10 +533,18 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
         self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
 
+        # Resolve the CSV dialect through the shared pipeline (manifest
+        # metadata, then benchmark attributes, then extension fallback) so a
+        # converted dataset whose suffix contradicts its declared dialect
+        # still loads with the right delimiter.
+        dialect = None
+        if data_source is not None and benchmark is not None:
+            dialect = resolve_csv_dialect(data_source, table_name, valid_files[0], benchmark).delimiter
+
         qualified_table = f"{target_catalog}.{target_schema}.{table_name_lower}"
         rows_loaded = 0
         for file_path in valid_files:
-            rows_loaded += load_file_batches(cursor, file_path, qualified_table)
+            rows_loaded += load_file_batches(cursor, file_path, qualified_table, delimiter=dialect)
 
         return rows_loaded, len(valid_files)
 
@@ -550,10 +562,19 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             raise ValueError(f"Invalid catalog or schema for load: {target_catalog}.{target_schema}")
 
         try:
-            for table_name, file_paths in self._resolve_data_files(benchmark, data_dir).items():
+            data_source = resolve_adapter_data_source(self, benchmark, data_dir)
+            for table_name, file_paths in data_source.tables.items():
                 try:
                     load_start = mono_time()
-                    table_result = self._load_table_data(cursor, table_name, file_paths, target_catalog, target_schema)
+                    table_result = self._load_table_data(
+                        cursor,
+                        table_name,
+                        file_paths,
+                        target_catalog,
+                        target_schema,
+                        benchmark=benchmark,
+                        data_source=data_source,
+                    )
                     table_name_lower = table_name.lower()
                     if table_result is None:
                         table_stats[table_name_lower] = 0

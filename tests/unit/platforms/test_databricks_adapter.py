@@ -16,6 +16,12 @@ from benchbox.platforms.base.data_loading import DataSource
 from benchbox.platforms.databricks import DatabricksAdapter
 from benchbox.platforms.databricks.adapter import _select_databricks_warehouse
 
+
+def _first_copy_sql(cursor) -> str:
+    """Return the first COPY INTO statement executed; column resolution may DESCRIBE first."""
+    return next(str(c.args[0]) for c in cursor.execute.call_args_list if "COPY INTO" in str(c.args[0]))
+
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -542,8 +548,8 @@ class TestDatabricksAdapter:
             assert isinstance(table_stats, dict)
             assert isinstance(load_time, float)
             assert load_time >= 0
-            assert "TEST_TABLE" in table_stats
-            assert table_stats["TEST_TABLE"] == 100
+            assert "test_table" in table_stats
+            assert table_stats["test_table"] == 100
 
             # Should execute COPY INTO statements without temporary views or insert-select
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -584,7 +590,7 @@ class TestDatabricksAdapter:
 
             stats, load_time, _ = adapter.create_external_tables(benchmark, mock_connection, Path("dbfs:/tmp/data"))
 
-            assert stats["ORDERS"] == 123
+            assert stats["orders"] == 123
             assert load_time >= 0
 
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -1183,6 +1189,80 @@ class TestDatabricksSqlGenerationHelpers:
 
         assert adapter._get_column_list_for_table(benchmark, "orders") == " (o_orderkey, o_orderdate)"
         assert adapter._get_column_list_for_table(Mock(spec=[]), "orders") == ""
+
+    def _column_list_adapter(self):
+        with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
+            return DatabricksAdapter(
+                server_hostname="test.cloud.databricks.com",
+                http_path="/sql/1.0/warehouses/test",
+                access_token="test_token",
+            )
+
+    def test_get_column_list_for_table_reads_schema_table_objects(self):
+        """Data Vault returns Table objects, not dicts; their columns must still resolve."""
+        from benchbox.core.datavault.schema import Column, DataType, Table
+
+        adapter = self._column_list_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {
+            "hub_region": Table(
+                "hub_region",
+                [Column("hk_region", DataType.HASHKEY), Column("r_regionkey", DataType.INTEGER)],
+            )
+        }
+
+        assert adapter._get_column_list_for_table(benchmark, "hub_region") == " (hk_region, r_regionkey)"
+
+    def test_get_column_list_for_table_falls_back_to_describe_for_tables_outside_schema(self):
+        """Transaction Primitives and TPC-DS OBT load base tables their get_schema() omits."""
+        adapter = self._column_list_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"txn_orders": {"columns": [{"name": "o_orderkey"}]}}
+        cursor = Mock()
+        cursor.fetchall.return_value = [
+            ("c_custkey", "bigint", None),
+            ("c_name", "string", None),
+            ("", "", ""),
+            ("# Partition Information", "", ""),
+            ("c_name", "string", None),
+        ]
+
+        assert adapter._get_column_list_for_table(benchmark, "customer", cursor) == " (c_custkey, c_name)"
+        cursor.execute.assert_called_once_with("DESCRIBE TABLE CUSTOMER")
+
+    def test_get_column_list_for_table_prefers_schema_over_describe(self):
+        adapter = self._column_list_adapter()
+        benchmark = Mock()
+        benchmark.get_schema.return_value = {"orders": {"columns": [{"name": "o_orderkey"}]}}
+        cursor = Mock()
+
+        assert adapter._get_column_list_for_table(benchmark, "orders", cursor) == " (o_orderkey)"
+        cursor.execute.assert_not_called()
+
+    def test_get_column_list_for_table_warns_when_nothing_resolves(self, caplog):
+        adapter = self._column_list_adapter()
+        cursor = Mock()
+        cursor.execute.side_effect = RuntimeError("table missing")
+
+        with caplog.at_level("WARNING"):
+            assert adapter._get_column_list_for_table(Mock(spec=[]), "orders", cursor) == ""
+        assert "map CSV fields by position" in caplog.text
+
+    @pytest.mark.parametrize(
+        ("benchmark_id", "scale", "table"),
+        [
+            ("tpchavoc", 0.01, "customer"),
+            ("datavault", 0.01, "hub_region"),
+        ],
+    )
+    def test_real_benchmark_schemas_resolve_copy_columns(self, benchmark_id, scale, table):
+        """Guard against schema-shape drift for benchmarks whose loaded tables appear in get_schema()."""
+        from benchbox.core.benchmark_registry import get_benchmark_class
+
+        adapter = self._column_list_adapter()
+        benchmark = get_benchmark_class(benchmark_id)(scale_factor=scale)
+
+        assert adapter._get_column_list_for_table(benchmark, table).startswith(" (")
 
     def test_external_location_from_file_uri_normalizes_wildcard_and_rejects_non_parquet(self):
         assert (
@@ -2256,7 +2336,7 @@ class TestCopyIntoSqlGeneration:
                 {"lineitem"},
             )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
+        copy_sql = _first_copy_sql(cursor)
         assert "COPY INTO LINEITEM" in copy_sql
         assert "'delimiter'='|'" in copy_sql
         assert "'header'='false'" in copy_sql
@@ -2280,7 +2360,7 @@ class TestCopyIntoSqlGeneration:
                 {"customers"},
             )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
+        copy_sql = _first_copy_sql(cursor)
         assert "COPY INTO CUSTOMERS" in copy_sql
         assert "'delimiter'=','" in copy_sql
 
@@ -2303,7 +2383,7 @@ class TestCopyIntoSqlGeneration:
                 {"region"},
             )
 
-        copy_sql = cursor.execute.call_args_list[0].args[0]
+        copy_sql = _first_copy_sql(cursor)
         assert "'dbfs:/Volumes/main/bench/data/region.tbl'" in copy_sql
 
     def test_copy_into_with_wildcard_for_sharded(self):

@@ -260,6 +260,8 @@ class TestBigQueryAdapter:
         mock_benchmark = Mock()
         mock_benchmark.get_create_tables_sql.return_value = """
             CREATE TABLE table1 (id INT64, name STRING);
+            -- Generated staging load tables
+            CREATE TABLE orders_stage (id INT64);
             CREATE TABLE table2 (id INT64, data STRING);
         """
 
@@ -268,7 +270,10 @@ class TestBigQueryAdapter:
         # Mock translate_sql method
         with patch.object(adapter, "translate_sql") as mock_translate:
             mock_translate.return_value = (
-                "CREATE TABLE table1 (id INT64, name STRING);\nCREATE TABLE table2 (id INT64, data STRING);"
+                "CREATE TABLE table1 (id INT64, name STRING);\n"
+                "-- Generated staging load tables\n"
+                "CREATE TABLE orders_stage (id INT64);\n"
+                "CREATE TABLE table2 (id INT64, data STRING);"
             )
 
             schema_time = adapter.create_schema(mock_benchmark, mock_client)
@@ -278,8 +283,11 @@ class TestBigQueryAdapter:
 
         # Should create tables via DDL execution
         query_calls = list(mock_client.query.call_args_list)
-        assert len(query_calls) >= 2  # At least 2 CREATE TABLE statements
-        # Note: Actual SQL will be converted to BigQuery format with dataset qualification
+        assert len(query_calls) == 3
+        executed_ddl = [call.args[0] for call in query_calls]
+        assert any("`test-project.test_dataset.TABLE1`" in ddl for ddl in executed_ddl)
+        assert any("`test-project.test_dataset.ORDERS_STAGE`" in ddl for ddl in executed_ddl)
+        assert any("`test-project.test_dataset.TABLE2`" in ddl for ddl in executed_ddl)
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_csv_upload(self, mock_bigquery, dependencies_available):
@@ -2166,6 +2174,63 @@ class TestConvertToBigqueryTable:
         assert "PRIMARY KEY (id) NOT ENFORCED" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_reference_qualified_and_not_enforced(self, mock_bigquery):
+        """BigQuery rejects an unqualified REFERENCES target and enforced foreign keys."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        result = adapter._convert_to_bigquery_table(
+            "CREATE TABLE `link_nation_region` (`hk_nation` STRING(64) NOT NULL, `hk_region` STRING(64) NOT NULL, "
+            "PRIMARY KEY (`hk_nation`), FOREIGN KEY (`hk_nation`) REFERENCES `hub_nation` (`hk_nation`), "
+            "FOREIGN KEY (`hk_region`) REFERENCES hub_region (`hk_region`))"
+        )
+        assert "REFERENCES `proj.ds.HUB_NATION` (`hk_nation`) NOT ENFORCED" in result
+        assert "REFERENCES `proj.ds.HUB_REGION` (`hk_region`) NOT ENFORCED" in result
+        assert "`hub_nation`" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_already_not_enforced_is_unchanged(self, mock_bigquery):
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = "CREATE TABLE t (a INT64, FOREIGN KEY (a) REFERENCES `proj.ds.P` (a) NOT ENFORCED)"
+        result = adapter._convert_to_bigquery_table(sql)
+        assert result.count("NOT ENFORCED") == 1
+        assert "REFERENCES `proj.ds.P` (a) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_foreign_key_rewrite_ignores_string_literals(self, mock_bigquery):
+        """REFERENCES text inside a string default is data, not a constraint."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = "CREATE TABLE t (note STRING DEFAULT 'REFERENCES parent(id)', a INT64, FOREIGN KEY (a) REFERENCES p (a))"
+        result = adapter._convert_to_bigquery_table(sql)
+        assert "DEFAULT 'REFERENCES parent(id)'" in result
+        assert "REFERENCES `proj.ds.P` (a) NOT ENFORCED" in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_extract_unqualified_tables_skips_earlier_sibling_ctes(self, mock_bigquery):
+        """A CTE body that reads an earlier CTE must not qualify that name as a base table."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = (
+            "WITH first_cte AS (SELECT a FROM base_one), "
+            "second_cte AS (SELECT f.a FROM orders o JOIN first_cte f ON o.a = f.a) "
+            "SELECT * FROM second_cte"
+        )
+        assert adapter._extract_unqualified_tables(query) == ["BASE_ONE", "ORDERS"]
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualify_aliases_table_referenced_with_backticked_prefix(self, mock_bigquery):
+        """Translated queries write `lineitem`.`col`; qualifying must keep that name resolvable."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = "SELECT SUM(`l_quantity`) FROM `lineitem`, `part` WHERE `p_partkey` = `lineitem`.`l_partkey`"
+        result = adapter._qualify_single_statement(query)
+        assert "FROM `proj.ds.LINEITEM` AS lineitem," in result
+        assert "`proj.ds.PART` AS" not in result
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_extract_unqualified_tables_keeps_self_shadowed_base_table(self, mock_bigquery):
+        """A CTE named like the base table it reads still qualifies the base table."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        query = "WITH orders AS (SELECT * FROM orders WHERE a > 1) SELECT * FROM orders"
+        assert adapter._extract_unqualified_tables(query) == ["ORDERS"]
+
+    @patch("benchbox.platforms.bigquery.bigquery")
     def test_inline_pk_survives_parameterized_types(self, mock_bigquery):
         """Commas inside DECIMAL(10, 2) must not split the column definition."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -2183,6 +2248,34 @@ class TestConvertToBigqueryTable:
         )
         assert "/* note ) */" in result
         assert result.rstrip().endswith("PRIMARY KEY (id) NOT ENFORCED)")
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_numeric_decimal_literals_skip_strings_and_identifiers(self, mock_bigquery):
+        """FLOAT64 literals cannot be inserted into NUMERIC columns (verified live)."""
+        sql = "UPDATE t SET p = p * 1.05, c = 'v1.5', q = 1000.0 * n WHERE k2 = 3 AND x = 0.02"
+        result = BigQueryAdapter._numeric_decimal_literals(sql)
+        assert result == (
+            "UPDATE t SET p = p * NUMERIC '1.05', c = 'v1.5', q = NUMERIC '1000.0' * n "
+            "WHERE k2 = 3 AND x = NUMERIC '0.02'"
+        )
+
+    @patch("benchbox.platforms.bigquery.bigquery")
+    def test_qualify_leaves_script_temp_tables_bare(self, mock_bigquery):
+        """Script temp tables live outside the dataset; qualifying them fails with Not found."""
+        adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
+        sql = (
+            "BEGIN TRANSACTION;\n"
+            "CREATE TEMP TABLE IF NOT EXISTS temp_orders_1 AS SELECT * FROM orders WHERE 1=0;\n"
+            "INSERT INTO temp_orders_1 VALUES (1);\n"
+            "INSERT INTO txn_orders SELECT * FROM temp_orders_1;\n"
+            "DROP TABLE IF EXISTS temp_orders_1;\n"
+            "COMMIT;\n"
+        )
+        result = adapter._qualify_table_names(sql)
+        assert "`proj.ds.ORDERS`" in result
+        assert "INSERT INTO `proj.ds.TXN_ORDERS` SELECT * FROM temp_orders_1" in result
+        assert "TEMP_ORDERS_1" not in result
+        assert adapter._batch_temp_tables == frozenset()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preprocess_operation_sql_rewrites_bq_gaps(self, mock_bigquery):
@@ -2520,7 +2613,7 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
         bench1._write_staging_manifest(conn, source_tables)
         assert bench1._staging_manifest_matches(conn, source_tables) is True
 
-        manifest_table = "BENCHBOX_STAGING_MANIFEST_V2"
+        manifest_table = bench1._STAGING_MANIFEST_TABLE.upper()
         assert len(conn.tables[manifest_table]) == 1
         assert conn.tables[manifest_table][0][0] == "Transaction Primitives"
 
