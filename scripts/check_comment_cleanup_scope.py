@@ -301,7 +301,11 @@ def validate_dispositions(policy: dict[str, Any], task_ids: set[str] | None = No
     for index, item in enumerate(policy["review_dispositions"]):
         if not isinstance(item, dict):
             raise PolicyError(f"review_dispositions[{index}] must be an object")
-        require_fields(item, {"id", "disposition", "requirements", "owner"}, f"review_dispositions[{index}]")
+        require_fields(
+            item,
+            {"id", "disposition", "requirements", "owner", "original_verdict", "rationale", "acceptance_refs"},
+            f"review_dispositions[{index}]",
+        )
         item_id = check_string(item["id"], f"review_dispositions[{index}].id")
         if item_id in found:
             raise PolicyError(f"duplicate review disposition: {item_id}")
@@ -312,6 +316,13 @@ def validate_dispositions(policy: dict[str, Any], task_ids: set[str] | None = No
             raise PolicyError(f"review disposition {item_id} needs requirements")
         for requirement in item["requirements"]:
             check_string(requirement, f"review disposition {item_id} requirement")
+        if item["original_verdict"] not in {"accepted", "narrowed", "rebutted"}:
+            raise PolicyError(f"invalid original verdict for {item_id}")
+        check_string(item["rationale"], f"review disposition {item_id} rationale")
+        if not isinstance(item["acceptance_refs"], list) or not item["acceptance_refs"]:
+            raise PolicyError(f"review disposition {item_id} needs acceptance references")
+        for reference in item["acceptance_refs"]:
+            check_string(reference, f"review disposition {item_id} acceptance reference")
         check_owner(item["owner"], f"review disposition {item_id}.owner", task_ids)
     if found != expected:
         raise PolicyError(f"review dispositions must be exactly {sorted(expected)}")

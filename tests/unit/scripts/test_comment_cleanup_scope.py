@@ -43,7 +43,10 @@ def policy() -> dict:
             {
                 "id": f"R{number}",
                 "disposition": "accepted",
+                "original_verdict": "accepted",
                 "requirements": ["requirement"],
+                "rationale": "Fixture rationale.",
+                "acceptance_refs": ["Fixture acceptance reference."],
                 "owner": "comment-cleanup-scope-policy",
             }
             for number in range(1, 19)
@@ -318,3 +321,61 @@ def test_validator_writes_only_to_ignored_output(tmp_path: Path, policy: dict) -
         )
         == 2
     )
+
+
+def test_verified_source_slices_have_distinct_blocked_owners() -> None:
+    repository_policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    roots = scope.validate_roots(repository_policy)
+    rules = scope.validate_rules(repository_policy)
+    paths = [
+        "benchbox/core/tpch/queries.py",
+        "benchbox/core/tpcds/dataframe_queries/queries.py",
+        "benchbox/core/tpcds/generator/runner.py",
+        "benchbox/core/tpcdi/generator/data.py",
+        "benchbox/core/tpchavoc/dataframe_queries/queries.py",
+        "benchbox/core/ssb/queries.py",
+        "benchbox/core/clickbench/queries.py",
+        "benchbox/core/read_primitives/dataframe_queries.py",
+    ]
+    resolved, findings = scope.owned_paths(paths, roots, rules)
+    assert not findings
+    assert all(record["state"] == "blocked" for record in resolved)
+    assert {record["owner"] for record in resolved} == {
+        "comment-cleanup-tpch",
+        "comment-cleanup-tpcds-dataframe",
+        "comment-cleanup-tpcds-generation",
+        "comment-cleanup-tpcdi-generation",
+        "comment-cleanup-tpchavoc-dataframe",
+        "comment-cleanup-ssb",
+        "comment-cleanup-clickbench",
+        "comment-cleanup-read-primitives",
+    }
+
+
+def test_verified_source_slice_paths_remain_blocked_when_unmapped() -> None:
+    repository_policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    roots = scope.validate_roots(repository_policy)
+    rules = scope.validate_rules(repository_policy)
+    resolved, findings = scope.owned_paths(["benchbox/core/tpchavoc_variants/new.py"], roots, rules)
+    assert [finding.code for finding in findings] == ["SCOPE001"]
+    assert resolved[0]["owner"] is None
+    assert resolved[0]["state"] == "blocked"
+
+
+def test_verified_source_slice_rule_ids_are_unique() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rules = scope.validate_rules(policy)
+    ids = [rule["id"] for rule in rules if rule["id"].endswith("-source-slice")]
+    assert len(ids) == 20
+    assert len(ids) == len(set(ids))
+
+
+def test_review_dispositions_preserve_original_verdict_and_rationale() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    dispositions = policy["review_dispositions"]
+    assert len(dispositions) == 18
+    assert {item["id"] for item in dispositions} == {f"R{number}" for number in range(1, 19)}
+    for item in dispositions:
+        assert item["original_verdict"] == item["disposition"]
+        assert item["rationale"]
+        assert item["acceptance_refs"]

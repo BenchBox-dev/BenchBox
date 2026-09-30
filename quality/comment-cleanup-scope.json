@@ -29,6 +29,166 @@
         {"path": "docs/development/comment-cleanup-scope.md"},
         {"path": "docs/index.rst"}
       ]
+    },
+    {
+      "id": "tpch-source-slice",
+      "owner": "comment-cleanup-tpch",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpch/"}, {"path": "benchbox/tpch.py"}]
+    },
+    {
+      "id": "tpcds-dataframe-source-slice",
+      "owner": "comment-cleanup-tpcds-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; resolve docstring readers before producer edits.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpcds/dataframe_queries/"}]
+    },
+    {
+      "id": "tpcds-generation-source-slice",
+      "owner": "comment-cleanup-tpcds-generation",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve generated payload identity and consumer evidence.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpcds/generator/"}, {"prefix": "benchbox/core/tpcds/schema/"}]
+    },
+    {
+      "id": "tpcds-runtime-source-slice",
+      "owner": "comment-cleanup-tpcds-runtime",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; defer stream, RNG, timing, and caller migrations.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpcds/"}, {"path": "benchbox/tpcds.py"}]
+    },
+    {
+      "id": "tpcds-obt-source-slice",
+      "owner": "comment-cleanup-tpcds-obt",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve useful generated query references.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpcds_obt/"}, {"path": "benchbox/tpcds_obt.py"}]
+    },
+    {
+      "id": "tpcdi-generation-source-slice",
+      "owner": "comment-cleanup-tpcdi-generation",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve generator and manifest contracts.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpcdi/generator/"}]
+    },
+    {
+      "id": "tpcdi-runtime-source-slice",
+      "owner": "comment-cleanup-tpcdi-runtime",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; resolve runtime readers before producer edits.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpcdi/"}, {"path": "benchbox/tpcdi.py"}]
+    },
+    {
+      "id": "tpch-skew-source-slice",
+      "owner": "comment-cleanup-tpch-skew",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and payload consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpch_skew/"}, {"path": "benchbox/tpch_skew.py"}]
+    },
+    {
+      "id": "tpchavoc-dataframe-source-slice",
+      "owner": "comment-cleanup-tpchavoc-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve query payload identity and readers.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpchavoc/dataframe_queries/"}]
+    },
+    {
+      "id": "tpchavoc-runtime-source-slice",
+      "owner": "comment-cleanup-tpchavoc-runtime",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; variants and sibling consumers remain separately blocked.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpchavoc/"}, {"path": "benchbox/tpchavoc.py"}]
+    },
+    {
+      "id": "ssb-source-slice",
+      "owner": "comment-cleanup-ssb",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests, outputs, and readers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/ssb/"}, {"path": "benchbox/ssb.py"}]
+    },
+    {
+      "id": "clickbench-source-slice",
+      "owner": "comment-cleanup-clickbench",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and generated references before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/clickbench/"}, {"path": "benchbox/clickbench.py"}]
+    },
+    {
+      "id": "coffeeshop-source-slice",
+      "owner": "comment-cleanup-coffeeshop",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/coffeeshop/"}, {"prefix": "benchbox/data/coffeeshop/"}, {"path": "benchbox/coffeeshop.py"}]
+    },
+    {
+      "id": "amplab-source-slice",
+      "owner": "comment-cleanup-amplab",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/amplab/"}, {"path": "benchbox/amplab.py"}]
+    },
+    {
+      "id": "datavault-source-slice",
+      "owner": "comment-cleanup-datavault",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/datavault/"}, {"path": "benchbox/datavault.py"}]
+    },
+    {
+      "id": "flightdata-source-slice",
+      "owner": "comment-cleanup-flightdata",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/flightdata/"}, {"path": "benchbox/flightdata.py"}]
+    },
+    {
+      "id": "h2odb-source-slice",
+      "owner": "comment-cleanup-h2odb",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/h2odb/"}, {"path": "benchbox/h2odb.py"}]
+    },
+    {
+      "id": "nyctaxi-source-slice",
+      "owner": "comment-cleanup-nyctaxi",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and generated references before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/nyctaxi/"}, {"path": "benchbox/nyctaxi.py"}]
+    },
+    {
+      "id": "tsbs-devops-source-slice",
+      "owner": "comment-cleanup-tsbs-devops",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tsbs_devops/"}, {"path": "benchbox/tsbs_devops.py"}]
+    },
+    {
+      "id": "read-primitives-source-slice",
+      "owner": "comment-cleanup-read-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; resolve docstring readers before producer edits.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/read_primitives/"}, {"path": "benchbox/read_primitives.py"}]
     }
   ],
   "external_entries": [],
@@ -223,23 +383,23 @@
   ],
   "obligations": [],
   "review_dispositions": [
-    {"id": "R1", "disposition": "accepted", "requirements": ["individual-notice-provenance"], "owner": "comment-cleanup-scope-policy"},
-    {"id": "R2", "disposition": "accepted", "requirements": ["consumer-before-producer"], "owner": "comment-cleanup-contracts-gate"},
-    {"id": "R3", "disposition": "accepted", "requirements": ["source-text-reader-inventory"], "owner": "comment-cleanup-shared-infrastructure"},
-    {"id": "R4", "disposition": "accepted", "requirements": ["useful-reference-content"], "owner": "comment-cleanup-contracts-gate"},
-    {"id": "R5", "disposition": "narrowed", "requirements": ["payload-identity-by-slice"], "owner": "comment-cleanup-generators"},
-    {"id": "R6", "disposition": "rebutted", "requirements": ["remove-unsupported-claims"], "owner": "comment-cleanup-tpch"},
-    {"id": "R7", "disposition": "accepted", "requirements": ["defer-stream-rng-migration"], "owner": "comment-cleanup-tpcds-stream-decision"},
-    {"id": "R8", "disposition": "narrowed", "requirements": ["repair-active-references-only"], "owner": "comment-cleanup-final-enforcement"},
-    {"id": "R9", "disposition": "accepted", "requirements": ["exact-directive-grammar"], "owner": "comment-cleanup-checker"},
-    {"id": "R10", "disposition": "accepted", "requirements": ["control-file-inventory"], "owner": "comment-cleanup-shared-infrastructure"},
-    {"id": "R11", "disposition": "accepted", "requirements": ["safe-deletion-comparator"], "owner": "comment-cleanup-checker"},
-    {"id": "R12", "disposition": "accepted", "requirements": ["measured-batch-budget"], "owner": "comment-cleanup-pilot-budget"},
-    {"id": "R13", "disposition": "narrowed", "requirements": ["demonstrated-regression-gaps"], "owner": "comment-cleanup-validation"},
-    {"id": "R14", "disposition": "narrowed", "requirements": ["missing-count-behavior-proof"], "owner": "comment-cleanup-missing-count-decision"},
-    {"id": "R15", "disposition": "accepted", "requirements": ["expected-wrapper-use-proof"], "owner": "comment-cleanup-expected-wrapper"},
-    {"id": "R16", "disposition": "accepted", "requirements": ["datafusion-boundary-typing-proof"], "owner": "comment-cleanup-datafusion-typing"},
-    {"id": "R17", "disposition": "narrowed", "requirements": ["obsolete-consumer-proof"], "owner": "comment-cleanup-contracts-gate"},
-    {"id": "R18", "disposition": "accepted", "requirements": ["consumer-generator-dependency"], "owner": "comment-cleanup-scope-policy"}
+    {"id": "R1", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["individual-notice-provenance"], "rationale": "Resolve notices in derived first-party material by provenance and governing requirement; no blanket SPDX substitution or legal prose exception.", "acceptance_refs": ["Notice/provenance ledger resolves first-party derived material and upstream exceptions individually, with governing requirement and retained bytes."], "owner": "comment-cleanup-scope-policy"},
+    {"id": "R2", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["consumer-before-producer"], "rationale": "Migrate Click, FastMCP, argparse, API, display, and known runtime __doc__ consumers before removing producers.", "acceptance_refs": ["Consumer→producer ordering covers cross-module runtime/source-test reads, not only directory ownership."], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R3", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["source-text-reader-inventory"], "rationale": "Inventory source-text guards, delimiters, and parsed output records while preserving meaningful rejected and nonempty cases.", "acceptance_refs": ["Fresh revision-bound inventory covers every maintained code/config class, embedded SQL/output generator, runtime docstring consumer and source-text reader."], "owner": "comment-cleanup-shared-infrastructure"},
+    {"id": "R4", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["useful-reference-content"], "rationale": "Sphinx rendering alone is insufficient; useful per-interface reference content must precede source deletion.", "acceptance_refs": ["Consumer→producer ordering covers cross-module runtime/source-test reads, not only directory ownership."], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R5", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["payload-identity-by-slice"], "rationale": "Accept raw SQL and ledger identity risk, but reject a permanent exemption for explanatory SQL; disclose payload identity by slice without normalization or historical-result rewriting.", "acceptance_refs": ["Policy prohibits all discretionary explanatory comments/docstrings, appended directive prose and unused replacement documentation strings."], "owner": "comment-cleanup-generators"},
+    {"id": "R6", "disposition": "rebutted", "original_verdict": "rebutted", "requirements": ["remove-unsupported-claims"], "rationale": "Unsupported claims are scheduled for deletion; TPC-H compliance assurance and false TPC-DS equivalence claims must disappear, not relocate as provenance.", "acceptance_refs": ["Policy prohibits all discretionary explanatory comments/docstrings, appended directive prose and unused replacement documentation strings."], "owner": "comment-cleanup-tpch"},
+    {"id": "R7", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["defer-stream-rng-migration"], "rationale": "Evaluate every legacy TPC-DS power, runner, throughput, and DataFrame caller and global RNG effect; ordering, parameters, RNG, and timing changes require a separate migration.", "acceptance_refs": ["Implementation and parallel-write authorization boundaries, ownership freeze, shared test lock and independent PR/review requirements are written into the dispatch contract."], "owner": "comment-cleanup-tpcds-stream-decision"},
+    {"id": "R8", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["repair-active-references-only"], "rationale": "Repair active references while rejecting rewrites of historical snapshots, counts, and SHA citations.", "acceptance_refs": ["Policy prohibits all discretionary explanatory comments/docstrings, appended directive prose and unused replacement documentation strings."], "owner": "comment-cleanup-final-enforcement"},
+    {"id": "R9", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["exact-directive-grammar"], "rationale": "Require exact per-language directive grammar, minimal syntax, stable exception identity, owner and trigger, while acknowledging static limits on dynamic prose and simplicity.", "acceptance_refs": ["Policy prohibits all discretionary explanatory comments/docstrings, appended directive prose and unused replacement documentation strings."], "owner": "comment-cleanup-checker"},
+    {"id": "R10", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["control-file-inventory"], "rationale": "Include compiler references, Vitest environments, formatting, and ignore or coverage controls without wider waivers.", "acceptance_refs": ["Fresh revision-bound inventory covers every maintained code/config class, embedded SQL/output generator, runtime docstring consumer and source-text reader."], "owner": "comment-cleanup-shared-infrastructure"},
+    {"id": "R11", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["safe-deletion-comparator"], "rationale": "Replace sole-docstring bodies with pass only where required; executable comparison must not ignore arbitrary strings or control flow.", "acceptance_refs": ["Policy prohibits all discretionary explanatory comments/docstrings, appended directive prose and unused replacement documentation strings."], "owner": "comment-cleanup-checker"},
+    {"id": "R12", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["measured-batch-budget"], "rationale": "Refresh volume and classification, then choose measured file, PR, review, and CI budgets before broad cleanup; independent soundness and native review remain required.", "acceptance_refs": ["Implementation and parallel-write authorization boundaries, ownership freeze, shared test lock and independent PR/review requirements are written into the dispatch contract."], "owner": "comment-cleanup-pilot-budget"},
+    {"id": "R13", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["demonstrated-regression-gaps"], "rationale": "Map invariants to effective tests, including timed cursor counting and all-chunk CRLF carry; add only demonstrated gaps such as joined-slot replacement races.", "acceptance_refs": ["Every TODO/FIXME obligation has an existing tracker link or an explicit approved follow-up destination."], "owner": "comment-cleanup-validation"},
+    {"id": "R14", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["missing-count-behavior-proof"], "rationale": "Investigate exact missing counts versus lookup failures and publication; preserve current SKIP and warning behavior without endorsing fail-open policy.", "acceptance_refs": ["Policy prohibits all discretionary explanatory comments/docstrings, appended directive prose and unused replacement documentation strings."], "owner": "comment-cleanup-missing-count-decision"},
+    {"id": "R15", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["expected-wrapper-use-proof"], "rationale": "Remove the private expected-results wrapper only after direct and dynamic-use proof, preserving the actual loader and historical classification record.", "acceptance_refs": ["Consumer→producer ordering covers cross-module runtime/source-test reads, not only directory ownership."], "owner": "comment-cleanup-expected-wrapper"},
+    {"id": "R16", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["datafusion-boundary-typing-proof"], "rationale": "Assess existing DataFusionExpr typing at the deferred filter boundary; preserve filter build behavior and lazy imports without blind casts or wrappers.", "acceptance_refs": ["Implementation and parallel-write authorization boundaries, ownership freeze, shared test lock and independent PR/review requirements are written into the dispatch contract."], "owner": "comment-cleanup-datafusion-typing"},
+    {"id": "R17", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["obsolete-consumer-proof"], "rationale": "Remove obsolete interrogate and badge consumers and regenerate the current Make inventory, without rewriting historical baselines or proofs.", "acceptance_refs": ["Fresh revision-bound inventory covers every maintained code/config class, embedded SQL/output generator, runtime docstring consumer and source-text reader."], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R18", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["consumer-generator-dependency"], "rationale": "Consumer and generator migrations precede deletion; each batch must prove completed prerequisites and owning destinations.", "acceptance_refs": ["Consumer→producer ordering covers cross-module runtime/source-test reads, not only directory ownership."], "owner": "comment-cleanup-scope-policy"}
   ]
 }
