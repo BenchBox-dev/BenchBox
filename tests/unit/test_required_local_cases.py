@@ -38,6 +38,43 @@ def test_sqlite_node_exists_in_matrix_module() -> None:
     assert callable(getattr(matrix, name))
 
 
+@pytest.mark.parametrize("compressed", [False, True], ids=["tbl", "tbl-zst"])
+def test_duckdb_reference_loader_accepts_apostrophe_path(tmp_path: Path, compressed: bool) -> None:
+    import zstandard
+
+    from benchbox.core.tpch.schema import TABLES, DataType
+    from tests.integration import test_local_platform_benchmark_matrix as matrix
+
+    datagen_dir = tmp_path / "case's data" / "datagen"
+    datagen_dir.mkdir(parents=True)
+    values = {
+        DataType.INTEGER: "1",
+        DataType.DECIMAL: "1.25",
+        DataType.CHAR: "A",
+        DataType.VARCHAR: "reference row",
+        DataType.DATE: "1997-06-01",
+    }
+    for table in TABLES:
+        row = ("|".join(values[column.data_type] for column in table.columns) + "|\n").encode()
+        suffix = ".tbl.zst" if compressed else ".tbl"
+        if compressed:
+            row = zstandard.ZstdCompressor().compress(row)
+        (datagen_dir / f"{table.name}{suffix}").write_bytes(row)
+
+    connection = matrix._load_duckdb_from_generated_files(datagen_dir)
+    try:
+        counts = {
+            table.name: connection.execute(f"SELECT COUNT(*) FROM {table.name}").fetchone()[0] for table in TABLES
+        }
+        assert counts == dict.fromkeys(required.TPCH_TABLE_NAMES, 1)
+        assert connection.execute("SELECT l_extendedprice, l_discount FROM lineitem").fetchall() == [
+            (Decimal("1.25"), Decimal("1.25"))
+        ]
+        assert connection.execute("SELECT r_comment FROM region").fetchall() == [("reference row",)]
+    finally:
+        connection.close()
+
+
 def test_sqlite_case_rejects_checkout_owned_output(monkeypatch: pytest.MonkeyPatch) -> None:
     from tests.integration import test_local_platform_benchmark_matrix as matrix
 

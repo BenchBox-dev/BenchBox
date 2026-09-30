@@ -530,6 +530,7 @@ def _load_duckdb_from_generated_files(datagen_dir: Path):
     import zstandard
 
     from benchbox.core.tpch.schema import TABLES
+    from benchbox.platforms.base.data_loading import escape_sql_string_literal
 
     con = duckdb.connect(":memory:")
     scratch = datagen_dir.parent / "duckdb_reference_input"
@@ -546,7 +547,8 @@ def _load_duckdb_from_generated_files(datagen_dir: Path):
             lines = [line[:-1] if line.endswith(b"|") else line for line in raw.splitlines() if line]
             staged = scratch / f"{table.name}.{index}.csv"
             staged.write_bytes(b"\n".join(lines) + b"\n")
-            con.execute(f"COPY {table.name} FROM '{staged}' (DELIMITER '|', HEADER false)")
+            escaped_path = escape_sql_string_literal(str(staged))
+            con.execute(f"COPY {table.name} FROM '{escaped_path}' (DELIMITER '|', HEADER false)")
     return con
 
 
