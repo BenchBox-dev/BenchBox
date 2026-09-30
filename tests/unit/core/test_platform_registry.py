@@ -5,6 +5,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -55,6 +56,29 @@ class TestPlatformRegistry:
     def setup_method(self):
         """Clear registry cache before each test."""
         PlatformRegistry.clear_cache()
+
+    @pytest.mark.parametrize("error_type", [None, ImportError, OSError])
+    def test_detect_library_restores_import_cwd(self, tmp_path, error_type):
+        original_cwd = Path.cwd()
+
+        def import_with_native_side_effect(module_name):
+            assert module_name == "chdb"
+            os.chdir(tmp_path)
+            if error_type is not None:
+                raise error_type("native library unavailable")
+            return SimpleNamespace(__version__="1.2.3")
+
+        try:
+            with patch(
+                "benchbox.core.platform_registry.importlib.import_module", side_effect=import_with_native_side_effect
+            ):
+                info = PlatformRegistry.detect_library({"name": "chdb"})
+            assert Path.cwd() == original_cwd
+            assert info.installed is (error_type is None)
+            assert info.version == ("1.2.3" if error_type is None else None)
+            assert info.import_error == (None if error_type is None else "native library unavailable")
+        finally:
+            os.chdir(original_cwd)
 
     def test_get_all_platform_metadata(self):
         """Test getting all platform metadata."""
