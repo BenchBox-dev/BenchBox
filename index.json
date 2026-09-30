@@ -2914,6 +2914,13 @@
       "status": "done",
       "title": "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
     },
+    "comment-cleanup-scope-policy": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Define comment-removal scope, provenance, ownership and exception policy"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],
