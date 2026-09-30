@@ -31,6 +31,7 @@ from benchbox.core.tsbs_devops.schema import (
     TABLE_ORDER,
     TSBS_DEVOPS_SCHEMA,
 )
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.compression_mixin import CompressionMixin
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
@@ -95,7 +96,10 @@ class TSBSDevOpsDataGenerator(CompressionMixin, VerbosityMixin):
         super().__init__(**kwargs)
 
         self.scale_factor = scale_factor
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd() / "tsbs_devops_data"
+        # normalize_output_dir keeps a CloudStagingPath/DatabricksPath handler
+        # intact; the wrapper delegates mkdir/truediv to its local cache, so
+        # generation behavior is unchanged while the cloud target survives.
+        self.output_dir = normalize_output_dir(output_dir) or Path.cwd() / "tsbs_devops_data"
 
         # Calculate dimensions based on scale factor.
         # SF=1.0 uses 100 hosts over 2 days, which keeps the dataset close to

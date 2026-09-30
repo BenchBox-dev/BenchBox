@@ -206,7 +206,7 @@ class TestReleaseInfrastructure:
     def test_required_fast_marker_expression_is_consistent(self):
         """Pin required PR fast-test marker selection across local and CI surfaces."""
         makefile_content = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-        develop_pr_run_text = _workflow_job_run_text("pr.yml", "code-test")
+        develop_pr_run_text = _workflow_job_run_text("ci.yml", "code-test")
         main_pr_run_text = _workflow_job_run_text("test.yml", "test")
 
         expected_marker_flag = f'-m "{CI_FAST_EXPRESSION}"'
