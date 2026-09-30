@@ -11,6 +11,7 @@ import pytest
 
 from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark
 from benchbox.core.read_primitives.catalog import ResultContract, load_primitives_catalog
+from benchbox.platforms.clickhouse._dependencies import import_chdb_session
 
 pytestmark = [
     pytest.mark.integration,
@@ -139,8 +140,10 @@ def datafusion_ctx(read_primitives_tpch_parquet_dir):
 @pytest.fixture(scope="session")
 def clickhouse_session(read_primitives_tpch_parquet_dir):
     """ClickHouse-local session backed by the same SF=0.01 Parquet tables."""
-    pytest.importorskip("chdb", reason="chdb not installed")
-    from chdb import session as chdb_session
+    try:
+        chdb_session = import_chdb_session()
+    except ImportError as exc:
+        pytest.skip(f"chdb not installed: {exc}")
 
     sess = chdb_session.Session()
     sess.query("CREATE DATABASE IF NOT EXISTS tpch", "CSV")

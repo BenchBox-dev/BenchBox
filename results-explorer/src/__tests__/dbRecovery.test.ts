@@ -25,6 +25,10 @@ const hoisted = vi.hoisted(() => {
     return { toArray: () => data.map((row) => ({ toJSON: () => row, ...row })) };
   }
 
+  const membershipAttempts = new Map<string, number>();
+  let membershipQuery:
+    ((sql: string, params: unknown[], attempt: number) => Array<Record<string, unknown>>) | null = null;
+
   // Answers every SQL shape the readiness ladder and typed queries in db.ts
   // issue. Deliberately permissive: matches by SQL shape rather than pinning
   // exact table lists, so it doesn't need updating when SNAPSHOT_READY_SCANS
@@ -48,10 +52,16 @@ const hoisted = vi.hoisted(() => {
     query: (...params: unknown[]) => Promise<FakeRows>;
     close: () => Promise<void>;
 
-    constructor(dead: boolean) {
+    constructor(dead: boolean, sql: string) {
       this.dead = dead;
-      this.query = () => {
+      this.query = (...params: unknown[]) => {
         if (this.dead) return new Promise(() => {});
+        if (membershipQuery && /FROM bench\.result_detail_metrics/i.test(sql)) {
+          const key = params.join(",");
+          const attempt = (membershipAttempts.get(key) ?? 0) + 1;
+          membershipAttempts.set(key, attempt);
+          return Promise.resolve(rows(membershipQuery(sql, params, attempt)));
+        }
         return Promise.resolve(healthyQueryImpl("prepared"));
       };
       this.close = () => {
@@ -93,7 +103,7 @@ const hoisted = vi.hoisted(() => {
         if (this.dead) return new Promise(() => {}); // cleanup on a dead worker hangs too
         return Promise.resolve();
       };
-      this.prepare = async () => new FakeStatement(this.dead);
+      this.prepare = async (sql: string) => new FakeStatement(this.dead, sql);
     }
   }
 
@@ -161,7 +171,15 @@ const hoisted = vi.hoisted(() => {
     }
   }
 
-  return { nextInstanceBehaviors, instances, FakeAsyncDuckDB };
+  return {
+    nextInstanceBehaviors,
+    instances,
+    FakeAsyncDuckDB,
+    membershipAttempts,
+    setMembershipQuery: (query: typeof membershipQuery) => {
+      membershipQuery = query;
+    },
+  };
 });
 
 vi.mock("@duckdb/duckdb-wasm", () => ({
@@ -192,6 +210,7 @@ import {
   getDb,
   queryRows,
 } from "@/db";
+import { getExistingResultIds } from "@/lib/duckdbQueries";
 
 class FakeWorker {
   addEventListener(): void {}
@@ -203,6 +222,8 @@ beforeEach(() => {
   _resetDbStateForTest();
   hoisted.nextInstanceBehaviors.length = 0;
   hoisted.instances.length = 0;
+  hoisted.membershipAttempts.clear();
+  hoisted.setMembershipQuery(null);
 
   vi.stubGlobal("Worker", FakeWorker);
   vi.stubGlobal(
@@ -223,6 +244,47 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+describe("Compare membership with cold reads", () => {
+  it("confirms a missing ID once after a complete scan", async () => {
+    vi.useFakeTimers();
+    hoisted.setMembershipQuery((sql, params) => {
+      if (params.length === 2) return [{ result_id: "known-a" }];
+      return /HAVING COUNT\(DISTINCT result_id\)/i.test(sql) ? [{ result_id: null }] : [];
+    });
+    const initialMatches = vi.fn();
+    const pending = getExistingResultIds(["known-a", "missing-b"], initialMatches);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual(new Set(["known-a"]));
+    expect(initialMatches).toHaveBeenCalledWith(new Set(["known-a"]));
+    expect(hoisted.membershipAttempts.get("missing-b")).toBe(1);
+  });
+
+  it("retries an incomplete confirmation and keeps the recovered real ID", async () => {
+    vi.useFakeTimers();
+    hoisted.setMembershipQuery((_sql, params, attempt) => {
+      if (params.length === 2) return [{ result_id: "known-a" }];
+      return attempt === 1 ? [] : [{ result_id: "cold-b" }];
+    });
+    const pending = getExistingResultIds(["known-a", "cold-b"]);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual(new Set(["known-a", "cold-b"]));
+    expect(hoisted.membershipAttempts.get("cold-b")).toBe(2);
+  });
+
+  it("recovers from a transient confirmation error before reporting absence", async () => {
+    vi.useFakeTimers();
+    hoisted.setMembershipQuery((_sql, params, attempt) => {
+      if (params.length === 2) return [{ result_id: "known-a" }];
+      if (attempt === 1) throw new RangeError("offset is out of bounds");
+      return [{ result_id: null }];
+    });
+    const pending = getExistingResultIds(["known-a", "missing-b"]);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual(new Set(["known-a"]));
+    expect(hoisted.membershipAttempts.get("missing-b")).toBe(2);
+  });
 });
 
 describe("DuckDB instance eviction and recovery", () => {

@@ -30,7 +30,7 @@ def test_databricks_smoke_run(monkeypatch, tmp_path):
 
     stats, metadata, stub_state = run_smoke_benchmark(adapter, benchmark, tmp_path)
 
-    assert stats["LINEITEM"] == stub_state.row_counts["LINEITEM"]
+    assert stats["lineitem"] == stub_state.row_counts["LINEITEM"]
     assert any(stmt.startswith("COPY INTO LINEITEM") for stmt in stub_state.copy_statements)
     assert metadata["platform_name"] == "Databricks"
 

@@ -34,6 +34,7 @@ from benchbox.core.tpch_skew.distributions import (
     UniformDistribution,
     ZipfianDistribution,
 )
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 if TYPE_CHECKING:
@@ -93,7 +94,10 @@ class TPCHSkewDataGenerator(VerbosityMixin):
             **kwargs: Additional arguments passed to base generator
         """
         self.scale_factor = scale_factor
-        self.output_dir = Path(output_dir) if output_dir else Path.cwd() / "tpch_skew_data"
+        # normalize_output_dir keeps a CloudStagingPath/DatabricksPath handler
+        # intact; the wrapper delegates mkdir/truediv to its local cache, so
+        # generation behavior is unchanged while the cloud target survives.
+        self.output_dir = normalize_output_dir(output_dir) or Path.cwd() / "tpch_skew_data"
 
         # Initialize verbosity
         verbosity_settings = compute_verbosity(verbose, quiet)

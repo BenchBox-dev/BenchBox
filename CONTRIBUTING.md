@@ -44,7 +44,7 @@ This document provides guidelines and instructions for contributing.
 
 `develop` is the long-lived development branch and the repository's default branch; **all changes land via PR**. `release` is release-only (handled by the version-branch flow — see `docs/operations/release-guide.md`). PRs target `develop` and squash-merge with linear history.
 
-Required CI on `develop` reports through `ci-required-result`. The umbrella uses `.github/path-filters.yml` to classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
+Required CI on `develop` reports six unit results (`core`, `explorer`, `results-data`, `docs`, `landing`, `tooling`) from `.github/workflows/ci.yml`. `.github/ci-units.yml` and `.github/path-filters.yml` classify each PR: content-only PRs run content validation and skip Python fast tests, while code, infra, workflow, tooling, and unknown paths run the post-Step-3 lint/type + Ubuntu 3.12 fast-test gate. Reviews are not required for solo-dev work; once a finished branch is armed, auto-merge lands it when required checks are green.
 
 ## Development Workflow
 
@@ -123,7 +123,7 @@ There are two layers, and you only need the first:
 make pr-preflight
 ```
 
-This runs the local lint/type gate, then uses `.github/path-filters.yml` to decide the fast-test lane. Content-only branches run the cheap content guard and skip Python fast tests; code, infra, workflow, tooling, and unknown paths run the fast tests. This mirrors the `ci-required-result` umbrella, so a green preflight almost always means a green CI. The opt-in pre-push git hook runs the same path-aware test portion when `BENCHBOX_PREPUSH=1`.
+This runs the local lint/type gate, then uses `.github/path-filters.yml` to decide the fast-test lane. Content-only branches run the cheap content guard and skip Python fast tests; code, infra, workflow, tooling, and unknown paths run the fast tests. This mirrors the `core` unit, so a green preflight almost always means a green CI. The opt-in pre-push git hook runs the same path-aware test portion when `BENCHBOX_PREPUSH=1`.
 
 **Optional thoroughness check** — only useful when you've changed cross-cutting things (CI workflows, packaging, docs build, integration paths):
 

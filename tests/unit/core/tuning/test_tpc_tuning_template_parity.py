@@ -33,8 +33,10 @@ TUNING_ROOT = REPO_ROOT / "examples" / "tunings"
     [
         ("databricks", "tpch"),
         ("databricks", "tpcds"),
+        ("databricks", "ssb"),
         ("duckdb", "tpch"),
         ("duckdb", "tpcds"),
+        ("duckdb", "ssb"),
     ],
 )
 def test_tpc_tuned_templates_map_required_logical_profile_candidates(platform: str, benchmark_id: str) -> None:

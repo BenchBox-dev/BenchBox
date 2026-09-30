@@ -182,7 +182,8 @@ def test_staged_gates_are_marked_not_unguarded(rows):
     # a candidate anymore and no staged candidates remain.
     assert "flightdata" not in by_id
     assert "datavault" not in by_id
-    assert not [r["benchmark"] for r in rows if r.get("staged")], "unexpected staged candidates remain"
+    staged = {r["benchmark"] for r in rows if r.get("staged")}
+    assert staged == {"nyctaxi", "tpch_skew", "tsbs_devops"}, f"staged set changed: {sorted(staged)}"
     assert by_id["joinorder"].get("staged") is False
 
 

@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter
+from benchbox.platforms.clickhouse._dependencies import import_chdb
 
 pytestmark = [
     pytest.mark.unit,
@@ -21,13 +22,13 @@ pytestmark = [
 ]
 
 
-# Check for optional dependencies
+# Check for optional dependencies, including native-load usability.
 try:
-    import importlib.util
-
-    CHDB_AVAILABLE = importlib.util.find_spec("chdb") is not None
+    import_chdb()
 except ImportError:
     CHDB_AVAILABLE = False
+else:
+    CHDB_AVAILABLE = True
 
 
 @pytest.fixture(autouse=True)
