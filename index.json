@@ -3242,6 +3242,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from Synthetic JoinOrder modules"
     },
+    "comment-cleanup-local-native-adapters": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from DataFusion, Polars and SQLite adapters"
+    },
     "comment-cleanup-managed-warehouses": {
       "claim": null,
       "needs": [
