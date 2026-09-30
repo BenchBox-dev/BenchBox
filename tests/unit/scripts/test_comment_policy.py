@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
+import sys
 from copy import deepcopy
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
+import run_comment_policy as policy_runner
 import yaml
 from check_comment_policy import allowed, check_ratchet, introduced, load_policy, main, scan_sources, source_paths
 from comment_syntax import Finding, javascript_requests, python_findings, scan, sql_comments
@@ -519,6 +523,66 @@ def test_comment_policy_trust_roots_require_soundness_review() -> None:
     for path in (*TRUSTED_FILES, "scripts/run_comment_policy.py", "quality/comment-policy.json"):
         assert "file\t" + path in routes
         assert path + " @joeharris76" in owners
+
+
+@pytest.mark.parametrize("prose,native_failure", [(True, False), (True, True), (False, False), (False, True)])
+def test_candidate_native_execution_cannot_replace_checker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prose: bool, native_failure: bool
+) -> None:
+    git_repo(tmp_path, "x = 1\n")
+    for name in TRUSTED_FILES:
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("", encoding="utf-8")
+    (tmp_path / "scripts/comment_policy_entry.py").write_bytes((ROOT / "scripts/comment_policy_entry.py").read_bytes())
+    (tmp_path / "scripts/check_comment_policy.py").write_text(
+        "import sys\nfrom pathlib import Path\n"
+        "root = Path(sys.argv[sys.argv.index('--root') + 1])\n"
+        "raise SystemExit(int('# explanation' in (root / 'scripts/bad.py').read_text()))\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(tmp_path), "add", "scripts", "quality"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "Checker fixture",
+        ],
+        check=True,
+    )
+    base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    (tmp_path / "scripts/bad.py").write_text("# explanation\n" if prose else "x = 1\n", encoding="utf-8")
+    order = []
+    real_run = subprocess.run
+
+    def execute(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess:
+        if command[0] == "node":
+            order.append("native")
+            directory = kwargs["cwd"]
+            assert isinstance(directory, Path)
+            (directory / "check_comment_policy.py").write_text("raise SystemExit(0)\n", encoding="utf-8")
+            if native_failure:
+                raise subprocess.CalledProcessError(1, command)
+            return subprocess.CompletedProcess(command, 0)
+        if command[0] == sys.executable and any(str(value).endswith("comment_policy_entry.py") for value in command):
+            order.append("checker")
+        return real_run(command, **kwargs)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(policy_runner, "parser_environment", lambda trusted: (Path(sys.executable), dict(os.environ)))
+    monkeypatch.setattr(policy_runner.subprocess, "run", execute)
+    assert policy_runner.main(["--base", base, "--native-tests"]) == (1 if prose else 2 if native_failure else 0)
+    assert order == (["checker"] if prose else ["checker", "native"])
+    assert (tmp_path / "scripts/bad.py").read_text() == ("# explanation\n" if prose else "x = 1\n")
 
 
 def test_new_files_do_not_inherit_vendor_directory_exclusion() -> None:

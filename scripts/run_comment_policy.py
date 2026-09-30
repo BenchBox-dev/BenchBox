@@ -133,13 +133,6 @@ def main(argv: list[str] | None = None) -> int:
                 for name in TRUSTED_FILES:
                     (trusted / Path(name).name).write_bytes((root / name).read_bytes())
             python, env = parser_environment(trusted)
-            if args.native_tests:
-                subprocess.run(
-                    ["node", "--test", str(root / "tests/unit/scripts/test_comment_syntax_js.cjs")],
-                    cwd=trusted,
-                    env=env,
-                    check=True,
-                )
             command = [
                 str(python),
                 "-I",
@@ -155,7 +148,17 @@ def main(argv: list[str] | None = None) -> int:
                 command.append("--bootstrap")
             if args.staged:
                 command.append("--staged")
-            return subprocess.run(command, cwd=trusted, env=env, check=False).returncode
+            result = subprocess.run(command, cwd=trusted, env=env, check=False).returncode
+            if result:
+                return result
+            if args.native_tests:
+                subprocess.run(
+                    ["node", "--test", str(root / "tests/unit/scripts/test_comment_syntax_js.cjs")],
+                    cwd=trusted,
+                    env=env,
+                    check=True,
+                )
+            return 0
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as exc:
         print(f"comment-policy: trusted invocation failed: {exc}", file=sys.stderr)
         return 2

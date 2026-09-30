@@ -20,6 +20,11 @@ assignments. A help string or protocol record must have an actual reader.
   reviewed, hash-pinned specifications. `comment-policy-check` also runs the
   native parser regressions.
 
+Source enforcement completes before any candidate native test executes. A
+rejection exits without running those tests, so a test cannot replace the
+trusted checker or hide source before it is checked. Native test failures still
+fail the command after a successful source check.
+
 The CI job runs on every pull request and merge group. The required tooling
 result consumes it even when other code lint is skipped. CI takes its base SHA
 from the platform event and rejects an override. After the initial rollout, the
