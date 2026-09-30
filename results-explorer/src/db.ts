@@ -312,7 +312,7 @@ async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<num
         return 0;
       }
       lastError = error;
-      if (!isTransientDuckDbSnapshotError(error)) {
+      if (isDuckDbBufferBoundsError(error) || !isTransientDuckDbSnapshotError(error)) {
         throw error;
       }
       await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
@@ -461,7 +461,7 @@ async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
       }
     } catch (error: unknown) {
       lastError = error;
-      if (!isTransientDuckDbSnapshotError(error)) throw error;
+      if (isDuckDbBufferBoundsError(error) || !isTransientDuckDbSnapshotError(error)) throw error;
     }
     await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
   }
@@ -723,6 +723,14 @@ async function queryRowsOnce<T>(
 
 function isDuckDbTimeoutError(error: unknown): boolean {
   return error instanceof DuckDbTimeoutError;
+}
+
+// COI memory growth can leave the worker's heap view stale. Repeating SQL on
+// that worker cannot reliably refresh it; initialization must terminate it and let the
+// existing bounded query recovery create a fresh instance.
+function isDuckDbBufferBoundsError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /offset is out of bounds/i.test(message);
 }
 
 // Timeouts use the hard cutoff policy; the next independent read can recover

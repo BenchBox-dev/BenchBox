@@ -117,6 +117,8 @@ const hoisted = vi.hoisted(() => {
     | "healthy"
     | "dead-after-init"
     | "dead-during-init"
+    | "buffer-error-on-metadata"
+    | "buffer-error-on-readiness"
     | "terminated-after-init"
     | "slow-query";
   const nextInstanceBehaviors: InstanceBehavior[] = [];
@@ -127,6 +129,7 @@ const hoisted = vi.hoisted(() => {
     behavior: InstanceBehavior;
     terminate: () => Promise<void>;
     connectCount = 0;
+    queryCalls: string[] = [];
     // Flipped by a connection's query() in the "terminated-after-init"
     // scenario, and by `terminate()` itself - mirrors the real bridge's
     // `isDetached()`, which is exactly `!this._worker`.
@@ -161,6 +164,17 @@ const hoisted = vi.hoisted(() => {
       const terminatedBy =
         this.behavior === "terminated-after-init" && this.connectCount > 1 ? this : null;
       const conn = new FakeConnection(isDead, terminatedBy);
+      const query = conn.query;
+      conn.query = async (sql: string) => {
+        this.queryCalls.push(sql);
+        if (
+          (this.behavior === "buffer-error-on-metadata" && /read_model_version/i.test(sql)) ||
+          (this.behavior === "buffer-error-on-readiness" && /^SELECT result_id FROM bench.results LIMIT 1/.test(sql))
+        ) {
+          throw new RangeError("offset is out of bounds");
+        }
+        return query(sql);
+      };
       if (this.behavior === "slow-query" && this.connectCount === 2) {
         conn.query = async () => {
           await new Promise((resolve) => setTimeout(resolve, 10_000));
@@ -244,6 +258,47 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+describe("Initialization with a stale worker memory view", () => {
+  it.each(["buffer-error-on-metadata", "buffer-error-on-readiness"] as const)(
+    "replaces %s promptly and preserves concurrent real-ID reads",
+    async (behavior) => {
+      vi.useFakeTimers();
+      hoisted.nextInstanceBehaviors.push(behavior, "healthy");
+      hoisted.setMembershipQuery((_sql, params) => params.map((result_id) => ({ result_id })));
+      const pending = Promise.all([getExistingResultIds(["real-a"]), getExistingResultIds(["real-b"])]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hoisted.instances[0]?.terminate).toHaveBeenCalledOnce();
+      const failingSql = behavior === "buffer-error-on-metadata"
+        ? /read_model_version/i
+        : /^SELECT result_id FROM bench.results LIMIT 1/;
+      expect(hoisted.instances[0]?.queryCalls.filter((sql) => failingSql.test(sql))).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toEqual([new Set(["real-a"]), new Set(["real-b"])]);
+      expect(hoisted.instances).toHaveLength(2);
+      expect(hoisted.instances[1]?.terminated).toBe(false);
+      expect(_getInitFailuresForTest()).toBe(0);
+    },
+  );
+
+  it.each(["buffer-error-on-metadata", "buffer-error-on-readiness"] as const)(
+    "bounds repeated %s failures without retrying SQL on broken workers",
+    async (behavior) => {
+      vi.useFakeTimers();
+      hoisted.nextInstanceBehaviors.push(behavior, behavior, behavior);
+      let failure: unknown;
+      const pending = queryRows("SELECT 1").catch((error: unknown) => { failure = error; });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(failure).toBeInstanceOf(RangeError);
+      await pending;
+      expect(hoisted.instances).toHaveLength(3);
+      expect(hoisted.instances.every((instance) => instance.terminated)).toBe(true);
+      expect(_getInitFailuresForTest()).toBe(3);
+      await expect(getDb()).rejects.toThrow("offset is out of bounds");
+      expect(hoisted.instances).toHaveLength(3);
+    },
+  );
 });
 
 describe("Compare membership with cold reads", () => {
