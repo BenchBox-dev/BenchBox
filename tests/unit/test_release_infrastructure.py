@@ -874,7 +874,7 @@ class TestReleaseInfrastructure:
             "tests/unit/workflows/test_validate_submission_changed_bundles.py",
             "tests/unit/workflows/test_validate_submission_fail_open.py",
         }
-        assert len(v040_missed_paths) == 37
+        assert len(v040_missed_paths) == 38
         assert v040_missed_paths <= curated_paths, (
             "release-cut is missing tests that had to be curated manually in the v0.4.0 release PR: "
             f"{sorted(v040_missed_paths - curated_paths)}"
