@@ -3088,6 +3088,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from cost estimation"
     },
+    "comment-cleanup-cross-module-integration-tests": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from remaining integration and contract suites"
+    },
     "comment-cleanup-cross-module-unit-tests": {
       "claim": null,
       "needs": [
