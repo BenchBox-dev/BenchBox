@@ -28,10 +28,11 @@ does not perform a normal Pages write.
 3. Review the generated candidate summary and approve the protected
    `github-pages` environment once. There is no permit hash, comment, tracker
    claim, generation entry, or author footer to copy into the workflow.
-   Package releases start this flow automatically:
-   `publication-release-handoff.yml` dispatches the candidate build and the
-   promotion transaction when a GitHub Release publishes, and opens a tracked
-   `publication` issue if the handoff fails.
+   The release operator starts the current publication flow manually. The
+   replacement site deployment must connect package releases to an exact
+   candidate run, report dispatch and promotion failures, and bound its wait
+   within the workflow's runtime limit. That automatic path remains pending
+   replacement deployment acceptance.
 4. The deploy job revalidates the same artifact after approval, then records
    journal intent before submitting the Pages write. It uploads the exact site
    bytes, records the provider response, probes the public routes, signs the
