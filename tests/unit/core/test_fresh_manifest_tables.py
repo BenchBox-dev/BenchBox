@@ -1,88 +1,91 @@
-"""Same-invocation datagen must stay visible to the load phase.
+"""Read Primitives fresh mappings must match manifest reuse at the platform seam.
 
-Regression test for tracker item ``loader-fresh-manifest-invisible``: a fresh
-parallel (sharded, compressed) generate produced ``benchmark.tables`` values
-that were stringified Python lists (``str()`` applied to a ``list[Path]``),
-so no entry resolved to an existing file. Multi-file tables were then
-skipped by the loader (``Skipping <table> - no valid data files``) while
-single-file tables loaded, exactly matching the BigQuery cloud failure. A
-warm rerun worked because ``_populate_tables_from_manifest`` rebuilds proper
-lists.
+These tests cover generation and path normalization, not the legacy direct
+loaders, whose shard and compression support is outside this mapping contract.
 
 Copyright 2026 Joe Harris / BenchBox Project
-
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
 from __future__ import annotations
 
+import gzip
 from pathlib import Path
 
 import pytest
 
-from benchbox.core.read_primitives.generator import ReadPrimitivesDataGenerator
-from benchbox.core.ssb.generator import SSBDataGenerator
+from benchbox.core.read_primitives.benchmark import ReadPrimitivesBenchmark
+from benchbox.core.runner.runner import _populate_tables_from_manifest
 from benchbox.platforms.base.data_loading import normalize_table_paths
+from benchbox.read_primitives import ReadPrimitives
+from benchbox.utils.datagen_manifest import DataGenerationManifest, load_manifest
 
-pytestmark = [
-    pytest.mark.unit,
-    pytest.mark.fast,
-]
-
-
-def _make_shard_files(output_dir: Path) -> dict[str, Path | list[Path]]:
-    """Create a fake sharded layout: one multi-file table, one single file."""
-    shards = []
-    for chunk in (1, 2, 3):
-        shard = output_dir / f"customer.tbl.{chunk}.gz"
-        shard.write_bytes(b"fake-gzip-payload")
-        shards.append(shard)
-    nation = output_dir / "nation.tbl.gz"
-    nation.write_bytes(b"fake-gzip-payload")
-    return {"customer": shards, "nation": nation}
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-def _assert_tables_resolve(tables: dict) -> None:
-    """Every tables value must normalize to paths that exist on disk."""
-    assert tables, "generate_data() must return a non-empty mapping"
-    for table_name, value in tables.items():
-        assert not (isinstance(value, str) and value.startswith("[")), (
-            f"table {table_name!r} holds a stringified list, invisible to the loader: {value!r}"
-        )
-        paths = normalize_table_paths(value)
-        assert paths, f"table {table_name!r} normalized to zero paths"
-        for path in paths:
-            assert isinstance(path, Path), f"table {table_name!r} entry is not a path: {path!r}"
-            assert path.exists(), f"table {table_name!r} references missing file: {path}"
-
-
-def test_read_primitives_generate_preserves_sharded_lists(tmp_path, monkeypatch):
-    """Fresh sharded generate must keep list values, not repr strings."""
-    gen = ReadPrimitivesDataGenerator(scale_factor=0.01, output_dir=tmp_path)
-    layout = _make_shard_files(tmp_path)
-    monkeypatch.setattr(gen.tpch_generator, "generate", lambda: layout)
-
-    tables = gen.generate_data()
-
-    assert isinstance(tables["customer"], list), f"expected a list, got {tables['customer']!r}"
-    assert all(isinstance(entry, str) for entry in tables["customer"])
-    _assert_tables_resolve(tables)
-    # Impl-facing mapping must agree with what generate_data() returned.
-    assert gen.tpch_generator.generate() == layout
-
-
-def test_ssb_generate_preserves_sharded_lists(tmp_path, monkeypatch):
-    """SSB generator shares the str-conversion helper contract."""
-    gen = SSBDataGenerator(scale_factor=0.0001, output_dir=tmp_path)
-    layout = _make_shard_files(tmp_path)
-    monkeypatch.setattr(
-        SSBDataGenerator,
-        "_generate_data_local",
-        lambda self, output_dir, tables=None: layout,
+@pytest.mark.parametrize("compressed", [False, True], ids=["uncompressed", "gzip"])
+@pytest.mark.parametrize("facade", [False, True], ids=["implementation", "public-facade"])
+def test_fresh_mapping_matches_manifest_reuse(tmp_path: Path, monkeypatch, compressed: bool, facade: bool) -> None:
+    """Propagate real shard paths through the mixin and normal platform helper."""
+    benchmark = (
+        ReadPrimitives(scale_factor=0.01, output_dir=tmp_path)
+        if facade
+        else ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
     )
+    impl = benchmark._impl if facade else benchmark
+    layout: dict[str, Path | list[Path]] = {}
+    payloads: dict[Path, bytes] = {}
+    manifest = DataGenerationManifest(
+        output_dir=tmp_path,
+        benchmark="tpch",
+        scale_factor=0.01,
+        compression={"enabled": compressed, "type": "gzip" if compressed else None, "level": None},
+        parallel=3,
+    )
+    for table, chunks in (("customer", 3), ("nation", 1)):
+        paths = []
+        for chunk in range(1, chunks + 1):
+            suffix = f".tbl.{chunk}" if chunks > 1 else ".tbl"
+            path = tmp_path / f"{table}{suffix}{'.gz' if compressed else ''}"
+            payload = f"{chunk}|sample|\n".encode()
+            path.write_bytes(gzip.compress(payload) if compressed else payload)
+            payloads[path] = payload
+            paths.append(path)
+            manifest.add_entry(table, path, row_count=1)
+        layout[table] = paths if chunks > 1 else paths[0]
 
-    tables = gen.generate_data()
+    producer_manifest_bytes = None
 
-    assert isinstance(tables["customer"], list), f"expected a list, got {tables['customer']!r}"
-    assert all(isinstance(entry, str) for entry in tables["customer"])
-    _assert_tables_resolve(tables)
+    def generate() -> dict[str, Path | list[Path]]:
+        nonlocal producer_manifest_bytes
+        manifest.write()
+        producer_manifest_bytes = manifest.manifest_path.read_bytes()
+        return layout
+
+    # Replace only expensive dbgen execution. Keep wrapper, mixin, manifest I/O,
+    # runner reuse and platform normalization real.
+    monkeypatch.setattr(impl.data_generator.tpch_generator, "generate", generate)
+    fresh = benchmark.generate_data(tables=["customer", "nation"])
+    assert fresh is impl.tables
+    assert isinstance(layout["customer"], list)
+    assert fresh == {
+        "customer": [str(path) for path in layout["customer"]],
+        "nation": str(layout["nation"]),
+    }
+    assert manifest.manifest_path.read_bytes() == producer_manifest_bytes
+    assert load_manifest(manifest.manifest_path)["benchmark"] == "tpch"
+
+    reused = ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
+    summary = _populate_tables_from_manifest(reused)
+    assert summary is not None
+    assert summary["table_count"] == 2
+    assert summary["file_count"] == 4
+    for table, value in fresh.items():
+        fresh_paths = normalize_table_paths(value)
+        assert fresh_paths == normalize_table_paths(reused.tables[table])
+        assert len(fresh_paths) == (3 if table == "customer" else 1)
+        for path in fresh_paths:
+            assert path.is_file()
+            contents = gzip.decompress(path.read_bytes()) if compressed else path.read_bytes()
+            assert contents == payloads[path]
+    assert manifest.manifest_path.read_bytes() == producer_manifest_bytes
