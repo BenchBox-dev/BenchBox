@@ -731,3 +731,23 @@ class TestHandleNoQueries:
                 benchmark_id="tpcds_obt",
                 query_filter=None,
             )
+
+
+class TestResolveColumnNamesAndDelimiter:
+    """The csv_delimiter override must be a real string, never Mock pollution."""
+
+    def _config(self):
+        return BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
+
+    def test_mock_benchmark_delimiter_is_ignored(self):
+        """getattr on a Mock fabricates a child mock; it must not become the delimiter."""
+        adapter = DummyAdapter()
+        _, delimiter = adapter._resolve_column_names_and_delimiter(self._config(), MagicMock())
+        assert delimiter is None
+
+    def test_string_benchmark_delimiter_is_kept(self):
+        """A real benchmark-declared delimiter still flows through."""
+        adapter = DummyAdapter()
+        benchmark = SimpleNamespace(csv_delimiter=";", tables={})
+        _, delimiter = adapter._resolve_column_names_and_delimiter(self._config(), benchmark)
+        assert delimiter == ";"

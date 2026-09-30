@@ -112,6 +112,7 @@ def test_runtime_metrics_only_include_successful_jobs() -> None:
 def test_event_fanout_for_pr_fetches_same_head_runs_jobs_and_checks() -> None:
     checks = [
         _check("ci-required-result", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"),
+        _check("tooling", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:00:30Z"),
         _check("Results Explorer browser gate", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:01:00Z"),
         _check("ruleset-drift", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
         _check("Public-site visual acceptance", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:03:00Z"),
@@ -179,12 +180,37 @@ def test_required_gate_uses_latest_rerun_and_ignores_stale_failure() -> None:
             "ci-required-result", conclusion="failure", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"
         ),
         _check("ci-required-result", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:20:00Z"),
+        _check("tooling", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
         _check("ruleset-drift", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
         _check("Public-site visual acceptance", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
     ]
     assert metrics.required_gate_seconds(checks) == 8 * 60.0
     assert metrics.merge_unblock_seconds(checks) == 8 * 60.0
+
+
+def test_required_gate_resolves_six_unit_contexts_when_core_is_present() -> None:
+    checks = [
+        _check("core", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:09:00Z"),
+        _check("explorer", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:02:00Z"),
+        _check("results-data", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:00Z"),
+        _check("docs", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:03:00Z"),
+        _check("landing", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:00Z"),
+        _check("tooling", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:30Z"),
+    ]
+
+    assert metrics.resolve_required_contexts(checks) == metrics.REQUIRED_CONTEXT_NAMES
+    assert metrics.required_gate_seconds(checks) == 9 * 60.0
+    assert metrics.required_gate_end(checks) is not None
+
+
+def test_required_gate_does_not_count_a_partial_six_unit_head_as_green() -> None:
+    checks = [
+        _check("core", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:09:00Z"),
+        _check("tooling", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:30Z"),
+    ]
+
+    assert metrics.required_gate_seconds(checks) is None
 
 
 def test_missing_required_context_yields_no_merge_unblock() -> None:
@@ -288,6 +314,7 @@ def test_cancelled_jobs_are_excluded_from_completed_runner_minutes() -> None:
 def test_event_fanout_separates_required_gate_from_documentation() -> None:
     checks = [
         _check("ci-required-result", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"),
+        _check("tooling", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:15Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:20Z"),
         _check("ruleset-drift", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:30Z"),
         _check("Public-site visual acceptance", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:05:00Z"),

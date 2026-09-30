@@ -136,7 +136,7 @@ def test_explorer_vitest_group_covers_the_full_contract(rules: dict[str, list[st
             "_project/scripts/explorer_pipeline/contract.py",
             "results-data/corpus-inventory.json",
             "scripts/generate_corpus_inventory.py",
-            ".github/workflows/results-explorer-browser.yml",
+            ".github/workflows/ci.yml",
         ],
         rules,
     )
@@ -148,7 +148,7 @@ def test_explorer_vitest_group_covers_the_full_contract(rules: dict[str, list[st
         "_project/scripts/explorer_pipeline/contract.py",
         "results-data/corpus-inventory.json",
         "scripts/generate_corpus_inventory.py",
-        ".github/workflows/results-explorer-browser.yml",
+        ".github/workflows/ci.yml",
     }
 
 

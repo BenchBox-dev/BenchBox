@@ -221,14 +221,13 @@ def test_published_results_base_mirror_stays_a_corpus_check_not_develops_matrix(
 def test_published_results_base_guard_still_has_no_branch_filter() -> None:
     """Cross-check against #1563's guard: must-preserve constraint from this TODO.
 
-    `pr-base-guard.yml`'s unfiltered trigger is what stops it from becoming a
-    required check that can never report (the same failure mode this whole
-    TODO is about). Nothing in this change may add a `branches:`/`paths:`
-    filter to it - re-assert the guard file's own invariant here so a future
-    edit that touches both files in the same PR cannot regress this one
-    silently.
+    `ci.yml` reports the required unit contexts. Its unfiltered pull_request
+    trigger is what stops those contexts from becoming required checks that can
+    never report (the same failure mode this whole TODO is about), including on
+    PRs opened against a non-develop base. Nothing may add a `branches:` or
+    `paths:` filter to it - re-assert that invariant here.
     """
-    guard = WORKFLOWS / "pr-base-guard.yml"
+    guard = WORKFLOWS / "ci.yml"
     pull_request = _triggers(_load(guard))["pull_request"] or {}
     assert "branches" not in pull_request
     assert "paths" not in pull_request

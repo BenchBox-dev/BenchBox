@@ -8,6 +8,7 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import os
 import sys
 from collections.abc import Sequence
 from functools import lru_cache
@@ -289,12 +290,16 @@ def check_platform_dependencies(platform: str, packages: Optional[Sequence[str]]
 
     missing: list[str] = []
     for package in platforms_packages:
+        # Optional native modules can change cwd before failing to load.
+        original_cwd = os.getcwd()
         try:
             # Use mapping if available, otherwise fall back to simple hyphen-to-underscore replacement
             import_name = PACKAGE_IMPORT_NAMES.get(package, package.replace("-", "_"))
             __import__(import_name)
         except ImportError:
             missing.append(package)
+        finally:
+            os.chdir(original_cwd)
 
     return len(missing) == 0, missing
 

@@ -760,7 +760,7 @@ describe("resolveShortId", () => {
     const onInitialExistingIds = vi.fn();
     mockedQueryRows
       .mockResolvedValueOnce([{ result_id: "known-a" }])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([{ result_id: null }]);
 
     await expect(
       getExistingResultIds(["known-a", "missing-b"], onInitialExistingIds),
@@ -769,7 +769,7 @@ describe("resolveShortId", () => {
     expect(mockedQueryRows).toHaveBeenCalledTimes(2);
     expect(mockedQueryRows.mock.calls).toEqual([
       ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id IN (?, ?)", ["known-a", "missing-b"]],
-      ["SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?", ["missing-b"]],
+      [expect.stringMatching(/HAVING COUNT\(DISTINCT result_id\) = \(SELECT COUNT\(\*\) FROM bench\.results\)/), ["missing-b"]],
     ]);
   });
 
@@ -783,7 +783,7 @@ describe("resolveShortId", () => {
     );
     expect(mockedQueryRows).toHaveBeenCalledTimes(2);
     expect(mockedQueryRows.mock.calls[1]).toEqual([
-      "SELECT result_id FROM bench.result_detail_metrics WHERE result_id = ?",
+      expect.stringMatching(/MAX\(CASE WHEN result_id = \? THEN result_id END\)/),
       ["cold-b"],
     ]);
   });

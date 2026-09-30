@@ -10,6 +10,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.cli.dryrun import DryRunExecutor
+from benchbox.core.schemas import BenchmarkConfig
+from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
+from benchbox.platforms.datafusion import DataFusionAdapter
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 pytestmark = [
@@ -147,9 +150,17 @@ class TestDryRunExecutorPlatformIntegration:
         benchmark_config = Mock(name=benchmark_name, scale_factor=0.01, test_execution_type="power")
         benchmark_config.name = benchmark_name
         adapter = Mock()
+        adapter._get_dialect_queries.return_value = {1: "SELECT 1"}
+        adapter._filter_queries.return_value = {1: "SELECT 1"}
         adapter.create_connection.side_effect = AssertionError("query extraction opened a platform connection")
 
         assert executor._extract_queries(benchmark, benchmark_config, adapter) == {"1": "SELECT 1"}
+        adapter._get_dialect_queries.assert_called_once_with(
+            benchmark,
+            benchmark_slug=benchmark_name,
+            connection=None,
+            strict_translation=True,
+        )
         adapter.create_connection.assert_not_called()
         adapter.enable_dry_run.assert_not_called()
 
@@ -163,7 +174,8 @@ class TestDryRunExecutorPlatformIntegration:
 
         # Create mock platform adapter
         mock_adapter = Mock()
-        mock_adapter.translate_sql.return_value = "SELECT 1 /* translated */"
+        mock_adapter._get_dialect_queries.return_value = {"1": "SELECT 1 /* translated */"}
+        mock_adapter._filter_queries.return_value = {"1": "SELECT 1 /* translated */"}
 
         # Create mock benchmark config
         benchmark_config = Mock()
@@ -172,8 +184,41 @@ class TestDryRunExecutorPlatformIntegration:
 
         result = executor._extract_queries(mock_benchmark, benchmark_config, mock_adapter)
 
-        # Should return standard queries without translation (fallback mode)
-        assert result == {"1": "SELECT 1"}
+        assert result == {"1": "SELECT 1 /* translated */"}
+        mock_adapter._get_dialect_queries.assert_called_once_with(
+            mock_benchmark,
+            benchmark_slug="tpcds",
+            connection=None,
+            strict_translation=True,
+        )
+
+    def test_invalid_query_subset_fails_instead_of_saving_empty_preview(self):
+        """Invalid query IDs must not be hidden as a successful empty dry run."""
+        executor = DryRunExecutor()
+        benchmark = TPCHavocBenchmark(scale_factor=0.01)
+        benchmark_config = BenchmarkConfig(
+            name="tpchavoc",
+            display_name="TPC-Havoc",
+            scale_factor=0.01,
+            queries=["definitely-invalid"],
+            test_execution_type="power",
+        )
+
+        with pytest.raises(RuntimeError, match="Dry-run query extraction failed.*Invalid query IDs"):
+            executor._extract_queries(benchmark, benchmark_config, DataFusionAdapter())
+
+    def test_adapter_translation_fallback_is_rejected_for_dry_run(self):
+        """Unexpected translation failures must not emit raw benchmark SQL."""
+        executor = DryRunExecutor()
+        benchmark = Mock()
+        benchmark_config = Mock()
+        benchmark_config.name = "tpchavoc"
+        benchmark_config.test_execution_type = "standard"
+        adapter = Mock()
+        adapter._get_dialect_queries.side_effect = RuntimeError("translation failed")
+
+        with pytest.raises(RuntimeError, match="Dry-run query extraction failed: translation failed"):
+            executor._extract_queries(benchmark, benchmark_config, adapter)
 
     def test_extract_queries_standard_without_platform_adapter(self):
         """Test standard query extraction without platform adapter."""

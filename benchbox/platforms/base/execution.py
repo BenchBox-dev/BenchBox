@@ -987,7 +987,14 @@ class TestDriversMixin:
             return None
         return str(version)
 
-    def _get_dialect_queries(self, benchmark, benchmark_slug: str, connection: Any | None = None) -> dict:
+    def _get_dialect_queries(
+        self,
+        benchmark,
+        benchmark_slug: str,
+        connection: Any | None = None,
+        *,
+        strict_translation: bool = False,
+    ) -> dict:
         """Get queries with platform-specific dialect translation if supported.
 
         Args:
@@ -1022,7 +1029,11 @@ class TestDriversMixin:
                     return benchmark.get_queries()
             except SQLTranslationError:
                 raise
-            except Exception:
+            except Exception as exc:
+                if strict_translation:
+                    raise RuntimeError(
+                        f"Dialect query extraction failed for benchmark {benchmark_slug or 'generic'}"
+                    ) from exc
                 return benchmark.get_queries()
         return benchmark.get_queries()
 

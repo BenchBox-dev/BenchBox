@@ -29,6 +29,13 @@ from benchbox.core.transaction_primitives.generator import TransactionPrimitives
 from benchbox.core.transaction_primitives.operations import TransactionOperationsManager
 from benchbox.core.transaction_primitives.schema import STAGING_TABLES, get_all_staging_tables_sql, get_create_table_sql
 from benchbox.core.transactional.benchmark_base import TransactionalBenchmarkBase
+from benchbox.sql_compat.rules.execution_filter.cloud_transaction_primitives import (
+    BIGQUERY_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+    SNOWFLAKE_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+)
+from benchbox.sql_compat.rules.execution_filter.databricks_transaction_primitives import (
+    DATABRICKS_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+)
 from benchbox.sql_compat.rules.execution_filter.duckdb_transaction_primitives import (
     DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
 )
@@ -39,6 +46,7 @@ from benchbox.sql_compat.rules.execution_filter.timescaledb_transaction_primitiv
     TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
 )
 from benchbox.utils.clock import elapsed_seconds, mono_time
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 
@@ -155,12 +163,14 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         self._version = "1.0"
         self._description = "Transaction Primitives benchmark - Testing fundamental write operations using TPC-H schema"
 
-        # Setup directories
+        # Setup directories. normalize_output_dir keeps an orchestrator-resolved
+        # CloudStagingPath/DatabricksPath handler intact instead of leaving a
+        # raw cloud URI string for downstream Path(...) calls to stringify.
         if output_dir is None:
             # Reuse the canonical TPC-H datagen directory
             output_dir = get_benchmark_runs_datagen_path("tpch", scale_factor)
 
-        self.output_dir = output_dir
+        self.output_dir = normalize_output_dir(output_dir)
 
         # Initialize components
         self.operations_manager = TransactionOperationsManager()
@@ -705,7 +715,10 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
 
         try:
             platform_operation_skips = {
+                "bigquery": BIGQUERY_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+                "databricks": DATABRICKS_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
                 "duckdb": DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
+                "snowflake": SNOWFLAKE_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
                 "pg_duckdb": PG_DUCKDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
                 "timescaledb": TIMESCALEDB_TRANSACTION_PRIMITIVES_OPERATION_SKIPS,
             }

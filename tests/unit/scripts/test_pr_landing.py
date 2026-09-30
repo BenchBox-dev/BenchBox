@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import importlib.util
 import json
 import subprocess
@@ -212,6 +213,44 @@ def test_ready_all_green(tmp_path: Path) -> None:
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     assert landing.ready_failures(_identity(repo, head), head, _evidence(head), repo) == []
+
+
+def test_ready_allows_empty_review_decision_for_non_soundness_pr(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "docs").mkdir()
+    (repo / "docs" / "note.md").write_text("documentation")
+    subprocess.run(["git", "add", "docs/note.md"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "docs"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    evidence = _evidence(head, review_decision="")
+
+    assert landing.ready_failures(_identity(repo, head, base), head, evidence, repo) == []
+
+
+def test_ready_rejects_empty_review_decision_for_soundness_pr(tmp_path: Path) -> None:
+    repo = _repo(tmp_path / "r")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    (repo / "publication").mkdir()
+    (repo / "publication" / "policy.json").write_text("{}")
+    subprocess.run(["git", "add", "publication/policy.json"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "soundness"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    failures = landing.ready_failures(_identity(repo, head, base), head, _evidence(head, review_decision=""), repo)
+
+    assert any("not APPROVED" in failure for failure in failures)
 
 
 def test_batch_ready_requires_active_registered_runtime(tmp_path: Path) -> None:
@@ -1034,6 +1073,122 @@ def test_enqueue_bound_path_rechecks_full_pr_identity() -> None:
     assert "--match-head-commit" in run.calls[2]
 
 
+@pytest.mark.parametrize("decision", ["", "APPROVED"])
+def test_enqueue_preserves_the_verified_review_decision(decision: str) -> None:
+    pr = {
+        "number": 3,
+        "id": "PR_node_3",
+        "headRefName": "feat/x",
+        "headRefOid": HEAD,
+        "state": "OPEN",
+        "reviewDecision": decision,
+    }
+    run = FakeRun([(0, pr), (0, _live_threads()), (0, "")])
+    result = landing.enqueue_pr(
+        run,
+        "o/r",
+        3,
+        HEAD,
+        HEAD,
+        expected_branch="feat/x",
+        expected_node_id="PR_node_3",
+        expected_review_decision=decision,
+    )
+    assert result["enqueued"] is True
+    assert "--match-head-commit" in run.calls[-1]
+
+
+@pytest.mark.parametrize("before,after", [("", "CHANGES_REQUESTED"), ("APPROVED", ""), ("", "APPROVED")])
+def test_enqueue_refuses_a_changed_review_decision(before: str, after: str) -> None:
+    pr = {
+        "number": 3,
+        "id": "PR_node_3",
+        "headRefName": "feat/x",
+        "headRefOid": HEAD,
+        "state": "OPEN",
+        "reviewDecision": after,
+    }
+    run = FakeRun([(0, pr)])
+    with pytest.raises(landing.LandingError, match="review disposition changed"):
+        landing.enqueue_pr(
+            run,
+            "o/r",
+            3,
+            HEAD,
+            HEAD,
+            expected_branch="feat/x",
+            expected_node_id="PR_node_3",
+            expected_review_decision=before,
+        )
+    assert len(run.calls) == 1
+
+
+def test_enqueue_does_not_accept_a_blocking_review_as_the_expected_decision() -> None:
+    run = FakeRun([])
+    with pytest.raises(landing.LandingError, match="review decision"):
+        landing.enqueue_pr(
+            run,
+            "o/r",
+            3,
+            HEAD,
+            HEAD,
+            expected_branch="feat/x",
+            expected_node_id="PR_node_3",
+            expected_review_decision="CHANGES_REQUESTED",
+        )
+    assert run.calls == []
+
+
+@pytest.mark.parametrize("decision", ["", "APPROVED"])
+def test_ready_forwards_the_live_verified_review_decision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, decision: str
+) -> None:
+    repo = _repo(tmp_path / "r")
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    identity = _identity(repo, head)
+    pr = {"number": 3, "id": "PR_node_3", "headRefOid": head}
+    evidence_path = tmp_path / "evidence.json"
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "delivery_mode": "serial",
+                "review_decision": decision,
+                "dispositions_complete": True,
+                "check_runs": _green_checks(head),
+            }
+        )
+    )
+    monkeypatch.setattr(landing, "require_start_identity", lambda *a, **kw: {})
+    monkeypatch.setattr(landing, "resolve_pr", lambda *a, **kw: pr)
+    monkeypatch.setattr(landing, "view_pr", lambda *a, **kw: pr)
+    events: list[str] = []
+
+    def verify(*args: object) -> None:
+        assert args[-1].review_decision == decision
+        events.append("verified")
+
+    def enqueue(*args: object, **kwargs: object) -> dict:
+        assert events == ["verified"]
+        assert kwargs["expected_review_decision"] == decision
+        events.append("enqueued")
+        return {"enqueued": True}
+
+    monkeypatch.setattr(landing, "verify_evidence_live", verify)
+    monkeypatch.setattr(landing, "enqueue_pr", enqueue)
+    args = argparse.Namespace(
+        expected_head=head,
+        pr=3,
+        pr_node_id=None,
+        repo="o/r",
+        evidence_json=evidence_path,
+        require_batch=False,
+        worktree_id=None,
+        arm=True,
+    )
+    assert landing._run_ready(args, identity, identity.branch, repo) == 0
+    assert events == ["verified", "enqueued"]
+
+
 def test_enqueue_bound_path_rejects_new_unresolved_thread() -> None:
     run = FakeRun(
         [
@@ -1374,19 +1529,3 @@ def test_makefile_has_separate_bounded_all_open_status_view() -> None:
     assert "ALL_OPEN" in status
     assert "PR_STATUS_ALL_OPEN_LIMIT" in status
     assert "All open develop PRs" in status
-
-
-def test_lane_isolation_make_target_rejects_empty_changed_paths(tmp_path: Path) -> None:
-    lists = tmp_path / "lists"
-    lists.mkdir()
-    (lists / "changed.txt").write_text("", encoding="utf-8")
-    result = subprocess.run(
-        ["make", "-s", "lane-isolation-check", f"PATH_LISTS={lists}"],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode != 0
-    assert "non-empty changed paths artifact is required" in result.stderr

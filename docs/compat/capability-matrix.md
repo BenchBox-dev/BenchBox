@@ -4,7 +4,7 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 535
+**Total registered rules:** 556
 
 **Platforms covered:** 35
 
@@ -13,14 +13,14 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
 |---|---|---|---|---|---|---|---|
 | athena | - | - | - | - | 1 | - | 1 |
-| bigquery | - | 2 | 25 | 2 | 1 | 2 | 32 |
-| clickhouse | - | 18 | 3 | 4 | 1 | - | 26 |
-| clickhouse-cloud | - | - | - | - | - | 23 | 23 |
-| clickhouse-local | 1 | - | - | - | - | 23 | 24 |
-| clickhouse-server | - | - | - | - | - | 23 | 23 |
+| bigquery | - | 2 | 25 | 2 | 1 | 8 | 38 |
+| clickhouse | - | 19 | 3 | 4 | 1 | - | 27 |
+| clickhouse-cloud | - | - | 2 | - | - | 21 | 23 |
+| clickhouse-local | 1 | - | 2 | - | - | 21 | 24 |
+| clickhouse-server | - | - | 2 | - | - | 21 | 23 |
 | databend | - | - | - | - | 1 | - | 1 |
-| databricks | - | 1 | 11 | 2 | 1 | 1 | 16 |
-| datafusion | - | 3 | 4 | 2 | - | 14 | 23 |
+| databricks | - | 1 | 11 | 2 | 2 | 8 | 24 |
+| datafusion | - | 3 | 6 | 2 | - | 12 | 23 |
 | doris | - | 7 | - | 2 | 1 | - | 10 |
 | duckdb | - | - | - | - | - | 26 | 26 |
 | ducklake | - | - | - | 2 | 1 | - | 3 |
@@ -28,8 +28,8 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | firebolt | - | - | - | - | 1 | - | 1 |
 | lakesail | 5 | 6 | 11 | - | 1 | 69 | 92 |
 | mysql | - | 1 | - | - | - | - | 1 |
-| pg-duckdb | 3 | - | - | - | - | 21 | 24 |
-| pg-mooncake | 6 | - | - | - | - | 17 | 23 |
+| pg-duckdb | 3 | - | 10 | - | - | 11 | 24 |
+| pg-mooncake | 6 | - | 10 | - | - | 7 | 23 |
 | pg_mooncake | - | - | - | - | 1 | - | 1 |
 | postgres | - | - | - | 1 | - | 67 | 68 |
 | postgresql | - | 6 | - | 1 | 1 | - | 8 |
@@ -37,13 +37,13 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | questdb | 1 | - | - | - | 1 | - | 2 |
 | redshift | - | - | - | 2 | 1 | - | 3 |
 | singlestore | - | - | - | - | 4 | - | 4 |
-| snowflake | - | 7 | 2 | 2 | 1 | 2 | 14 |
+| snowflake | - | 7 | 2 | 2 | 1 | 7 | 19 |
 | spark | - | 6 | 11 | 2 | 1 | - | 20 |
 | sqlite | - | 1 | - | - | - | - | 1 |
-| starrocks | - | 14 | 1 | 2 | 1 | - | 18 |
+| starrocks | - | 15 | 1 | 2 | 1 | - | 19 |
 | synapse | - | - | - | - | 1 | - | 1 |
 | timescale | - | - | - | 3 | - | - | 3 |
-| timescaledb | 3 | - | - | - | - | 19 | 22 |
+| timescaledb | 3 | - | 10 | - | - | 9 | 22 |
 | trino | - | - | - | 2 | 1 | - | 3 |
 | tsql | - | - | - | 2 | - | - | 2 |
 | velox | - | - | 11 | - | 1 | - | 12 |
@@ -92,6 +92,12 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.bigquery.all.convert_to_bigquery_table` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=2_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.tpchavoc.2_v2` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_create_temp_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_create_temp_table` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_nested` |
 
 ### clickhouse
 
@@ -100,6 +106,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_source | benchmark=coffeeshop, query=SA4 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.sa4_cross_join_variant` |
 | query_source | benchmark=coffeeshop, query=TM1 | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.coffeeshop.tm1_todatetime_variant` |
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.clickhouse.h2odb.q9_quantile_variant` |
+| query_source | benchmark=nyctaxi, query=fhv-base-volume | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.fhv_base_volume_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.rush_hour_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trip_duration_datediff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.clickhouse.nyctaxi.trips_by_dow_todayofweek_variant` |
@@ -128,9 +135,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_adapter | benchmark=tpchavoc, query=12_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.clickhouse-cloud.tpchavoc.12_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=1_v6 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.clickhouse-cloud.tpchavoc.1_v6.filtered_aggregate` |
 | execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.10_v1` |
 | execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.11_v4` |
-| execution_filter | benchmark=tpchavoc, query=12_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.12_v7` |
 | execution_filter | benchmark=tpchavoc, query=13_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.13_v8` |
 | execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.14_v8` |
 | execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.16_v1` |
@@ -138,7 +146,6 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.17_v10` |
 | execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.17_v7` |
 | execution_filter | benchmark=tpchavoc, query=1_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.1_v10` |
-| execution_filter | benchmark=tpchavoc, query=1_v6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.1_v6` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.3_v1` |
 | execution_filter | benchmark=tpchavoc, query=3_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-cloud.tpchavoc.3_v10` |
@@ -157,9 +164,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | benchmark_gate | benchmark=metadata_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.clickhouse-local.metadata_primitives.unsupported` |
+| query_adapter | benchmark=tpchavoc, query=12_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.clickhouse-local.tpchavoc.12_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=1_v6 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.clickhouse-local.tpchavoc.1_v6.filtered_aggregate` |
 | execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.10_v1` |
 | execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.11_v4` |
-| execution_filter | benchmark=tpchavoc, query=12_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.12_v7` |
 | execution_filter | benchmark=tpchavoc, query=13_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.13_v8` |
 | execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.14_v8` |
 | execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.16_v1` |
@@ -167,7 +175,6 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.17_v10` |
 | execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.17_v7` |
 | execution_filter | benchmark=tpchavoc, query=1_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.1_v10` |
-| execution_filter | benchmark=tpchavoc, query=1_v6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.1_v6` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.3_v1` |
 | execution_filter | benchmark=tpchavoc, query=3_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-local.tpchavoc.3_v10` |
@@ -185,9 +192,10 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
+| query_adapter | benchmark=tpchavoc, query=12_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.clickhouse-server.tpchavoc.12_v7.filtered_aggregate` |
+| query_adapter | benchmark=tpchavoc, query=1_v6 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.clickhouse-server.tpchavoc.1_v6.filtered_aggregate` |
 | execution_filter | benchmark=tpchavoc, query=10_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.10_v1` |
 | execution_filter | benchmark=tpchavoc, query=11_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.11_v4` |
-| execution_filter | benchmark=tpchavoc, query=12_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.12_v7` |
 | execution_filter | benchmark=tpchavoc, query=13_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.13_v8` |
 | execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.14_v8` |
 | execution_filter | benchmark=tpchavoc, query=16_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.16_v1` |
@@ -195,7 +203,6 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=tpchavoc, query=17_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.17_v10` |
 | execution_filter | benchmark=tpchavoc, query=17_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.17_v7` |
 | execution_filter | benchmark=tpchavoc, query=1_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.1_v10` |
-| execution_filter | benchmark=tpchavoc, query=1_v6 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.1_v6` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=3_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.3_v1` |
 | execution_filter | benchmark=tpchavoc, query=3_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.clickhouse-server.tpchavoc.3_v10` |
@@ -233,8 +240,16 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_adapter | benchmark=tpchavoc, query=9_v1 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.databricks.tpchavoc.q09_scalar_group_by_first` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.transaction_primitives.pk_not_enforced` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | INFORMATIONAL | SILENT_CORRUPTION | `schema_emit.databricks.write_primitives.pk_not_enforced` |
+| ddl_optimize | benchmark=transaction_primitives | rewrite_ddl | REWRITTEN | UNSUPPORTED_FEATURE | `ddl_optimize.databricks.transaction_primitives.txn_staging_catalog_managed` |
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.databricks.all.convert_to_delta_table` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.tpchavoc.1_v7` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_create_temp_table | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_create_temp_table` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_savepoint_nested` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_truncate_in_transaction | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.databricks.transaction_primitives.transaction_truncate_in_transaction` |
 
 ### datafusion
 
@@ -247,10 +262,11 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | query_adapter | benchmark=tpch, query=16 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q16_not_in_to_not_exists` |
 | query_adapter | benchmark=tpch, query=18 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q18_in_having_to_exists` |
 | query_adapter | benchmark=tpch, query=20 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_adapter.datafusion.tpch.q20_correlated_to_cte` |
+| query_adapter | benchmark=tpchavoc, query=14_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.datafusion.tpchavoc.14_v2.empty_group` |
+| query_adapter | benchmark=tpchavoc, query=6_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.datafusion.tpchavoc.6_v2.empty_group` |
 | schema_emit | benchmark=transaction_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.datafusion.transaction_primitives.pk_lock_table_unsupported` |
 | schema_emit | benchmark=write_primitives | rewrite_ddl | SKIPPED_DDL_FRAGMENT | SYNTAX_ERROR | `schema_emit.datafusion.write_primitives.pk_lock_table_unsupported` |
 | execution_filter | benchmark=tpchavoc, query=12_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.12_v1` |
-| execution_filter | benchmark=tpchavoc, query=14_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.14_v2` |
 | execution_filter | benchmark=tpchavoc, query=14_v8 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.14_v8` |
 | execution_filter | benchmark=tpchavoc, query=16_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.16_v10` |
 | execution_filter | benchmark=tpchavoc, query=16_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.16_v7` |
@@ -259,7 +275,6 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=4_v10 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.4_v10` |
 | execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.4_v7` |
-| execution_filter | benchmark=tpchavoc, query=6_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.6_v2` |
 | execution_filter | benchmark=tpchavoc, query=7_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.7_v1` |
 | execution_filter | benchmark=tpchavoc, query=8_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.8_v1` |
 | execution_filter | benchmark=tpchavoc, query=9_v1 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.datafusion.tpchavoc.9_v1` |
@@ -440,22 +455,22 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.ai_primitives.unsupported` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.read_primitives.duckdb_intrinsics` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-duckdb.vector_search.no_vector_type` |
-| execution_filter | benchmark=tpchavoc, query=10_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.10_v7` |
+| query_adapter | benchmark=tpchavoc, query=10_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.10_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=11_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.11_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=17_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.17_v2.qualify_columns` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.17_v4.values_source` |
+| query_adapter | benchmark=tpchavoc, query=2_v5 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.2_v5.qualify_columns` |
+| query_adapter | benchmark=tpchavoc, query=3_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.3_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=4_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.4_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=5_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.5_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=7_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.7_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=9_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-duckdb.tpchavoc.9_v7.inline_select_alias` |
 | execution_filter | benchmark=tpchavoc, query=10_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.10_v9` |
-| execution_filter | benchmark=tpchavoc, query=11_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.11_v7` |
 | execution_filter | benchmark=tpchavoc, query=11_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.11_v9` |
 | execution_filter | benchmark=tpchavoc, query=13_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.13_v9` |
-| execution_filter | benchmark=tpchavoc, query=17_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.17_v2` |
-| execution_filter | benchmark=tpchavoc, query=17_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.17_v4` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.1_v7` |
-| execution_filter | benchmark=tpchavoc, query=2_v5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.2_v5` |
-| execution_filter | benchmark=tpchavoc, query=3_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.3_v7` |
-| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.4_v7` |
-| execution_filter | benchmark=tpchavoc, query=5_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.5_v7` |
 | execution_filter | benchmark=tpchavoc, query=5_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.5_v9` |
-| execution_filter | benchmark=tpchavoc, query=7_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.7_v7` |
 | execution_filter | benchmark=tpchavoc, query=7_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.7_v9` |
-| execution_filter | benchmark=tpchavoc, query=9_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.9_v7` |
 | execution_filter | benchmark=tpchavoc, query=9_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.tpchavoc.9_v9` |
 | execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.transaction_primitives.transaction_isolation_repeatable_read` |
 | execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-duckdb.transaction_primitives.transaction_isolation_serializable` |
@@ -472,22 +487,22 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | benchmark_gate | benchmark=transaction_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.transaction_primitives.moonlink_read_only_mirrors` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.vector_search.no_vector_type` |
 | benchmark_gate | benchmark=write_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.pg-mooncake.write_primitives.moonlink_read_only_mirrors` |
-| execution_filter | benchmark=tpchavoc, query=10_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.10_v7` |
+| query_adapter | benchmark=tpchavoc, query=10_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.10_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=11_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.11_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=17_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.17_v2.qualify_columns` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.17_v4.values_source` |
+| query_adapter | benchmark=tpchavoc, query=2_v5 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.2_v5.qualify_columns` |
+| query_adapter | benchmark=tpchavoc, query=3_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.3_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=4_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.4_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=5_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.5_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=7_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.7_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=9_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.pg-mooncake.tpchavoc.9_v7.inline_select_alias` |
 | execution_filter | benchmark=tpchavoc, query=10_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.10_v9` |
-| execution_filter | benchmark=tpchavoc, query=11_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.11_v7` |
 | execution_filter | benchmark=tpchavoc, query=11_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.11_v9` |
 | execution_filter | benchmark=tpchavoc, query=13_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.13_v9` |
-| execution_filter | benchmark=tpchavoc, query=17_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.17_v2` |
-| execution_filter | benchmark=tpchavoc, query=17_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.17_v4` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.1_v7` |
-| execution_filter | benchmark=tpchavoc, query=2_v5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.2_v5` |
-| execution_filter | benchmark=tpchavoc, query=3_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.3_v7` |
-| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.4_v7` |
-| execution_filter | benchmark=tpchavoc, query=5_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.5_v7` |
 | execution_filter | benchmark=tpchavoc, query=5_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.5_v9` |
-| execution_filter | benchmark=tpchavoc, query=7_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.7_v7` |
 | execution_filter | benchmark=tpchavoc, query=7_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.7_v9` |
-| execution_filter | benchmark=tpchavoc, query=9_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.9_v7` |
 | execution_filter | benchmark=tpchavoc, query=9_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.pg-mooncake.tpchavoc.9_v9` |
 
 ### pg_mooncake
@@ -632,6 +647,11 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | ddl_optimize | platform-wide | rewrite_ddl | REWRITTEN | SYNTAX_ERROR | `ddl_optimize.snowflake.all.optimize_table_definition` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.tpchavoc.1_v7` |
 | execution_filter | benchmark=tpchavoc, query=2_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.tpchavoc.2_v2` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_read_committed | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_isolation_read_committed` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_isolation_repeatable_read` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_isolation_serializable` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_deep_nesting` |
+| execution_filter | benchmark=transaction_primitives, query=transaction_savepoint_nested | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_nested` |
 
 ### spark
 
@@ -669,6 +689,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.starrocks.h2odb.q9_percentile_approx_variant` |
+| query_source | benchmark=nyctaxi, query=fhv-base-volume | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.fhv_base_volume_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=rush-hour-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.rush_hour_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=trip-duration-analysis | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.trip_duration_timestampdiff_variant` |
 | query_source | benchmark=nyctaxi, query=trips-by-day-of-week | select_variant | REWRITTEN | UNSUPPORTED_FEATURE | `query_source.starrocks.nyctaxi.trips_by_dow_dayofweek_variant` |
@@ -708,22 +729,22 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | benchmark_gate | benchmark=ai_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.ai_primitives.unsupported` |
 | benchmark_gate | benchmark=read_primitives | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.read_primitives.duckdb_intrinsics` |
 | benchmark_gate | benchmark=vector_search | block_benchmark | BLOCKED | UNSUPPORTED_FEATURE | `benchmark_gate.timescaledb.vector_search.no_vector_type` |
-| execution_filter | benchmark=tpchavoc, query=10_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.10_v7` |
+| query_adapter | benchmark=tpchavoc, query=10_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.10_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=11_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.11_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=17_v2 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.17_v2.qualify_columns` |
+| query_adapter | benchmark=tpchavoc, query=17_v4 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.17_v4.values_source` |
+| query_adapter | benchmark=tpchavoc, query=2_v5 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.2_v5.qualify_columns` |
+| query_adapter | benchmark=tpchavoc, query=3_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.3_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=4_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.4_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=5_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.5_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=7_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.7_v7.inline_select_alias` |
+| query_adapter | benchmark=tpchavoc, query=9_v7 | rewrite_query | REWRITTEN | UNSUPPORTED_FEATURE | `query_adapter.timescaledb.tpchavoc.9_v7.inline_select_alias` |
 | execution_filter | benchmark=tpchavoc, query=10_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.10_v9` |
-| execution_filter | benchmark=tpchavoc, query=11_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.11_v7` |
 | execution_filter | benchmark=tpchavoc, query=11_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.11_v9` |
 | execution_filter | benchmark=tpchavoc, query=13_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.13_v9` |
-| execution_filter | benchmark=tpchavoc, query=17_v2 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.17_v2` |
-| execution_filter | benchmark=tpchavoc, query=17_v4 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.17_v4` |
 | execution_filter | benchmark=tpchavoc, query=1_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.1_v7` |
-| execution_filter | benchmark=tpchavoc, query=2_v5 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.2_v5` |
-| execution_filter | benchmark=tpchavoc, query=3_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.3_v7` |
-| execution_filter | benchmark=tpchavoc, query=4_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.4_v7` |
-| execution_filter | benchmark=tpchavoc, query=5_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.5_v7` |
 | execution_filter | benchmark=tpchavoc, query=5_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.5_v9` |
-| execution_filter | benchmark=tpchavoc, query=7_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.7_v7` |
 | execution_filter | benchmark=tpchavoc, query=7_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.7_v9` |
-| execution_filter | benchmark=tpchavoc, query=9_v7 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.9_v7` |
 | execution_filter | benchmark=tpchavoc, query=9_v9 | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.tpchavoc.9_v9` |
 | execution_filter | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_repeatable_read` |
 | execution_filter | benchmark=transaction_primitives, query=transaction_isolation_serializable | skip_query | SKIPPED_QUERY | UNSUPPORTED_FEATURE | `execution_filter.timescaledb.transaction_primitives.transaction_isolation_serializable` |

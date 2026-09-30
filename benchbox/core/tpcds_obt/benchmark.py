@@ -12,6 +12,7 @@ from benchbox.base import BaseBenchmark
 from benchbox.core.tpcds.generator import TPCDSDataGenerator
 from benchbox.core.tpcds_obt.etl.transformer import SUPPORTED_CHANNELS, TPCDSOBTTransformer
 from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
+from benchbox.utils.cloud_storage import normalize_output_dir
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,11 @@ class TPCDSOBTBenchmark(BaseBenchmark):
     while OBT-specific transformations are stored separately.
     """
 
+    # OBT generates its own output table from TPC-DS source data, so the CLI
+    # must not redirect its output_dir to the shared TPC-DS root: that would
+    # hide the generated OBT parquet from the cloud loader.
+    GENERATES_OWN_OUTPUT = True
+
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -169,15 +175,17 @@ class TPCDSOBTBenchmark(BaseBenchmark):
 
         # Determine standard paths via the shared helper so BENCHBOX_OUTPUT_DIR is
         # honored; falls back to Path.cwd()/benchmark_runs/datagen when unset.
-        # OBT output directory (for transformed OBT table)
+        # OBT output directory (for transformed OBT table). normalize_output_dir
+        # keeps a CloudStagingPath/DatabricksPath handler intact; Path(...)
+        # would stringify it to the local cache and drop the cloud target.
         if output_dir:
-            self.output_dir = Path(output_dir)
+            self.output_dir = normalize_output_dir(output_dir)
         else:
             self.output_dir = get_benchmark_runs_datagen_path("tpcds_obt", scale_factor)
 
         # TPC-DS source directory (for base TPC-DS data)
         if tpcds_source_dir:
-            self.tpcds_source_dir = Path(tpcds_source_dir)
+            self.tpcds_source_dir = normalize_output_dir(tpcds_source_dir)
         else:
             self.tpcds_source_dir = get_benchmark_runs_datagen_path("tpcds", scale_factor)
 
@@ -545,8 +553,22 @@ class TPCDSOBTBenchmark(BaseBenchmark):
         ddl = schema.get_obt_table(self.dimension_mode).get_create_table_sql()
         target = dialect.lower() if dialect else "duckdb"
         if target not in {"duckdb", "postgres", "ansi", "standard"}:
-            source_ddl = translate_sql_query(
-                source_ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"
+            # Translate statement-by-statement: sqlglot.transpile returns only
+            # the first element for multi-statement input, which would drop
+            # 24 of the 25 source tables (datavault follows the same pattern).
+            source_statements = [stmt.strip() for stmt in source_ddl.split(";") if stmt.strip()]
+            source_ddl = (
+                ";\n\n".join(
+                    translate_sql_query(
+                        stmt,
+                        target_dialect=target,
+                        source_dialect="standard",
+                        identify=True,
+                        scope="schema_ddl",
+                    )
+                    for stmt in source_statements
+                )
+                + ";"
             )
             ddl = translate_sql_query(
                 ddl, target_dialect=target, source_dialect="standard", identify=True, scope="schema_ddl"

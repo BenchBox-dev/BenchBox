@@ -736,7 +736,7 @@ class TestCreateExternalTables:
         create_sql = next((s for s in executed_sqls if "CREATE TABLE" in s and "PARQUET" in s), None)
         assert create_sql is not None, f"No CREATE TABLE USING PARQUET found in: {executed_sqls}"
         assert "ORDERS" in create_sql
-        assert "ORDERS" in table_stats
+        assert "orders" in table_stats
 
 
 # ---------------------------------------------------------------------------
@@ -2711,9 +2711,9 @@ class TestLoadData:
                                     data_dir=Path("/data"),
                                 )
 
-        assert "ORDERS" in table_stats
-        assert "LINEITEM" in table_stats
-        assert table_stats["ORDERS"] == 1500
+        assert "orders" in table_stats
+        assert "lineitem" in table_stats
+        assert table_stats["orders"] == 1500
         assert total_time == 1.0
 
     def test_handles_individual_table_failure_gracefully(self):
@@ -2746,7 +2746,7 @@ class TestLoadData:
                                 )
 
         # Table should be recorded with 0 rows on failure
-        assert table_stats["ORDERS"] == 0
+        assert table_stats["orders"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -3640,6 +3640,16 @@ class TestPreprocessOperationSql:
         result = adapter.preprocess_operation_sql("op", _make_operation("SELECT CAST(n AS VARCHAR)"))
 
         assert result == "SELECT CAST(n AS STRING)"
+
+    def test_unnest_generate_series_rewritten_to_explode_sequence(self):
+        """Databricks has neither unnest nor generate_series (UNRESOLVED_ROUTINE live)."""
+        adapter = _make_adapter()
+
+        result = adapter.preprocess_operation_sql(
+            "op", _make_operation("SELECT n FROM (SELECT unnest(generate_series(1, 100)) AS n) t")
+        )
+
+        assert result == "SELECT n FROM (SELECT explode(sequence(1, 100)) AS n) t"
 
     def test_skip_override_returns_none(self):
         adapter = _make_adapter()

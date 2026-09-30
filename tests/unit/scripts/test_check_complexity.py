@@ -17,7 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = REPO_ROOT / "_project" / "scripts" / "check_complexity.py"
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 MAKEFILE = REPO_ROOT / "Makefile"
-PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr.yml"
+PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 
 def _load_module():
