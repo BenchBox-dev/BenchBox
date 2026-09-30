@@ -3488,6 +3488,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from Star Schema Benchmark modules"
     },
+    "comment-cleanup-timeseries-adapters": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from QuestDB and InfluxDB"
+    },
     "comment-cleanup-tpcdi-generation": {
       "claim": null,
       "needs": [
