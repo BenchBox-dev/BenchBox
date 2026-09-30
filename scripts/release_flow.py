@@ -37,6 +37,7 @@ import subprocess
 import sys
 import tomllib
 from collections.abc import Callable, Sequence
+from datetime import date
 from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
@@ -162,6 +163,13 @@ def check_changelog(root: Path, version: str) -> list[str]:
         return ["CHANGELOG.md: file not found"]
     if not changelog.has_changelog_section(root, version):
         return [f"CHANGELOG.md: no '## [{version}] - <date>' section"]
+    header = re.search(rf"^## \[{re.escape(version)}\] - (.+)$", (root / "CHANGELOG.md").read_text(), re.MULTILINE)
+    try:
+        if header is None or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", header[1]):
+            raise ValueError("missing ISO date")
+        date.fromisoformat(header[1])
+    except ValueError:
+        return [f"CHANGELOG.md [{version}]: release date must be a valid YYYY-MM-DD date"]
     _ok, problems = changelog.check_changelog_curation(root, version)
     return [f"CHANGELOG.md [{version}]: {problem}" for problem in problems]
 
@@ -174,9 +182,14 @@ def _delegated(label: str, argv: Sequence[str], root: Path, runner: Runner) -> l
     return [f"{label}: `{' '.join(argv)}` exited {returncode}" + (f"\n{tail}" if tail else "")]
 
 
-def check_uv_lock_revision(root: Path, runner: Runner) -> list[str]:
+def check_uv_lock_revision(root: Path, runner: Runner, baseline_ref: str | None) -> list[str]:
+    if baseline_ref is None:
+        return ["uv.lock revision: no prior final release tag; provide --baseline-ref"]
+    code, commit = run_command(["git", "rev-parse", "--verify", f"{baseline_ref}^{{commit}}"], root)
+    if code != 0 or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        return [f"uv.lock revision: baseline {baseline_ref!r} cannot be resolved to a commit"]
     script = root / "_project" / "scripts" / "check_uv_lock_revision.py"
-    return _delegated("uv.lock revision", [sys.executable, str(script)], root, runner)
+    return _delegated("uv.lock revision", [sys.executable, str(script), "--baseline-ref", commit], root, runner)
 
 
 def check_release_curation(root: Path, runner: Runner) -> list[str]:
@@ -189,14 +202,14 @@ def check_dependency_bounds(root: Path, runner: Runner) -> list[str]:
     return _delegated("dependency bounds", [sys.executable, str(script), "--fail-on=cap-reached"], root, runner)
 
 
-def run_checks(root: Path, version: str, runner: Runner = run_command) -> list[str]:
+def run_checks(root: Path, version: str, runner: Runner = run_command, *, baseline_ref: str | None = None) -> list[str]:
     """Return every problem found; an empty list means the tree is ready to tag."""
     problems: list[str] = []
     if normalize_version(version) is None:
         return [f"version {version!r} is not a valid version"]
     problems += check_version_markers(root, version)
     problems += check_changelog(root, version)
-    problems += check_uv_lock_revision(root, runner)
+    problems += check_uv_lock_revision(root, runner, baseline_ref or latest_release_tag(root, before_version=version))
     problems += check_release_curation(root, runner)
     problems += check_dependency_bounds(root, runner)
     return problems
@@ -207,13 +220,15 @@ def run_checks(root: Path, version: str, runner: Runner = run_command) -> list[s
 # ---------------------------------------------------------------------------
 
 
-def latest_release_tag(root: Path) -> str | None:
+def latest_release_tag(root: Path, *, before_version: str | None = None) -> str | None:
     """Newest final ``vX.Y.Z`` tag, as a full ref so a same-named branch cannot shadow it."""
     code, output = run_command(["git", "tag", "--list", "v[0-9]*", "--sort=-v:refname"], root)
     if code != 0:
         return None
     for tag in output.splitlines():
-        if _RELEASE_TAG_RE.match(tag.strip()):
+        if _RELEASE_TAG_RE.match(tag.strip()) and (
+            before_version is None or Version(tag.strip()[1:]) < Version(before_version)
+        ):
             return f"refs/tags/{tag.strip()}"
     return None
 
@@ -221,15 +236,35 @@ def latest_release_tag(root: Path) -> str | None:
 def prep(root: Path, version: str, since_ref: str | None, release_date: str | None, runner: Runner) -> int:
     update_version = root / "scripts" / "update_version.py"
     changelog = root / "scripts" / "generate_changelog_entry.py"
+    if normalize_version(version) is None:
+        print(f"release-prep: invalid version {version!r}", file=sys.stderr)
+        return 1
+    if release_date:
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", release_date):
+                raise ValueError("date format")
+            date.fromisoformat(release_date)
+        except ValueError:
+            print("release-prep: release date must be a valid YYYY-MM-DD date", file=sys.stderr)
+            return 1
+    ref = since_ref or latest_release_tag(root)
+    if ref:
+        code, output = runner(["git", "rev-parse", "--verify", f"{ref}^{{commit}}"], root)
+        if code != 0:
+            print(f"release-prep: changelog lower bound {ref!r} cannot be resolved: {output}", file=sys.stderr)
+            return code
 
     steps: list[tuple[str, list[str]]] = [
+        (
+            "version marker validation",
+            [sys.executable, str(update_version), "--version", version, "--update-pyproject", "--dry-run"],
+        ),
         (
             "version markers",
             [sys.executable, str(update_version), "--version", version, "--update-pyproject"],
         ),
         ("uv.lock", ["uv", "lock"]),
     ]
-    ref = since_ref or latest_release_tag(root)
     changelog_cmd = [sys.executable, str(changelog), "--version", version, "--source", str(root)]
     if release_date:
         changelog_cmd += ["--release-date", release_date]
@@ -244,6 +279,7 @@ def prep(root: Path, version: str, since_ref: str | None, release_date: str | No
             print(output)
         if code != 0:
             print(f"release-prep failed at: {label}", file=sys.stderr)
+            print("Inspect git diff before retrying; preparation may be partial.", file=sys.stderr)
             return code or 1
 
     print()
@@ -264,6 +300,9 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument("--root", type=Path, default=REPO_ROOT, help=argparse.SUPPRESS)
     sub.choices["prep"].add_argument("--since-ref", help="Changelog lower bound (default: newest final v* tag)")
     sub.choices["prep"].add_argument("--release-date", help="YYYY-MM-DD (default: today)")
+    sub.choices["check"].add_argument(
+        "--baseline-ref", help="Lock revision baseline (default: prior final release tag)"
+    )
 
     args = parser.parse_args(argv)
     version = args.version.removeprefix("v")
@@ -271,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "prep":
         return prep(args.root, version, args.since_ref, args.release_date, run_command)
 
-    problems = run_checks(args.root, version)
+    problems = run_checks(args.root, version, baseline_ref=args.baseline_ref)
     if problems:
         print(f"release-check FAILED for {version}:", file=sys.stderr)
         for problem in problems:

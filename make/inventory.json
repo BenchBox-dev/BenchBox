@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "fac1108c3d1a3816a9eedf4064b443b67dfb190fbd652e32aaede727ec69d415",
+  "contract_sha256": "9abfb0cca2ca2833c86f04350e43cb8caee35e22f9aa09c385fb8ce7effe2b45",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1347,8 +1347,8 @@
     "release-check": [
       {
         "header": "release-check:",
-        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py check --version \"$(VERSION)\"",
-        "recipe_sha256": "bb93cf233b3619103e99e1c2891223d8b70606aa8038fd574907e6f323b05b23"
+        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run --locked -- python scripts/release_flow.py check --version \"$(VERSION)\" $(if $(BASE_REF),--baseline-ref \"$(BASE_REF)\",)",
+        "recipe_sha256": "54564ae5f9fcb26ddb252a05855cbe80ab03df30f36eeab71f23f764ab289757"
       }
     ],
     "release-cut": [
@@ -1375,8 +1375,8 @@
     "release-prep": [
       {
         "header": "release-prep:",
-        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-prep VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py prep --version \"$(VERSION)\" $(if $(SINCE_REF),--since-ref \"$(SINCE_REF)\",)",
-        "recipe_sha256": "be996ec46839b6fd26b200f59411971d4603892592ad43e1a15a79818064d3a0"
+        "recipe": "\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-prep VERSION=X.Y.Z\" && exit 1)\n\tuv run --frozen -- python scripts/release_flow.py prep --version \"$(VERSION)\" $(if $(SINCE_REF),--since-ref \"$(SINCE_REF)\",)",
+        "recipe_sha256": "fa3507fb7acdd2a130a7aec10e66764e0699a148332cd2d1d044d12e21badee0"
       }
     ],
     "run-test": [
@@ -2157,7 +2157,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "93f3e5906489eeb090f832d08c8afdc77d105947b27a05f9bb80c6f9653e3ec9",
+  "semantic_sha256": "bc4a3957feb731328404a4f3e94bdb1601569991ccbf5a193a537ad4b816fc5b",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3810,17 +3810,17 @@
       ]
     },
     {
-      "body": "release-prep:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-prep VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py prep --version \"$(VERSION)\" $(if $(SINCE_REF),--since-ref \"$(SINCE_REF)\",)",
+      "body": "release-prep:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-prep VERSION=X.Y.Z\" && exit 1)\n\tuv run --frozen -- python scripts/release_flow.py prep --version \"$(VERSION)\" $(if $(SINCE_REF),--since-ref \"$(SINCE_REF)\",)",
       "kind": "rule",
-      "sha256": "60838ef2edb26e70b7e989563fb02ad3a37a7f969ef4e82e1e16bf3656b3ad56",
+      "sha256": "fb7a0141f320044be98cf45173e9322fb7a38341f1612ffaa2bc0a84492570cf",
       "targets": [
         "release-prep"
       ]
     },
     {
-      "body": "release-check:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_flow.py check --version \"$(VERSION)\"",
+      "body": "release-check:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run --locked -- python scripts/release_flow.py check --version \"$(VERSION)\" $(if $(BASE_REF),--baseline-ref \"$(BASE_REF)\",)",
       "kind": "rule",
-      "sha256": "583928354ed0f3c85a51098a0393034ee29f616295cfa21bfa871f05701bf50d",
+      "sha256": "9bb77e2c1eec91e15f2ac8ae507e8a10f120d53b2e2c3e36a033275ab1e6e3bb",
       "targets": [
         "release-check"
       ]

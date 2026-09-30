@@ -373,7 +373,7 @@ commit. They do not replace `release-cut` and `release-finalize` above.
 ```bash
 make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
 # hand-curate the [X.Y.Z] section of CHANGELOG.md, then
-make release-check VERSION=X.Y.Z
+make release-check VERSION=X.Y.Z [BASE_REF=<immutable-predecessor-sha>]
 ```
 
 `release-prep` runs `scripts/update_version.py` (`pyproject.toml`,
@@ -396,6 +396,14 @@ problem it finds. It verifies that:
 
 Both targets need the full development tree, because the lock-revision check
 lives under `_project/`.
+The check uses a locked environment and leaves `uv.lock` unchanged. Its revision
+baseline defaults to the newest final release tag older than `VERSION`; that
+tag is resolved once to a commit. CI should supply the exact event base SHA
+with `BASE_REF` to also catch revision decreases since the last release.
+Missing baseline history fails the check. Preparation uses a frozen environment
+until its explicit `uv lock` step. It validates the date and changelog lower
+bound before changing version markers; a later command failure can leave
+partial changes for inspection.
 
 ## Reference
 

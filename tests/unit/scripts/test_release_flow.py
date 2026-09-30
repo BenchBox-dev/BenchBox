@@ -98,7 +98,12 @@ def failing_runner(script_name: str):
 
 @pytest.fixture
 def tree(tmp_path: Path) -> Path:
-    return write_tree(tmp_path)
+    root = write_tree(tmp_path)
+    git(root, "init", "-q")
+    git(root, "add", "--", "uv.lock")
+    git(root, "commit", "-q", "-m", "Initial lock revision")
+    git(root, "tag", "v1.2.2")
+    return root
 
 
 def test_check_passes_when_every_element_is_present(tree: Path) -> None:
@@ -163,6 +168,81 @@ def test_check_fails_when_the_changelog_entry_is_an_uncurated_draft(tree: Path) 
     problems = release_flow.run_checks(tree, VERSION, ok_runner)
 
     assert any("verbatim commit subjects" in problem for problem in problems), problems
+
+
+@pytest.mark.parametrize("invalid_date", ["TBD", "2026-02-30", "2026-1-1"])
+def test_check_rejects_an_invalid_changelog_date(tree: Path, invalid_date: str) -> None:
+    (tree / "CHANGELOG.md").write_text(CHANGELOG.replace("2026-01-01", invalid_date), encoding="utf-8")
+    assert any("valid YYYY-MM-DD" in problem for problem in release_flow.check_changelog(tree, VERSION))
+
+
+def test_check_rejects_a_committed_lock_revision_downgrade(tree: Path) -> None:
+    scripts = tree / "_project" / "scripts"
+    scripts.mkdir(parents=True)
+    shutil.copy(REPO_ROOT / "_project/scripts/check_uv_lock_revision.py", scripts)
+    (tree / "uv.lock").write_text(LOCK.format(version=VERSION).replace("revision = 3", "revision = 2"))
+    git(tree, "add", "--", "uv.lock")
+    git(tree, "commit", "-q", "-m", "Downgrade lock revision")
+    git(tree, "tag", "v1.2.3")
+    problems = release_flow.run_checks(tree, VERSION)
+    assert any("DOWNGRADE" in problem for problem in problems), problems
+
+
+def test_check_pins_an_explicit_lock_baseline(tree: Path) -> None:
+    expected = subprocess.check_output(["git", "rev-parse", "refs/tags/v1.2.2"], cwd=tree, text=True).strip()
+    seen = []
+
+    def runner(argv, cwd):  # noqa: ARG001
+        seen.append(list(argv))
+        return 0, ""
+
+    assert release_flow.check_uv_lock_revision(tree, runner, "refs/tags/v1.2.2") == []
+    assert seen[0][-2:] == ["--baseline-ref", expected]
+    assert release_flow.check_uv_lock_revision(tree, runner, "refs/tags/missing")
+    assert len(seen) == 1
+
+
+@pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")
+def test_make_release_check_refuses_stale_lock_without_modifying_it(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
+    subprocess.run(["uv", "lock", "--offline"], cwd=tree, check=True, capture_output=True)
+    original = (tree / "uv.lock").read_bytes()
+    project = tree / "pyproject.toml"
+    project.write_text(project.read_text().replace('version = "1.2.3"', 'version = "1.2.4"'))
+    result = subprocess.run(
+        ["make", "-f", str(REPO_ROOT / "Makefile"), "release-check", "VERSION=1.2.4"],
+        cwd=tree,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "lockfile" in result.stderr and "--locked" in result.stderr, result.stdout + result.stderr
+    assert (tree / "uv.lock").read_bytes() == original
+
+
+@pytest.mark.parametrize(
+    "version,ref,release_date",
+    [
+        ("bad-version", "refs/tags/v1.2.2", None),
+        (VERSION, "refs/tags/missing", None),
+        (VERSION, "refs/tags/v1.2.2", "2026-02-30"),
+    ],
+)
+def test_invalid_preparation_inputs_leave_files_unchanged(
+    tree: Path, version: str, ref: str, release_date: str | None
+) -> None:
+    before = {path: path.read_bytes() for path in tree.rglob("*") if path.is_file() and ".git" not in path.parts}
+    assert release_flow.prep(tree, version, ref, release_date, release_flow.run_command) != 0
+    assert {path: path.read_bytes() for path in before} == before
+
+
+def test_missing_preparation_marker_fails_before_any_write(tree: Path) -> None:
+    (tree / "docs/README.md").unlink()
+    before = {path: path.read_bytes() for path in tree.rglob("*") if path.is_file() and ".git" not in path.parts}
+    assert release_flow.prep(tree, "1.2.4", "refs/tags/v1.2.2", None, release_flow.run_command) != 0
+    assert {path: path.read_bytes() for path in before} == before
 
 
 @pytest.mark.parametrize(
@@ -273,11 +353,13 @@ def test_prep_stops_at_the_first_failing_step(tree: Path) -> None:
 
     def runner(argv, cwd):  # noqa: ARG001
         calls.append(list(argv))
+        if argv[0] == "git":
+            return 0, "a" * 40
         return 3, "boom"
 
     assert release_flow.prep(tree, VERSION, "refs/tags/v1.2.2", None, runner) == 3
-    assert len(calls) == 1
-    assert Path(calls[0][1]).name == "update_version.py"
+    assert len(calls) == 2
+    assert Path(calls[1][1]).name == "update_version.py"
 
 
 def test_prep_passes_the_requested_lower_bound_to_the_changelog_step(tree: Path) -> None:

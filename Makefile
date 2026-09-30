@@ -1260,11 +1260,11 @@ release-finalize:
 .PHONY: release-prep release-check
 release-prep:
 	@test -n "$(VERSION)" || (echo "Usage: make release-prep VERSION=X.Y.Z" && exit 1)
-	uv run -- python scripts/release_flow.py prep --version "$(VERSION)" $(if $(SINCE_REF),--since-ref "$(SINCE_REF)",)
+	uv run --frozen -- python scripts/release_flow.py prep --version "$(VERSION)" $(if $(SINCE_REF),--since-ref "$(SINCE_REF)",)
 
 release-check:
 	@test -n "$(VERSION)" || (echo "Usage: make release-check VERSION=X.Y.Z" && exit 1)
-	uv run -- python scripts/release_flow.py check --version "$(VERSION)"
+	uv run --locked -- python scripts/release_flow.py check --version "$(VERSION)" $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
 # =============================================================================
 # PR + worktree workflow
