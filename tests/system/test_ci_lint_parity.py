@@ -140,6 +140,7 @@ MERGE_GATE_GUARD_TOKENS = (
 # parity for code-lint remains owned by _guard_commands() above, while these
 # entries pin the other merge-gate surfaces to their local entry points.
 MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
+    ("ci.yml", "ci-paths", "Check release content"): "release-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
