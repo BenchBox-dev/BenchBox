@@ -3188,6 +3188,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from Doris, Databend and StarRocks"
     },
+    "comment-cleanup-documentation-samples": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from executable documentation samples"
+    },
     "comment-cleanup-duckdb-family": {
       "claim": null,
       "needs": [
