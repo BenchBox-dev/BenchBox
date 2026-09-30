@@ -62,5 +62,7 @@ def test_actual_pytest_shard_execution(tmp_path: Path, workers: int, case: str) 
     assert payload["complete"] is (case != "missing")
     assert payload["commit_sha"] == "a" * 40
     assert payload["assigned_node_ids"] == assigned
+    assert len(payload["collected_node_ids"]) == (workers or 1)
+    assert all(collection == selected for collection in payload["collected_node_ids"])
     assert payload["executed_node_ids"] == selected
     assert payload["pytest_exit_status"] == (1 if case == "failure" else 0)

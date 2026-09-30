@@ -28,7 +28,7 @@ Classification values:
 | Publication rollback and transactions | `.github/workflows/publication-transaction.yml`, `.github/workflows/publication-recover.yml`, `.github/workflows/publication-soak-monitor.yml`, `tests/unit/workflows/test_publication_transaction.py`, `tests/unit/workflows/test_publication_recover.py`, `tests/unit/workflows/test_publication_rollback.py` | site-deploy rollback with last-known-good validation | pending | open |
 | Explorer snapshot and UI compatibility | `results-explorer/src/db.ts` read-model version gate, `tests/unit/scripts/test_results_explorer_snapshot_invariants.py` | ci.yml `explorer` | pending | open |
 | Public-site visual acceptance | `Public-site visual acceptance` required check from `.github/workflows/docs.yml` | site-deploy route and digest probes | pending | open |
-| Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` | pending | open |
+| Binary integrity (vendored engine hashes, dbgen framing) | `_binaries/` hashes, TPC-H binary framing tests | ci.yml `core` hash checks; nightly-v2.yml matrix dbgen framing on all three OS at Python 3.12 | pending | open |
 | Wheel installability | `package-smoke` job, release workflow build | release workflow artifact verification | pending | open |
 | Dependency bounds | `scripts/check_dependency_bounds.py`, `tests/unit/scripts/test_check_dependency_bounds.py` | ci.yml `tooling` | pending | open |
 | Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml` | release workflow | pending | open |
