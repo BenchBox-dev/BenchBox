@@ -161,6 +161,16 @@ def _medium_artifacts(root: Path, sha: str) -> list[str]:
                     "assigned_node_ids": assigned,
                     "executed_node_ids": assigned,
                     "collected_node_ids": [assigned, assigned],
+                    "node_outcomes": [
+                        {
+                            "node_id": node_id,
+                            "reports": [
+                                {"phase": phase, "outcome": "passed", "skip_reason": None, "xfail_reason": None}
+                                for phase in ("setup", "call", "teardown")
+                            ],
+                        }
+                        for node_id in assigned
+                    ],
                 }
             )
         )

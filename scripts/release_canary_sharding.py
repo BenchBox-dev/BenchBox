@@ -172,6 +172,38 @@ def write_shard(
     return len(shard_node_ids)
 
 
+def _validate_node_outcomes(outcomes: object, assigned: list[str]) -> None:
+    """Check actual report correspondence without requiring optional tests to pass."""
+    if not isinstance(outcomes, list) or any(not isinstance(item, dict) for item in outcomes):
+        raise ValueError("medium outcome evidence is missing or malformed")
+    if [item.get("node_id") for item in outcomes] != assigned:
+        raise ValueError("medium outcome node IDs do not match the exact assignment")
+    for item in outcomes:
+        reports = item.get("reports")
+        if not isinstance(reports, list) or not reports or any(not isinstance(report, dict) for report in reports):
+            raise ValueError("medium outcome reports are missing or malformed")
+        expected_phases = (
+            ["setup", "call", "teardown"] if reports[0].get("outcome") == "passed" else ["setup", "teardown"]
+        )
+        if [report.get("phase") for report in reports] != expected_phases:
+            raise ValueError("medium outcome phases are missing, duplicated or inconsistent")
+        for report in reports:
+            outcome = report.get("outcome")
+            if outcome not in ("passed", "skipped"):
+                raise ValueError("medium outcome contradicts successful pytest exit status")
+            reason = report.get("skip_reason")
+            xfail = report.get("xfail_reason")
+            if "skip_reason" not in report or "xfail_reason" not in report:
+                raise ValueError("medium outcome reason fields are missing")
+            if outcome == "skipped":
+                if not isinstance(reason, str) or not reason.strip():
+                    raise ValueError("medium skipped outcome has no observed reason")
+            elif reason is not None:
+                raise ValueError("medium passed outcome cannot have a skip reason")
+            if xfail is not None and not isinstance(xfail, str):
+                raise ValueError("medium outcome xfail reason is malformed")
+
+
 def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
     """Prove both medium shards executed the exact collected set once."""
     collection_root = artifact_root / f"t2-medium-nodeids-{checked_sha}"
@@ -206,6 +238,7 @@ def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
             or any(ids != assigned for ids in evidence["collected_node_ids"])
         ):
             raise ValueError(f"medium shard {index} did not execute its exact assignment successfully")
+        _validate_node_outcomes(evidence.get("node_outcomes"), assigned)
         executed.extend(evidence["executed_node_ids"])
     if sorted(executed) != node_ids:
         raise ValueError("medium shard execution does not conserve the collected node IDs")

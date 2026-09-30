@@ -23,6 +23,7 @@ class ShardEvidence:
         self.sha = config.getoption("checked_sha")
         self.observed: list[str] = []
         self.collections: list[list[str]] = []
+        self.outcomes: dict[str, list[dict[str, str | None]]] = {}
 
     def pytest_collection_finish(self, session: pytest.Session) -> None:
         # xdist controllers delegate collection to workers. Capture each
@@ -35,6 +36,17 @@ class ShardEvidence:
         self.collections.append(sorted(ids))
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
+        reason = None
+        if report.skipped:
+            reason = str(report.longrepr[2]) if isinstance(report.longrepr, tuple) else str(report.longrepr)
+        self.outcomes.setdefault(report.nodeid, []).append(
+            {
+                "phase": report.when,
+                "outcome": report.outcome,
+                "skip_reason": reason,
+                "xfail_reason": getattr(report, "wasxfail", None),
+            }
+        )
         if report.when == "call" or (report.when == "setup" and report.outcome in {"failed", "skipped"}):
             self.observed.append(report.nodeid)
 
@@ -52,6 +64,9 @@ class ShardEvidence:
                     "assigned_node_ids": self.assigned,
                     "collected_node_ids": self.collections,
                     "executed_node_ids": sorted(self.observed),
+                    "node_outcomes": [
+                        {"node_id": node_id, "reports": reports} for node_id, reports in sorted(self.outcomes.items())
+                    ],
                     "complete": complete,
                     "pytest_exit_status": int(exitstatus),
                 },
