@@ -55,6 +55,7 @@ NON_CONTEXT_WORDS = {
     "format",
     "join",
     "toJSON",
+    "toJson",
     "fromJSON",
     "hashFiles",
     "true",

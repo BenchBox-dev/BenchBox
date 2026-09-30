@@ -4,7 +4,7 @@
 
 Rules the registry applies to queries, benchmarks, and DDL statements. Split into two sections based on whether the outcome is user-visible in result counts. Each entry names the platform, the scope the rule applies to, the registered reason, and the rule_id you can grep for in `benchbox/sql_compat/rules/`.
 
-**Total rules:** 326
+**Total rules:** 337
 
 **Platforms with rules:** 22
 
@@ -18,6 +18,12 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | BigQuery does not support DuckDB LIST aggregates and LIST lambda functions in this variant. | `execution_filter.bigquery.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=2_v2 | execution_filter | BigQuery rejects the correlated scalar subquery in this grouped variant. | `execution_filter.bigquery.tpchavoc.2_v2` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_create_temp_table | execution_filter | BigQuery runs each multi-statement script as chained single-statement jobs, so a TEMP TABLE created in one statement is invisible to the next. | `execution_filter.bigquery.transaction_primitives.transaction_create_temp_table` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | BigQuery rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.bigquery.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | BigQuery rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.bigquery.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | BigQuery rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.bigquery.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | BigQuery has no SAVEPOINT statement. | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | BigQuery has no SAVEPOINT statement. | `execution_filter.bigquery.transaction_primitives.transaction_savepoint_nested` |
 
 ### clickhouse-cloud
 
@@ -365,6 +371,11 @@ Queries or benchmarks that are **omitted from the result set** - either because 
 |---|---|---|---|---|
 | SKIPPED_QUERY | benchmark=tpchavoc, query=1_v7 | execution_filter | Snowflake does not support DuckDB LIST aggregates and LIST lambda functions in this variant. | `execution_filter.snowflake.tpchavoc.1_v7` |
 | SKIPPED_QUERY | benchmark=tpchavoc, query=2_v2 | execution_filter | Snowflake rejects the correlated scalar subquery in this grouped variant. | `execution_filter.snowflake.tpchavoc.2_v2` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_read_committed | execution_filter | Snowflake rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.snowflake.transaction_primitives.transaction_isolation_read_committed` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_repeatable_read | execution_filter | Snowflake rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.snowflake.transaction_primitives.transaction_isolation_repeatable_read` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_isolation_serializable | execution_filter | Snowflake rejects SET TRANSACTION ISOLATION LEVEL. | `execution_filter.snowflake.transaction_primitives.transaction_isolation_serializable` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_deep_nesting | execution_filter | Snowflake has no SAVEPOINT statement. | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_deep_nesting` |
+| SKIPPED_QUERY | benchmark=transaction_primitives, query=transaction_savepoint_nested | execution_filter | Snowflake has no SAVEPOINT statement. | `execution_filter.snowflake.transaction_primitives.transaction_savepoint_nested` |
 
 ### starrocks
 
