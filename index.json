@@ -3151,6 +3151,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from JoinOrder modules"
     },
+    "comment-cleanup-joinorder-synthetic": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from Synthetic JoinOrder modules"
+    },
     "comment-cleanup-manifest": {
       "claim": null,
       "needs": [
