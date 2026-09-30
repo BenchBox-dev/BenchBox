@@ -2914,6 +2914,15 @@
       "status": "done",
       "title": "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
     },
+    "comment-cleanup-checker": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-scope-policy"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Build grammar-aware comment policy checks and safe deletion comparisons"
+    },
     "comment-cleanup-scope-policy": {
       "claim": null,
       "needs": [],
