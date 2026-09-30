@@ -223,7 +223,10 @@ def git(cwd: Path, *args: str) -> None:
 
 
 @pytest.mark.skipif(shutil.which("uv") is None or shutil.which("git") is None, reason="needs uv and git")
-def test_prep_updates_every_marker_and_drafts_the_changelog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("version", ["1.2.3", "1.2.3-rc.1"])
+def test_prep_updates_every_marker_and_drafts_the_changelog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str
+) -> None:
     """A fixture release, never a real one: prep yields exactly the files check reads."""
     monkeypatch.setenv("BENCHBOX_CHANGELOG_SUMMARIZE", "0")
     monkeypatch.delenv("UV_PROJECT_ENVIRONMENT", raising=False)
@@ -241,7 +244,7 @@ def test_prep_updates_every_marker_and_drafts_the_changelog(tmp_path: Path, monk
     before = subprocess.run(["git", "status", "--porcelain"], cwd=root, capture_output=True, text=True).stdout
     assert before == ""
 
-    code = release_flow.prep(root, VERSION, None, "2026-02-03", release_flow.run_command)
+    code = release_flow.prep(root, version, None, "2026-02-03", release_flow.run_command)
 
     assert code == 0
     changed = set(
@@ -259,9 +262,9 @@ def test_prep_updates_every_marker_and_drafts_the_changelog(tmp_path: Path, monk
         "benchbox/utils/VERSION_MANAGEMENT.md",
         "landing/index.html",
     }
-    assert release_flow.check_version_markers(root, VERSION) == []
+    assert release_flow.check_version_markers(root, version) == []
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "## [1.2.3] - 2026-02-03" in changelog
+    assert f"## [{version}] - 2026-02-03" in changelog
     assert "add a fixture feature" in changelog
 
 

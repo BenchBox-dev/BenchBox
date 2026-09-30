@@ -186,6 +186,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_reference_usage_audit.py` | tooling |
 | `test_release_cut_start.py` | product-safety |
 | `test_release_finalize.py` | product-safety |
+| `test_release_flow.py` | product-safety |
 | `test_results_explorer_corpus_migrate.py` | product-safety |
 | `test_results_explorer_cpu_attestation_backfill.py` | product-safety |
 | `test_results_explorer_snapshot_invariants.py` | product-safety |
