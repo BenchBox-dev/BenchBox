@@ -16,6 +16,7 @@ from benchbox.utils.binary_manifest import (
     DEFAULT_ROOT,
     MANIFEST_NAME,
     build_binary_manifest,
+    main,
     read_binary_manifest,
     verify_binary_tree,
 )
@@ -37,6 +38,14 @@ def binary_root(tmp_path: Path) -> Path:
 def test_shipped_manifest_covers_the_real_package() -> None:
     verify_binary_tree(DEFAULT_ROOT)
     assert build_binary_manifest(DEFAULT_ROOT) == (DEFAULT_ROOT / MANIFEST_NAME).read_bytes()
+
+
+def test_installed_verification_respects_quiet_output(binary_root: Path, monkeypatch, capsys) -> None:
+    from benchbox.utils import printing
+
+    monkeypatch.setattr(printing, "_QUIET", True)
+    assert main(["--root", str(binary_root)]) == 0
+    assert capsys.readouterr().out == ""
 
 
 @pytest.mark.parametrize("case", ["missing", "extra", "tampered", "missing-manifest", "linked"])

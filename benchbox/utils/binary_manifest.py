@@ -104,6 +104,8 @@ def verify_binary_tree(root: Path = DEFAULT_ROOT) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    from benchbox.utils.printing import emit
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     args = parser.parse_args(argv)
@@ -111,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         verify_binary_tree(args.root)
     except (OSError, ValueError) as exc:
         parser.exit(1, f"Bundled binary verification failed: {exc}\n")
-    print("Bundled binary membership and SHA-256 hashes verified.")
+    emit("Bundled binary membership and SHA-256 hashes verified.")
     return 0
 
 
