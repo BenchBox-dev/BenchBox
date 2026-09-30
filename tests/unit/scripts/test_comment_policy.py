@@ -262,6 +262,23 @@ def test_missing_base_and_unpinned_bootstrap_fail(tmp_path: Path) -> None:
     assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base, "--bootstrap"]) == 2
 
 
+def test_local_default_base_is_the_branch_point_when_develop_moved_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    branch_point = git_repo(tmp_path, "x = 1\n")
+    subprocess.run(["git", "-C", str(tmp_path), "branch", "-q", "develop-tip"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "checkout", "-q", "develop-tip"], check=True)
+    develop_tip = commit_change(tmp_path, "x = 2\n")
+    subprocess.run(["git", "-C", str(tmp_path), "update-ref", "refs/remotes/origin/develop", develop_tip], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "checkout", "-q", "-B", "feature", branch_point], check=True)
+    feature_head = commit_change(tmp_path, "x = 3\n")
+    assert resolve_base(tmp_path, None) == branch_point
+    assert resolve_base(tmp_path, feature_head) == feature_head
+    with pytest.raises(subprocess.CalledProcessError):
+        resolve_base(tmp_path, develop_tip)
+
+
 def commit_change(tmp_path: Path, source: str) -> str:
     (tmp_path / "a.py").write_text(source, encoding="utf-8")
     subprocess.run(["git", "-C", str(tmp_path), "add", "a.py"], check=True)

@@ -102,6 +102,9 @@ def resolve_base(root: Path, requested: str | None) -> str:
         base = subprocess.check_output(
             ["git", "-C", str(root), "rev-parse", "--verify", f"{requested or 'origin/develop'}^{{commit}}"], text=True
         ).strip()
+        stale = subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", base, "HEAD"]).returncode != 0
+        if not requested and stale:
+            base = subprocess.check_output(["git", "-C", str(root), "merge-base", base, "HEAD"], text=True).strip()
     if not re.fullmatch(r"[a-f0-9]{40}", base):
         raise ValueError("invalid base SHA")
     subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", base, "HEAD"], check=True)
