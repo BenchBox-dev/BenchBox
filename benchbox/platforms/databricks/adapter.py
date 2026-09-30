@@ -354,6 +354,7 @@ class DatabricksAdapter(PlatformAdapter):
         self._liquid_clustering_operations: list[dict[str, Any]] = []
         self._z_order_operations: list[dict[str, Any]] = []
         self._cache_disabled_sessions: Any = None
+        self._cache_disable_failed = False
         self._applied_layout_operations: list[dict[str, Any]] = []
         self._skipped_layout_operations: list[dict[str, Any]] = []
 
@@ -382,6 +383,7 @@ class DatabricksAdapter(PlatformAdapter):
     def _reset_run_scoped_state(self) -> None:
         super()._reset_run_scoped_state()
         self._cache_disabled_sessions = None
+        self._cache_disable_failed = False
         self._liquid_clustering_operations = []
         self._z_order_operations = []
         self._applied_layout_operations = []
@@ -899,14 +901,17 @@ class DatabricksAdapter(PlatformAdapter):
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
         compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
 
-        # Report the effective session state, not the warehouse default.
-        # The adapter disables the serverless result cache on every session
-        # (SET use_cached_result = false), but the warehouse describe path
-        # reports the account default (true). Override so the bundle label
-        # matches enforced behavior.
+        # Report the read-back session outcome, not the warehouse default
+        # and not bare intent. The adapter disables the serverless result
+        # cache on every session (SET use_cached_result = false), but the
+        # warehouse describe path reports the account default (true). When
+        # any session SET failed (_cache_disable_failed), the outcome is
+        # unknown and the label stays True (fail closed) so the bundle
+        # cannot claim cache-free measurements it did not earn.
         if isinstance(config, dict):
             config = dict(config)
-            config["result_cache_enabled"] = not self.disable_result_cache
+            failed = bool(getattr(self, "_cache_disable_failed", False))
+            config["result_cache_enabled"] = (not self.disable_result_cache) or failed
 
         metadata["platform_deployment"] = self._databricks_deployment_metadata(config, compute)
         metadata["platform_cloud"] = self._databricks_cloud_metadata(config)
@@ -2596,18 +2601,36 @@ class DatabricksAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-    def _ensure_session_cache_disabled(self, cursor: Any) -> None:
+    def _ensure_session_cache_disabled(self, cursor: Any) -> bool:
         """Emit SET use_cached_result = false once per query session.
 
         Sessions that never pass through create_connection() (pooled and
-        per-stream) need the disable on their own session. Tracking uses a
-        WeakSet so dead sessions drop out; cursors that reject weak
-        references fall back to one SET per call (always safe, never
-        timed). Successful SETs are recorded in the applied ledger.
-        Never raises: capture and execution must survive a failed SET.
+        per-stream) need the disable on their own session. Tracking keys on
+        the underlying connection when reachable (cursor.connection), else
+        the cursor object itself, in a WeakSet so dead sessions drop out.
+        Cursors that reject weak references fall back to one SET per call
+        (always safe, never timed). Successful SETs are recorded in the
+        applied ledger.
+
+        Returns True when the session is known cache-disabled. Returns
+        False when the SET failed: callers must fail closed (invalidate
+        or qualify cache-sensitive measurements) and the bundle label
+        must read back this outcome, never the requested intent. Never
+        raises.
         """
         import weakref
 
+        key: Any = None
+        for attr in ("connection", "conn", "_conn"):
+            try:
+                candidate = getattr(cursor, attr, None)
+            except Exception:
+                candidate = None
+            if candidate is not None:
+                key = candidate
+                break
+        if key is None:
+            key = cursor
         tracked = getattr(self, "_cache_disabled_sessions", None)
         if tracked is None:
             try:
@@ -2617,8 +2640,8 @@ class DatabricksAdapter(PlatformAdapter):
             self._cache_disabled_sessions = tracked
         if tracked is not None:
             try:
-                if cursor in tracked:
-                    return
+                if key in tracked:
+                    return True
             except Exception:
                 pass
         try:
@@ -2629,10 +2652,14 @@ class DatabricksAdapter(PlatformAdapter):
                 pass
         except Exception as e:
             self.logger.warning(f"Failed to disable Databricks result cache: {e}")
-            return
+            try:
+                self._cache_disable_failed = True
+            except Exception:
+                pass
+            return False
         if tracked is not None:
             try:
-                tracked.add(cursor)
+                tracked.add(key)
             except Exception:
                 pass
         ledger = getattr(self, "_applied_tuning_ledger", None)
@@ -2644,6 +2671,7 @@ class DatabricksAdapter(PlatformAdapter):
                 record("SET use_cached_result = false", PHASE_SESSION, mechanism="session_cache_disable")
             except Exception:
                 pass
+        return True
 
     def execute_query(
         self,
@@ -2677,9 +2705,12 @@ class DatabricksAdapter(PlatformAdapter):
         # which would re-emit the SET per query). Successful SETs are
         # recorded in the applied ledger so bundles carry the session
         # state. Verified live 2026-09-29: SET use_cached_result = false
-        # takes a COUNT(*) from 0.28s (cached) to 1.01s (fresh).
+        # takes a COUNT(*) from 0.28s (cached) to 1.01s (fresh). A False
+        # return means the SET failed: the result is marked cache-unknown
+        # below (fail closed) instead of silently labeled cache-disabled.
+        session_cache_disabled = True
         if self.disable_result_cache:
-            self._ensure_session_cache_disabled(cursor)
+            session_cache_disabled = self._ensure_session_cache_disabled(cursor)
 
         start_time = mono_time()
         self.log_verbose(f"Executing query {query_id}")
@@ -2752,6 +2783,9 @@ class DatabricksAdapter(PlatformAdapter):
 
             # Include Databricks-specific fields
             result_dict["translated_query"] = None  # Translation handled by base adapter
+            # Fail-closed cache receipt: downstream consumers must not treat
+            # this measurement as cache-free unless the session SET succeeded.
+            result_dict["session_cache_disabled"] = bool(session_cache_disabled)
 
             # Add resource usage for cost calculation (execution time for DBU estimation)
             result_dict["resource_usage"] = {
