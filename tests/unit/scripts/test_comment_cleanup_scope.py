@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
 ROOT = Path(__file__).resolve().parents[3]
 SPEC = importlib.util.spec_from_file_location("comment_cleanup_scope", ROOT / "scripts/check_comment_cleanup_scope.py")
 assert SPEC and SPEC.loader
@@ -466,3 +468,54 @@ def test_derived_rule_rejects_unknown_method(policy: dict) -> None:
     policy["derived_rules"] = [{**_derived_rule(), "method": "guess-from-names"}]
     with pytest.raises(scope.PolicyError):
         scope.validate_derived_rules(policy)
+
+
+def test_derived_rule_skips_ownership_collisions(tmp_path: Path) -> None:
+    root, base = _git_repo_with(tmp_path, {"benchbox/a.py": "", "tests/t.py": "import benchbox.a\n"})
+    collision = {**_resolved("tests/t.py", None), "rule": ["rule-a", "rule-b"], "competing_owners": ["a", "b"]}
+    resolved = [_resolved("benchbox/a.py", "comment-cleanup-a"), collision]
+    scope.apply_derived_rules(resolved, [_derived_rule()], root, base, {})
+    assert resolved[1]["owner"] is None
+    assert resolved[1]["rule"] == ["rule-a", "rule-b"]
+
+
+def test_derived_rule_counts_module_literals_and_rejects_unowned_modules(tmp_path: Path) -> None:
+    root, base = _git_repo_with(
+        tmp_path,
+        {
+            "benchbox/a.py": "",
+            "benchbox/b.py": "",
+            "benchbox/loose.py": "",
+            "tests/test_patch.py": 'import benchbox.a\npatch("benchbox.b.Thing")\n',
+            "tests/test_dynamic.py": 'importlib.import_module("benchbox.a")\n',
+            "tests/test_unowned.py": "import benchbox.a\nimport benchbox.loose\n",
+        },
+    )
+    resolved = [
+        _resolved("benchbox/a.py", "comment-cleanup-a"),
+        _resolved("benchbox/b.py", "comment-cleanup-b"),
+        _resolved("benchbox/loose.py", None),
+        *(
+            _resolved(f"tests/{n}.py", "comment-cleanup-fallback")
+            for n in ("test_patch", "test_dynamic", "test_unowned")
+        ),
+    ]
+    scope.apply_derived_rules(resolved, [_derived_rule()], root, base, {})
+    owners = {record["path"]: record["owner"] for record in resolved}
+    assert owners["tests/test_patch.py"] == "comment-cleanup-fallback"
+    assert owners["tests/test_dynamic.py"] == "comment-cleanup-a"
+    assert owners["tests/test_unowned.py"] == "comment-cleanup-fallback"
+
+
+def test_notice_owner_claims_an_unowned_path_and_reports_conflicts() -> None:
+    notices = [
+        {"path": "LICENSE", "owner": "comment-cleanup-scope-policy", "blocking_disposition": "Retain exact bytes."},
+        {"path": "NOTICE", "owner": "comment-cleanup-scope-policy", "blocking_disposition": "Retain exact bytes."},
+    ]
+    resolved = [_resolved("LICENSE", None), _resolved("NOTICE", "comment-cleanup-other")]
+    resolved[0]["rule"] = None
+    findings = scope.apply_notice_owners(resolved, notices)
+    assert resolved[0]["owner"] == "comment-cleanup-scope-policy"
+    assert resolved[0]["rule"] == "notice"
+    assert resolved[1]["owner"] == "comment-cleanup-other"
+    assert [finding.code for finding in findings] == ["SCOPE005"]

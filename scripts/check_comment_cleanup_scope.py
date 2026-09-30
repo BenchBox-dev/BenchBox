@@ -4,6 +4,7 @@ import argparse
 import ast
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -379,10 +380,13 @@ def read_blobs(root: Path, base: str, paths: list[str]) -> dict[str, bytes]:
     return blobs
 
 
+MODULE_LITERAL = re.compile(r"benchbox(?:\.[A-Za-z_][A-Za-z0-9_]*)+")
+
+
 def imported_modules(source: bytes) -> set[str]:
     try:
         tree = ast.parse(source)
-    except (SyntaxError, ValueError):
+    except (SyntaxError, ValueError, MemoryError, RecursionError):
         return set()
     modules: set[str] = set()
     for node in ast.walk(tree):
@@ -392,18 +396,32 @@ def imported_modules(source: bytes) -> set[str]:
             if node.module.split(".")[0] == "benchbox":
                 modules.add(node.module)
                 modules.update(f"{node.module}.{alias.name}" for alias in node.names)
+        elif isinstance(node, ast.Constant) and isinstance(node.value, str) and MODULE_LITERAL.fullmatch(node.value):
+            modules.add(node.value)
     return modules
+
+
+def module_path(module: str, path_owners: dict[str, str | None]) -> str | None:
+    parts = module.split(".")
+    while parts:
+        stem = "/".join(parts)
+        for candidate in (f"{stem}.py", f"{stem}/__init__.py"):
+            if candidate in path_owners:
+                return candidate
+        parts.pop()
+    return None
 
 
 def import_owner(source: bytes, path_owners: dict[str, str | None]) -> str | None:
     owners = set()
     for module in imported_modules(source):
-        stem = module.replace(".", "/")
-        for candidate in (f"{stem}.py", f"{stem}/__init__.py"):
-            if candidate in path_owners:
-                if candidate != "benchbox/__init__.py" and path_owners[candidate]:
-                    owners.add(path_owners[candidate])
-                break
+        candidate = module_path(module, path_owners)
+        if candidate is None or candidate == "benchbox/__init__.py":
+            continue
+        owner = path_owners[candidate]
+        if owner is None:
+            return None
+        owners.add(owner)
     return owners.pop() if len(owners) == 1 else None
 
 
@@ -422,6 +440,7 @@ def apply_derived_rules(
             record
             for record in resolved
             if record["path"].endswith(".py")
+            and not isinstance(record["rule"], list)
             and priorities.get(record["path"], -1) < rule["priority"]
             and any(matches(record["path"], selector) for selector in rule["selectors"])
         ]
@@ -434,6 +453,23 @@ def apply_derived_rules(
                 owner=owner, state=rule["state"], blocking_disposition=rule["blocking_disposition"], rule=rule["id"]
             )
             priorities[record["path"]] = rule["priority"]
+
+
+def apply_notice_owners(resolved: list[dict[str, Any]], notices: list[dict[str, Any]]) -> list[Finding]:
+    by_path = {notice["path"]: notice for notice in notices}
+    findings = []
+    for record in resolved:
+        notice = by_path.get(record["path"])
+        if notice is None or isinstance(record["rule"], list):
+            continue
+        if record["owner"] is not None and record["owner"] != notice["owner"]:
+            findings.append(Finding("SCOPE005", record["path"], "notice owner conflicts with an ownership rule"))
+            continue
+        record.update(
+            owner=notice["owner"], state="blocked", blocking_disposition=notice["blocking_disposition"], rule="notice"
+        )
+        record.pop("competing_owners", None)
+    return findings
 
 
 def selected_root(path: str, roots: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -559,8 +595,10 @@ def main(argv: list[str] | None = None) -> int:
         priorities: dict[str, int] = {}
         resolved, findings = owned_paths(paths, roots, rules, priorities)
         apply_derived_rules(resolved, derived, root, args.base, priorities)
+        notice_findings = apply_notice_owners(resolved, policy["notices"])
         owned = {record["path"] for record in resolved if record["owner"]}
         findings = [finding for finding in findings if finding.subject not in owned]
+        findings.extend(notice_findings)
         findings.extend(dependency_findings(policy, resolved))
         output = output_path(root, args.output)
         report = {
