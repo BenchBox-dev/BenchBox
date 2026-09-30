@@ -3251,6 +3251,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from BigQuery and GCP support"
     },
+    "comment-cleanup-generators": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from documentation and site generators"
+    },
     "comment-cleanup-h2odb": {
       "claim": null,
       "needs": [
