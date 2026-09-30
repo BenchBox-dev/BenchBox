@@ -1,24 +1,69 @@
 # Release artifact contract
 
-The release workflow publishes the exact wheel and sdist that the merge-queue
-CI run built and tested. It never rebuilds them.
+Release admission consumes the exact wheel and sdist from a successful
+merge-queue CI attempt. It never rebuilds or publishes packages.
 
-## Producer (ci.yml, `merge_group` runs)
+## Producer
 
-The CI run for a merge-queue commit uploads one artifact:
+The `dist-artifact` job of `.github/workflows/ci.yml` runs only on
+`merge_group`. Its artifact name is
+`dist-<full head SHA>-attempt-<positive run attempt>`.
 
-- Artifact name: `dist-<sha>`, where `<sha>` is the full 40-character
-  `head_sha` of the run. The queue fast-forwards `develop` to that commit, so
-  the tag commit equals this SHA.
-- Contents, at the artifact root: one wheel (`*.whl`), one sdist (`*.tar.gz`),
-  and `SHA256SUMS` in `sha256sum` format (`<hex>  <filename>`, one line per
-  wheel and sdist, no paths).
+The artifact contains exactly four regular files at its root:
 
-## Consumer (release-v2.yml)
+- one wheel (`*.whl`);
+- one sdist (`*.tar.gz`);
+- `SHA256SUMS`, containing exactly their two SHA-256 hashes and basenames;
+- `producer-receipt.json`.
 
-1. Find the successful `merge_group` run of `ci.yml` whose `head_sha` is the
-   tag commit.
-2. Download `dist-<sha>` from that run.
-3. Run `sha256sum --check SHA256SUMS`; any mismatch, missing file, or extra
-   distribution file fails the release.
-4. Attest, test, and publish only those files.
+The receipt has schema `1` and records `repository`, `repository_id`,
+`head_repository_id`, `workflow_path`, `head_sha`, `run_id`, `run_attempt`,
+`job_id`, `job_name`, `artifact_name`, `sha256sums_sha256`, and `files`.
+`files` maps each distribution basename to its `size` and `sha256`.
+The producer reads its actual job ID from the attempt-scoped GitHub jobs API.
+It cannot record the artifact ID or ZIP digest before upload; admission obtains
+those values from GitHub and binds them to this receipt.
+
+This replaces the former three-file `dist-<SHA>` format. Older artifacts lack
+attempt evidence and are refused. They cannot be upgraded by local metadata or
+by choosing an earlier successful run.
+
+## Admission
+
+Run from an exact checkout of an annotated `v*` version tag:
+
+```bash
+uv run -- python scripts/release_artifact_consumer.py admit \
+  --source . --tag v0.4.2 --output /tmp/benchbox-release-admission
+```
+
+The command fetches `develop`, checks tag/version agreement and ancestry, and
+selects the latest exact-SHA CI run. The run must belong to
+`BenchBox-dev/BenchBox`, use `.github/workflows/ci.yml`, and have completed
+successfully on `merge_group`. Its exact attempt must have one successful
+`dist-artifact` job and one unexpired attempt-qualified artifact.
+
+Admission verifies the API ZIP digest before reading any archive member. It
+rejects paths, duplicate names, links, nonregular members, encryption, extra
+files, and payloads larger than 256 MiB. It recomputes the distribution hashes,
+requires the producer receipt to match the actual run and job attempt, and
+checks package/version identity. The exact tagged source's distribution binary
+verifier must exist and pass. Metadata is read again before an admission receipt
+and verified files appear in the new output directory.
+
+An admission receipt is byte and producer evidence. It is not a cryptographic
+attestation or permission to release. Admission does not change hosted tag
+rules, environments, or publishing workflows.
+
+## Release requirements
+
+The publishing workflow still requires the live `v-tag-restricted` rule,
+verifiable provenance attestation, all twelve Python 3.11–3.14 installation and
+smoke cells across Linux/macOS/Windows, artifact-bound release UAT, the binary
+manifest, `make release-check`, ruleset drift checks, and no open
+release-blocking `t3:*` issue. Linux correctness evidence remains separate from
+the deferred Darwin digest certification.
+
+TestPyPI rehearsals must exercise refusal paths and verify installed hashes.
+Production PyPI retains owner approval. The existing `release.yml` remains
+operational until its approved replacement is accepted.
