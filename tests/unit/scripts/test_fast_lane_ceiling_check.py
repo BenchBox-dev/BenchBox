@@ -1,10 +1,10 @@
-"""Unit tests for the --emit-fast-count / --delta-check modes added to
-_project/scripts/timing_policy_check.py (fast-lane-decouple-ceiling-contention-2).
+"""Unit tests for _project/scripts/fast_lane_ceiling_check.py: the absolute
+ceiling, merge-queue grace, --emit-fast-count and --delta-check modes.
 
 The pytest-collection subprocess itself is monkeypatched out via
 `_run_pytest_collect` (fast, offline, deterministic) -- these tests pin the
 new modes' own parsing/threshold logic, not pytest's collection output
-format, which is exercised for real by `timing_policy_check.py --strict`
+format, which is exercised for real by `fast_lane_ceiling_check.py --strict`
 itself (and by the fast-lane collect these very tests are marked medium to
 avoid contending with -- see the pytestmark comment below).
 """
@@ -18,28 +18,18 @@ from typing import Callable
 
 import pytest
 
-# medium, not fast: this batch reforms the fast lane's own contention
-# problem; adding new fast tests to the PR that raises the ceiling would
-# recreate exactly the pattern fast-lane-decouple-ceiling-contention-2
-# exists to end (see _project/config/fast_lane_ceiling_log.md's 2026-07-24
+# medium, not fast: these tests cover the fast lane's own contention
+# controls; adding fast tests here would recreate the ceiling contention they
+# guard against (see _project/config/fast_lane_ceiling_log.md's 2026-07-24
 # entry). Medium still runs in the required pre-merge lane (medium-test).
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 _ROOT = Path(__file__).resolve().parents[3]
-_PROJECT_SCRIPTS_DIR = str(_ROOT / "_project" / "scripts")
-if _PROJECT_SCRIPTS_DIR not in sys.path:
-    # timing_policy_check.py does `from timing_audit import collect_findings`
-    # with no self-inserted sys.path entry -- it relies on being run as
-    # `__main__` (Python auto-adds the script's own directory in that case).
-    # Loading it via spec_from_file_location below skips that, so add the
-    # directory ourselves before exec_module.
-    sys.path.insert(0, _PROJECT_SCRIPTS_DIR)
-
-_SCRIPT = _ROOT / "_project" / "scripts" / "timing_policy_check.py"
+_SCRIPT = _ROOT / "_project" / "scripts" / "fast_lane_ceiling_check.py"
 
 
 def _load():
-    spec = importlib.util.spec_from_file_location("_timing_policy_check", _SCRIPT)
+    spec = importlib.util.spec_from_file_location("_fast_lane_ceiling_check", _SCRIPT)
     assert spec is not None and spec.loader is not None
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
@@ -486,11 +476,13 @@ def test_ceiling_grace_is_scoped_to_the_queue_lane() -> None:
 
     pr = yaml.safe_load((_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
     lint_steps = pr["jobs"]["code-lint"]["steps"]
-    timing = next(s for s in lint_steps if s.get("id") == "guard-timing-policy")
+    ceiling = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-ceiling")
     # No environment variable may smuggle the grace in: the committed command
     # carries the flag and the script gates it on runner event identity.
-    assert "FAST_LANE_CEILING_GRACE" not in (timing.get("env") or {})
-    assert "--ceiling-grace 750" in timing["run"]
+    assert "FAST_LANE_CEILING_GRACE" not in (ceiling.get("env") or {})
+    assert "--ceiling-grace 750" in ceiling["run"]
+    wall_clock = next(s for s in lint_steps if s.get("id") == "guard-timing-policy")
+    assert "--ceiling-grace" not in wall_clock["run"]
     delta = next(s for s in lint_steps if s.get("id") == "guard-fast-lane-delta")
     assert delta["if"] == "github.event_name == 'pull_request'"
     assert "--require-develop-baseline" in delta["run"]

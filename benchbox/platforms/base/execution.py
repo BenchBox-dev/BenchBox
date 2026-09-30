@@ -60,6 +60,7 @@ from benchbox.platforms.base.connection_wrappers import (
     open_stream_connection,
     require_throughput_stream_capability,
 )
+from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.dialect_utils import SQLTranslationError
 from benchbox.utils.printing import quiet_console
 
@@ -754,27 +755,37 @@ class TestDriversMixin:
             and getattr(self, "plan_capture_phase_eligible", False)
             and not getattr(self, "dry_run_mode", False)
         )
-        if not phase_eligible:
-            results = self._dispatch_queries_by_type(benchmark, connection, run_config)
-            self._contain_outstanding_throughput_work(run_config)
-            return results
-
         # Isolate capture: record executed queries during the timed run, capture after.
         # ``_captured_plans`` is the per-run accumulator keyed by capture key; it lets
         # capture happen in more than one isolated pass (a pre-mutation checkpoint plus
         # the final pass) while plans are attached to result rows exactly once at the
         # end. Reset here so a reused adapter never carries plans across runs.
-        self._plan_capture_phase_active = True
-        self._phase_recorded_queries = {}
-        self._captured_plans = {}
+        self._last_power_workload_timing = None
+        if phase_eligible:
+            self._plan_capture_phase_active = True
+            self._phase_recorded_queries = {}
+            self._captured_plans = {}
+        workload_start_time = datetime.now().isoformat()
+        workload_start = mono_time()
         try:
             results = self._dispatch_queries_by_type(benchmark, connection, run_config)
         finally:
-            self._plan_capture_phase_active = False
+            if phase_eligible:
+                self._plan_capture_phase_active = False
+        workload_duration_ms = int(elapsed_seconds(workload_start) * 1000)
+        workload_end_time = datetime.now().isoformat()
+        effective_type = run_config.get("_effective_execution_type") or run_config.get(
+            "test_execution_type", "standard"
+        )
+        if effective_type in {"standard", "power"} and not self.is_dry_run:
+            # Include driver preparation, warmups and history lookups, but stop
+            # before isolated EXPLAIN capture or any post-workload probes.
+            self._last_power_workload_timing = (workload_start_time, workload_end_time, workload_duration_ms)
 
         if not self._contain_outstanding_throughput_work(run_config):
             return results
-        self._capture_plans_post_measurement(connection, dict(self._phase_recorded_queries), results)
+        if phase_eligible:
+            self._capture_plans_post_measurement(connection, dict(self._phase_recorded_queries), results)
         return results
 
     def _contain_outstanding_throughput_work(self, run_config: dict[str, Any]) -> bool:
