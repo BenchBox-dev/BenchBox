@@ -233,8 +233,6 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "tokens_used",
         "total_rows",
         "translated_query",
-        # Databricks per-query receipt for the session result-cache disable.
-        "session_cache_disabled",
         "validation_passed",
         "validation_time",
         "variant_id",
