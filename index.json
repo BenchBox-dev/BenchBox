@@ -2914,6 +2914,15 @@
       "status": "done",
       "title": "Harden TODO verification commands: audit buggy DONE examples, schema-enforce single-line commands, decide actioned-completion convention"
     },
+    "comment-cleanup-ai-primitives": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from AI primitives modules"
+    },
     "comment-cleanup-analysis-comparison": {
       "claim": null,
       "needs": [
