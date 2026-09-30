@@ -3298,6 +3298,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from TPC-Havoc runtime"
     },
+    "comment-cleanup-tpchavoc-variants": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from TPC-Havoc variant catalogs"
+    },
     "comment-cleanup-tuning": {
       "claim": null,
       "needs": [
