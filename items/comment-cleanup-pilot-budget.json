@@ -3,7 +3,7 @@
     "Pilot package, assigned tests and examples reach zero discretionary comments/docstrings, preserving actual runtime strings and raw SQL payloads; new and completed-scope checks plus narrow AST parity pass.",
     "Pilot records elapsed authoring, review and required-check cost and any false positives/consumer omissions, then adjusts checker/ownership before broad rollout.",
     "Fresh baseline counts distinguish owned removable text, required notices/directives, upstream material, parsed fixtures and generated payloads.",
-    "Concrete module file/batch/PR/reviewer/CI budget is approved in a later operator message before broad deletion; estimated counts are not presented as delivery commitments.",
+    "Concrete module file/batch/PR/reviewer/CI budget is selected and recorded from pilot evidence before broad deletion; estimated counts are not delivery commitments. Pause and revise the plan if the agreed scope, cost limit or required reviews cannot be met. Existing implementation authorization is not requested again.",
     "Soundness paths have explicit reviewer and verification requirements. Pilot success is not UAT, publication or production certification."
   ],
   "context": "Planning basis: the aggressive comment/docstring-removal plan revised after external Claude Opus 5.5, medium-effort review. The reviewer originally rejected the draft; all 18 findings received dispositions (12 accepted, five narrowed, one rebutted). The updated plan has not received a second external review. Original source baseline 0697891d449b1e31f22e4842169f3b2e743337fb; planning worktree was created at newer origin/develop c7bcdb9bc1d713a0c616969b2eb3f19f3d1d86a1. Refresh all facts at implementation start.",
@@ -15,6 +15,14 @@
       "client": "codex-mcp-client",
       "op": "create",
       "op_id": "6a66e6a92bbe465c966de382d6dd7015",
+      "session_id": "ad486d2419af432fa889205fbc465e0c"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:d448b08be5b969faae2e2a3d",
+      "at": "2026-09-30T00:13:20Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "1d5ec524ce4a4423b4e61d6685e147cb",
       "session_id": "ad486d2419af432fa889205fbc465e0c"
     }
   ]
