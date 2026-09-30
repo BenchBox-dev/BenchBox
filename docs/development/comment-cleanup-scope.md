@@ -22,6 +22,14 @@ remains in the local manifest with every competing rule and owner, then fails.
 When roots overlap, the most specific selector wins; equal-specificity roots are
 invalid. An unclassified path is not an external exclusion.
 
+A derived rule assigns a Python test to a module owner only when every
+`benchbox` module the test imports belongs to that one owner. The root package
+facade gives no evidence. A test with no production import, mixed owners, or a
+source that does not parse keeps the owner of its directory rule. A rule or exact
+path with a higher priority is never overridden. A payload record names the
+single region of a file that an earlier task may edit; the file's rule still
+names the later owner.
+
 The policy does not create a permanent path ledger. Before dispatch, run the
 validator against the immutable source commit and write the resolved manifest to
 an ignored local path:
