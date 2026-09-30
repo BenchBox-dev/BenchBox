@@ -3308,6 +3308,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from adapter registration and shared cloud support"
     },
+    "comment-cleanup-postgresql-family": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from PostgreSQL family adapters"
+    },
     "comment-cleanup-pricing-consumer": {
       "claim": null,
       "needs": [
