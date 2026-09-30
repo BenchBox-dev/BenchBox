@@ -35,29 +35,24 @@ name: Auto-merge revocation
 #      there is nothing to revoke.
 #
 # Soundness predicate evaluation (disable path):
-#   Union of (a) the base-ref copy and (b) the PR checkout copy. Base-ref
-#   alone stops a PR from judging its own diff by a narrowed rule set.
-#   Evaluating the PR copy alongside it means a gate *widened* mid-flight
-#   in the same PR still revokes auto-merge for paths only the new gate
-#   covers. Self-touch of the predicate or this workflow forces
-#   soundness_path=true regardless.
+#   The workflow evaluates the trusted base-ref predicate. A PR that adds a
+#   rule must touch the protected manifest or predicate, and self-touch is
+#   forced to soundness below.
 #
-# HONESTY NOTE on the self-protection checks below (base-ref predicate
-# execution + self-touch override): they are BEST-EFFORT for same-repo PRs.
-# GitHub executes the PR's OWN copy of a pull_request-triggered workflow
-# file, so a PR that edits this workflow can delete these checks in the
-# same commit that would have triggered them. The repo-layer backstop is
+# The workflow uses pull_request_target and checks out only the immutable base
+# tree. It never executes Python or shell code from the PR head, so the write
+# token used by the revoke step cannot be exposed by a workflow or predicate
+# edit in the PR. The repo-layer backstop is
 # the develop ruleset's require_code_owner_review rule, re-enabled
 # 2026-07-21 with required approvals 0 (retired 2026-07-18 over a
 # self-approval deadlock, then restored — see
 # docs/operations/repo-admin-settings.md, "Soundness-path review
 # enforcement"). CODEOWNERS mirrors the soundness prefixes 1:1. GitHub
-# forbids self-approval, so soundness PRs never merge hands-free: the owner
-# reviews the diff and merges manually. The residual workflow-tamper risk
-# is recorded and accepted in that runbook section.
+# reviews the diff and merges manually. The trusted-target execution removes
+# the former workflow-tamper exposure.
 
 on:
-  pull_request:
+  pull_request_target:
     # `labeled` so applying `no-auto-merge` revokes auto-merge without a push.
     # No `ready_for_review`: nothing armable exists on a draft, so the
     # draft→ready transition has nothing to revoke (and never arms — see
@@ -67,7 +62,7 @@ on:
 
 permissions:
   pull-requests: write
-  contents: write
+  contents: read
 
 jobs:
   revoke:
@@ -77,9 +72,14 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
 
-      - name: Fetch base branch
-        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
+      - name: Fetch pull request head
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: git fetch --no-tags origin "pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
 
       - name: Check explicit hold label
         id: hold
@@ -102,49 +102,72 @@ jobs:
 
       - name: Check soundness-critical paths
         id: soundness
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          # A missing or stale head ref is an inability to certify the diff,
+          # not evidence that the diff is safe. Emit a result so the revoke
+          # step still runs instead of failing before it can disable auto-merge.
+          if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+            echo "Could not verify the event head SHA; failing closed."
+            echo "soundness_path=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           # --no-renames so a rename OUT of a protected tree surfaces the deleted
           # source path. With rename detection on, `git diff` reports only the
           # (unprotected) destination, so a PR that removes a soundness-critical
           # file via rename would slip past the gate.
-          diff_paths="$(git diff --name-only --no-renames "origin/${{ github.base_ref || 'develop' }}...HEAD")"
+          if ! diff_paths="$(git diff --name-only --no-renames "${BASE_SHA}...${HEAD_SHA}")"; then
+            echo "Could not compute the event diff; failing closed."
+            echo "soundness_path=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-          # (a) BASE-REF copy: a PR that narrows SOUNDNESS_PREFIXES must still be
-          # judged by develop's rules, not its own. The base branch is already
-          # fetched by the preceding "Fetch base branch" step.
-          git show "origin/${{ github.base_ref || 'develop' }}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py
-          base_result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate_base.py --stdin --format github-output)"
-
-          # (b) PR checkout copy: a gate *widened* in this PR still revokes
-          # auto-merge for paths only the new gate covers. Fail closed (treat as
-          # soundness) if the PR copy is missing or errors — never let a broken
-          # PR-side predicate silence revocation.
-          pr_result="soundness_path=false"
-          if [ -f "_project/scripts/auto_merge_soundness_paths.py" ]; then
-            if ! pr_result="$(printf '%s\n' "$diff_paths" | python3 _project/scripts/auto_merge_soundness_paths.py --stdin --format github-output)"; then
-              pr_result="soundness_path=true"
+          # Evaluate only the trusted base-ref predicate. A PR that adds a new
+          # rule must touch the protected manifest or predicate, both of which
+          # are forced to soundness below. Never execute the PR copy because it
+          # could expose this workflow's write-capable pull-request token.
+          base_result="soundness_path=true"
+          if git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null; then
+            if git show "${BASE_SHA}:_project/scripts/soundness_paths.py" > /tmp/predicate_base.py \
+              && git show "${BASE_SHA}:.github/soundness-paths.txt" > /tmp/soundness-paths-base.txt \
+              && base_result="$(printf '%s\n' "$diff_paths" | SOUNDNESS_PATH_MANIFEST=/tmp/soundness-paths-base.txt python3 /tmp/predicate_base.py --stdin --format github-output)"; then
+              :
+            else
+              base_result="soundness_path=true"
+            fi
+          else
+            if ! git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" > /tmp/predicate_base.py \
+              || ! base_result="$(printf '%s\n' "$diff_paths" | python3 /tmp/predicate_base.py --stdin --format github-output)"; then
+              base_result="soundness_path=true"
             fi
           fi
 
-          # Union: soundness if either copy says so, so a PR cannot weaken its
-          # own gate by narrowing the PR-side rules.
-          if [ "$base_result" = "soundness_path=true" ] || [ "$pr_result" = "soundness_path=true" ]; then
-            result="soundness_path=true"
-          else
-            result="soundness_path=false"
-          fi
+          case "$base_result" in
+            soundness_path=true|soundness_path=false) result="$base_result" ;;
+            *) result="soundness_path=true" ;;
+          esac
 
-          # Base-ref + PR-copy union alone does not flag "this diff touches the
-          # predicate (or the workflow that runs it)" as review-worthy - a PR
-          # could still edit the predicate to make FUTURE PRs unsafe without
-          # itself needing owner review. Force soundness_path=true whenever
-          # the diff touches either file, regardless of what either predicate
-          # says about the rest of the diff.
-          if printf '%s\n' "$diff_paths" | grep -qxF "_project/scripts/auto_merge_soundness_paths.py" \
-             || printf '%s\n' "$diff_paths" | grep -qxF ".github/workflows/auto-merge-on-open.yml"; then
-            result="soundness_path=true"
-          fi
+          # A PR could still edit the predicate or workflow to make FUTURE PRs
+          # unsafe without itself needing owner review. Force soundness_path=true
+          # whenever the diff touches any review-gate machinery, regardless of
+          # what the trusted base predicate says about the rest of the diff.
+          for protected_path in \
+            "AGENTS.md" \
+            ".github/CODEOWNERS" \
+            ".github/PULL_REQUEST_TEMPLATE.md" \
+            ".github/soundness-paths.txt" \
+            ".github/workflows/auto-merge-on-open.yml" \
+            ".github/workflows/ci.yml" \
+            "_project/scripts/auto_merge_soundness_paths.py" \
+            "_project/scripts/check_soundness_review.py" \
+            "_project/scripts/soundness_paths.py"; do
+            if printf '%s\n' "$diff_paths" | grep -qxF "$protected_path"; then
+              result="soundness_path=true"
+            fi
+          done
 
           echo "$result" >> "$GITHUB_OUTPUT"
 

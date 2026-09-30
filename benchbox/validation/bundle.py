@@ -207,7 +207,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
     "datafusion": frozenset(
         [
             "12_v1",
-            "14_v2",
             "14_v8",
             "16_v10",
             "16_v7",
@@ -216,7 +215,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
             "1_v7",
             "4_v10",
             "4_v7",
-            "6_v2",
             "7_v1",
             "8_v1",
             "9_v1",
@@ -255,7 +253,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
         [
             "10_v1",
             "11_v4",
-            "12_v7",
             "13_v8",
             "14_v8",
             "16_v1",
@@ -263,7 +260,6 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
             "17_v10",
             "17_v7",
             "1_v10",
-            "1_v6",
             "1_v7",
             "3_v1",
             "3_v10",
@@ -280,23 +276,30 @@ TPCHAVOC_DOCUMENTED_SKIPS: dict[str, frozenset[str]] = {
     ),
     "postgres": frozenset(
         [
-            "10_v7",
             "10_v9",
-            "11_v7",
             "11_v9",
             "13_v9",
-            "17_v2",
-            "17_v4",
             "1_v7",
-            "2_v5",
-            "3_v7",
-            "4_v7",
-            "5_v7",
             "5_v9",
-            "7_v7",
             "7_v9",
-            "9_v7",
             "9_v9",
+        ]
+    ),
+    "snowflake": frozenset(
+        [
+            "1_v7",
+            "2_v2",
+        ]
+    ),
+    "databricks": frozenset(
+        [
+            "1_v7",
+        ]
+    ),
+    "bigquery": frozenset(
+        [
+            "1_v7",
+            "2_v2",
         ]
     ),
 }

@@ -12,12 +12,12 @@
 | --- | --- | --- | --- | --- | --- |
 | joinorder | not-cheaply-gateable | 113 | 113 | 113 | → NOT a routine-PR gate: rejects bounded scale SF=0.01 (ValueError: joinorder now uses canonical IMDb 2013 data and accepts only scale_factor=1.0; use joinorder_synthetic for scaled synthetic smoke-test data.); requires SF=1.0; canonical manifest fetch (data_manifest.toml); use joinorder_synthetic (already CI-enforced) for scaled smoke-test data |
 | metadata_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
-| nyctaxi | not-cheaply-gateable | 25 | 25 | 0 | → NOT a routine-PR gate: downloader-backed network fetch at the bounded scale (downloader.py) |
+| nyctaxi | not-cheaply-gateable | 25 | 25 | 0 | → NOT a routine-PR gate: downloader-backed network fetch at the bounded scale (downloader.py) [staged, not CI-enforced] |
 | tpcdi | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 | tpcds_obt | abandoned | 89 | 17 | 0 | → correspondence abandoned: DataFrame Q1..Q17 denote OBT-native analytics while SQL ids denote TPC-DS queries; no clean correspondence without renumbering one side (see tests/unit/core/tpcds_obt/test_tpcds_obt_id_mapping_decision.py) Also rejects bounded scale SF=0.01 (requires SF=1). |
-| tpch_skew | candidate-unverified | 22 | 22 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
+| tpch_skew | candidate-unverified | 22 | 22 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) [staged, not CI-enforced] |
 | transaction_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
-| tsbs_devops | candidate-unverified | 18 | 18 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) |
+| tsbs_devops | candidate-unverified | 18 | 18 | 0 | → confirm an independent SQL↔DataFrame id mapping before gating (do NOT guess) [staged, not CI-enforced] |
 | write_primitives | no-df-query-surface | — | 0 | — | → w2 fallback oracle (no DataFrame query registry) |
 
 ## Campaign dispatch

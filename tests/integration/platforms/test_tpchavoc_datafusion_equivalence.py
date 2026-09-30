@@ -52,7 +52,7 @@ def datafusion_divergences(tmp_path_factory):
 
     DataFusion is in-process, so "unreachable" means "not installed" - skip
     cleanly in that case (mirroring the Postgres sample's connect-only skip). The
-    206-variant sweep is the expensive part, so it is computed a single time at
+    executable-variant sweep is the expensive part, so it is computed once at
     module scope and shared across the assertions below.
     """
     pytest.importorskip("datafusion", reason="DataFusion not installed")

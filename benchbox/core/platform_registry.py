@@ -11,6 +11,7 @@ enabling dynamic discovery and instantiation of platform adapters.
 
 import argparse
 import importlib
+import os
 from collections import Counter
 from collections.abc import Iterable
 from copy import deepcopy
@@ -328,6 +329,8 @@ class PlatformRegistry:
         lib_name = lib_spec["name"]
         import_name = lib_spec.get("import_name", lib_name)
 
+        # Optional native modules can change cwd before failing to load.
+        original_cwd = os.getcwd()
         try:
             module = importlib.import_module(import_name)
             version = getattr(module, "__version__", None)
@@ -347,6 +350,8 @@ class PlatformRegistry:
             return LibraryInfo(name=lib_name, version=version, installed=True)
         except (ImportError, OSError) as e:
             return LibraryInfo(name=lib_name, version=None, installed=False, import_error=str(e))
+        finally:
+            os.chdir(original_cwd)
 
     @staticmethod
     def _extract_requirement_package(requirement: str) -> Optional[str]:

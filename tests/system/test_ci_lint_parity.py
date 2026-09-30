@@ -2,7 +2,7 @@
 
 Guards that only run in CI (never locally) fire for the first time on a
 pushed PR, costing a full remote round trip per miss. This test parses
-``.github/workflows/pr.yml`` -- the source of truth -- and asserts that
+``.github/workflows/ci.yml`` -- the source of truth -- and asserts that
 every guard command the `lint` job (job id ``code-lint``) runs after its
 dependency-install step also appears, verbatim, in the Makefile's
 ``ci-lint`` recipe. Parity is asserted at the COMMAND level (not just
@@ -39,8 +39,8 @@ import yaml
 pytestmark = pytest.mark.medium
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pr.yml"
-PUBLICATION_DOCS_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "publication-lane-docs.yml"
+PR_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+PUBLICATION_DOCS_WORKFLOW = None  # retired by the ci.yml flip
 RELEASE_TEST_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "test.yml"
 MAKEFILE = REPO_ROOT / "Makefile"
 LINT_JOB_ID = "code-lint"
@@ -62,22 +62,31 @@ SETUP_STEP_NAMES = {"Install dependencies"}
 # Steps that are genuinely CI-only. Every entry needs a reason, and the test
 # below fails if a listed step is renamed or removed -- so this dict can't
 # rot into cover for a guard that quietly stopped existing.
+MERGE_GROUP_ONLY_NOTE = (
+    "merge_group-only input, honored by `timing_policy_check.py` only when the "
+    "runner's own event file also says merge_group: the script rejects the "
+    "flag on any other event, so a PR editing its own workflow copy cannot "
+    "self-grant grace, and ci-lint's local run carries no event file and "
+    "therefore enforces the strict ceiling."
+)
+
 EXCLUDED_STEPS: dict[str, str] = {
+    # The timing-policy step is excluded only because its merge_group-only
+    # branch has no local equivalent. The dedicated strict-command test below
+    # pins the ordinary --strict command to the Makefile recipe, while the
+    # merge-group branch and skip aggregation are pinned by workflow assertions.
+    "Timing policy (wall-clock allowlist)": MERGE_GROUP_ONLY_NOTE,
     "Fast lane ceiling delta vs develop": (
         "CI-cache-dependent, no local equivalent: the guard's input is "
         "`fast-lane-count.txt`, restored from the GitHub Actions cache "
-        "(`actions/cache/restore@v4`, exact key "
+        "(`actions/cache/restore@v5.1.0`, exact key "
         "`fast-lane-count-develop-<base-sha>`, populated by "
-        "develop-post-merge.yml's own cache-save step) -- "
-        "there is no Actions cache to restore from in a local shell. This "
-        "is fail-open by design: `timing_policy_check.py --delta-check` "
-        "prints `DELTA_CHECK_SKIPPED (no develop baseline available - "
-        "absolute ceiling still enforced)` and exits 0 whenever the count "
-        "file is missing, which is exactly the state a local run is always "
-        "in. `guard-timing-policy` (the `--strict` step just above this "
-        "one) already enforces the absolute `max_fast_tests` ceiling "
-        "locally via `ci-lint` -- this guard is additive to that, not a "
-        "replacement for it. See docs/operations/fast-lane-budget.md."
+        "fast-lane-baseline.yml's cache-save step) -- "
+        "there is no Actions cache to restore from in a local shell. The "
+        "pull-request command passes `--require-develop-baseline`, so a "
+        "missing cache fails closed with `DELTA_CHECK_BASELINE_ERROR`; "
+        "direct callers without that flag retain the compatibility skip. "
+        "See docs/operations/fast-lane-budget.md."
     ),
 }
 
@@ -87,8 +96,7 @@ EXCLUDED_STEPS: dict[str, str] = {
 # stricter Make target; a hosted-only exception must name the missing input or
 # service and is documented in docs/operations/ci-local-parity.md.
 MERGE_GATE_WORKFLOWS = {
-    "pr.yml": PR_WORKFLOW,
-    "publication-lane-docs.yml": PUBLICATION_DOCS_WORKFLOW,
+    "ci.yml": PR_WORKFLOW,
     "test.yml": RELEASE_TEST_WORKFLOW,
 }
 MERGE_GATE_SETUP_NAMES = {
@@ -104,6 +112,14 @@ MERGE_GATE_NON_GUARD_JOBS = {
     "certification-identity",
     "ci-required-result",
     "release-required-result",
+    # ci.yml unit result jobs only aggregate needs into pass/fail; they run
+    # no guard logic of their own, so they need no local equivalent.
+    "core",
+    "explorer",
+    "results-data",
+    "docs",
+    "landing",
+    "tooling",
 }
 MERGE_GATE_GUARD_TOKENS = (
     "guard",
@@ -124,32 +140,31 @@ MERGE_GATE_GUARD_TOKENS = (
 # parity for code-lint remains owned by _guard_commands() above, while these
 # entries pin the other merge-gate surfaces to their local entry points.
 MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
-    ("pr.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
-    ("pr.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
-    ("pr.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
-    ("pr.yml", "content-guard", "Validate docs references"): "pr-content-guard",
-    ("pr.yml", "content-guard", "Validate public contract drift guard"): "pr-content-guard",
-    ("pr.yml", "skill-integrity", "Validate skill config, receipt, and tool pin"): "skill-integrity-check",
-    ("pr.yml", "skill-integrity", "Validate tracked artifact hygiene"): "skill-integrity-check",
-    ("pr.yml", "skill-integrity", "Enforce untracked mirror boundary"): "ci-lint",
-    ("pr.yml", "code-lint", "Lint and format check with ruff"): "ci-lint",
-    ("pr.yml", "code-lint", "Type check with ty"): "ci-lint",
-    ("pr.yml", "code-lint", "Validate test marker annotations"): "ci-lint",
-    ("pr.yml", "code-lint", "Validate import layering"): "ci-lint",
-    ("pr.yml", "code-lint", "Validate Windows antipatterns"): "ci-lint",
-    ("pr.yml", "code-lint", "Validate artifact hygiene"): "ci-lint",
-    ("pr.yml", "code-lint", "Validate agent instruction authority and efficiency"): "ci-lint",
-    ("pr.yml", "code-lint", "Validate no agent authorship or attribution in PR commits"): "ci-lint",
-    ("pr.yml", "code-lint", "UAT spec LOC table drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Compatibility governance drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Platform manifest drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Oracle coverage map drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Public contract drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Dependency inventory drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Release curation list drift check"): "ci-lint",
-    ("pr.yml", "code-lint", "Untracked skill-mirror drift guard (cloud parity)"): "ci-lint",
-    ("pr.yml", "parity-check", "Verify parity fixtures match Python source"): "parity-check",
-    ("publication-lane-docs.yml", "build-docs-lane", "Verify lane isolation"): "lane-isolation-check",
+    ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
+    ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
+    ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
+    ("ci.yml", "content-guard", "Validate docs references"): "pr-content-guard",
+    ("ci.yml", "content-guard", "Validate public contract drift guard"): "pr-content-guard",
+    ("ci.yml", "skill-integrity", "Validate skill config, receipt, and tool pin"): "skill-integrity-check",
+    ("ci.yml", "skill-integrity", "Validate tracked artifact hygiene"): "skill-integrity-check",
+    ("ci.yml", "skill-integrity", "Enforce untracked mirror boundary"): "ci-lint",
+    ("ci.yml", "code-lint", "Lint and format check with ruff"): "ci-lint",
+    ("ci.yml", "code-lint", "Type check with ty"): "ci-lint",
+    ("ci.yml", "code-lint", "Validate test marker annotations"): "ci-lint",
+    ("ci.yml", "code-lint", "Validate import layering"): "ci-lint",
+    ("ci.yml", "code-lint", "Validate Windows antipatterns"): "ci-lint",
+    ("ci.yml", "code-lint", "Validate artifact hygiene"): "ci-lint",
+    ("ci.yml", "code-lint", "Validate agent instruction authority and efficiency"): "ci-lint",
+    ("ci.yml", "code-lint", "Validate no agent authorship or attribution in PR commits"): "ci-lint",
+    ("ci.yml", "code-lint", "UAT spec LOC table drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Compatibility governance drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Platform manifest drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Oracle coverage map drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Public contract drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Dependency inventory drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Release curation list drift check"): "ci-lint",
+    ("ci.yml", "code-lint", "Untracked skill-mirror drift guard (cloud parity)"): "ci-lint",
+    ("ci.yml", "parity-check", "Verify parity fixtures match Python source"): "parity-check",
     ("test.yml", "test", "Run linting"): "ci-lint",
     ("test.yml", "test", "Run type checking"): "ci-lint",
     ("test.yml", "compat-test", "Run linting"): "ci-lint",
@@ -158,51 +173,51 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
 }
 
 MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
-    ("pr.yml", "ci-paths", "Validate TODO JSON/Git state contract"): (
+    ("ci.yml", "ci-paths", "Validate TODO JSON/Git state contract"): (
         "Hosted classifier bootstrap; it runs before dependency installation and "
         "has no standalone Make target. The local preflight consumes the same "
         "classifier through pr-preflight."
     ),
-    ("pr.yml", "tpch-binary-framing", "Verify bundled dbgen binaries emit clean framing"): (
+    ("ci.yml", "tpch-binary-framing", "Verify bundled dbgen binaries emit clean framing"): (
         "Cross-platform macOS/Windows binary smoke; the local macOS checkout has no Windows runner equivalent."
     ),
-    ("pr.yml", "skill-integrity", "Clone skill sources to the configured checkout paths"): (
+    ("ci.yml", "skill-integrity", "Clone skill sources to the configured checkout paths"): (
         "Hosted provenance step; it clones published skill sources into a fresh "
         "runner home, which a local checkout must not overwrite."
     ),
-    ("pr.yml", "skill-integrity", "Preview, apply, verify, and re-check the skill mirrors"): (
+    ("ci.yml", "skill-integrity", "Preview, apply, verify, and re-check the skill mirrors"): (
         "Hosted source-materialization step; skill-integrity-check proves the "
         "local committed payload but does not clone remote source checkouts."
     ),
-    ("pr.yml", "skill-integrity", "Audit instruction authority and PR commit identity"): (
+    ("ci.yml", "skill-integrity", "Audit instruction authority and PR commit identity"): (
         "The hosted command checks the immutable PR base range; ci-lint covers the "
         "current checkout and agent-commit-range-check covers local commits."
     ),
-    ("pr.yml", "code-test", "Run cross-surface mutation target drift guard"): (
+    ("ci.yml", "code-test", "Run cross-surface mutation target drift guard"): (
         "Promoted slow regression guard; it is intentionally CI-gated and is not "
         "silently represented by the fast local test lane."
     ),
-    ("pr.yml", "code-test", "Run cross-surface GATES Make/CI pinning guard"): (
+    ("ci.yml", "code-test", "Run cross-surface GATES Make/CI pinning guard"): (
         "Promoted medium regression guard; its explicit CI node prevents marker "
         "selection from dropping it and has no cheaper local equivalent."
     ),
-    ("pr.yml", "code-test", "Run promoted TPC-DS power-test drain-before-commit reproducer"): (
+    ("ci.yml", "code-test", "Run promoted TPC-DS power-test drain-before-commit reproducer"): (
         "Promoted slow regression guard; it is intentionally CI-gated and is not "
         "silently represented by the fast local test lane."
     ),
-    ("pr.yml", "postgres-integration", "Wait for PostgreSQL service to be reachable"): (
+    ("ci.yml", "postgres-integration", "Wait for PostgreSQL service to be reachable"): (
         "Non-blocking service sample; the hosted container is deliberately not a "
         "local prerequisite for the required product lane."
     ),
-    ("pr.yml", "postgres-integration", "Run PostgreSQL live integration tests"): (
+    ("ci.yml", "postgres-integration", "Run PostgreSQL live integration tests"): (
         "Non-blocking live service sample; the hosted PostgreSQL container has no "
         "local equivalent in the required product lane."
     ),
-    ("pr.yml", "publication-reconciliation", "Run publication plan reconciliation (live Git state)"): (
+    ("ci.yml", "publication-reconciliation", "Run publication plan reconciliation (live Git state)"): (
         "Hosted reconciliation reads the live tracker and publication refs; local "
         "preflight cannot safely substitute those mutable inputs."
     ),
-    ("pr.yml", "audit-sha", "Validate changed audit develop SHA stamps"): (
+    ("ci.yml", "audit-sha", "Validate changed audit develop SHA stamps"): (
         "Hosted audit lane compares the PR event base and merge-queue ancestry; "
         "those refs are not available as a stable local input."
     ),
@@ -225,58 +240,64 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
         "Release parity's Node/npm suite is hosted in this workflow; it is not a "
         "silent omission because the exception names the exact runner surface."
     ),
-    ("pr.yml", "skill-integrity", "Run skill policy and instruction audit contracts"): (
+    ("ci.yml", "base-guard", "Check base branch"): (
+        "Branch-identity guard with no local equivalent: the check reads the "
+        "hosted PR base ref (`github.base_ref`), which has no meaning in a "
+        "local checkout. The policy itself is pinned by "
+        "tests/unit/workflows/test_stacked_pr_base_guard.py."
+    ),
+    ("ci.yml", "skill-integrity", "Run skill policy and instruction audit contracts"): (
         "The hosted contract bundle runs the complete policy/audit test set; the "
         "same tests run as part of the local full preflight rather than a separate "
         "lightweight Make target."
     ),
-    ("pr.yml", "code-test", "Run promoted h2odb mutation-catch reproducer (#901)"): (
+    ("ci.yml", "code-test", "Run promoted h2odb mutation-catch reproducer (#901)"): (
         "Promoted slow mutation regression; it is intentionally CI-gated and is "
         "not silently represented by the fast local lane."
     ),
-    ("pr.yml", "code-test", "Run promoted plan-capture-phase reproducers (#909)"): (
+    ("ci.yml", "code-test", "Run promoted plan-capture-phase reproducers (#909)"): (
         "Promoted slow regression; it is intentionally CI-gated and is not silently represented by the fast local lane."
     ),
-    ("pr.yml", "code-test", "Run DuckLake in-process adapter integration tests"): (
+    ("ci.yml", "code-test", "Run DuckLake in-process adapter integration tests"): (
         "Optional integration dependency is hosted in this lane; the local "
         "required preflight does not manufacture the DuckLake service."
     ),
-    ("pr.yml", "code-test", "Run promoted DuckDB FK tuning load-ordering reproducers"): (
+    ("ci.yml", "code-test", "Run promoted DuckDB FK tuning load-ordering reproducers"): (
         "Promoted slow regression; it is intentionally CI-gated and is not silently represented by the fast local lane."
     ),
-    ("pr.yml", "code-test", "Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers"): (
+    ("ci.yml", "code-test", "Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers"): (
         "Promoted slow regression; it is intentionally CI-gated and is not silently represented by the fast local lane."
     ),
-    ("pr.yml", "code-test", "Run fast tests"): "Covered by the local `test-fast` target.",
-    ("pr.yml", "medium-test", "Run medium speed tier"): "Covered by the local `test-medium` target.",
-    ("pr.yml", "correctness-gate", "Run bounded real-result correctness gate"): (
+    ("ci.yml", "code-test", "Run fast tests"): "Covered by the local `test-fast` target.",
+    ("ci.yml", "medium-test", "Run medium speed tier"): "Covered by the local `test-medium` target.",
+    ("ci.yml", "correctness-gate", "Run bounded real-result correctness gate"): (
         "Covered by the local `test-correctness-gate` target."
     ),
-    ("pr.yml", "postgres-integration", "Run TPC-Havoc PostgreSQL variant-equivalence sample"): (
+    ("ci.yml", "postgres-integration", "Run TPC-Havoc PostgreSQL variant-equivalence sample"): (
         "Hosted PostgreSQL is an optional service sample; the local required lane "
         "does not start or substitute that service."
     ),
     (
-        "pr.yml",
+        "ci.yml",
         "datafusion-integration",
         "Run TPC-Havoc DataFusion variant-equivalence sample and .tbl load regression",
     ): ("Hosted integration sample with its own dependency/runtime; the local required lane does not substitute it."),
-    ("pr.yml", "clickhouse-integration", "Run TPC-Havoc ClickHouse variant-equivalence sample"): (
+    ("ci.yml", "clickhouse-integration", "Run TPC-Havoc ClickHouse variant-equivalence sample"): (
         "Hosted ClickHouse is an optional service sample; the local required lane "
         "does not start or substitute that service."
     ),
-    ("pr.yml", "explorer-tokens", "Run explorer token scan"): "Covered by the local `lint-explorer-tokens` target.",
+    ("ci.yml", "explorer-tokens", "Run explorer token scan"): "Covered by the local `lint-explorer-tokens` target.",
     (
-        "pr.yml",
+        "ci.yml",
         "site-theme-tokens",
         "Run public site theme token scan",
     ): "Covered by the local `lint-site-theme-tokens` target.",
-    ("pr.yml", "package-smoke", "Test package installation"): "Covered by the local `test-package` target.",
-    ("pr.yml", "dependency-audit", "Run security audit"): "Covered by the local `security-audit` target.",
-    ("pr.yml", "explorer-vitest", "Run Explorer Vitest suite"): (
+    ("ci.yml", "package-smoke", "Test package installation"): "Covered by the local `test-package` target.",
+    ("ci.yml", "dependency-audit", "Run security audit"): "Covered by the local `security-audit` target.",
+    ("ci.yml", "explorer-vitest", "Run Explorer Vitest suite"): (
         "Hosted Node/npm lane; the local required Python preflight does not manufacture the Explorer dependency tree."
     ),
-    ("pr.yml", "audit-sha", "Fetch PR head for audit ancestry (merge queue only)"): (
+    ("ci.yml", "audit-sha", "Fetch PR head for audit ancestry (merge queue only)"): (
         "Merge-queue-only ref preparation; those ephemeral refs do not exist in a stable local checkout."
     ),
     ("test.yml", "test", "Run linting"): "Covered by the local `ci-lint` target.",
@@ -298,6 +319,78 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ),
     ("test.yml", "test-package", "Test package installation"): "Covered by the local `test-package` target.",
     ("test.yml", "pyspark-tests", "Run PySpark tests"): "Covered by the local `test-pyspark` target.",
+    ("ci.yml", "soundness-flag", "soundness-flag"): (
+        "Hosted soundness review gate reads the live PR body via the API; the "
+        "checker logic is covered locally by tests/unit/test_soundness_review_flag.py."
+    ),
+    ("ci.yml", "ruleset-drift", "Compare live governance with the trusted runbook"): (
+        "Hosted governance check reads the live ruleset via the API with a "
+        "secret token; covered locally by tests/unit/test_ruleset_drift.py."
+    ),
+    ("ci.yml", "explorer-e2e", "Typecheck explorer e2e harness"): (
+        "Hosted Node/npm lane; the local required Python preflight does not manufacture the Explorer dependency tree."
+    ),
+    ("ci.yml", "explorer-e2e", "Audit frontend dependencies"): (
+        "Hosted Node/npm lane; the local required Python preflight does not manufacture the Explorer dependency tree."
+    ),
+    ("ci.yml", "explorer-e2e", "Run Chromium suite"): (
+        "Hosted browser suite; covered locally by the explorer-vitest contract, not a headed browser."
+    ),
+    ("ci.yml", "results-data-check", "Corpus inventory is current"): (
+        "Covered by the corpus inventory check inside the results-data unit; no separate local target."
+    ),
+    ("ci.yml", "results-data-check", "Corpus validation"): (
+        "Covered by results-data/validate_corpus.py run in the results-data unit; no separate local target."
+    ),
+    ("ci.yml", "results-data-check", "Submission validator stays in sync"): (
+        "Hosted branch-copy comparison against published-results; the checker logic is covered by its unit tests."
+    ),
+    ("ci.yml", "results-data-check", "Corpus, submission, and explorer-pipeline contract tests"): (
+        "Covered by the local unit test lane running the same test files."
+    ),
+    ("ci.yml", "visual-inputs", "Classify site inputs and validate recovery source"): (
+        "Hosted path classifier output consumed by downstream ci.yml jobs; the "
+        "classifier logic is covered by tests/unit/scripts/test_ci_units.py."
+    ),
+    ("ci.yml", "docs-build", "Validate results-explorer lockfile"): (
+        "Hosted Node/npm lane; the local required Python preflight does not manufacture the Explorer dependency tree."
+    ),
+    ("ci.yml", "docs-build", "Verify curated Explorer publication inputs"): (
+        "Hosted publication-input check; covered locally by the explorer-pipeline contract tests."
+    ),
+    ("ci.yml", "docs-build", "Typecheck results-explorer"): (
+        "Hosted Node/npm lane; the local required Python preflight does not manufacture the Explorer dependency tree."
+    ),
+    ("ci.yml", "docs-build", "Validate explorer snapshot invariants"): (
+        "Hosted snapshot check; covered locally by the explorer-pipeline contract tests."
+    ),
+    ("ci.yml", "docs-build", "Scan assembled site for privacy leaks"): (
+        "Hosted site-assembly scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."
+    ),
+    ("ci.yml", "public-site-visual-regression", "Capture public site"): (
+        "Hosted visual-baseline capture; needs the assembled site and Playwright browsers."
+    ),
+    ("ci.yml", "public-site-visual-regression", "Compare public site with exact base"): (
+        "Hosted visual comparison against the SHA-bound baseline; no local equivalent."
+    ),
+    ("ci.yml", "example-validation", "Validate example file references"): (
+        "Covered by the local example-validation lane in preflight."
+    ),
+    ("ci.yml", "example-validation", "Check example file syntax"): (
+        "Covered by the local example-validation lane in preflight."
+    ),
+    ("ci.yml", "example-validation", "Validate visualization screenshot sync"): (
+        "Hosted screenshot sync check; needs the built explorer app."
+    ),
+    ("ci.yml", "example-validation", "Check /prompts/ catalog is fresh"): (
+        "Covered by the local example-validation lane in preflight."
+    ),
+    ("ci.yml", "example-validation", "Check for unsafe patch() string paths in tests"): (
+        "Covered by the local example-validation lane in preflight."
+    ),
+    ("ci.yml", "docstring-coverage", "Check docstring coverage"): (
+        "Covered by the local `docstring-coverage` lane in preflight."
+    ),
 }
 
 
@@ -415,7 +508,7 @@ def _command_satisfied(command: str, recipe_lines: list[str]) -> bool:
 
 
 def test_lint_job_guards_run_in_ci_lint() -> None:
-    """Every non-excluded pr.yml `lint`-job guard command must appear,
+    """Every non-excluded ci.yml `lint`-job guard command must appear,
     command-for-command, in the `ci-lint` Makefile recipe."""
     guard_commands = _guard_commands()
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
@@ -429,11 +522,23 @@ def test_lint_job_guards_run_in_ci_lint() -> None:
                 missing.append(f"{step_name!r}: {command!r}")
 
     assert not missing, (
-        "pr.yml `lint` job guard(s) not mirrored in `make ci-lint` -- these "
+        "ci.yml `lint` job guard(s) not mirrored in `make ci-lint` -- these "
         "will fire for the FIRST time in CI instead of locally. Add the "
         "command to the ci-lint recipe in the Makefile (or, if genuinely "
         "CI-only, add it to EXCLUDED_STEPS with a reason):\n  " + "\n  ".join(missing)
     )
+
+
+def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
+    """The merge-group-only branch must not hide the ordinary strict guard."""
+    timing = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-timing-policy")
+    workflow_run = str(timing["run"])
+    recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
+    strict_command = "uv run -- python _project/scripts/timing_policy_check.py --strict"
+
+    assert strict_command in recipe_lines
+    assert "args=(--strict)" in workflow_run
+    assert 'timing_policy_check.py "${args[@]}"' in workflow_run
 
 
 def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemption() -> None:
@@ -519,7 +624,7 @@ def test_excluded_steps_still_exist() -> None:
     current_step_names = {step.get("name") for step in _load_lint_job_steps()}
     stale = sorted(name for name in EXCLUDED_STEPS if name not in current_step_names)
     assert not stale, (
-        "EXCLUDED_STEPS references pr.yml `lint`-job step name(s) that no "
+        "EXCLUDED_STEPS references ci.yml `lint`-job step name(s) that no "
         f"longer exist (renamed or removed) -- update the exclusion: {stale}"
     )
 
@@ -581,11 +686,15 @@ def test_lint_guard_summary_step_exists() -> None:
     assert steps[-1] is aggregator, f"{AGGREGATOR_STEP_NAME!r} must be the last step in the code-lint job"
 
 
-def test_lint_guard_summary_only_marks_success_as_passing() -> None:
+def test_lint_guard_summary_accepts_only_success_or_intentional_merge_skip() -> None:
     aggregator = next(step for step in _load_lint_job_steps() if step.get("name") == AGGREGATOR_STEP_NAME)
     run = aggregator["run"]
 
     assert 'if [ "$outcome" = "success" ]; then' in run
+    assert '[ "$id" = "guard-fast-lane-delta" ]' in run
+    assert '[ "${GITHUB_EVENT_NAME:-}" = "merge_group" ]' in run
+    assert '[ "$outcome" = "skipped" ]' in run
+    assert "merge_group composition" in run
     assert 'echo "FAILED: $id ($outcome)"' in run
     assert "All lint guards passed." in run
 

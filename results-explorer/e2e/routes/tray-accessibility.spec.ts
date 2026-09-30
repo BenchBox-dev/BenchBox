@@ -98,17 +98,29 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     const n = await checkboxes.count();
     expect(n).toBeGreaterThanOrEqual(5);
 
-    // Select 4 rows to hit cap.
+    // Select 4 *comparable* rows to hit cap. Partial-subset runs (e.g. the
+    // genuine Polars SF0.01 source with 3 queries) render disabled with an
+    // "insufficient valid queries" reason, so skip ineligible rows instead
+    // of assuming DOM order.
+    const handles = await checkboxes.all();
+    const comparable: typeof handles = [];
+    for (const cb of handles) {
+      if (await cb.isEnabled()) comparable.push(cb);
+      if (comparable.length >= 5) break;
+    }
+    expect(comparable.length).toBeGreaterThanOrEqual(5);
     for (let i = 0; i < 4; i++) {
-      const cb = checkboxes.nth(i);
+      const cb = comparable[i];
+      if (!cb) throw new Error(`expected comparable checkbox at index ${i}`);
       await expect(cb).toBeEnabled();
       await cb.scrollIntoViewIfNeeded();
       await cb.check();
       await expect(cb).toBeChecked();
     }
 
-    // Fifth checkbox must be disabled at cap with aria-describedby pointing to reason.
-    const fifth = checkboxes.nth(4);
+    // Fifth comparable checkbox must be disabled at cap with aria-describedby pointing to reason.
+    const fifth = comparable[4];
+    if (!fifth) throw new Error("expected fifth comparable checkbox for cap assertion");
     await expect(fifth).toBeDisabled();
     const describedBy = await fifth.getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();

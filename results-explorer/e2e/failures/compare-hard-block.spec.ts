@@ -79,4 +79,21 @@ test.describe("Compare guardrails", () => {
     await expect(page.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Cannot compare/i })).toHaveCount(0);
   });
+
+  test("missing comparison IDs settle within the first data wait after delayed worker startup", async ({ page }) => {
+    let delayedWorker = false;
+    await page.route("**/*duckdb*worker*.js", async (route) => {
+      if (!delayedWorker) {
+        delayedWorker = true;
+        await new Promise((resolve) => setTimeout(resolve, 4500));
+      }
+      await route.continue();
+    });
+    const ids = [TPCH_SHORT, STAR_SCHEMA_SHORT, TPCH_SF01_SHORT, "stale-one"].join(",");
+    await page.goto(`/results/compare?ids=${ids}`);
+    await waitForShell(page);
+    await expect(page.getByRole("heading", { name: "Comparison summary" })).toBeVisible();
+    await expect(page.getByTestId("compare-url-notice")).toContainText("Ignored unavailable result ID");
+    expect(delayedWorker).toBe(true);
+  });
 });

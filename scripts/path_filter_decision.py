@@ -221,7 +221,7 @@ def write_github_output(path: Path, decision: dict[str, object]) -> None:
         f"estimated-runner-minutes-saved={decision['estimated_runner_minutes_saved']}",
     ]
     # Extra path-filter groups (packaging, viz, ...): one `<group>-needed`
-    # boolean output per group defined in path-filters.yml, so pr.yml jobs
+    # boolean output per group defined in path-filters.yml, so ci.yml jobs
     # can gate on `needs.ci-paths.outputs.<group>-needed` without this
     # script hardcoding each group's name.
     for group_id in cast(list[str], decision.get("extra_group_ids", [])):

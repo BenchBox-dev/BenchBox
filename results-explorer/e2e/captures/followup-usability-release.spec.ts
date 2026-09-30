@@ -182,7 +182,7 @@ test.describe("@followup-usability release-gate route walk", () => {
   });
 
   test("Benchmark detail exposes a sibling switcher and the heatmap header is sticky-top", async ({ page }) => {
-    await page.goto("/results/tpch/?sf=0.01&phase=standard");
+    await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
     await openAnalysisCard(page, "query_heatmap");

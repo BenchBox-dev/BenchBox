@@ -341,7 +341,7 @@ def test_load_config_missing_file(tmp_path: Path):
 
 
 def test_stress_default_fields_have_reader_or_reserved_contract():
-    payload = yaml.safe_load(Path("tests/uat/configs/stress-default.yaml").read_text(encoding="utf-8"))
+    payload = yaml.safe_load((_CORPUS_CONFIGS_ROOT / "stress-default.yaml").read_text(encoding="utf-8"))
     evidence = {
         "name": ("tests/uat/config.py", 'name = payload.get("name")'),
         "description": ("tests/uat/config.py", 'description=str(payload.get("description", ""))'),
@@ -376,8 +376,9 @@ def test_stress_default_fields_have_reader_or_reserved_contract():
 
     fields = _leaf_field_paths(payload)
     assert fields == set(evidence)
+    repo_root = Path(__file__).resolve().parent.parent.parent
     for field, (path, snippet) in evidence.items():
-        text = Path(path).read_text(encoding="utf-8")
+        text = (repo_root / path).read_text(encoding="utf-8")
         assert snippet in text, f"{field} lost its reader/reserved-field evidence in {path}"
 
 
@@ -811,4 +812,21 @@ def test_top_level_config_paths_exclude_generated_rerun_shards():
     this parametrized set."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
     assert all(shard_dir not in p.parents for p in _top_level_config_paths())
-    assert len(_top_level_config_paths()) == 17
+    assert len(_top_level_config_paths()) == 18
+
+
+def test_throughput_explorer_smoke_config_covers_throughput_phase():
+    """Throughput-phase coverage (#259): the explorer smoke sweep must run a
+    real multi-stream throughput cell through package + explorer_smoke."""
+    from tests.uat.config import load_config
+
+    cfg = load_config(_CORPUS_CONFIGS_ROOT / "uat-throughput-explorer-smoke.yaml")
+    assert cfg.execute.phases_arg == "load,throughput"
+    assert cfg.execute.official is True
+    assert cfg.execute.streams == 3
+    assert cfg.scales.rungs == (1.0,)
+    assert "package" in cfg.phases
+    assert "explorer_smoke" in cfg.phases
+    # Same-day reruns must not overwrite each other's artifacts: execute.py
+    # only applies collision suffixing when the template contains {time}.
+    assert "{time}" in cfg.output.logs_dir_template

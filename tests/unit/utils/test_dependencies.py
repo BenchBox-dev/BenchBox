@@ -8,6 +8,8 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import os
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -263,6 +265,29 @@ class TestInstallationScenarioRegistry:
 
 class TestCheckPlatformDependencies:
     """Test the check_platform_dependencies function."""
+
+    @pytest.mark.parametrize("error_type", [None, ImportError, OSError])
+    def test_probe_restores_import_cwd(self, tmp_path, error_type):
+        original_cwd = Path.cwd()
+
+        def import_with_native_side_effect(module_name):
+            assert module_name == "chdb"
+            os.chdir(tmp_path)
+            if error_type is not None:
+                raise error_type("native library unavailable")
+            return MagicMock()
+
+        try:
+            with patch("builtins.__import__", side_effect=import_with_native_side_effect):
+                if error_type is OSError:
+                    with pytest.raises(OSError, match="native library unavailable"):
+                        check_platform_dependencies("clickhouse-local", ["chdb"])
+                else:
+                    result = check_platform_dependencies("clickhouse-local", ["chdb"])
+                    assert result == (error_type is None, [] if error_type is None else ["chdb"])
+            assert Path.cwd() == original_cwd
+        finally:
+            os.chdir(original_cwd)
 
     def test_check_available_packages(self):
         """Test checking packages that are available."""

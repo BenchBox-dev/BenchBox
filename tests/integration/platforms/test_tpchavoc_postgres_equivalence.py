@@ -53,7 +53,7 @@ pytestmark = [
 def postgres_divergences(tmp_path_factory):
     """Load SF=0.1 TPC-H into the live Postgres and run the sweep ONCE.
 
-    The 203-variant sweep is the expensive part, so it is computed a single time
+    The executable-variant sweep is the expensive part, so it is computed once
     at module scope and shared across the assertions below (keeping the
     non-blocking CI job well inside its budget).
     """
