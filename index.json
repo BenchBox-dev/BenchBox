@@ -3235,6 +3235,15 @@
       "status": "open",
       "title": "Pilot safe deletion and approve module batch and review budgets"
     },
+    "comment-cleanup-platform-registry": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from adapter registration and shared cloud support"
+    },
     "comment-cleanup-pricing-consumer": {
       "claim": null,
       "needs": [
