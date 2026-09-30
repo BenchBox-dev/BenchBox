@@ -336,6 +336,21 @@ def python_findings(path: str, source: str) -> list[Finding]:
     return result
 
 
+def python_consumer_digest(tree: ast.AST) -> str:
+    def canonical(value: object) -> object:
+        if isinstance(value, ast.AST):
+            return type(value).__name__, tuple(
+                (name, canonical(child))
+                for name, child in ast.iter_fields(value)
+                if not (name == "type_params" and child == [])
+            )
+        if isinstance(value, list):
+            return tuple(canonical(child) for child in value)
+        return value
+
+    return "sha256:" + hashlib.sha256(repr(canonical(tree)).encode()).hexdigest()
+
+
 def python_executable_findings(path: str, tree: ast.AST, scopes: list[tuple[int, int, str]]) -> list[Finding]:
     result = []
     bindings = PythonBindings(tree)
@@ -353,7 +368,7 @@ def python_executable_findings(path: str, tree: ast.AST, scopes: list[tuple[int,
                     "payload-error",
                     "unresolved executable source: " + ast.unparse(expression),
                     symbol,
-                    "sha256:" + hashlib.sha256(ast.dump(tree).encode()).hexdigest(),
+                    python_consumer_digest(tree),
                 )
             )
         elif lang == "javascript":

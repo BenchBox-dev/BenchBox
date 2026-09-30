@@ -69,7 +69,10 @@ use the base policy. Introduce and review the evidence first, then use the
 approved exception in a later change. The initial registry contains one mechanical fixture permission: a test executes
 conditions derived from the checked Makefile to prove a broken gate still runs
 the guard. Its unresolved program argument is bound to the entire consumer AST
-digest. Changing any contributing consumer code invalidates that permission.
+digest. The digest preserves every AST field except empty type-parameter lists
+introduced in Python 3.12, so supported Python versions agree. Nonempty type
+parameters remain part of the identity. Changing contributing consumer code
+invalidates that permission.
 It permits no comment or docstring text.
 Unused and unnecessary exceptions must be removed during module review.
 

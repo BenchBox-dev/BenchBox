@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
@@ -707,3 +708,25 @@ def test_native_payload_batches_include_nested_shell_javascript(monkeypatch: pyt
     assert [(f.kind, f.text) for f in findings] == [("comment", "// explanation")]
     assert len(batches) == 2
     assert list(batches[1].values()) == ["// explanation"]
+
+
+@pytest.mark.parametrize("node_type", [ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef])
+def test_consumer_digest_ignores_absent_empty_type_parameters(node_type: type[ast.AST]) -> None:
+    from comment_syntax import python_consumer_digest
+
+    node: Any = node_type()
+    vars(node)["_fields"] = tuple(name for name in node_type._fields if name != "type_params")
+    tree = ast.Module(body=[node], type_ignores=[])
+    before = python_consumer_digest(tree)
+    vars(node)["_fields"] = (*node._fields, "type_params")
+    node.type_params = []
+    assert python_consumer_digest(tree) == before
+    node.type_params = [ast.Name(id="T", ctx=ast.Load())]
+    assert python_consumer_digest(tree) != before
+
+
+def test_consumer_digest_has_stable_python_version_encoding() -> None:
+    from comment_syntax import python_consumer_digest
+
+    tree = ast.parse("def consume(value):\n    return value + 1\n")
+    assert python_consumer_digest(tree) == "sha256:c6aaea25c78f8f6fdbf83d97c11fe1be21e859156b678d34cfbcc79f8c261c69"
