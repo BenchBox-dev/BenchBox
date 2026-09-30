@@ -4,6 +4,7 @@
     "T2 run on the flip branch: job count <=8, wall time recorded, artifacts uploaded with sha256",
     "All canary PRs closed unmerged and their branches deleted"
   ],
+  "context": "Canaries #2451-#2456 (drafts against feat/dev-loop-v2-flip, closed unmerged, branches deleted):\n- #2451 failing unit test: core FAILURE (test job), other units green.\n- #2452 failing vitest: explorer FAILURE (explorer-vitest).\n- #2454 invalid bundle: results-data FAILURE (results-data-check).\n- #2455 landing comment, #2456 unowned top-level file: routed as designed; #2456 routed to core (fail-closed).\n- tooling red on all six by design (base-guard: non-develop base).\n- Gap found: #2453 broken :doc: link did NOT fail docs-build (ref.doc suppressed, no -W). Fixed in https://github.com/BenchBox-dev/BenchBox/pull/2457 .\n- docs/landing/explorer also red on canaries because no visual baseline exists for a feature-branch base (expected; develop bases have baselines).\n- Soundness flag proven post-flip on real PRs: #2382 and #2381 (touch soundness paths, no section) -> tooling red; #2448 with section -> tooling green.\n- Merge-group T2 run on the flip itself: https://github.com/BenchBox-dev/BenchBox/actions/runs/36640375588",
   "description": "Replaces live dual-running. Open throwaway PRs based on the flip branch (ci.yml has no branch filter, so they get CI; close all unmerged afterwards):\n- one trivial change per unit (core, explorer, results-data, docs, landing, tooling) -> only that unit runs, other five pass as untouched;\n- one PR touching core + docs + explorer -> three units run;\n- one PR touching a soundness path -> soundness flag fails without the `Soundness review:` section, passes with it;\n- one deliberately broken change per unit (failing test, lint error, broken build, invalid bundle, broken docs build, broken landing link) -> that unit's result job fails.\nAlso run the flip branch's merge_group behavior once via workflow_dispatch or a test merge-group-equivalent run of T2 to confirm the job budget (<=8 jobs) and wall time.",
   "sessions": [
     {
@@ -21,6 +22,14 @@
       "generation": "c0f0a754f84146feb1c55062a1f177d9",
       "op": "take",
       "op_id": "74679302d61a4eac836b71b8b5e6a866",
+      "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:jcode:joe@joe-mac-mini.local:be79346d189583df1c60b0ef",
+      "at": "2026-09-30T00:06:40Z",
+      "client": "jcode",
+      "op": "update",
+      "op_id": "9c58d0c5dcc7413a8d180e04abd34302",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
     }
   ]
