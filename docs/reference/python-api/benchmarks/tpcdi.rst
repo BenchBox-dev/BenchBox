@@ -699,6 +699,8 @@ See Also
 - :doc:`../base` - Base benchmark interface
 - :doc:`../results` - Results API
 - :doc:`/benchmarks/tpc-di` - TPC-DI guide
+- :doc:`/guides/tpc/tpc-di-deployment-guide` - Deployment guide
+- :doc:`/guides/tpc/tpc-di-etl-guide` - ETL implementation guide
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

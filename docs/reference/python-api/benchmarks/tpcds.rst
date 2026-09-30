@@ -459,3 +459,4 @@ See Also
 - :doc:`../base` - Base benchmark interface
 - :doc:`../results` - Results API
 - :doc:`/benchmarks/tpc-ds` - TPC-DS guide
+- :doc:`/guides/tpc/tpc-ds-official-guide` - Official benchmark guide

@@ -269,4 +269,4 @@ See Also
 - :doc:`/usage/getting-started` - Getting started guide with complete examples
 - :doc:`/platforms/platform-selection-guide` - Platform adapter documentation
 - :doc:`/benchmarks/index` - Available benchmark implementations
-- :doc:`/reference/python-api/index` - High-level API overview
+- :doc:`/reference/api-reference` - High-level API overview

@@ -384,25 +384,14 @@ CSV export provides tabular query-level data for spreadsheet analysis.
 
 ### Query Results CSV
 
+One row per query execution. Abbreviated example:
+
 ```text
-id,ms,rows,iter,stream,run_type,status
-Q1,1520,4,1,0,measurement,SUCCESS
-Q2,892,460,1,0,measurement,SUCCESS
-Q3,1230,10,1,0,measurement,SUCCESS
+query_id,execution_time_ms,rows_returned,status,error_message,iteration,stream
+Q1,1520,4,SUCCESS,,1,0
+Q2,892,460,SUCCESS,,1,0
+Q3,1230,10,SUCCESS,,1,0
 ...
-```
-
-### Summary CSV
-
-```text
-metric,value
-benchmark,tpch
-scale_factor,0.1
-platform,duckdb
-total_time_ms,39800
-avg_time_ms,1809.1
-power_at_size,89.5
-total_duration_ms,45230
 ```
 
 ## HTML Format
