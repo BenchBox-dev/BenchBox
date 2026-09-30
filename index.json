@@ -3262,6 +3262,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from query plan parsing and capture"
     },
+    "comment-cleanup-read-primitives": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from Read primitives modules"
+    },
     "comment-cleanup-results": {
       "claim": null,
       "needs": [
