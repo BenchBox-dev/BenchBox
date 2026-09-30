@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import subprocess
 from copy import deepcopy
@@ -590,6 +591,24 @@ def test_shell_comments_at_end_of_input(source: str) -> None:
 def test_shell_dynamic_execution_requires_adapter() -> None:
     assert scan("a.sh", 'python -c "$code"', "bash")[0].kind == "coverage-error"
     assert not scan("a.sh", 'printf "%s" "eval # input data"', "bash")
+
+
+@pytest.mark.parametrize("module_name", ["check_deps", "scan_imports"])
+def test_markdown_parser_dependency_is_backed_by_import_sites(module_name: str, tmp_path: Path) -> None:
+    spec = importlib.util.spec_from_file_location(
+        module_name, ROOT / "_project/scripts/dependency_audit" / f"{module_name}.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    collect = getattr(module, "_collect_python_imports", None) or module.collect_python_imports
+    uses = getattr(module, "_package_uses", None) or module.package_uses
+    script = tmp_path / "consumer.py"
+    script.write_text("from markdown_it import MarkdownIt\n", encoding="utf-8")
+    assert uses("markdown-it-py", collect(tmp_path, ["consumer.py"])) == ["consumer.py:1"]
+    script.write_text('data = "from markdown_it import MarkdownIt"\n', encoding="utf-8")
+    assert not uses("markdown-it-py", collect(tmp_path, ["consumer.py"]))
+    assert not uses("markdown-it-py", {})
 
 
 def test_opaque_fixture_permission_changes_with_contributing_consumer_code() -> None:
