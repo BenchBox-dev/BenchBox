@@ -3208,6 +3208,15 @@
       "status": "open",
       "title": "Remove comments and docstrings from SQL compatibility rules and decisions"
     },
+    "comment-cleanup-tpcdi-runtime": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from TPC-DI runtime and ETL"
+    },
     "comment-cleanup-tpcds-dataframe": {
       "claim": null,
       "needs": [
