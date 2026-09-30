@@ -8,7 +8,7 @@
 # The ClickHouse probes cover the three headline sketch ops only. The
 # parameter-sweep variants are unsupported on ClickHouse (the sweep stays
 # within one DataSketches family per engine), so they have no probes here.
-# Probes intentionally run on a small synthetic deterministic
+# The ClickHouse probes intentionally run on a small synthetic deterministic
 # dataset (15000 rows from numbers()), NOT the SF=0.01 TPC-H corpus the
 # catalog bounds were calibrated against. Their TSV rows therefore pin
 # drift in the probe SQL and engine behavior, not reproduction of the
