@@ -6,7 +6,7 @@
     "macOS/Windows wheel install and Python 3.11-3.14 matrix included (moved out of T2)",
     "Owner response policy documented: fix or revert within one working day"
   ],
-  "context": "Moved before any deletion per codex C6 / agy A5 / muse M11. Guardrails G2, G3. Owner decision: t3:cloud is wired but gated by a repo variable (e.g. BENCHBOX_T3_CLOUD_ENABLED) that defaults to off; the agent never runs live cloud tests. Parity for the cloud domain is by static comparison with the old nightly jobs, not execution.",
+  "context": "Moved before any deletion per codex C6 / agy A5 / muse M11. Guardrails G2, G3. Owner decision: t3:cloud is wired but gated by a repo variable (e.g. BENCHBOX_T3_CLOUD_ENABLED) that defaults to off; the agent never runs live cloud tests. Parity for the cloud domain is by static comparison with the old nightly jobs, not execution.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN; nightly2449 and repair2465 merged, but rehearsal236672361173 at a074FAILED06:53:27 (validatorruntime/parity, AzureSynapse429, Q17failure hiddenbehinddurationSUCCESS). No new rehearsal dispatched during stop. Pricing2473/integrity2472/validator2474/verdict2475/Q172476 stillunmerged; Q17latest69ee localonly. Validator needs accepted6runtimepaths, trusteddevelopbotmirror/all437archiveidentity, separatelyreviewedWORKFLOWONLY published-results slimuvport, thenremaining2sourceguard/test; no paritywaiver/blindrerun. Afteractualdelivery/parity, run2–3serialsuccessfulrehearsals before anylegacyretirement. Clouddefaultoff unchanged, staticcloudparityonly. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
   "description": "New .github/workflows/nightly-v2.yml (renamed to nightly.yml when the old one retires in dlv2-70) at trunk tip with separate jobs and separate failure labels: t3:docker (postgres, clickhouse, trino from docker-integration.yml), t3:cloud (credentialed, optional), t3:perf (perf-smoke), t3:matrix (Python 3.11-3.14 x Linux/macOS/Windows from cross-platform-validation.yml), t3:browser (firefox/webkit explorer), t3:extension (duckdb-datasketches from extension-smoke.yml), t3:install (pypi-latest installability from release-canary.yml), t3:drift (weekly: corpus-drift, pricing-data drift, submission-validator drift, cross-surface baseline autodetect); plus quarantined tests and durations-file refresh. Each failing domain opens/updates one issue with its own label and owner. An open t3:* issue marked release-blocking blocks release.yml (dlv2-51). The trunk-tip run replaces the develop-post-merge push-triggered re-run.",
   "sessions": [
     {
@@ -32,6 +32,14 @@
       "op": "update",
       "op_id": "a6e452a3b1f04490b471b10042805cd0",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:3d46a40fb3c8977a514bfd1c",
+      "at": "2026-09-30T12:24:23Z",
+      "client": "codex-mcp-client",
+      "op": "update",
+      "op_id": "e22be1d030c5474baa822588ede0d1c8",
+      "session_id": "3596d314cb5a4d6d9a30621673dff602"
     }
   ]
 }
