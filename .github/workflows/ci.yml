@@ -1144,18 +1144,12 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   # Core: heavy tier (merge queue, plus soundness/packaging carve-outs from heavy_tier_needed.py).
-  medium-test:
-    name: medium-test
+  medium-collect:
+    name: medium-collect
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
     runs-on: ubuntu-latest
-    # Sized to observed p95 + >=30% headroom, not to a value that never needs
-    # thinking about: this timeout is the only backstop against a hung medium
-    # tier. 2026-07-25: p95 29.9 min over the last 20 runs (8 of 19 within 48s
-    # of the old 30 cap) -> 29.9 * 1.3 = 38.9 -> 40.
-    # `make dev-loop-metrics` warns at 75% of this value.
-    # Rule, censoring caveat and resize history: docs/operations/fast-lane-budget.md
-    timeout-minutes: 40
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -1175,17 +1169,118 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
+      - name: Collect the complete medium tier
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p t2-artifacts
+          BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest --collect-only -q -n 0 \
+            -m "medium and not (slow or stress or resource_heavy or live_integration)" \
+            > t2-artifacts/medium-collect.txt
+          count=$(grep -Eo '^[0-9]+/[0-9]+ tests collected' t2-artifacts/medium-collect.txt | tail -1 | cut -d/ -f1)
+          test -n "$count"
+          uv run -- python scripts/release_canary_sharding.py collect \
+            --input t2-artifacts/medium-collect.txt \
+            --nodeids-output t2-artifacts/medium-nodeids.txt \
+            --summary-output t2-artifacts/medium-collection.json \
+            --expected-count "$count" --shard-count 2 \
+            --workflow ci.yml --job medium-collect \
+            --marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" \
+            --checked-ref "${{ github.ref }}" --checked-sha "${{ github.sha }}"
+
+      - name: Upload medium collection evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t2-medium-nodeids-${{ github.sha }}
+          path: t2-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  medium-test:
+    name: medium-test (shard ${{ matrix.shard_index }})
+    needs: [ci-paths, medium-collect]
+    if: ${{ !cancelled() && needs.medium-collect.result == 'success' && needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_index: [0, 1]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Full history: the canary live-tree tests diff historical
+          # regression commits, which a shallow checkout cannot resolve.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Download medium collection evidence
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: t2-medium-nodeids-${{ github.sha }}
+          path: t2-artifacts
+
+      - name: Partition the complete medium tier
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
+        run: |
+          uv run -- python scripts/release_canary_sharding.py shard \
+            --input t2-artifacts/medium-nodeids.txt \
+            --nodeids-output "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
+            --summary-output "t2-artifacts/shard-${SHARD_INDEX}-summary.json" \
+            --shard-index "$SHARD_INDEX" --shard-count 2 \
+            --workflow ci.yml --job medium-test \
+            --marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" \
+            --collection-summary t2-artifacts/medium-collection.json --checked-sha "${{ github.sha }}"
+
       - name: Run medium speed tier
-        run: make test-medium
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
+        run: |
+          set -euo pipefail
+          test -s "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          mapfile -t node_ids < "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest \
+            -m "medium and not (slow or stress or resource_heavy or live_integration)" \
+            --tb=short --timeout=60 -n 5 \
+            -p scripts.pytest_shard_evidence \
+            --assigned-nodeids "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
+            --shard-evidence "t2-artifacts/shard-${SHARD_INDEX}-execution.json" \
+            --checked-sha "${{ github.sha }}" "${node_ids[@]}"
+
+      - name: Upload medium shard evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t2-medium-shard-${{ matrix.shard_index }}-${{ github.sha }}
+          path: t2-artifacts/
+          if-no-files-found: error
+          retention-days: 30
 
   correctness-gate:
-    name: correctness-gate
+    name: correctness-gate (${{ matrix.partition }})
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
     runs-on: ubuntu-latest
-    # Nine enforced gates plus setup must fit: the FlightData promotion added
-    # the ninth gate step to this job.
+    # Preserve every gate; split measured work across standard Linux runners.
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [a, b]
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -1207,39 +1302,51 @@ jobs:
         run: uv sync --group dev
 
       - name: Run bounded real-result correctness gate
+        if: matrix.partition == 'b'
         run: make test-correctness-gate
 
       - name: Run TPC-Havoc variant-equivalence gate
+        if: matrix.partition == 'b'
         run: make tpchavoc-equivalence-report
 
       - name: Run TPC-Havoc DataFrame variant-equivalence gate
+        if: matrix.partition == 'a'
         run: make tpchavoc-dataframe-equivalence-report
 
       - name: Run SSB cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
         run: make ssb-cross-surface-equivalence-report
 
       - name: Run AMPLab cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
         run: make amplab-cross-surface-equivalence-report
 
       - name: Run CoffeeShop cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make coffeeshop-cross-surface-equivalence-report
 
       - name: Run ClickBench cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
         run: make clickbench-cross-surface-equivalence-report
 
       - name: Run JoinOrder-synthetic cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
         run: make joinorder-synthetic-cross-surface-equivalence-report
 
       - name: Run H2O-DB cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make h2odb-cross-surface-equivalence-report
 
       - name: Run Read Primitives cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
         run: make read-primitives-cross-surface-equivalence-report
 
       - name: Run FlightData cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make flightdata-cross-surface-equivalence-report
 
       - name: Run Data Vault cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
         run: make datavault-cross-surface-equivalence-report
 
   plan-capture-gate:
@@ -2102,7 +2209,7 @@ jobs:
   # Unit result: core. Required by the merge ruleset; reports on every event and passes when untouched.
   core:
     name: core
-    needs: [ci-paths, code-lint, code-test, medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dist-artifact, dependency-audit]
+    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dist-artifact, dependency-audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2112,8 +2219,22 @@ jobs:
         with:
           fetch-depth: 1
           persist-credentials: false
-          sparse-checkout: scripts/ci_unit_result.py
+          sparse-checkout: |
+            scripts/ci_unit_result.py
+            scripts/release_canary_sharding.py
           sparse-checkout-cone-mode: false
+
+      - name: Download complete medium shard evidence
+        if: needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: t2-medium-*-${{ github.sha }}
+          path: t2-evidence
+          merge-multiple: false
+
+      - name: Verify complete medium shard coverage
+        if: needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true'
+        run: python scripts/release_canary_sharding.py verify-medium --artifacts t2-evidence --checked-sha "${{ github.sha }}"
 
       - name: Aggregate core result
         env:
@@ -2126,6 +2247,7 @@ jobs:
             --always ci-paths \
             --expect code-lint=${{ needs.ci-paths.outputs.code-tests-needed == 'true' }} \
             --expect code-test=${{ needs.ci-paths.outputs.code-tests-needed == 'true' }} \
+            --expect medium-collect=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect medium-test=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect correctness-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
