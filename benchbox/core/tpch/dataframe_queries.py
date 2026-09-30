@@ -904,20 +904,16 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Main query. SQL SUM over an empty set returns NULL, not 0: when the
     # small-quantity filter matches nothing, emit a single NULL row so the
     # gate compares NULL-vs-NULL instead of manufacturing 0.0. Emptiness is
-    # detected by materializing the filtered row count (the backend's SUM
-    # scalar returns 0.0 on empty input, which is exactly the lie avoided).
+    # detected through the backend's scalar aggregation, including inputs
+    # with no non-NULL prices. Keep the NULL result on the same backend.
     filtered = (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
     )
-    from benchbox.core.equivalence.dataframe_surface import materialize_rows
-
-    if len(materialize_rows(filtered.select(col("l_extendedprice")))) == 0:
-        import pandas as pd
-
-        return pd.DataFrame({"avg_yearly": [None]})
+    if ctx.scalar(filtered.select(col("l_extendedprice").count())) == 0:
+        return ctx.scalar_to_df({"avg_yearly": None})
     return filtered.select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
 
 
