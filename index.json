@@ -3506,6 +3506,15 @@
       "status": "open",
       "title": "Migrate Windows lint suppressions and clean its source reader"
     },
+    "comment-cleanup-write-primitives": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments and docstrings from Write primitives modules"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],
