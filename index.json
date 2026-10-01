@@ -6166,17 +6166,12 @@
       "title": "Add a Linux vs macOS job comparing dsdgen data checksums and dsqgen -LOG output"
     },
     "dfparity-t16-qualification-renderer-spike": {
-      "claim": {
-        "expires_at": "2026-10-02T18:09:50Z",
-        "generation": "a21aff47e6144995b8eed829ef71380d",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Spike a qualification-value SQL renderer and retire the generate_with_parameters stub"
     },
     "dfparity-t17-qualification-values-and-ans": {
