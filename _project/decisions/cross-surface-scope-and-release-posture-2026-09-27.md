@@ -31,7 +31,8 @@ authority. Out of scope for the cross-surface gate, by construction:
 - `joinorder` stays outside `GATES`: it accepts only the canonical IMDb data at
   `scale_factor=1.0`, which is not a bounded routine-PR cell. The
   `joinorder_synthetic` CI-enforced gate covers scaled smoke-test data for the
-  JoinOrder family in the meantime.
+  JoinOrder family in the meantime. A divergence that appears only on the
+  canonical IMDb distributions is not caught by any cross-surface gate.
 - `tpcds_obt` has an abandoned correspondence (OBT-native Q1..Q17 versus
   TPC-DS numbered SQL IDs), ruled out without renumbering one side.
 - `ai_primitives` and `vector_search` stay `supports_dataframe: false` in
@@ -40,12 +41,11 @@ authority. Out of scope for the cross-surface gate, by construction:
 
 ## Release-branch posture
 
-`test.yml` runs only the bounded `test-correctness-gate` on release-bound
-pull requests; the per-benchmark cross-surface suite runs in `ci.yml` on
-`develop`. Release PRs therefore rely on develop-time squash-merge
-enforcement: every change entering `develop` passes the blocking
-correctness-gate suite (including all `GATES` cross-surface reports) before
-it can ride a release. A change committed directly to a release branch without
-passing through `develop` (a hotfix) is not covered by that inheritance and
-gets only `test-correctness-gate`. Adding the cross-surface suite to
-`test.yml` is a separate, explicitly approved CI change if it is ever wanted.
+`ci.yml` has no branch filter on `pull_request`, so a pull request opened
+against `release` runs the same path-aware unit checks as one against
+`develop`, including the blocking correctness-gate suite and its `GATES`
+cross-surface reports when the touched paths select them. `test.yml`
+additionally runs the bounded `test-correctness-gate` on release-bound pull
+requests. The `release` ruleset rejects direct pushes, so every change reaches
+it through a pull request. Adding the full cross-surface suite to `test.yml` is
+a separate, explicitly approved CI change if it is ever wanted.
