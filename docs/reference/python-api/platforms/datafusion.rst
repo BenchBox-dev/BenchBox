@@ -670,7 +670,7 @@ API Reference
 ~~~~~~~~~~~~~
 
 - :doc:`../base` - Base platform adapter interface
-- :doc:`index` - Python API overview
+- :doc:`/reference/python-api/index` - Python API overview
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

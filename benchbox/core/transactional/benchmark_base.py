@@ -32,6 +32,18 @@ _POSTGRES_SERIES_DIALECTS = frozenset({"postgres", "postgresql"})
 # SQL ROLLBACK is needed to close a transaction opened by catalog BEGIN SQL.
 _SQL_ROLLBACK_AFTER_ERROR_DIALECTS = frozenset({"databricks"})
 _UNNEST_GENERATE_SERIES_RE = re.compile(r"unnest\(\s*generate_series\((?P<args>[^()]*)\)\s*\)", re.IGNORECASE)
+# The catalog writes integer series as ``(SELECT unnest(generate_series(a, b)) AS n) t``.
+# Snowflake and BigQuery have neither function (verified live: "Unknown functions
+# GENERATE_SERIES, UNNEST" and "Unexpected keyword UNNEST"); rewrite the whole
+# derived-table body into each engine's series generator.
+_UNNEST_SERIES_SELECT_RE = re.compile(
+    r"SELECT\s+unnest\(\s*generate_series\(\s*(?P<lo>[^,()]+?)\s*,\s*(?P<hi>[^,()]+?)\s*\)\s*\)\s+AS\s+(?P<alias>\w+)",
+    re.IGNORECASE,
+)
+_SERIES_SELECT_TEMPLATES = {
+    "snowflake": "SELECT value::INT AS {alias} FROM TABLE(FLATTEN(ARRAY_GENERATE_RANGE({lo}, {hi} + 1)))",
+    "bigquery": "SELECT {alias} FROM UNNEST(GENERATE_ARRAY({lo}, {hi})) AS {alias}",
+}
 _SET_THEN_BEGIN_ISOLATION_RE = re.compile(
     r"SET\s+TRANSACTION\s+ISOLATION\s+LEVEL\s+(?P<level>REPEATABLE\s+READ|SERIALIZABLE|READ\s+COMMITTED)\s*;\s*"
     r"BEGIN\s+TRANSACTION\s*;",
@@ -337,7 +349,13 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
 
     def _rewrite_transactional_sql_for_platform(self, sql: str, platform_key: str | None) -> str:
         """Apply narrow transactional catalog rewrites for the active SQL dialect."""
-        if (platform_key or "").lower() not in _POSTGRES_SERIES_DIALECTS:
+        dialect = (platform_key or "").lower()
+        template = _SERIES_SELECT_TEMPLATES.get(dialect)
+        if template is not None:
+            return _UNNEST_SERIES_SELECT_RE.sub(
+                lambda m: template.format(lo=m.group("lo"), hi=m.group("hi"), alias=m.group("alias")), sql
+            )
+        if dialect not in _POSTGRES_SERIES_DIALECTS:
             return sql
         sql = _UNNEST_GENERATE_SERIES_RE.sub(r"generate_series(\g<args>)", sql)
         return _SET_THEN_BEGIN_ISOLATION_RE.sub(r"BEGIN TRANSACTION ISOLATION LEVEL \g<level>;", sql)

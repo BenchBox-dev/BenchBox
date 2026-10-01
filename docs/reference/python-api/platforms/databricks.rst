@@ -732,7 +732,7 @@ Platform Documentation
 - :doc:`/platforms/platform-selection-guide` - Choosing Databricks vs other platforms
 - :doc:`/platforms/quick-reference` - Quick setup for all platforms
 - :doc:`/platforms/comparison-matrix` - Feature comparison
-- :doc:`/cloud-storage` - S3, ADLS, GCS integration
+- :doc:`/guides/cloud-storage` - S3, ADLS, GCS integration
 
 Benchmark Guides
 ~~~~~~~~~~~~~~~~

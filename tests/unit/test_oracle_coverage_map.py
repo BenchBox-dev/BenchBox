@@ -298,6 +298,8 @@ def test_surface_provenance_is_read_live_from_gate_metadata(rows):
 
     by_id = {r["benchmark"]: r for r in rows}
     for benchmark_id, gate in {**GATES, **STAGED_GATES}.items():
+        # Every registered gate discloses its provenance, including those whose
+        # primary oracle is higher priority (e.g. tpch's expected-results).
         assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
             f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
         )

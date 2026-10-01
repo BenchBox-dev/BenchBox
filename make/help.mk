@@ -53,7 +53,7 @@ help:
 	@echo "  make ci-lint         Lint + format check + type check (matches lint.yml)"
 	@echo "  make ci-test         Fast tests with coverage (matches test.yml)"
 	@echo "  make ci-docs         Build documentation (matches docs.yml)"
-	@echo "  make ci-linux        Reproduce the Linux pr.yml gate in Apple container (Apple silicon, opt-in)"
+	@echo "  make ci-linux        Reproduce the Linux ci.yml gate in Apple container (Apple silicon, opt-in)"
 	@echo "  make test-integration-smoke  Integration smoke tests"
 	@echo "  make test-package    Build and test package installation"
 	@echo "  make security-audit  Run pip-audit security check"
