@@ -85,6 +85,13 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     # head SHA is unknown until it runs, so only a digest recorded at review time can match it.
     assert run["env"]["APPROVED_VISUAL_CHANGE_DIGESTS"] == "${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}"
     assert run["env"]["VISUAL_CHANGE_APPROVAL_REASON"] == "${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}"
+    # The approval is bound to a pull request number: the PR's own, or the one GitHub puts in the name
+    # of the queue branch it builds for a group. Without it a retained approval would authorize the same
+    # pixels in any later PR.
+    assert (
+        run["env"]["VISUAL_APPROVAL_PR_REF"]
+        == "${{ github.event.pull_request.number || github.event.merge_group.head_ref || '' }}"
+    )
     assert run["env"]["E2E_PAGES_SHAPED"] == "1"
     assert "public-site-visual" in run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 
@@ -350,5 +357,10 @@ def test_the_approval_procedure_documents_the_variables_the_workflow_reads() -> 
     # A maintainer follows the doc, so a variable the workflow reads and the doc omits would leave
     # an intentional visual change with no way through the queue.
     doc = (REPO_ROOT / "docs/development/results-explorer-browser-testing.md").read_text()
-    for variable in ("APPROVED_VISUAL_CHANGE_DIGESTS", "VISUAL_CHANGE_APPROVAL_REASON", "Visual change digest:"):
+    for variable in (
+        "APPROVED_VISUAL_CHANGE_DIGESTS",
+        "VISUAL_CHANGE_APPROVAL_REASON",
+        "approval entry:",
+        "<pull request number>:<digest>",
+    ):
         assert variable in doc, variable

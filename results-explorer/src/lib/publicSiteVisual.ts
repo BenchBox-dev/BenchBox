@@ -20,11 +20,15 @@ export type VisualApproval = {
   approvedHeadSha?: string;
   currentHeadSha?: string;
   reason?: string;
-  // Digests of reviewed visual changes, separated by whitespace or commas. Unlike a head SHA, a
-  // change digest can be recorded at PR review time and still match in a merge group, whose own
-  // head SHA does not exist until the group forms.
+  // Reviewed visual changes, each `<pull request number>:<change digest>`, separated by whitespace or
+  // commas. Unlike a head SHA, this can be recorded at PR review time and still match in a merge
+  // group, whose own head SHA does not exist until the group forms. The pull request number keeps an
+  // approval from authorizing the same pixels in a different PR, for example after a revert.
   approvedChangeDigests?: string;
   changeReason?: string;
+  // The pull request number, or the merge-queue branch name `gh-readonly-queue/<base>/pr-<n>-<sha>`
+  // that GitHub generates for a group, which carries the number of the PR it was built for.
+  pullRequestRef?: string;
 };
 
 export type VisualComparison = {
@@ -58,20 +62,30 @@ export function visualChangeDigest(
   unexpected: { key: string; to: string }[],
 ): string {
   if (changed.length === 0 && unexpected.length === 0) return "";
-  const lines = [
-    ...changed.map((entry) => `changed\t${entry.key}\t${entry.from}\t${entry.to}`),
-    ...unexpected.map((entry) => `new\t${entry.key}\t${entry.to}`),
-  ].sort();
+  // JSON keeps field boundaries unambiguous whatever characters a route contains, so two different
+  // change sets cannot serialize to the same bytes. Sorting makes the digest independent of order.
+  const byText = (left: unknown[], right: unknown[]) => JSON.stringify(left).localeCompare(JSON.stringify(right));
+  const changedRows = changed.map((entry) => [entry.key, entry.from, entry.to]).sort(byText);
+  const newRows = unexpected.map((entry) => [entry.key, entry.to]).sort(byText);
   return createHash("sha256")
-    .update([VISUAL_CHANGE_DIGEST_VERSION, ...lines].join("\n"))
+    .update(JSON.stringify([VISUAL_CHANGE_DIGEST_VERSION, changedRows, newRows]))
     .digest("hex");
+}
+
+/** The pull request number from a number or a merge-queue branch name, or "" when it cannot be read. */
+export function pullRequestNumberFromRef(ref: string | undefined): string {
+  const value = ref?.trim() ?? "";
+  if (/^[1-9]\d*$/.test(value)) return value;
+  return /^(?:refs\/heads\/)?gh-readonly-queue\/[^/]+\/pr-([1-9]\d*)-[0-9a-f]{40}$/.exec(value)?.[1] ?? "";
 }
 
 export function hasChangeDigestVisualApproval(approval: VisualApproval | undefined, changeDigest: string): boolean {
   if (!approval || changeDigest.length === 0) return false;
   const reason = approval.changeReason?.trim() ?? "";
-  const approved = (approval.approvedChangeDigests ?? "").split(/[\s,]+/).filter((digest) => digest.length > 0);
-  return reason.length > 0 && approved.includes(changeDigest);
+  const pullRequest = pullRequestNumberFromRef(approval.pullRequestRef);
+  if (reason.length === 0 || pullRequest.length === 0) return false;
+  const approved = (approval.approvedChangeDigests ?? "").split(/[\s,]+/).filter((entry) => entry.length > 0);
+  return approved.includes(`${pullRequest}:${changeDigest}`);
 }
 
 export function compareVisualManifests(
@@ -101,7 +115,9 @@ export function compareVisualManifests(
     unexpected.map((captureKey) => ({ key: captureKey, to: actual.get(captureKey) ?? "" })),
   );
   const approvedByHead = hasExactHeadVisualApproval(approval);
-  const approvedByDigest = hasChangeDigestVisualApproval(approval, changeDigest);
+  // During the one-time landing migration the landing captures are left out of `changed`, so a
+  // digest would not cover them. Approve by head SHA then, or wait for a settled baseline.
+  const approvedByDigest = !migratingLanding && hasChangeDigestVisualApproval(approval, changeDigest);
   const approvalApplied = approvedByHead || approvedByDigest;
   return {
     missing,

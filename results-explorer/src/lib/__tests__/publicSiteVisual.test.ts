@@ -5,6 +5,7 @@ import {
   hasChangeDigestVisualApproval,
   hasExactHeadVisualApproval,
   PUBLIC_SITE_CAPTURE_PROFILE,
+  pullRequestNumberFromRef,
   VISUAL_CHANGE_DIGEST_VERSION,
   visualChangeDigest,
   type VisualManifest,
@@ -130,26 +131,28 @@ describe("content-bound visual change approval", () => {
     ],
   };
   const reason = "Reviewed the section indexes at all captured widths";
+  const prRef = "2385";
+  const groupRef = `refs/heads/gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`;
 
   // What the PR run prints, which a maintainer records after reviewing the diagnostics.
   const digest = compareVisualManifests(baseline, reviewed).changeDigest;
+  const entry = `${prRef}:${digest}`;
+  const approve = (overrides: Record<string, string> = {}) => ({
+    approvedChangeDigests: entry,
+    changeReason: reason,
+    pullRequestRef: prRef,
+    ...overrides,
+  });
 
   it("prints a stable digest only when something changed or appeared", () => {
     expect(digest).toMatch(/^[0-9a-f]{64}$/);
     expect(compareVisualManifests(baseline, baseline).changeDigest).toBe("");
-    // Capture order does not matter: the same change gives the same digest.
-    const shuffled: VisualManifest = { ...reviewed, captures: [...reviewed.captures].reverse() };
-    expect(compareVisualManifests(baseline, shuffled).changeDigest).toBe(digest);
   });
 
   it("accepts the reviewed change in a merge group that has a different head SHA", () => {
-    // The PR run approved nothing by SHA; the group recomputes the same digest from its own tree.
-    const result = compareVisualManifests(baseline, reviewed, {
-      approvedChangeDigests: digest,
-      changeReason: reason,
-      approvedHeadSha: "",
-      currentHeadSha: "synthetic-merge-group-head",
-    });
+    // Approved on the PR run, then recomputed from the group's own captures under the group's
+    // branch name, which carries the same pull request number.
+    const result = compareVisualManifests(baseline, reviewed, approve({ pullRequestRef: groupRef }));
     expect(result).toMatchObject({
       changed: [],
       unexpected: [],
@@ -160,28 +163,43 @@ describe("content-bound visual change approval", () => {
     });
   });
 
-  it("accepts a digest listed among several, separated by spaces or commas", () => {
-    expect(hasChangeDigestVisualApproval({ approvedChangeDigests: `a1 ${digest},b2`, changeReason: reason }, digest)).toBe(
-      true,
-    );
+  it("does not approve the same pixels for a different pull request", () => {
+    // The replay scenario: the change is approved, merged and reverted, and another PR reapplies it.
+    for (const ref of ["2386", `gh-readonly-queue/develop/pr-2386-${"a".repeat(40)}`]) {
+      const result = compareVisualManifests(baseline, reviewed, approve({ pullRequestRef: ref }));
+      expect(result.approvalApplied).toBe(false);
+      expect(result.changed).toEqual(["/@390"]);
+    }
   });
 
   it.each([
-    ["a missing reason", { approvedChangeDigests: digest, changeReason: "" }],
-    ["a blank reason", { approvedChangeDigests: digest, changeReason: "   " }],
-    ["no digests recorded", { approvedChangeDigests: "", changeReason: reason }],
-    ["a different digest", { approvedChangeDigests: "0".repeat(64), changeReason: reason }],
-    ["only a prefix of the digest", { approvedChangeDigests: digest.slice(0, 32), changeReason: reason }],
-  ])("does not approve with %s", (_label, approval) => {
-    const result = compareVisualManifests(baseline, reviewed, approval);
+    ["no pull request reference", { pullRequestRef: "" }],
+    ["an unreadable reference", { pullRequestRef: "refs/heads/feature/pr-2385" }],
+    ["a branch that only looks like a queue branch", { pullRequestRef: `gh-readonly-queue/develop/pr-2385-${"a".repeat(39)}` }],
+    ["a bare digest with no pull request", { approvedChangeDigests: digest }],
+    ["an entry with an empty pull request number and no reference", { approvedChangeDigests: `:${digest}`, pullRequestRef: "" }],
+    ["another pull request's entry", { approvedChangeDigests: `2386:${digest}` }],
+    ["a missing reason", { changeReason: "" }],
+    ["a blank reason", { changeReason: "   " }],
+    ["no entries recorded", { approvedChangeDigests: "" }],
+    ["a different digest", { approvedChangeDigests: `${prRef}:${"0".repeat(64)}` }],
+    ["only a prefix of the digest", { approvedChangeDigests: `${prRef}:${digest.slice(0, 32)}` }],
+    ["an entry for a pull request whose number is a prefix", { approvedChangeDigests: `238:${digest}` }],
+  ])("does not approve with %s", (_label, overrides) => {
+    const result = compareVisualManifests(baseline, reviewed, approve(overrides));
     expect(result.approvalApplied).toBe(false);
     expect(result.changed).toEqual(["/@390"]);
     expect(result.unexpected).toEqual(["/results/benchmarks/@390"]);
   });
 
+  it("accepts an entry listed among several, separated by spaces or commas", () => {
+    const listed = `7:${"1".repeat(64)} ${entry},9:${"2".repeat(64)}`;
+    expect(hasChangeDigestVisualApproval(approve({ approvedChangeDigests: listed }), digest)).toBe(true);
+  });
+
   it("does not approve nothing: an empty change has no digest to match", () => {
-    expect(hasChangeDigestVisualApproval({ approvedChangeDigests: "", changeReason: reason }, "")).toBe(false);
-    expect(hasChangeDigestVisualApproval({ approvedChangeDigests: " , ", changeReason: reason }, "")).toBe(false);
+    expect(hasChangeDigestVisualApproval(approve({ approvedChangeDigests: `${prRef}:` }), "")).toBe(false);
+    expect(hasChangeDigestVisualApproval(approve({ approvedChangeDigests: " , " }), "")).toBe(false);
   });
 
   it("stops matching when the group renders the reviewed capture differently", () => {
@@ -191,7 +209,7 @@ describe("content-bound visual change approval", () => {
         capture.route === "/" ? { ...capture, digest: "landing-drifted" } : capture,
       ),
     };
-    const result = compareVisualManifests(baseline, drifted, { approvedChangeDigests: digest, changeReason: reason });
+    const result = compareVisualManifests(baseline, drifted, approve());
     expect(result.approvalApplied).toBe(false);
     expect(result.changed).toEqual(["/@390"]);
   });
@@ -202,8 +220,7 @@ describe("content-bound visual change approval", () => {
       capture_profile: profile,
       captures: [{ ...captures[0]!, digest: "landing-moved" }, captures[1]!],
     };
-    const result = compareVisualManifests(movedBase, reviewed, { approvedChangeDigests: digest, changeReason: reason });
-    expect(result.approvalApplied).toBe(false);
+    expect(compareVisualManifests(movedBase, reviewed, approve()).approvalApplied).toBe(false);
   });
 
   it("stops matching when the group adds a change that was never reviewed", () => {
@@ -213,16 +230,36 @@ describe("content-bound visual change approval", () => {
         capture.route === "/docs/" ? { ...capture, digest: "docs-unreviewed" } : capture,
       ),
     };
-    const result = compareVisualManifests(baseline, extra, { approvedChangeDigests: digest, changeReason: reason });
+    const result = compareVisualManifests(baseline, extra, approve());
     expect(result.approvalApplied).toBe(false);
     expect(result.changed).toEqual(["/@390", "/docs/@390"]);
+  });
+
+  it("does not use a digest approval during the landing-profile migration", () => {
+    // The landing captures are left out of the comparison then, so a digest would not cover them.
+    const legacyBaseline: VisualManifest = { captures };
+    const migrating: VisualManifest = {
+      capture_profile: profile,
+      captures: [
+        { ...captures[0]!, digest: "landing-settled" },
+        { ...captures[1]!, digest: "docs-changed" },
+      ],
+    };
+    const migratingDigest = compareVisualManifests(legacyBaseline, migrating).changeDigest;
+    const result = compareVisualManifests(
+      legacyBaseline,
+      migrating,
+      approve({ approvedChangeDigests: `${prRef}:${migratingDigest}` }),
+    );
+    expect(result.approvalApplied).toBe(false);
+    expect(result.changed).toEqual(["/docs/@390"]);
   });
 
   it("never lets a digest approval hide a missing capture", () => {
     const missing: VisualManifest = { capture_profile: profile, captures: [{ ...captures[0]!, digest: "landing-reviewed" }] };
     const missingDigest = compareVisualManifests(baseline, missing).changeDigest;
     expect(
-      compareVisualManifests(baseline, missing, { approvedChangeDigests: missingDigest, changeReason: reason }),
+      compareVisualManifests(baseline, missing, approve({ approvedChangeDigests: `${prRef}:${missingDigest}` })),
     ).toMatchObject({ missing: ["/docs/@390"], approvalApplied: true });
   });
 
@@ -252,5 +289,49 @@ describe("content-bound visual change approval", () => {
     expect(visualChangeDigest([{ key: "/x@390", from: "a", to: "b" }], [{ key: "/y@390", to: "c" }])).not.toBe(base);
     expect(visualChangeDigest([], [])).toBe("");
     expect(VISUAL_CHANGE_DIGEST_VERSION).toMatch(/^public-site-visual-change-v\d+$/);
+  });
+
+  it("cannot be made to collide by characters inside a route", () => {
+    // With tab and newline separated text, a route containing the separators and a second capture's
+    // line could serialize to the same bytes as two real captures.
+    const x = "x".repeat(64);
+    const y = "y".repeat(64);
+    const two = visualChangeDigest([], [
+      { key: "/a@390", to: x },
+      { key: "/b@390", to: y },
+    ]);
+    const forged = visualChangeDigest([], [{ key: `/a@390\t${x}\nnew\t/b@390`, to: y }]);
+    expect(forged).not.toBe(two);
+    // The same holds for a changed capture whose old and new digests contain separators.
+    expect(visualChangeDigest([{ key: "/a@390", from: "p\tq", to: "r" }], [])).not.toBe(
+      visualChangeDigest([{ key: "/a@390", from: "p", to: "q\tr" }], []),
+    );
+  });
+});
+
+describe("pull request reference", () => {
+  it.each([
+    ["2385", "2385"],
+    ["  2385 ", "2385"],
+    [`gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`, "2385"],
+    [`refs/heads/gh-readonly-queue/develop/pr-17-${"0".repeat(40)}`, "17"],
+  ])("reads the number from %s", (ref, expected) => {
+    expect(pullRequestNumberFromRef(ref)).toBe(expected);
+  });
+
+  it.each([
+    undefined,
+    "",
+    "0",
+    "-5",
+    "12abc",
+    "pr-2385",
+    `gh-readonly-queue/develop/pr-0-${"a".repeat(40)}`,
+    `gh-readonly-queue/develop/pr-2385-${"A".repeat(40)}`,
+    `gh-readonly-queue/develop/pr-2385-${"a".repeat(41)}`,
+    `gh-readonly-queue/develop/extra/pr-2385-${"a".repeat(40)}`,
+    `feature/gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`,
+  ])("rejects %s", (ref) => {
+    expect(pullRequestNumberFromRef(ref)).toBe("");
   });
 });

@@ -313,6 +313,8 @@ jobs:
           # review time and valid in the merge group, whose head SHA is unknown until the group runs.
           APPROVED_VISUAL_CHANGE_DIGESTS: ${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}
           VISUAL_CHANGE_APPROVAL_REASON: ${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}
+          # The approval is bound to a pull request number: the PR's own, or the one GitHub puts in a merge group's branch name.
+          VISUAL_APPROVAL_PR_REF: ${{ github.event.pull_request.number || github.event.merge_group.head_ref || '' }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
