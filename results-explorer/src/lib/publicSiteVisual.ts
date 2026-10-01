@@ -64,7 +64,13 @@ export function visualChangeDigest(
   if (changed.length === 0 && unexpected.length === 0) return "";
   // JSON keeps field boundaries unambiguous whatever characters a route contains, so two different
   // change sets cannot serialize to the same bytes. Sorting makes the digest independent of order.
-  const byText = (left: unknown[], right: unknown[]) => JSON.stringify(left).localeCompare(JSON.stringify(right));
+  // Compare by UTF-16 code units, not locale collation, so the order is the same on every machine and
+  // distinct strings never compare equal.
+  const byText = (left: unknown[], right: unknown[]) => {
+    const first = JSON.stringify(left);
+    const second = JSON.stringify(right);
+    return first < second ? -1 : first > second ? 1 : 0;
+  };
   const changedRows = changed.map((entry) => [entry.key, entry.from, entry.to]).sort(byText);
   const newRows = unexpected.map((entry) => [entry.key, entry.to]).sort(byText);
   return createHash("sha256")

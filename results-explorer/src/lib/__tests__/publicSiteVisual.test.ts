@@ -281,6 +281,15 @@ describe("content-bound visual change approval", () => {
     expect(compareVisualManifests(many, reversed).changeDigest).toBe(forward.changeDigest);
   });
 
+  it("orders rows by code unit so keys that differ only by Unicode normalization stay distinct", () => {
+    // `/é@390` composed and decomposed look the same and can collate as equal in a locale; code-unit
+    // order keeps them distinct, so the digest does not depend on the order they were listed in.
+    const composed = { key: "/\u00e9@390", to: "same" };
+    const decomposed = { key: "/e\u0301@390", to: "same" };
+    expect(visualChangeDigest([], [composed, decomposed])).toBe(visualChangeDigest([], [decomposed, composed]));
+    expect(visualChangeDigest([], [composed])).not.toBe(visualChangeDigest([], [decomposed]));
+  });
+
   it("binds the direction and the capture of each change", () => {
     const base = visualChangeDigest([{ key: "/x@390", from: "a", to: "b" }], []);
     // Swapping old and new is a different change, as is the same change on another capture.
