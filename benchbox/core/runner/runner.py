@@ -35,6 +35,7 @@ from benchbox.core.contracts import (
     as_sql_benchmark_executor,
     as_statistics_phase_runner,
 )
+from benchbox.core.loaded_tables import require_loaded_tables
 from benchbox.core.results.driver_metadata import apply_driver_metadata
 from benchbox.core.results.models import (
     BenchmarkResults,
@@ -583,8 +584,6 @@ def _execute_load_only_mode(
             native_loader = as_native_table_loader(adapter)
             schema_time = native_loader.create_schema(benchmark, connection)
             table_stats, load_time, per_table_timings = native_loader.load_data(benchmark, connection, data_dir)
-            from benchbox.platforms.base.adapter import require_loaded_tables
-
             require_loaded_tables(benchmark, table_stats)
             schema_phase = {
                 "status": "COMPLETED",

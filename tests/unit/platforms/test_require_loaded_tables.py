@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from benchbox.platforms.base.adapter import require_loaded_tables
+from benchbox.core.loaded_tables import require_loaded_tables
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
