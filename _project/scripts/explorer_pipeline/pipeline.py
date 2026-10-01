@@ -42,6 +42,7 @@ from _project.scripts.explorer_pipeline.transformer import (
     CompanionPrivacyError,
     _applied_receipt,
     _override_display,
+    _parse_bundle,
     _platform_percentile_stats,
     _public_companion_bytes,
     _sanitize_applied_receipt,
@@ -298,7 +299,7 @@ def _public_applied_receipt(
     published before the move. Sanitization is unchanged either way: the public
     path re-scrubs whatever it finds.
     """
-    receipt_json = _applied_receipt(bundle_path, bundle_data)
+    receipt_json = _applied_receipt(bundle_path, _parse_bundle(bundle_data) if bundle_data is not None else None)
     if receipt_json is None:
         return None
     try:
