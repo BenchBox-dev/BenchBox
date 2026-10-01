@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Every documented `--platform-option` example in docs/ parses against its platform's registry, or is removed or replaced.",
+    "A test or lint fails when a doc example uses an unregistered key.",
+    "The decision per platform (register vs fix doc) is stated in the PR."
+  ],
+  "context": "Defect found during the Spark tuning review (2026-09-30), requested as its own item by the user. The original research said table_format was not exposed in the CLI; that is only half true (the argparse flag exists, the platform option does not). Not a prerequisite for the Spark tuning items.",
+  "description": "Docs show `--platform-option` keys that the platform's option registry rejects, so copy-pasted commands fail. Checked with PlatformHookRegistry.parse_options (benchbox/core/hooks/platform_hooks.py) on 2026-09-30:\n- spark accepts adaptive_enabled, driver_memory, java_home (list was truncated in the error text; re-run for the full set) but rejects table_format, shuffle_partitions and spark_config. The Spark argparse group defines --table-format and --shuffle-partitions (spark.py ~L298-312) and the config builder lists those fields (spark.py ~L825-845), so they exist as adapter config but are not reachable as platform options.\n- pyspark-df and starburst: \"does not accept platform-specific options\", yet docs/platforms/pyspark-dataframe.md (L81, L130, L163, L218, L396) and docs/platforms/starburst.md (L111, L115, L175) use table_format / shuffle_partitions.\n- databricks rejects table_format, yet docs/platforms/databricks.md (L73, L82) documents it and docs/advanced/format-conversion.md uses table_format=hudi.\n- lakesail rejects table_format, shuffle_partitions, driver_memory, spark_config. velox accepts table_format, shuffle_partitions and driver_memory but not spark_config.\nFor each case decide, with the owner, whether to register the option or correct the doc; do not guess. Add a docs check (or test) that every `--platform-option key=` in docs/ is accepted by that platform's registry. Related: spark_config has no CLI route at all; arbitrary Spark settings go through the tuning item instead.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:14:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "58c72ff646fd4874a4a3d4aece4994de",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    }
+  ]
+}

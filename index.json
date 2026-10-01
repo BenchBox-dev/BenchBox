@@ -12866,6 +12866,13 @@
       "status": "done",
       "title": "Add a keys-only platform enumeration path that skips the metadata deepcopy"
     },
+    "platform-option-docs-unregistered-keys": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix docs advertising --platform-option keys the platform rejects"
+    },
     "platform-options-key-id-not-redacted": {
       "claim": null,
       "needs": [],
