@@ -108,6 +108,17 @@
       "op_id": "299bacc3d4814eb6a25a7bf9c3112a99",
       "reason": "Interrupted Claude session 3931bf2a-d2fa-419f-84d1-0b420d82c12d hit rate limit; taking over per user instruction",
       "session_id": "689c42d34d544d54b2f313cec2a2e296"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:88e67c6514508591d05f83d1",
+      "at": "2026-10-01T21:10:41Z",
+      "client": "claude-code",
+      "displaced": "mcp:antigravity-client:joe@joe-mac-mini.local:7c837248ce5f53beb41a048e",
+      "generation": "bf395fc9febd4f60885a3a2a085fb887",
+      "op": "takeover",
+      "op_id": "8dbbbf1b5d824a769ef8b3d6e32b5371",
+      "reason": "agy session fc7a1d50 died: interrupted 2026-09-30 23:52Z; no agy process now, its db unwritten ~21h, only a stale presence lock. Active Claude session 3931bf2a continues this work, on the user's instruction (todo-db lease takeover).",
+      "session_id": "61f7d250943b46ec8a6e05b38173c81b"
     }
   ]
 }
