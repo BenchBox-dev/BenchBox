@@ -194,3 +194,32 @@ def test_q34_orders_a_null_preferred_flag_first_because_the_key_is_descending(fa
     impl = queries.q34_expression_impl if family == "expression" else queries.q34_pandas_impl
 
     assert [row[3] for row in _rows(impl(_context(family, tables)))] == [None, "Y", "N"]
+
+
+def test_joined_aggregate_runs_on_dask_and_keeps_a_null_group_last():
+    """Dask Series has no ``notna``, and its sort cannot use helper columns; the helper must still run."""
+    dd = pytest.importorskip("dask.dataframe")
+    import pandas as pd
+
+    from benchbox.core.tpcds.dataframe_queries import queries
+    from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
+
+    ctx = DaskDataFrameAdapter(use_distributed=False).create_context()
+    data = {"g": ["x", "x", "x", "y", "y"], "k": ["b", None, "a", None, "c"], "v": [1.0, 2.0, 3.0, 4.0, 5.0]}
+    ctx.register_table("t", dd.from_pandas(pd.DataFrame(data), npartitions=2))
+    spec = {
+        "query_id": 15,
+        "base": "t",
+        "joins": [],
+        "group_by": ["g", "k"],
+        "aggs": [["total", "v", "sum"]],
+        "sort_by": ["g", "k"],
+    }
+
+    assert _rows(queries._joined_agg_pandas_impl(ctx, spec)) == [
+        ("x", "a", 3.0),
+        ("x", "b", 1.0),
+        ("x", None, 2.0),
+        ("y", "c", 5.0),
+        ("y", None, 4.0),
+    ]

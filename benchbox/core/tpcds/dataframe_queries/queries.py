@@ -1440,7 +1440,16 @@ def _sort_null_largest_expression(ctx: DataFrameContext, frame: Any, columns: li
 
 
 def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[bool]) -> Any:
-    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort)."""
+    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort).
+
+    When every key points the same way one ``na_position`` is enough (last when ascending, first when
+    descending). A mix needs the ``is_null`` flag columns, which Dask cannot sort on (its optimizer
+    drops them), so on Dask a mixed sort keeps NULLs last for every key.
+    """
+    if all(descending):
+        return frame.sort_values(columns, ascending=[False] * len(columns), na_position="first")
+    if not any(descending) or hasattr(frame, "npartitions"):
+        return frame.sort_values(columns, ascending=[not value for value in descending], na_position="last")
     flags = [f"_null_{index}" for index in range(len(columns))]
     keyed = frame.assign(**{flag: frame[name].isna() for name, flag in zip(columns, flags)})
     by = [name for pair in zip(flags, columns) for name in pair]
@@ -1489,7 +1498,7 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
         **{alias: (source, func) for alias, source, func in spec["aggs"]}
     )
     for column in spec["group_by"]:
-        result[column] = result[column].astype(object).where(result[column].notna(), None)
+        result[column] = result[column].astype(object).where(~result[column].isna(), None)
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result[_joined_agg_pandas_condition(result, params, post_filter)]
@@ -3447,7 +3456,7 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
     # Join with customer
     result = ticket_filtered.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
     for column in ("c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"):
-        result[column] = result[column].astype(object).where(result[column].notna(), None)
+        result[column] = result[column].astype(object).where(~result[column].isna(), None)
 
     # Select and sort
     result = result[["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]]
