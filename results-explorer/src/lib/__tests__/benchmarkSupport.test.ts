@@ -44,7 +44,7 @@ describe("benchmarkSupportRank", () => {
     const ranks = ordered.map(benchmarkSupportRank);
     // Strictly increasing: a constant or duplicated rank would still pass a sort-equality check.
     ranks.slice(1).forEach((rank, index) => {
-      expect(rank).toBeGreaterThan(ranks[index]);
+      expect(rank).toBeGreaterThan(ranks[index]!);
     });
   });
 
