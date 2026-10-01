@@ -17903,6 +17903,16 @@
       "status": "done",
       "title": "Spark SQL TPCHavoc scalar subquery and dual rewrites"
     },
+    "spark-tuning-discovery-cli": {
+      "claim": null,
+      "needs": [
+        "spark-session-config-model",
+        "spark-session-config-runtime"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Make Spark tuning discoverable in tuning CLI and capability registry"
+    },
     "spellcheck-node-modules-skip-never-landed": {
       "claim": null,
       "needs": [],

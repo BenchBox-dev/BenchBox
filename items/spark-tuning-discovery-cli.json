@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "`benchbox tuning platforms` lists spark with its own capabilities; get_capability('spark', LIQUID_CLUSTERING) is None.",
+    "Spark stays out of the known-platform set; existing tests that pin it pass unchanged and an existing custom Spark table_tunings file still loads.",
+    "`benchbox tuning init --platform spark` writes a commented example; `tuning show` and `--dry-run` render the spark map as a table.",
+    "A spark map on an unsupported platform produces a validation warning and a dropped ledger record.",
+    "uv run -- pytest tests/unit/core/tuning tests/unit/cli -q passes."
+  ],
+  "context": "Origin: user-approved 2026-09-30. Opus findings R5, R6, R9 and the Considerations. Known related gap, tracked separately: ddl_generator maps spark to DeltaDDLGenerator (see spark-ddl-generator-delta-default-mismatch); dry-run DDL preview for default Parquet Spark stays wrong until that is fixed.",
+  "description": "Users do not find Spark under `benchbox tuning`: `PLATFORM_ALIASES[\"spark\"] = \"databricks\"` (benchbox/core/tuning/capability_registry.py ~L152) makes Spark lookups resolve as Databricks (Liquid Clustering / Z-Order), `PLATFORM_TUNING_CAPABILITIES` has no spark row so `tuning platforms` (cli/commands/tuning_group.py ~L503) omits it, and `tuning init --platform spark` has no Spark branch.\n\nScope:\n- Remove the spark to databricks alias; add a spark registry row using the existing `_session()` helper (capability_registry.py ~L100, currently unused) for the session-config mechanism. DO NOT add spark to `_INTERFACE_KNOWN_PLATFORMS`: that turns every unsupported-type warning into a hard error at config load (interface.py ~L1597-1604, cli/config.py ~L756) and would break existing custom Spark files that use table_tunings; it also conflicts with tests/unit/core/tuning/test_platform_identity_keys.py and the instruction in test_capability_source_drift.py ~L510-522. Follow the starrocks/doris precedent (registry row, not in the known set). The registry is keyed by TuningType and has no session type; decide the row shape, and check `tuning platforms` renders a session-only platform sensibly.\n- `tuning init --platform spark` emits a documented, commented example of the `spark:` map (also check `is_compatible_with_platform`, cli/config.py ~L811-835). It must NOT ship as a curated `tuned` template, which would relabel `tuned-fallback` as `tuned` (ADR-002) without changing behaviour; curated templates are a separate item.\n- `tuning show`, `validate` and `--dry-run` report the spark map; benchbox/cli/dryrun.py ~L665-676 renders nested dicts as str(dict), so render a Property/Value sub-table.\n- Non-Spark platforms given a non-empty `spark` map (Databricks, EMR, Glue, Dataproc; cloud_spark/mixins.py ~L108-125 returns []) warn at validation and call ledger.record_dropped instead of silently ignoring.\n- Docs: tuning guide section for Spark session config, including precedence and the preflight discrepancy report.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:14:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ed19733bb44344db954d2598300f7b7b",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    }
+  ]
+}
