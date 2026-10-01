@@ -3,7 +3,7 @@
     "The cause is stated with evidence",
     "Q21, Q62, Q66 and Q99 match on the expression family at SF=0.1 after the fix, or are reclassified with evidence"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T11). Hypothesis only; SF=1 reproduction needs explicit approval. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nFindings 2026-10-01 (from the existing probe data evidence/pq_*.jsonl plus one light check; no SF=1 query run): the hypothesis is wrong. (a) At SF 0.01, 0.03, 0.05 and 0.1 Q21, Q62 and Q99 do not diverge at all; they diverge only at SF=1. (b) TESTED: generating only the warehouse table with the bundled dsdgen shows SF=0.1 has 1 warehouse with no NULLs, while SF=1 has 5 warehouses and warehouse 5 has NULL w_warehouse_name (and NULL address fields). So None is the data, not a loader or projection bug. (c) The SF=1 expression divergences are NULL ordering: the reference key starts with 'Bad cards must make.' while the DataFrame starts with None (Polars sorts NULLs first) in Q21, Q62, Q66, Q99. (d) The SF=1 pandas divergences are dropped NULL group keys: Q66 5 vs 4 rows, Q99 90 vs 72 rows. This is the same class as dfparity-t10 (PR #2502 fixes it for the joined-aggregate helper, Q15, Q34, Q38, Q87 only; Q21, Q62, Q66, Q99 have their own implementations in queries.py and are not fixed there). (e) Separately Q66 diverges at SF 0.03, 0.05 and 0.1 on BOTH families with a large value mismatch (SF 0.1: 8288141.53 vs 238632.13 at column 8), so that cause is not a name or NULL problem and is unexplained (parameter drift is a candidate; not tested). Not done: fix of Q21/Q62/Q66/Q99 NULL order and NULL groups, and the SF=1 confirmation, which needs explicit approval for an SF=1 run.",
+  "context": "Source: DataFrame query parity proposal v3 (item T11). Hypothesis only; SF=1 reproduction needs explicit approval. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nFindings 2026-10-01: the hypothesis (loader or projection returns None) is wrong. (a) At SF 0.01-0.1 Q21, Q62 and Q99 do not diverge; they diverge only at SF=1. (b) TESTED: generating only the warehouse table with the bundled dsdgen: SF=0.1 has 1 warehouse with no NULLs; SF=1 has 5 warehouses and warehouse 5 has NULL w_warehouse_name and NULL sq_ft. So None is the data. (c) Causes at SF=1: expression sorts NULLs first (reference sorts last) in Q21, Q62, Q66, Q99; pandas drops the NULL group (Q66 5 vs 4 rows, Q99 90 vs 72) and leaks NaN. (d) A third bug found by a unit test: Q66 expression divided every row by col(w_warehouse_sq_ft).first(), the first group's value, which is wrong whenever there is more than one warehouse.\n\nProgress: fixed and published as PR #2506 (branch fix/tpcds-warehouse-null-order, worktree ../BenchBox.wt-tpcds-warehouse-null, head eaaa4843b), held, auto-merge withheld; make pr-preflight exit 0 on that head. Evidence: 8 new unit cases (two warehouses, one NULL name; both families; Q21, Q62, Q66, Q99) all fail without the change and pass with it; full probe at SF 0.1 unchanged (no cell changed, expected since there is no NULL warehouse there); staged gate at 0.01 unchanged (146/198, 52 empty, 0 divergent). NOT done: the acceptance wording asks for a match at SF=0.1, but Q21, Q62 and Q99 already matched there and Q66 still diverges at SF 0.03-0.1 on both families with a large value mismatch (SF 0.1: 8288141.53 vs 238632.13 at column 8; cause not diagnosed, parameter drift is a candidate and not tested). Confirming the four queries at SF=1 needs explicit approval for an SF=1 run. Remaining: hosted CI, maintainer merge, SF=1 confirmation if approved, a decision on whether to track the Q66 value mismatch, then finish.",
   "description": "Hypothesis from a prior review (not verified by me): at SF=1 one cause, w_warehouse_name returned as None by the Polars/expression path, accounts for Q21, Q62, Q66 and Q99 divergences. Reproduce on a small scale if possible (SF 0.1 shows Q66 and others), find the loader or projection cause, and fix it. If the cause differs, record it.",
   "sessions": [
     {
@@ -29,6 +29,14 @@
       "generation": "5c984aad26254c88b5ac5c67d71d7f72",
       "op": "take",
       "op_id": "ef74283f1534453f8721605341878f9d",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T17:23:28Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "aedceb0795df4c81accdc47838367d0d",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
