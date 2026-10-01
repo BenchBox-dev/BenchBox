@@ -3,7 +3,7 @@
     "The cause is stated with evidence",
     "Q21, Q62, Q66 and Q99 match on the expression family at SF=0.1 after the fix, or are reclassified with evidence"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T11). Hypothesis only; SF=1 reproduction needs explicit approval. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T11). Hypothesis only; SF=1 reproduction needs explicit approval. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nFindings 2026-10-01 (from the existing probe data evidence/pq_*.jsonl plus one light check; no SF=1 query run): the hypothesis is wrong. (a) At SF 0.01, 0.03, 0.05 and 0.1 Q21, Q62 and Q99 do not diverge at all; they diverge only at SF=1. (b) TESTED: generating only the warehouse table with the bundled dsdgen shows SF=0.1 has 1 warehouse with no NULLs, while SF=1 has 5 warehouses and warehouse 5 has NULL w_warehouse_name (and NULL address fields). So None is the data, not a loader or projection bug. (c) The SF=1 expression divergences are NULL ordering: the reference key starts with 'Bad cards must make.' while the DataFrame starts with None (Polars sorts NULLs first) in Q21, Q62, Q66, Q99. (d) The SF=1 pandas divergences are dropped NULL group keys: Q66 5 vs 4 rows, Q99 90 vs 72 rows. This is the same class as dfparity-t10 (PR #2502 fixes it for the joined-aggregate helper, Q15, Q34, Q38, Q87 only; Q21, Q62, Q66, Q99 have their own implementations in queries.py and are not fixed there). (e) Separately Q66 diverges at SF 0.03, 0.05 and 0.1 on BOTH families with a large value mismatch (SF 0.1: 8288141.53 vs 238632.13 at column 8), so that cause is not a name or NULL problem and is unexplained (parameter drift is a candidate; not tested). Not done: fix of Q21/Q62/Q66/Q99 NULL order and NULL groups, and the SF=1 confirmation, which needs explicit approval for an SF=1 run.",
   "description": "Hypothesis from a prior review (not verified by me): at SF=1 one cause, w_warehouse_name returned as None by the Polars/expression path, accounts for Q21, Q62, Q66 and Q99 divergences. Reproduce on a small scale if possible (SF 0.1 shows Q66 and others), find the loader or projection cause, and fix it. If the cause differs, record it.",
   "sessions": [
     {
@@ -13,6 +13,14 @@
       "op": "create",
       "op_id": "5b2eff68e37342c2aaa5079f47e42793",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T16:37:22Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "e70862a2c0bb47f7a038ba6dcba58a75",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
 }
