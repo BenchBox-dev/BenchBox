@@ -1,10 +1,22 @@
 {
   "acceptance": [
     "NYC Taxi completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
-    "Flight Data completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "Flight Data completed at SF 0.1 and 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
+    "Flight Data SF 10.0 on each platform follows the scale policy recorded by flightdata-source-status-and-alternatives: either a bundle built only from real, contiguous months (3 bundles), or an explicit record that SF 10 is not published and why; no bundle that backfills missing months with synthetic data or a non-contiguous window is submitted",
     "100% query pass rate across all runs",
-    "All 18 result bundles pass scripts/validate_submission.py with 0 errors"
+    "Databricks bundles that predate the result-cache receipt check are rerun on current develop (eleven failed the check on 2026-10-01: nyctaxi 0.1, 1, 10; flightdata 0.1, 1; and others in the campaign's per-cell table)",
+    "All result bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal; held bundles (identity, replacement and timing holds) are cleared or rerun, not overridden"
   ],
-  "context": "Real-world datasets test real-life data types (timestamps, geo coordinates, nested string categoricals) and skew characteristics differing from synthetic TPC generators. Total 18 benchmark executions (9 NYC Taxi, 9 Flight Data).",
-  "description": "Expand live cloud benchmark runs across BigQuery, Databricks, and Snowflake to the Real-World domain benchmark suites:\n- NYC Taxi: 25 OLAP queries on taxi trip data covering temporal, geographic, and fare analysis (SF 0.1, 1.0, 10.0)\n- Flight Data: 20 OLAP queries on airline on-time performance and delay metrics (SF 0.1, 1.0, 10.0)\n\nExecute both benchmarks across all three cloud platforms at SF 0.1, 1.0, and 10.0.\nVerify 100% query execution and validate resulting bundles against repository gates."
+  "context": "Real-world datasets test real-life data types (timestamps, geo coordinates, nested string categoricals) and skew characteristics differing from synthetic TPC generators. Required scope is 15 bundles (9 NYC Taxi, 6 Flight Data at SF 0.1 and 1.0) plus up to 3 conditional FlightData SF 10 bundles.\n\nRevalidated 2026-10-01. Query counts match the loaded classes (25 and 20). Both suites are rows of the 84-cell live-cloud corpus campaign, so progress is read from that campaign's per-cell table. The campaign's interim policy is to run FlightData on cloud at SF 1 and SF 5 and to hold SF 10 until the source decision exists. The BigQuery and Snowflake FlightData SF 10 bundles on disk carry identity, replacement and timing holds. Runs inside the campaign's limits (6 h per cell, BigQuery cap from 2026-09-22) need no new approval; anything else needs one stating command, maximum runtime, log path and stop condition.",
+  "description": "Expand live cloud benchmark runs across BigQuery, Databricks, and Snowflake to the Real-World domain benchmark suites:\n- NYC Taxi: 25 OLAP queries on taxi trip data covering temporal, geographic, and fare analysis (SF 0.1, 1.0, 10.0)\n- Flight Data: 20 OLAP queries on airline on-time performance and delay metrics (SF 0.1, 1.0 required; SF 10.0 only if the source policy allows it)\n\nFlightData downloads monthly BTS archives, and 1990-01..1999-12 and part of 1987 are unavailable, so only 327 of the 410 months SF 10 requests can be supplied. SF 10 is gated on the decision recorded by flightdata-source-status-and-alternatives (real months only, a capped scale, or another source).\n\nExecute across all three cloud platforms. Verify 100% query execution and validate resulting bundles against repository gates.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8995e2100042cfa8b56876be",
+      "at": "2026-10-01T15:02:32Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "bf6c84e3180946f5a6b752a495ccc646",
+      "session_id": "a90fbddb3b8e47b781e3c8bf731c4a32"
+    }
+  ]
 }
