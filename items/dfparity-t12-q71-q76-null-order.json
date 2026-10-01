@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Q71 and Q76 match on both families at SF=0.03 and 0.1",
+    "No comparator change; no tie-break columns added to implementations",
+    "Other queries' statuses are unchanged"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T12). Owner decision D4 (NULL-order and tie policy) is recorded in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Verified: the rendered DuckDB SQL for Q71 is ORDER BY \"ext_price\" DESC NULLS FIRST, \"i_brand_id\" (probe: SQL first key None vs DataFrame 3023.76), and Q76's ORDER BY equals its GROUP BY keys so ties are impossible (probe shows a NULL in the last key). These are implementation defects against an explicit ORDER BY, not comparator or tie issues. Fix NULL ordering in both families (pandas na_position, Polars nulls_last) to match the SQL; do not loosen the comparator and do not add tie-break keys to implementations. Q20 is a separate unclassified case.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:06:16Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cdc0ea15a29f41a78d2b32cd53511ed0",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
