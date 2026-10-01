@@ -4,7 +4,7 @@
     "No comparator change; no tie-break columns added to implementations",
     "Other queries' statuses are unchanged"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T12). Owner decision D4 (NULL-order and tie policy) is recorded in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T12). Owner decision D4 (NULL-order and tie policy) is recorded in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nFindings 2026-10-01 (TESTED at SF 0.03, nothing implemented yet): (1) The diagnosis in the description is only half right. Q76 (all keys ascending) is a NULL-order plus NaN leak: expression puts the NULL i_category first where the reference puts it last (position 61), pandas returns nan where SQL has NULL (position 67). Fix: nulls last (ascending) in Polars, na_position last and None for NULL in pandas. (2) Q71 is NOT only NULL ordering. The SQL result has one group (brand 7008009, hour 18, minute 26) whose ext_price is NULL because every summed value is NULL (SQL SUM of only NULLs is NULL), and the SQL sorts it first (ORDER BY ext_price DESC NULLS FIRST). Both DataFrame families sum the NULLs to 0, so the group has no NULL and sorts elsewhere. Q71 needs a null-preserving sum (same class as dfparity-t09) AND the reference's NULL placement. (3) The reference treats NULL as the LARGEST value (DuckDB default_null_order NULLS_LAST for ascending; the rendered SQL adds NULLS FIRST to descending keys), so a global nulls_last or na_position cannot express Q71's mixed keys (ext_price DESC, i_brand_id ASC); use the helpers _sort_null_largest_expression / _sort_null_largest_pandas introduced by PR #2502 (dfparity-t10). BLOCKED on the merge of PR #2502: adding the helpers again here would conflict, and stacked PRs are unsupported. Plan once #2502 is merged: Q71 null-preserving sum plus helper sort in both families; Q76 ascending NULL placement and None; unit tests with an all-NULL group (Q71) and a NULL category (Q76); verify Q71 and Q76 at SF 0.03 and 0.1 on both families and that no other cell changes. Q20 is a separate case (see dfparity-t09 context).",
   "description": "Verified: the rendered DuckDB SQL for Q71 is ORDER BY \"ext_price\" DESC NULLS FIRST, \"i_brand_id\" (probe: SQL first key None vs DataFrame 3023.76), and Q76's ORDER BY equals its GROUP BY keys so ties are impossible (probe shows a NULL in the last key). These are implementation defects against an explicit ORDER BY, not comparator or tie issues. Fix NULL ordering in both families (pandas na_position, Polars nulls_last) to match the SQL; do not loosen the comparator and do not add tie-break keys to implementations. Q20 is a separate unclassified case.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "82e03160cc8248a98f1764e1d49d1070",
       "op": "take",
       "op_id": "8b21c639920143f68110a800cc911dad",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T17:47:31Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4a21de36f523420c97cf1490d29609c7",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
