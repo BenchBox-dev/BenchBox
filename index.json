@@ -17873,7 +17873,9 @@
     },
     "spark-baseline-no-default-overrides": {
       "claim": null,
-      "needs": [],
+      "needs": [
+        "spark-session-config-runtime"
+      ],
       "priority": "high",
       "status": "open",
       "title": "Stop overriding Spark defaults in notuning runs; record harness settings"
