@@ -6242,6 +6242,15 @@
       "status": "open",
       "title": "Decide whether production TPC-DS get_queries should render at the data's scale"
     },
+    "dfparity-t23-docs": {
+      "claim": null,
+      "needs": [
+        "dfparity-t20-promote-polars-gate"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Document the two parameter bindings, the two gates, and how to add a TPC-DS query"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Docs describe both bindings and both gates with the commands that run them",
+    "A contributor guide covers adding a query and the lint that enforces it",
+    "Docs build passes"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T23). Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Write durable documentation: the definition of true parity (same data, same parameters, same results), the gate binding (dsqgen -LOG at a pinned seed and the data's scale) versus the qualification binding (spec values, official answer sets), how adapters map -LOG names to DataFrame keys, how to add or change a TPC-DS query without introducing literal fallbacks, and the lanes (blocking Polars gate, parallel pandas job, scheduled SF=1 oracle). Record the decisions from dfparity-t00-owner-decisions.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:15:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "da1184ec38884a36b13a4bc952267ca0",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
