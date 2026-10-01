@@ -158,6 +158,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_check_uv_lock_revision.py` | tooling |
 | `test_check_windows_antipatterns.py` | tooling |
 | `test_ci_lint_environment_boundary.py` | tooling |
+| `test_comment_cleanup_scope.py` | tooling |
 | `test_compile_all_platforms.py` | product-safety |
 | `test_compose_joinorder_hero.py` | product-safety |
 | `test_corpus_cohort_depth.py` | product-safety |

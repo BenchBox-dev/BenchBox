@@ -74,6 +74,25 @@ def quote_identifier_for_dialect(identifier: str, dialect: str | None) -> str:
     return quote_identifier(identifier)
 
 
+#: Dialects whose staging rebuild replaces tables in place instead of dropping
+#: them. Unity Catalog counts a dropped table against the metastore table quota
+#: for about seven days; ``CREATE OR REPLACE`` on an existing table does not.
+_REPLACE_IN_PLACE_DIALECTS = frozenset({"databricks"})
+
+
+def replaces_tables_in_place(dialect: str | None) -> bool:
+    """Return True when staging rebuilds should replace tables, not drop them."""
+    return (dialect or "").lower() in _REPLACE_IN_PLACE_DIALECTS
+
+
+def replace_table_sql(create_sql: str) -> str:
+    """Turn a plain ``CREATE TABLE`` statement into ``CREATE OR REPLACE TABLE``."""
+    head, sep, rest = create_sql.partition("CREATE TABLE")
+    if not sep or "IF NOT EXISTS" in rest.split("(", 1)[0].upper():
+        raise ValueError("replace_table_sql expects a plain CREATE TABLE statement")
+    return f"{head}CREATE OR REPLACE TABLE{rest}"
+
+
 def failed_platform_error(cursor: Any) -> str | None:
     """Return the adapter-reported error if ``cursor`` wraps a FAILED result.
 

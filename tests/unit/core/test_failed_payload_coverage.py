@@ -389,3 +389,14 @@ class TestTuningMetadataManagerFailedPayload:
             RuntimeError, match="Tuning metadata query failed: SELECT 1 metadata query failed in cursor"
         ):
             manager._fetch_one(conn, "SELECT 1")
+
+
+def test_replace_table_sql_only_rewrites_plain_create():
+    from benchbox.core.primitives_benchmark_utils import replace_table_sql, replaces_tables_in_place
+
+    assert replace_table_sql("CREATE TABLE t (a INT);") == "CREATE OR REPLACE TABLE t (a INT);"
+    with pytest.raises(ValueError):
+        replace_table_sql("CREATE TABLE IF NOT EXISTS t (a INT);")
+    assert replaces_tables_in_place("Databricks") is True
+    assert replaces_tables_in_place("snowflake") is False
+    assert replaces_tables_in_place(None) is False

@@ -143,6 +143,9 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # lane artifact builds.
     "scripts/generate_cloud_tpc_templates.py",
     "scripts/check_rerun_shard_retention.py",
+    # SF=1 size measurement helper: invoked manually/by CI, never read by
+    # lane artifact builds.
+    "scripts/measure_sf1_sizes.py",
     "tox.ini",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
