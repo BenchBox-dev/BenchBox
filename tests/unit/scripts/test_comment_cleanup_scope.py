@@ -737,7 +737,7 @@ z = 2  # type: ignore[attr-defined]  TODO later
         ("# see the renderer-consolidation TODO", False),
         ("# TODO) only for a divergence", False),
         ("# Confirmed (TODO w5): only the cells", False),
-        ("# _project/TODO/main/planning/item.yaml", False),
+        ("# see TODO/main/planning/item.yaml", False),
         ("# the TODO's w4 stays pure", False),
         ("# Per the tuning-keys TODO: do not add new aliases", False),
     ],
