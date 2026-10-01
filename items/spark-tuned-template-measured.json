@@ -8,6 +8,12 @@
   ],
   "context": "Origin: user-approved 2026-09-30; Opus finding C1. Requires live Spark and cannot be completed in a sandbox without it. Local PySpark 4.2.0 fails to start on this machine's JDK (ClassNotFoundException jdk.internal.ref.Cleaner), so use a supported JDK or a remote cluster.",
   "description": "Today `--tuning tuned` on Spark resolves to TuningSource.FALLBACK (benchbox/cli/tuning_resolver.py ~L454) and runs identically to notuning. Add curated templates (benchbox/core/tuning/templates/spark/ and examples/tunings/spark/, per-benchmark such as tpch_tuned.yaml and tpcds_tuned.yaml, following the databricks/duckdb layout) so `tuned` means something.\n\nConstraint from review: a template whose values already hold in a notuning run changes nothing and would be relabelled `tuned` (ADR-002). Every key in a shipped template must differ from the effective baseline established by spark-baseline-no-default-overrides and be confirmed by the preflight capture. Candidates (not decisions): shuffle partitions sized to scale factor, AQE coalesce/skew settings, broadcast threshold, CBO and join reorder (now tuned-only), codegen limits.\n\nMeasurement:\n- Run on live Spark; record baseline vs tuned for TPC-H and TPC-DS at stated scale factors and Spark version. A template ships only if it demonstrates a measurable, explainable effect.\n- OBT (TPC-DS One Big Table): prior probes used a synthetic 518-column table, not the real rendered queries. Do not cite them as OBT validation. Verified facts only: the OBT schema has 518 full / 424 minimal columns; the widest rendered projection is Q66 at 44 columns (sqlglot count over 89 queries). Test the actual rendered OBT queries and plans before making any codegen.maxFields or similar claim.\n- Decide platform-wide vs benchmark-specific templates from the results (both layouts exist for other platforms).",
+  "links": [
+    "item:spark-baseline-no-default-overrides",
+    "item:spark-effective-config-preflight-capture",
+    "item:spark-tuning-discovery-cli",
+    "docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md"
+  ],
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
@@ -15,6 +21,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "22545ec9428742818e452dff01e4e40e",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:27:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d7134d7786fd44a1895729aee179903a",
       "session_id": "84cb9f884244423988b9cef251a0c248"
     }
   ]
