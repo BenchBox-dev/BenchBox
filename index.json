@@ -6169,6 +6169,16 @@
       "status": "open",
       "title": "Commit TPC-DS qualification values and parse official answer sets by value"
     },
+    "dfparity-t18-sf1-oracle-lane": {
+      "claim": null,
+      "needs": [
+        "dfparity-t17-qualification-values-and-ans",
+        "dfparity-t13-pandas-q78-perf"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add a scheduled, non-blocking SF=1 qualification oracle lane for both families"
+    },
     "dfparity-t21-tpch-seeded-path": {
       "claim": null,
       "needs": [

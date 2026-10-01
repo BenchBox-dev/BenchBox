@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A scheduled workflow runs both families at SF=1 and reports per-query agreement with the answer sets",
+    "The lane is non-blocking and its runtime and memory are recorded",
+    "Disagreements are reported with the classifier output (dfparity-t14) where available"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T18). Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Run both DataFrame families and the SQL surface at SF=1 under the qualification binding and compare their results value by value to the official answer sets, an oracle independent of DuckDB. Scheduled lane only, never blocking. SF=1 is heavy (a full probe took about 450 s and 3.5 GB peak RSS on the author's Mac, with pandas Q78 timing out at 180 s), so it needs the Q78 fix and explicit approval for the resource use.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:12:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e734f91f83ee41f1b858efa3101fc67f",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
