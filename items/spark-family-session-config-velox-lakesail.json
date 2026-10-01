@@ -7,6 +7,11 @@
   ],
   "context": "Origin: user-approved 2026-09-30; Opus Considerations on LakeSail and review finding R8. Low urgency; native Spark first.",
   "description": "SparkAdapter, VeloxAdapter and LakeSailAdapter share SparkLikeAdapterMixin but not configuration semantics, so each needs its own decision after native Spark ships.\n- Velox/Gluten: accepts standard Spark SQL keys plus spark.gluten.* ; adapter-owned keys (spark.plugins, spark.shuffle.manager, spark.memory.offHeap.* in velox.py ~L395-398) stay rejected. Remote Velox over Spark Connect rejects core keys server-side. Needs live verification with a Gluten build.\n- LakeSail: a Rust engine behind Spark Connect. A successful conf.set records \"executed\" even for keys Sail ignores. Build a verified list of honoured keys (or an advisory tag on ledger statements) before shipping Sail templates or accepting the map; until then, a spark map on LakeSail warns and is recorded as dropped.\n- Template discovery is keyed by platform directory: Velox and LakeSail stay `tuned-fallback` until they have their own templates; do NOT alias them to spark.\n- Use the preflight capture from spark-effective-config-preflight-capture to confirm what each engine actually reports.",
+  "links": [
+    "item:spark-session-config-runtime",
+    "item:spark-effective-config-preflight-capture",
+    "item:spark-baseline-no-default-overrides"
+  ],
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
@@ -14,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "cf1e5fbc5a3f4b69976c39255bb61c7b",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:27:35Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "0d58961971ac4caaaa338ec826a09bf4",
       "session_id": "84cb9f884244423988b9cef251a0c248"
     }
   ]
