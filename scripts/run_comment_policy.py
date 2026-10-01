@@ -126,6 +126,39 @@ def bootstrap_base_allowed(root: Path, base: str) -> bool:
     return contains_rollout and not installed
 
 
+def comparison_base(root: Path, base: str) -> str:
+    if os.environ.get("GITHUB_ACTIONS") != "true":
+        return base
+    parents = subprocess.check_output(["git", "-C", str(root), "rev-list", "--parents", "-n", "1", "HEAD"], text=True)
+    parents = parents.split()[1:]
+    if len(parents) != 2:
+        return base
+    if subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor", base, parents[0]]).returncode != 0:
+        raise ValueError("event base is not an ancestor of the merge target")
+    return parents[0]
+
+
+def checker_command(
+    python: Path, trusted: Path, root: Path, compare_base: str, *, bootstrap: bool, staged: bool
+) -> list[str]:
+    command = [
+        str(python),
+        "-I",
+        str(trusted / "comment_policy_entry.py"),
+        "--root",
+        str(root),
+        "--mode",
+        "transition",
+        "--base",
+        compare_base,
+    ]
+    if bootstrap:
+        command.append("--bootstrap")
+    if staged:
+        command.append("--staged")
+    return command
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the comment policy with immutable base parsers.")
     parser.add_argument("--base", default=os.environ.get("BASE_REF"))
@@ -153,21 +186,9 @@ def main(argv: list[str] | None = None) -> int:
                 for name in TRUSTED_FILES:
                     (trusted / Path(name).name).write_bytes((root / name).read_bytes())
             python, env = parser_environment(trusted)
-            command = [
-                str(python),
-                "-I",
-                str(trusted / "comment_policy_entry.py"),
-                "--root",
-                str(root),
-                "--mode",
-                "transition",
-                "--base",
-                base,
-            ]
-            if bootstrap:
-                command.append("--bootstrap")
-            if args.staged:
-                command.append("--staged")
+            command = checker_command(
+                python, trusted, root, comparison_base(root, base), bootstrap=bootstrap, staged=args.staged
+            )
             result = subprocess.run(command, cwd=trusted, env=env, check=False).returncode
             if result:
                 return result

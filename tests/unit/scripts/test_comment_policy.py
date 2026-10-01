@@ -276,6 +276,70 @@ def test_bootstrap_base_is_refused_when_a_policy_registry_exists(
     assert not policy_runner.bootstrap_base_allowed(tmp_path, with_registry)
 
 
+def git_run(root: Path, *args: str) -> str:
+    return subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            *args,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def merge_commit_repo(tmp_path: Path) -> tuple[str, str, str]:
+    event_base = plain_repo(tmp_path, "x = 1\n")
+    git_run(tmp_path, "checkout", "-q", "-b", "pr")
+    (tmp_path / "pr.py").write_text("y = 1\n", encoding="utf-8")
+    git_run(tmp_path, "add", "pr.py")
+    git_run(tmp_path, "commit", "-qm", "pr")
+    pr_head = git_run(tmp_path, "rev-parse", "HEAD")
+    git_run(tmp_path, "checkout", "-q", "-B", "target", event_base)
+    (tmp_path / "target.py").write_text("z = 1\n", encoding="utf-8")
+    git_run(tmp_path, "add", "target.py")
+    git_run(tmp_path, "commit", "-qm", "target moved on")
+    target_tip = git_run(tmp_path, "rev-parse", "HEAD")
+    git_run(tmp_path, "checkout", "-q", "--detach", target_tip)
+    git_run(tmp_path, "merge", "--no-ff", "-qm", "merge ref", pr_head)
+    return event_base, target_tip, pr_head
+
+
+def test_ci_comparison_base_is_the_merge_target_not_the_stale_event_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    event_base, target_tip, pr_head = merge_commit_repo(tmp_path)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    assert policy_runner.comparison_base(tmp_path, event_base) == target_tip
+    with pytest.raises(ValueError, match="not an ancestor"):
+        policy_runner.comparison_base(tmp_path, pr_head)
+    git_run(tmp_path, "checkout", "-q", "--detach", target_tip)
+    assert policy_runner.comparison_base(tmp_path, event_base) == event_base
+
+
+def test_local_runs_keep_the_requested_base_even_on_a_merge_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    event_base, _target_tip, _pr_head = merge_commit_repo(tmp_path)
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    assert policy_runner.comparison_base(tmp_path, event_base) == event_base
+
+
+def test_checker_command_compares_against_the_given_base(tmp_path: Path) -> None:
+    command = policy_runner.checker_command(Path("python"), tmp_path, tmp_path, "c" * 40, bootstrap=True, staged=False)
+    assert command[command.index("--base") + 1] == "c" * 40
+    assert "--bootstrap" in command
+    assert "--staged" not in command
+
+
 def test_local_default_base_is_the_branch_point_when_develop_moved_on(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

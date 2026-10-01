@@ -71,7 +71,10 @@ scopes; report and strict modes inspect everything.
 The `comment-policy` job runs on every pull request and merge group and feeds
 the required tooling result. Its base SHA comes from the platform event and
 cannot be overridden. The launcher, checker, adapters and hash-pinned parser
-dependency specifications come from that immutable base. The checker runs
+dependency specifications come from that immutable base. The comparison is
+against the first parent of the merge commit CI checks out, which is the target
+branch tip. Changes that reached the target after the event are not charged to
+the pull request. The checker runs
 isolated from project configuration, import and installer overrides, candidate
 `node_modules` and candidate Python environments. The candidate's own checker is used only to bootstrap a
 base that contains the rollout commit `ed5c263c513ba65499f4918d3a7de607f280c65b`
