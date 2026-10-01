@@ -26,3 +26,17 @@ def test_queue_artifact_verifies_exact_distributions_before_upload() -> None:
     assert "sha256sum -- *.whl *.tar.gz > SHA256SUMS" in build
     assert steps[upload_index]["with"]["name"] == "dist-${{ github.sha }}"
     assert "dist-artifact" in jobs["core"]["needs"]
+
+
+def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
+    # The job only runs two scripts that import the package, so it needs the runtime dependencies
+    # and not the dev group. A cold full sync inside a short limit timed the job out, and a failed
+    # dist-artifact fails the core unit and ejects the merge group.
+    job = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["dist-artifact"]
+    assert job["timeout-minutes"] >= 20
+    for step in job["steps"]:
+        run = step.get("run", "")
+        for line in (line.strip() for line in run.splitlines()):
+            if line.startswith("uv run ") or " uv run " in line:
+                assert "--no-dev" in line and "--frozen" in line, f"{step['name']}: {line}"
+            assert "uv sync" not in line, f"{step['name']}: {line}"
