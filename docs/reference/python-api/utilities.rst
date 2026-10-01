@@ -507,7 +507,7 @@ See Also
 --------
 
 - :doc:`base` - Base benchmark interface
-- :doc:`platforms/index` - Platform adapter documentation
+- :doc:`platforms` - Platform adapter documentation
 - :doc:`benchmarks/index` - Benchmark API overview
 - :doc:`/usage/configuration` - Configuration guide
 - :doc:`/usage/troubleshooting` - Troubleshooting guide

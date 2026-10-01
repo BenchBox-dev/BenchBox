@@ -52,10 +52,12 @@ from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # no
 
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
-    "ci-required-result",
-    "Results Explorer browser gate",
-    "ruleset-drift",
-    "Public-site visual acceptance",
+    "core",
+    "explorer",
+    "results-data",
+    "docs",
+    "landing",
+    "tooling",
 )
 REQUIRED_BATCH_TOOLS = frozenset({"register_batch", "prepare", "bind_batch_pr", "abort_batch"})
 MAX_RERUNS_PER_JOB = 1
@@ -1258,7 +1260,10 @@ def ready_failures(
     if remote_head != expected_head:
         failures.append(f"remote head {remote_head[:12]} != expected {expected_head[:12]}")
     failures.extend(f"unpublished work: {problem}" for problem in unpublished_work(repo))
-    if evidence.review_decision != "APPROVED":
+    # GitHub leaves reviewDecision empty when the branch-wide ruleset needs no formal approval.
+    # Non-soundness PRs still require complete review dispositions; soundness paths require approval.
+    soundness_changed = head_valid and soundness_paths_changed(repo, identity.base, expected_head)
+    if evidence.review_decision != "APPROVED" and (evidence.review_decision != "" or soundness_changed):
         failures.append(f"review decision is {evidence.review_decision!r}, not APPROVED")
     if not evidence.dispositions_complete:
         failures.append("review dispositions incomplete (every top-level finding needs evidence)")
@@ -1267,7 +1272,7 @@ def ready_failures(
     if HOLD_LABEL in holds:
         failures.append(f"durable hold label {HOLD_LABEL!r} present; a human removes it, never this helper")
     failures.extend(batch_mode_failures(evidence, repo))
-    if head_valid and soundness_paths_changed(repo, identity.base, expected_head):
+    if soundness_changed:
         failures.append("soundness paths changed; auto-enqueue is forbidden and requires manual maintainer merge")
     if head_valid and evidence.batch is not None:
         if evidence.batch.get("repository") != evidence.repository:
@@ -1304,6 +1309,7 @@ def enqueue_pr(
     *,
     expected_branch: str | None = None,
     expected_node_id: str | None = None,
+    expected_review_decision: str = "APPROVED",
 ) -> dict:
     """Arm queue enrollment after a final expected-head check.
 
@@ -1314,6 +1320,8 @@ def enqueue_pr(
     """
     repo_full = normalize_github_repository(repo_full)
     _require_revision(expected_head, "expected head")
+    if expected_review_decision not in {"", "APPROVED"}:
+        raise LandingError("expected review decision is not ready for enqueue")
     if remote_head != expected_head:
         raise LandingError(
             f"remote head moved to {remote_head[:12]} during enqueue; "
@@ -1344,7 +1352,7 @@ def enqueue_pr(
             )
         if state != "OPEN":
             raise LandingError(f"PR #{pr_number} state {state!r} is not OPEN; readiness is invalid")
-        if current.get("reviewDecision") != "APPROVED":
+        if str(current.get("reviewDecision") or "") != expected_review_decision:
             raise LandingError("PR review disposition changed before enqueue; readiness is invalid")
         if unresolved_review_threads(run, repo_full, pr_number):
             raise LandingError("PR review threads changed before enqueue; unresolved, non-outdated threads remain")
@@ -2090,6 +2098,7 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
             str(pr.get("headRefOid") or ""),
             expected_branch=branch,
             expected_node_id=node_id,
+            expected_review_decision=evidence.review_decision,
         )
         print(json.dumps(result, indent=2))
     else:

@@ -19,6 +19,7 @@ from benchbox.core.datavault.etl.hash_functions import (
 )
 from benchbox.core.datavault.schema import LOADING_ORDER, TABLES_BY_NAME
 from benchbox.utils.compression_mixin import CompressionMixin
+from benchbox.utils.file_format import detect_compression
 
 logger = logging.getLogger(__name__)
 
@@ -354,6 +355,9 @@ class DataVaultETLTransformer(CompressionMixin):
 
             # Find the appropriate file pattern for this table
             file_pattern = self._find_tpch_file_pattern(tpch_dir, table_name)
+            # Parallel CSV scans can re-pin evicted buffers by seeking, which
+            # compressed streams cannot support. Keep plain-file scans parallel.
+            parallel = "false" if detect_compression(file_pattern) else "true"
 
             # DuckDB read_csv handles compression automatically based on file extension
             # and supports glob patterns for reading multiple sharded files
@@ -363,7 +367,8 @@ class DataVaultETLTransformer(CompressionMixin):
                     '{file_pattern}',
                     delim='|',
                     header=false,
-                    names={columns}
+                    names={columns},
+                    parallel={parallel}
                 )
             """
             conn.execute(sql)

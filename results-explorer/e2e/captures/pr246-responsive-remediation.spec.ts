@@ -47,7 +47,7 @@ const ROUTES: CaptureRoute[] = [
   })),
   ...WIDTHS.map((width) => ({
     filename: `benchmark-tpch-${width}.png`,
-    url: "/results/tpch/?sf=0.01&phase=standard",
+    url: "/results/tpch/?sf=0.01&phase=power",
     width,
     ready: /TPC-H Results/i,
     hintTestId: width >= 768 ? "query-heatmap-scroll-hint" : undefined,

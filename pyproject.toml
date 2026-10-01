@@ -718,7 +718,7 @@ exclusions = []
 # identifiers). The threshold is a ceiling on total duplicated lines; raise it
 # only when intentional duplication is added and lower it as clones are removed.
 #
-# PR gate: `make duplicate-check-delta` / pr.yml `guard-duplicate-delta` compares
+# PR gate: `make duplicate-check-delta` / ci.yml `guard-duplicate-delta` compares
 # duplicated lines against the merge-base of the PR base (or origin/develop) and
 # fails only when the change *increases* the count. Absolute `threshold` below
 # remains for local/campaign use (`make duplicate-check`), not the PR delta path.
@@ -834,6 +834,18 @@ ignore_rules = [
     # consolidated in the helper; residual similarity is adapter arity, not logic.
     { function_names = ["find_postgres_divergences", "find_clickhouse_divergences"], path_contains = ["benchbox/core/tpchavoc/equivalence.py"] },
 
+    # Cross-surface gate builders - thin per-benchmark delegations over
+    # _assemble_simple_duckdb_cell that must remain distinct public names for
+    # gate wiring. Shared assembly lives in the helper; residual similarity
+    # is benchmark binding arity, not logic.
+    { function_names = ["build_tpcds_duckdb", "build_tpch_duckdb", "build_tpch_skew_duckdb", "build_nyctaxi_duckdb", "build_tsbs_devops_duckdb"], path_contains = [
+        "benchbox/core/equivalence/builders/tpcds.py",
+        "benchbox/core/equivalence/builders/tpch.py",
+        "benchbox/core/equivalence/builders/tpch_skew.py",
+        "benchbox/core/equivalence/builders/nyctaxi.py",
+        "benchbox/core/equivalence/builders/tsbs_devops.py",
+    ] },
+
     # --- Boilerplate ignore rules added 2026-02-21 (groups G1-G28 from duplicate-check triage) ---
 
     # G8,G9,G11,G22: Protocol/ABC abstract method stubs across dataframe type hierarchy
@@ -857,6 +869,13 @@ ignore_rules = [
     # method per SQL window function implementing the expression-family
     # contract. Thin same-shape delegations are intentional API surface.
     { function_names = ["window_lag", "window_lead", "window_ntile", "window_percent_rank", "window_cume_dist"], path_contains = ["benchbox/platforms/dataframe/pyspark_df.py"] },
+
+    # Throughput-sweep-mandated stream-session parity hooks: PG-extension
+    # adapters whose create_connection adds only one-time extension setup
+    # must carry an explicit delegating _apply_stream_session_state override
+    # proving per-stream parity (see test_throughput_session_capability_sweep
+    # rule R3). The bodies are intentionally identical delegations.
+    { function_names = ["_apply_stream_session_state"], path_contains = ["benchbox/platforms/paradedb.py", "benchbox/platforms/citus.py"] },
 
     # G3,G10: DataFrame platform adapter thin wrappers (col/lit/from_pandas/detect_format/read_*)
     # G29: extend with get_row_count and pandas_family.py
@@ -1003,6 +1022,16 @@ ignore_rules = [
         "benchbox/core/tpchavoc/queries.py",
     ] },
 
+    # Cross-surface gate builders - thin per-benchmark delegations over
+    # _assemble_simple_duckdb_cell that must remain distinct public names for
+    # gate wiring. Shared assembly lives in the helper; residual similarity
+    # is benchmark binding arity, not logic.
+    { function_names = ["build_tpcds_duckdb", "build_tpch_duckdb", "build_tpch_skew_duckdb"], path_contains = [
+        "benchbox/core/equivalence/builders/tpcds.py",
+        "benchbox/core/equivalence/builders/tpch.py",
+        "benchbox/core/equivalence/builders/tpch_skew.py",
+    ] },
+
     # --- Boilerplate ignore rules added 2026-03-12 (wave-2 triage) ---
 
     # G2: Protocol operation support methods across primitives dataframe_operations and platform adapters
@@ -1018,7 +1047,13 @@ ignore_rules = [
 
     # G6,G19,G30: TPC-DS spec-mandated structurally similar query pairs (Q62/Q99, Q38/Q87)
     # w3-G27: extend with Q7/Q26 spec pair (promotional item-joined fact table aggregation)
-    { function_names = ["q62_expression_impl", "q99_expression_impl", "q38_expression_impl", "q87_expression_impl", "q62_pandas_impl", "q99_pandas_impl", "q7_expression_impl", "q26_expression_impl"], path_contains = ["benchbox/core/tpcds/dataframe_queries/"] },
+    # Q47/Q57: spec-mirrored rolling-average queries (store vs catalog channel);
+    # thin per-query delegations over shared _rolling_average_*_impl helpers.
+    # Q46/Q68: spec-mirrored ticket-household queries (weekend vs day-of-month
+    # window); thin per-query delegations over shared _ticket_household_* helpers.
+    # Q77: three-channel sales-returns; thin family delegations over shared
+    # _sales_returns_rollup_* helpers with per-channel specs.
+    { function_names = ["q62_expression_impl", "q99_expression_impl", "q38_expression_impl", "q87_expression_impl", "q62_pandas_impl", "q99_pandas_impl", "q7_expression_impl", "q26_expression_impl", "q47_expression_impl", "q57_expression_impl", "q47_pandas_impl", "q57_pandas_impl", "q46_expression_impl", "q68_expression_impl", "q77_expression_impl", "q77_pandas_impl"], path_contains = ["benchbox/core/tpcds/dataframe_queries/"] },
 
     # G14: Compression protocol stubs matching canonical implementations
     { function_names = ["compress_file", "decompress_file", "open_for_read"], path_contains = [

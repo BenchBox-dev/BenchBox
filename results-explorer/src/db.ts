@@ -32,6 +32,9 @@ import {
 let dbInstance: duckdb.AsyncDuckDB | null = null;
 let initPromise: Promise<duckdb.AsyncDuckDB> | null = null;
 let initFailures = 0;
+// A fresh COI worker can repeat the same heap-view failure. Retain the
+// supported single-threaded runtime for this tab once COI cannot initialize.
+let excludeCoiBundle = false;
 const INIT_FAILURE_LIMIT = 3;
 const SNAPSHOT_READY_ATTEMPTS = 8;
 const SNAPSHOT_READY_DELAY_MS = 100;
@@ -282,6 +285,7 @@ export function _resetDbStateForTest(): void {
   initPromise = null;
   initFailures = 0;
   initError = null;
+  excludeCoiBundle = false;
   snapshotReadyAt = 0;
   queryQueue = Promise.resolve();
 }
@@ -312,7 +316,7 @@ async function readSnapshotReadModelVersion(conn: DuckDBConnection): Promise<num
         return 0;
       }
       lastError = error;
-      if (!isTransientDuckDbSnapshotError(error)) {
+      if (isDuckDbBufferBoundsError(error) || !isTransientDuckDbSnapshotError(error)) {
         throw error;
       }
       await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
@@ -461,7 +465,7 @@ async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
       }
     } catch (error: unknown) {
       lastError = error;
-      if (!isTransientDuckDbSnapshotError(error)) throw error;
+      if (isDuckDbBufferBoundsError(error) || !isTransientDuckDbSnapshotError(error)) throw error;
     }
     await sleep(SNAPSHOT_READY_DELAY_MS * attempt);
   }
@@ -517,7 +521,10 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.DB_INIT_START, { once: true });
     // Bound bundle selection as well, so any initialization rejection clears
     // the shared promise and counts against the automatic retry budget.
-    const bundle = await withDuckDbTimeout(duckdb.selectBundle(LOCAL_DUCKDB_BUNDLES), "selectBundle");
+    const bundles = excludeCoiBundle
+      ? { mvp: LOCAL_DUCKDB_BUNDLES.mvp, eh: LOCAL_DUCKDB_BUNDLES.eh }
+      : LOCAL_DUCKDB_BUNDLES;
+    const bundle = await withDuckDbTimeout(duckdb.selectBundle(bundles), "selectBundle");
     const worker = await createCspBoundWorker(bundle.mainWorker!);
     const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
     const db = new duckdb.AsyncDuckDB(logger, worker);
@@ -568,6 +575,9 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
         await withDuckDbTimeout(conn.close(), "connection close", DUCKDB_CLEANUP_TIMEOUT_MS).catch(() => {});
       }
     } catch (error: unknown) {
+      if (bundle.mainModule === LOCAL_DUCKDB_BUNDLES.coi?.mainModule && isDuckDbBufferBoundsError(error)) {
+        excludeCoiBundle = true;
+      }
       // Initialization failed; release this worker before the next attempt.
       void db.terminate();
       throw error;
@@ -723,6 +733,14 @@ async function queryRowsOnce<T>(
 
 function isDuckDbTimeoutError(error: unknown): boolean {
   return error instanceof DuckDbTimeoutError;
+}
+
+// COI memory growth can leave the worker's heap view stale. Repeating SQL on
+// that worker cannot reliably refresh it; initialization must terminate it and let the
+// existing bounded query recovery create a fresh instance.
+function isDuckDbBufferBoundsError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /offset is out of bounds/i.test(message);
 }
 
 // Timeouts use the hard cutoff policy; the next independent read can recover

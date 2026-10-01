@@ -3,8 +3,8 @@
 The "fast lane" is every test collected under `pytest -m fast` (excluding
 `slow`/`stress`/`resource_heavy`/`live_integration`) -- the required,
 sub-few-minutes suite every develop PR runs in `code-test`
-(`.github/workflows/pr.yml`). `_project/scripts/timing_policy_check.py`'s
-fast-lane check enforces a hard ceiling on how many tests that lane may
+(`.github/workflows/ci.yml`). `_project/scripts/fast_lane_ceiling_check.py`
+enforces a hard ceiling on how many tests that lane may
 collect, `max_fast_tests` in `_project/config/fast_test_lane_policy.json`.
 
 ## Why this file exists (fast-lane-decouple-ceiling-contention-2)
@@ -39,9 +39,8 @@ of relying on whoever happens to hit the wall.
 
 **1. Quantum ceiling -- coarse backstop, everywhere, every phase.**
 `max_fast_tests` in `fast_test_lane_policy.json` remains the absolute,
-always-enforced limit: PR lane (`guard-timing-policy` in `pr.yml`), the
-develop-post-merge safety net (`lint` job in `develop-post-merge.yml`, via
-`make ci-lint`), and the release lane (`lint.yml`). This is a **backstop**,
+always-enforced limit: PR lane (`guard-fast-lane-ceiling` in `ci.yml`) and the
+release lane (`lint.yml`). This is a **backstop**,
 never a delta-only check -- a fast lane growing by small increments across
 many PRs still eventually needs a real ceiling, and this is it.
 
@@ -54,26 +53,25 @@ contention (few, larger, uncontested bumps beat many, minimal, colliding
 ones).
 
 **2. Per-PR delta guard -- catches runaway growth early.** The PR lane's
-`code-lint` job restores the most recent develop fast-lane count (cached by
-`develop-post-merge.yml` after every push to develop) and compares this PR's
+`code-lint` job restores the fast-lane count recorded for the PR's base commit
+(cached by `fast-lane-baseline.yml` after every push to develop) and compares this PR's
 own collect count against it:
 
-- delta > 150 fails the guard (`guard-fast-lane-delta`, `pr.yml`).
+- delta > 150 fails the guard (`guard-fast-lane-delta`, `ci.yml`).
 - delta > 75 warns (does not fail).
 - No baseline available (cache miss -- e.g. the very first run after this
-  landed, or a cache eviction) -- **fails open**: prints
-  `DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling
-  still enforced)` and exits 0. This is deliberate: the absolute ceiling
-  check (`guard-timing-policy`, run just before this guard in the same
-  job) is the enforced backstop in that case, and a hard failure on a
-  missing baseline would make the delta guard a single point of failure for
-  every PR whenever the cache happens to be cold.
+  landed, or a cache eviction) -- the pull-request workflow passes
+  `--require-develop-baseline`, so the guard fails closed with
+  `DELTA_CHECK_BASELINE_ERROR` instead of allowing a queued PR to bypass the
+  per-PR prerequisite. Restore the exact develop baseline or rerun after the
+  baseline producer completes. Direct callers that omit the flag retain the
+  historical skip behavior.
 
 **3. Nightly ratchet signal -- surfaces the need for a bump before the next
 PR collides with it.** `_project/scripts/fast_lane_ratchet_check.py` runs
 nightly (`fast-lane-ratchet-check` job, `nightly.yml`), collects the fast
 lane fresh, and -- if headroom drops below the same 100-test warning
-threshold `timing_policy_check.py`'s own `FAST_LANE_WARNING` uses --
+threshold `fast_lane_ceiling_check.py`'s own `FAST_LANE_WARNING` uses --
 files/updates ONE marker-tagged tracking issue ("Fast-lane ceiling needs a
 quantum bump") naming the current numbers and the exact edit to make. It
 never pushes a branch or opens a PR itself: `GITHUB_TOKEN`-authored PRs get
@@ -103,16 +101,32 @@ pointer string.
 
 ## What to do when each guard fires
 
-- **`FAST_LANE_WARNING` (advisory, `timing_policy_check.py`, any lane
+- **`FAST_LANE_WARNING` (advisory, `fast_lane_ceiling_check.py`, any lane
   that runs it):** headroom is below 100. Not a failure by itself, but the
   next test-adding PR may hit the ceiling. Bump `max_fast_tests` by +500
   (or the smallest multiple of 500 that restores >= 250 headroom -- see
   `suggested_next_ceiling` in `fast_lane_ratchet_check.py` for the exact
   rule) and add a dated entry to `fast_lane_ceiling_log.md`.
 - **`FAST_LANE_VIOLATION: fast lane count N exceeds limit M`
-  (`guard-timing-policy`, blocking):** the absolute ceiling backstop
+  (`guard-fast-lane-ceiling`, blocking):** the absolute ceiling backstop
   tripped. Bump per the convention above; this is the hard stop, not a
   suggestion.
+- **`FAST_LANE_WARNING: composed tree collects N, K over the M ceiling but
+  within the G-test composition grace` (merge queue only, advisory):**
+  independently green PRs composed over the ceiling. The queue lane passes
+  `--ceiling-grace 750`, which is five entries times the 150-test per-PR
+  delta limit permitted by the approved merge-queue configuration. This lets
+  every independently compliant five-entry composition warn instead of ejecting
+  the group. The flag is only
+  honored when the runner's own event file says `merge_group`, so a PR cannot
+  self-grant it by editing its workflow copy, and the delta guard below stays
+  `pull_request`-only, so a composed overage ejects nowhere silently. Develop
+  post-merge keeps the strict ceiling, so a graced queue tip that lands over
+  the ceiling still trips the normal lint failure and revert path, and the
+  nightly ratchet issue fires on the negative headroom. An overage beyond the
+  grace is still a `FAST_LANE_VIOLATION` in every lane, and a `--ceiling-grace`
+  flag on any other event fails closed with
+  `FAST_LANE_CONFIGURATION_ERROR`.
 - **`FAST_LANE_DELTA_WARNING` (`guard-fast-lane-delta`, non-blocking):**
   this PR alone adds more than 75 fast tests over develop's current
   baseline. Consider whether the new coverage needs sub-second fast-lane
@@ -127,12 +141,16 @@ pointer string.
 - **`DELTA_CHECK_ENVIRONMENT_ERROR` (`guard-fast-lane-delta`, blocking):** a
   develop baseline exists, but the PR's fast-lane collection failed or did not
   produce a count. Fix the collection environment before relying on the delta
-  result; this is distinct from a cold-cache baseline miss.
+  result.
+- **`DELTA_CHECK_BASELINE_ERROR` (`guard-fast-lane-delta`, blocking):** the
+  pull-request workflow could not read the exact develop fast-lane baseline.
+  Restore the cache-producing develop baseline or rerun after it completes;
+  the guard fails closed because merge-group composition grace depends on every
+  queued member proving its own per-PR delta.
 - **`DELTA_CHECK_SKIPPED (no develop baseline available - absolute ceiling
-  still enforced)` (`guard-fast-lane-delta`, exits 0):** no cached develop
-  count was found (cold cache, first run after this feature landed, or an
-  eviction). Not an error -- `guard-timing-policy`'s absolute ceiling is
-  still enforcing normally. No action needed.
+  still enforced)`** (`--delta-check` callers that omit
+  `--require-develop-baseline`, exits 0): no cached develop count was found.
+  This compatibility mode is not used by the pull-request workflow.
 - **Nightly issue "Fast-lane ceiling needs a quantum bump":** open a normal
   PR making the exact edit the issue body names (ceiling bump +
   `fast_lane_ceiling_log.md` entry). The issue self-clears (patched once,
@@ -190,14 +208,14 @@ not silently demote the count guards.
 
 Not to be confused with w6: that gate is about *replacing* the fast lane's
 count ceiling. This is the `medium-test` job's `timeout-minutes` in
-`.github/workflows/pr.yml` -- a hard cancel, not a policy check.
+`.github/workflows/ci.yml` -- a hard cancel, not a policy check.
 
 Sizing rule: **observed p95 + >=30% headroom**, rounded up. The timeout is
 the only backstop against a genuinely hung medium tier, so it is not set to
 a large "never think about it again" value -- that converts a hang into an
 hour-long queue stall.
 
-**2026-07-25 resize, 30 -> 40 min.** Last 20 `pr.yml` runs: min 20.2 /
+**2026-07-25 resize, 30 -> 40 min.** Last 20 runs of the former `pr.yml`: min 20.2 /
 median 27.4 / p95 29.9 min, with 8 of 19 successful runs within 48s of the
 old 30-minute cap. PR #1306 was cancelled twice at 30m16s having reached
 95% of the suite; it added three monkeypatched tests worth ~2s, so it was
@@ -219,11 +237,33 @@ per the rule above, or split the tier. `MEDIUM_TEST_TIMEOUT_MINUTES` in
 `_project/scripts/dev_loop_pr_metrics.py` must be updated with the workflow
 so the metric and the budget it measures cannot drift apart.
 
+## Linux queue partitions
+
+The medium tier collects its complete marker-selected test set once at the
+checked commit, then splits sorted node IDs across two standard Linux runners.
+Each shard preserves the medium timeout and worker limits. Pytest records its
+actual collection and execution; the core result rejects missing, duplicate,
+deselected, failed, or stale evidence before accepting the combined set.
+`make test-medium` remains the full local suite.
+
+The correctness tier also uses two Linux runners. Every existing Make command
+belongs to exactly one partition, including the value, digest, query-set, and
+no-skip checks. Raw bundled dbgen framing remains a required pre-merge check on
+macOS and Windows. It also runs in the nightly Python 3.12 cells on Linux,
+macOS, and Windows, alongside the installed-wheel generator smoke.
+
+At maximum packaging coverage, the heavy payload uses ten standard Linux
+runners, including the shared collector. This follows the approved sharding
+allowance in [the development-loop ADR](../development/adr/adr-dev-loop-v2.md).
+Classifier, aggregate, fast-tier, and other merge-unit jobs are counted
+separately. Hosted shard timings must establish the queue wall-time budget;
+equal node counts alone do not prove balanced duration.
+
 ## Required-gate versus whole-event fan-out
 
-Merge-unblock latency is the last **required** context (`ci-required-result`,
-`Results Explorer browser gate`, `ruleset-drift`, `Public-site visual acceptance`).
-The remaining documentation, integration samples, and other synchronize jobs
+Merge-unblock latency is the last **required** context (`core`, `explorer`,
+`results-data`, `docs`, `landing`, `tooling`).
+The remaining integration samples and other synchronize jobs
 are all-workflow fan-out: they consume runner-minutes and can extend wall time
 after the PR is already mergeable.
 `dev_loop_pr_metrics.py --event-fanout` emits the versioned

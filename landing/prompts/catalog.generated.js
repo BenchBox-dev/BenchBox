@@ -182,6 +182,26 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
       "credential_deployments": [
         "self-hosted"
       ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "citus",
+      "install_command": "uv add 'psycopg[binary]'",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "citus",
+      "safety_terms": {
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
+    },
+    {
+      "cost_class": "free",
+      "credential_deployments": [
+        "self-hosted"
+      ],
       "dependency_check_command": "uv run benchbox check-deps --platform clickhouse",
       "dependency_check_platform": "clickhouse",
       "deployments": [
@@ -673,6 +693,26 @@ window.__BENCHBOX_PROMPT_CATALOG__ = {
         "dataframe"
       ],
       "label": "Pandas"
+    },
+    {
+      "cost_class": "free",
+      "credential_deployments": [
+        "self-hosted"
+      ],
+      "deployments": [
+        "self-hosted"
+      ],
+      "id": "paradedb",
+      "install_command": "uv add 'psycopg[binary]'",
+      "interfaces": [
+        "sql"
+      ],
+      "label": "paradedb",
+      "safety_terms": {
+        "dependency": "Check platform SDK and connector dependencies before any live run.",
+        "dry_run": "Use a dry run to inspect commands before any live run.",
+        "no_secrets": "Configure platform connection credentials in your shell env or config files. Do NOT paste credentials in chat."
+      }
     },
     {
       "cost_class": "paid_credits",
