@@ -127,7 +127,7 @@ def bootstrap_base_allowed(root: Path, base: str) -> bool:
 
 
 def comparison_base(root: Path, base: str) -> str:
-    if os.environ.get("GITHUB_ACTIONS") != "true":
+    if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_EVENT_NAME") != "pull_request":
         return base
     parents = subprocess.check_output(["git", "-C", str(root), "rev-list", "--parents", "-n", "1", "HEAD"], text=True)
     parents = parents.split()[1:]

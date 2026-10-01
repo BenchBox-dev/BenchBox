@@ -318,6 +318,9 @@ def test_ci_comparison_base_is_the_merge_target_not_the_stale_event_base(
 ) -> None:
     event_base, target_tip, pr_head = merge_commit_repo(tmp_path)
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "merge_group")
+    assert policy_runner.comparison_base(tmp_path, event_base) == event_base
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
     assert policy_runner.comparison_base(tmp_path, event_base) == target_tip
     with pytest.raises(ValueError, match="not an ancestor"):
         policy_runner.comparison_base(tmp_path, pr_head)
