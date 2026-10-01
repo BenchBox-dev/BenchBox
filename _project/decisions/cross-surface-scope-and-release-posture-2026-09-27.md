@@ -41,11 +41,26 @@ authority. Out of scope for the cross-surface gate, by construction:
 
 ## Release-branch posture
 
+Cross-surface enforcement is a develop-time gate. It is not a release-time
+gate.
+
 `ci.yml` has no branch filter on `pull_request`, so a pull request opened
-against `release` runs the same path-aware unit checks as one against
-`develop`, including the blocking correctness-gate suite and its `GATES`
-cross-surface reports when the touched paths select them. `test.yml`
-additionally runs the bounded `test-correctness-gate` on release-bound pull
-requests. The `release` ruleset rejects direct pushes, so every change reaches
-it through a pull request. Adding the full cross-surface suite to `test.yml` is
-a separate, explicitly approved CI change if it is ever wanted.
+against `release` triggers the same workflow as one against `develop`, but the
+`release` ruleset does not require its results. The required checks are
+`validate-base` and `release-required-result`
+(`docs/operations/repo-admin-settings.md`). `release-required-result`
+aggregates `test.yml`, which runs the bounded `test-correctness-gate`
+(`make test-correctness-gate`, a strict expected-results run of the local
+platform benchmark matrix) and does not include `ci.yml`'s `core` unit or its
+`GATES` cross-surface reports. Those reports can run on a release pull request,
+but nothing makes them merge-blocking there.
+
+The `release` ruleset rejects direct pushes, so every change reaches it through
+a pull request. Making cross-surface coverage a release requirement would be a
+separate, explicitly approved change to `test.yml` or the ruleset.
+
+Known limitation: release curation (`make release-cut`) removes
+`_project/scripts/todo_state_contract_check.py`, while `ci.yml` runs it on every
+pull request without a condition. As written, that step cannot succeed on a
+curated release tree, so `ci.yml` results on release pull requests are not a
+usable signal until the two are reconciled. This record does not change either.
