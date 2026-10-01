@@ -4,7 +4,7 @@
     "Q15, Q34, Q38 and Q87 match on the expression family at SF=0.1 after the fix, or are reclassified with evidence",
     "pandas results for these queries are unchanged"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T10). Hypothesis only. D4 (NULL-order policy) is recorded in dfparity-t00-owner-decisions: NULL order is fixed in implementations, not absorbed by the comparator. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T10). Hypothesis only. D4 (NULL-order policy) is recorded in dfparity-t00-owner-decisions: NULL order is fixed in implementations, not absorbed by the comparator. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-01: fixed and published as PR #2502 (branch fix/tpcds-null-order-and-set-ops, worktree ../BenchBox.wt-tpcds-null-semantics, head ac113e57b), held, auto-merge withheld; make pr-preflight exit 0 on that head. CAUSES (TESTED, hypothesis confirmed with a correction): (1) Q15 and Q34 expression: Polars sorts NULLs first, the reference sorts them last; (2) Q15 pandas: groupby drops the NULL zip group (30 rows vs 29), and Q34 pandas leaked NaN for NULL names; (3) Q38/Q87 expression: Polars join does not match NULL keys, SQL INTERSECT/EXCEPT do (Q38 1 vs 0, Q87 4809 vs 4830 at SF 0.1); pandas already correct. Evidence: full per-query probe at SF 0.1 before/after: exactly 6 cells changed, all divergent to match (Q15 and Q34 both families, Q38 and Q87 expression), no other cell changed (28 to 22 divergent); at SF 0.03 Q34 and Q87 expression changed the same way (22 to 20); staged gate at 0.01 unchanged (146/198, 52 empty, 0 divergent); 6 of 10 new unit cases fail without the fix. Note: acceptance said pandas unchanged for these queries; Q15 and Q34 pandas improved (divergent to match), no pandas regression. Remaining: hosted CI, maintainer merge, then finish.",
   "description": "Hypothesis from a prior review (not verified by me): Q15 and Q34 on the expression family put NULLs first at position 0, and Q38/Q87 (EXCEPT/INTERSECT) differ because a Polars join treats NULL keys as unequal while SQL set operations treat them as equal (pandas merge matches NaN keys and Q38/Q87 pass on pandas). Reproduce, then fix at the cause with NULL-safe set operations and explicit NULL ordering. If a case is actually parameter drift or a tie, reclassify it.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "a0ec8cb942f44dff9b5ddcca809e4efe",
       "op": "take",
       "op_id": "fe1fb4a128394ed3a9c6fb2d3739b1fa",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T16:37:12Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3069af761dcc4c17a78f79132c6effa0",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
