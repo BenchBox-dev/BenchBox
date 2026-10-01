@@ -286,6 +286,12 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
     larger or longer literals, scientific notation and negative results keep SQLite's
     semantics and are left alone. The rewrite is not benchmark-scoped: any SQLite query with
     such an ``l_discount`` bound is folded, including the TPC-Havoc Q6 variants.
+
+    The folded bound is the exact decimal endpoint, so the comparison follows exact decimal
+    semantics in both directions. SQLite's noisy endpoint can sit just below the exact value
+    (dropping an endpoint row, the Q6 defect) or just above it. A stored value inside that
+    noise band, about 1e-16 from the endpoint, is therefore decided by the exact endpoint.
+    TPC-H discounts are ``DECIMAL(15,2)``, so no stored value lies in that band.
     """
     # Most SQLite queries need no extra parse. The AST, not this hint, selects rewrites.
     if not re.search(r"\bl_discount\b", query, re.IGNORECASE) or not re.search(r"\bBETWEEN\b", query, re.IGNORECASE):

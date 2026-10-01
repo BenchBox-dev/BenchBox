@@ -126,6 +126,60 @@ class TestSQLiteDiscountBoundaries:
         finally:
             connection.close()
 
+    def test_two_decimal_discount_domain_matches_exact_decimal_semantics(self):
+        import sqlite3
+        from decimal import Decimal
+
+        from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
+
+        values = [f"{cents / 100:.2f}" for cents in range(101)]
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.execute("CREATE TABLE lineitem (l_discount DECIMAL(15,2))")
+            connection.executemany("INSERT INTO lineitem VALUES (?)", [(value,) for value in values])
+            original_wrong = rewritten_wrong = checked = 0
+            for cents in range(101):
+                for delta in ("0.01", "0.02", "0.05"):
+                    low, high = (
+                        Decimal(f"{cents / 100:.2f}") - Decimal(delta),
+                        Decimal(f"{cents / 100:.2f}") + Decimal(delta),
+                    )
+                    if low < 0:
+                        continue
+                    query = (
+                        f"SELECT l_discount FROM lineitem WHERE l_discount BETWEEN {cents / 100:.2f} - {delta} "
+                        f"AND {cents / 100:.2f} + {delta} ORDER BY l_discount"
+                    )
+                    expected = [float(value) for value in values if low <= Decimal(value) <= high]
+                    checked += 1
+                    original_wrong += [row[0] for row in connection.execute(query).fetchall()] != expected
+                    rewritten = _fix_sqlite_unsupported_syntax(query)
+                    rewritten_wrong += [row[0] for row in connection.execute(rewritten).fetchall()] != expected
+            assert checked > 250
+            assert original_wrong > 0, "the sweep must exercise the SQLite boundary defect"
+            assert rewritten_wrong == 0
+        finally:
+            connection.close()
+
+    def test_value_inside_the_double_noise_band_follows_exact_decimal_semantics(self):
+        import sqlite3
+
+        from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
+
+        # 0.1 + 0.2 - 0.3 is 5.55e-17 in doubles but exactly 0. A stored 1e-17 lies in that band, so
+        # SQLite's noisy bound matches it and the exact endpoint does not. TPC-H discounts have two
+        # decimals, so this cannot occur in the benchmark data; the behavior is documented, not relied on.
+        query = (
+            "WITH t AS (SELECT 0.00000000000000001 AS l_discount) SELECT l_discount FROM t "
+            "WHERE l_discount BETWEEN (0.0 + 0.0) AND (0.1 + 0.2 - 0.3)"
+        )
+        connection = sqlite3.connect(":memory:")
+        try:
+            assert connection.execute(query).fetchall() == [(1e-17,)]
+            assert connection.execute(_fix_sqlite_unsupported_syntax(query)).fetchall() == []
+        finally:
+            connection.close()
+
     @pytest.mark.parametrize(
         "rows, low, high, expected",
         [
