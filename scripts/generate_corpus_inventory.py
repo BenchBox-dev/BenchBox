@@ -284,21 +284,21 @@ def generate_inventory(bundles_dir: Path) -> dict:
         )
     )
 
-    cohorts: dict[str, list[str]] = {}
-    cohort_members: defaultdict[tuple[str, str, str], set[str]] = defaultdict(set)
+    # Phase-suffixed throughput cohorts keep multi-stream throughput runs out of
+    # single-stream power cohorts, which share (benchmark, sf) keys downstream.
+    # Power and unknown phases both use the legacy bare key, so members merge
+    # by final key instead of overwriting one another.
+    cohort_members: defaultdict[str, set[str]] = defaultdict(set)
     for entry in entries:
-        key = (entry["benchmark"], str(entry["scale_factor"]), str(entry.get("phase", "unknown")))
+        phase = str(entry.get("phase", "unknown"))
+        suffix = "" if phase in ("power", "unknown") else f"#{phase}"
+        key = f"{entry['benchmark']}@sf{entry['scale_factor']}{suffix}"
         identity = entry["platform"]
         if entry["platform_version"] != "unknown":
             identity = f"{identity} v{entry['platform_version']}"
         cohort_members[key].add(identity)
 
-    for (benchmark, scale_factor, phase), platforms in sorted(cohort_members.items()):
-        # Phase-suffixed throughput cohorts keep multi-stream throughput runs
-        # out of single-stream power cohorts, which share (benchmark, sf)
-        # keys downstream. Power-phase cohorts keep the legacy bare key.
-        suffix = "" if phase in ("power", "unknown") else f"#{phase}"
-        cohorts[f"{benchmark}@sf{scale_factor}{suffix}"] = sorted(platforms)
+    cohorts: dict[str, list[str]] = {key: sorted(platforms) for key, platforms in sorted(cohort_members.items())}
 
     by_benchmark = Counter(entry["benchmark"] for entry in entries)
     by_platform = Counter(entry["platform"] for entry in entries)

@@ -371,6 +371,17 @@ class TestMain:
         phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
         assert phases == {"tp.json": "throughput", "pw.json": "power", "none.json": "unknown"}
 
+    def test_unknown_phase_merges_with_power_cohort(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        power["benchmark"]["test_type"] = "power"
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        unknown = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DataFusion")
+        (tmp_path / "unknown.json").write_text(json.dumps(unknown), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        assert inventory["cohorts"] == {"tpch@sf1.0": ["DataFusion v1.0.0", "DuckDB v1.0.0"]}
+
     def test_throughput_runs_do_not_pollute_power_cohorts(self, tmp_path: Path) -> None:
         power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
         power["benchmark"]["test_type"] = "power"
