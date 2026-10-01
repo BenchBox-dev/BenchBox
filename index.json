@@ -17873,6 +17873,15 @@
       "status": "open",
       "title": "Capture actual Spark session config at preflight and flag discrepancies"
     },
+    "spark-family-session-config-velox-lakesail": {
+      "claim": null,
+      "needs": [
+        "spark-session-config-runtime"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Support tuning spark map on Velox/Gluten and LakeSail separately"
+    },
     "spark-mixin-open-table-format-loading": {
       "claim": null,
       "needs": [],
