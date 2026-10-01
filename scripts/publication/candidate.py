@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import shutil
+import subprocess
 import sys
 import zipfile
 from dataclasses import asdict, dataclass, replace
@@ -30,6 +31,11 @@ EXPECTED_WORKFLOW_NAME = "Publication Control Plane Deployment"
 EXPECTED_WORKFLOW_PATH = ".github/workflows/publication-deploy.yml"
 MAX_CANDIDATE_MEMBERS = 100_000
 MAX_CANDIDATE_UNCOMPRESSED_BYTES = 4 * 1024 * 1024 * 1024
+# A candidate stays promotable while its develop commit is an ancestor of the
+# protected tip and no more than this many develop commits behind it. The
+# bound keeps a queued approval usable across merge-queue landings while still
+# rejecting pathologically stale bundles.
+DEFAULT_DEVELOP_MAX_BEHIND_COMMITS = 50
 
 
 class CandidateValidationError(ValueError):
@@ -42,6 +48,60 @@ def _sha256(value: str) -> bool:
 
 def _commit_sha(value: str) -> bool:
     return len(value) == 40 and all(char in "0123456789abcdef" for char in value)
+
+
+def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def is_ancestor_commit(repo: Path, ancestor: str, descendant: str) -> bool:
+    """Return True when ancestor is reachable from descendant in repo."""
+    if not _commit_sha(ancestor) or not _commit_sha(descendant):
+        return False
+    return _git(repo, "merge-base", "--is-ancestor", ancestor, descendant).returncode == 0
+
+
+def commits_behind(repo: Path, ancestor: str, descendant: str) -> int:
+    """Count commits descendant is ahead of ancestor; -1 when unmeasurable."""
+    result = _git(repo, "rev-list", "--count", f"{ancestor}..{descendant}")
+    if result.returncode != 0:
+        return -1
+    try:
+        return int(result.stdout.strip())
+    except ValueError:
+        return -1
+
+
+def check_develop_freshness(
+    develop_sha: str,
+    expected_develop_sha: str,
+    *,
+    max_behind_commits: int = DEFAULT_DEVELOP_MAX_BEHIND_COMMITS,
+    repo: Path = ROOT,
+) -> None:
+    """Accept a candidate built from the tip or a recent ancestor of it.
+
+    Raises CandidateValidationError when the candidate's develop commit is
+    not reachable from the protected tip, when either SHA is malformed or
+    unknown to the repository, or when the candidate trails the tip by more
+    than max_behind_commits commits.
+    """
+    if not _commit_sha(develop_sha) or not _commit_sha(expected_develop_sha):
+        raise CandidateValidationError("candidate develop SHA is stale")
+    if develop_sha == expected_develop_sha:
+        return
+    if max_behind_commits < 0:
+        raise CandidateValidationError("candidate develop SHA is stale")
+    if not is_ancestor_commit(repo, develop_sha, expected_develop_sha):
+        raise CandidateValidationError("candidate develop SHA is stale")
+    behind = commits_behind(repo, develop_sha, expected_develop_sha)
+    if behind < 0 or behind > max_behind_commits:
+        raise CandidateValidationError("candidate develop SHA is stale")
 
 
 def archive_sha256(path: Path) -> str:
@@ -154,6 +214,8 @@ def validate_candidate_directory(  # noqa: C901 - this is one fail-closed valida
     run_metadata: dict[str, Any],
     artifact_metadata: dict[str, Any],
     expected_develop_sha: str | None = None,
+    develop_max_behind_commits: int = DEFAULT_DEVELOP_MAX_BEHIND_COMMITS,
+    develop_repo: Path | None = None,
     expected_published_results_sha: str | None = None,
     expected_generation: int | None = None,
     expected_parent_sha: str | None = None,
@@ -198,8 +260,16 @@ def validate_candidate_directory(  # noqa: C901 - this is one fail-closed valida
         raise CandidateValidationError("candidate target or source branch is invalid")
     if manifest.get("source_commit") != manifest.get("develop_sha"):
         raise CandidateValidationError("candidate source_commit and develop_sha differ")
-    if expected_develop_sha and manifest.get("develop_sha") != expected_develop_sha:
-        raise CandidateValidationError("candidate develop SHA is stale")
+    if expected_develop_sha:
+        develop_sha = manifest.get("develop_sha")
+        if not isinstance(develop_sha, str):
+            raise CandidateValidationError("candidate develop SHA is stale")
+        check_develop_freshness(
+            develop_sha,
+            expected_develop_sha,
+            max_behind_commits=develop_max_behind_commits,
+            repo=develop_repo or ROOT,
+        )
     if expected_published_results_sha and manifest.get("published_results_sha") != expected_published_results_sha:
         raise CandidateValidationError("candidate published-results SHA is stale")
     if expected_generation is not None and manifest.get("generation") != expected_generation:
@@ -360,6 +430,12 @@ def main(argv: list[str] | None = None) -> int:
     validate.add_argument("--artifact-metadata", type=Path, required=True)
     validate.add_argument("--run-metadata", type=Path, required=True)
     validate.add_argument("--expected-develop-sha")
+    validate.add_argument(
+        "--develop-max-behind-commits",
+        type=int,
+        default=DEFAULT_DEVELOP_MAX_BEHIND_COMMITS,
+    )
+    validate.add_argument("--develop-repo", type=Path, default=None)
     validate.add_argument("--expected-published-results-sha")
     validate.add_argument("--expected-generation", type=int)
     validate.add_argument("--expected-parent-sha")
@@ -387,6 +463,8 @@ def main(argv: list[str] | None = None) -> int:
                 run_metadata=_load_object(args.run_metadata),
                 artifact_metadata=_load_object(args.artifact_metadata),
                 expected_develop_sha=args.expected_develop_sha,
+                develop_max_behind_commits=args.develop_max_behind_commits,
+                develop_repo=args.develop_repo,
                 expected_published_results_sha=args.expected_published_results_sha,
                 expected_generation=args.expected_generation,
                 expected_parent_sha=args.expected_parent_sha,
