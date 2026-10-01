@@ -527,7 +527,10 @@ def apply_external_entries(resolved: list[dict[str, Any]], entries: list[dict[st
         for entry in entries:
             if matches(record["path"], entry["selector"]):
                 record.update(
-                    owner=entry["owner"], state="excluded", blocking_disposition=entry["provenance"], rule="external"
+                    owner=entry["owner"],
+                    state="excluded",
+                    blocking_disposition=entry["blocking_disposition"],
+                    rule="external",
                 )
                 break
 
@@ -562,6 +565,7 @@ def verify_png_signature(path: str, blob: bytes) -> bool:
 
 
 MARKDOWN_BLOCK_PREFIX = re.compile(r"^\s*(?:>\s*)*(?:(?:[-*+]|\d+[.)])\s+)*")
+MARKDOWN_LINK_REFERENCE = re.compile(r"\[(?!\^)[^\]]+\]:")
 MARKDOWN_COMMENT_MARKERS = re.compile(
     r"<!--|\{/\*|\{%|\{#|<(?:pre|code|script|style)\b|\[(?://|comment)\]\s*:\s*(?:#|<>)", re.IGNORECASE
 )
@@ -584,7 +588,8 @@ def verify_markdown_prose(path: str, blob: bytes) -> bool:
             return False
         if MARKDOWN_COMMENT_MARKERS.search(line):
             return False
-        if MARKDOWN_BLOCK_PREFIX.sub("", line).startswith(("```", "~~~")):
+        block = MARKDOWN_BLOCK_PREFIX.sub("", line)
+        if block.startswith(("```", "~~~")) or MARKDOWN_LINK_REFERENCE.match(block):
             return False
     return True
 

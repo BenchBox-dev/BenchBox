@@ -768,6 +768,7 @@ def test_external_entry_excludes_unowned_paths_only(policy: dict) -> None:
         record["rule"] = None if record["owner"] is None else "r"
     scope.apply_external_entries(resolved, entries)
     assert (resolved[0]["owner"], resolved[0]["state"]) == ("comment-cleanup-external-ownership", "excluded")
+    assert resolved[0]["blocking_disposition"] == "Excluded."
     assert resolved[1]["owner"] == "comment-cleanup-owned"
     assert resolved[2]["owner"] is None
 
@@ -897,10 +898,19 @@ def test_strict_json_verifier_rejects_comment_conventions_and_ambiguity(path: st
         b"<pre>code</pre>\n",
         b"<SCRIPT>x</SCRIPT>\n",
         b"  % myst comment\n",
+        b"[todo]: ../planning/item.yaml\n",
+        b'[a]: <https://example.com> "hidden title"\n',
+        b"- [a]: target\n",
+        b"> [a]: target\n",
     ],
 )
 def test_markdown_prose_verifier_rejects_every_comment_or_code_form(blob: bytes) -> None:
     assert not scope.verify_markdown_prose("a.md", blob)
+
+
+def test_markdown_prose_verifier_keeps_visible_links_and_footnotes() -> None:
+    blob = b"See [the guide](guide.md) and the note[^1].\n\nRef: see [a]: b in running text.\n\n[^1]: A visible note.\n"
+    assert scope.verify_markdown_prose("a.md", blob)
 
 
 def test_sql_verifier_requires_the_absence_of_comment_markers() -> None:

@@ -107,8 +107,10 @@ unowned, and ambiguity counts as failure.
 - `png-signature`: the file starts with the PNG signature. It does not validate
   the image or its metadata chunks.
 - `markdown-prose`: no code fence (also inside quotes and lists), indented line,
-  `<pre>`, `<code>`, `<script>` or `<style>` tag, HTML, link-reference, MDX,
-  MyST, Liquid or Jinja comment marker, or commented front matter.
+  `<pre>`, `<code>`, `<script>` or `<style>` tag, HTML, MDX, MyST, Liquid or
+  Jinja comment marker, link reference definition (any label, because its title
+  can hold hidden text), or commented front matter. Footnote definitions and
+  inline links are allowed.
 - `sql-without-comment-markers`: no `--`, `/*` or `#` anywhere in the file.
 
 A class applies only to unclaimed paths under its selectors with a listed
