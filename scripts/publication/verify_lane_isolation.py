@@ -163,6 +163,8 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     ".todo-db/",
     # Import-layering config: consumed by CI lint, never read by lane builds.
     ".importlinter",
+    # Spellcheck wordlist: consumed by CI spellcheck, never read by lane builds.
+    ".codespell-ignore.txt",
 )
 
 LANE_PREFIXES: dict[str, tuple[str, ...]] = {

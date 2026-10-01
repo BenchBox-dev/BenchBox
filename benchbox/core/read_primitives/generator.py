@@ -55,14 +55,14 @@ class ReadPrimitivesDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             scale_factor=scale_factor, output_dir=output_dir, verbose=verbose, **kwargs
         )
 
-    def generate_data(self, tables: Optional[list[str]] = None) -> dict[str, str]:
+    def generate_data(self, tables: Optional[list[str]] = None) -> dict[str, str | list[str]]:
         """Generate Read Primitives data files using TPC-H data generator.
 
         Args:
             tables: Optional list of table names to generate. If None, generates all tables.
 
         Returns:
-            Dictionary mapping table names to file paths
+            Dictionary mapping table names to a file path or an ordered list of shard paths.
         """
 
         # Use centralized cloud/local generation handler
@@ -80,8 +80,9 @@ class ReadPrimitivesDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         # shares TPC-H data. Validation engines should accept TPC-H manifests
         # for Read Primitives benchmarks since they use the same data.
 
-        # Convert Path objects to strings for compatibility
-        return {k: str(v) for k, v in result.items()}
+        # Preserve shard boundaries while converting paths for platform consumers.
+        # Stringifying a whole list produces a repr rather than usable file paths.
+        return {k: [str(path) for path in v] if isinstance(v, list) else str(v) for k, v in result.items()}
 
     def _generate_data_local(self, output_dir: Path, tables: Optional[list[str]] = None) -> dict[str, TablePaths]:
         """Generate Read Primitives data files locally using TPC-H data generator."""

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,8 @@ spec.loader.exec_module(check_release_curation)
 
 CURATED_PROJECT_DEPENDENT_TESTS = {
     "tests/unit/scripts/test_check_complexity.py",
+    "tests/unit/scripts/test_fast_lane_ceiling_check.py",
+    "tests/unit/scripts/test_timing_policy_check.py",
 }
 RELEASE_SAFE_PROJECT_TESTS = {
     "tests/unit/scripts/test_check_makefile_inventory.py",
@@ -259,21 +262,75 @@ def test_curated_release_make_runtime_fails_closed_when_module_is_omitted(tmp_pa
     assert "No such file or directory" in result.stderr
 
 
+def _release_curation_recipes() -> tuple[str, str]:
+    """Use the shipped removal commands and guard without executing release-cut."""
+    text = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    target = re.search(r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)", text, re.MULTILINE)
+    assert target is not None
+    body = target.group(1)
+    removals = "\n".join(line for line in body.splitlines() if line.startswith("\tgit rm "))
+    guard = re.search(r"\t@LEFTOVER=.*?\n\tfi", body, re.DOTALL)
+    assert removals and guard is not None
+    return removals, guard.group(0)
+
+
+@pytest.mark.parametrize("relative", sorted(CURATED_PROJECT_DEPENDENT_TESTS))
+def test_release_curation_guard_rejects_retained_project_test(tmp_path: Path, relative: str) -> None:
+    retained = tmp_path / relative
+    retained.parent.mkdir(parents=True)
+    retained.write_text("# accidentally retained development test\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "add", relative], cwd=tmp_path, check=True, capture_output=True)
+    _, guard = _release_curation_recipes()
+    (tmp_path / "guard.mk").write_text("guard:\n" + guard + "\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["make", "--no-print-directory", "-f", "guard.mk", "guard"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "release curation incomplete" in result.stderr
+    assert relative in result.stderr
+
+
 def test_curated_release_removes_dangling_project_test_and_runs_retained_tests(
     tmp_path: Path,
 ) -> None:
     curated = check_release_curation.parse_curation_list(REPO_ROOT / "Makefile")
-    assert curated >= CURATED_PROJECT_DEPENDENT_TESTS
     assert curated.isdisjoint(RELEASE_SAFE_PROJECT_TESTS)
 
     _copy_curated_make_runtime(tmp_path)
     shutil.copytree(REPO_ROOT / "benchbox", tmp_path / "benchbox")
-    retained_tests = []
+    for relative in sorted(CURATED_PROJECT_DEPENDENT_TESTS):
+        project_test = tmp_path / relative
+        project_test.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / relative, project_test)
+    project_scripts = tmp_path / "_project" / "scripts"
+    project_scripts.mkdir(parents=True)
+    for name in ["fast_lane_ceiling_check.py", "timing_policy_check.py", "timing_audit.py"]:
+        shutil.copy2(REPO_ROOT / "_project" / "scripts" / name, project_scripts / name)
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(["git", "add", "tests", "_project"], cwd=tmp_path, check=True, capture_output=True)
+    removals, guard = _release_curation_recipes()
+    (tmp_path / "curate.mk").write_text("curate:\n" + removals + "\n" + guard + "\n", encoding="utf-8")
+    curation = subprocess.run(
+        ["make", "--no-print-directory", "-f", "curate.mk", "curate"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert curation.returncode == 0, curation.stdout + curation.stderr
+    assert not project_scripts.exists()
+
     for relative in sorted(RELEASE_SAFE_PROJECT_TESTS):
         retained_test = tmp_path / relative
         retained_test.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / relative, retained_test)
-        retained_tests.append(str(retained_test))
 
     env = {
         key: value
@@ -281,7 +338,7 @@ def test_curated_release_removes_dangling_project_test_and_runs_retained_tests(
         if not key.startswith(("PYTEST_XDIST", "COV_CORE")) and key != "PYTEST_CURRENT_TEST"
     }
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", "-q", "-n", "0", "-p", "no:cacheprovider", *retained_tests],
+        [sys.executable, "-m", "pytest", "-q", "-n", "0", "-p", "no:cacheprovider", "-m", "fast", "tests"],
         cwd=tmp_path,
         check=False,
         capture_output=True,
@@ -289,5 +346,5 @@ def test_curated_release_removes_dangling_project_test_and_runs_retained_tests(
         env=env,
     )
 
-    assert result.returncode == 0, result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     assert "passed" in result.stdout

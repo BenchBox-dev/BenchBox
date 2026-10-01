@@ -332,7 +332,7 @@ class ExpressionFamilyContext(DataFrameContextImpl[DF], Generic[DF, Expr]):
         # Check platform type from adapter
         platform = self._adapter.platform_name
 
-        if platform == "PySpark":
+        if platform in {"PySpark", "LakeSail"}:
             # For PySpark, we just store the condition - F.when is called in then()
             return UnifiedWhen(cond, platform="PySpark")
 
