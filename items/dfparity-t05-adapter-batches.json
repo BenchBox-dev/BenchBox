@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Batch items exist in the tracker, each with explicit queries, acceptance (match at SF=0.1 on both families or documented reason) and needs on t04 and t02",
+    "Category (c) queries are in their own items with an effort estimate",
+    "dfparity-t06, t07, t19 and t20 are updated to need every batch item"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T5). Estimated 3-5 days for the adapters (judgement, not measured). Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "After the prototype (T4) and the inventory (T2), partition the remaining queries into batches of about 10 and CREATE one tracker item per batch (ids dfparity-t05a, t05b, ...), each: write per-query adapters from dsqgen -LOG to DataFrame keys, make the implementation read the mapped keys, delete dead YAML keys in default_parameters.yaml, and shrink the T2 xfail list. Category (c) queries (hard-coded semantics) need rewrites and may exceed one batch; budget them separately if more than about 15. When the batch items exist, update the needs of dfparity-t06, t07, t19 and t20 to include every batch item, because dependencies are done-only and this item closes when the batches are created, not when they are implemented.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:11:22Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2769b2047d12471f9c72f28b22cdf95c",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
