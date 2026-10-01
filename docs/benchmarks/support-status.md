@@ -65,7 +65,7 @@ integrity spec, query count, dataset/source, scales, and DataFrame capability.
 | `tpcdi` | `beta` | 38-query data-integration workload; generated; integrity spec; docs; scales to SF10; DataFrame-capable. | Confirm canonical transform/query completeness and a maintenance commitment before `stable`. |
 | `h2odb` | `beta` | 10-query data-science groupby/join; generated; integrity spec; docs; DataFrame-capable. | Broaden cross-platform coverage evidence before `stable`. |
 | `amplab` | `beta` | 8-query big-data subset; generated; integrity spec; docs; DataFrame-capable. | Small canonical subset; confirm dataset contract breadth before `stable`. |
-| `read_primitives` | `beta` | 136-query read-primitive matrix; derived from TPC-H data; integrity spec; docs; DataFrame-capable. | Pin the derived-from-`tpch` dataset contract and confirm DataFrame parity before `stable`. |
+| `read_primitives` | `beta` | 157-query read-primitive matrix; derived from TPC-H data; integrity spec; docs; DataFrame-capable. | Pin the derived-from-`tpch` dataset contract and confirm DataFrame parity before `stable`. |
 | `write_primitives` | `beta` | 12-query non-transactional writes; derived from TPC-H; integrity spec; docs; DataFrame-capable. | Broad cross-platform write support still maturing. |
 | `metadata_primitives` | `beta` | 62-query catalog introspection; no data generation (`requires_tables_object=false`); integrity spec; docs; DataFrame-capable. | Cross-dialect catalog coverage still expanding. |
 | `transaction_primitives` | `beta` | 12-query ACID/isolation workload; derived from TPC-H; integrity spec (`high_failure_expected`); docs; DataFrame-capable. | ACID adapter coverage limited (PostgreSQL/MySQL/SQL Server adapters planned). |
