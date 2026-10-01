@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Overrides apply only to queries flagged as consuming their parameters",
+    "A seeded production DataFrame run for an enabled query uses the seed's parameters; a non-enabled query is unchanged",
+    "TPC-H behavior is unchanged"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T7). Add every batch item created by dfparity-t05 to this item's needs when they exist. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Restore the override call in the production DataFrame path (benchbox/platforms/dataframe/benchmark_mixin.py; set_parameter_overrides has had no production caller since #2126) but only for queries whose implementation consumes the mapped parameters with no literal fallback (per the T2 inventory and T6 lint). Unmapped keys are ignored by implementations, so enabling globally would ship partial, unfaithful parity as stale defaults. Needs owner decision D3 (runtime -LOG vs committed defaults) and must not change TPC-H behavior.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:13:19Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "97ce8aaaa65f4816a4e9e85fa349e40e",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
