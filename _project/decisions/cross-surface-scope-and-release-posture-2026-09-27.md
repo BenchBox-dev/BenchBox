@@ -16,39 +16,36 @@ at the gated scale (see the module docstring and
 `_project/analysis/cross-surface-oracle-independence.md` for per-benchmark
 provenance).
 
-Out of scope for the cross-surface gate, by construction:
+Which dual-surface benchmarks are enforced (`GATES`) or staged
+(`STAGED_GATES`) changes as burn-downs finish, so this record does not list
+them; `cross_surface.py` and `_project/analysis/oracle-coverage-map.md` are the
+authority. Out of scope for the cross-surface gate, by construction:
 
-- Operation-pipeline benchmarks with no DataFrame query surface route to the
-  w2 fallback oracle (differential second-engine check or curated
-  expected-results subset), not to a cross-surface builder:
-  `write_primitives`, `metadata_primitives`, `transaction_primitives`,
-  `tpcdi` (see `_project/analysis/cross-surface-applicability.md`).
-- Dual-surface benchmarks that have a SQL surface plus a DataFrame query
-  registry but are not currently gated, per
-  `_project/analysis/cross-surface-applicability.md`: `joinorder` and
-  `nyctaxi` are not cheaply gateable (bounded-scale rejection, canonical
-  manifest fetch, or downloader-backed network fetch); `tpch_skew` and
-  `tsbs_devops` have unverified SQL-to-DataFrame ID mappings (zero verbatim
-  ID overlap, mapping must be confirmed independently, never guessed);
-  `tpcds_obt` has an abandoned correspondence (OBT-native Q1..Q17 versus
-  TPC-DS numbered SQL IDs, ruled out without renumbering one side). These
-  stay outside `GATES` until their named precondition is met; the
-  `joinorder_synthetic` CI-enforced gate covers scaled smoke-test data for
-  the JoinOrder family in the meantime.
+- Operation-pipeline benchmarks with no DataFrame query surface need a
+  different oracle (a differential second-engine check or a curated
+  expected-results subset), not a cross-surface builder: `write_primitives`,
+  `metadata_primitives`, `transaction_primitives`, `tpcdi` (see
+  `_project/analysis/cross-surface-applicability.md`). That oracle does not
+  exist yet, so until it does these benchmarks have no cross-surface
+  protection; this record does not provide it.
+- `joinorder` stays outside `GATES`: it accepts only the canonical IMDb data at
+  `scale_factor=1.0`, which is not a bounded routine-PR cell. The
+  `joinorder_synthetic` CI-enforced gate covers scaled smoke-test data for the
+  JoinOrder family in the meantime.
+- `tpcds_obt` has an abandoned correspondence (OBT-native Q1..Q17 versus
+  TPC-DS numbered SQL IDs), ruled out without renumbering one side.
 - `ai_primitives` and `vector_search` stay `supports_dataframe: false` in
-  `benchmark_registry.yaml` and are likewise single-surface benchmarks
-  needing a fallback oracle, not cross-surface members.
-
-Building the w2 fallback oracle itself is explicitly out of scope here; this
-record only routes the benchmarks to it so they are not silently unguarded.
+  `benchmark_registry.yaml` and are single-surface benchmarks that need the
+  same non-cross-surface oracle.
 
 ## Release-branch posture
 
 `test.yml` runs only the bounded `test-correctness-gate` on release-bound
-pull requests; the per-benchmark cross-surface suite runs in `pr.yml` on
+pull requests; the per-benchmark cross-surface suite runs in `ci.yml` on
 `develop`. Release PRs therefore rely on develop-time squash-merge
 enforcement: every change entering `develop` passes the blocking
 correctness-gate suite (including all `GATES` cross-surface reports) before
-it can ride a release. Adding the cross-surface suite to `test.yml` is a
-separate, explicitly approved CI change if it is ever wanted; until then,
-release coverage is by inheritance, not by omission.
+it can ride a release. A change committed directly to a release branch without
+passing through `develop` (a hotfix) is not covered by that inheritance and
+gets only `test-correctness-gate`. Adding the cross-surface suite to
+`test.yml` is a separate, explicitly approved CI change if it is ever wanted.
