@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   baselineShaOrder,
   findTrustedBaseline,
+  JOBS_PAGE_SIZE,
   MAX_BASELINE_SHAS,
+  MAX_JOB_PAGES,
   trustedBaselineSource,
   waitForTrustedBaseline,
 } from "../../../scripts/public-site-visual-baseline-lookup.mjs";
@@ -48,10 +50,14 @@ function fakeGithub(
   const calls: string[] = [];
   const github = async (path: string) => {
     calls.push(path);
-    const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs$/);
+    // Like the real endpoint: 30 jobs per page unless per_page says otherwise (maximum 100).
+    const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs(?:\?(.*))?$/);
     if (jobsMatch) {
-      const runId = Number(jobsMatch[1]);
-      return { jobs: jobs[runId] ?? [] };
+      const query = new URLSearchParams(jobsMatch[2] ?? "");
+      const perPage = Math.min(Number(query.get("per_page") ?? 30), 100);
+      const page = Number(query.get("page") ?? 1);
+      const all = jobs[Number(jobsMatch[1])] ?? [];
+      return { total_count: all.length, jobs: all.slice((page - 1) * perPage, page * perPage) };
     }
     const runMatch = path.match(/\/actions\/runs\/(\d+)$/);
     if (runMatch) return runs[Number(runMatch[1])];
@@ -194,7 +200,7 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
       },
     );
     expect(await find(github)).toMatchObject({ source: "merge-queue", artifact: { id: 1 } });
-    expect(calls.some((path) => path.endsWith("/actions/runs/10/jobs"))).toBe(true);
+    expect(calls.some((path) => path.includes("/actions/runs/10/jobs"))).toBe(true);
   });
 
   it.each([
@@ -218,10 +224,61 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
       { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }) },
     );
     const github = async (path: string) => {
-      if (path.endsWith("/jobs")) throw new Error("jobs unavailable");
+      if (/\/jobs(\?|$)/.test(path)) throw new Error("jobs unavailable");
       return inner(path);
     };
     expect(await find(github)).toBeUndefined();
+  });
+
+  describe("when the run has more jobs than one page holds", () => {
+    const filler = (count: number) =>
+      Array.from({ length: count }, (_unused, index) => ({
+        name: `filler-${index}`,
+        status: "completed",
+        conclusion: "success",
+      }));
+    const leader = { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }) };
+    const visual = (status: string, conclusion: string) => ({ name: VISUAL, status, conclusion });
+
+    it("finds a successful visual job beyond the endpoint's default page of 30", async () => {
+      // CI declares more than 30 jobs, so the visual job can be on the second default page.
+      const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(40), visual("completed", "success")],
+      });
+      expect(await find(github)).toMatchObject({ source: "merge-queue", artifact: { id: 1 } });
+      expect(calls.some((path) => path.includes("/jobs?per_page=100"))).toBe(true);
+    });
+
+    it("follows further pages when the first full page of 100 does not contain it", async () => {
+      const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(150), visual("completed", "success")],
+      });
+      expect(await find(github)).toMatchObject({ source: "merge-queue" });
+      expect(calls.some((path) => path.endsWith("page=2"))).toBe(true);
+    });
+
+    it("does not trust a visual job that is still running on a later page", async () => {
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(40), visual("in_progress", "")],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+
+    it("does not trust a leader when a later duplicate of the visual job failed", async () => {
+      // Every job carrying the name must have succeeded, so a collision cannot launder a failure.
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [visual("completed", "success"), ...filler(120), visual("completed", "failure")],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+
+    it("fails closed rather than paging without bound", async () => {
+      const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(MAX_JOB_PAGES * JOBS_PAGE_SIZE), visual("completed", "success")],
+      });
+      expect(await find(github)).toBeUndefined();
+      expect(calls.filter((path) => path.includes("/jobs?")).length).toBe(MAX_JOB_PAGES);
+    });
   });
 
   it("never trusts a CI leader that finished without succeeding, even if its visual job passed", async () => {
@@ -247,7 +304,7 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
       { 10: [{ name: VISUAL, status: "completed", conclusion: "success" }] },
     );
     expect(await find(github)).toBeUndefined();
-    expect(calls.some((path) => path.endsWith("/actions/runs/10/jobs"))).toBe(false);
+    expect(calls.some((path) => path.includes("/actions/runs/10/jobs"))).toBe(false);
   });
 
   it("still prefers a landed develop baseline over an unfinished CI leader's candidate", async () => {

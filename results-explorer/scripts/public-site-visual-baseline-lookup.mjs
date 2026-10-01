@@ -37,6 +37,10 @@ export const MERGE_QUEUE_WORKFLOW_PATHS = [DOCS_WORKFLOW_PATH, CI_WORKFLOW_PATH]
 export const VISUAL_JOB_NAME = "Public-site visual regression";
 export const MERGE_QUEUE_BRANCH_PREFIX = "gh-readonly-queue/develop/";
 export const ARTIFACT_PAGE_SIZE = 100;
+// The jobs endpoint returns 30 jobs by default and the CI workflow declares more than that, so the
+// visual job can sit on a later page. Request the maximum page size and follow pages.
+export const JOBS_PAGE_SIZE = 100;
+export const MAX_JOB_PAGES = 5;
 export const LEGACY_BASELINE_NAME = "public-site-visual-baseline";
 // Bounds GitHub API use per lookup pass while several queue groups poll.
 // Must cover every SHA the classifier can emit (base plus 25 ancestors).
@@ -90,13 +94,30 @@ export function isQueueLeaderRun(run, { repository, baseSha }) {
   );
 }
 
+async function listRunJobs(github, repository, runId) {
+  const jobs = [];
+  for (let page = 1; page <= MAX_JOB_PAGES; page += 1) {
+    const data = await github(
+      `/repos/${repository}/actions/runs/${runId}/jobs?per_page=${JOBS_PAGE_SIZE}&page=${page}`,
+    );
+    if (!Array.isArray(data?.jobs)) throw new Error("GitHub API returned an invalid job list");
+    jobs.push(...data.jobs);
+    if (data.jobs.length < JOBS_PAGE_SIZE) break;
+  }
+  return jobs;
+}
+
+/**
+ * True only when the run has a visual job and every job carrying that name completed successfully.
+ * An unreadable job list is not evidence of success, and neither is a name that matches no job.
+ */
 async function visualJobSucceeded(github, repository, runId) {
   try {
-    const jobsData = await github(`/repos/${repository}/actions/runs/${runId}/jobs`);
-    const visualJob = jobsData?.jobs?.find((job) => job.name === VISUAL_JOB_NAME);
-    return Boolean(visualJob && visualJob.status === "completed" && visualJob.conclusion === "success");
+    const visualJobs = (await listRunJobs(github, repository, runId)).filter((job) => job.name === VISUAL_JOB_NAME);
+    return (
+      visualJobs.length > 0 && visualJobs.every((job) => job.status === "completed" && job.conclusion === "success")
+    );
   } catch {
-    // An unreadable job list is not evidence of success.
     return false;
   }
 }
