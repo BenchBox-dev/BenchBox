@@ -4,7 +4,7 @@
     "Q98 matches on both families at SF=0.1 after the fix, or the item is closed with evidence that no defect exists",
     "No regression in other queries using the same helper"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T9). Hypothesis, not a confirmed bug. Parameter alignment (dfparity-t04/t05) may change which queries diverge; re-check before fixing. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T9). Hypothesis, not a confirmed bug. Parameter alignment (dfparity-t04/t05) may change which queries diverge; re-check before fixing. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-01: fixed and published as PR #2500 (branch fix/tpcds-q98-no-limit, worktree ../BenchBox.wt-tpcds-q98-limit, head 0905d16e4), held, auto-merge withheld; make pr-preflight exit 0 on that head. CAUSE (TESTED): the shared helper _item_category_sales_* (Q12, Q20, Q98) hardcoded limit(100); Q12/Q20 templates have _LIMIT=100, Q98 has none (269 SQL rows vs 100 on both families at SF 0.1). A second defect was hidden behind it: SQL SUM over an all-NULL group is NULL, Polars/pandas give 0, so revenueratio was 0.0 instead of NULL (SQL result has 1 NULL-itemrevenue group in each of Q98 and Q20 at SF 0.1; Q98 also has one true-zero group that stays 0.0). Fix: limit is a spec argument (Q98 null) and null-preserving sums. Evidence: Q98, Q20, Q12 match on both families at SF 0.1; Q98 and Q12 at SF 0.03; gate at SF 0.01 unchanged (146/198 compared, 52 empty, 0 divergent); 4 of 8 new unit cases fail without the fix. Side effect: Q20 now matches at SF 0.1. OPEN FINDING: Q20 still diverges at SF 0.03 (ORDER BY key mismatch at position 55, both families), identical before the change; cause not diagnosed. Remaining: hosted CI, maintainer merge, then finish.",
   "description": "Hypothesis from a prior review (not verified by me): the shared helper path used by Q98 imposes a LIMIT 100 where the SQL returns all 269 rows, identically on both families. Reproduce first with the existing probe data (scratchpad pq_<sf>.jsonl shows Q98 divergent at SF 0.1 and 1.0); if the cause is different, record it and fix that instead; if there is no defect, close with evidence. Fix in the shared helper, not per query.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "1fdd5565a9004057b263342a515f4761",
       "op": "take",
       "op_id": "085d6d71ec0245ba85419755a00e265d",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T16:19:35Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4dbe18b056d84b2eb4db006dd2e7ffec",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
