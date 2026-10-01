@@ -85,6 +85,17 @@
       "op_id": "5277da937c5e410c93987f4acc7931c8",
       "reason": "User directed takeover of interrupted agy conversation a76c7bfa (last activity 23:49Z); no live process holds it and its preflight task died. Holder antigravity-client is idle.",
       "session_id": "d352d35f204c4b1ea3ed3acf01ac40fe"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-01T18:30:47Z",
+      "client": "claude-code",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:a10c9ef416cfcf381d698d58",
+      "generation": "156fcbc83256472cbfd96228b4b4df13",
+      "op": "takeover",
+      "op_id": "6a60cd2e2d6344359af77ed46f7d7b9b",
+      "reason": "Holder a10c9ef4 is this Claude session's earlier MCP identity (took over 2026-10-01T00:04Z). Its generation now fails renew (E_CLAIM_STALE) and take (E_CONFLICT). User asked to renew and said proceed. No other agent works this item.",
+      "session_id": "bec2d032574a4742968b229c90460810"
     }
   ]
 }
