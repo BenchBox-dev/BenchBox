@@ -65,10 +65,16 @@ def _tables(ctx: DataFrameContext, *names: str) -> tuple[Any, ...]:
 
 
 def _none_for_null(frame: Any, columns: list[str]) -> Any:
-    """Report NULL as None rather than NaN in the named pandas columns, as the SQL surface does."""
+    """Report NULL as None rather than NaN in the named pandas columns, as the SQL surface does.
+
+    Only a column that actually holds a NULL is converted, so a result without NULLs keeps its native
+    dtypes (object columns are not supported by every pandas-family backend).
+    """
     frame = frame.copy()
     for column in columns:
-        frame[column] = frame[column].astype(object).where(frame[column].notna(), None)
+        nulls = frame[column].isna()
+        if nulls.any():
+            frame[column] = frame[column].astype(object).where(~nulls, None)
     return frame
 
 

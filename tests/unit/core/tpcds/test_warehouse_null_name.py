@@ -139,3 +139,18 @@ def test_q66_keeps_and_orders_a_null_warehouse_last(family, monkeypatch):
     assert rows[0][march_per_sq_foot] == pytest.approx(0.3)
     assert rows[1][march_sales] == 30.0
     assert rows[1][march_per_sq_foot] is None  # dividing by a NULL square footage is NULL
+
+
+def test_none_for_null_converts_only_columns_that_hold_a_null():
+    import pandas as pd
+
+    from benchbox.core.tpcds.dataframe_queries.queries import _none_for_null
+
+    frame = pd.DataFrame({"clean": [1.5, 2.5], "holey": [1.5, float("nan")], "name": ["a", None]})
+
+    result = _none_for_null(frame, ["clean", "holey", "name"])
+
+    assert result["clean"].dtype == "float64"  # no NULL: native dtype is kept
+    assert list(result["holey"]) == [1.5, None]
+    assert list(result["name"]) == ["a", None]
+    assert frame["holey"].dtype == "float64"  # the input is not modified
