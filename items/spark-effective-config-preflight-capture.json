@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Preflight records effective Spark config at the three points for spark, and degrades with an explicit marker where reads are unsupported.",
+    "A tuning key overridden or refused by the engine appears as a discrepancy on the console and in the bundle; a clean run shows none.",
+    "A baseline (notuning) bundle contains the real effective state.",
+    "No credential-shaped value or absolute path leaks into the bundle, logs or anonymised export (tested).",
+    "Result schema change is versioned and documented; old bundles still load.",
+    "requested_config_hash and the drift marker are unchanged by the capture."
+  ],
+  "context": "Origin: user requirement 2026-09-30 (\"we must capture the actual state of the config during preflight for the run and highlight discrepancies\"). Needs the runtime item's read-back hooks. Verify live: getAll() on Spark Connect, and what Sail returns.",
+  "description": "User requirement 2026-09-30 (must): capture the ACTUAL Spark configuration state during run preflight and highlight discrepancies. Configuration can be changed outside BenchBox (spark-defaults.conf, SPARK_CONF_DIR, cluster or service policy), so a ledger of what BenchBox asked for does not prove what ran. Today nothing reads the live session back; `get_platform_info` reports adapter fields, and spark.conf.set results are only recorded as \"executed\".\n\nDesign:\n- Snapshot the effective session config at three points: (1) right after session creation, before BenchBox sets anything, to show what external config supplied; (2) after BenchBox has applied its settings (tuning, and for baseline only the harness-required ones); (3) at run start (just before queries) so late changes are visible. Use spark.conf.getAll() or per-key spark.conf.get; check availability on Spark Connect engines (Velox remote, LakeSail) and degrade explicitly (\"not readable\"), never silently.\n- Compare: requested (tuning map) vs effective; BenchBox harness intent vs effective; external-supplied values that differ from the engine default. Discrepancy classes: requested != effective (override/refusal/immutable), external value present at snapshot 1, value changed between snapshots 2 and 3.\n- Applies to notuning too: the baseline run must show the real default state.\n- Surface discrepancies on the console at preflight and in the result bundle (a new block beside the applied ledger; extend the schema deliberately and version it). A discrepancy is a warning, not a failure, unless the user asks for strict mode.\n- Redaction is mandatory: getAll() will include credentials (spark.hadoop.fs.s3a.*, tokens) and absolute paths. Apply the same credential-shaped key rules as the model item, and the anonymisation path used for the ledger, before anything is written to a bundle or log.\n- Do not hash the full effective config into requested_config_hash or the drift marker; it is evidence, not identity (ADR-001). Decide whether a digest of the effective config belongs beside applied_ledger_hash.\n- Tests with a fake session for each discrepancy class; live-Spark check for the real read-back behaviour.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:13:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "19f9843eab33429ca3f2baf9dc63f287",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    }
+  ]
+}

@@ -17864,6 +17864,15 @@
       "status": "open",
       "title": "Stop overriding Spark defaults in notuning runs; record harness settings"
     },
+    "spark-effective-config-preflight-capture": {
+      "claim": null,
+      "needs": [
+        "spark-session-config-runtime"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Capture actual Spark session config at preflight and flag discrepancies"
+    },
     "spark-mixin-open-table-format-loading": {
       "claim": null,
       "needs": [],
