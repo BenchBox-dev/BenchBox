@@ -1571,6 +1571,13 @@
       "status": "done",
       "title": "Raise bottom 25 modules (all <42% coverage) to 80%"
     },
+    "bound-datagen-sync-and-investigate-io-stall": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Investigate the macOS I/O stall that hung local validation, and bound the unbounded sync calls in the data generators"
+    },
     "bounded-correctness-gate-value-oracle": {
       "claim": null,
       "needs": [],
