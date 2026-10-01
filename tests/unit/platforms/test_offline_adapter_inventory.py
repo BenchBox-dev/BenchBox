@@ -14,7 +14,9 @@ import pytest
 
 from benchbox.core.platform_manifest import get_adapter_imports
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+# Importing every adapter class pulls in vendor SDK modules and costs well over the fast-lane
+# per-test budget on a cold worker, and 150 fast nodes would exceed the fast-lane count ceiling.
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 # adapter key -> target dialect reported by the real adapter class.
 ADAPTER_DIALECTS: dict[str, str] = {

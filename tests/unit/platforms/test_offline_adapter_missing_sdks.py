@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,11 +11,14 @@ import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
+INVENTORY = Path(__file__).with_name("test_offline_adapter_inventory.py")
+SUCCESS_MESSAGE = "49 adapters, 94 real SQL assertions, 2 positive alternatives, no vendor SDK imports"
 
-def test_all_adapter_semantics_with_vendor_sdk_imports_blocked() -> None:
-    # Process startup and cold imports belong in T2, not the 0.5-second T1 lane.
-    inventory = Path(__file__).with_name("test_offline_adapter_inventory.py")
-    script = r"""
+# The child runs the inventory's plain `assert` statements, which Python -O or PYTHONOPTIMIZE
+# would strip, so it refuses to run with assertions disabled.
+CHILD_SCRIPT = r"""
+if not __debug__:
+    raise SystemExit("assertions are disabled, so the inventory would pass without checking anything")
 import importlib.abc
 import runpy
 import sys
@@ -53,13 +57,32 @@ suite["test_influx_measurement_schema_and_typed_line_protocol"]()
 assert not any(name.split(".")[0] in roots for name in sys.modules)
 print("49 adapters, 94 real SQL assertions, 2 positive alternatives, no vendor SDK imports")
 """
-    result = subprocess.run(
-        [sys.executable, "-c", script, str(inventory)],
-        cwd=inventory.parents[3],
+
+
+def _run_child(env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-c", CHILD_SCRIPT, str(INVENTORY)],
+        cwd=INVENTORY.parents[3],
+        env=env,
         text=True,
         capture_output=True,
         timeout=60,
         check=False,
     )
+
+
+def test_all_adapter_semantics_with_vendor_sdk_imports_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Process startup and cold imports belong in T2, not the 0.5-second T1 lane.
+    # An optimizing parent must not make the child's assertions vanish.
+    monkeypatch.setenv("PYTHONOPTIMIZE", "1")
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONOPTIMIZE"}
+    result = _run_child(env)
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "49 adapters, 94 real SQL assertions, 2 positive alternatives, no vendor SDK imports" in result.stdout
+    assert SUCCESS_MESSAGE in result.stdout
+
+
+def test_child_refuses_to_run_with_assertions_disabled() -> None:
+    result = _run_child({**os.environ, "PYTHONOPTIMIZE": "1"})
+    assert result.returncode != 0
+    assert "assertions are disabled" in result.stderr
+    assert SUCCESS_MESSAGE not in result.stdout
