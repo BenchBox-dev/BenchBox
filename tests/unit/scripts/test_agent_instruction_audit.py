@@ -247,6 +247,9 @@ def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) ->
         # A hand-back that the first guard missed.
         "When CI passes, ask the user to enable auto-merge.",
         "Then ask the owner to merge it.",
+        # Variants a first version missed.
+        "Mark the pull-request as ready once the checks finish and the summary is posted for review.",
+        "Auto merge remains withheld pending approval.",
     ],
 )
 def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: str) -> None:
@@ -263,6 +266,8 @@ def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: s
         "Do not mark PR ready before required external review is complete.",
         "Never mark a PR ready while review dispositions are incomplete.",
         "When the branch is final, arm the exact head and monitor until merged.",
+        "Never ask the owner to merge a finished PR.",
+        "Do not ask the user to enable auto-merge; arm it yourself.",
         # A list item must not join the next one into a phrase.
         "- mark the PR\n- ready to arm after the checks",
     ],
@@ -277,9 +282,11 @@ def test_handback_guard_allows_safety_wording_and_separate_list_items(tmp_path: 
 def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(
-        agents.read_text().replace("agent work are not authorization\n(", "agent work are not\nauthorization (")
-    )
+    original = agents.read_text()
+    # Break the pinned phrase "not authorization" across two lines: anchors are whitespace-normalized.
+    reflowed = original.replace("not authorization", "not\nauthorization", 1)
+    assert reflowed != original, "the reflow fixture text is no longer in AGENTS.md; the test would mutate nothing"
+    agents.write_text(reflowed)
     _, errors = audit(project, CORPUS)
     assert errors == []
 

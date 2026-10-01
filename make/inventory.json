@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "3c0dd7c6b9e46d968686dc3985a584a5a85bce216f9e5d3dafb69ca455572eef",
+  "contract_sha256": "527dd7070528913a542f6031904827e60ba053f7197b9a19648d79d5d6dab313",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -95,6 +95,7 @@
     "plan-capture-gate",
     "platform-manifest",
     "platform-manifest-check",
+    "pr-arm",
     "pr-arm-auto-merge",
     "pr-conflict-scan",
     "pr-content-guard",
@@ -181,7 +182,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 211,
+  "public_target_count": 212,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -266,6 +267,7 @@
     "plan-capture-gate",
     "platform-manifest",
     "platform-manifest-check",
+    "pr-arm",
     "pr-arm-auto-merge",
     "pr-conflict-scan",
     "pr-content-guard",
@@ -1126,6 +1128,13 @@
         "header": "platform-manifest-check:",
         "recipe": "\tuv run -- python _project/scripts/platform_manifest.py --check",
         "recipe_sha256": "4c240335f0cdd1e3a17ff7017aa5b092b2f5c0a1105d25ef9431c0737064ed24"
+      }
+    ],
+    "pr-arm": [
+      {
+        "header": "pr-arm:",
+        "recipe": "\t@uv run -- python scripts/pr_arm.py $(if $(PR),--pr $(PR),) $(if $(HEAD),--head $(HEAD),) $(if $(REPO),--repo $(REPO),)",
+        "recipe_sha256": "42e8128180cf7d0c2082b8d059351c453cc3b25f08dc4e31d4de3f20eeab17dc"
       }
     ],
     "pr-arm-auto-merge": [
@@ -2157,7 +2166,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "0729970a761d139e3b1baa965e99e0c12b86b2faec816b18e9805ceca3ef2b14",
+  "semantic_sha256": "cefe68d0acf9b40340e80c3b8e9e17e4a4d41506ed5b16c5759c73caf73bbee6",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3826,9 +3835,9 @@
       ]
     },
     {
-      "body": ".PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
+      "body": ".PHONY: pr-arm pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
       "kind": "rule",
-      "sha256": "63633fe7fabde38d081289a39c1e1775862d001bf95838ea64471dcb4381411d",
+      "sha256": "54e7dc398419eefab8a6def0c6ebad5a74d6b930e0ba60995d3ba6a29bf8bd33",
       "targets": [
         ".PHONY"
       ]
@@ -3987,6 +3996,14 @@
       "sha256": "2751963a2a4a75d3b55c689f662e56e8993eee5c7d48cd2504f7ade9977334e5",
       "targets": [
         "pr-arm-auto-merge"
+      ]
+    },
+    {
+      "body": "pr-arm:\n\t@uv run -- python scripts/pr_arm.py $(if $(PR),--pr $(PR),) $(if $(HEAD),--head $(HEAD),) $(if $(REPO),--repo $(REPO),)",
+      "kind": "rule",
+      "sha256": "f85a551ac077e4b981030b049865a81321abfa8d12466df188c3509bbeb313ea",
+      "targets": [
+        "pr-arm"
       ]
     },
     {
@@ -4408,7 +4425,7 @@
       ]
     }
   ],
-  "target_count": 217,
+  "target_count": 218,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4496,6 +4513,7 @@
     "plan-capture-gate",
     "platform-manifest",
     "platform-manifest-check",
+    "pr-arm",
     "pr-arm-auto-merge",
     "pr-conflict-scan",
     "pr-content-guard",

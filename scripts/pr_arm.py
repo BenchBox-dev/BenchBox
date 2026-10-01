@@ -3,10 +3,15 @@
 
 The merge queue and the required status checks decide whether a PR merges; this
 helper only enqueues the head the author pushed. It reads the live PR first and
-refuses, without merging, when a durable hold, a requested change, a draft or
-closed state, or a head other than the local one says the PR is not ready to be
-armed. Re-enqueueing after a spurious queue ejection uses the same command, so
-a policy hold is never mistaken for a queue failure.
+refuses, without merging, when a durable hold label, a requested change, an
+unresolved review thread, a draft or closed state, a base other than `develop`,
+unpublished local work, or a head other than local HEAD says the PR is not ready.
+Re-enqueueing after a spurious queue ejection uses the same command, so a policy
+hold is never mistaken for a queue failure.
+
+It enforces only what GitHub can state mechanically. A required external review
+that returned HOLD is not visible there; stopping for it stays the author's duty
+under `[WRITE-CLOSEOUT-001]`.
 """
 
 from __future__ import annotations
@@ -16,77 +21,107 @@ import json
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
-HOLD_LABEL = "no-auto-merge"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pr_landing  # noqa: E402
+
+HOLD_LABEL = pr_landing.HOLD_LABEL
 REPOSITORY = "BenchBox-dev/BenchBox"
+BASE_BRANCH = "develop"
+VIEW_FIELDS = "number,state,isDraft,labels,reviewDecision,headRefOid,baseRefName"
 
-Runner = Callable[[Sequence[str]], tuple[int, str]]
-
-
-def _run(cmd: Sequence[str]) -> tuple[int, str]:
-    proc = subprocess.run(list(cmd), text=True, capture_output=True, timeout=120, check=False)
-    return proc.returncode, (proc.stdout or "") + (proc.stderr or "")
+Runner = Callable[[list[str]], tuple[int, str]]
 
 
-def refusals(view: dict, head: str) -> list[str]:
+def refusals(view: dict, local_head: str, *, unpublished: Sequence[str], unresolved_threads: bool) -> list[str]:
     """Return why the live PR must not be armed; an empty list means it may be."""
     reasons: list[str] = []
     if view.get("state") != "OPEN":
         reasons.append(f"PR is {view.get('state')!r}, not OPEN")
     if view.get("isDraft"):
         reasons.append("PR is a draft")
+    if view.get("baseRefName") != BASE_BRANCH:
+        reasons.append(f"PR targets {view.get('baseRefName')!r}; this path arms only PRs into {BASE_BRANCH!r}")
     labels = {label.get("name") for label in view.get("labels") or []}
     if HOLD_LABEL in labels:
         reasons.append(f"durable hold label {HOLD_LABEL!r} is present; remove it deliberately to release the hold")
     if view.get("reviewDecision") == "CHANGES_REQUESTED":
         reasons.append("a reviewer requested changes")
-    if view.get("headRefOid") != head:
-        reasons.append(f"pushed head {str(view.get('headRefOid'))[:9]} is not local HEAD {head[:9]}; push first")
+    if unresolved_threads:
+        reasons.append("an unresolved, non-outdated review thread is open")
+    reasons.extend(f"unpublished work: {problem}" for problem in unpublished)
+    if view.get("headRefOid") != local_head:
+        reasons.append(f"pushed head {str(view.get('headRefOid'))[:9]} is not local HEAD {local_head[:9]}; push first")
     return reasons
 
 
-def arm(pr: str | None, head: str | None, repo: str = REPOSITORY, run: Runner = _run) -> int:
-    if head is None:
+def _current_branch_pr(run: Runner, repo: str) -> str:
+    code, branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    if code != 0 or not branch.strip() or branch.strip() == "HEAD":
+        raise pr_landing.LandingError("cannot resolve the current branch; pass PR=<number>")
+    code, out = run(
+        ["gh", "pr", "list", "--repo", repo, "--head", branch.strip(), "--base", BASE_BRANCH, "--state", "open"]
+        + ["--json", "number"]
+    )
+    if code != 0:
+        raise pr_landing.LandingError(f"cannot list pull requests for {branch.strip()!r}: {out.strip()}")
+    numbers = [item["number"] for item in json.loads(out)]
+    if len(numbers) != 1:
+        raise pr_landing.LandingError(
+            f"expected exactly one open PR into {BASE_BRANCH!r} from {branch.strip()!r}, found {len(numbers)}; pass PR=<number>"
+        )
+    return str(numbers[0])
+
+
+def arm(
+    pr: str | None,
+    head: str | None,
+    repo: str = REPOSITORY,
+    run: Runner = pr_landing.live_run,
+    checkout: Path = Path("."),
+    unpublished: Callable[[Path], list[str]] = pr_landing.unpublished_work,
+    threads: Callable[[Runner, str, int], bool] = pr_landing.unresolved_review_threads,
+) -> int:
+    try:
         code, out = run(["git", "rev-parse", "HEAD"])
         if code != 0:
             print(f"pr-arm: cannot read local HEAD: {out.strip()}", file=sys.stderr)
             return 1
-        head = out.strip()
-    selector = [pr] if pr else []
-    code, out = run(
-        [
-            "gh",
-            "pr",
-            "view",
-            *selector,
-            "--repo",
-            repo,
-            "--json",
-            "number,state,isDraft,labels,reviewDecision,headRefOid",
-        ]
-    )
-    if code != 0:
-        print(f"pr-arm: cannot read the pull request: {out.strip()}", file=sys.stderr)
-        return 1
-    try:
+        local_head = out.strip()
+        if head is not None and head != local_head:
+            print(f"pr-arm: refusing: requested head {head[:9]} is not local HEAD {local_head[:9]}", file=sys.stderr)
+            return 2
+        number = pr or _current_branch_pr(run, repo)
+        code, out = run(["gh", "pr", "view", number, "--repo", repo, "--json", VIEW_FIELDS])
+        if code != 0:
+            print(f"pr-arm: cannot read the pull request: {out.strip()}", file=sys.stderr)
+            return 1
         view = json.loads(out)
-    except json.JSONDecodeError:
-        print(f"pr-arm: unreadable pull request state: {out[:200]!r}", file=sys.stderr)
+        reasons = refusals(
+            view,
+            local_head,
+            unpublished=unpublished(checkout),
+            unresolved_threads=threads(run, repo, int(view["number"])),
+        )
+        if reasons:
+            for reason in reasons:
+                print(f"pr-arm: refusing to arm PR #{view['number']}: {reason}", file=sys.stderr)
+            return 2
+        code, out = run(
+            ["gh", "pr", "merge", str(view["number"]), "--repo", repo, "--squash", "--match-head-commit", local_head]
+        )
+        print(out.strip())
+        return code
+    except (pr_landing.LandingError, subprocess.SubprocessError, OSError, ValueError, KeyError, TypeError) as exc:
+        print(f"pr-arm: refusing, live state could not be verified: {exc}", file=sys.stderr)
         return 1
-    reasons = refusals(view, head)
-    if reasons:
-        for reason in reasons:
-            print(f"pr-arm: refusing to arm PR #{view.get('number')}: {reason}", file=sys.stderr)
-        return 2
-    code, out = run(["gh", "pr", "merge", str(view["number"]), "--repo", repo, "--squash", "--match-head-commit", head])
-    print(out.strip())
-    return code
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--pr", help="pull request number; default: the PR for the current branch")
-    parser.add_argument("--head", help="exact head SHA to arm; default: local HEAD")
+    parser.add_argument("--pr", help="pull request number; default: the open PR into develop for the current branch")
+    parser.add_argument("--head", help="expected head SHA; refused unless it equals local HEAD")
     parser.add_argument("--repo", default=REPOSITORY)
     args = parser.parse_args(argv)
     return arm(args.pr, args.head, args.repo)

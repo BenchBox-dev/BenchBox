@@ -12,7 +12,7 @@ description: BenchBox PR workflow - preflight, push, open PR vs develop, arm, mo
 
 ## Your task
 
-BenchBox PR workflow to `develop` (linear history, squash-only). Run in order; stop on the first failure:
+BenchBox PR workflow to `develop` (linear history, squash-only). Run in order; stop on the first failure of steps 1-5:
 
 1. `make agent-write-preflight`. If it refuses (primary clone), have the user create a worktree
    (`make worktree-create BRANCH=<name> WORKTREE_PATH=<path>`); never write from the primary clone

@@ -45,6 +45,7 @@ def test_contributing_documents_arming_the_exact_head_and_monitoring_to_merge(co
     for required in (
         "make pr-arm",
         "make pr-landing-withdraw",
+        "refuses on a hold label",
         "monitor to merge",
         "You are done when the PR is merged",
         "[WRITE-CLOSEOUT-001]",

@@ -141,10 +141,10 @@ HANDBACK_TEXT = (
     "docs/development/development.md",
 )
 HANDBACK_PATTERNS = {
-    "auto-merge withheld": r"\bauto-merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
+    "auto-merge withheld": r"\bauto[- ]merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
     "withheld until": r"\bwithheld until\b",
     "mark a PR ready": (
-        r"(?<!not )(?<!never )\bmark(?:ing|ed)?\s+(?:the\s+|a\s+|an\s+)?(?:pr|pull request)s?\b[^.]{0,40}\bready\b"
+        r"(?<!not )(?<!never )\bmark(?:ing|ed)?\s+(?:the\s+|a\s+|an\s+)?(?:pr|pull[- ]request)s?\b[^.]{0,80}\bready\b"
     ),
     "decisions are yours": r"\bdecisions?\s+(?:are|is)\s+yours\b",
     "pending is terminal": r"\bpending is terminal\b",
@@ -152,7 +152,7 @@ HANDBACK_PATTERNS = {
     "run make pr-ready when": r"\brun\s+['\"]?make pr-ready['\"]?\s+when\b",
     "PR stays held": r"\bpr (?:created and held|stays held|remains held)\b",
     "ask the user to arm or merge": (
-        r"\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|approve|mark)\b"
+        r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|approve|mark)\b"
     ),
 }
 _MARKDOWN_EMPHASIS = re.compile(r"[*_`]")
