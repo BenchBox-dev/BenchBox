@@ -17871,6 +17871,15 @@
       "status": "open",
       "title": "Add validated spark session-config map to PlatformOptimizationConfiguration"
     },
+    "spark-session-config-runtime": {
+      "claim": null,
+      "needs": [
+        "spark-session-config-model"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Apply tuning spark map to the Spark session once, with ledger evidence"
+    },
     "spark-sql-tpchavoc-scalar-subquery-and-dual-rewrites": {
       "claim": null,
       "needs": [],
