@@ -78,6 +78,9 @@ class TestSQLiteDiscountBoundaries:
             "l_discount BETWEEN 1 - 1 AND 1 + 1",
             "l_discount BETWEEN 0.06 - 1 AND 0.06 + 1",
             "l_discount BETWEEN (9223372036854775807 + 1 - 9223372036854775807) AND (1 + 1)",
+            "l_discount BETWEEN 0.01 - 0.06 AND 0.06 + 0.01",
+            "l_discount BETWEEN 6e-2 - 1e-2 AND 6e-2 + 1e-2",
+            "l_discount BETWEEN (10000000000000000000000000000.0 + 9.0 - 10000000000000000000000000000.0) AND (20.0 + 0.0)",
         ],
     )
     def test_unrelated_or_nonliteral_expressions_are_unchanged(self, predicate):
@@ -98,6 +101,39 @@ class TestSQLiteDiscountBoundaries:
             # SQLite overflows to REAL here, so the lower bound is 0.0 and the row matches.
             expected = connection.execute(query).fetchall()
             assert expected == [(0,)]
+            translated = translate_sql_query(query, target_dialect="sqlite")
+            assert connection.execute(translated).fetchall() == expected
+        finally:
+            connection.close()
+
+    def test_bare_dot_decimal_bounds_are_folded(self):
+        import sqlite3
+
+        # SQLGlot reads `.06` as `0.06`, so this has the same boundary defect as the public Q6 text.
+        query = "SELECT l_discount FROM lineitem WHERE l_discount BETWEEN .06 - .01 AND .06 + .01 ORDER BY l_discount"
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.execute("CREATE TABLE lineitem (l_discount DECIMAL(15,2))")
+            connection.executemany("INSERT INTO lineitem VALUES (?)", [(v,) for v in ("0.04", "0.05", "0.06", "0.07")])
+            assert connection.execute(query).fetchall() == [(0.05,), (0.06,)]
+            translated = translate_sql_query(query, target_dialect="sqlite")
+            assert connection.execute(translated).fetchall() == [(0.05,), (0.06,), (0.07,)]
+        finally:
+            connection.close()
+
+    def test_large_magnitude_decimal_cancellation_keeps_sqlite_semantics(self):
+        import sqlite3
+
+        query = (
+            "WITH t AS (SELECT 8.0 AS l_discount UNION ALL SELECT 9.0) SELECT * FROM t WHERE l_discount BETWEEN "
+            "(10000000000000000000000000000.0 + 9.0 - 10000000000000000000000000000.0) AND (20.0 + 0.0) "
+            "ORDER BY l_discount"
+        )
+        connection = sqlite3.connect(":memory:")
+        try:
+            # REAL arithmetic loses the 9.0, so the lower bound is 0.0 and both rows match.
+            expected = connection.execute(query).fetchall()
+            assert expected == [(8.0,), (9.0,)]
             translated = translate_sql_query(query, target_dialect="sqlite")
             assert connection.execute(translated).fetchall() == expected
         finally:

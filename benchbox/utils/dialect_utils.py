@@ -11,6 +11,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
+from decimal import Context, Decimal, DecimalException, Inexact
 from typing import Callable
 
 #: Translation workload scopes. ``schema_ddl`` marks schema-creation DDL while
@@ -276,10 +277,13 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
 def _fold_sqlite_discount_bounds(query: str) -> str:
     """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic.
 
-    Only bounds built entirely from decimal literals are folded, because SQLite evaluates
-    those as REAL. Integer arithmetic keeps SQLite's own overflow rules and is left alone.
-    The rewrite is not benchmark-scoped: any SQLite query with such an ``l_discount`` bound
-    is folded, including the TPC-Havoc Q6 variants.
+    A bound is folded only when it is a ``+``/``-`` expression of plain decimal literals
+    (``0.06 - 0.01``), which SQLite evaluates as REAL. The exact decimal result is computed
+    with a trapped-inexact context, and the bound is replaced only when SQLite's own double
+    arithmetic differs from it by rounding noise. Integer or mixed bounds, other operators,
+    and expressions where doubles lose the answer (large-magnitude cancellation) keep SQLite's
+    semantics and are left alone. The rewrite is not benchmark-scoped: any SQLite query with
+    such an ``l_discount`` bound is folded, including the TPC-Havoc Q6 variants.
     """
     # Most SQLite queries need no extra parse. The AST, not this hint, selects rewrites.
     if not re.search(r"\bl_discount\b", query, re.IGNORECASE) or not re.search(r"\bBETWEEN\b", query, re.IGNORECASE):
@@ -287,29 +291,45 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
 
     import sqlglot
     from sqlglot import exp
-    from sqlglot.optimizer.simplify import simplify
+
+    context = Context(prec=60, traps=[Inexact])
+
+    def evaluate(node: "exp.Expression") -> "tuple[Decimal, float] | None":
+        """Return the exact decimal value and the IEEE-double value of a decimal +/- tree."""
+        node = node.unnest()
+        if isinstance(node, exp.Literal):
+            if not node.is_number or not re.fullmatch(r"\d+\.\d+", node.name):
+                return None
+            return Decimal(node.name), float(node.name)
+        if isinstance(node, (exp.Add, exp.Sub)):
+            left, right = evaluate(node.this), evaluate(node.expression)
+            if left is None or right is None:
+                return None
+            try:
+                if isinstance(node, exp.Add):
+                    return context.add(left[0], right[0]), left[1] + right[1]
+                return context.subtract(left[0], right[0]), left[1] - right[1]
+            except DecimalException:
+                return None
+        return None
 
     tree = sqlglot.parse_one(query, read="sqlite")
     changed = False
     for between in tree.find_all(exp.Between):
         if not isinstance(between.this, exp.Column) or between.this.name.lower() != "l_discount":
             continue
-        bounds = [between.args["low"], between.args["high"]]
-        if not all(
-            isinstance(bound.unnest(), (exp.Add, exp.Sub))
-            and all(
-                isinstance(node, (exp.Add, exp.Sub, exp.Paren))
-                or (isinstance(node, exp.Literal) and node.is_number and not node.is_int)
-                for node in bound.walk()
-            )
-            for bound in bounds
-        ):
-            continue
-        # Simplify copies of the isolated bounds only, never the query or its predicates.
-        folded = [simplify(bound.copy()) for bound in bounds]
-        if all(isinstance(bound, exp.Literal) and bound.is_number for bound in folded):
-            between.set("low", folded[0])
-            between.set("high", folded[1])
+        folded: list[Decimal] = []
+        for bound in (between.args["low"], between.args["high"]):
+            value = evaluate(bound) if isinstance(bound.unnest(), (exp.Add, exp.Sub)) else None
+            if value is None:
+                break
+            exact, real = value
+            if exact < 0 or abs(real - float(exact)) > 1e-9 * max(1.0, abs(float(exact))):
+                break
+            folded.append(exact)
+        else:
+            between.set("low", exp.Literal.number(format(folded[0], "f")))
+            between.set("high", exp.Literal.number(format(folded[1], "f")))
             changed = True
     return tree.sql(dialect="sqlite") if changed else query
 
