@@ -5,11 +5,16 @@
  *
  * - protected develop: a `push` or `workflow_dispatch` Documentation run on
  *   `develop`, uploaded after the commit landed;
- * - merge-queue candidate: a `merge_group` Documentation run on a
- *   `gh-readonly-queue/develop/*` branch in this repository, uploaded only after
- *   that group passed its own exact-base comparison. A queue follower's
- *   `merge_group.base_sha` is the leader group's head, and the follower can only
- *   merge on top of that head, so the candidate is the exact tree it lands on.
+ * - merge-queue candidate: a `merge_group` run of the CI workflow (which
+ *   validates queue groups and uploads the candidate) or of the Documentation
+ *   workflow, on a `gh-readonly-queue/develop/*` branch in this repository,
+ *   uploaded only after that group passed its own exact-base comparison. A queue
+ *   follower's `merge_group.base_sha` is the leader group's head, and the
+ *   follower can only merge on top of that head, so the candidate is the exact
+ *   tree it lands on. A CI leader's full run lasts as long as its slowest
+ *   unrelated job, which can exceed the follower's wait, so a leader that has not
+ *   finished is trusted once its own visual-regression job has succeeded: that
+ *   job is what gates the candidate upload.
  *
  * Callers may pass site-equivalent SHAs after the base: first-parent ancestors
  * whose public-site inputs are byte-identical to the base (computed by the
@@ -25,6 +30,11 @@
  */
 
 export const DOCS_WORKFLOW_PATH = ".github/workflows/docs.yml";
+export const CI_WORKFLOW_PATH = ".github/workflows/ci.yml";
+// Merge-queue groups are validated, and their candidate baseline uploaded, by the CI workflow.
+// The Documentation workflow only captures protected develop pushes, so develop stays docs-only.
+export const MERGE_QUEUE_WORKFLOW_PATHS = [DOCS_WORKFLOW_PATH, CI_WORKFLOW_PATH];
+export const VISUAL_JOB_NAME = "Public-site visual regression";
 export const MERGE_QUEUE_BRANCH_PREFIX = "gh-readonly-queue/develop/";
 export const ARTIFACT_PAGE_SIZE = 100;
 export const LEGACY_BASELINE_NAME = "public-site-visual-baseline";
@@ -49,26 +59,46 @@ export const MAX_ARTIFACT_PAGES = 5;
  * also rejected: only success means the comparison passed.
  */
 export function trustedBaselineSource(run, { repository, baseSha }) {
-  if (!run || run.path !== DOCS_WORKFLOW_PATH) return undefined;
+  if (!run) return undefined;
   if (run.status !== "completed" || run.conclusion !== "success") return undefined;
   if (
+    run.path === DOCS_WORKFLOW_PATH &&
     run.head_branch === "develop" &&
     (run.event === "push" || run.event === "workflow_dispatch") &&
     run.repository?.full_name === repository
   ) {
     return "develop";
   }
-  if (
-    run.event === "merge_group" &&
-    run.head_sha === baseSha &&
-    typeof run.head_branch === "string" &&
-    run.head_branch.startsWith(MERGE_QUEUE_BRANCH_PREFIX) &&
-    run.head_repository?.full_name === repository &&
-    run.repository?.full_name === repository
-  ) {
-    return "merge-queue";
-  }
+  if (isQueueLeaderRun(run, { repository, baseSha })) return "merge-queue";
   return undefined;
+}
+
+/**
+ * True for a `merge_group` run of a trusted workflow on this repository's develop queue at exactly
+ * the requested SHA, whatever its status. Callers add their own status requirement.
+ */
+export function isQueueLeaderRun(run, { repository, baseSha }) {
+  return Boolean(
+    run &&
+      MERGE_QUEUE_WORKFLOW_PATHS.includes(run.path) &&
+      run.event === "merge_group" &&
+      run.head_sha === baseSha &&
+      typeof run.head_branch === "string" &&
+      run.head_branch.startsWith(MERGE_QUEUE_BRANCH_PREFIX) &&
+      run.head_repository?.full_name === repository &&
+      run.repository?.full_name === repository,
+  );
+}
+
+async function visualJobSucceeded(github, repository, runId) {
+  try {
+    const jobsData = await github(`/repos/${repository}/actions/runs/${runId}/jobs`);
+    const visualJob = jobsData?.jobs?.find((job) => job.name === VISUAL_JOB_NAME);
+    return Boolean(visualJob && visualJob.status === "completed" && visualJob.conclusion === "success");
+  } catch {
+    // An unreadable job list is not evidence of success.
+    return false;
+  }
 }
 
 export function baselineNames(baseSha) {
@@ -118,15 +148,13 @@ async function trustedFromCandidates(github, repository, sha, candidates) {
       (run.event === "push" || run.event === "workflow_dispatch") &&
       run.repository?.full_name === repository
     ) {
-      try {
-        const jobsData = await github(`/repos/${repository}/actions/runs/${runId}/jobs`);
-        const visualJob = jobsData?.jobs?.find((j) => j.name === "Public-site visual regression");
-        if (visualJob && visualJob.status === "completed" && visualJob.conclusion === "success") {
-          source = "develop";
-        }
-      } catch {
-        // Fall back to undefined if jobs cannot be fetched
-      }
+      if (await visualJobSucceeded(github, repository, runId)) source = "develop";
+    }
+    // A leader group that has not finished: its other jobs can run far longer than a follower is
+    // willing to wait, but its candidate is only uploaded after its own visual job passed.
+    // A run that finished without succeeding is never trusted.
+    if (!source && isQueueLeaderRun(run, { repository, baseSha: sha }) && run.status !== "completed") {
+      if (await visualJobSucceeded(github, repository, runId)) source = "merge-queue";
     }
     if (source === "develop") return { artifact: candidate, source, baselineSha: sha };
     if (source === "merge-queue" && !queueCandidate) queueCandidate = { artifact: candidate, source, baselineSha: sha };

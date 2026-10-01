@@ -176,6 +176,37 @@ def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> No
     )
 
 
+def _candidate_producers() -> list[tuple[Path, str]]:
+    """Workflows that run on merge_group and upload a candidate baseline, with that job's name."""
+    producers = []
+    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        triggers = workflow.get(True, workflow.get("on", {})) or {}
+        if "merge_group" not in triggers:
+            continue
+        for job in workflow["jobs"].values():
+            steps = job.get("steps", [])
+            if any(step.get("name") == "Upload merge-queue candidate visual baseline" for step in steps):
+                producers.append((path, job.get("name", "")))
+    return producers
+
+
+def test_the_lookup_trusts_every_workflow_that_publishes_a_merge_queue_candidate() -> None:
+    # The lookup only trusts candidates from named workflow paths. When validation moved into CI
+    # the list was not updated, so every follower ignored a candidate that already existed and
+    # waited out its deadline. A workflow that runs on merge_group and uploads a candidate must be
+    # trusted, and the job the lookup reads for an unfinished leader must be the job that uploads.
+    lookup = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
+        encoding="utf-8"
+    )
+    producers = _candidate_producers()
+    assert producers, "no merge_group workflow uploads a candidate baseline"
+    for path, job_name in producers:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        assert f'"{relative}"' in lookup, f"{relative} uploads candidates but the lookup does not trust it"
+        assert f'VISUAL_JOB_NAME = "{job_name}"' in lookup, f"{relative} job {job_name!r} differs from the lookup"
+
+
 def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     script = REPO_ROOT / "results-explorer" / "scripts" / "download-public-site-visual-baseline.mjs"
     package = __import__("json").loads((REPO_ROOT / "results-explorer" / "package.json").read_text(encoding="utf-8"))
