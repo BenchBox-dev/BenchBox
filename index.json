@@ -3663,10 +3663,10 @@
     },
     "comment-cleanup-scope-policy": {
       "claim": {
-        "expires_at": "2026-10-01T22:53:00Z",
-        "generation": "03d491aa243c499eadc30289e77c3a7c",
+        "expires_at": "2026-10-02T00:04:36Z",
+        "generation": "63d9d97339124e88b1ccd9c382b6d142",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:7a192fede8100d9e3805747d"
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:a10c9ef416cfcf381d698d58"
       },
       "needs": [],
       "priority": "high",

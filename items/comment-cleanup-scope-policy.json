@@ -74,6 +74,17 @@
       "op": "update",
       "op_id": "9985e4e31a0542739fb8bdc780d7196a",
       "session_id": "3b9fbb9580624290ac8efc508b354318"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a10c9ef416cfcf381d698d58",
+      "at": "2026-10-01T00:04:36Z",
+      "client": "claude-code",
+      "displaced": "mcp:antigravity-client:joe@joe-mac-mini.local:7a192fede8100d9e3805747d",
+      "generation": "63d9d97339124e88b1ccd9c382b6d142",
+      "op": "takeover",
+      "op_id": "5277da937c5e410c93987f4acc7931c8",
+      "reason": "User directed takeover of interrupted agy conversation a76c7bfa (last activity 23:49Z); no live process holds it and its preflight task died. Holder antigravity-client is idle.",
+      "session_id": "d352d35f204c4b1ea3ed3acf01ac40fe"
     }
   ]
 }
