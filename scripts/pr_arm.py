@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -91,6 +92,11 @@ def arm(
         local_head = out.strip()
         if head is not None and head != local_head:
             print(f"pr-arm: refusing: requested head {head[:9]} is not local HEAD {local_head[:9]}", file=sys.stderr)
+            return 2
+        if pr is not None and not re.fullmatch(r"[1-9][0-9]*", pr):
+            # gh treats a URL or owner/repo#N selector as that other repository's PR, so only a plain number
+            # may reach it; otherwise the PR checked and the PR armed could differ.
+            print(f"pr-arm: refusing: --pr must be a plain PR number, got {pr!r}", file=sys.stderr)
             return 2
         number = pr or _current_branch_pr(run, repo)
         code, out = run(["gh", "pr", "view", number, "--repo", repo, "--json", VIEW_FIELDS])

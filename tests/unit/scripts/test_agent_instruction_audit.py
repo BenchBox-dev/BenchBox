@@ -247,6 +247,8 @@ def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) ->
         # A hand-back that the first guard missed.
         "When CI passes, ask the user to enable auto-merge.",
         "Then ask the owner to merge it.",
+        "Wait for the human to merge the green PR.",
+        "Then waiting for the maintainer to approve it, stop.",
         # Variants a first version missed.
         "Mark the pull-request as ready once the checks finish and the summary is posted for review.",
         "Auto merge remains withheld pending approval.",
@@ -268,6 +270,7 @@ def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: s
         "When the branch is final, arm the exact head and monitor until merged.",
         "Never ask the owner to merge a finished PR.",
         "Do not ask the user to enable auto-merge; arm it yourself.",
+        "Never wait for the owner to merge a finished PR.",
         # A list item must not join the next one into a phrase.
         "- mark the PR\n- ready to arm after the checks",
     ],

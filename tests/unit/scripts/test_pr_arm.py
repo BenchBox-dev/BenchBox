@@ -206,6 +206,30 @@ def test_fails_closed_when_a_command_cannot_be_executed(capsys: pytest.CaptureFi
     assert "live state could not be verified" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    "selector",
+    [
+        "https://github.com/other-org/other-repo/pull/7",
+        "other-org/other-repo#7",
+        "feature/branch",
+        "7abc",
+        "-7",
+        "0",
+        "07 ",
+        " 7",
+        "7\n8",
+        "",
+    ],
+)
+def test_only_a_plain_pr_number_may_reach_gh(selector: str, capsys: pytest.CaptureFixture[str]) -> None:
+    """A URL selector makes gh read another repository's PR, so the PR checked could differ from the one armed."""
+    gh = FakeGh()
+    assert _arm(gh, pr=selector) == 2
+    assert gh.calls == [["git", "rev-parse", "HEAD"]]  # nothing but the local HEAD read happened
+    assert gh.merged() == []
+    assert "plain PR number" in capsys.readouterr().err
+
+
 def test_a_hold_label_wins_even_when_everything_else_is_fine() -> None:
     gh = FakeGh(view=_view(labels=[{"name": "no-auto-merge"}], reviewDecision="APPROVED"))
     assert _arm(gh) == 2

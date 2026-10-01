@@ -141,7 +141,7 @@ This runs the broader CI mirror:
 
 Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
 
-Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Once the PR is armed, auto-merge still blocks on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push (and re-arm with `make pr-ready` if needed).
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. The required checks gate the merge queue, so the cost of being wrong is a re-push and `make pr-arm` for the new head.
 
 ## Testing
 

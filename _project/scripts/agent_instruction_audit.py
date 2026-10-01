@@ -151,6 +151,10 @@ HANDBACK_PATTERNS = {
     "do not poll CI": r"\bdo not poll ci\b",
     "run make pr-ready when": r"\brun\s+['\"]?make pr-ready['\"]?\s+when\b",
     "PR stays held": r"\bpr (?:created and held|stays held|remains held)\b",
+    "wait for a human to merge": (
+        r"(?<!not )(?<!never )\bwait(?:s|ing)?\s+for\s+(?:the\s+|a\s+)?(?:user|owner|maintainer|human)\s+to\s+"
+        r"(?:enable|arm|merge|approve|mark)\b"
+    ),
     "ask the user to arm or merge": (
         r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|approve|mark)\b"
     ),
