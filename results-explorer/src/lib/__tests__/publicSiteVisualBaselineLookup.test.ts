@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 import {
   baselineShaOrder,
   findTrustedBaseline,
+  JOBS_PAGE_SIZE,
   MAX_BASELINE_SHAS,
+  MAX_JOB_PAGES,
   trustedBaselineSource,
   waitForTrustedBaseline,
 } from "../../../scripts/public-site-visual-baseline-lookup.mjs";
@@ -13,6 +15,8 @@ const REPO = "BenchBox-dev/BenchBox";
 const BASE = "f8f38867676f96d4e36e9d7e1dbdf84800da11f1";
 const OTHER = "7214e982a1a78d13caf15b0893c487be9048d19e";
 const NAME = `public-site-visual-baseline-${BASE}`;
+const CI = ".github/workflows/ci.yml";
+const VISUAL = "Public-site visual regression";
 
 type Run = Record<string, unknown>;
 
@@ -46,10 +50,14 @@ function fakeGithub(
   const calls: string[] = [];
   const github = async (path: string) => {
     calls.push(path);
-    const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs$/);
+    // Like the real endpoint: 30 jobs per page unless per_page says otherwise (maximum 100).
+    const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs(?:\?(.*))?$/);
     if (jobsMatch) {
-      const runId = Number(jobsMatch[1]);
-      return { jobs: jobs[runId] ?? [] };
+      const query = new URLSearchParams(jobsMatch[2] ?? "");
+      const perPage = Math.min(Number(query.get("per_page") ?? 30), 100);
+      const page = Number(query.get("page") ?? 1);
+      const all = jobs[Number(jobsMatch[1])] ?? [];
+      return { total_count: all.length, jobs: all.slice((page - 1) * perPage, page * perPage) };
     }
     const runMatch = path.match(/\/actions\/runs\/(\d+)$/);
     if (runMatch) return runs[Number(runMatch[1])];
@@ -86,6 +94,10 @@ describe("trustedBaselineSource", () => {
     expect(trustedBaselineSource(queueRun(), context)).toBe("merge-queue");
   });
 
+  it("trusts a merge-queue run of the CI workflow, which is where queue groups are validated", () => {
+    expect(trustedBaselineSource(queueRun({ path: CI }), context)).toBe("merge-queue");
+  });
+
   it.each([
     ["pull_request event", queueRun({ event: "pull_request" })],
     ["pull_request on develop-named branch", developRun({ event: "pull_request" })],
@@ -99,6 +111,12 @@ describe("trustedBaselineSource", () => {
     ["in-progress queue run", queueRun({ status: "in_progress", conclusion: null })],
     ["failed develop run", developRun({ conclusion: "failure" })],
     ["develop run from another repository", developRun({ repository: { full_name: "someone/BenchBox" } })],
+    ["CI workflow run on develop: develop baselines come from the Documentation workflow only", developRun({ path: CI })],
+    ["CI queue run on another SHA", queueRun({ path: CI, head_sha: OTHER })],
+    ["CI pull_request run", queueRun({ path: CI, event: "pull_request", head_branch: "fix/forged" })],
+    ["CI queue run from a fork head repository", queueRun({ path: CI, head_repository: { full_name: "someone/BenchBox" } })],
+    ["CI queue run for another branch", queueRun({ path: CI, head_branch: `gh-readonly-queue/release/pr-1-${OTHER}` })],
+    ["unfinished CI queue run (decided by its visual job, not here)", queueRun({ path: CI, status: "in_progress", conclusion: null })],
   ])("rejects %s", (_label, run) => {
     expect(trustedBaselineSource(run, context)).toBeUndefined();
   });
@@ -157,6 +175,165 @@ describe("findTrustedBaseline", () => {
     );
     const found = await findTrustedBaseline({ github, repository: REPO, baseSha: BASE });
     expect(found).toBeUndefined();
+  });
+});
+
+describe("findTrustedBaseline with merge-queue leaders validated by the CI workflow", () => {
+  const find = (github: (path: string) => Promise<unknown>) =>
+    findTrustedBaseline({ github: github as never, repository: REPO, baseSha: BASE });
+
+  it("uses the candidate of a finished CI leader, the case that used to be ignored while a follower waited", async () => {
+    // The leader's CI run finished and uploaded its candidate before the follower started waiting.
+    const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], { 10: queueRun({ path: CI }) });
+    expect(await find(github)).toMatchObject({ source: "merge-queue", artifact: { id: 1 } });
+  });
+
+  it("trusts an unfinished CI leader once its own visual job has succeeded", async () => {
+    const { github, calls } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }) },
+      {
+        10: [
+          { name: "medium-test (shard 0)", status: "in_progress", conclusion: "" },
+          { name: VISUAL, status: "completed", conclusion: "success" },
+        ],
+      },
+    );
+    expect(await find(github)).toMatchObject({ source: "merge-queue", artifact: { id: 1 } });
+    expect(calls.some((path) => path.includes("/actions/runs/10/jobs"))).toBe(true);
+  });
+
+  it.each([
+    ["its visual job is still running", [{ name: VISUAL, status: "in_progress", conclusion: "" }]],
+    ["its visual job failed", [{ name: VISUAL, status: "completed", conclusion: "failure" }]],
+    ["its visual job was cancelled", [{ name: VISUAL, status: "completed", conclusion: "cancelled" }]],
+    ["it has no visual job", [{ name: "lint", status: "completed", conclusion: "success" }]],
+    ["only a differently named job succeeded", [{ name: `${VISUAL} (shard 0)`, status: "completed", conclusion: "success" }]],
+  ])("does not trust an unfinished CI leader when %s", async (_label, jobs) => {
+    const { github } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }) },
+      { 10: jobs },
+    );
+    expect(await find(github)).toBeUndefined();
+  });
+
+  it("does not trust an unfinished leader whose job list cannot be read", async () => {
+    const { github: inner } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }) },
+    );
+    const github = async (path: string) => {
+      if (/\/jobs(\?|$)/.test(path)) throw new Error("jobs unavailable");
+      return inner(path);
+    };
+    expect(await find(github)).toBeUndefined();
+  });
+
+  describe("when the run has more jobs than one page holds", () => {
+    const filler = (count: number) =>
+      Array.from({ length: count }, (_unused, index) => ({
+        name: `filler-${index}`,
+        status: "completed",
+        conclusion: "success",
+      }));
+    const leader = { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }) };
+    const visual = (status: string, conclusion: string) => ({ name: VISUAL, status, conclusion });
+
+    it("finds a successful visual job beyond the endpoint's default page of 30", async () => {
+      // CI declares more than 30 jobs, so the visual job can be on the second default page.
+      const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(40), visual("completed", "success")],
+      });
+      expect(await find(github)).toMatchObject({ source: "merge-queue", artifact: { id: 1 } });
+      expect(calls.some((path) => path.includes("/jobs?per_page=100"))).toBe(true);
+    });
+
+    it("follows further pages when the first full page of 100 does not contain it", async () => {
+      const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(150), visual("completed", "success")],
+      });
+      expect(await find(github)).toMatchObject({ source: "merge-queue" });
+      expect(calls.some((path) => path.endsWith("page=2"))).toBe(true);
+    });
+
+    it("does not trust a visual job that is still running on a later page", async () => {
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(40), visual("in_progress", "")],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+
+    it("does not trust a leader when a later duplicate of the visual job failed", async () => {
+      // Every job carrying the name must have succeeded, so a collision cannot launder a failure.
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [visual("completed", "success"), ...filler(120), visual("completed", "failure")],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+
+    it("fails closed rather than paging without bound", async () => {
+      const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [...filler(MAX_JOB_PAGES * JOBS_PAGE_SIZE), visual("completed", "success")],
+      });
+      expect(await find(github)).toBeUndefined();
+      expect(calls.filter((path) => path.includes("/jobs?")).length).toBe(MAX_JOB_PAGES);
+    });
+
+    it("does not trust a successful visual job when the bound hides a failing duplicate", async () => {
+      // The prefix read before the bound holds a success, but the failure sits beyond it, so the
+      // evidence is incomplete and must not count as success.
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [visual("completed", "success"), ...filler(MAX_JOB_PAGES * JOBS_PAGE_SIZE - 1), visual("completed", "failure")],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+
+    it("does not trust a leader when a later page holds a malformed job entry", async () => {
+      // A success on the first page must not be enough when a later page cannot be read in full.
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [visual("completed", "success"), ...filler(JOBS_PAGE_SIZE - 1), {} as never],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+  });
+
+  it("never trusts a CI leader that finished without succeeding, even if its visual job passed", async () => {
+    // A failed group is ejected and its followers rebuilt on a new base, so its candidate is moot.
+    const { github } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: queueRun({ path: CI, conclusion: "failure" }) },
+      { 10: [{ name: VISUAL, status: "completed", conclusion: "success" }] },
+    );
+    expect(await find(github)).toBeUndefined();
+  });
+
+  it.each([
+    ["a pull_request run", { event: "pull_request", head_branch: "fix/forged" }],
+    ["a run on another SHA", { head_sha: OTHER }],
+    ["a run from a fork head repository", { head_repository: { full_name: "someone/BenchBox" } }],
+    ["a run of another workflow", { path: ".github/workflows/test.yml" }],
+  ])("does not trust an unfinished visual job reported by %s", async (_label, overrides) => {
+    // The artifact name is untrusted, so the producing run is vetted before its jobs are read.
+    const { github, calls } = fakeGithub(
+      [{ id: 1, name: NAME, runId: 10 }],
+      { 10: queueRun({ path: CI, status: "in_progress", conclusion: null, ...overrides }) },
+      { 10: [{ name: VISUAL, status: "completed", conclusion: "success" }] },
+    );
+    expect(await find(github)).toBeUndefined();
+    expect(calls.some((path) => path.includes("/actions/runs/10/jobs"))).toBe(false);
+  });
+
+  it("still prefers a landed develop baseline over an unfinished CI leader's candidate", async () => {
+    const { github } = fakeGithub(
+      [
+        { id: 1, name: NAME, runId: 10 },
+        { id: 2, name: NAME, runId: 20 },
+      ],
+      { 10: queueRun({ path: CI, status: "in_progress", conclusion: null }), 20: developRun() },
+      { 10: [{ name: VISUAL, status: "completed", conclusion: "success" }] },
+    );
+    expect(await find(github)).toMatchObject({ source: "develop", artifact: { id: 2 } });
   });
 });
 
