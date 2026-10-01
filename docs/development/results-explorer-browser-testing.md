@@ -133,9 +133,11 @@ Because the entry names the pull request, it cannot approve the same pixels in
 another PR, for example one that reapplies a reverted change. It does stay valid
 for its own PR: closing and reopening the PR, or force-pushing it, keeps the
 approval for any head that produces exactly the reviewed change, and a changed
-rendering stops matching. To withdraw an approval, remove its entry. An entry for
-a merged PR can never match again, because that PR number cannot be reopened, so
-merged entries can be removed whenever you tidy the variable.
+rendering stops matching. To withdraw an approval, remove its entry; checks that
+already finished are not affected. Once a PR has merged, its entry cannot
+authorize any later PR or new queue entry (a rerun of that PR's original workflow
+run could still match it), so merged entries can be removed whenever you tidy the
+variable.
 Digest approval is not available while the baseline still uses the legacy
 capture profile (the one-time landing migration leaves the landing captures out
 of the comparison, so a digest would not cover them); use the exact-head
