@@ -7,6 +7,7 @@ community submissions survive when develop is also ahead.
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -278,6 +279,50 @@ def test_build_mirror_carries_shared_schema_policy() -> None:
     assert '"benchbox/core/results/schema_policy.py"' in workflow
     build = workflow.split("name: Build mirror branch", 1)[1].split("name: ", 1)[0]
     assert "'benchbox/core/results/schema_policy.py'" in build
+
+
+def _mirrored_runtime_paths() -> tuple[list[str], list[str], list[str]]:
+    text = WORKFLOW_PATH.read_text(encoding="utf-8")
+    workflow = yaml.safe_load(text)
+    triggers = workflow.get("on", workflow.get(True))["push"]["paths"]
+    drift = next(
+        step["run"]
+        for step in workflow["jobs"]["mirror"]["steps"]
+        if step.get("name") == "Detect drift between develop and published-results"
+    )
+    comparison = drift.split("mapfile -t DIFFED < <(", 1)[1].split(")\n", 1)[0].replace("\\\n", "")
+    compare_paths = shlex.split(comparison)[shlex.split(comparison).index("--") + 1 :]
+    copy_paths = shlex.split(_build_step_run().split("FILE_PATHS=(", 1)[1].split(")", 1)[0])
+    return triggers, compare_paths, copy_paths
+
+
+def test_parity_runtime_triggers_is_compared_and_is_copied() -> None:
+    for paths in _mirrored_runtime_paths():
+        assert "scripts/publication/validator_parity.py" in paths
+
+
+def test_runtime_drift_copies_exact_source_and_preserves_published_only_archive(tmp_path: Path) -> None:
+    repo = tmp_path / "runtime-mirror"
+    _init_repo(repo)
+    helper = "scripts/publication/validator_parity.py"
+    community = f"{BUNDLES_DIR}/community.json"
+    archive_bytes = '{"archive": "published-only"}\n'
+    published = _commit_files(repo, {helper: "old helper\n", community: archive_bytes}, "published runtime")
+    source_bytes = "new trusted helper\n"
+    _run(["git", "rm", "--quiet", community], cwd=repo)
+    source = _commit_files(repo, {helper: source_bytes}, "source runtime")
+    assert community not in _tracked_under(repo, BUNDLES_DIR, source)
+    _, compare_paths, copy_paths = _mirrored_runtime_paths()
+    changed = _run(["git", "diff", "--name-only", published, source, "--", *compare_paths], cwd=repo)
+    assert set(changed.splitlines()) == {helper, community}
+    _run(["git", "switch", "--create", "mirror", published], cwd=repo)
+    for path in copy_paths:
+        exists = subprocess.run(["git", "cat-file", "-e", f"{source}:{path}"], cwd=repo, capture_output=True)
+        if exists.returncode == 0:
+            _run(["git", "checkout", source, "--", path], cwd=repo)
+    assert (repo / helper).read_bytes() == source_bytes.encode()
+    assert (repo / community).read_bytes() == archive_bytes.encode()
+    assert _run(["git", "diff", "--cached", "--name-only"], cwd=repo) == helper
 
 
 def test_drift_check_ignores_derived_inventory_difference() -> None:

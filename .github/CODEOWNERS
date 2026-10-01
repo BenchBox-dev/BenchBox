@@ -102,3 +102,7 @@ docs/reference/threat-model.md @joeharris76
 scripts/check_decision_records.py @joeharris76
 publication/** @joeharris76
 scripts/publication/** @joeharris76
+benchbox/_binaries/** @joeharris76
+benchbox/utils/binary_manifest.py @joeharris76
+scripts/bundled_binary_manifest.py @joeharris76
+scripts/verify_distribution_binaries.py @joeharris76

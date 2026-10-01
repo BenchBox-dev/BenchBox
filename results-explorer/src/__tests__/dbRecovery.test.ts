@@ -26,6 +26,12 @@ const hoisted = vi.hoisted(() => {
   }
 
   const membershipAttempts = new Map<string, number>();
+  const bundleSelections: string[] = [];
+  const bundles = {
+    mvp: { mainModule: "duckdb-mvp.wasm", mainWorker: "duckdb-mvp.worker.js" },
+    eh: { mainModule: "duckdb-eh.wasm", mainWorker: "duckdb-eh.worker.js" },
+    coi: { mainModule: "duckdb-coi.wasm", mainWorker: "duckdb-coi.worker.js", pthreadWorker: "pthread.js" },
+  };
   let membershipQuery:
     ((sql: string, params: unknown[], attempt: number) => Array<Record<string, unknown>>) | null = null;
 
@@ -117,6 +123,10 @@ const hoisted = vi.hoisted(() => {
     | "healthy"
     | "dead-after-init"
     | "dead-during-init"
+    | "buffer-error-on-metadata"
+    | "buffer-error-on-readiness"
+    | "coi-buffer-errors"
+    | "old-snapshot"
     | "terminated-after-init"
     | "slow-query";
   const nextInstanceBehaviors: InstanceBehavior[] = [];
@@ -125,8 +135,10 @@ const hoisted = vi.hoisted(() => {
   class FakeAsyncDuckDB {
     id: number;
     behavior: InstanceBehavior;
+    bundleModule: string;
     terminate: () => Promise<void>;
     connectCount = 0;
+    queryCalls: string[] = [];
     // Flipped by a connection's query() in the "terminated-after-init"
     // scenario, and by `terminate()` itself - mirrors the real bridge's
     // `isDetached()`, which is exactly `!this._worker`.
@@ -134,6 +146,7 @@ const hoisted = vi.hoisted(() => {
 
     constructor() {
       this.behavior = nextInstanceBehaviors.shift() ?? "healthy";
+      this.bundleModule = bundleSelections.at(-1) ?? "";
       this.id = instances.length + 1;
       this.terminate = vi.fn(async () => {
         this.terminated = true;
@@ -161,6 +174,21 @@ const hoisted = vi.hoisted(() => {
       const terminatedBy =
         this.behavior === "terminated-after-init" && this.connectCount > 1 ? this : null;
       const conn = new FakeConnection(isDead, terminatedBy);
+      const query = conn.query;
+      conn.query = async (sql: string) => {
+        this.queryCalls.push(sql);
+        if (this.behavior === "old-snapshot" && /read_model_version/i.test(sql)) {
+          return rows([{ read_model_version: 10 }]);
+        }
+        if (
+          (this.behavior === "coi-buffer-errors" && this.bundleModule === bundles.coi.mainModule) ||
+          (this.behavior === "buffer-error-on-metadata" && /read_model_version/i.test(sql)) ||
+          (this.behavior === "buffer-error-on-readiness" && /^SELECT result_id FROM bench.results LIMIT 1/.test(sql))
+        ) {
+          throw new RangeError("offset is out of bounds");
+        }
+        return query(sql);
+      };
       if (this.behavior === "slow-query" && this.connectCount === 2) {
         conn.query = async () => {
           await new Promise((resolve) => setTimeout(resolve, 10_000));
@@ -173,6 +201,8 @@ const hoisted = vi.hoisted(() => {
 
   return {
     nextInstanceBehaviors,
+    bundleSelections,
+    bundles,
     instances,
     FakeAsyncDuckDB,
     membershipAttempts,
@@ -183,7 +213,11 @@ const hoisted = vi.hoisted(() => {
 });
 
 vi.mock("@duckdb/duckdb-wasm", () => ({
-  selectBundle: vi.fn(async () => ({ mainModule: "duckdb.wasm", mainWorker: "duckdb-worker.js" })),
+  selectBundle: vi.fn(async (bundles: typeof hoisted.bundles) => {
+    const bundle = bundles.coi ?? bundles.eh ?? bundles.mvp;
+    hoisted.bundleSelections.push(bundle.mainModule);
+    return bundle;
+  }),
   ConsoleLogger: class {},
   LogLevel: { WARNING: 3 },
   DuckDBDataProtocol: { HTTP: 1 },
@@ -191,7 +225,7 @@ vi.mock("@duckdb/duckdb-wasm", () => ({
 }));
 
 vi.mock("@/lib/duckdbBundles", () => ({
-  LOCAL_DUCKDB_BUNDLES: {},
+  LOCAL_DUCKDB_BUNDLES: hoisted.bundles,
 }));
 
 vi.mock("@/lib/performanceMarks", () => ({
@@ -223,6 +257,7 @@ beforeEach(() => {
   hoisted.nextInstanceBehaviors.length = 0;
   hoisted.instances.length = 0;
   hoisted.membershipAttempts.clear();
+  hoisted.bundleSelections.length = 0;
   hoisted.setMembershipQuery(null);
 
   vi.stubGlobal("Worker", FakeWorker);
@@ -244,6 +279,73 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+describe("Initialization with a stale worker memory view", () => {
+  it("uses the supported single-threaded bundle after persistent COI buffer errors", async () => {
+    vi.useFakeTimers();
+    hoisted.nextInstanceBehaviors.push("coi-buffer-errors", "coi-buffer-errors", "coi-buffer-errors");
+    hoisted.setMembershipQuery((_sql, params) => params.map((result_id) => ({ result_id })));
+    const pending = Promise.all([getExistingResultIds(["real-a"]), getExistingResultIds(["real-b"])])
+      .catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await pending).toEqual([new Set(["real-a"]), new Set(["real-b"])]);
+    expect(hoisted.bundleSelections).toEqual([hoisted.bundles.coi.mainModule, hoisted.bundles.eh.mainModule]);
+    expect(hoisted.instances[0]?.terminate).toHaveBeenCalledOnce();
+    expect(hoisted.instances[1]?.terminated).toBe(false);
+    resetDuckDbInitializationFailures();
+    expect(await getDb()).toBe(hoisted.instances[1]);
+  });
+
+  it.each(["network", "version"] as const)("does not exclude COI after a %s failure", async (failure) => {
+    if (failure === "network") {
+      vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    } else {
+      hoisted.nextInstanceBehaviors.push("old-snapshot");
+    }
+    await expect(getDb()).rejects.toThrow();
+    await getDb();
+    expect(hoisted.bundleSelections).toEqual([hoisted.bundles.coi.mainModule, hoisted.bundles.coi.mainModule]);
+  });
+
+  it.each(["buffer-error-on-metadata", "buffer-error-on-readiness"] as const)(
+    "replaces %s promptly and preserves concurrent real-ID reads",
+    async (behavior) => {
+      vi.useFakeTimers();
+      hoisted.nextInstanceBehaviors.push(behavior, "healthy");
+      hoisted.setMembershipQuery((_sql, params) => params.map((result_id) => ({ result_id })));
+      const pending = Promise.all([getExistingResultIds(["real-a"]), getExistingResultIds(["real-b"])]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hoisted.instances[0]?.terminate).toHaveBeenCalledOnce();
+      const failingSql = behavior === "buffer-error-on-metadata"
+        ? /read_model_version/i
+        : /^SELECT result_id FROM bench.results LIMIT 1/;
+      expect(hoisted.instances[0]?.queryCalls.filter((sql) => failingSql.test(sql))).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toEqual([new Set(["real-a"]), new Set(["real-b"])]);
+      expect(hoisted.instances).toHaveLength(2);
+      expect(hoisted.instances[1]?.terminated).toBe(false);
+      expect(_getInitFailuresForTest()).toBe(0);
+    },
+  );
+
+  it.each(["buffer-error-on-metadata", "buffer-error-on-readiness"] as const)(
+    "bounds repeated %s failures without retrying SQL on broken workers",
+    async (behavior) => {
+      vi.useFakeTimers();
+      hoisted.nextInstanceBehaviors.push(behavior, behavior, behavior);
+      let failure: unknown;
+      const pending = queryRows("SELECT 1").catch((error: unknown) => { failure = error; });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(failure).toBeInstanceOf(RangeError);
+      await pending;
+      expect(hoisted.instances).toHaveLength(3);
+      expect(hoisted.instances.every((instance) => instance.terminated)).toBe(true);
+      expect(_getInitFailuresForTest()).toBe(3);
+      await expect(getDb()).rejects.toThrow("offset is out of bounds");
+      expect(hoisted.instances).toHaveLength(3);
+    },
+  );
 });
 
 describe("Compare membership with cold reads", () => {
