@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "All four queries match on both families at SF=0.1 under identical bindings, or the failure is explained with evidence and the approach is declared falsified",
+    "Per-query status before and after at SF=0.01 and 0.1 is recorded; Q44 and Q93 emptiness at SF=0.1 is recorded (non-empty, or kept as classification evidence)",
+    "No SF=1 DataFrame run (SQL-only at SF=1 if needed, with approval)"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T4). Prior art to extend: benchbox/core/tpcds/parameter_extractor.py (orphaned since #2126), the per-benchmark set_parameter_overrides seams; the NYC Taxi builders scrape SQL (_extract_sql_windows) and are not the model. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Write per-query adapter functions mapping the dsqgen -LOG parameters to the DataFrame parameter keys, wire them into the gate builder (benchbox/core/equivalence/builders/tpcds.py) at the gate's scale, and measure. A flat name map is insufficient: Q39's SQL uses [MONTH] and [MONTH]+1 while -LOG records only MONTH.01 and the DataFrame expects months: [1, 2]. Verified drift between the gate's SQL and the DataFrame defaults: Q39 SQL year 1998 months 4-5 vs default 2001 [1,2]; Q49 SQL 2000/month 12 vs default 2001; Q41 SQL BETWEEN 742 AND 742+40 vs default [738,129,830,540]. Q44 and Q93 are SQL-empty at SF 0.01-0.1 and diverge only at SF=1 (verified from probe data). Hypothesis (unproven): with parameters rendered at the data's scale they become non-empty and match at SF=0.1. Q41 is the negative control because its implementation hard-codes colors and reads manufact_start with a literal fallback; do not prototype on it. Falsified if Q39, Q44, Q49 or Q93 still diverge under identical bindings, or an adapter cannot be written without ambiguity.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:08:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bbd80e5c0f5445aeabb2901348110570",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
