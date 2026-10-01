@@ -111,6 +111,7 @@ def load_policy(path: Path) -> dict[str, Any]:
             "maintained_roots",
             "ownership_rules",
             "external_entries",
+            "format_classes",
             "payloads",
             "derived_rules",
             "consumer_edges",
@@ -203,7 +204,6 @@ def validate_evidence(
     policy: dict[str, Any], root: Path, base: str, paths: set[str], task_ids: set[str] | None = None
 ) -> None:
     for category, fields in {
-        "external_entries": {"path", "owner", "provenance", "governing_requirement", "blocking_disposition"},
         "directives": {"path", "token", "count", "consumer", "necessity", "alternative", "owner", "removal_trigger"},
         "notices": {
             "path",
@@ -494,6 +494,169 @@ def apply_derived_rules(
             priorities[record["path"]] = rule["priority"]
 
 
+def validate_external_entries(
+    policy: dict[str, Any], paths: set[str], task_ids: set[str] | None = None
+) -> list[dict[str, Any]]:
+    fields = {"selector", "owner", "provenance", "governing_requirement", "blocking_disposition"}
+    entries = []
+    for index, entry in enumerate(policy["external_entries"]):
+        if not isinstance(entry, dict):
+            raise PolicyError(f"external_entries[{index}] must be an object")
+        require_fields(entry, fields, f"external_entries[{index}]")
+        if not valid_selector(entry["selector"]):
+            raise PolicyError(f"external_entries[{index}] has an invalid selector")
+        for field in ("provenance", "governing_requirement", "blocking_disposition"):
+            check_string(entry[field], f"external_entries[{index}].{field}")
+        check_owner(entry["owner"], f"external_entries[{index}].owner", task_ids)
+        if not any(matches(path, entry["selector"]) for path in paths):
+            raise PolicyError(f"external_entries[{index}] selector matches no tracked path at the base")
+        entries.append(entry)
+    prefixes = [entry["selector"]["prefix"] for entry in entries if "prefix" in entry["selector"]]
+    for index, prefix in enumerate(prefixes):
+        if any(other.startswith(prefix) for other in prefixes[index + 1 :]) or any(
+            prefix.startswith(other) for other in prefixes[:index]
+        ):
+            raise PolicyError(f"external entry prefix overlaps another entry: {prefix}")
+    return entries
+
+
+def apply_external_entries(resolved: list[dict[str, Any]], entries: list[dict[str, Any]]) -> None:
+    for record in resolved:
+        if record["owner"] is not None or isinstance(record["rule"], list):
+            continue
+        for entry in entries:
+            if matches(record["path"], entry["selector"]):
+                record.update(
+                    owner=entry["owner"], state="excluded", blocking_disposition=entry["provenance"], rule="external"
+                )
+                break
+
+
+JSON_COMMENT_KEYS = {"_comment", "__comment", "comment", "$comment", "//"}
+
+
+def _json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    keys = [key for key, _ in pairs]
+    if len(keys) != len(set(keys)) or JSON_COMMENT_KEYS & set(keys):
+        raise ValueError("duplicate or comment key")
+    return dict(pairs)
+
+
+def _json_constant(name: str) -> Any:
+    raise ValueError(name)
+
+
+def verify_strict_json(path: str, blob: bytes) -> bool:
+    try:
+        text = blob.decode("utf-8")
+        documents = [line for line in text.splitlines() if line.strip()] if path.endswith(".jsonl") else [text]
+        for document in documents:
+            json.loads(document, object_pairs_hook=_json_object, parse_constant=_json_constant)
+    except (UnicodeError, ValueError):
+        return False
+    return bool(documents)
+
+
+def verify_png_signature(path: str, blob: bytes) -> bool:
+    return blob.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+MARKDOWN_BLOCK_PREFIX = re.compile(r"^\s*(?:>\s*)*(?:(?:[-*+]|\d+[.)])\s+)*")
+MARKDOWN_COMMENT_MARKERS = re.compile(
+    r"<!--|\{/\*|\{%|\{#|<(?:pre|code|script|style)\b|\[(?://|comment)\]\s*:\s*(?:#|<>)", re.IGNORECASE
+)
+
+
+def verify_markdown_prose(path: str, blob: bytes) -> bool:
+    try:
+        lines = blob.decode("utf-8").splitlines()
+    except UnicodeError:
+        return False
+    if lines and lines[0].strip() in {"---", "+++"}:
+        closing = next((index for index, line in enumerate(lines[1:], 1) if line.strip() == lines[0].strip()), None)
+        if lines[0].strip() == "+++" or closing is None:
+            return False
+        if any(re.search(r"(^|\s)#", line) for line in lines[1:closing]):
+            return False
+        lines = lines[closing + 1 :]
+    for line in lines:
+        if line.startswith(("    ", "\t")) or line.lstrip().startswith("%"):
+            return False
+        if MARKDOWN_COMMENT_MARKERS.search(line):
+            return False
+        if MARKDOWN_BLOCK_PREFIX.sub("", line).startswith(("```", "~~~")):
+            return False
+    return True
+
+
+def verify_sql_without_comment_markers(path: str, blob: bytes) -> bool:
+    try:
+        text = blob.decode("utf-8")
+    except UnicodeError:
+        return False
+    return not any(marker in text for marker in ("--", "/*", "#"))
+
+
+FORMAT_VERIFIERS = {
+    "strict-json": verify_strict_json,
+    "png-signature": verify_png_signature,
+    "markdown-prose": verify_markdown_prose,
+    "sql-without-comment-markers": verify_sql_without_comment_markers,
+}
+
+
+def validate_format_classes(policy: dict[str, Any], task_ids: set[str] | None = None) -> list[dict[str, Any]]:
+    fields = {"id", "verifier", "extensions", "selectors", "owner", "blocking_disposition"}
+    classes = []
+    ids = set()
+    for index, entry in enumerate(policy["format_classes"]):
+        if not isinstance(entry, dict):
+            raise PolicyError(f"format_classes[{index}] must be an object")
+        require_fields(entry, fields, f"format_classes[{index}]")
+        class_id = check_string(entry["id"], f"format_classes[{index}].id")
+        if class_id in ids:
+            raise PolicyError(f"duplicate format class: {class_id}")
+        ids.add(class_id)
+        if entry["verifier"] not in FORMAT_VERIFIERS:
+            raise PolicyError(f"format class {class_id} has an unknown verifier")
+        extensions = entry["extensions"]
+        if not isinstance(extensions, list) or not extensions:
+            raise PolicyError(f"format class {class_id} needs extensions")
+        for extension in extensions:
+            if not isinstance(extension, str) or not extension.startswith(".") or extension != extension.lower():
+                raise PolicyError(f"format class {class_id} extensions must be lowercase and start with a dot")
+        if not isinstance(entry["selectors"], list) or not entry["selectors"]:
+            raise PolicyError(f"format class {class_id} needs selectors")
+        if not all(valid_selector(selector) for selector in entry["selectors"]):
+            raise PolicyError(f"format class {class_id} has an invalid selector")
+        check_owner(entry["owner"], f"format class {class_id}.owner", task_ids)
+        check_string(entry["blocking_disposition"], f"format class {class_id}.blocking_disposition")
+        classes.append(entry)
+    return classes
+
+
+def apply_format_classes(resolved: list[dict[str, Any]], classes: list[dict[str, Any]], root: Path, base: str) -> None:
+    for entry in classes:
+        eligible = [
+            record
+            for record in resolved
+            if record["owner"] is None
+            and not isinstance(record["rule"], list)
+            and PurePosixPath(record["path"]).suffix.lower() in entry["extensions"]
+            and any(matches(record["path"], selector) for selector in entry["selectors"])
+        ]
+        blobs = read_blobs(root, base, [record["path"] for record in eligible])
+        verifier = FORMAT_VERIFIERS[entry["verifier"]]
+        for record in eligible:
+            if verifier(record["path"], blobs[record["path"]]):
+                record.update(
+                    owner=entry["owner"],
+                    state="comment-free",
+                    blocking_disposition=entry["blocking_disposition"],
+                    rule=f"format:{entry['id']}",
+                )
+
+
 def apply_notice_owners(resolved: list[dict[str, Any]], notices: list[dict[str, Any]]) -> list[Finding]:
     by_path = {notice["path"]: notice for notice in notices}
     findings = []
@@ -780,6 +943,8 @@ def main(argv: list[str] | None = None) -> int:
         rules = validate_rules(policy, task_ids)
         derived = validate_derived_rules(policy)
         validate_rule_priorities(rules, derived)
+        external = validate_external_entries(policy, path_set, task_ids)
+        format_classes = validate_format_classes(policy, task_ids)
         validate_evidence(policy, root, args.base, path_set, task_ids)
         validate_payloads_and_edges(policy, path_set, task_ids)
         validate_dispositions(policy, task_ids)
@@ -787,6 +952,8 @@ def main(argv: list[str] | None = None) -> int:
         resolved, findings = owned_paths(paths, roots, rules, priorities)
         apply_derived_rules(resolved, derived, root, args.base, priorities)
         notice_findings = apply_notice_owners(resolved, policy["notices"])
+        apply_external_entries(resolved, external)
+        apply_format_classes(resolved, format_classes, root, args.base)
         owned = {record["path"] for record in resolved if record["owner"]}
         findings = [finding for finding in findings if finding.subject not in owned]
         findings.extend(notice_findings)
@@ -810,8 +977,11 @@ def main(argv: list[str] | None = None) -> int:
             output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         for finding in findings:
             print(finding, file=sys.stderr)
+        excluded = sum(record["state"] == "excluded" for record in resolved)
+        comment_free = sum(record["state"] == "comment-free" for record in resolved)
         print(
-            f"comment-cleanup-scope: {len(resolved)} resolved paths, {len(carriers)} docstring carriers, "
+            f"comment-cleanup-scope: {len(resolved)} resolved paths ({excluded} excluded, {comment_free} comment-free), "
+            f"{len(carriers)} docstring carriers, "
             f"{open_directives} directive and {open_todos} TODO/FIXME comments in Python sources not yet registered, "
             f"{len(findings)} findings"
         )
