@@ -6037,10 +6037,15 @@
       "title": "Record owner decisions D1-D5 gating the DataFrame parity work"
     },
     "dfparity-t01-dsqgen-log-parser": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-02T14:52:47Z",
+        "generation": "541387c4d58743a4b6926f5fc7578c39",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Add dsqgen -LOG support and a structured parameter-log parser"
     },
     "dfparity-t02-parameter-inventory-test": {
