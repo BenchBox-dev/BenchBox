@@ -5,7 +5,7 @@
     "Stream number is part of the parsed result",
     "No change to existing query generation behavior when -LOG is not requested"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T1). Not dependent on owner decisions because the parser records everything including stream. Heavy runs need approval; this item needs only single-template dsqgen runs. The project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T1). Not dependent on owner decisions because the parser records everything including stream. Heavy runs need approval; this item needs only single-template dsqgen runs. The project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-01: implemented and published as PR #2498 (branch feat/tpcds-dsqgen-parameter-log, worktree ../BenchBox.wt-tpcds-dsqgen-log, head 1e9baeaf1), held, auto-merge withheld. make pr-preflight exit 0 on that head (first run was SIGTERMed during the medium-test stage by an unknown external signal; rerun passed). All four acceptance criteria are covered by tests/unit/tpcds/test_parameter_log.py. New module benchbox/core/tpcds/parameter_log.py; DSQGenBinary.generate_parameter_log(query_id, seed, scale_factor, stream_id, dialect). Streams: stream n is requested as -STREAMS n+1 and is independent of the stream count (tested). Not verified: log identity of non-darwin-arm64 binaries (t15). Remaining: hosted CI on the pushed head, merge by a maintainer, then finish this item.",
   "description": "Extend DSQGenBinary (benchbox/core/tpcds/c_tools.py, _build_dsqgen_cmd) to pass -LOG <file> and add a parser returning per-template substituted parameters (names like YEAR.01, MONTH.01) including the stream (BEGIN STREAM n). Tested facts: -LOG works, the same -RNGSEED gives an identical log, a different seed changes it, 99 invocations take about 3 s; -QUALIFY Y does not change values. The log records base variables only (Q39 logs MONTH.01 but the SQL also uses [MONTH]+1), which downstream adapters must handle. Extends the orphaned benchbox/core/tpcds/parameter_extractor.py (no production callers since commit 72d167081, #2126); do not add more regex SQL scraping.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "generation": "541387c4d58743a4b6926f5fc7578c39",
       "op": "take",
       "op_id": "55a16a1f59264a168a7d05b360182c17",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T15:31:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3eb06de96c1449089f268e0c4312a9c6",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
