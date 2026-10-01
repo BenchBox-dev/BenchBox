@@ -1,11 +1,22 @@
 {
   "acceptance": [
-    "ClickBench runs completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
-    "CoffeeShop runs completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
-    "H2ODB runs completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
+    "ClickBench bundles exist at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles); CoffeeShop at SF 0.1, 1.0 (6 bundles); H2ODB at SF 0.1, 1.0 (6 bundles); 21 bundles in total",
+    "The seven Databricks bundles (ClickBench x3, CoffeeShop x2, H2ODB x2) are rerun on current develop because the 2026-09-19/20 bundles lack the result-cache receipt the validator now requires",
+    "The cause of ClickBench's scale-invariant timings (geomean x1.00 to x1.45 across 100x scale on all six BigQuery, Snowflake and Databricks bundles) is determined (result cache, fixed overhead, or generator size) and recorded before any override is authored; each remaining scale-invariant or timing-plateau override carries a maintainer-written reason",
+    "The two stray ClickBench BigQuery files (a partial run, 20260919_184034_070d9adb, and a data-only run, 20260919_185659_317ef35f) are excluded from submission",
     "100% query pass rate across all runs",
-    "All 21 result bundles pass scripts/validate_submission.py with 0 errors"
+    "All 21 result bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal"
   ],
-  "context": "Builds on first-live-cloud-benchmark-run-and-publish. ClickBench and H2ODB represent high-concurrency analytical and ML aggregation patterns. ClickBench SF 10 represents 100M rows / ~15 GB raw data. Ensure GCS/S3/Snowflake staging bucket permissions and table creation scripts handle wide schemas cleanly.",
-  "description": "Expand live cloud benchmark runs across BigQuery, Databricks, and Snowflake to the Industry benchmark suites:\n- ClickBench: 43 queries on web analytics hits data (SF 0.1, 1.0, 10.0)\n- CoffeeShop: 11 analytical queries on retail/coffee transactional schema (SF 0.1, 1.0)\n- H2ODB: 10 analytical queries for ML data preparation (SF 0.1, 1.0)\n\nExecute across all three platforms at the supported scale factors from {0.1, 1.0, 10.0}.\nCapture valid result bundles satisfying the cohort gate (results-data/validate_corpus.py and scripts/validate_submission.py)."
+  "context": "Builds on first-live-cloud-benchmark-run-and-publish, which is done. Ensure GCS/S3/Snowflake staging bucket permissions and table creation scripts handle wide schemas cleanly.\n\nRevalidated 2026-10-01. Query counts match the loaded classes (43 / 11 / 10). The registry lists ClickBench scale_options as [1.0] only, but only min_scale (0.01) is enforced, so SF 0.1 and 10.0 are valid. The earlier statement that ClickBench SF 10 is 100M rows (~15 GB raw) is wrong for BenchBox: core/clickbench/generator.py creates 1,000,000 x scale_factor rows. These suites are not rows of the 84-cell corpus campaign. Rerunning the seven Databricks cells needs an approval that states command, maximum runtime, log path and stop condition, and a check of the 500-table Unity Catalog quota first (the low-scale-factor ClickBench, CoffeeShop and H2ODB schemas were dropped to free quota). Overrides are maintainer decisions.",
+  "description": "Publish live cloud benchmark results across BigQuery, Databricks, and Snowflake for the Industry benchmark suites:\n- ClickBench: 43 queries on web analytics hits data (SF 0.1, 1.0, 10.0)\n- CoffeeShop: 11 analytical queries on retail/coffee transactional schema (SF 0.1, 1.0)\n- H2ODB: 10 analytical queries for ML data preparation (SF 0.1, 1.0)\n\nRuns from 2026-09-19/20 already exist locally for every cell but none is published. Under the current validator 26 of 41 local bundle files for the six Industry and Academic suites pass; the rest need reruns or overrides (see acceptance). BenchBox's ClickBench generator makes 1M rows per scale factor, so SF 10 is 10M synthetic rows.\nCapture valid result bundles satisfying the cohort gate (results-data/validate_corpus.py and scripts/validate_submission.py).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8995e2100042cfa8b56876be",
+      "at": "2026-10-01T15:02:58Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b9f045f5db504de285c610a838fef3a3",
+      "session_id": "a90fbddb3b8e47b781e3c8bf731c4a32"
+    }
+  ]
 }
