@@ -86,25 +86,24 @@ class PythonBindings:
             if isinstance(value, ast.Call) and self.actor(value.func) == "builtins.compile":
                 return None
             return node.args[0], "python", self.literal(node.args[0])
-        if (
-            actor
-            in {
-                "subprocess.run",
-                "subprocess.call",
-                "subprocess.check_call",
-                "subprocess.check_output",
-                "subprocess.Popen",
-            }
-            and node.args
-        ):
-            value = self.dereference(node.args[0])
+        if actor in {
+            "subprocess.run",
+            "subprocess.call",
+            "subprocess.check_call",
+            "subprocess.check_output",
+            "subprocess.Popen",
+        }:
+            command = node.args[0] if node.args else next((kw.value for kw in node.keywords if kw.arg == "args"), None)
+            if command is None:
+                return None
+            value = self.dereference(command)
             if isinstance(value, (ast.List, ast.Tuple)):
                 return self.process_payload(value.elts)
             if any(
                 keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
                 for keyword in node.keywords
             ):
-                return node.args[0], "bash", self.literal(node.args[0])
+                return command, "bash", self.literal(command)
         return None
 
     def process_payload(self, args: list[ast.expr]) -> tuple[ast.AST, str, str | None] | None:

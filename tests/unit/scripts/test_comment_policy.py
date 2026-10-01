@@ -781,6 +781,8 @@ def test_invalid_source_encoding_is_inventory_debt_in_report(tmp_path: Path) -> 
         'import subprocess\nsubprocess.run(["python3", "-c", "# explanation"])',
         'import subprocess, sys\nsubprocess.run([sys.executable, "-c", "# explanation"])',
         "import subprocess\nsubprocess.run(\"python3 -c '# explanation'\", shell=True)",
+        'import subprocess\nsubprocess.run(args=["python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(args="echo ok # explanation", shell=True)',
     ],
 )
 def test_python_executable_strings_reach_scanner(source: str) -> None:
