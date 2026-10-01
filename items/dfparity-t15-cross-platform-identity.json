@@ -4,7 +4,7 @@
     "dsqgen -LOG output for a pinned seed is compared across platforms for all 99 templates",
     "The result of the first comparison is recorded in this item"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T15). Needs a CI runner; the author could only measure macOS. Informs owner decision D3 in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T15). Needs a CI runner; the author could only measure macOS. Informs owner decision D3 in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-01 findings, nothing implemented: (1) the sandbox that did the work has no Docker and no Rosetta, so only the darwin-arm64 binaries can run; the other bundled binaries (darwin-x86_64, linux-arm64, linux-x86_64, windows) are unchecked. (2) Prior art: .github/workflows/cross-platform-validation.yml compares platforms (DuckDB vs DataFusion/Polars/ClickHouse) on ubuntu only, not operating systems, so this needs its own workflow (matrix of ubuntu and macOS runners plus a compare job); benchbox/core/tpcds/streams.py already runs dsqgen -LOG for ordering and carries a Windows-only retry for a transient Q46 cities distribution error, so Windows should be considered for the matrix. (3) Design: reuse DSQGenBinary.generate_parameter_log from dfparity-t01 (PR #2498) to emit all 99 templates for a pinned seed, plus per-table row counts and sha256 of dsdgen output at a small scale, upload each platform's manifest as an artifact and diff them. (4) Blocked on the merge of PR #2498 (stacked PRs are unsupported); a new workflow file must keep the repo's pinned-action policy. Decision for the owner: whether the job should be scheduled/dispatch only or also run on PRs touching tpcds binaries.",
   "description": "Automated Codex reviews twice reported a Q70 divergence that did not reproduce on the author's macOS machine, and bundled dsqgen/dsdgen binaries differ per platform (benchbox/_binaries/tpc-ds/<platform>/). Add a CI job (or scheduled lane) that generates data at a small scale on Linux and macOS runners, records a per-table manifest checksum and row counts, and compares dsqgen -LOG output for a fixed seed across platforms. Until this exists, no scale or timing choice is trustworthy across platforms.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "f584018b3a0c44e6b466def93a1a11c6",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T17:23:57Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d3153cc26c5f484cb8df9cda977bfcc1",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
 }
