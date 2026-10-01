@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A committed test classifies all 99 queries into (a), (b) or (c) with a derived-value flag",
+    "The test passes with an xfail list that may only shrink",
+    "The category counts are recorded in this item, with the decision on the 15-query gate"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T2). Do not prototype adapters on Q41; it is the negative control. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Classify each of the 99 queries by whether its DataFrame implementation consumes the parameters dsqgen produces: (a) keys match, (b) literal fallback or dead YAML keys, (c) hard-coded semantics (Q41 hard-codes four color pairs where the SQL has 16 colors x units x sizes; Q8 uses 5 of 400 zips). Also flag queries needing derived values (Q39 [MONTH]+1). A prior mock-based scan found 15 queries reading keys absent from default_parameters.yaml with silent literal fallback (8, 10, 21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88, 90, 91) and up to 58 with unread YAML keys; it stops at the first exception, so treat counts as lower bounds (unverified by me beyond Q41). The test runs without data (dsqgen only, about 4 s). Gate: if category (c) exceeds about 15 queries, the adapter and rewrite work must be budgeted as a separate program.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:05:25Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "228ab5765c9b4311a3caef751c4a2e0b",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
