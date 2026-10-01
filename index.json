@@ -6245,7 +6245,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Decide whether production TPC-DS get_queries should render at the data's scale"
+      "title": "Render production TPC-DS get_queries at the data's scale (owner decision D1)"
     },
     "dfparity-t23-docs": {
       "claim": null,
