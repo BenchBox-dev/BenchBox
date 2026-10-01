@@ -39,13 +39,13 @@ routes, carriers, and temporal patterns - across 20 OLAP queries.
 | ----: | --------------: | -----------: | ------------------------------------ |
 |  0.01 |          ~600 K |        ~10 MB | 1-month BTS / dev sample             |
 |   0.1 |          ~2.4 M |       ~100 MB | ~4 months of BTS data                |
-|   1.0 |          ~24 M  |        ~1 GB  | ~41 months (~3.4 years)              |
+|   1.0 |          ~24 M  |   ~2.8 GB  | ~41 months (~3.4 years), uncompressed CSV |
 | ≥10.0 |          Full   |       ~10 GB+ | Approaches full historical corpus    |
 
 ## Usage
 
 ```bash
-# Default scale (SF=1.0, ~24M flights, ~1 GB)
+# Default scale (SF=1.0, ~24M flights, ~2.8 GB uncompressed CSV)
 benchbox run --platform duckdb --benchmark flightdata --scale 1.0
 
 # Quick dev sample

@@ -2516,3 +2516,54 @@ def test_populate_staging_tables_count_exception_treats_as_zero(fast_bench):
         result = fast_bench._populate_staging_tables(conn, {"update_ops_orders": "orders"})
 
     assert result.get("update_ops_orders", 0) >= 0
+
+
+def test_population_sql_runs_one_statement_per_call_on_databricks(fast_bench):
+    """Databricks rejects multi-statement batches, so SCD2 staging must be split."""
+
+    class _OneStatementConnection:
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, sql):
+            if ";" in sql.strip().rstrip(";"):
+                raise AssertionError(f"multi-statement batch sent: {sql!r}")
+            self.statements.append(sql.strip())
+            return None
+
+    fast_bench._setup_dialect = "databricks"
+    connection = _OneStatementConnection()
+    sql = fast_bench._get_population_sql("scd2_ops_stage_customer", "customer")
+
+    fast_bench._execute_population_sql(connection, sql)
+
+    assert len(connection.statements) == 3
+    assert all(stmt.upper().startswith("INSERT INTO") for stmt in connection.statements)
+    # Databricks rejects VARCHAR without a length, so the fingerprint casts to STRING.
+    assert all("AS STRING)" in stmt and "AS VARCHAR)" not in stmt for stmt in connection.statements)
+
+
+def test_setup_force_replaces_tables_in_place_on_databricks(fast_bench, fast_conn):
+    """Databricks rebuilds staging with CREATE OR REPLACE and never drops tables.
+
+    Unity Catalog counts dropped tables against the metastore quota for about
+    seven days, so a drop-and-create rebuild exhausts small quotas.
+    """
+    with (
+        patch.object(fast_bench, "_acquire_setup_lock", return_value=True),
+        patch.object(fast_bench, "_release_setup_lock"),
+        patch.object(fast_bench, "_table_exists", return_value=True),
+        patch.object(fast_bench, "_populate_staging_tables", return_value={}),
+    ):
+        result = fast_bench.setup(fast_conn, force=True, dialect="databricks")
+
+    assert result["success"] is True
+    executed = [str(c.args[0]) for c in fast_conn.execute.call_args_list if c.args]
+    staging_drops = [s for s in executed if s.startswith("DROP TABLE") and "manifest" not in s.lower()]
+    assert staging_drops == []
+    assert any(s.startswith("CREATE OR REPLACE TABLE") for s in executed)
+    # The old manifest row is cleared first, so a part-failed rebuild is not reused.
+    manifest_clears = [s for s in executed if s.startswith("DELETE FROM") and "staging_manifest" in s]
+    assert manifest_clears and executed.index(manifest_clears[0]) < next(
+        i for i, s in enumerate(executed) if s.startswith("CREATE OR REPLACE TABLE")
+    )

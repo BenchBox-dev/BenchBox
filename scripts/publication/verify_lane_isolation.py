@@ -145,6 +145,9 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # ClickHouse sketch storage smoke helper: on-demand sweep tool, never
     # run in CI and never read by lane artifact builds.
     "scripts/sketch_storage_smoke.sh",
+    # SF=1 size measurement helper: invoked manually/by CI, never read by
+    # lane artifact builds.
+    "scripts/measure_sf1_sizes.py",
     "tox.ini",
     # Worktree and agent lifecycle tooling: developer loop only.
     "scripts/agent_write_preflight.sh",
