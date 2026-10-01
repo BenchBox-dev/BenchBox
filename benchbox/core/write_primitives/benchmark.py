@@ -204,6 +204,10 @@ def _resolve_validation_sql(
     return override, None
 
 
+#: Setup dialects whose connection runs one SQL statement per ``execute`` call.
+_SINGLE_STATEMENT_SETUP_DIALECTS = frozenset({"sqlite", "databricks"})
+
+
 class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
     """Write Primitives benchmark implementation.
 
@@ -619,7 +623,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
               changed row look unchanged (or vice versa); use a collision-
               resistant separator or length-prefixed encoding in that case.
         """
-        text_type = "STRING" if getattr(self, "_setup_dialect", "standard").lower() == "bigquery" else "VARCHAR"
+        # BigQuery has no VARCHAR, and Databricks rejects VARCHAR without a length.
+        dialect = getattr(self, "_setup_dialect", "standard").lower()
+        text_type = "STRING" if dialect in {"bigquery", "databricks"} else "VARCHAR"
         return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS {text_type}) || '|' || c_mktsegment"
 
     def _date_literal(self, value: str) -> str:
@@ -728,12 +734,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
     def _execute_population_sql(self, connection: DatabaseConnection, sql: str) -> None:
         """Execute staging population SQL using the active dialect's statement contract.
 
-        SQLite's DB-API ``execute`` accepts only one statement, while the SCD2
-        stage population is intentionally a three-statement batch. The other
-        adapters accept the batch as-is, so split only for SQLite and keep the
-        existing execution path unchanged elsewhere.
+        SQLite's DB-API ``execute`` and the Databricks SQL connector accept
+        only one statement per call (Databricks answers a batch with
+        ``PARSE_SYNTAX_ERROR``), while the SCD2 stage population is
+        intentionally a three-statement batch. The other adapters accept the
+        batch as-is, so split only for those dialects and keep the existing
+        execution path unchanged elsewhere.
         """
-        if self._setup_dialect.lower() == "sqlite":
+        if self._setup_dialect.lower() in _SINGLE_STATEMENT_SETUP_DIALECTS:
             for statement in sql.split(";"):
                 if statement.strip():
                     stmt_res = connection.execute(statement)
