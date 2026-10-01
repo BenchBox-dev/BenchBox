@@ -6043,6 +6043,13 @@
       "status": "open",
       "title": "Add dsqgen -LOG support and a structured parameter-log parser"
     },
+    "dfparity-t08-q70-expression-rounding": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Round Q70 expression total_sum to DECIMAL scale to match SQL ordering"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],

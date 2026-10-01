@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Q70 matches on the expression family at SF=0.03 in the report-mode gate",
+    "Q70 matches on the expression family at SF=1.0 (SQL plus Polars family only; needs explicit approval for the SF=1 run)",
+    "Q70 still matches at SF 0.01, 0.05 and 0.1",
+    "No other query's status changes"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T8). Probe data showing the Q70 divergence pattern: expression diverges at SF 0.03 and 1.0, matches at 0.01, 0.05, 0.1. The latent top-5 filter is a separate item (dfparity-t08b-q70-top5-latent). The project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "q70_expression_impl (benchbox/core/tpcds/dataframe_queries/queries.py ~4640-4720) has no rounding, while q70_pandas_impl rounds total_sum to 2 decimals with a comment that subtotal and grand-total rows must keep the same equality and sort position as DuckDB's DECIMAL. Evidence (verified): Q70 SQL returns exactly 3 rows at every scale (one state), each row has a distinct lochierarchy, and the divergence is 'Value mismatch at row 0, column 1. Original: None, Variant: TN' at SF 0.03 and 1.0 only, which fits a one-ulp float difference flipping the comparator's order-insensitive sort (that last step is code-reading only, not run). Fix: round(2) in the expression impl. This replaces an earlier incorrect diagnosis (sort sentinel / per-state rank).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:02:29Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c429fd23db234a64bd73d477d32116b3",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
