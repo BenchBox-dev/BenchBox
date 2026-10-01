@@ -207,6 +207,8 @@ def test_calibrated_table_matches_baseline_fixture():
         )
     for benchmark in set(parsed) - set(baseline["sizes"]) - documented_without_generation:
         raise AssertionError(f"{benchmark}: table entry without baseline entry")
+    # ai_primitives reuses TPC-H data, so its row must track the tpch row.
+    assert parsed["ai_primitives"] == parsed["tpch"]
 
 
 def test_jobs_option_runs_subset():
