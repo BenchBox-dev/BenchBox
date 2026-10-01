@@ -6064,6 +6064,13 @@
       "status": "open",
       "title": "Check Polars NULL ordering and NULL-safe set operations in Q15, Q34, Q38, Q87"
     },
+    "dfparity-t11-warehouse-name-none": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Check w_warehouse_name coming back None on the expression family (Q21, Q62, Q66, Q99)"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],

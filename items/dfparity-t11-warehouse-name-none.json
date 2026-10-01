@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The cause is stated with evidence",
+    "Q21, Q62, Q66 and Q99 match on the expression family at SF=0.1 after the fix, or are reclassified with evidence"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T11). Hypothesis only; SF=1 reproduction needs explicit approval. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Hypothesis from a prior review (not verified by me): at SF=1 one cause, w_warehouse_name returned as None by the Polars/expression path, accounts for Q21, Q62, Q66 and Q99 divergences. Reproduce on a small scale if possible (SF 0.1 shows Q66 and others), find the loader or projection cause, and fix it. If the cause differs, record it.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:03:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5b2eff68e37342c2aaa5079f47e42793",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
