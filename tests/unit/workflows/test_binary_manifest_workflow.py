@@ -31,12 +31,20 @@ def test_queue_artifact_verifies_exact_distributions_before_upload() -> None:
 def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
     # The job only runs two scripts that import the package, so it needs the runtime dependencies
     # and not the dev group. A cold full sync inside a short limit timed the job out, and a failed
-    # dist-artifact fails the core unit and ejects the merge group.
+    # dist-artifact fails the core unit and ejects the merge group. --locked makes a stale uv.lock
+    # fail the job instead of installing older versions than pyproject declares.
     job = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["dist-artifact"]
     assert job["timeout-minutes"] >= 20
-    for step in job["steps"]:
-        run = step.get("run", "")
-        for line in (line.strip() for line in run.splitlines()):
-            if line.startswith("uv run ") or " uv run " in line:
-                assert "--no-dev" in line and "--frozen" in line, f"{step['name']}: {line}"
-            assert "uv sync" not in line, f"{step['name']}: {line}"
+    commands = [
+        line.split("#", 1)[0].split()
+        for step in job["steps"]
+        for line in step.get("run", "").replace("\\\n", " ").splitlines()
+        if "uv " in line.split("#", 1)[0]
+    ]
+    scripts = {"scripts/bundled_binary_manifest.py", "scripts/verify_distribution_binaries.py"}
+    for script in scripts:
+        (tokens,) = [c for c in commands if script in c]
+        assert tokens[:2] == ["uv", "run"] and "--locked" in tokens and "--no-dev" in tokens, tokens
+        assert tokens.index("--") < tokens.index("python"), tokens
+    # Any other uv call must be `uv build` (isolated build env); nothing may sync the dev group.
+    assert all(c[:2] == ["uv", "run"] or c[:2] == ["uv", "build"] for c in commands), commands
