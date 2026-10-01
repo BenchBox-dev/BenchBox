@@ -104,17 +104,80 @@ PROJECT_REVIEW_ANCHORS = {
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
 AGENT_WRITE_ANCHORS = {
     "WRITE-CLOSEOUT-001": (
-        "authorized write workflow closes at a named branch",
+        "authorized write workflow closes at a merged pull request",
         "make pr-open",
-        "auto-merge stays withheld until",
-        "make pr-ready",
-        "required close-out steps of write authorization, not separate permissions",
+        "make pr-arm",
+        "monitor to merge",
+        "close-out steps are part of write authorization, not separate permissions",
+        "never hand a green, reviewed pr back",
+        "re-enqueue after a spurious ejection",
+        "fix and push after a real failure",
+        # The limits on merging: dropping any of these would widen what an agent may merge unasked.
+        "owner-only action",
+        "a denied permission",
+        "production publish or release",
+        "live-cloud spend",
+        "a hold or unresolved critical/high review",
+        "a real design choice",
         "do not stop before",
         "explicitly forbids publication",
         "authorizes only a local commit",
         "gate fails",
     )
 }
+# Agent-facing text must not tell an agent or operator to stop and hand a finished PR back to a
+# human. A PR that passed its checks and required review is merged by the agent; the narrow cases
+# that do need a human are listed in [WRITE-CLOSEOUT-001]. This is a phrase regression check, not
+# semantic assurance: it catches the known wordings, matched on whole paragraphs with Markdown
+# emphasis stripped so line wrapping and **bold** cannot hide them. There is deliberately no
+# per-line exemption; a legitimate sentence that trips a pattern is reworded or the pattern narrowed
+# in a reviewed change. Scripts that print guidance (Makefile, pr_landing.py) join this list as they
+# are fixed.
+HANDBACK_TEXT = (
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    ".claude/commands/*.md",
+    "docs/agent/*.md",
+    "docs/development/development.md",
+)
+HANDBACK_PATTERNS = {
+    "auto-merge withheld": r"\bauto[- ]merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
+    "withheld until": r"\bwithheld until\b",
+    "mark a PR ready": (
+        r"(?<!not )(?<!never )\bmark(?:ing|ed)?\s+(?:the\s+|a\s+|an\s+)?(?:pr|pull[- ]request)s?\b[^.]{0,80}\bready\b"
+    ),
+    "decisions are yours": r"\bdecisions?\s+(?:are|is)\s+yours\b",
+    "pending is terminal": r"\bpending is terminal\b",
+    "do not poll CI": r"\bdo not poll ci\b",
+    "run make pr-ready when": r"\brun\s+['\"]?make pr-ready['\"]?\s+when\b",
+    "PR stays held": r"\bpr (?:created and held|stays held|remains held)\b",
+    "wait for a human to merge": (
+        r"(?<!not )(?<!never )\bwait(?:s|ing)?\s+for\s+(?:the\s+|a\s+)?(?:user|owner|maintainer|human)\s+to\s+"
+        r"(?:merge|arm|mark)\b"
+    ),
+    "ask the user to arm or merge": (
+        r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|mark)\b"
+    ),
+}
+_MARKDOWN_EMPHASIS = re.compile(r"[*_`]")
+_LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
+
+
+def _paragraphs(text: str) -> list[tuple[int, str]]:
+    """Split Markdown into (first line number, flattened text), one entry per paragraph or list item."""
+    paragraphs: list[tuple[int, list[str]]] = []
+    current: tuple[int, list[str]] | None = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            current = None
+            continue
+        if current is None or _LIST_ITEM.match(line):
+            current = (number, [])
+            paragraphs.append(current)
+        current[1].append(line.strip())
+    return [(number, _MARKDOWN_EMPHASIS.sub("", " ".join(lines))) for number, lines in paragraphs]
+
+
 CODE_REVIEW_RULE_ANCHORS = (
     "Do not report commit identity.",
     "Review sandboxes may use synthetic identities.",
@@ -607,6 +670,27 @@ def audit_docs_placement(project: Path) -> list[str]:
     return errors
 
 
+def audit_handback_wording(project: Path) -> list[str]:
+    """Fail agent-facing text that hands a finished PR back to a human."""
+    errors: list[str] = []
+    compiled = {label: re.compile(pattern, re.IGNORECASE) for label, pattern in HANDBACK_PATTERNS.items()}
+    paths: list[Path] = []
+    for entry in HANDBACK_TEXT:
+        paths.extend(sorted(project.glob(entry)))
+    for path in paths:
+        if not path.is_file():
+            continue
+        relative = path.relative_to(project).as_posix()
+        for number, paragraph in _paragraphs(path.read_text(encoding="utf-8", errors="ignore")):
+            for label, pattern in compiled.items():
+                if pattern.search(paragraph):
+                    errors.append(
+                        f"{relative}:{number} tells a reader to hand a finished PR back ({label}); "
+                        "arm and merge it, or reword it"
+                    )
+    return errors
+
+
 def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     """Run every non-Git check and return its errors tagged with the check name.
 
@@ -667,6 +751,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, ACTIVE_REVIEW_PROTOCOL)
     errors.extend(_tag("review-policy", audit_review_policy(project)))
     errors.extend(_tag("docs-placement", audit_docs_placement(project)))
+    errors.extend(_tag("handback", audit_handback_wording(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
     errors.extend(_tag("dependency-caps", audit_dependency_caps(project)))
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))

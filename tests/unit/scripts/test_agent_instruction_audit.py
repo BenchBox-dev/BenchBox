@@ -72,6 +72,15 @@ def _candidate(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _with_repo_file(project: Path, relative: str) -> Path:
+    """Copy one repository file into a candidate project and return its path there."""
+    target = project / relative
+    if not target.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, target)
+    return target
+
+
 def test_repository_candidate_passes() -> None:
     metrics, errors = audit(ROOT, CORPUS)
     assert errors == []
@@ -139,12 +148,13 @@ def test_project_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
 def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(
-        agents.read_text().replace(
-            "required close-out steps of write authorization, not separate permissions",
-            "optional suggestions that require separate user approval",
-        )
+    pattern = re.compile(
+        r"close-out\s+steps\s+are\s+part\s+of\s+write\s+authorization,\s+not\s+separate\s+permissions",
+        re.IGNORECASE,
     )
+    content, count = pattern.subn("optional suggestions that require separate user approval", agents.read_text())
+    assert count == 1
+    agents.write_text(content)
     _, errors = audit(project, CORPUS)
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
 
@@ -156,13 +166,26 @@ def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
         "authorizes only a local commit",
         "gate fails",
         "do not stop before",
+        "make pr-arm",
+        "monitor to merge",
+        "never hand a green, reviewed PR back",
+        "closes at a merged pull request",
+        "re-enqueue after a spurious ejection",
+        "fix and push after a real failure",
+        # The limits on merging: deleting any one widens what an agent may merge unasked.
+        "owner-only action",
+        "a denied permission",
+        "production publish or release",
+        "live-cloud spend",
+        "a HOLD or unresolved Critical/High review",
+        "a real design choice",
     ],
 )
 def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: str) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
     content = agents.read_text()
-    pattern = re.compile(r"\s+".join(re.escape(w) for w in phrase.split()))
+    pattern = re.compile(r"\s+".join(re.escape(w) for w in phrase.split()), re.IGNORECASE)
     new_content, count = pattern.subn("deleted constraint", content)
     assert count > 0, f"Pattern {phrase} was not found in AGENTS.md"
     agents.write_text(new_content)
@@ -170,12 +193,107 @@ def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: st
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
 
 
+def test_agent_facing_text_does_not_hand_a_finished_pr_back() -> None:
+    """The repository's own instructions must not tell anyone to stop with a green PR."""
+    assert agent_instruction_audit.audit_handback_wording(ROOT) == []
+
+
+HANDBACK_LINES = [
+    "Auto-merge stays withheld until `make pr-ready`.",
+    "Mark PR 12 ready when CI is green.",
+    "Then mark the pull request as ready for the queue.",
+    "The next decisions are yours:",
+    "Do not poll CI: pending is terminal.",
+    "Run 'make pr-ready' when the branch is final.",
+    "A newly created PR stays held until review.",
+]
+
+
+@pytest.mark.parametrize("line", HANDBACK_LINES)
+@pytest.mark.parametrize(
+    "target",
+    [
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        ".claude/commands/pr.md",
+        "docs/agent/review-protocol.md",
+        "docs/development/development.md",
+    ],
+)
+def test_handback_wording_fails_in_every_scanned_location(tmp_path: Path, line: str, target: str) -> None:
+    project = _candidate(tmp_path)
+    path = _with_repo_file(project, target)
+    path.write_text(path.read_text() + "\n" + line + "\n")
+    _, errors = audit(project, CORPUS)
+    assert any(error.startswith("handback:") and target in error for error in errors), errors
+
+
+def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) -> None:
+    """The guard has no per-line exemption: appending a marker must not hide a hand-back."""
+    project = _candidate(tmp_path)
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\nMark PR 12 ready when CI is green. owner-only\n")
+    assert any("mark a PR ready" in error for error in agent_instruction_audit.audit_handback_wording(project))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Markdown reflow and emphasis must not hide the old wording.
+        "Do not poll\nCI: pending is\nterminal.",
+        "Mark **PR 12** ready when CI is green.",
+        "Mark the _pull request_ ready for the queue.",
+        "Auto-merge stays\nwithheld until a human decides.",
+        # A hand-back that the first guard missed.
+        "When CI passes, ask the user to enable auto-merge.",
+        "Then ask the owner to merge it.",
+        "Wait for the human to merge the green PR.",
+        "Then waiting for the maintainer to merge it, stop.",
+        # Variants a first version missed.
+        "Mark the pull-request as ready once the checks finish and the summary is posted for review.",
+        "Auto merge remains withheld pending approval.",
+    ],
+)
+def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: str) -> None:
+    project = _candidate(tmp_path)
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\n\n" + text + "\n")
+    assert agent_instruction_audit.audit_handback_wording(project) != []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Safety guidance and instructions that do not hand back completed work.
+        "Do not mark PR ready before required external review is complete.",
+        "Never mark a PR ready while review dispositions are incomplete.",
+        "When the branch is final, arm the exact head and monitor until merged.",
+        "Never ask the owner to merge a finished PR.",
+        "Do not ask the user to enable auto-merge; arm it yourself.",
+        "Never wait for the owner to merge a finished PR.",
+        # Release and publication authorization is an explicit exception, not a PR hand-back.
+        "Wait for the owner to approve the production release before publishing.",
+        "For a release, wait for the owner to approve deployment.",
+        "Ask the owner to approve the production release before publishing.",
+        # A list item must not join the next one into a phrase.
+        "- mark the PR\n- ready to arm after the checks",
+    ],
+)
+def test_handback_guard_allows_safety_wording_and_separate_list_items(tmp_path: Path, text: str) -> None:
+    project = _candidate(tmp_path)
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\n\n" + text + "\n")
+    assert agent_instruction_audit.audit_handback_wording(project) == []
+
+
 def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(
-        agents.read_text().replace("agent work are not authorization\n(", "agent work are not\nauthorization (")
-    )
+    original = agents.read_text()
+    # Break the pinned phrase "not authorization" across two lines: anchors are whitespace-normalized.
+    reflowed = original.replace("not authorization", "not\nauthorization", 1)
+    assert reflowed != original, "the reflow fixture text is no longer in AGENTS.md; the test would mutate nothing"
+    agents.write_text(reflowed)
     _, errors = audit(project, CORPUS)
     assert errors == []
 

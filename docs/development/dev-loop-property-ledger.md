@@ -187,6 +187,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_path_filter_decision.py` | tooling |
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
+| `test_pr_arm.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
