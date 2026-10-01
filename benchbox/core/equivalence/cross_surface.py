@@ -61,7 +61,11 @@ DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives,
 flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
 ``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
 .. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
-``"Q1"`` .. ``"Q22"``). Additional dual-surface
+``"Q1"`` .. ``"Q22"``). Staged (registered in :data:`STAGED_GATES`, runnable
+in report mode, not CI-enforced): ``tpch``, ``tpcds``, ``nyctaxi``,
+``tpch_skew``, and ``tsbs_devops``. TPC-DS runs the full 99-query matrix at
+``SF=0.01`` with bounded empty cells explicitly classified.
+Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
 Waiver review policy. A ``known_divergences`` entry may carry an OPTIONAL
@@ -106,6 +110,8 @@ from benchbox.core.equivalence.builders import (
     build_nyctaxi_duckdb,
     build_read_primitives_duckdb,
     build_ssb_duckdb,
+    build_tpcds_duckdb,
+    build_tpch_duckdb,
     build_tpch_skew_duckdb,
     build_tsbs_devops_duckdb,
 )
@@ -1508,6 +1514,118 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
     ),
 }
 
+# TPC-DS deliberately runs its complete 99-query matrix at SF=0.01. A full
+# SF=0.05 matrix exceeds the gate's short-run budget and also exposes unrelated
+# larger-cell divergences, so these entries describe the bounded gate cell rather
+# than claiming that the predicates are empty at every scale. Every listed query
+# returns zero rows in the SQL reference and in both DataFrame families at SF=0.01.
+_TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
+    "3": (
+        "The bounded SF=0.01 cell has no December sales for manufacturer 436, so the exact "
+        "manufacturing and month predicates produce an empty SQL result mirrored by both DataFrame families."
+    ),
+    "4": (
+        "The bounded cell has no customer with qualifying year-over-year sales in all required channels; "
+        "the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "6": (
+        "The bounded cell has no state with at least ten February 2000 sales for items above the category-price "
+        "threshold; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "8": (
+        "The bounded cell has no store sales matching the preferred-customer ZIP cohort for Q1 2002; "
+        "the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "10": (
+        "The bounded cell has no customer county and year combination satisfying the required store and web "
+        "channel overlap; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "11": (
+        "The bounded cell has no customer with qualifying store and web revenue growth across the required "
+        "years; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "24": (
+        "The bounded cell has no qualifying store-return rows for the configured item color and market filters; "
+        "the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "31": (
+        "The bounded cell has no customer satisfying the six-channel quarterly sales comparison; the empty SQL "
+        "result is mirrored by both DataFrame families."
+    ),
+    "37": (
+        "The bounded cell has no inventory and sales combination satisfying the date, manufacturer, and quantity "
+        "filters; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "39": (
+        "The bounded cell has no inventory month pair whose standard-deviation to mean ratio exceeds one; "
+        "the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "41": (
+        "The bounded item dimension contains no product satisfying the manufacturer range and correlated attribute "
+        "conditions; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "44": (
+        "The bounded cell has no store and household-demographic combination satisfying the configured rank "
+        "conditions; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "49": (
+        "The bounded cell has no web, catalog, and store return combination satisfying the December 2000 and "
+        "profit thresholds; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "53": (
+        "The bounded cell has no manager and item combination satisfying the twelve-month sequence and brand or "
+        "category filters; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "54": (
+        "The bounded cell has no jewelry or consignment customer revenue segment for March 1999; the empty SQL "
+        "result is mirrored by both DataFrame families."
+    ),
+    "55": (
+        "The bounded cell has no item brand with store sales for manager 36 in December 2001; the empty SQL result "
+        "is mirrored by both DataFrame families."
+    ),
+    "58": (
+        "The bounded cell has no item with comparable revenue in all three channels during the week containing the "
+        "configured February 1998 date; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "63": (
+        "The bounded cell has no manager whose twelve-month sales deviation exceeds ten percent for the configured "
+        "item filters; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "64": (
+        "The bounded cell has no cross-year store-sale and catalog-return pair satisfying the refund, demographic, "
+        "and price filters; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "65": (
+        "The bounded cell has no store and item revenue below ten percent of the store average across the configured "
+        "month sequence; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "73": (
+        "The bounded cell has no store ticket in Williamson County satisfying the day-of-month and household "
+        "vehicle or dependent filters; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "82": (
+        "The bounded cell has no item and inventory combination satisfying the May 2002 date window, manufacturer, "
+        "price, and quantity filters; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "83": (
+        "The bounded cell has no item returned in all three channels during the weeks containing the configured "
+        "1998 return dates; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "85": (
+        "The bounded cell has no web return satisfying the 1998 date, customer-demographic, state, and profit "
+        "conditions; the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "91": (
+        "The bounded cell has no call-center return satisfying the November 1999 demographic and GMT-offset filters; "
+        "the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "93": (
+        "The bounded cell has no store sale joined to a return reason of 'Did not like the warranty'; the empty SQL "
+        "result is mirrored by both DataFrame families."
+    ),
+}
+
 
 # Registry of ENFORCED gated benchmarks: clean, blocking cross-surface gates whose
 # DataFrame surface matches its SQL surface. The oracle coverage map reads this set
@@ -1669,11 +1787,37 @@ GATES: dict[str, CrossSurfaceGate] = {
 # enforcement.
 # The next gateable benchmarks (nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+_TPCH_SCALE = 0.01
+_TPCDS_SCALE = 0.01
 _NYCTAXI_SCALE = 0.01
 _TSBS_DEVOPS_SCALE = 0.01
 _TPCH_SKEW_SCALE = 0.01
 
 STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q22"). SQL pinned to fixed stream 0.
+    "tpch": CrossSurfaceGate(
+        name="tpch",
+        build=build_tpch_duckdb,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-H expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCH_SCALE,
+    ),
+    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q99"). Bounded empty cells at SF=0.01
+    # are classified explicitly. Registration remains distinct from CI enforcement.
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
+    ),
     # NYC Taxi: 25 SQL slugs map 1:1 to DataFrame Q1..Q25 via the builder-local
     # hand-authored dict. Offline synthetic cell (12k trips at SF=0.01); the
     # builder forces synthesis and fails if any network download runs.

@@ -114,7 +114,6 @@ autodoc_default_options = {
 # We intentionally document classes in multiple places for different contexts (api.rst + detailed refs)
 suppress_warnings = [
     "autosummary",  # Suppress autosummary warnings
-    "ref.doc",  # Suppress unknown document references
     "ref.myst",  # Suppress myst cross-reference warnings (internal anchors)
     "myst.xref_missing",  # Suppress missing myst cross-references
     "toc.not_readable",  # Suppress nonexisting document warnings (handled above)

@@ -148,6 +148,53 @@ class TestDataVaultTransformer:
 class TestDataVaultTransformerCompression:
     """Tests for compression support in the transformer."""
 
+    @pytest.mark.parametrize("suffix", ["", ".gz", ".zst"])
+    @pytest.mark.parametrize("sharded", [False, True])
+    def test_source_read_parallelism_and_identity(self, tmp_path, suffix, sharded):
+        """Compressed sources use sequential scans without changing rows or hashes."""
+        import gzip
+
+        import duckdb
+        import zstandard
+
+        rows = [b"0|AFRICA|comment|\n", b"1|ASIA|other comment|\n"]
+        shards = rows if sharded else [b"".join(rows)]
+        for index, data in enumerate(shards, 1):
+            if suffix == ".gz":
+                data = gzip.compress(data)
+            elif suffix == ".zst":
+                data = zstandard.ZstdCompressor().compress(data)
+            name = f"region.tbl.{index}" if sharded else "region.tbl"
+            (tmp_path / f"{name}{suffix}").write_bytes(data)
+
+        transformer = DataVaultETLTransformer()
+        mock_conn = MagicMock()
+        transformer._load_tpch_tables(mock_conn, tmp_path, tables=["hub_region"])
+        sql = mock_conn.execute.call_args.args[0]
+        assert f"parallel={'false' if suffix else 'true'}" in sql
+        with duckdb.connect() as conn:
+            threads = conn.execute("SELECT current_setting('threads')").fetchone()
+            transformer._load_tpch_tables(conn, tmp_path, tables=["hub_region"])
+            assert conn.execute("SELECT * FROM region ORDER BY r_regionkey").fetchall() == [
+                (0, "AFRICA", "comment", None),
+                (1, "ASIA", "other comment", None),
+            ]
+            assert conn.execute(
+                "SELECT md5(CAST(r_regionkey AS VARCHAR)) FROM region ORDER BY r_regionkey"
+            ).fetchall() == [
+                ("cfcd208495d565ef66e7dff9f98764da",),
+                ("c4ca4238a0b923820dcc509a6f75849b",),
+            ]
+            assert conn.execute("SELECT current_setting('threads')").fetchone() == threads
+
+    def test_invalid_compressed_source_is_rejected(self, tmp_path):
+        """The scanner workaround must not suppress invalid compressed input."""
+        import duckdb
+
+        (tmp_path / "region.tbl.gz").write_bytes(b"not a gzip stream")
+        with duckdb.connect() as conn, pytest.raises(duckdb.Error):
+            DataVaultETLTransformer()._load_tpch_tables(conn, tmp_path, tables=["hub_region"])
+
     def test_compression_mixin_inherited(self):
         """Transformer should inherit from CompressionMixin."""
         from benchbox.utils.compression_mixin import CompressionMixin
