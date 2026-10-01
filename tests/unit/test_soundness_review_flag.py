@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import importlib.util
+import os
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+
+from tests.utilities.posix_shell import run_posix_shell, skip_without_posix_shell
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "_project" / "scripts" / "check_soundness_review.py"
@@ -142,3 +147,155 @@ def test_checker_cli_reports_failure_and_success(tmp_path: Path) -> None:
 
     body.write_text("", encoding="utf-8")
     assert CHECKER.main(["--paths-file", str(paths), "--body-file", str(body)]) == 1
+
+
+def _git(repo: Path, *args: str, input: str | None = None) -> str:
+    result = subprocess.run(
+        ["git", "-c", "core.hooksPath=/dev/null", "-c", "commit.gpgsign=false", *args],
+        cwd=repo,
+        input=input,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+@pytest.fixture
+def queue_history(tmp_path: Path) -> dict[str, Any]:
+    """Create a behind PR and its squash on an independently advanced base."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "--initial-branch=trunk")
+    _git(repo, "config", "user.name", "Test Fixture")
+    _git(repo, "config", "user.email", "fixture@example.invalid")
+    for relative in (
+        "_project/scripts/check_soundness_review.py",
+        "_project/scripts/soundness_paths.py",
+        ".github/soundness-paths.txt",
+    ):
+        target = repo / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((ROOT / relative).read_bytes())
+    source_path = "benchbox/platforms/duckdb/adapter.py"
+    source = repo / source_path
+    source.parent.mkdir(parents=True)
+    source.write_text("original\n", encoding="utf-8")
+    (repo / "trunk.txt").write_text("original\n", encoding="utf-8")
+    _git(repo, "add", ".github/soundness-paths.txt", "_project/scripts", source_path, "trunk.txt")
+    _git(repo, "commit", "-m", "Initial fixture")
+    _git(repo, "checkout", "-b", "source")
+    source.write_text("approved source\n", encoding="utf-8")
+    _git(repo, "add", source_path)
+    _git(repo, "commit", "-m", "Source change")
+    head = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "trunk")
+    (repo / "trunk.txt").write_text("unrelated trunk evolution\n", encoding="utf-8")
+    _git(repo, "add", "trunk.txt")
+    _git(repo, "commit", "-m", "Advance trunk independently")
+    base = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-b", "queue")
+    source.write_text("approved source\n", encoding="utf-8")
+    _git(repo, "add", source_path)
+    _git(repo, "commit", "-m", "Squash approved source onto current base")
+    _git(repo, "remote", "add", "origin", str(repo))
+    runner = tmp_path / "runner"
+    runner.mkdir()
+    return {"repo": repo, "head": head, "base": base, "runner": runner, "source_path": source_path}
+
+
+def _run_queue_guard(history: dict[str, Any], **overrides: str) -> subprocess.CompletedProcess[str]:
+    skip_without_posix_shell()
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    step = next(step for step in workflow["jobs"]["soundness-flag"]["steps"] if step.get("name") == "soundness-flag")
+    script = step["run"].replace("${{ github.event_name }}", "merge_group")
+    script = script.replace(
+        "${{ github.ref }}", overrides.pop("queue_ref", "refs/heads/gh-readonly-queue/develop/pr-1")
+    )
+    # Stub only the API: Git history and the trusted base checker remain real.
+    api = r"""
+gh() {
+  case "$*" in
+    *".head.sha") printf '%s' "$TEST_HEAD" ;;
+    *".base.sha") printf '%s' "$TEST_BASE" ;;
+    *".body // empty") printf '%s' "$TEST_BODY" ;;
+    *"/files "*) printf '%s\n' "$TEST_SOURCE_PATH" ;;
+    *) echo "unexpected gh call: $*" >&2; return 1 ;;
+  esac
+}
+python() { "$TEST_PYTHON" "$@"; }
+"""
+    env = {
+        **os.environ,
+        "REPO": "BenchBox-dev/BenchBox",
+        "RUNNER_TEMP": str(history["runner"]),
+        "BASE_SHA": history["base"],
+        "MERGE_GROUP_PRS": "null",
+        "PR_BODY": "",
+        "TEST_HEAD": history["head"],
+        "TEST_BASE": history["base"],
+        "TEST_BODY": "",
+        "TEST_SOURCE_PATH": history["source_path"],
+        "TEST_PYTHON": sys.executable,
+        **overrides,
+    }
+    return run_posix_shell(api + script, cwd=history["repo"], env=env, capture_output=True, text=True, timeout=30)
+
+
+def test_behind_anchor_preserves_approved_bytes_with_unrelated_trunk_changes(queue_history: dict[str, Any]) -> None:
+    result = _run_queue_guard(queue_history)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "content verified in queue" in result.stderr
+
+
+def test_anchor_content_changed_by_queue_fails_closed(queue_history: dict[str, Any]) -> None:
+    (queue_history["repo"] / queue_history["source_path"]).write_text("unapproved change\n", encoding="utf-8")
+    _git(queue_history["repo"], "add", queue_history["source_path"])
+    _git(queue_history["repo"], "commit", "-m", "Alter source bytes in queue")
+    result = _run_queue_guard(queue_history)
+    assert result.returncode != 0
+    assert "content mismatch in queue" in result.stderr
+
+
+@pytest.mark.parametrize("narrow_manifest", [False, True])
+def test_group_only_protected_changes_use_trusted_base_manifest(
+    queue_history: dict[str, Any], narrow_manifest: bool
+) -> None:
+    repo = queue_history["repo"]
+    protected = repo / "benchbox/core/equivalence/compare.py"
+    protected.parent.mkdir(parents=True)
+    protected.write_text("unreviewed protected change\n", encoding="utf-8")
+    paths = ["benchbox/core/equivalence/compare.py"]
+    if narrow_manifest:
+        (repo / ".github/soundness-paths.txt").write_text("", encoding="utf-8")
+        paths.append(".github/soundness-paths.txt")
+    _git(repo, "add", *paths)
+    _git(repo, "commit", "-m", "Add group-only protected change")
+    result = _run_queue_guard(queue_history)
+    assert result.returncode != 0
+    assert "Soundness review:" in result.stderr
+    reviewed = _run_queue_guard(queue_history, TEST_BODY=VALID_REVIEW)
+    assert reviewed.returncode == 0, reviewed.stdout + reviewed.stderr
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"TEST_HEAD": ""},
+        {"TEST_BASE": ""},
+        {"TEST_HEAD": "f" * 40},
+        {"TEST_BASE": "e" * 40},
+        {"queue_ref": "refs/heads/gh-readonly-queue/develop/unresolvable"},
+        {"MERGE_GROUP_PRS": "[]"},
+        {"MERGE_GROUP_PRS": "malformed"},
+    ],
+)
+def test_missing_or_malformed_queue_evidence_fails_closed(
+    queue_history: dict[str, Any], overrides: dict[str, str]
+) -> None:
+    result = _run_queue_guard(queue_history, **overrides)
+    assert result.returncode != 0, result.stdout + result.stderr
+    if overrides.get("TEST_HEAD") == "":
+        assert "cannot resolve head of anchor PR" in result.stderr
+    if overrides.get("TEST_BASE") == "":
+        assert "cannot resolve base of anchor PR" in result.stderr

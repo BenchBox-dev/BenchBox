@@ -288,13 +288,14 @@
     {
       "benchmark": "tpcds",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": null,
+      "cross_surface_enforced": false,
       "dual_surface": true,
       "guarded": true,
       "independence": "semi-independent",
       "independence_rationale": "External TPC answer sets provide row-count authority only; result values are not checked.",
       "oracles": [
-        "expected-results"
+        "expected-results",
+        "cross-surface"
       ],
       "primary_oracle": "expected-results",
       "scale": "SF=1",
@@ -328,13 +329,14 @@
     {
       "benchmark": "tpch",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": null,
+      "cross_surface_enforced": false,
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
       "independence_rationale": "Reference is a frozen benchbox snapshot, not an external authority.",
       "oracles": [
-        "expected-results"
+        "expected-results",
+        "cross-surface"
       ],
       "primary_oracle": "expected-results",
       "scale": "SF=1",

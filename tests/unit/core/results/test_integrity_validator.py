@@ -533,3 +533,22 @@ class TestVectorSearchExportIntegrity:
         report = ResultIntegrityValidator().validate(data)
         check = next(c for c in report.checks if c.name == "success_rate")
         assert check.status == CheckStatus.PASS
+
+    @pytest.mark.parametrize("benchmark_id", ["tpch", "vector_search", "tpchavoc", "unknown_benchmark"])
+    def test_all_skipped_queries_do_not_pass_success_rate(self, benchmark_id: str) -> None:
+        """Compatibility skips cannot certify a run with no executed query."""
+        if benchmark_id == "vector_search":
+            data = build_result_payload(_make_vector_search_result())
+            data["export"] = {"format": "json"}
+        else:
+            data = _make_valid_tpch_result()
+            data["benchmark"]["id"] = benchmark_id
+        for query in data["queries"]:
+            query["status"] = "SKIPPED"
+        total = len(data["queries"])
+        data["summary"]["queries"] = {"total": total, "passed": 0, "failed": 0, "skipped": total}
+
+        report = ResultIntegrityValidator().validate(data)
+        check = next(c for c in report.checks if c.name == "success_rate")
+        assert check.status == CheckStatus.FAIL
+        assert report.overall_status == CheckStatus.FAIL

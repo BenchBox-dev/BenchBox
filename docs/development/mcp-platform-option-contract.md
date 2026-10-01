@@ -10,7 +10,7 @@ The matrix is intentionally narrower than the CLI option registry. `consumer`
 identifies the code path that must consume the normalized value; it is not
 permission to expose the underlying adapter's full configuration surface.
 
-### Security classification
+## Security classification
 
 `security_class` states the review signal. `connection` means the option can
 change which endpoint the server talks to. Any option able to steer the server

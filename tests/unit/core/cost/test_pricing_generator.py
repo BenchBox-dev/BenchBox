@@ -8,11 +8,17 @@ here is offline (the fetchers are covered through fixture-shaped payloads).
 
 from __future__ import annotations
 
+import io
+import json
 import shutil
 import sys
-from datetime import date
+import urllib.error
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from email.message import Message
+from email.utils import format_datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -389,6 +395,209 @@ def test_refresh_records_moved_price_with_new_date(scratch_copy, monkeypatch):
     assert revised["fabric_cu_prices"]["retrieved"] == "2026-09-19"
     assert revised["redshift_node_prices"]["retrieved"] == "2026-09-18"
     assert b"  us: 0.19" in pricing.read_bytes()
+
+
+@pytest.fixture()
+def http_replay(monkeypatch):
+    clock = SimpleNamespace(now=0.0, sleeps=[], calls=[], actions=[], bodies=[])
+
+    def sleep(delay):
+        clock.sleeps.append(delay)
+        clock.now += delay
+
+    def open_url(request, *, timeout):
+        clock.calls.append((request.full_url, timeout))
+        action = clock.actions.pop(0)
+        if isinstance(action, Exception):
+            raise action
+        body = io.BytesIO(action if isinstance(action, bytes) else json.dumps(action).encode())
+        clock.bodies.append(body)
+        return body
+
+    monkeypatch.setattr(generator, "mono_time", lambda: clock.now)
+    monkeypatch.setattr(generator, "elapsed_seconds", lambda started: clock.now - started)
+    monkeypatch.setattr(generator.time, "sleep", sleep)
+    monkeypatch.setattr(generator.urllib.request, "urlopen", open_url)
+    return clock
+
+
+def _http_error(code=429, retry_after=None):
+    headers = Message()
+    if retry_after is not None:
+        headers["Retry-After"] = retry_after
+    return urllib.error.HTTPError("https://vendor.invalid/prices", code, "vendor error", headers, io.BytesIO(b"error"))
+
+
+@pytest.mark.parametrize("code", [429, 500, 502, 503, 504])
+def test_transient_http_error_retries_fresh_response_and_closes_errors(http_replay, code):
+    error = _http_error(code)
+    http_replay.actions = [error, {"price": 0.19}]
+    assert generator._http_get_json("https://vendor.invalid/prices") == {"price": 0.19}
+    assert http_replay.sleeps == [2.0]
+    assert len(http_replay.calls) == 2
+    assert error.fp.closed and all(body.closed for body in http_replay.bodies)
+
+
+def test_persistent_throttling_exhausts_three_attempts(http_replay):
+    errors = [_http_error() for _ in range(3)]
+    http_replay.actions = list(errors)
+    with pytest.raises(generator.PricingGeneratorError, match="after 3 attempt"):
+        generator._http_get_json("https://vendor.invalid/prices")
+    assert len(http_replay.calls) == 3
+    assert http_replay.sleeps == [2.0, 4.0]
+    assert all(error.fp.closed for error in errors)
+
+
+def test_retry_after_seconds_controls_sleep(http_replay):
+    http_replay.actions = [_http_error(retry_after="7"), {}]
+    assert generator._http_get_json("https://vendor.invalid/prices") == {}
+    assert http_replay.sleeps == [7.0]
+
+
+def test_retry_after_http_date_is_interpreted_as_utc_timestamp():
+    now = datetime(2026, 9, 30, tzinfo=timezone.utc)
+    header = format_datetime(now + timedelta(seconds=7), usegmt=True)
+    assert generator._retry_after_seconds(header, now=now) == 7
+    assert generator._retry_after_seconds(header, now=now + timedelta(seconds=10)) == 0
+
+
+def test_retry_after_http_date_controls_request_backoff(http_replay, monkeypatch):
+    now = datetime(2026, 9, 30, tzinfo=timezone.utc)
+    parse = generator._retry_after_seconds
+    monkeypatch.setattr(generator, "_retry_after_seconds", lambda value: parse(value, now=now))
+    http_replay.actions = [_http_error(retry_after=format_datetime(now + timedelta(seconds=7), usegmt=True)), {}]
+    assert generator._http_get_json("https://vendor.invalid/prices") == {}
+    assert http_replay.sleeps == [7.0]
+
+
+def test_paginated_azure_retry_keeps_each_page_once(http_replay):
+    next_url = "https://vendor.invalid/prices?page=2"
+    http_replay.actions = [
+        {"Items": [{"meterName": "first"}], "NextPageLink": next_url},
+        _http_error(),
+        {"Items": [{"meterName": "second"}], "NextPageLink": None},
+    ]
+    assert generator.fetch_azure_region_items("Azure Synapse Analytics", "westeurope") == [
+        {"meterName": "first"},
+        {"meterName": "second"},
+    ]
+    assert [url for url, _ in http_replay.calls][1:] == [next_url, next_url]
+    assert http_replay.sleeps == [2.0]
+
+
+def test_late_success_is_rejected_after_budget(http_replay, monkeypatch):
+    http_replay.actions = [{"price": 0.19}]
+    open_url = generator.urllib.request.urlopen
+
+    def late_response(request, *, timeout):
+        http_replay.now = 121.0
+        return open_url(request, timeout=timeout)
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", late_response)
+    with pytest.raises(generator.PricingGeneratorError, match="exhausted its HTTP retry budget"):
+        generator._http_get_json("https://vendor.invalid/prices")
+    assert len(http_replay.calls) == 1 and http_replay.bodies[0].closed
+
+
+@pytest.mark.parametrize("header", [None, "invalid", "-1", "1.5"])
+def test_invalid_retry_after_uses_bounded_backoff(http_replay, header):
+    http_replay.actions = [_http_error(retry_after=header), {}]
+    assert generator._http_get_json("https://vendor.invalid/prices") == {}
+    assert http_replay.sleeps == [2.0]
+
+
+@pytest.mark.parametrize("header", ["120", "1000000", "Wed, 30 Sep 2054 00:00:00 GMT"])
+def test_over_budget_retry_after_does_not_retry_earlier(http_replay, header):
+    error = _http_error(retry_after=header)
+    http_replay.actions = [error, {}]
+    with pytest.raises(generator.PricingGeneratorError, match="cannot honor Retry-After"):
+        generator._http_get_json("https://vendor.invalid/prices")
+    assert len(http_replay.calls) == 1 and not http_replay.sleeps and error.fp.closed
+
+
+def test_retry_budget_is_rechecked_after_oversleep(http_replay, monkeypatch):
+    http_replay.actions = [_http_error(), {}]
+    monkeypatch.setattr(generator.time, "sleep", lambda delay: setattr(http_replay, "now", 121.0))
+    with pytest.raises(generator.PricingGeneratorError, match="exhausted its HTTP retry budget"):
+        generator._http_get_json("https://vendor.invalid/prices")
+    assert len(http_replay.calls) == 1
+
+
+def test_request_timeout_shrinks_to_remaining_retry_budget(http_replay, monkeypatch):
+    http_replay.actions = [_http_error(retry_after="1"), {}]
+    open_url = generator.urllib.request.urlopen
+
+    def slow_first_request(request, *, timeout):
+        if not http_replay.calls:
+            http_replay.now = 70.0
+        return open_url(request, timeout=timeout)
+
+    monkeypatch.setattr(generator.urllib.request, "urlopen", slow_first_request)
+    assert generator._http_get_json("https://vendor.invalid/prices") == {}
+    assert [timeout for _, timeout in http_replay.calls] == [60, 49]
+
+
+@pytest.mark.parametrize("code", [400, 401, 403, 404])
+def test_permanent_http_errors_do_not_retry(http_replay, code):
+    error = _http_error(code)
+    http_replay.actions = [error, {}]
+    with pytest.raises(generator.PricingGeneratorError):
+        generator._http_get_json("https://vendor.invalid/prices")
+    assert len(http_replay.calls) == 1 and not http_replay.sleeps and error.fp.closed
+
+
+@pytest.mark.parametrize("response", [[], b"invalid json", urllib.error.URLError("TLS verification failed")])
+def test_invalid_evidence_and_transport_errors_remain_fatal(http_replay, response):
+    http_replay.actions = [response, {}]
+    with pytest.raises(generator.PricingGeneratorError):
+        generator._http_get_json("https://vendor.invalid/prices")
+    assert len(http_replay.calls) == 1 and not http_replay.sleeps
+
+
+@pytest.mark.parametrize("moved", [False, True])
+def test_refresh_after_throttling_preserves_real_drift(scratch_copy, monkeypatch, http_replay, moved):
+    evidence, pricing = scratch_copy
+    before = (evidence.read_bytes(), pricing.read_bytes())
+    http_replay.actions = [_http_error()] + [{} for _ in range(30)]
+    monkeypatch.setattr(generator, "fetch_aws_region_offer", _recorded_aws_offer)
+
+    def fetch_rows(service, region):
+        generator._http_get_json("https://vendor.invalid/prices")
+        return (_moved_fabric_rows if moved else _recorded_azure_rows)(service, region)
+
+    monkeypatch.setattr(generator, "fetch_azure_region_items", fetch_rows)
+    assert generator.run_refresh(evidence, pricing, today="2026-09-30") == 0
+    if moved:
+        assert b"  us: 0.19" in pricing.read_bytes()
+        assert generator.run_check(evidence, pricing) == 0
+        assert (evidence.read_bytes(), pricing.read_bytes()) != before
+    else:
+        assert (evidence.read_bytes(), pricing.read_bytes()) == before
+
+
+def test_exhausted_refresh_leaves_files_unchanged(scratch_copy, monkeypatch, http_replay):
+    evidence, pricing = scratch_copy
+    before = (evidence.read_bytes(), pricing.read_bytes())
+    http_replay.actions = [_http_error() for _ in range(3)]
+    pending_prices = []
+
+    def changed_aws_offer(url_template, region):
+        publication, products, terms = _recorded_aws_offer(url_template, region)
+        for offers in terms.values():
+            for offer in offers.values():
+                for dimension in offer["priceDimensions"].values():
+                    dimension["pricePerUnit"]["USD"] = "0.33"
+                    pending_prices.append(region)
+        return publication, products, terms
+
+    monkeypatch.setattr(generator, "fetch_aws_region_offer", changed_aws_offer)
+    monkeypatch.setattr(
+        generator, "fetch_azure_region_items", lambda *_: generator._http_get_json("https://vendor.invalid")
+    )
+    with pytest.raises(generator.PricingGeneratorError):
+        generator.run_refresh(evidence, pricing)
+    assert pending_prices
+    assert (evidence.read_bytes(), pricing.read_bytes()) == before
 
 
 def _recorded_aws_offer(url_template, region):

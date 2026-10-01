@@ -1909,7 +1909,15 @@ class ResultCaptureMixin:
         log_fn = self.logger.warning if capture_failures else self.logger.info
         log_fn(summary_message)
 
-    def _build_execution_phases(self, query_results, query_executions, run_config, setup_phase) -> tuple:
+    def _build_execution_phases(
+        self,
+        query_results,
+        query_executions,
+        run_config,
+        setup_phase,
+        *,
+        power_workload_timing: tuple[str, str, int] | None = None,
+    ) -> tuple:
         """Build power/throughput test phases and return execution phases with metrics.
 
         Returns:
@@ -1936,10 +1944,20 @@ class ResultCaptureMixin:
 
         power_test_phase = None
         if execution_type not in {"throughput"}:
+            # Only a standalone executed power workload supplies wall boundaries.
+            # Keep query aggregates independent for latency and cost consumers;
+            # combined/maintenance callers retain their existing phase accounting.
+            # Wall-based effective cost per hour uses this phase duration, while
+            # query-based spend inputs remain unchanged.
+            start_time, end_time, duration_ms = power_workload_timing or (
+                _datetime.now().isoformat(),
+                _datetime.now().isoformat(),
+                int(total_exec_time * 1000),
+            )
             power_test_phase = PowerTestPhase(
-                start_time=_datetime.now().isoformat(),
-                end_time=_datetime.now().isoformat(),
-                duration_ms=int(total_exec_time * 1000),
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=duration_ms,
                 query_executions=query_executions,
                 geometric_mean_time=avg_time,
                 power_at_size=power_at_size_value,
