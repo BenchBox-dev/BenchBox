@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "0697e691c2992226d49c1033696dd6afa497ec9701b0593f5796bf8838320236",
+  "contract_sha256": "f22ba98faec86f51a39f324332de4b744ca7031b0347e12b10d0421c549da364",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -130,6 +130,7 @@
     "soundness-drain-report",
     "soundness-drain-self-test",
     "spellcheck",
+    "sqlglot-repro-retirement-check",
     "ssb-cross-surface-equivalence-report",
     "test",
     "test-all",
@@ -182,7 +183,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 212,
+  "public_target_count": 213,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -310,6 +311,7 @@
     "soundness-drain-report",
     "soundness-drain-self-test",
     "spellcheck",
+    "sqlglot-repro-retirement-check",
     "ssb-cross-surface-equivalence-report",
     "test",
     "test-all",
@@ -596,8 +598,8 @@
       },
       {
         "header": "ci-lint:",
-        "recipe": "\t@echo \"Running CI lint checks...\"\n\t@case \" $(MAKEFLAGS) \" in *\" n \"*|*\" -n \"*|*\" --just-print \"*) echo \"Dry-run: ci-lint guards suppressed\"; exit 0;; esac; \\\n\tset +e; failed=\"\"; \\\n\tuv run ruff check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-check\"; \\\n\tuv run ruff format --check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-format\"; \\\n\tuv run ty check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ty-check\"; \\\n\t$(MAKE) quality-governance-typecheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed quality-governance-typecheck\"; \\\n\t$(MAKE) uv-lock-revision-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uv-lock-revision\"; \\\n\t$(MAKE) lint-markers; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-markers\"; \\\n\t$(MAKE) lint-imports; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-imports\"; \\\n\t$(MAKE) windows-antipatterns-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed windows-antipatterns\"; \\\n\t$(MAKE) lint-explorer-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-explorer-tokens\"; \\\n\t$(MAKE) lint-site-theme-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-site-theme-tokens\"; \\\n\t$(MAKE) artifact-hygiene; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed artifact-hygiene\"; \\\n\t$(MAKE) agent-instructions-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-instructions\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) agent-identity-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed agent-identity\"; \\\n\tfi; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-commit-range\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) skill-sync-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed skill-sync-check\"; \\\n\tfi; \\\n\tuv run -- python _project/scripts/timing_policy_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed timing-policy\"; \\\n\tuv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed fast-lane-ceiling\"; \\\n\tuv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uat-loc-table\"; \\\n\t$(MAKE) compat-docs-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed compat-docs-check\"; \\\n\t$(MAKE) platform-manifest-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed platform-manifest-check\"; \\\n\t$(MAKE) oracle-coverage-map-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed oracle-coverage-map-check\"; \\\n\t$(MAKE) pricing-data-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed pricing-data-check\"; \\\n\t$(MAKE) makefile-inventory-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed makefile-inventory-check\"; \\\n\tuv run -- python scripts/check_public_contract_drift.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed public-contract-drift\"; \\\n\t$(MAKE) audit-deps; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-deps\"; \\\n\t$(MAKE) audit-raw-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-raw-check\"; \\\n\tuv run -- python scripts/check_release_curation.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed release-curation\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed skill-mirror-drift\"; \\\n\t$(MAKE) duplicate-check-delta; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed duplicate-delta\"; \\\n\t$(MAKE) complexity-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed complexity-check\"; \\\n\t$(MAKE) spellcheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed spellcheck\"; \\\n\tuv run -- python _project/scripts/check_project_references.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed project-references\"; \\\n\tif [ -n \"$$failed\" ]; then \\\n\t\techo \"\"; \\\n\t\techo \"\u274c FAILED guards:$$failed\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"\u2705 CI lint checks passed\"",
-        "recipe_sha256": "471364d66c347fd5f7e981c3908f03be6e7f367897fd77c52ed189ec9ff2a9b5"
+        "recipe": "\t@echo \"Running CI lint checks...\"\n\t@case \" $(MAKEFLAGS) \" in *\" n \"*|*\" -n \"*|*\" --just-print \"*) echo \"Dry-run: ci-lint guards suppressed\"; exit 0;; esac; \\\n\tset +e; failed=\"\"; \\\n\tuv run ruff check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-check\"; \\\n\tuv run ruff format --check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-format\"; \\\n\tuv run ty check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ty-check\"; \\\n\t$(MAKE) quality-governance-typecheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed quality-governance-typecheck\"; \\\n\t$(MAKE) uv-lock-revision-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uv-lock-revision\"; \\\n\t$(MAKE) sqlglot-repro-retirement-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed sqlglot-repro-retirement\"; \\\n\t$(MAKE) lint-markers; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-markers\"; \\\n\t$(MAKE) lint-imports; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-imports\"; \\\n\t$(MAKE) windows-antipatterns-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed windows-antipatterns\"; \\\n\t$(MAKE) lint-explorer-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-explorer-tokens\"; \\\n\t$(MAKE) lint-site-theme-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-site-theme-tokens\"; \\\n\t$(MAKE) artifact-hygiene; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed artifact-hygiene\"; \\\n\t$(MAKE) agent-instructions-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-instructions\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) agent-identity-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed agent-identity\"; \\\n\tfi; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-commit-range\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) skill-sync-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed skill-sync-check\"; \\\n\tfi; \\\n\tuv run -- python _project/scripts/timing_policy_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed timing-policy\"; \\\n\tuv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed fast-lane-ceiling\"; \\\n\tuv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uat-loc-table\"; \\\n\t$(MAKE) compat-docs-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed compat-docs-check\"; \\\n\t$(MAKE) platform-manifest-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed platform-manifest-check\"; \\\n\t$(MAKE) oracle-coverage-map-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed oracle-coverage-map-check\"; \\\n\t$(MAKE) pricing-data-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed pricing-data-check\"; \\\n\t$(MAKE) makefile-inventory-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed makefile-inventory-check\"; \\\n\tuv run -- python scripts/check_public_contract_drift.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed public-contract-drift\"; \\\n\t$(MAKE) audit-deps; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-deps\"; \\\n\t$(MAKE) audit-raw-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-raw-check\"; \\\n\tuv run -- python scripts/check_release_curation.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed release-curation\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed skill-mirror-drift\"; \\\n\t$(MAKE) duplicate-check-delta; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed duplicate-delta\"; \\\n\t$(MAKE) complexity-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed complexity-check\"; \\\n\t$(MAKE) spellcheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed spellcheck\"; \\\n\tuv run -- python _project/scripts/check_project_references.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed project-references\"; \\\n\tif [ -n \"$$failed\" ]; then \\\n\t\techo \"\"; \\\n\t\techo \"\u274c FAILED guards:$$failed\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"\u2705 CI lint checks passed\"",
+        "recipe_sha256": "de45b4b0ffd3034e8e714f4271fec06dd9012f53ab709bfc4687c8e1464bf394"
       }
     ],
     "ci-linux": [
@@ -1521,6 +1523,18 @@
         "recipe_sha256": "b18530eacbbcd705bcf527e3caeea3cc0a3eb02aca1b32f2f9d012f93bac085e"
       }
     ],
+    "sqlglot-repro-retirement-check": [
+      {
+        "header": "$(DEVELOPMENT_TREE_ONLY_TARGETS): .development-tree-required",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "sqlglot-repro-retirement-check:",
+        "recipe": "\tuv run -- python scripts/check_sqlglot_repro_retirement.py $(if $(BASE_REF),--base-ref \"$(BASE_REF)\",) --check",
+        "recipe_sha256": "8e2c24df32043376b765ee6ee2e02ed9500074f677687a4722982d5cb499bb86"
+      }
+    ],
     "ssb-cross-surface-equivalence-report": [
       {
         "header": "ssb-cross-surface-equivalence-report:",
@@ -2211,7 +2225,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "ae5977b2fa1ca054fe2546931e6e34f2223b9aa1326ed43e6c5d9e3542299d8f",
+  "semantic_sha256": "948bc0a180ee5654227a221cfbcaa09c30c39a64b37ead9d46bfea72d4c1d0a7",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2340,10 +2354,10 @@
       "sha256": "293dcd6f40e208240417878919e8f488ea36aec45931f510d57ae17e5e6dba92"
     },
     {
-      "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
+      "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
       "kind": "variable",
       "name": "DEVELOPMENT_TREE_ONLY_TARGETS",
-      "sha256": "08788a1d7d394407fce2eb0df7e8ca4b9912570a8ae5fd607011d0650021033f"
+      "sha256": "d53aff086f65f315fb1cabb23a3fe4b32e53ea92ba107429f67f231107fd18be"
     },
     {
       "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck docstring-coverage test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path",
@@ -2376,6 +2390,7 @@
         "complexity-report",
         "quality-governance-typecheck",
         "uv-lock-revision-check",
+        "sqlglot-repro-retirement-check",
         "audit-deps",
         "audit-raw",
         "audit-raw-check",
@@ -3232,6 +3247,22 @@
       ]
     },
     {
+      "body": ".PHONY: sqlglot-repro-retirement-check",
+      "kind": "rule",
+      "sha256": "d98ee4d32e08302ffa720f78b1bd88b23aaff3586bdd90cd92775507faaa7e2b",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
+      "body": "sqlglot-repro-retirement-check:\n\tuv run -- python scripts/check_sqlglot_repro_retirement.py $(if $(BASE_REF),--base-ref \"$(BASE_REF)\",) --check",
+      "kind": "rule",
+      "sha256": "2220e11be8f3d62a67f8d2d4ed826630dec255bc2100decbafa10003a7b5556a",
+      "targets": [
+        "sqlglot-repro-retirement-check"
+      ]
+    },
+    {
       "body": "audit-deps:\n\tuv run -- python _project/scripts/dependency_audit/check_deps.py",
       "kind": "rule",
       "sha256": "57bfc43725bd11b433f485c6c163d361f534f543587f300a6f2ed33e2a2721f0",
@@ -3474,9 +3505,9 @@
       ]
     },
     {
-      "body": "ci-lint:\n\t@echo \"Running CI lint checks...\"\n\t@case \" $(MAKEFLAGS) \" in *\" n \"*|*\" -n \"*|*\" --just-print \"*) echo \"Dry-run: ci-lint guards suppressed\"; exit 0;; esac; \\\n\tset +e; failed=\"\"; \\\n\tuv run ruff check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-check\"; \\\n\tuv run ruff format --check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-format\"; \\\n\tuv run ty check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ty-check\"; \\\n\t$(MAKE) quality-governance-typecheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed quality-governance-typecheck\"; \\\n\t$(MAKE) uv-lock-revision-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uv-lock-revision\"; \\\n\t$(MAKE) lint-markers; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-markers\"; \\\n\t$(MAKE) lint-imports; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-imports\"; \\\n\t$(MAKE) windows-antipatterns-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed windows-antipatterns\"; \\\n\t$(MAKE) lint-explorer-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-explorer-tokens\"; \\\n\t$(MAKE) lint-site-theme-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-site-theme-tokens\"; \\\n\t$(MAKE) artifact-hygiene; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed artifact-hygiene\"; \\\n\t$(MAKE) agent-instructions-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-instructions\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) agent-identity-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed agent-identity\"; \\\n\tfi; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-commit-range\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) skill-sync-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed skill-sync-check\"; \\\n\tfi; \\\n\tuv run -- python _project/scripts/timing_policy_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed timing-policy\"; \\\n\tuv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed fast-lane-ceiling\"; \\\n\tuv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uat-loc-table\"; \\\n\t$(MAKE) compat-docs-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed compat-docs-check\"; \\\n\t$(MAKE) platform-manifest-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed platform-manifest-check\"; \\\n\t$(MAKE) oracle-coverage-map-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed oracle-coverage-map-check\"; \\\n\t$(MAKE) pricing-data-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed pricing-data-check\"; \\\n\t$(MAKE) makefile-inventory-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed makefile-inventory-check\"; \\\n\tuv run -- python scripts/check_public_contract_drift.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed public-contract-drift\"; \\\n\t$(MAKE) audit-deps; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-deps\"; \\\n\t$(MAKE) audit-raw-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-raw-check\"; \\\n\tuv run -- python scripts/check_release_curation.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed release-curation\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed skill-mirror-drift\"; \\\n\t$(MAKE) duplicate-check-delta; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed duplicate-delta\"; \\\n\t$(MAKE) complexity-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed complexity-check\"; \\\n\t$(MAKE) spellcheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed spellcheck\"; \\\n\tuv run -- python _project/scripts/check_project_references.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed project-references\"; \\\n\tif [ -n \"$$failed\" ]; then \\\n\t\techo \"\"; \\\n\t\techo \"\u274c FAILED guards:$$failed\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"\u2705 CI lint checks passed\"",
+      "body": "ci-lint:\n\t@echo \"Running CI lint checks...\"\n\t@case \" $(MAKEFLAGS) \" in *\" n \"*|*\" -n \"*|*\" --just-print \"*) echo \"Dry-run: ci-lint guards suppressed\"; exit 0;; esac; \\\n\tset +e; failed=\"\"; \\\n\tuv run ruff check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-check\"; \\\n\tuv run ruff format --check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-format\"; \\\n\tuv run ty check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ty-check\"; \\\n\t$(MAKE) quality-governance-typecheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed quality-governance-typecheck\"; \\\n\t$(MAKE) uv-lock-revision-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uv-lock-revision\"; \\\n\t$(MAKE) sqlglot-repro-retirement-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed sqlglot-repro-retirement\"; \\\n\t$(MAKE) lint-markers; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-markers\"; \\\n\t$(MAKE) lint-imports; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-imports\"; \\\n\t$(MAKE) windows-antipatterns-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed windows-antipatterns\"; \\\n\t$(MAKE) lint-explorer-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-explorer-tokens\"; \\\n\t$(MAKE) lint-site-theme-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-site-theme-tokens\"; \\\n\t$(MAKE) artifact-hygiene; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed artifact-hygiene\"; \\\n\t$(MAKE) agent-instructions-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-instructions\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) agent-identity-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed agent-identity\"; \\\n\tfi; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-commit-range\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) skill-sync-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed skill-sync-check\"; \\\n\tfi; \\\n\tuv run -- python _project/scripts/timing_policy_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed timing-policy\"; \\\n\tuv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed fast-lane-ceiling\"; \\\n\tuv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uat-loc-table\"; \\\n\t$(MAKE) compat-docs-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed compat-docs-check\"; \\\n\t$(MAKE) platform-manifest-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed platform-manifest-check\"; \\\n\t$(MAKE) oracle-coverage-map-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed oracle-coverage-map-check\"; \\\n\t$(MAKE) pricing-data-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed pricing-data-check\"; \\\n\t$(MAKE) makefile-inventory-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed makefile-inventory-check\"; \\\n\tuv run -- python scripts/check_public_contract_drift.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed public-contract-drift\"; \\\n\t$(MAKE) audit-deps; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-deps\"; \\\n\t$(MAKE) audit-raw-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-raw-check\"; \\\n\tuv run -- python scripts/check_release_curation.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed release-curation\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed skill-mirror-drift\"; \\\n\t$(MAKE) duplicate-check-delta; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed duplicate-delta\"; \\\n\t$(MAKE) complexity-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed complexity-check\"; \\\n\t$(MAKE) spellcheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed spellcheck\"; \\\n\tuv run -- python _project/scripts/check_project_references.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed project-references\"; \\\n\tif [ -n \"$$failed\" ]; then \\\n\t\techo \"\"; \\\n\t\techo \"\u274c FAILED guards:$$failed\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"\u2705 CI lint checks passed\"",
       "kind": "rule",
-      "sha256": "135b41ebc851b079245884b317451b702796ed939d69fa2725056e72078051c7",
+      "sha256": "c9858d29b0f40bd2b4e82133bea42598891c7dd678ae9eee1269ee315fb0ccd4",
       "targets": [
         "ci-lint"
       ]
@@ -4560,7 +4591,7 @@
       ]
     }
   ],
-  "target_count": 218,
+  "target_count": 219,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4691,6 +4722,7 @@
     "soundness-drain-report",
     "soundness-drain-self-test",
     "spellcheck",
+    "sqlglot-repro-retirement-check",
     "ssb-cross-surface-equivalence-report",
     "test",
     "test-all",
@@ -4868,7 +4900,7 @@
     ],
     "DEVELOPMENT_TREE_ONLY_TARGETS": [
       {
-        "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
+        "body": "DEVELOPMENT_TREE_ONLY_TARGETS := \\\n\tcorrectness-gate-digests-regen cross-surface-baseline-autodetect \\\n\toracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \\\n\tjoinorder-verify-reference-results complexity-check complexity-report \\\n\tquality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \\\n\taudit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \\\n\texplorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \\\n\tagent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \\\n\tpr-review-followups-list pr-review-followups dev-loop-metrics platform-manifest \\\n\tplatform-manifest-check test-docker-parity blind-spots-list blind-spots-report \\\n\tsoundness-drain-report soundness-drain-self-test worktree-audit worktree-finish",
         "directive": "",
         "operator": ":="
       }

@@ -275,6 +275,34 @@
       "selectors": [{"prefix": "benchbox/core/joinorder_replicated/"}, {"prefix": "benchbox/core/joinorder_sampled/"}]
     },
     {
+      "id": "retained-notices-scope",
+      "owner": "comment-cleanup-scope-policy",
+      "state": "blocked",
+      "blocking_disposition": "Retain the exact bytes recorded in the notice ledger until the governing instrument and provenance are confirmed; the ledger owner decides retention.",
+      "priority": 40,
+      "selectors": [
+        {"path": "LICENSE"},
+        {"path": "_binaries/tpc-ds/NOTICE.txt"},
+        {"path": "_binaries/tpc-ds/darwin-arm64/EULA.txt"},
+        {"path": "_binaries/tpc-ds/darwin-x86_64/EULA.txt"},
+        {"path": "_binaries/tpc-ds/linux-arm64/EULA.txt"},
+        {"path": "_binaries/tpc-ds/linux-x86_64/EULA.txt"},
+        {"path": "_binaries/tpc-ds/windows-arm64/EULA.txt"},
+        {"path": "_binaries/tpc-ds/windows-x86_64/EULA.txt"},
+        {"path": "_sources/tpc-h/EULA.txt"},
+        {"path": "_sources/tpc-ds/EULA.txt"},
+        {"path": "_binaries/tpc-ds/darwin-arm64/NOTICE.txt"},
+        {"path": "_binaries/tpc-ds/darwin-x86_64/NOTICE.txt"},
+        {"path": "_binaries/tpc-ds/linux-arm64/NOTICE.txt"},
+        {"path": "_binaries/tpc-ds/linux-x86_64/NOTICE.txt"},
+        {"path": "_binaries/tpc-ds/windows-arm64/NOTICE.txt"},
+        {"path": "_binaries/tpc-ds/windows-x86_64/NOTICE.txt"},
+        {"path": "_sources/tpc-h/PATCHES.md"},
+        {"path": "_sources/tpc-ds/PATCHES.md"},
+        {"path": "COPYRIGHT.md"}
+      ]
+    },
+    {
       "id": "joinorder-synthetic-scope",
       "owner": "comment-cleanup-joinorder-synthetic",
       "state": "blocked",
@@ -1166,7 +1194,70 @@
       ]
     }
   ],
-  "external_entries": [],
+  "external_entries": [
+    {
+      "selector": {"prefix": "_sources/tpc-h/"},
+      "owner": "comment-cleanup-external-ownership",
+      "provenance": "TPC-H source kit: TPC-distributed source, data and tools, owned outside BenchBox.",
+      "governing_requirement": "Decided by the repository owner (@joeharris76) on 2026-10-01: the TPC vendor trees are externally owned and excluded as a whole. That covers the modified upstream copies that PATCHES.md records, the stdout-support.patch files, and build outputs such as checksums.md5 and the bundled binaries. They stay excluded so the patches still apply and the checksums still reproduce.",
+      "blocking_disposition": "Excluded from comment cleanup. The retained-notice rule still protects the exact bytes of the EULA, NOTICE and PATCHES files."
+    },
+    {
+      "selector": {"prefix": "_sources/tpc-ds/"},
+      "owner": "comment-cleanup-external-ownership",
+      "provenance": "TPC-DS source kit: TPC-distributed source, data and tools, owned outside BenchBox.",
+      "governing_requirement": "Decided by the repository owner (@joeharris76) on 2026-10-01: the TPC vendor trees are externally owned and excluded as a whole. That covers the modified upstream copies that PATCHES.md records, the stdout-support.patch files, and build outputs such as checksums.md5 and the bundled binaries. They stay excluded so the patches still apply and the checksums still reproduce.",
+      "blocking_disposition": "Excluded from comment cleanup. The retained-notice rule still protects the exact bytes of the EULA, NOTICE and PATCHES files."
+    },
+    {
+      "selector": {"prefix": "_binaries/"},
+      "owner": "comment-cleanup-external-ownership",
+      "provenance": "Pre-built TPC tools and licence copies: TPC-distributed source, data and tools, owned outside BenchBox.",
+      "governing_requirement": "Decided by the repository owner (@joeharris76) on 2026-10-01: the TPC vendor trees are externally owned and excluded as a whole. That covers the modified upstream copies that PATCHES.md records, the stdout-support.patch files, and build outputs such as checksums.md5 and the bundled binaries. They stay excluded so the patches still apply and the checksums still reproduce.",
+      "blocking_disposition": "Excluded from comment cleanup. The retained-notice rule still protects the exact bytes of the EULA, NOTICE and PATCHES files."
+    },
+    {
+      "selector": {"prefix": "benchbox/_binaries/"},
+      "owner": "comment-cleanup-external-ownership",
+      "provenance": "Bundled TPC tools and query templates: TPC-distributed source, data and tools, owned outside BenchBox.",
+      "governing_requirement": "Decided by the repository owner (@joeharris76) on 2026-10-01: the TPC vendor trees are externally owned and excluded as a whole. That covers the modified upstream copies that PATCHES.md records, the stdout-support.patch files, and build outputs such as checksums.md5 and the bundled binaries. They stay excluded so the patches still apply and the checksums still reproduce.",
+      "blocking_disposition": "Excluded from comment cleanup. The retained-notice rule still protects the exact bytes of the EULA, NOTICE and PATCHES files."
+    }
+  ],
+  "format_classes": [
+    {
+      "id": "json-data",
+      "verifier": "strict-json",
+      "extensions": [".json", ".jsonl"],
+      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}],
+      "owner": "comment-cleanup-final-enforcement",
+      "blocking_disposition": "Parses as strict JSON, which has no comment syntax. The final scan confirms none of these files gained comments."
+    },
+    {
+      "id": "png-images",
+      "verifier": "png-signature",
+      "extensions": [".png"],
+      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}],
+      "owner": "comment-cleanup-final-enforcement",
+      "blocking_disposition": "Has a PNG signature, so it is an image with no comment syntax. The final scan confirms the format is unchanged."
+    },
+    {
+      "id": "markdown-prose",
+      "verifier": "markdown-prose",
+      "extensions": [".md"],
+      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}],
+      "owner": "comment-cleanup-final-enforcement",
+      "blocking_disposition": "Markdown with no code, comment markers or commented front matter, so it holds prose only. The final scan confirms this still holds."
+    },
+    {
+      "id": "sql-queries",
+      "verifier": "sql-without-comment-markers",
+      "extensions": [".sql"],
+      "selectors": [{"prefix": "_project/"}],
+      "owner": "comment-cleanup-final-enforcement",
+      "blocking_disposition": "Contains no --, /* or # marker, so it holds no SQL comment. The final scan confirms this still holds."
+    }
+  ],
   "payloads": [
     {
       "id": "benchmark-class-docstring-reader",

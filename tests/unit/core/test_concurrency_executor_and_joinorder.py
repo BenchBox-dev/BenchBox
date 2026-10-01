@@ -446,8 +446,12 @@ class TestJoinOrderGenerator:
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         keywords = gen._generate_keywords(30)
         assert len(keywords) == 30
-        assert keywords[0][1] == "action"  # first known keyword
-        assert keywords[29][1] == "keyword_30"  # generated keyword
+        assert [row[0] for row in keywords] == list(range(1, 31))
+        # A random share of rows carries a seeded JOB predicate keyword, so each
+        # row is either its positional keyword or one of the seeds.
+        seeds = set(JoinOrderGenerator._SEED_KEYWORDS_EXTRA)
+        assert keywords[0][1] in {"action", *seeds}  # first known keyword
+        assert keywords[29][1] in {"keyword_30", *seeds}  # generated keyword
 
     def test_generate_character_names(self, tmp_path):
         from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator

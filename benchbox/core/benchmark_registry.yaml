@@ -405,8 +405,8 @@ benchmark_metadata:
     description: Uniformly-random Join Order schema smoke-test data
     category: Academic
     support_status: repo_only
-    num_queries: 13
-    query_description: 13 synthetic smoke queries
+    num_queries: 113
+    query_description: 113 JOB queries (13 historical smoke plus 100 canonical extensions)
     supports_streams: false
     default_scale: 1.0
     scale_options:
