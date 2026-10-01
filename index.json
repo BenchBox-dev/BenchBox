@@ -6082,6 +6082,15 @@
       "status": "open",
       "title": "Split the remaining parameter adapters into batch todos from the T2 inventory"
     },
+    "dfparity-t06-literal-fallback-lint": {
+      "claim": null,
+      "needs": [
+        "dfparity-t05-adapter-batches"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add an AST lint banning params.get(\"k\", literal) fallbacks for unmapped TPC-DS keys"
+    },
     "dfparity-t08-q70-expression-rounding": {
       "claim": null,
       "needs": [],

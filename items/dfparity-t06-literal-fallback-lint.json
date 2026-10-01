@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The lint passes on the current tree and fails on a seeded counter-example",
+    "The completeness test covers all 99 templates and runs in about 4 s without data",
+    "Declared-structural entries each carry a reason"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T6). Add every batch item created by dfparity-t05 to this item's needs when they exist. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "After the adapters exist, prevent silent literal fallbacks from returning: an AST-based test (fast lane, no data) that fails when a TPC-DS DataFrame implementation calls params.get(\"key\", literal) for a key that is not mapped from dsqgen -LOG or declared structural with a reason. Motivating example: Q41 reads manufact_start with a literal fallback of 738 while the YAML holds a dead manufact_ids key. Also add a completeness test: every -LOG parameter name is mapped or declared structural with a reason.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:12:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f30bc50445e44d6eac11a783f82737ca",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
