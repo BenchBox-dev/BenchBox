@@ -75,6 +75,9 @@ class TestSQLiteDiscountBoundaries:
             "l_discount BETWEEN 0.06 * 0.01 AND 0.06 + 0.01",
             "l_discount BETWEEN 0.05 AND 0.06 + 0.01",
             "l_discount BETWEEN 0.06 - 0.01 AND 0.07",
+            "l_discount BETWEEN 1 - 1 AND 1 + 1",
+            "l_discount BETWEEN 0.06 - 1 AND 0.06 + 1",
+            "l_discount BETWEEN (9223372036854775807 + 1 - 9223372036854775807) AND (1 + 1)",
         ],
     )
     def test_unrelated_or_nonliteral_expressions_are_unchanged(self, predicate):
@@ -82,6 +85,23 @@ class TestSQLiteDiscountBoundaries:
 
         query = f"SELECT 0.06 + 0.01 FROM lineitem WHERE {predicate}"
         assert _fix_sqlite_unsupported_syntax(query) == query
+
+    def test_integer_overflow_bounds_keep_sqlite_semantics(self):
+        import sqlite3
+
+        query = (
+            "WITH t AS (SELECT 0 AS l_discount) SELECT * FROM t "
+            "WHERE l_discount BETWEEN (9223372036854775807 + 1 - 9223372036854775807) AND (1 + 1)"
+        )
+        connection = sqlite3.connect(":memory:")
+        try:
+            # SQLite overflows to REAL here, so the lower bound is 0.0 and the row matches.
+            expected = connection.execute(query).fetchall()
+            assert expected == [(0,)]
+            translated = translate_sql_query(query, target_dialect="sqlite")
+            assert connection.execute(translated).fetchall() == expected
+        finally:
+            connection.close()
 
     @pytest.mark.parametrize("dialect", ["duckdb", "postgres", "mysql"])
     def test_non_sqlite_bounds_are_unchanged(self, dialect):

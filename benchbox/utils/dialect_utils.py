@@ -274,7 +274,13 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
 
 
 def _fold_sqlite_discount_bounds(query: str) -> str:
-    """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic."""
+    """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic.
+
+    Only bounds built entirely from decimal literals are folded, because SQLite evaluates
+    those as REAL. Integer arithmetic keeps SQLite's own overflow rules and is left alone.
+    The rewrite is not benchmark-scoped: any SQLite query with such an ``l_discount`` bound
+    is folded, including the TPC-Havoc Q6 variants.
+    """
     # Most SQLite queries need no extra parse. The AST, not this hint, selects rewrites.
     if not re.search(r"\bl_discount\b", query, re.IGNORECASE) or not re.search(r"\bBETWEEN\b", query, re.IGNORECASE):
         return query
@@ -292,7 +298,8 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
         if not all(
             isinstance(bound.unnest(), (exp.Add, exp.Sub))
             and all(
-                isinstance(node, (exp.Add, exp.Sub, exp.Paren)) or (isinstance(node, exp.Literal) and node.is_number)
+                isinstance(node, (exp.Add, exp.Sub, exp.Paren))
+                or (isinstance(node, exp.Literal) and node.is_number and not node.is_int)
                 for node in bound.walk()
             )
             for bound in bounds
