@@ -10,6 +10,13 @@
   ],
   "context": "Origin: user-approved 2026-09-30 (see spark-session-config-model). Opus review findings C2, R3, R4 drive this item. Precedence rule is the user's own wording: \"tuning file beats everything except user overrides configured outside of benchbox\". Interpretation to confirm with user if it matters in implementation: a non-enforced external default (e.g. spark-defaults.conf) is overridden by a runtime conf.set and reported as a discrepancy by the preflight-capture item; only enforced external settings win. Verified: `--platform-option spark_config=...` is rejected for spark, velox and lakesail, so spark_config has no CLI route today. Pitfall: the CLI default --shuffle-partitions 200 is indistinguishable from an explicit value, which no longer matters because the tuning file wins either way.",
   "description": "Make `platform_optimizations.spark` take effect on native Spark. Today `SparkLikeAdapterMixin.apply_platform_optimizations` (benchbox/platforms/_spark_helpers.py ~L473-505) has a `spark` branch that is unreachable with the production dataclass (tests use a dummy object), prepends `spark.` to keys that may already be qualified, and logs \"platform optimizations applied\" unconditionally. Prior art (extend): `_record_spark_conf_ledger` (_spark_helpers.py ~L523) and the cloud capture in benchbox/platforms/base/cloud_spark/mixins.py ~L261 (PHASE_SESSION, mechanism spark_session_config).\n\nDesign:\n- Apply in exactly one place: `SparkAdapter.configure_for_benchmark` (spark.py ~L659), gated on `self.tuning_enabled`, AFTER the OLAP defaults. configure_for_benchmark runs on both fresh and reused databases (adapter.py ~L1039), whereas apply_unified_tuning (~L1553) runs only on a fresh database and before configure_for_benchmark, which resets AQE/CBO and would silently undo a tuned value the ledger already called applied. apply_platform_optimizations must skip `spark`. Consequence to document: data load runs with untuned session settings.\n- Precedence (user decision 2026-09-30): the tuning file beats everything configured inside BenchBox (built-in defaults and explicit adapter options such as spark_config / --shuffle-partitions). Only an override enforced OUTSIDE BenchBox wins (cluster-locked or immutable settings, a managed service refusing the change). Do not try to defeat external enforcement. A tuning key that shadows an explicit BenchBox adapter option is logged and recorded so the user sees it.\n- Before each set call `spark.conf.isModifiable(key)` where the API exists (treat absence, e.g. on Spark Connect engines, as \"attempt the set\"). A key that is refused or does not read back as requested is recorded as failed and surfaced loudly (WARNING plus bundle), never as applied. Detailed read-back and discrepancy reporting belongs to spark-effective-config-preflight-capture; this item must expose the hooks it needs.\n- Record each applied tuning key as an executed PHASE_SESSION statement with the canonical key and lower-cased value; record exactly once per run so applied_ledger_hash is the same for fresh and reused databases.\n- get_platform_info (spark.py ~L376-398) reports configured self.shuffle_partitions/self.adaptive_enabled, not live values; make result metadata agree with the tuned session.\n- Replace the dummy-object tests with the real dataclass; delete the unconditional success log.",
+  "links": [
+    "item:spark-session-config-model",
+    "item:spark-baseline-no-default-overrides",
+    "item:spark-effective-config-preflight-capture",
+    "benchbox/platforms/_spark_helpers.py",
+    "benchbox/platforms/spark.py"
+  ],
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
@@ -17,6 +24,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "a41015eb11b5484a9c53e26a060f3ea3",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:25:37Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "431ab3f21f394b83a2f5a7e8a2df4b25",
       "session_id": "84cb9f884244423988b9cef251a0c248"
     }
   ]
