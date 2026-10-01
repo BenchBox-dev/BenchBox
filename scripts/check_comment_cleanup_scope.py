@@ -173,12 +173,36 @@ def base_blob(root: Path, base: str, path: str) -> bytes:
     return git(root, "show", f"{base}:{path}")
 
 
+def check_evidence_field(category: str, index: int, field: str, value: Any) -> None:
+    label = f"{category}[{index}].{field}"
+    if (category == "notices" and field in {"byte_start", "byte_end"}) or (
+        category == "directives" and field == "count"
+    ):
+        if not isinstance(value, int) or isinstance(value, bool) or (field == "count" and value < 1):
+            raise PolicyError(f"{label} must be an integer")
+    elif category == "obligations" and field in {"tracker_reference", "approved_destination"}:
+        if not isinstance(value, str):
+            raise PolicyError(f"{label} must be a string")
+    else:
+        check_string(value, label)
+
+
+def check_token_evidence(category: str, index: int, entry: dict[str, Any], root: Path, base: str) -> None:
+    occurrences = base_blob(root, base, entry["path"]).count(entry["token"].encode())
+    if occurrences == 0:
+        raise PolicyError(f"{category}[{index}] token is not present in {entry['path']} at the base")
+    if category == "directives" and occurrences != entry["count"]:
+        raise PolicyError(
+            f"directives[{index}] counts {entry['count']} but {entry['path']} has {occurrences} at the base"
+        )
+
+
 def validate_evidence(
     policy: dict[str, Any], root: Path, base: str, paths: set[str], task_ids: set[str] | None = None
 ) -> None:
     for category, fields in {
         "external_entries": {"path", "owner", "provenance", "governing_requirement", "blocking_disposition"},
-        "directives": {"path", "token", "consumer", "necessity", "alternative", "owner", "removal_trigger"},
+        "directives": {"path", "token", "count", "consumer", "necessity", "alternative", "owner", "removal_trigger"},
         "notices": {
             "path",
             "blob_sha256",
@@ -205,17 +229,12 @@ def validate_evidence(
                 raise PolicyError(f"{category}[{index}] must be an object")
             require_fields(entry, fields, f"{category}[{index}]")
             for field, value in entry.items():
-                if category == "notices" and field in {"byte_start", "byte_end"}:
-                    if not isinstance(value, int):
-                        raise PolicyError(f"{category}[{index}].{field} must be an integer")
-                elif category == "obligations" and field in {"tracker_reference", "approved_destination"}:
-                    if not isinstance(value, str):
-                        raise PolicyError(f"{category}[{index}].{field} must be a string")
-                else:
-                    check_string(value, f"{category}[{index}].{field}")
+                check_evidence_field(category, index, field, value)
             if entry["path"] not in paths:
                 raise PolicyError(f"{category}[{index}] path is not tracked at the immutable base")
             check_owner(entry["owner"], f"{category}[{index}].owner", task_ids)
+            if category in {"directives", "obligations"}:
+                check_token_evidence(category, index, entry, root, base)
             if category == "obligations":
                 tracker_reference = entry["tracker_reference"]
                 approved_destination = entry["approved_destination"]
@@ -542,6 +561,23 @@ def carrier_findings(carriers: list[dict[str, Any]], policy: dict[str, Any]) -> 
     return findings
 
 
+def evidence_owner_findings(policy: dict[str, Any], resolved: list[dict[str, Any]]) -> list[Finding]:
+    owners = {record["path"]: record["owner"] for record in resolved}
+    findings = []
+    for category in ("directives", "obligations"):
+        for entry in policy[category]:
+            path_owner = owners.get(entry["path"])
+            if path_owner is not None and path_owner != entry["owner"]:
+                findings.append(
+                    Finding(
+                        "SCOPE007",
+                        entry["path"],
+                        f"{category} owner {entry['owner']} differs from the path owner {path_owner}",
+                    )
+                )
+    return findings
+
+
 def selected_root(path: str, roots: list[dict[str, Any]]) -> dict[str, Any] | None:
     candidates = [root for root in roots if matches(path, root["selector"])]
     if not candidates:
@@ -670,6 +706,7 @@ def main(argv: list[str] | None = None) -> int:
         owned = {record["path"] for record in resolved if record["owner"]}
         findings = [finding for finding in findings if finding.subject not in owned]
         findings.extend(notice_findings)
+        findings.extend(evidence_owner_findings(policy, resolved))
         carriers = detect_carriers(resolved, root, args.base)
         findings.extend(carrier_findings(carriers, policy))
         findings.extend(dependency_findings(policy, resolved))

@@ -573,3 +573,70 @@ def test_exact_rule_must_outrank_the_derived_rule() -> None:
         scope.validate_rule_priorities([rule], derived)
     scope.validate_rule_priorities([{**rule, "priority": 30}], derived)
     scope.validate_rule_priorities([{**rule, "selectors": [{"prefix": "tests/unit/"}], "priority": 5}], derived)
+
+
+def _directive(**overrides: object) -> dict:
+    entry = {
+        "path": "src/a.py",
+        "token": "# noqa: F401",
+        "count": 1,
+        "consumer": "Ruff",
+        "necessity": "Imported for side effects.",
+        "alternative": "Call an explicit function.",
+        "owner": "comment-cleanup-core-bootstrap",
+        "removal_trigger": "Explicit function exists.",
+    }
+    entry.update(overrides)
+    return entry
+
+
+def test_directive_token_and_count_must_match_the_base_file(tmp_path: Path, policy: dict) -> None:
+    root, base = _git_repo_with(tmp_path, {"src/a.py": "import x  # noqa: F401\nimport y  # noqa: F401\n"})
+    policy["directives"] = [_directive(count=2)]
+    scope.validate_evidence(policy, root, base, {"src/a.py"})
+    policy["directives"] = [_directive(count=1)]
+    with pytest.raises(scope.PolicyError, match="counts 1"):
+        scope.validate_evidence(policy, root, base, {"src/a.py"})
+    policy["directives"] = [_directive(token="# noqa: N815", count=1)]
+    with pytest.raises(scope.PolicyError, match="not present"):
+        scope.validate_evidence(policy, root, base, {"src/a.py"})
+    policy["directives"] = [_directive(count=0)]
+    with pytest.raises(scope.PolicyError, match="integer"):
+        scope.validate_evidence(policy, root, base, {"src/a.py"})
+
+
+def test_obligation_token_must_be_present_at_the_base(tmp_path: Path, policy: dict) -> None:
+    root, base = _git_repo_with(tmp_path, {"src/a.py": "# TODO: follow up\n"})
+    entry = {
+        "path": "src/a.py",
+        "token": "TODO: elsewhere",
+        "destination": "follow-up",
+        "tracker_reference": "existing-item",
+        "approved_destination": "",
+        "owner": "comment-cleanup-core-bootstrap",
+        "blocking_disposition": "Await follow-up.",
+    }
+    policy["obligations"] = [entry]
+    with pytest.raises(scope.PolicyError, match="not present"):
+        scope.validate_evidence(policy, root, base, {"src/a.py"})
+    entry["token"] = "TODO: follow up"
+    scope.validate_evidence(policy, root, base, {"src/a.py"})
+
+
+def test_directive_and_obligation_owners_must_match_the_path_owner(policy: dict) -> None:
+    policy["directives"] = [_directive(owner="comment-cleanup-other")]
+    policy["obligations"] = [
+        {
+            "path": "src/a.py",
+            "token": "TODO",
+            "destination": "d",
+            "tracker_reference": "t",
+            "approved_destination": "",
+            "owner": "comment-cleanup-core-bootstrap",
+            "blocking_disposition": "b",
+        }
+    ]
+    resolved = [_resolved("src/a.py", "comment-cleanup-core-bootstrap")]
+    findings = scope.evidence_owner_findings(policy, resolved)
+    assert [(finding.code, finding.subject) for finding in findings] == [("SCOPE007", "src/a.py")]
+    assert scope.evidence_owner_findings(policy, [_resolved("src/a.py", None)]) == []

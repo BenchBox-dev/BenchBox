@@ -78,10 +78,13 @@ blob SHA-256, retained byte range, retained-byte SHA-256, source identity,
 governing requirement, owner, and blocking disposition. Do not infer either
 from a vendor directory or replace it with a blanket SPDX label.
 
-A directive records its exact token, actual consumer, necessity, smaller
-alternative considered, owner, and removal trigger. A TODO or FIXME records its
-path, token, owner, blocking disposition, and an existing tracker reference or
-approved destination. Deletion alone does not satisfy the obligation.
+A directive records its exact token, the number of occurrences in the file, its
+actual consumer, necessity, smaller alternative considered, owner, and removal
+trigger. A TODO or FIXME records its path, token, owner, blocking disposition,
+and an existing tracker reference or approved destination. The validator
+requires the token to appear in the file at the base, and the directive count to
+match it. A directive or obligation owner that differs from the owner of its
+path is reported. Deletion alone does not satisfy the obligation.
 
 Known runtime and source-text carriers are recorded only with source proof. New
 or unresolved carriers stay blocked until their owner establishes the necessary

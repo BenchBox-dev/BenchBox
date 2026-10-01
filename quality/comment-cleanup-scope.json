@@ -215,6 +215,14 @@
       "selectors": [{"prefix": "benchbox/core/joinorder/"}, {"path": "benchbox/joinorder.py"}]
     },
     {
+      "id": "joinorder-prototypes-scope",
+      "owner": "comment-cleanup-joinorder",
+      "state": "blocked",
+      "blocking_disposition": "Added after the task definition was written. joinorder_sampled came in with #2386 and joinorder_replicated with #2388, both feat(joinorder) changes, and the live joinorder task now lists both. They import only the standard library and no registry names them, so no import evidence points to another owner.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/joinorder_replicated/"}, {"prefix": "benchbox/core/joinorder_sampled/"}]
+    },
+    {
       "id": "joinorder-synthetic-scope",
       "owner": "comment-cleanup-joinorder-synthetic",
       "state": "blocked",
@@ -1305,7 +1313,11 @@
       "proof": "_query_page calls query_description, get_sql_render, and get_dataframe_render."
     }
   ],
-  "directives": [],
+  "directives": [
+    {"path": "benchbox/cli/app.py", "token": "# noqa: F401", "count": 1, "consumer": "Ruff rule F401", "necessity": "The import runs benchbox.cli.platform_defaults only for its module-level platform hook registrations; the imported name is otherwise unused.", "alternative": "Have the entrypoint call an explicit registration function; platform_defaults has none today, so that is an executable change.", "owner": "comment-cleanup-cli-foundation", "removal_trigger": "Default platform hooks register through an explicit function that the CLI entrypoint calls."},
+    {"path": "_project/scripts/platform_manifest.py", "token": "# noqa: N815", "count": 2, "consumer": "Ruff rule N815", "necessity": "ast.NodeVisitor dispatches on method names such as visit_AsyncFunctionDef and visit_ImportFrom, and the two aliases must keep those mixed-case names.", "alternative": "Define both methods explicitly and delegate to visit_FunctionDef and visit_Import, which removes the suppression.", "owner": "comment-cleanup-project-tooling", "removal_trigger": "The aliases are replaced by delegating methods."},
+    {"path": "_project/scripts/platform_manifest.py", "token": "# noqa: C901", "count": 1, "consumer": "Ruff rule C901", "necessity": "_validate_semantic_surfaces exceeds the cyclomatic complexity limit; this is a discretionary suppression.", "alternative": "Split the function into one validator per semantic surface.", "owner": "comment-cleanup-project-tooling", "removal_trigger": "The function is split below the complexity limit."}
+  ],
   "notices": [
     {
       "path": "LICENSE",
@@ -1517,7 +1529,9 @@
       "blocking_disposition": "Keep distinct from governing license files; do not infer blanket retention or removal."
     }
   ],
-  "obligations": [],
+  "obligations": [
+    {"path": ".github/workflows/nightly-v2.yml", "token": "TODO: drop the registration guard", "destination": "Drop the quarantine registration guard in the nightly workflow, or record a tracked follow-up first. The quarantine marker is now registered in pytest.ini and pytest-ci.ini, and dlv2-13-durations-budget-quarantine enforces owner, expiry and issue metadata.", "tracker_reference": "dlv2-13-durations-budget-quarantine", "approved_destination": "", "owner": "comment-cleanup-shared-infrastructure", "blocking_disposition": "The trigger condition appears met. The shared-infrastructure owner decides whether to drop the guard; deleting the comment alone earns no credit."}
+  ],
   "review_dispositions": [
     {"id": "R1", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["individual-notice-provenance"], "rationale": "Resolve notices in derived first-party material by provenance and governing requirement; no blanket SPDX substitution or legal prose exception.", "acceptance_refs": ["Notice/provenance ledger resolves first-party derived material and upstream exceptions individually, with governing requirement and retained bytes; no wholesale legal or vendor-directory carve-out."], "owner": "comment-cleanup-scope-policy"},
     {"id": "R2", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["consumer-before-producer"], "rationale": "Migrate Click, FastMCP, argparse, API, display, and known runtime __doc__ consumers before removing producers.", "acceptance_refs": ["Benchmark-list runtime descriptions use existing canonical registry data before any benchmark class docstring removal. All other cross-module consumers have migrated or have a verified consumer-before-producer dependency; local consumers are explicitly owned."], "owner": "comment-cleanup-contracts-gate"},
