@@ -1,12 +1,23 @@
 {
   "acceptance": [
     "TPC-H Skew completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
-    "TPC-Havoc completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
+    "TPC-Havoc completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles); each bundle's query count is reconciled with the 220 variations the benchmark loads, and any variation skipped on a platform is listed with its reason (on 2026-10-01 the Snowflake bundles report 218 queries and the Databricks bundles 219)",
     "TPC-H Data Vault completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
-    "TPC-DS-OBT completed at SF 1.0 on BigQuery, Databricks, Snowflake (3 bundles)",
-    "100% query pass rate across all runs",
-    "All 30 result bundles pass scripts/validate_submission.py with 0 errors"
+    "TPC-DS-OBT completed at SF 1.0 on BigQuery, Databricks, Snowflake (3 bundles); the Snowflake data-identity hold and the Snowflake and Databricks timing holds are cleared by reruns on current develop",
+    "Every executed query succeeds (no FAILED); skipped queries are limited to documented platform gaps",
+    "All 30 result bundles pass scripts/validate_submission.py with 0 errors, were produced on code that includes the Databricks result-cache receipt check and the phase wall-clock bounds, and carry result_source=internal",
+    "BigQuery cells stay inside the approved spend cap recorded in the campaign ledger; no cell exceeds the 6-hour wall-clock limit"
   ],
-  "context": "TPC variants stress optimizer edge cases: skewed data distributions reveal whether cost-based optimizers handle data skew gracefully; TPC-Havoc tests nested subqueries and complex predicates; Data Vault evaluates enterprise modeling patterns; OBT tests denormalized analytical performance.",
-  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to the TPC variant and experimental benchmark suites:\n- TPC-H Skew: 22 queries on data with Zipfian/exponential/normal skew distributions (SF 0.1, 1.0, 10.0)\n- TPC-Havoc: 220 query variations stressing engine subquery and predicate evaluation (SF 0.1, 1.0, 10.0)\n- TPC-H Data Vault: 22 queries adapted for Hub-Link-Satellite data modeling (SF 0.1, 1.0, 10.0)\n- TPC-DS-OBT: 89 queries adapted for One Big Table / de-normalized denormalization (SF 1.0)\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify 100% query pass rate and valid bundle structure."
+  "context": "TPC variants stress optimizer edge cases: skewed data distributions reveal whether cost-based optimizers handle data skew gracefully; TPC-Havoc tests nested subqueries and complex predicates; Data Vault evaluates enterprise modeling patterns; OBT tests denormalized analytical performance.\n\nRevalidated 2026-10-01. Query counts match the loaded benchmark classes (22 / 220 / 22 / 89; the registry num_queries metadata is stale for TPC-DS-OBT, showing 17). These four suites are rows of the 84-cell live-cloud corpus campaign (28 benchmark rows x 3 warehouses), so progress is read from that campaign's per-cell table and its BigQuery spend ledger rather than from separate runs. Runs inside the campaign's settled limits (6 h per cell, BigQuery cap counted from 2026-09-22) need no new approval; anything outside them needs one that states command, maximum runtime, log path and stop condition. Databricks cells share a 500-table Unity Catalog metastore quota.",
+  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to the TPC variant and experimental benchmark suites:\n- TPC-H Skew: 22 queries on data with Zipfian/exponential/normal skew distributions (SF 0.1, 1.0, 10.0)\n- TPC-Havoc: 220 query variations stressing engine subquery and predicate evaluation (SF 0.1, 1.0, 10.0)\n- TPC-H Data Vault: 22 queries adapted for Hub-Link-Satellite data modeling (SF 0.1, 1.0, 10.0)\n- TPC-DS-OBT: 89 queries adapted for One Big Table / de-normalized denormalization (SF 1.0)\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify 100% query pass rate and valid bundle structure.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8995e2100042cfa8b56876be",
+      "at": "2026-10-01T15:01:08Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d0ae621690b94c888b765c7862058f10",
+      "session_id": "a90fbddb3b8e47b781e3c8bf731c4a32"
+    }
+  ]
 }
