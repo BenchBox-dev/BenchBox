@@ -98,7 +98,7 @@ class TestSQLiteDiscountBoundaries:
         import sqlite3
 
         query = (
-            "WITH t AS (SELECT 0 AS l_discount) SELECT * FROM t "
+            "WITH lineitem AS (SELECT 0 AS l_discount) SELECT * FROM lineitem "
             "WHERE l_discount BETWEEN (9223372036854775807 + 1 - 9223372036854775807) AND (1 + 1)"
         )
         connection = sqlite3.connect(":memory:")
@@ -161,6 +161,32 @@ class TestSQLiteDiscountBoundaries:
         finally:
             connection.close()
 
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "SELECT * FROM orders WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
+            "SELECT * FROM t WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
+            # Mentioning the table in a string or comment is not reading it.
+            "SELECT 'lineitem' AS note FROM t WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
+            "SELECT * FROM t /* lineitem */ WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
+        ],
+    )
+    def test_queries_that_do_not_read_lineitem_are_not_folded(self, query):
+        from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
+
+        assert _fix_sqlite_unsupported_syntax(query) == query
+
+    def test_a_query_that_reads_lineitem_is_folded_in_a_join_and_a_subquery(self):
+        from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
+
+        joined = (
+            "SELECT 1 FROM orders o JOIN lineitem l ON l.l_orderkey = o.o_orderkey "
+            "WHERE l.l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01"
+        )
+        assert "BETWEEN 0.05 AND 0.07" in _fix_sqlite_unsupported_syntax(joined)
+        nested = "SELECT * FROM (SELECT l_discount FROM lineitem) WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01"
+        assert "BETWEEN 0.05 AND 0.07" in _fix_sqlite_unsupported_syntax(nested)
+
     def test_value_inside_the_double_noise_band_follows_exact_decimal_semantics(self):
         import sqlite3
 
@@ -170,7 +196,7 @@ class TestSQLiteDiscountBoundaries:
         # SQLite's noisy bound matches it and the exact endpoint does not. TPC-H discounts have two
         # decimals, so this cannot occur in the benchmark data; the behavior is documented, not relied on.
         query = (
-            "WITH t AS (SELECT 0.00000000000000001 AS l_discount) SELECT l_discount FROM t "
+            "WITH lineitem AS (SELECT 0.00000000000000001 AS l_discount) SELECT l_discount FROM lineitem "
             "WHERE l_discount BETWEEN (0.0 + 0.0) AND (0.1 + 0.2 - 0.3)"
         )
         connection = sqlite3.connect(":memory:")
@@ -203,7 +229,7 @@ class TestSQLiteDiscountBoundaries:
 
         values = " UNION ALL ".join(f"SELECT {value} AS l_discount" for value in rows)
         query = (
-            f"WITH t AS ({values}) SELECT l_discount FROM t "
+            f"WITH lineitem AS ({values}) SELECT l_discount FROM lineitem "
             f"WHERE l_discount BETWEEN {low} AND {high} ORDER BY l_discount"
         )
         assert _fix_sqlite_unsupported_syntax(query) == query

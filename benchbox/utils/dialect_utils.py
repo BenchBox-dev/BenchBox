@@ -284,8 +284,9 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
     result is computed in a trapped-inexact context and the bound is replaced only when the
     double result is finite and within 1e-12 of it. Integer or mixed bounds, other operators,
     larger or longer literals, scientific notation and negative results keep SQLite's
-    semantics and are left alone. The rewrite is not benchmark-scoped: any SQLite query with
-    such an ``l_discount`` bound is folded, including the TPC-Havoc Q6 variants.
+    semantics and are left alone. The rewrite is scoped to queries that read a table named ``lineitem``, the TPC-H table
+    whose ``l_discount`` is ``DECIMAL(15,2)``, so a query over any other table is left alone;
+    the TPC-Havoc Q6 variants read ``lineitem`` and are folded.
 
     The folded bound is the exact decimal endpoint, so the comparison follows exact decimal
     semantics in both directions. SQLite's noisy endpoint can sit just below the exact value
@@ -327,6 +328,9 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
         return None
 
     tree = sqlglot.parse_one(query, read="sqlite")
+    # A string or comment that merely mentions the table must not count: look at table references.
+    if not any(table.name.lower() == "lineitem" for table in tree.find_all(exp.Table)):
+        return query
     changed = False
     for between in tree.find_all(exp.Between):
         if not isinstance(between.this, exp.Column) or between.this.name.lower() != "l_discount":
