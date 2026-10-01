@@ -99,6 +99,12 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
 
     allowed = {config.name.lower()}
 
+    # A benchmark that builds its own tables from the source data (tpcds_obt)
+    # must not accept the source manifest: reusing it loads the source tables
+    # instead of the benchmark's own.
+    if getattr(benchmark, "GENERATES_OWN_OUTPUT", False) is True:
+        return allowed
+
     getter = getattr(benchmark, "get_data_source_benchmark", None)
     if callable(getter):
         try:
@@ -577,6 +583,9 @@ def _execute_load_only_mode(
             native_loader = as_native_table_loader(adapter)
             schema_time = native_loader.create_schema(benchmark, connection)
             table_stats, load_time, per_table_timings = native_loader.load_data(benchmark, connection, data_dir)
+            from benchbox.platforms.base.adapter import require_loaded_tables
+
+            require_loaded_tables(benchmark, table_stats)
             schema_phase = {
                 "status": "COMPLETED",
                 "duration_ms": int(schema_time * 1000),

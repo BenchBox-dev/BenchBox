@@ -29,6 +29,15 @@ def test_obt_bundle_with_empty_obt_table_fails():
     assert "loaded with 0 rows" in _errors(data)[0]
 
 
-def test_other_benchmarks_and_missing_tables_block_are_not_checked():
+def test_other_benchmarks_are_not_checked():
     assert _errors({"benchmark": {"id": "tpcds"}, "tables": {"CALL_CENTER": {"rows": 6}}}) == []
+    assert _errors({"benchmark": {"id": "tpcds"}, "queries": [{"id": "1"}]}) == []
+
+
+def test_obt_bundle_with_measured_queries_but_no_tables_block_fails():
+    errors = _errors({"benchmark": {"id": "tpcds_obt"}, "queries": [{"id": "2", "status": "SUCCESS"}]})
+    assert len(errors) == 1 and "no 'tables' block" in errors[0]
+
+
+def test_obt_bundle_without_queries_or_tables_is_not_checked():
     assert _errors({"benchmark": {"id": "tpcds_obt"}}) == []

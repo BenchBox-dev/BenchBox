@@ -1630,14 +1630,21 @@ def _validate_required_tables(data: dict, vr: ValidationResult) -> None:
 
     A run that loads the wrong dataset can still finish: the schema creates
     the query table empty and every query succeeds with no or trivial rows.
-    Only checked when the ``tables`` block is present (absence means "not
-    measured").
+    A bundle with measured queries must therefore show these tables in its
+    ``tables`` block; omitting the block is not evidence that they loaded.
     """
     benchmark = data.get("benchmark")
     benchmark_id = str(benchmark.get("id") or "").lower() if isinstance(benchmark, dict) else ""
     required = _REQUIRED_LOADED_TABLES.get(benchmark_id)
+    if not required:
+        return
     tables = data.get("tables")
-    if not required or not isinstance(tables, dict):
+    if not isinstance(tables, dict):
+        if data.get("queries"):
+            vr.error(
+                f"benchmark '{benchmark_id}' bundle has measured queries but no 'tables' block, "
+                f"so it cannot show that {', '.join(required)} was loaded"
+            )
         return
     loaded = {str(name).lower(): entry for name, entry in tables.items()}
     for table in required:
