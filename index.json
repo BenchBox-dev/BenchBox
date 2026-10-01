@@ -6036,6 +6036,13 @@
       "status": "open",
       "title": "Record owner decisions D1-D5 gating the DataFrame parity work"
     },
+    "dfparity-t01-dsqgen-log-parser": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Add dsqgen -LOG support and a structured parameter-log parser"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
