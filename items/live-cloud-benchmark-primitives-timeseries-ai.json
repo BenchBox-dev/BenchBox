@@ -1,11 +1,21 @@
 {
   "acceptance": [
-    "Primitives benchmarks completed on BigQuery, Databricks, Snowflake at supported scale factors",
+    "Read, Write, Transaction and Metadata Primitives completed on BigQuery, Databricks, Snowflake at their supported scale factors (Read 0.01 and 0.1; Write and Transaction 0.01, 0.1 and 1.0; Metadata 1.0)",
+    "No operation FAILS; every skipped operation is a platform capability gap recorded in the benchmark catalog (for example Snowflake write_primitives SF 0.01 skips 44 of 112 operations), and each bundle's skip list is checked against it",
     "TSBS DevOps completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
-    "Vector Search completed at SF 0.1, 1.0, 10.0 on BigQuery, Databricks, Snowflake (9 bundles)",
-    "AI Primitives completed at SF 0.1, 1.0 on BigQuery, Databricks, Snowflake (6 bundles)",
-    "All generated bundles pass scripts/validate_submission.py with 0 errors"
+    "Vector Search completed at SF 0.1, 1.0, 10.0 on Snowflake and Databricks (6 bundles); BigQuery either gains a native vector_search query variant first or is recorded as unsupported with the reason, never run on the DuckDB fallback SQL",
+    "All generated bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal"
   ],
-  "context": "Tests non-OLAP and specialized capabilities on modern cloud warehouses: ACID transactions, write latency, metadata discovery, time series rollups, and vector search / AI function integration across cloud engines.",
-  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to Primitives, Time Series, and AI/ML specialized benchmark suites:\n- Read Primitives: 157 read pattern queries (SF 0.1)\n- Write Primitives: 112 write/update/delete operations (SF 0.1, 1.0)\n- Transaction Primitives: 23 transaction queries (SF 0.1, 1.0)\n- Metadata: 62 schema and catalog inspection queries (SF 1.0)\n- TSBS DevOps: 18 time-series aggregation queries (SF 0.1, 1.0, 10.0)\n- Vector Search: 6 vector similarity and ANN search queries (SF 0.1, 1.0, 10.0)\n- AI Primitives: 16 AI/ML built-in function queries (SF 0.1, 1.0)\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify all operations execute and bundles validate cleanly."
+  "context": "Tests non-OLAP and specialized capabilities on modern cloud warehouses: ACID transactions, write latency, metadata discovery, time series rollups, and vector search across cloud engines.\n\nRevalidated 2026-10-01. Query counts match the loaded benchmark classes (157 / 112 / 23 / 62 / 18 / 6; the registry num_queries metadata is stale for read, write and transaction primitives, showing 136 / 12 / 12). AI Primitives was removed because the user deferred it on 2026-09-22; its max_cost_usd CLI follow-up is reported in the campaign summary and has no tracker item. Vector Search has Snowflake and Spark/Databricks variants in core/vector_search/queries.py but none for BigQuery. All other rows are cells of the 84-cell live-cloud corpus campaign, so progress is read from that campaign's per-cell table; its limits (6 h per cell, BigQuery cap counted from 2026-09-22) apply, and runs outside them need a new approval stating command, maximum runtime, log path and stop condition.",
+  "description": "Expand live cloud benchmark execution across BigQuery, Databricks, and Snowflake to Primitives and Time Series suites, plus Vector Search where a platform variant exists:\n- Read Primitives: 157 read pattern queries (SF 0.01, 0.1; the registry caps this benchmark at 0.1)\n- Write Primitives: 112 write/update/delete operations (SF 0.01, 0.1, 1.0)\n- Transaction Primitives: 23 transaction queries (SF 0.01, 0.1, 1.0)\n- Metadata: 62 schema and catalog inspection queries (SF 1.0)\n- TSBS DevOps: 18 time-series aggregation queries (SF 0.1, 1.0, 10.0)\n- Vector Search: 6 vector similarity and ANN search queries (SF 0.1, 1.0, 10.0) on Snowflake and Databricks; BigQuery has no vector_search query variant\n\nAI Primitives (16 queries) is out of scope: it was deferred on 2026-09-22 and is not part of the corpus campaign.\n\nExecute across BigQuery, Databricks, and Snowflake at the supported scale factors.\nVerify that no operation FAILS, that skipped operations match the benchmark's recorded platform capability gaps, and that bundles validate cleanly.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8995e2100042cfa8b56876be",
+      "at": "2026-10-01T15:01:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "828a86160d5046c794c57d6b1418fc2c",
+      "session_id": "a90fbddb3b8e47b781e3c8bf731c4a32"
+    }
+  ]
 }
