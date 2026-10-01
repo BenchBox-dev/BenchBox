@@ -1188,6 +1188,7 @@ class DatabricksAdapter(PlatformAdapter):
             for table in tables:
                 cursor.execute(f"TRUNCATE TABLE {catalog}.{schema}.`{table}`")
             self.log_verbose(f"Truncated {len(tables)} tables in {catalog}.{schema} for reload")
+            self._schema_reset_in_place = True
             return True
         except Exception as e:
             self.log_verbose(f"In-place reset of {catalog}.{schema} failed, dropping instead: {e}")
@@ -2451,21 +2452,27 @@ class DatabricksAdapter(PlatformAdapter):
         else:
             column_list = self._get_column_list_for_table(benchmark, table_name, cursor)
 
+        # COPY INTO skips files it has already loaded into the target table.
+        # Staging file URIs are reused across runs, and a reload can target a
+        # table that was truncated rather than dropped, so force every load;
+        # the row count check below still catches a double load.
+        copy_options = " COPY_OPTIONS('force' = 'true')"
         copy_time = 0.0
         for source_uri in copy_sources:
             if is_parquet:
                 copy_sql = (
                     f"COPY INTO {table_name_upper} FROM (SELECT {cast_select} FROM '{source_uri}') FILEFORMAT = PARQUET"
+                    f"{copy_options}"
                 )
             elif copy_dialect.has_header:
                 copy_sql = (
                     f"COPY INTO {table_name_upper} FROM (SELECT {cast_select} FROM '{source_uri}') "
-                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options}){copy_options}"
                 )
             else:
                 copy_sql = (
                     f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
-                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options}){copy_options}"
                 )
             copy_start = mono_time()
             cursor.execute(copy_sql)
@@ -3093,6 +3100,12 @@ class DatabricksAdapter(PlatformAdapter):
         if "CREATE TABLE" in body.upper() and "OR REPLACE" not in body.upper():
             if "IF NOT EXISTS" not in body.upper():
                 body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+            elif getattr(self, "_schema_reset_in_place", False):
+                # After an in-place reset the table still exists with its old
+                # definition; replace it so the current DDL applies.
+                body = re.sub(
+                    r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS", "CREATE OR REPLACE TABLE", body, count=1, flags=re.IGNORECASE
+                )
         statement = prefix + body
 
         if self.table_format == "hudi":

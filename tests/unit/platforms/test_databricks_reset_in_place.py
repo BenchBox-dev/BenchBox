@@ -56,3 +56,20 @@ def test_reset_declines_when_a_table_cannot_be_truncated(adapter):
         assert adapter.reset_database_in_place(catalog="cat", schema="sch") is False
 
     assert not any(sql.startswith("DROP") for sql in executed)
+
+
+def test_if_not_exists_tables_are_replaced_only_after_reset(adapter):
+    ddl = "CREATE TABLE IF NOT EXISTS flights (id INT)"
+    assert "IF NOT EXISTS" in adapter._convert_to_delta_table(ddl)
+
+    adapter._schema_reset_in_place = True
+    converted = adapter._convert_to_delta_table(ddl)
+    assert converted.startswith("CREATE OR REPLACE TABLE flights")
+    assert "IF NOT EXISTS" not in converted
+
+
+def test_reset_marks_schema_for_replacement(adapter):
+    connection, _ = _connection([("sch", "orders", False)])
+    with patch.object(adapter, "_create_admin_connection", return_value=connection):
+        adapter.reset_database_in_place(catalog="cat", schema="sch")
+    assert adapter._schema_reset_in_place is True

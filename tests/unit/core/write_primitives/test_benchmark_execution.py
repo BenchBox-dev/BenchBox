@@ -2562,3 +2562,8 @@ def test_setup_force_replaces_tables_in_place_on_databricks(fast_bench, fast_con
     staging_drops = [s for s in executed if s.startswith("DROP TABLE") and "manifest" not in s.lower()]
     assert staging_drops == []
     assert any(s.startswith("CREATE OR REPLACE TABLE") for s in executed)
+    # The old manifest row is cleared first, so a part-failed rebuild is not reused.
+    manifest_clears = [s for s in executed if s.startswith("DELETE FROM") and "staging_manifest" in s]
+    assert manifest_clears and executed.index(manifest_clears[0]) < next(
+        i for i, s in enumerate(executed) if s.startswith("CREATE OR REPLACE TABLE")
+    )

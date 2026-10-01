@@ -887,6 +887,8 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             if rebuild:
                 reason = "force mode" if force else "stale/absent staging manifest"
                 self._drop_legacy_staging_manifests(connection)
+                if replace_in_place:
+                    self._invalidate_staging_manifest(connection)
                 for table_name in [] if replace_in_place else STAGING_TABLES:
                     try:
                         quoted = self._quote_identifier(table_name)
