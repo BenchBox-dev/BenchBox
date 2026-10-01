@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"{platform}/{benchmark}/{label}: {status}; "
                     f"mapped={coverage['mapped_count']}/{coverage['required_count']}; "
+                    f"capped={coverage.get('capped_count', 0)}; "
                     f"accepted={coverage['accepted_count']}; "
                     f"dropped={coverage['dropped_low_evidence_count']}; "
                     f"rendering={rendering}; mechanisms={mechanisms}; hash={metadata['tuning_template_hash']}"

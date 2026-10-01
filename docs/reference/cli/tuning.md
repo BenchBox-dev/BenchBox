@@ -35,7 +35,7 @@ Resolution happens in this order (see `benchbox/cli/tuning_resolver.py:resolve_t
          itself (`benchbox/core/tuning/packaged_templates.py`) - last resort,
          only reached when none of tiers 1-3 exist. Only a subset of
          platform/benchmark pairs ship a packaged template today (the
-         `duckdb` and `databricks` templates that follow the
+         `duckdb`, `databricks`, and `snowflake` templates that follow the
          `<benchmark>_tuned.yaml` naming convention); see
          `benchbox/core/tuning/templates/README.md` for the exact list and
          how it's kept in sync with `examples/tunings/`.
