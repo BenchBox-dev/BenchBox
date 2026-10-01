@@ -4,7 +4,7 @@
     "D3 records the result of comparing -LOG output from the bundled dsqgen binaries across platforms, or states it could not be checked",
     "Dependent items (t03, t07, t12, t16, t21, t22) are updated if a decision changes their scope"
   ],
-  "context": "Source: DataFrame query parity proposal v3, produced after two adversarial reviews (session scratchpad proposal_v3.md; not durable). Parity means same table data (already shared), same parameters (the gap), same results (to be confirmed). Gate code: benchbox/core/equivalence/cross_surface.py; TPC-DS is a staged report-only gate at SF=0.01. The project owner does NOT accept earlier reviewers' TPC-H claims; change nothing in TPC-H without an owner decision. Related existing items tpcds-parity-b1..b6 are left untouched. Heavy runs (SF=1: about 450 s and 3.5 GB) need explicit approval; the machine is shared.",
+  "context": "Source: DataFrame query parity proposal v3, produced after two adversarial reviews (session scratchpad proposal_v3.md; not durable). Parity means same table data (already shared), same parameters (the gap), same results (to be confirmed). Gate code: benchbox/core/equivalence/cross_surface.py; TPC-DS is a staged report-only gate at SF=0.01. The project owner does NOT accept earlier reviewers' TPC-H claims; change nothing in TPC-H without an owner decision. Related existing items tpcds-parity-b1..b6 are left untouched. Heavy runs (SF=1: about 450 s and 3.5 GB) need explicit approval; the machine is shared.\n\nDECISIONS (owner, 2026-10-01, in chat):\n- D1 render scale: gate AND production. Production runner.get_queries must render dsqgen at the data scale, not SCALE=1 (differs from the gate-only recommendation). Consequence: published SF!=1 SQL baselines and comparability change; dfparity-t22 becomes the implementation item for production, with a baseline/comparability note, rather than a deferred decision.\n- D2 provenance: configurable stream (differs from the stream-0-only recommendation). The stream number is carried through the gate and recorded with binary identity, seed and scale; default stream 0.\n- D3 runtime -LOG vs committed defaults: deferred. Checked bundled binaries: only darwin-arm64 dsqgen runs on this machine (no Docker, no Rosetta, so darwin-x86_64, linux-arm64, linux-x86_64 and windows could not be run). Cross-platform log identity is unverified here; dfparity-t15 is the check. Decide after t15 reports.\n- D4 NULL order and ties: as recommended. Fix NULL order in implementations against the explicit ORDER BY; canonicalize ties in the comparator only where the classifier proves a true tie.\n- D5 TPC-H reference-seed semantics: deferred; the owner contests it. TPC-H stays unchanged; dfparity-t21 is verification only.",
   "description": "Five decisions only the project owner can make, each with the evidence and a recommendation, recorded in the item context before dependent items start. D1 render scale: gate-only (recommended) vs also production get_queries. TPC-DS runner.get_queries (benchbox/core/tpcds/benchmark/runner.py:235) renders dsqgen at SCALE=1 regardless of data scale while get_query (line ~279) uses the data scale; platform adapters (platforms/base/execution.py ~1033-1049), tpcds/power_test.py:217 and throughput_test.py:423 call get_queries, so production SQL runs at SF!=1 use SF=1 parameters today; changing it alters baselines and published comparability. D2 provenance: (binary identity, seed, scale, stream); recommend stream 0 only (dsqgen -LOG emits BEGIN STREAM n). D3 runtime dsqgen -LOG (about 30 ms/query, 3 s for 99) vs committed defaults plus drift test; first check that the bundled dsqgen binaries under benchbox/_binaries/tpc-ds/ give identical logs across platforms. D4 NULL-order and tie policy: recommend fixing NULL order in implementations against the explicit ORDER BY, and canonicalizing ties in the comparator only where the classifier proves a true tie. D5 TPC-H reference-seed semantics (contested by the owner; see dfparity-t21).",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "a073fa6810f3483f97f759ff9df4053e",
       "op": "take",
       "op_id": "5c4de43d0655485e82134e87226830ac",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T14:50:55Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "aa53c46b1b0442489921263e673e8ae7",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
