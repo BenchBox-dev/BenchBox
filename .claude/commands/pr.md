@@ -22,5 +22,5 @@ BenchBox PR workflow to `develop` (linear history, squash-only). Run in order; s
    conventional commit.
 4. `make pr-preflight` (path-aware local gate). Fix root causes; never use `--no-verify`.
 5. `make pr-open` pushes the branch and opens the PR.
-6. `gh pr merge <n> --squash --match-head-commit "$(git rev-parse HEAD)"` enqueues it.
+6. `make pr-arm` checks the live PR for a hold, then enqueues the exact head.
 7. Monitor until merged; re-enqueue, fix, and stop-for-owner rules are in `AGENTS.md` [WRITE-CLOSEOUT-001].

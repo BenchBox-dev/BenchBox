@@ -43,7 +43,8 @@ def test_contributing_documents_arming_the_exact_head_and_monitoring_to_merge(co
     """The finished-branch path is: arm the exact head, then monitor until merged."""
     contributing_text = " ".join(contributing_text.split())  # tolerate reflowed lines
     for required in (
-        "--match-head-commit",
+        "make pr-arm",
+        "make pr-landing-withdraw",
         "monitor to merge",
         "You are done when the PR is merged",
         "[WRITE-CLOSEOUT-001]",

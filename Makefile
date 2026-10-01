@@ -1650,6 +1650,12 @@ pr-arm-auto-merge:
 	$(MAKE) -s pr-landing-ready REPO="$$REPOSITORY" PR="$$PR_NUMBER" HEAD="$$EXPECTED_HEAD" \
 		EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)" ARM=1
 
+# Arms a PR for its exact head after a live hold check and enqueues it into the merge queue.
+# `make pr-arm` (PR=<n> optional, HEAD=<sha> optional) refuses without merging when a hold label,
+# a requested change, a draft or closed state, or a head other than local HEAD applies.
+pr-arm:
+	@uv run -- python scripts/pr_arm.py $(if $(PR),--pr $(PR),) $(if $(HEAD),--head $(HEAD),) $(if $(REPO),--repo $(REPO),)
+
 # Declares the branch final and arms auto-merge / queue enrollment.
 #
 # Auto-merge is NOT armed by `pr-open`, because arming at creation is only

@@ -48,7 +48,7 @@ Required CI on `develop` reports six unit results (`core`, `explorer`, `results-
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it for its exact head with `gh pr merge <n> --squash --match-head-commit "$(git rev-parse HEAD)"`; the merge queue lands it when its checks are green. You are done when the PR is merged, not when it is open or green: re-enqueue after a spurious ejection and fix and push after a real failure. Stop and hand back only for an owner-only action (see `AGENTS.md` `[WRITE-CLOSEOUT-001]`).
+The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it with `make pr-arm`, which checks the live PR for a hold and enqueues the exact head; the merge queue lands it when its checks are green. You are done when the PR is merged, not when it is open or green: re-enqueue (`make pr-arm` again) after a spurious ejection and fix and push after a real failure. Stop and hand back only for the exceptions listed in `AGENTS.md` `[WRITE-CLOSEOUT-001]`.
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -90,13 +90,16 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
 5. **Arm it and monitor until it merges:**
 
    ```bash
-   gh pr merge 123 --squash --match-head-commit "$(git rev-parse HEAD)"   # enqueue the exact head
+   make pr-arm            # PR=<n> optional; refuses on a hold label, requested changes, a draft, or a head that is not pushed
    ```
 
-   A push after arming runs the checks again; arm the new head. `make pr-ready` remains only for
-   delivering a prepared batch, where its evidence file must declare `delivery_mode` and the complete
-   prepared-batch binding; a single PR does not need it. `auto-merge-on-open.yml` only revokes and never
-   arms. The `no-auto-merge` label is a deliberate opt-out (see `docs/operations/repo-admin-settings.md`).
+   `make pr-arm` reads the live PR first, so a `no-auto-merge` label or a requested change stops it instead of
+   being mistaken for a queue failure; remove a hold deliberately to release it. Before editing an armed PR,
+   withdraw it with the revision transaction (`make pr-landing-withdraw`, see `docs/agent/review-protocol.md`),
+   push the correction, and arm the new head: a later `--match-head-commit` cannot undo a merge of the old head.
+   `make pr-ready` remains only for delivering a prepared batch, where its evidence file must declare
+   `delivery_mode` and the complete prepared-batch binding; a single PR does not need it.
+   `auto-merge-on-open.yml` only revokes and never arms (see `docs/operations/repo-admin-settings.md`).
 
 6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 

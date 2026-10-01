@@ -166,11 +166,19 @@ def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
         "authorizes only a local commit",
         "gate fails",
         "do not stop before",
-        "match-head-commit",
+        "make pr-arm",
         "monitor to merge",
-        "owner-only action",
         "never hand a green, reviewed PR back",
         "closes at a merged pull request",
+        "re-enqueue after a spurious ejection",
+        "fix and push after a real failure",
+        # The limits on merging: deleting any one widens what an agent may merge unasked.
+        "owner-only action",
+        "a denied permission",
+        "production publish or release",
+        "live-cloud spend",
+        "a HOLD or unresolved Critical/High review",
+        "a real design choice",
     ],
 )
 def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: str) -> None:
@@ -220,13 +228,49 @@ def test_handback_wording_fails_in_every_scanned_location(tmp_path: Path, line: 
     assert any(error.startswith("handback:") and target in error for error in errors), errors
 
 
-def test_handback_line_naming_an_owner_only_action_is_exempt(tmp_path: Path) -> None:
+def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) -> None:
+    """The guard has no per-line exemption: appending a marker must not hide a hand-back."""
     project = _candidate(tmp_path)
-    contributing = _with_repo_file(project, "CONTRIBUTING.md")
-    contributing.write_text(
-        contributing.read_text()
-        + "\nAn owner-only ruleset change: mark the PR ready only after the owner applies it.\n"
-    )
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\nMark PR 12 ready when CI is green. owner-only\n")
+    assert any("mark a PR ready" in error for error in agent_instruction_audit.audit_handback_wording(project))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Markdown reflow and emphasis must not hide the old wording.
+        "Do not poll\nCI: pending is\nterminal.",
+        "Mark **PR 12** ready when CI is green.",
+        "Mark the _pull request_ ready for the queue.",
+        "Auto-merge stays\nwithheld until a human decides.",
+        # A hand-back that the first guard missed.
+        "When CI passes, ask the user to enable auto-merge.",
+        "Then ask the owner to merge it.",
+    ],
+)
+def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: str) -> None:
+    project = _candidate(tmp_path)
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\n\n" + text + "\n")
+    assert agent_instruction_audit.audit_handback_wording(project) != []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # Safety guidance and instructions that do not hand back completed work.
+        "Do not mark PR ready before required external review is complete.",
+        "Never mark a PR ready while review dispositions are incomplete.",
+        "When the branch is final, arm the exact head and monitor until merged.",
+        # A list item must not join the next one into a phrase.
+        "- mark the PR\n- ready to arm after the checks",
+    ],
+)
+def test_handback_guard_allows_safety_wording_and_separate_list_items(tmp_path: Path, text: str) -> None:
+    project = _candidate(tmp_path)
+    command = project / ".claude/commands/pr.md"
+    command.write_text(command.read_text() + "\n\n" + text + "\n")
     assert agent_instruction_audit.audit_handback_wording(project) == []
 
 

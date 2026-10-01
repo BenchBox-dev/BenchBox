@@ -106,11 +106,19 @@ AGENT_WRITE_ANCHORS = {
     "WRITE-CLOSEOUT-001": (
         "authorized write workflow closes at a merged pull request",
         "make pr-open",
-        "match-head-commit",
+        "make pr-arm",
         "monitor to merge",
         "close-out steps are part of write authorization, not separate permissions",
         "never hand a green, reviewed pr back",
+        "re-enqueue after a spurious ejection",
+        "fix and push after a real failure",
+        # The limits on merging: dropping any of these would widen what an agent may merge unasked.
         "owner-only action",
+        "a denied permission",
+        "production publish or release",
+        "live-cloud spend",
+        "a hold or unresolved critical/high review",
+        "a real design choice",
         "do not stop before",
         "explicitly forbids publication",
         "authorizes only a local commit",
@@ -119,8 +127,12 @@ AGENT_WRITE_ANCHORS = {
 }
 # Agent-facing text must not tell an agent or operator to stop and hand a finished PR back to a
 # human. A PR that passed its checks and required review is merged by the agent; the narrow cases
-# that do need a human are the owner-only list in [WRITE-CLOSEOUT-001], and a line that names one is
-# exempt. Scripts that print guidance (Makefile, pr_landing.py) are added to this list as they are fixed.
+# that do need a human are listed in [WRITE-CLOSEOUT-001]. This is a phrase regression check, not
+# semantic assurance: it catches the known wordings, matched on whole paragraphs with Markdown
+# emphasis stripped so line wrapping and **bold** cannot hide them. There is deliberately no
+# per-line exemption; a legitimate sentence that trips a pattern is reworded or the pattern narrowed
+# in a reviewed change. Scripts that print guidance (Makefile, pr_landing.py) join this list as they
+# are fixed.
 HANDBACK_TEXT = (
     "AGENTS.md",
     "CONTRIBUTING.md",
@@ -128,18 +140,40 @@ HANDBACK_TEXT = (
     "docs/agent/*.md",
     "docs/development/development.md",
 )
-HANDBACK_EXEMPT_MARKER = "owner-only"
 HANDBACK_PATTERNS = {
     "auto-merge withheld": r"\bauto-merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
     "withheld until": r"\bwithheld until\b",
-    "mark a PR ready": r"\bmark(?:ing|ed)?\s+(?:the\s+|a\s+|an\s+)?(?:pr|pull request)s?\b[^.\n]{0,40}\bready\b",
+    "mark a PR ready": (
+        r"(?<!not )(?<!never )\bmark(?:ing|ed)?\s+(?:the\s+|a\s+|an\s+)?(?:pr|pull request)s?\b[^.]{0,40}\bready\b"
+    ),
     "decisions are yours": r"\bdecisions?\s+(?:are|is)\s+yours\b",
     "pending is terminal": r"\bpending is terminal\b",
     "do not poll CI": r"\bdo not poll ci\b",
-    "run make pr-ready when": r"\brun\s+[`'\"]?make pr-ready[`'\"]?\s+when\b",
+    "run make pr-ready when": r"\brun\s+['\"]?make pr-ready['\"]?\s+when\b",
     "PR stays held": r"\bpr (?:created and held|stays held|remains held)\b",
-    "when the branch is final": r"\bwhen the branch is final\b",
+    "ask the user to arm or merge": (
+        r"\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|approve|mark)\b"
+    ),
 }
+_MARKDOWN_EMPHASIS = re.compile(r"[*_`]")
+_LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
+
+
+def _paragraphs(text: str) -> list[tuple[int, str]]:
+    """Split Markdown into (first line number, flattened text), one entry per paragraph or list item."""
+    paragraphs: list[tuple[int, list[str]]] = []
+    current: tuple[int, list[str]] | None = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        if not line.strip():
+            current = None
+            continue
+        if current is None or _LIST_ITEM.match(line):
+            current = (number, [])
+            paragraphs.append(current)
+        current[1].append(line.strip())
+    return [(number, _MARKDOWN_EMPHASIS.sub("", " ".join(lines))) for number, lines in paragraphs]
+
+
 CODE_REVIEW_RULE_ANCHORS = (
     "Do not report commit identity.",
     "Review sandboxes may use synthetic identities.",
@@ -643,14 +677,12 @@ def audit_handback_wording(project: Path) -> list[str]:
         if not path.is_file():
             continue
         relative = path.relative_to(project).as_posix()
-        for number, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1):
-            if HANDBACK_EXEMPT_MARKER in line.casefold():
-                continue
+        for number, paragraph in _paragraphs(path.read_text(encoding="utf-8", errors="ignore")):
             for label, pattern in compiled.items():
-                if pattern.search(line):
+                if pattern.search(paragraph):
                     errors.append(
                         f"{relative}:{number} tells a reader to hand a finished PR back ({label}); "
-                        "arm and merge it, or name the owner-only action that needs a human"
+                        "arm and merge it, or reword it"
                     )
     return errors
 

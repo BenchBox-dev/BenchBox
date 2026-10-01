@@ -40,7 +40,7 @@ Implementation requests authorize only the narrow implementation workflow, not
 unrelated cleanup or external actions.
 
 `[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a merged pull request:
-a named branch, a commit, `make pr-open`, `gh pr merge --squash --match-head-commit <head>`,
+a named branch, a commit, `make pr-open`, `make pr-arm`,
 then monitor to merge. Close-out steps are part of write
 authorization, not separate permissions. Never hand a green, reviewed PR back:
 re-enqueue after a spurious ejection, fix and push after a real failure. Stop only for
