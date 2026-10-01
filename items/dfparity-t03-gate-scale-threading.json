@@ -4,7 +4,7 @@
     "Report-mode gate at SF=0.01 and SF=0.1 runs; every classified-empty entry still returns 0 rows or is removed, with the new empty set recorded",
     "A test asserts the gate renders at the gate scale"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T3). If owner decision D1 chooses production scope, that is a separate item (dfparity-t22). Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T3). Owner decision D1 (see dfparity-t00-owner-decisions) also fixes production; that is the separate item dfparity-t22, so this item stays gate-builder only. Owner decision D2: the dsqgen stream is configurable, so thread a stream number (default 0) through the gate render and record it with seed, scale and binary identity. Project owner does NOT accept earlier reviewers' TPC-H claims.",
   "description": "Pass the gate's scale into the TPC-DS SQL render inside benchbox/core/equivalence/builders/tpcds.py only. Do NOT change runner.get_queries or any production path (see owner decision D1): production SQL runs at SF!=1 currently use SF=1 parameters and changing that alters baselines. About 10 templates use rowcount(...) so their dsqgen values depend on scale (Q44's differ at every other scale; tested). After rendering at the data's scale, _TPCDS_LEGITIMATELY_EMPTY (benchbox/core/equivalence/cross_surface.py ~1410, 26 entries, described as the bounded SF=0.01 cell) must be re-derived because emptiness is not monotonic in scale (23 queries are empty at some scales and not others).",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "6b0fde31f7cd42a2b3328a70afa2ddad",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T14:52:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "28fde2844ff4450d9aadaad122fc7f97",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
 }
