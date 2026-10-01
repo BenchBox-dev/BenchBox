@@ -41,6 +41,8 @@ def test_queue_artifact_verifies_exact_distributions_before_upload() -> None:
     assert "dist-artifact" in jobs["core"]["needs"]
 
 
+BIND_STEP = "Bind distributions to the producer attempt"
+BIND_RUN = "python -I -S scripts/release_artifact_consumer.py producer --dist dist"
 VERIFY_SOURCE_RUN = "uv run --locked --no-dev -- python scripts/bundled_binary_manifest.py"
 BUILD_AND_VERIFY_RUN = """\
 set -euo pipefail
@@ -68,7 +70,9 @@ def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
     # heredocs, extra options and extra commands are then all visible as a diff against this
     # contract, so changing what the job runs is a deliberate edit to this test.
     job = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["dist-artifact"]
-    assert set(job) == {"name", "needs", "if", "runs-on", "timeout-minutes", "steps"}
+    assert set(job) == {"name", "needs", "if", "runs-on", "permissions", "timeout-minutes", "steps"}
+    # The only token this job holds is read-only, and only the producer-receipt step is handed it.
+    assert job["permissions"] == {"contents": "read", "actions": "read"}
     assert job["timeout-minutes"] >= 20
 
     shape = [(step["name"], step["uses"].split("@")[0] if "uses" in step else "run") for step in job["steps"]]
@@ -78,14 +82,20 @@ def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
         ("Install uv", "astral-sh/setup-uv"),
         ("Verify source bundled binary manifest", "run"),
         ("Build wheel and sdist", "run"),
+        ("Bind distributions to the producer attempt", "run"),
         ("Upload dist artifact", "actions/upload-artifact"),
     ]
     runs = {step["name"]: step for step in job["steps"] if "run" in step}
-    for step in runs.values():
-        # No shell override, environment, or working directory can change how a script runs.
-        assert set(step) == {"name", "run"}, step
+    for name, step in runs.items():
+        # No shell override or working directory can change how a script runs, and the only
+        # environment is the receipt step's read-only token.
+        allowed = {"name", "run", "env"} if name == BIND_STEP else {"name", "run"}
+        assert set(step) == allowed, step
     assert runs["Verify source bundled binary manifest"]["run"].strip() == VERIFY_SOURCE_RUN
     assert runs["Build wheel and sdist"]["run"] == BUILD_AND_VERIFY_RUN
+    # The receipt step uses the isolated interpreter, never uv, so it installs nothing.
+    assert runs[BIND_STEP]["run"].strip() == BIND_RUN
+    assert runs[BIND_STEP]["env"] == {"GH_TOKEN": "${{ github.token }}"}
     # The steps that install tools take no inputs that add dependencies.
     uses = {step["name"]: step for step in job["steps"] if "uses" in step}
     assert uses["Install uv"].keys() <= {"name", "uses"}
