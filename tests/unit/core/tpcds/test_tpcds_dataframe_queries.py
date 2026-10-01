@@ -153,10 +153,10 @@ class TestTPCDSParameters:
         """Test that parameters have sensible defaults."""
         from benchbox.core.tpcds.dataframe_queries.parameters import get_parameters
 
-        # Q42 parameters
+        # Q42 parameters (stream-0 SQL: December 1998)
         params = get_parameters(42)
-        assert params.get("month") == 11
-        assert params.get("year") == 2000
+        assert params.get("month") == 12
+        assert params.get("year") == 1998
 
     def test_parameter_get_with_default(self):
         """Test getting parameter with default value."""

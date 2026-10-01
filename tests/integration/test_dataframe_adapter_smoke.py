@@ -27,6 +27,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from tests.utilities.optional_engines import pyspark_skip_reason, require_pyspark
+
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.medium,
@@ -88,10 +90,9 @@ def polars_adapter():
 
 
 @pytest.fixture(scope="module")
-def pyspark_adapter():
+def pyspark_adapter(pyspark_test_environment):
     """Create a PySpark adapter for testing."""
-    if not PYSPARK_AVAILABLE:
-        pytest.skip("PySpark not installed")
+    require_pyspark()
     adapter = PySparkDataFrameAdapter(
         master="local[2]",
         app_name="BenchBox-SmokeTest",
@@ -370,7 +371,7 @@ class TestPolarsSmoke:
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
+@pytest.mark.skipif(pyspark_skip_reason() is not None, reason=pyspark_skip_reason() or "PySpark is usable")
 class TestPySparkSmoke:
     """Smoke tests for PySpark DataFrame adapter."""
 

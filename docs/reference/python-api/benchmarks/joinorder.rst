@@ -129,7 +129,7 @@ Query Methods
 -------------
 
 ``get_query(query_id, *, params=None, dialect=None) -> str``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Returns a static JOB query by ID, such as ``"1a"`` or ``"33c"``.
 ``params`` is not supported because JOB queries are fixed. Pass
@@ -143,7 +143,7 @@ without it the canonical text is returned unchanged.
     duckdb_query = benchmark.get_query("1a", dialect="duckdb")
 
 ``get_queries(dialect=None) -> dict[str, str]``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Returns all embedded canonical JOB queries, translated via SQLGlot when
 ``dialect`` is given.
