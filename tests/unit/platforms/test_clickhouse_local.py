@@ -23,12 +23,10 @@ pytestmark = [
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from benchbox.platforms.clickhouse._dependencies import import_chdb  # noqa: E402
+from tests.utilities.optional_engines import require_chdb  # noqa: E402
 
-try:
-    import_chdb()
-except ImportError as exc:
-    pytest.skip(f"ClickHouse local mode requires chdb for these tests: {exc}", allow_module_level=True)
+# Local mode needs a chDB whose native library loads, not just an installed package.
+require_chdb()
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient  # noqa: E402
 
@@ -190,7 +188,7 @@ class TestClickHouseEmbeddedConnection:
                 def close(self):
                     pass
 
-            with patch("benchbox.platforms.clickhouse.ClickHouseLocalClient", _FakeClient):
+            with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
         # Should look like an local client (duck-typed): has execute()
@@ -227,7 +225,7 @@ class TestClickHouseEmbeddedConnection:
                 def close(self):
                     pass
 
-            with patch("benchbox.platforms.clickhouse.ClickHouseLocalClient", _FakeClient):
+            with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
         metadata = adapter._get_platform_metadata(connection)
@@ -260,7 +258,7 @@ class TestClickHouseEmbeddedIntegration:
                 def close(self):
                     pass
 
-            with patch("benchbox.platforms.clickhouse.ClickHouseLocalClient", _FakeClient):
+            with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
         result = adapter.execute_query(connection, "SELECT 42, 'result'", "test_query")
@@ -287,7 +285,7 @@ class TestClickHouseEmbeddedIntegration:
                 def close(self):
                     pass
 
-            with patch("benchbox.platforms.clickhouse.ClickHouseLocalClient", _FakeClient):
+            with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
         # Use a clearly invalid SQL query
@@ -325,7 +323,7 @@ class TestClickHouseEmbeddedIntegration:
                 def close(self):
                     pass
 
-            with patch("benchbox.platforms.clickhouse.ClickHouseLocalClient", _FakeClient):
+            with patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient", _FakeClient):
                 connection = adapter.create_connection()
 
         # a simple table

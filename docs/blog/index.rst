@@ -22,9 +22,9 @@ Archives
 
 Browse by:
 
-* :doc:`/blog/archive` - Posts organized by year
-* :doc:`/blog/tag` - Posts organized by topic
-* :doc:`/blog/author` - Posts organized by author
+* `Archive <archive.html>`_ - Posts organized by year
+* `Tags <tag.html>`_ - Posts organized by topic
+* `Authors <author.html>`_ - Posts organized by author
 
 .. toctree::
    :maxdepth: 1

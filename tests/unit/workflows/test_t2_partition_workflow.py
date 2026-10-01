@@ -1,0 +1,127 @@
+"""Pin full tier selection, gate conservation, and raw binary framing placement."""
+
+from __future__ import annotations
+
+from collections import Counter
+from math import prod
+from pathlib import Path
+
+import pytest
+import yaml
+
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _jobs(filename: str) -> dict:
+    return yaml.safe_load((ROOT / ".github/workflows" / filename).read_text())["jobs"]
+
+
+def test_correctness_partitions_preserve_each_gate_once() -> None:
+    from benchbox.core.equivalence.cross_surface import GATES
+
+    job = _jobs("ci.yml")["correctness-gate"]
+    assert job["strategy"] == {"fail-fast": False, "matrix": {"partition": ["a", "b"]}}
+    expected = {
+        "make test-correctness-gate",
+        "make tpchavoc-equivalence-report",
+        "make tpchavoc-dataframe-equivalence-report",
+    }
+    for gate in GATES:
+        target = gate.replace("_", "-")
+        if gate == "joinorder":
+            target = "joinorder-synthetic"
+        expected.add(f"make {target}-cross-surface-equivalence-report")
+    steps = [step for step in job["steps"] if str(step.get("run", "")).startswith("make ")]
+    assert Counter(step["run"] for step in steps) == Counter(dict.fromkeys(expected, 1))
+    groups = {
+        name: {step["run"] for step in steps if step["if"] == f"matrix.partition == '{name}'"} for name in ("a", "b")
+    }
+    assert groups["a"] and groups["b"]
+    assert groups["a"].isdisjoint(groups["b"])
+    assert groups["a"] | groups["b"] == expected
+    assert not any(step.get("continue-on-error") for step in steps)
+
+
+def test_medium_selection_and_receipts_gate_core() -> None:
+    jobs = _jobs("ci.yml")
+    medium = jobs["medium-test"]
+    assert medium["strategy"] == {"fail-fast": False, "matrix": {"shard_index": [0, 1]}}
+    assert medium["needs"] == ["ci-paths", "medium-collect"]
+    selector = "medium and not (slow or stress or resource_heavy or live_integration)"
+    collect_text = "\n".join(step.get("run", "") for step in jobs["medium-collect"]["steps"])
+    medium_text = "\n".join(step.get("run", "") for step in medium["steps"])
+    assert selector in collect_text and selector in medium_text
+    assert "--collect-only -q -n 0" in collect_text
+    assert "--tb=short --timeout=60 -n 5" in medium_text
+    assert "-p scripts.pytest_shard_evidence" in medium_text
+    assert "--collection-summary" in medium_text and "--checked-sha" in medium_text
+    assert "test -s" in medium_text
+    assert not medium.get("continue-on-error")
+    core_text = "\n".join(step.get("run", "") for step in jobs["core"]["steps"])
+    for job in ("medium-collect", "medium-test", "correctness-gate"):
+        assert job in jobs["core"]["needs"]
+        assert f"--expect {job}=" in core_text
+    assert "verify-medium" in core_text
+
+
+def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
+    jobs = _jobs("ci.yml")
+    payload = (
+        "medium-collect",
+        "medium-test",
+        "correctness-gate",
+        "plan-capture-gate",
+        "datafusion-integration",
+        "package-smoke",
+        "dist-artifact",
+        "dependency-audit",
+    )
+    count = 0
+    for name in payload:
+        assert jobs[name]["runs-on"] == "ubuntu-latest"
+        matrix = jobs[name].get("strategy", {}).get("matrix", {})
+        count += prod(len(values) for values in matrix.values())
+    assert count == 10
+
+
+def test_native_binary_framing_remains_required_before_merge() -> None:
+    jobs = _jobs("ci.yml")
+    native = jobs["tpch-binary-framing"]
+    assert native["needs"] == "ci-paths"
+    assert native["if"] == "${{ needs.ci-paths.outputs.heavy-needed == 'true' }}"
+    assert native["runs-on"] == "${{ matrix.os }}"
+    assert native["timeout-minutes"] == 15
+    assert native["strategy"] == {
+        "fail-fast": False,
+        "matrix": {"os": ["macos-latest", "windows-latest"]},
+    }
+    framing = next(
+        step for step in native["steps"] if step["name"] == "Verify bundled dbgen binaries emit clean framing"
+    )
+    assert framing["run"] == (
+        "uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -v"
+    )
+    assert not native.get("continue-on-error")
+    assert not framing.get("continue-on-error")
+    assert "tpch-binary-framing" in jobs["core"]["needs"]
+    core_text = "\n".join(step.get("run", "") for step in jobs["core"]["steps"])
+    assert "--expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }}" in core_text
+
+
+def test_three_os_nightly_cells_retain_raw_framing_guard() -> None:
+    matrix = _jobs("nightly-v2.yml")["matrix"]
+    assert set(matrix["strategy"]["matrix"]["os"]) == {"ubuntu-latest", "macos-latest", "windows-latest"}
+    framing = next(
+        step for step in matrix["steps"] if step["name"] == "Verify bundled dbgen binaries emit clean framing"
+    )
+    assert framing["if"] == "matrix.python-version == '3.12'"
+    assert (
+        framing["run"]
+        == "uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m slow -v"
+    )
+    assert not framing.get("continue-on-error")
+    from tests.unit.core.tpch.test_tpch_dbgen_framing_binaries import _assert_no_trailing_delimiter
+
+    with pytest.raises(AssertionError, match="trailing"):
+        _assert_no_trailing_delimiter(["1|ARGENTINA|1|comment|"], "raw fixture")

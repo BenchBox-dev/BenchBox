@@ -716,7 +716,7 @@ to all endpoints; authenticated requests receive higher limits.
 
 All API responses use a consistent envelope:
 
-```json
+```text
 {
   "data": { ... },
   "error": null,
@@ -729,7 +729,7 @@ All API responses use a consistent envelope:
 
 Error responses set `data: null` and populate `error`:
 
-```json
+```text
 {
   "data": null,
   "error": {

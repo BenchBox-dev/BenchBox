@@ -78,6 +78,7 @@ FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
 # timeout, so its wall time is tracked here to make the next resize proactive
 # rather than a reaction to a cancelled job (see ci.yml medium-test).
 MEDIUM_TEST_JOB_NAME = "medium-test"
+MEDIUM_SHARD_JOB_NAMES = ("medium-test (shard 0)", "medium-test (shard 1)")
 API_RETRY_ATTEMPTS = 3
 # Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
 # keys stay unchanged so current consumers keep working.
@@ -402,10 +403,39 @@ def touched_fast_test_lane_policy(client: GitHubClient, number: int) -> bool:
     return any(f.get("filename") == FAST_LANE_POLICY_PATH for f in files)
 
 
+def _partitioned_medium_seconds(jobs: list[dict]) -> float | None:
+    """Measure the complete collection-to-last-shard wall time, excluding censored runs."""
+    names = ("medium-collect", *MEDIUM_SHARD_JOB_NAMES)
+    selected = [job for job in jobs if job.get("name") in names or str(job.get("name")).startswith("medium-test (")]
+    if len(selected) != len(names) or {job.get("name") for job in selected} != set(names):
+        return None
+    intervals = {}
+    for job in selected:
+        if job.get("status") != "completed" or job.get("conclusion") != "success":
+            return None
+        if not isinstance(job.get("started_at"), str) or not isinstance(job.get("completed_at"), str):
+            return None
+        try:
+            started = _iso_to_dt(job["started_at"])
+            completed = _iso_to_dt(job["completed_at"])
+            if completed < started:
+                return None
+        except (KeyError, TypeError, ValueError):
+            return None
+        intervals[job["name"]] = (started, completed)
+    collector_start, collector_end = intervals["medium-collect"]
+    try:
+        if any(intervals[name][0] < collector_end for name in MEDIUM_SHARD_JOB_NAMES):
+            return None
+        return (max(intervals[name][1] for name in MEDIUM_SHARD_JOB_NAMES) - collector_start).total_seconds()
+    except TypeError:
+        return None
+
+
 def first_pass_green_and_job_seconds(
     client: GitHubClient, head_ref: str
 ) -> tuple[bool | None, float | None, float | None]:
-    """First "Develop PR" run on head_ref: (green?, fast-test seconds, medium-test seconds)."""
+    """First CI run on head_ref: (green?, fast-test seconds, complete medium-lane seconds)."""
     runs = client.get_paginated(
         f"/repos/{client.repo}/actions/runs?branch={head_ref}&event=pull_request",
         item_key="workflow_runs",
@@ -432,7 +462,10 @@ def first_pass_green_and_job_seconds(
             # timestamps. They are censored observations, not completed lane
             # runtimes, so keep them out of the p95 distribution.
             seconds_by_job.setdefault(name, (completed - started).total_seconds())
-    return green, seconds_by_job.get(FAST_TEST_JOB_NAME), seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
+    medium_seconds = seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
+    if any(str(job.get("name")).startswith("medium-test (") or job.get("name") == "medium-collect" for job in jobs):
+        medium_seconds = _partitioned_medium_seconds(jobs)
+    return green, seconds_by_job.get(FAST_TEST_JOB_NAME), medium_seconds
 
 
 def event_fanout_for_pr(client: GitHubClient, pr: dict) -> dict:
