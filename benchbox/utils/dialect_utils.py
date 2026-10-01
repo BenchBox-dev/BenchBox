@@ -273,6 +273,40 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
     )
 
 
+def _fold_sqlite_discount_bounds(query: str) -> str:
+    """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic."""
+    # Most SQLite queries need no extra parse. The AST, not this hint, selects rewrites.
+    if not re.search(r"\bl_discount\b", query, re.IGNORECASE) or not re.search(r"\bBETWEEN\b", query, re.IGNORECASE):
+        return query
+
+    import sqlglot
+    from sqlglot import exp
+    from sqlglot.optimizer.simplify import simplify
+
+    tree = sqlglot.parse_one(query, read="sqlite")
+    changed = False
+    for between in tree.find_all(exp.Between):
+        if not isinstance(between.this, exp.Column) or between.this.name.lower() != "l_discount":
+            continue
+        bounds = [between.args["low"], between.args["high"]]
+        if not all(
+            isinstance(bound.unnest(), (exp.Add, exp.Sub))
+            and all(
+                isinstance(node, (exp.Add, exp.Sub, exp.Paren)) or (isinstance(node, exp.Literal) and node.is_number)
+                for node in bound.walk()
+            )
+            for bound in bounds
+        ):
+            continue
+        # Simplify copies of the isolated bounds only, never the query or its predicates.
+        folded = [simplify(bound.copy()) for bound in bounds]
+        if all(isinstance(bound, exp.Literal) and bound.is_number for bound in folded):
+            between.set("low", folded[0])
+            between.set("high", folded[1])
+            changed = True
+    return tree.sql(dialect="sqlite") if changed else query
+
+
 def _fix_sqlite_unsupported_syntax(query: str) -> str:
     """Rewrite SQLGlot output that SQLite cannot execute."""
 
@@ -327,13 +361,14 @@ def _fix_sqlite_unsupported_syntax(query: str) -> str:
         expression = match.group("expression").strip()
         return f"STRFTIME('{trunc_formats[unit]}', {expression})"
 
-    return re.sub(
+    query = re.sub(
         r"\bDATE_TRUNC\s*\(\s*['\"](?P<unit>YEAR|MONTH|DAY|HOUR|MINUTE|SECOND)['\"]\s*,\s*"
         r"(?P<expression>[^(),]+?)\s*\)",
         replace_date_trunc,
         query,
         flags=re.IGNORECASE,
     )
+    return _fold_sqlite_discount_bounds(query)
 
 
 def normalize_dialect_for_sqlglot(dialect: str) -> str:

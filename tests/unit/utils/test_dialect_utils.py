@@ -24,6 +24,152 @@ pytestmark = [
 ]
 
 
+class TestSQLiteDiscountBoundaries:
+    def test_qualified_nested_bounds_and_translation_metadata(self):
+        import sqlglot
+
+        query = (
+            "SELECT 0.06 + 0.01 FROM lineitem AS l "
+            "WHERE l.l_discount BETWEEN (0.06 - 0.02 + 0.01) AND (0.06 + 0.02 - 0.01)"
+        )
+        with sql_translation_context(strict=True) as outcomes:
+            translated = translate_sql_query(query, target_dialect="sqlite")
+        expected = "SELECT 0.06 + 0.01 FROM lineitem AS l WHERE l.l_discount BETWEEN 0.05 AND 0.07"
+        expected_tree = sqlglot.parse_one(expected, read="sqlite")
+        assert sqlglot.parse_one(translated, read="sqlite") == sqlglot.parse_one(
+            expected_tree.sql(dialect="sqlite", identify=True), read="sqlite"
+        )
+        assert len(outcomes) == 1
+        assert outcomes[0].status == "success"
+        assert outcomes[0].normalized_target_dialect == "sqlite"
+        assert outcomes[0].query_fingerprint
+
+    @pytest.mark.parametrize("center, low, high", [("0.06", "0.05", "0.07"), ("0.07", "0.06", "0.08")])
+    def test_only_discount_bounds_are_folded(self, center, low, high):
+        import sqlglot
+        from sqlglot import exp
+
+        query = (
+            f"SELECT 0.06 + 0.01 AS untouched FROM lineitem "
+            f"WHERE l_discount BETWEEN {center} - 0.01 AND {center} + 0.01 AND l_quantity < 25"
+        )
+        actual = sqlglot.parse_one(translate_sql_query(query, target_dialect="sqlite"), read="sqlite")
+        expected = sqlglot.parse_one(
+            f"SELECT 0.06 + 0.01 AS untouched FROM lineitem "
+            f"WHERE l_discount BETWEEN {low} AND {high} AND l_quantity < 25",
+            read="sqlite",
+        )
+        assert actual == sqlglot.parse_one(expected.sql(dialect="sqlite", identify=True), read="sqlite")
+        between = actual.find(exp.Between)
+        assert isinstance(between.args["low"], exp.Literal)
+        assert isinstance(between.args["high"], exp.Literal)
+
+    @pytest.mark.parametrize(
+        "predicate",
+        [
+            "l_discount BETWEEN center - 0.01 AND 0.06 + 0.01",
+            "l_discount BETWEEN 0.06 - 0.01 AND center + 0.01",
+            "other_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
+            "l_discount > 0.06 + 0.01",
+            "l_discount BETWEEN '0.06' - 0.01 AND '0.06' + 0.01",
+            "l_discount BETWEEN 0.06 * 0.01 AND 0.06 + 0.01",
+            "l_discount BETWEEN 0.05 AND 0.06 + 0.01",
+            "l_discount BETWEEN 0.06 - 0.01 AND 0.07",
+        ],
+    )
+    def test_unrelated_or_nonliteral_expressions_are_unchanged(self, predicate):
+        from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
+
+        query = f"SELECT 0.06 + 0.01 FROM lineitem WHERE {predicate}"
+        assert _fix_sqlite_unsupported_syntax(query) == query
+
+    @pytest.mark.parametrize("dialect", ["duckdb", "postgres", "mysql"])
+    def test_non_sqlite_bounds_are_unchanged(self, dialect):
+        import sqlglot
+        from sqlglot import exp
+
+        query = "SELECT * FROM lineitem WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01"
+        actual = sqlglot.parse_one(translate_sql_query(query, target_dialect=dialect), read=dialect)
+        between = actual.find(exp.Between)
+        assert isinstance(between.args["low"], exp.Sub)
+        assert isinstance(between.args["high"], exp.Add)
+
+    @pytest.mark.parametrize("surface", ["seed42", "bulk"])
+    def test_public_q6_real_sqlite_duckdb_parity(self, surface):
+        from decimal import Decimal
+
+        import duckdb
+
+        from benchbox.core.tpch.benchmark import TPCHBenchmark
+        from benchbox.platforms.sqlite import SQLiteAdapter
+
+        benchmark = TPCHBenchmark(scale_factor=0.01)
+        if surface == "seed42":
+            queries = {
+                dialect: benchmark.get_query(6, seed=42, scale_factor=0.01, dialect=dialect)
+                for dialect in ("sqlite", "duckdb")
+            }
+            shipdate = "1997-06-01"
+        else:
+            queries = {
+                "sqlite": benchmark.get_queries(dialect="sqlite")["6"],
+                "duckdb": benchmark.get_query(6, dialect="duckdb"),
+            }
+            assert queries["sqlite"] == benchmark.get_query(6, dialect="sqlite")
+            shipdate = "1994-06-01"
+        adapter = SQLiteAdapter(database_path=":memory:")
+        sqlite = adapter.create_connection()
+        reference = duckdb.connect(":memory:")
+        rows = [("100.00", discount, shipdate, "1.00") for discount in ("0.04", "0.05", "0.06", "0.07", "0.08")]
+        try:
+            for connection in (sqlite, reference):
+                connection.execute(
+                    "CREATE TABLE lineitem (l_extendedprice DECIMAL(15,2), l_discount DECIMAL(15,2), "
+                    "l_shipdate DATE, l_quantity DECIMAL(15,2))"
+                )
+                connection.executemany("INSERT INTO lineitem VALUES (?, ?, ?, ?)", rows)
+            result = adapter.execute_query(sqlite, queries["sqlite"], "6", validate_row_count=False)
+            expected = reference.execute(queries["duckdb"]).fetchall()
+            assert expected == [(Decimal("18.0000"),)]
+            assert result["results"] == [(18.0,)]
+            assert [(Decimal(str(value)),) for (value,) in result["results"]] == expected
+        finally:
+            sqlite.close()
+            reference.close()
+
+    @pytest.mark.parametrize(
+        "center, discounts, expected",
+        [
+            ("0.06", ("0.04", "0.05", "0.06", "0.07", "0.08"), 18),
+            ("0.07", ("0.05", "0.06", "0.07", "0.08", "0.09"), 21),
+        ],
+    )
+    def test_real_engine_boundary_membership(self, center, discounts, expected):
+        import duckdb
+
+        from benchbox.platforms.sqlite import SQLiteAdapter
+
+        adapter = SQLiteAdapter(database_path=":memory:")
+        sqlite = adapter.create_connection()
+        reference = duckdb.connect(":memory:")
+        source = f"SELECT l_discount BETWEEN {center} - 0.01 AND {center} + 0.01 FROM lineitem ORDER BY l_discount"
+        aggregate = (
+            f"SELECT SUM(100 * l_discount) FROM lineitem WHERE l_discount BETWEEN {center} - 0.01 AND {center} + 0.01"
+        )
+        try:
+            for connection in (sqlite, reference):
+                connection.execute("CREATE TABLE lineitem (l_discount DECIMAL(15,2))")
+                connection.executemany("INSERT INTO lineitem VALUES (?)", [(value,) for value in discounts])
+            for source_query, expected_rows in [(source, [(0,), (1,), (1,), (1,), (0,)]), (aggregate, [(expected,)])]:
+                actual = adapter.execute_query(
+                    sqlite, translate_sql_query(source_query, target_dialect="sqlite"), "6", validate_row_count=False
+                )["results"]
+                assert actual == reference.execute(source_query).fetchall() == expected_rows
+        finally:
+            sqlite.close()
+            reference.close()
+
+
 class TestDialectNormalization:
     """Test dialect normalization for SQLGlot compatibility."""
 
