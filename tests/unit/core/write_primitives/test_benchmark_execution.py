@@ -2541,3 +2541,24 @@ def test_population_sql_runs_one_statement_per_call_on_databricks(fast_bench):
     assert all(stmt.upper().startswith("INSERT INTO") for stmt in connection.statements)
     # Databricks rejects VARCHAR without a length, so the fingerprint casts to STRING.
     assert all("AS STRING)" in stmt and "AS VARCHAR)" not in stmt for stmt in connection.statements)
+
+
+def test_setup_force_replaces_tables_in_place_on_databricks(fast_bench, fast_conn):
+    """Databricks rebuilds staging with CREATE OR REPLACE and never drops tables.
+
+    Unity Catalog counts dropped tables against the metastore quota for about
+    seven days, so a drop-and-create rebuild exhausts small quotas.
+    """
+    with (
+        patch.object(fast_bench, "_acquire_setup_lock", return_value=True),
+        patch.object(fast_bench, "_release_setup_lock"),
+        patch.object(fast_bench, "_table_exists", return_value=True),
+        patch.object(fast_bench, "_populate_staging_tables", return_value={}),
+    ):
+        result = fast_bench.setup(fast_conn, force=True, dialect="databricks")
+
+    assert result["success"] is True
+    executed = [str(c.args[0]) for c in fast_conn.execute.call_args_list if c.args]
+    staging_drops = [s for s in executed if s.startswith("DROP TABLE") and "manifest" not in s.lower()]
+    assert staging_drops == []
+    assert any(s.startswith("CREATE OR REPLACE TABLE") for s in executed)

@@ -852,3 +852,22 @@ class TestAdapterSummarizePerformance:
         # _extract returns None/default for those, so counts are computed but timing is None
         assert summary["total_queries"] == 1
         assert summary["average_query_time_ms"] is None
+
+
+def test_remove_database_prefers_in_place_reset_over_drop(adapter):
+    adapter.reset_database_in_place = Mock(return_value=True)
+    adapter.drop_database = Mock()
+
+    adapter._remove_database(False, "", schema="s")
+
+    adapter.reset_database_in_place.assert_called_once_with(schema="s")
+    adapter.drop_database.assert_not_called()
+
+
+def test_remove_database_drops_when_in_place_reset_declines(adapter):
+    adapter.reset_database_in_place = Mock(return_value=False)
+    adapter.drop_database = Mock()
+
+    adapter._remove_database(False, "", schema="s")
+
+    adapter.drop_database.assert_called_once_with(schema="s")

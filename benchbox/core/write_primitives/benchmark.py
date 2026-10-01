@@ -27,6 +27,8 @@ from benchbox.core.primitives_benchmark_utils import (
     failed_platform_error,
     fetch_count_probe,
     quote_identifier_for_dialect,
+    replace_table_sql,
+    replaces_tables_in_place,
     summarize_validation_failures,
     table_exists,
 )
@@ -881,10 +883,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             rebuild = force or not self._staging_manifest_matches(connection, required_tables)
 
             # Drop existing staging tables when rebuilding (done once before loop)
+            replace_in_place = rebuild and replaces_tables_in_place(dialect)
             if rebuild:
                 reason = "force mode" if force else "stale/absent staging manifest"
                 self._drop_legacy_staging_manifests(connection)
-                for table_name in STAGING_TABLES:
+                for table_name in [] if replace_in_place else STAGING_TABLES:
                     try:
                         quoted = self._quote_identifier(table_name)
                         connection.execute(f"DROP TABLE IF EXISTS {quoted}")
@@ -896,7 +899,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             created_tables = []
             for table_name in STAGING_TABLES:
                 table_existed = self._table_exists(connection, table_name)
-                create_sql = get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
+                create_sql = (
+                    replace_table_sql(get_create_table_sql(table_name, dialect=dialect))
+                    if replace_in_place
+                    else get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
+                )
                 try:
                     create_res = connection.execute(create_sql)
                     if (err := failed_platform_error(create_res)) is not None:

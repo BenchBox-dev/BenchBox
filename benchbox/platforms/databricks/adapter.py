@@ -1165,6 +1165,37 @@ class DatabricksAdapter(PlatformAdapter):
             if "connection" in locals():
                 connection.close()
 
+    def reset_database_in_place(self, **connection_config) -> bool:
+        """Truncate the schema's tables instead of dropping the schema.
+
+        Unity Catalog keeps dropped tables recoverable for about seven days,
+        and they count against the metastore table quota until then, so a
+        drop-and-recreate on every reload exhausts small quotas. Schema
+        creation replaces tables with ``CREATE OR REPLACE``, which does not add
+        to the quota. Tables created with ``IF NOT EXISTS`` keep their
+        structure and start empty. Returns False, and the caller drops the
+        schema as before, when the schema is absent or any table cannot be
+        truncated.
+        """
+        catalog = connection_config.get("catalog", self.catalog)
+        schema = connection_config.get("schema", self.schema)
+        connection = None
+        try:
+            connection = self._create_admin_connection(**connection_config)
+            cursor = connection.cursor()
+            cursor.execute(f"SHOW TABLES IN {catalog}.{schema}")
+            tables = [row[1] for row in cursor.fetchall() if not (len(row) > 2 and row[2])]
+            for table in tables:
+                cursor.execute(f"TRUNCATE TABLE {catalog}.{schema}.`{table}`")
+            self.log_verbose(f"Truncated {len(tables)} tables in {catalog}.{schema} for reload")
+            return True
+        except Exception as e:
+            self.log_verbose(f"In-place reset of {catalog}.{schema} failed, dropping instead: {e}")
+            return False
+        finally:
+            if connection is not None:
+                connection.close()
+
     def drop_database(self, **connection_config) -> None:
         """Drop schema in Databricks catalog."""
         try:
