@@ -20,7 +20,13 @@ from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
     BasisAvailability,
+    BundleContainerBlock,
+    BundleDocument,
+    BundleLogicalProfile,
+    BundlePlatformRuntime,
+    BundleTuningBlock,
     DetailResult,
+    ExplorerEnvironment,
     ManifestEntry,
     PercentileStats,
     QueryDisplayTiming,
@@ -308,6 +314,17 @@ def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
     return data, raw
 
 
+def _parse_bundle(data: dict[str, Any]) -> BundleDocument:
+    """Parse validated bundle data into the typed ingest document.
+
+    Callers pass the raw bundle mapping (source or anonymized public lane);
+    the schema gate must already have accepted it via
+    ``_ensure_explorer_input_schema``. All field extractors below take the
+    resulting document, never raw mappings.
+    """
+    return BundleDocument.model_validate(data)
+
+
 def _ensure_explorer_input_schema(data: dict[str, Any]) -> None:
     """Reject unsupported bundles before explorer field projection starts."""
     decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
@@ -353,7 +370,7 @@ def _run_date_from_timestamp(timestamp: object) -> str:
     return timestamp[:10].replace("-", "")
 
 
-def _driver_version(data: dict[str, Any]) -> str | None:
+def _driver_version(bundle: BundleDocument) -> str | None:
     """Extract the package version used to identify a DuckDB run.
 
     DuckDB development wheels can report an internal engine build string from
@@ -362,11 +379,8 @@ def _driver_version(data: dict[str, Any]) -> str | None:
     is the stable comparison identity; the raw bundle still retains the actual
     engine string for auditability.
     """
-    execution = data.get("execution", {})
-    if not isinstance(execution, dict):
-        execution = {}
-    platform = data.get("platform", {})
-    is_duckdb = isinstance(platform, dict) and str(platform.get("name", "")).lower() == "duckdb"
+    execution = bundle.execution
+    is_duckdb = str(bundle.platform.name).lower() == "duckdb"
     if is_duckdb:
         for key in (
             "driver_version_resolved",
@@ -374,10 +388,10 @@ def _driver_version(data: dict[str, Any]) -> str | None:
             "driver_resolved_version",
             "driver_requested_version",
         ):
-            val = execution.get(key)
+            val = getattr(execution, key)
             if val and isinstance(val, str):
                 return val
-        client_version = platform.get("client_version") if isinstance(platform, dict) else None
+        client_version = bundle.platform.client_version
         if client_version and isinstance(client_version, str) and client_version != "unknown":
             return client_version
     for key in (
@@ -388,43 +402,36 @@ def _driver_version(data: dict[str, Any]) -> str | None:
         "driver_resolved_version",
         "driver_requested_version",
     ):
-        val = execution.get(key)
+        val = getattr(execution, key)
         if val and isinstance(val, str):
             return val
     return None
 
 
-def _power_score(data: dict[str, Any]) -> float | None:
+def _power_score(bundle: BundleDocument) -> float | None:
     """Extract TPC power@size metric from a schema-v2 bundle."""
-    summary = data.get("summary", {})
-    tpc = summary.get("tpc_metrics", {}) if isinstance(summary, dict) else {}
-    if isinstance(tpc, dict):
-        for key in ("power_at_size", "qphh_at_size", "qphds_at_size"):
-            val = tpc.get(key)
-            if val is not None:
-                try:
-                    return float(val)
-                except (TypeError, ValueError):
-                    pass
+    tpc = bundle.summary.tpc_metrics
+    for key in ("power_at_size", "qphh_at_size", "qphds_at_size"):
+        val = getattr(tpc, key)
+        if val is not None:
+            try:
+                return float(val)
+            except (TypeError, ValueError):
+                pass
     return None
 
 
-def _geomean_ms(data: dict[str, Any]) -> float | None:
+def _geomean_ms(bundle: BundleDocument) -> float | None:
     """Compute geometric mean of measurement-query execution times in milliseconds.
 
     Uses only queries with run_type="measurement" (or all when run_type is absent).
     Returns None if no valid positive timings exist.
     """
-    raw_queries: list[dict[str, Any]] = data.get("queries", [])
     values: list[float] = []
-    for q in raw_queries:
-        if not isinstance(q, dict):
+    for q in bundle.queries:
+        if q.run_type is not None and q.run_type != "measurement":
             continue
-        run_type = q.get("run_type")
-        if run_type is not None and run_type != "measurement":
-            continue
-        ms_raw = q.get("ms")
-        duration_ms_raw = ms_raw if ms_raw is not None else q.get("execution_time_ms")
+        duration_ms_raw = q.ms if q.ms is not None else q.execution_time_ms
         if duration_ms_raw is None:
             continue
         try:
@@ -441,30 +448,30 @@ def _geomean_ms(data: dict[str, Any]) -> float | None:
 _FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
 
 
-def _funding(data: dict[str, Any]) -> str:
+def _funding(bundle: BundleDocument) -> str:
     """Extract the funding disclosure from a bundle's provenance block.
 
     Returns the normalized funding value, defaulting to "unspecified" when the
     bundle declares no provenance or an unrecognized value. Kept in lockstep with
     benchbox/core/results/provenance.py::FUNDING_SOURCES.
     """
-    provenance = data.get("provenance")
-    if not isinstance(provenance, dict):
-        return "unspecified"
-    token = str(provenance.get("funding") or "").strip().lower()
+    token = str(bundle.provenance.funding or "").strip().lower()
     return token if token in _FUNDING_SOURCES else "unspecified"
 
 
-def _platform_version(data: dict[str, Any]) -> str | None:
+def _platform_version(bundle: BundleDocument) -> str | None:
     """Extract platform version from schema-v2 bundle."""
-    platform = data.get("platform", {})
-    if not isinstance(platform, dict):
-        return None
-    val = platform.get("version")
+    val = bundle.platform.version
     return str(val) if val and val != "unknown" else None
 
 
-#: Ordered key paths consulted for a bundle's SQL-vs-DataFrame execution mode.
+#: Values a bundle may legitimately carry for execution mode.
+_EXECUTION_MODES = frozenset({"sql", "dataframe"})
+
+#: Documented lookup order for a bundle's SQL-vs-DataFrame execution mode, kept
+#: in lockstep with the candidate list in :func:`_execution_mode`:
+#: ``config.execution_mode``, ``platform.config.execution_mode``,
+#: ``config.mode``, ``execution.execution_mode``.
 #:
 #: Measured against all 207 published bundles on 2026-08-23:
 #:   - ``config.execution_mode`` and ``execution.execution_mode`` are the
@@ -478,39 +485,32 @@ def _platform_version(data: dict[str, Any]) -> str | None:
 #:
 #: ``execution.mode`` is deliberately NOT consulted: it reads "sql" for 105
 #: DataFrame runs, so using it would label more than half the corpus wrongly.
-_EXECUTION_MODE_KEY_PATHS: tuple[tuple[str, ...], ...] = (
-    ("config", "execution_mode"),
-    ("platform", "config", "execution_mode"),
-    ("config", "mode"),
-    ("execution", "execution_mode"),
-)
-
-#: Values a bundle may legitimately carry for execution mode.
-_EXECUTION_MODES = frozenset({"sql", "dataframe"})
 
 
-def _execution_mode(data: dict[str, Any]) -> str | None:
+def _execution_mode(bundle: BundleDocument) -> str | None:
     """Extract execution mode (sql/dataframe) from a schema-v2 bundle.
 
-    Walks :data:`_EXECUTION_MODE_KEY_PATHS` in order and returns the first
+    Consults the documented locations in order and returns the first
     recognized value. A bundle that records no mode, or records something
     outside the known vocabulary, stays ``None`` rather than being guessed --
     an invented mode would label a DataFrame result as SQL, which is worse
     than an honestly empty facet.
     """
-    for path in _EXECUTION_MODE_KEY_PATHS:
-        node: Any = data
-        for key in path:
-            if not isinstance(node, dict):
-                node = None
-                break
-            node = node.get(key)
+    # Lookup order (see the module comment above): config.execution_mode,
+    # platform.config.execution_mode, config.mode, execution.execution_mode.
+    candidates: list[Any] = [
+        bundle.config.execution_mode,
+        bundle.platform.config.execution_mode,
+        bundle.config.mode,
+        bundle.execution.execution_mode,
+    ]
+    for node in candidates:
         if node and str(node).lower() in _EXECUTION_MODES:
             return str(node).lower()
     return None
 
 
-def _tuning_mode(data: dict[str, Any]) -> str | None:
+def _tuning_mode(bundle: BundleDocument) -> str | None:
     """Extract tuning mode from a schema-v2 bundle.
 
     Reads ``config.tuning_mode`` first (the current schema location), falling
@@ -530,20 +530,16 @@ def _tuning_mode(data: dict[str, Any]) -> str | None:
     (``None`` here; the explorer surfaces that as the "Not Recorded" state)
     rather than silently reclassified.
     """
-    config = data.get("config", {})
-    if isinstance(config, dict):
-        val = config.get("tuning_mode")
-        if val and is_canonical_mode(str(val)):
-            return str(val)
-    execution = data.get("execution", {})
-    if isinstance(execution, dict):
-        val = execution.get("tuning_mode")
-        if val and is_canonical_mode(str(val)):
-            return str(val)
+    config = bundle.config
+    if config.tuning_mode and is_canonical_mode(str(config.tuning_mode)):
+        return str(config.tuning_mode)
+    execution = bundle.execution
+    if execution.tuning_mode and is_canonical_mode(str(execution.tuning_mode)):
+        return str(execution.tuning_mode)
     return None
 
 
-def _tuning_hash(data: dict[str, Any]) -> str | None:
+def _tuning_hash(bundle: BundleDocument) -> str | None:
     """Compute a stable 8-char hash of the tuning configuration.
 
     Only machine-readable tuning detail is hashed: a dict is hashed
@@ -555,13 +551,12 @@ def _tuning_hash(data: dict[str, Any]) -> str | None:
     its own when no machine-readable detail is present. Returns None when
     there is neither a mode nor machine-readable detail to hash.
     """
-    mode = _tuning_mode(data)
-    config = data.get("config", {})
+    mode = _tuning_mode(bundle)
+    config = bundle.config
     tuning_detail: dict[str, Any] | None = None
-    if isinstance(config, dict):
-        raw_detail = config.get("tuning_config") or config.get("tuning")
-        if isinstance(raw_detail, dict):
-            tuning_detail = raw_detail
+    raw_detail = config.tuning_config or config.tuning
+    if isinstance(raw_detail, dict):
+        tuning_detail = raw_detail
         # Non-dict detail (e.g. a repr() string) is intentionally not hashed:
         # it is not canonical, so cosmetic differences would change the hash
         # even when the underlying tuning configuration is identical.
@@ -571,22 +566,19 @@ def _tuning_hash(data: dict[str, Any]) -> str | None:
     return hashlib.sha256(payload.encode()).hexdigest()[:8]
 
 
-def _tuning_summary(data: dict[str, Any]) -> dict[str, Any] | None:
-    """Return the ``platform.tuning`` summary block, or None when absent.
+def _tuning_summary(bundle: BundleDocument) -> BundleTuningBlock:
+    """Return the ``platform.tuning`` summary block.
 
     This is the per-platform tuning summary emitted by
     ``benchbox/core/results/schema.py::_build_tuning_summary`` -- the same
-    block that carries ``logical_profile`` (see ``_logical_profile``). None
-    for legacy bundles that never recorded a tuning summary.
+    block that carries ``logical_profile`` (see ``_logical_profile``). The
+    document always carries a (possibly empty) block; extractors read
+    ``None`` fields off it for legacy bundles that never recorded a summary.
     """
-    platform = data.get("platform", {})
-    if not isinstance(platform, dict):
-        return None
-    tuning = platform.get("tuning", {})
-    return tuning if isinstance(tuning, dict) else None
+    return bundle.platform.tuning
 
 
-def _requested_config_hash(data: dict[str, Any]) -> str | None:
+def _requested_config_hash(bundle: BundleDocument) -> str | None:
     """Ingest the ADR-1 canonical requested-config hash from the bundle.
 
     Read verbatim from ``platform.tuning.requested_config_hash`` (emitted by
@@ -594,14 +586,11 @@ def _requested_config_hash(data: dict[str, Any]) -> str | None:
     that predate the field. Display-only, like ``tuning_hash`` -- never a
     join/dedup/grouping key.
     """
-    summary = _tuning_summary(data)
-    if summary is None:
-        return None
-    val = summary.get("requested_config_hash")
-    return str(val) if val else None
+    summary = _tuning_summary(bundle)
+    return summary.requested_config_hash
 
 
-def _applied_ledger_hash(data: dict[str, Any]) -> str | None:
+def _applied_ledger_hash(bundle: BundleDocument) -> str | None:
     """Ingest the ADR-1 physical applied-ledger hash from the bundle.
 
     Read verbatim from ``platform.tuning.applied_ledger_hash`` (emitted by
@@ -609,14 +598,11 @@ def _applied_ledger_hash(data: dict[str, Any]) -> str | None:
     recomputed here. None for legacy bundles, or new-generation bundles whose
     applied ledger recorded no executed statements. Display-only.
     """
-    summary = _tuning_summary(data)
-    if summary is None:
-        return None
-    val = summary.get("applied_ledger_hash")
-    return str(val) if val else None
+    summary = _tuning_summary(bundle)
+    return summary.applied_ledger_hash
 
 
-def _tuning_validation_status(data: dict[str, Any]) -> str | None:
+def _tuning_validation_status(bundle: BundleDocument) -> str | None:
     """Ingest the ADR-1 tuning verified-state from the bundle.
 
     Read verbatim from ``platform.tuning.validation_status`` (emitted by
@@ -627,34 +613,22 @@ def _tuning_validation_status(data: dict[str, Any]) -> str | None:
     catalog. ``None`` for legacy bundles predating the field -- the explorer
     treats absence as "unknown". Display-only; never a join/match key.
     """
-    summary = _tuning_summary(data)
-    if summary is None:
-        return None
-    val = summary.get("validation_status")
-    return str(val) if val else None
+    summary = _tuning_summary(bundle)
+    return summary.validation_status
 
 
-def _has_requested_tuning(bundle_data: dict[str, Any] | None) -> bool:
+def _has_requested_tuning(bundle: BundleDocument | None) -> bool:
     """Return True when the bundle carries a requested-tuning block of its own."""
-    if not isinstance(bundle_data, dict):
+    if bundle is None:
         return False
-    platform = bundle_data.get("platform")
-    tuning = platform.get("tuning") if isinstance(platform, dict) else None
-    if not isinstance(tuning, dict):
-        return False
-    return bool(tuning.get("requested"))
+    return bool(bundle.platform.tuning.requested)
 
 
-def _inline_applied_receipt(bundle_data: dict[str, Any] | None) -> Any:
+def _inline_applied_receipt(bundle: BundleDocument | None) -> Any:
     """Return the receipt carried inside the bundle, or None when it has none."""
-    if not isinstance(bundle_data, dict):
+    if bundle is None:
         return None
-    platform = bundle_data.get("platform")
-    tuning = platform.get("tuning") if isinstance(platform, dict) else None
-    applied = tuning.get("applied") if isinstance(tuning, dict) else None
-    if not isinstance(applied, dict):
-        return None
-    return applied.get("receipt")
+    return bundle.platform.tuning.applied.receipt
 
 
 def _companion_applied_receipt(bundle_path: Path) -> tuple[Any, bool]:
@@ -726,7 +700,7 @@ def _override_display(bundle_path: Path) -> dict[str, Any]:
     }
 
 
-def _applied_receipt(bundle_path: Path, bundle_data: dict[str, Any] | None = None) -> str | None:
+def _applied_receipt(bundle_path: Path, bundle: BundleDocument | None = None) -> str | None:
     """Ingest the per-statement introspection receipt for a run.
 
     The receipt is the post-load introspection record that earns the
@@ -746,7 +720,7 @@ def _applied_receipt(bundle_path: Path, bundle_data: dict[str, Any] | None = Non
     the exception: already-published legacy data is bounded defensively and
     stored with an explicit truncation marker rather than being silently dropped.
     """
-    receipt = _inline_applied_receipt(bundle_data)
+    receipt = _inline_applied_receipt(bundle)
     if receipt is None:
         receipt, already_serialized = _companion_applied_receipt(bundle_path)
         if already_serialized:
@@ -769,7 +743,7 @@ def _applied_receipt(bundle_path: Path, bundle_data: dict[str, Any] | None = Non
         return None
 
 
-def _tuning_policy_generation(data: dict[str, Any]) -> str | None:
+def _tuning_policy_generation(bundle: BundleDocument) -> str | None:
     """Ingest the ADR-3 explicit tuning-policy generation marker from the bundle.
 
     Read verbatim from ``platform.tuning.tuning_policy_generation`` (emitted by
@@ -778,14 +752,11 @@ def _tuning_policy_generation(data: dict[str, Any]) -> str | None:
     explorer treats that absence as the "pre-seam" generation. Display-only,
     like the tuning hashes: never a join/dedup/grouping/match key.
     """
-    summary = _tuning_summary(data)
-    if summary is None:
-        return None
-    val = summary.get("tuning_policy_generation")
-    return str(val) if val else None
+    summary = _tuning_summary(bundle)
+    return summary.tuning_policy_generation
 
 
-def _logical_profile(data: dict[str, Any]) -> dict[str, Any] | None:
+def _logical_profile(bundle: BundleDocument) -> BundleLogicalProfile | None:
     """Extract the `platform.tuning.logical_profile` block (ADR-2 §3).
 
     Returns `None` when no logical profile was recorded at all (unknown --
@@ -795,17 +766,10 @@ def _logical_profile(data: dict[str, Any]) -> dict[str, Any] | None:
     to distinguish "unknown" from "recorded, just empty" for fields like
     physical_mechanisms (see `_physical_mechanisms`).
     """
-    platform = data.get("platform", {})
-    if not isinstance(platform, dict):
-        return None
-    tuning = platform.get("tuning", {})
-    if not isinstance(tuning, dict):
-        return None
-    profile = tuning.get("logical_profile")
-    return profile if isinstance(profile, dict) else None
+    return bundle.platform.tuning.logical_profile
 
 
-def _physical_mechanisms(data: dict[str, Any]) -> list[str] | None:
+def _physical_mechanisms(bundle: BundleDocument) -> list[str] | None:
     """Extract the platform-rendered physical tuning mechanisms.
 
     Tri-state (see `DetailResult.physical_mechanisms`): `None` when no
@@ -816,56 +780,64 @@ def _physical_mechanisms(data: dict[str, Any]) -> list[str] | None:
     unknown/legacy bundle compared against a genuinely zero-mechanism bundle
     look like a real mismatch instead of "nothing to compare".
     """
-    profile = _logical_profile(data)
+    profile = _logical_profile(bundle)
     if profile is None:
         return None
-    mechanisms = profile.get("physical_mechanisms", [])
+    mechanisms = profile.physical_mechanisms
+    if mechanisms is None:
+        # No mechanisms key recorded at all: the profile exists but says
+        # nothing about mechanisms. Treat like an empty recording -- a
+        # genuine, comparable value -- rather than unknown.
+        return []
     if not isinstance(mechanisms, list):
         return []
     return [str(item) for item in mechanisms]
 
 
-def _physical_rendering_id(data: dict[str, Any]) -> str | None:
+def _physical_rendering_id(bundle: BundleDocument) -> str | None:
     """Extract the physical rendering strategy id (ADR-2 §3 secondary facet)."""
-    profile = _logical_profile(data)
+    profile = _logical_profile(bundle)
     if profile is None:
         return None
-    val = profile.get("physical_rendering_id")
+    val = profile.physical_rendering_id
     return str(val) if val else None
 
 
-def _test_type(data: dict[str, Any]) -> str | None:
+def _test_type(bundle: BundleDocument) -> str | None:
     """Extract test type (power/throughput) from schema-v2 bundle."""
-    benchmark = data.get("benchmark", {})
-    if isinstance(benchmark, dict):
-        val = benchmark.get("test_type")
-        if val:
-            return str(val)
-    phases = data.get("phases", {})
-    if isinstance(phases, dict):
-        if phases.get("power_test"):
-            return "power"
-        if phases.get("throughput_test"):
-            return "throughput"
+    if bundle.benchmark.test_type:
+        return bundle.benchmark.test_type
+    # A present-but-empty phase block carries no evidence the phase ran;
+    # truthiness on the unset-excluded dump matches the historical
+    # raw-mapping check.
+    power_phase = bundle.phases.get("power_test")
+    if power_phase is not None and bool(power_phase.model_dump(exclude_unset=True)):
+        return "power"
+    throughput_phase = bundle.phases.get("throughput_test")
+    if throughput_phase is not None and bool(throughput_phase.model_dump(exclude_unset=True)):
+        return "throughput"
     return None
 
 
-def _validation_status(data: dict[str, Any]) -> str | None:
+def _validation_status(bundle: BundleDocument, raw: dict[str, Any]) -> str | None:
     """Extract validation status from schema-v2 bundle summary.
 
     Handles both string (``"passed"``) and dict (``{"status": "passed", ...}``)
-    forms of ``summary.validation``.
+    forms of ``summary.validation``. ``raw`` is the original bundle mapping
+    for the shared ``benchbox.core.results.status`` helpers, which still take
+    raw mappings.
     """
-    summary = data.get("summary", {})
-    if not isinstance(summary, dict):
+    val = bundle.summary.validation
+    failed_queries = bundle_failed_query_count(raw)
+    raw_summary = raw.get("summary")
+    if raw_summary is not None and not isinstance(raw_summary, dict):
+        # A non-object summary carries no validation evidence at all.
         return None
-    val = summary.get("validation")
-    failed_queries = bundle_failed_query_count(data)
     if isinstance(val, str):
         normalized = normalize_validation_status(val)
         if failed_queries and normalized in {None, "passed"}:
             return "partial"
-        if _translation_uncertain(data, normalized):
+        if _translation_uncertain(raw, normalized):
             return "uncertain"
         return normalized
     if isinstance(val, dict):
@@ -873,7 +845,7 @@ def _validation_status(data: dict[str, Any]) -> str | None:
         normalized = normalize_validation_status(s)
         if failed_queries and normalized in {None, "passed"}:
             return "partial"
-        if _translation_uncertain(data, normalized):
+        if _translation_uncertain(raw, normalized):
             return "uncertain"
         return normalized
     if failed_queries:
@@ -901,14 +873,20 @@ def _unavailable_normalized_cost() -> NormalizedCost:
     )
 
 
-def _raw_normalized_cost_block(data: dict[str, Any]) -> dict[str, Any] | None:
-    """Find a normalized cost block in current or near-future bundle shapes."""
-    raw = data.get("normalized_cost")
-    if isinstance(raw, dict):
-        return raw
+def _raw_normalized_cost_block(bundle: BundleDocument) -> dict[str, Any] | None:
+    """Find a normalized cost block in current or near-future bundle shapes.
 
-    cost = data.get("cost", {})
-    if not isinstance(cost, dict):
+    Presence is keyed on the field being set, not on the mapping being
+    non-empty: an explicitly empty ``"normalized_cost": {}`` block is
+    malformed submitted cost evidence and must reach strict validation
+    (which rejects it for missing provenance fields) rather than degrade
+    to synthetic unavailable metadata.
+    """
+    if bundle.normalized_cost is not None:
+        return bundle.normalized_cost
+
+    cost = bundle.cost
+    if cost is None:
         return None
 
     for key in ("normalized_cost", "normalized"):
@@ -983,9 +961,9 @@ def _normalized_cost_from_block(raw: dict[str, Any]) -> NormalizedCost:
     )
 
 
-def _normalized_cost(data: dict[str, Any]) -> NormalizedCost:
+def _normalized_cost(bundle: BundleDocument) -> NormalizedCost:
     """Extract normalized BenchBox cost or explicit unavailable metadata."""
-    raw = _raw_normalized_cost_block(data)
+    raw = _raw_normalized_cost_block(bundle)
     if raw is None:
         return _unavailable_normalized_cost()
     return _normalized_cost_from_block(raw)
@@ -996,10 +974,6 @@ def _cost_usd_alias(cost: NormalizedCost) -> float | None:
     if cost.cost_usd is None:
         return None
     return float(cost.cost_usd)
-
-
-def _mapping_or_empty(raw: Any) -> dict[str, Any]:
-    return raw if isinstance(raw, dict) else {}
 
 
 def _string_or_none(raw: Any) -> str | None:
@@ -1017,16 +991,15 @@ def _first_string(*values: Any) -> str | None:
     return None
 
 
-def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
+def _deployment_class_from_contract(bundle: BundleDocument) -> str | None:
     """Classify deployment from normalized runtime/deployment metadata only."""
-    environment = _mapping_or_empty(data.get("environment"))
-    runtime = _mapping_or_empty(environment.get("platform_runtime"))
-    platform = _mapping_or_empty(data.get("platform"))
-    deployment = _mapping_or_empty(platform.get("deployment"))
+    environment = bundle.environment
+    runtime = environment.platform_runtime
+    deployment = bundle.platform.deployment
 
-    runtime_type = _string_or_none(runtime.get("runtime_type"))
-    deployment_type = _string_or_none(deployment.get("deployment_type"))
-    endpoint_class = _string_or_none(deployment.get("endpoint_class"))
+    runtime_type = _string_or_none(runtime.runtime_type)
+    deployment_type = _string_or_none(deployment.deployment_type)
+    endpoint_class = _string_or_none(deployment.endpoint_class)
 
     runtime_key = runtime_type.lower() if runtime_type else None
     deployment_key = deployment_type.lower() if deployment_type else None
@@ -1052,13 +1025,23 @@ def _deployment_class_from_contract(data: dict[str, Any]) -> str | None:
     return None
 
 
-def _has_normalized_environment_contract(data: dict[str, Any]) -> bool:
+def _has_normalized_environment_contract(bundle: BundleDocument) -> bool:
     """Return true when the bundle carries normalized environment/platform facets."""
-    environment = _mapping_or_empty(data.get("environment"))
-    platform = _mapping_or_empty(data.get("platform"))
-    return any(isinstance(environment.get(key), dict) for key in ("platform_runtime", "container")) or any(
-        isinstance(platform.get(key), dict) for key in ("deployment", "cloud", "compute", "storage")
+    environment = bundle.environment
+    platform = bundle.platform
+    # Content-based presence: a block counts when it carries at least one
+    # key. This deliberately narrows the historical isinstance check, under
+    # which an explicitly empty mapping (``"deployment": {}``) counted as a
+    # contract block and routed facet extraction away from the legacy cost
+    # fallback. An empty mapping carries no facets, so treating it as absent
+    # is the more correct routing; no corpus bundle hits the old branch.
+    runtime_present = environment.platform_runtime != BundlePlatformRuntime()
+    container_present = environment.container != BundleContainerBlock()
+    platform_present = any(
+        getattr(platform, key) != type(getattr(platform, key))()
+        for key in ("deployment", "cloud", "compute", "storage")
     )
+    return runtime_present or container_present or platform_present
 
 
 def _legacy_environment_facets_from_cost(normalized_cost: NormalizedCost) -> dict[str, str | None]:
@@ -1092,65 +1075,57 @@ def _legacy_environment_facets_from_cost(normalized_cost: NormalizedCost) -> dic
 
 
 def _environment_facets(
-    data: dict[str, Any],
+    bundle: BundleDocument,
     *,
     normalized_cost: NormalizedCost | None = None,
 ) -> dict[str, str | None]:
     """Flatten normalized execution-environment facets for the browser store."""
-    platform = _mapping_or_empty(data.get("platform"))
-    cloud = _mapping_or_empty(platform.get("cloud"))
-    compute = _mapping_or_empty(platform.get("compute"))
-    storage = _mapping_or_empty(platform.get("storage"))
+    platform = bundle.platform
+    cloud = platform.cloud
+    compute = platform.compute
+    storage = platform.storage
 
     facets = {
-        "deployment_class": _deployment_class_from_contract(data),
-        "cloud_provider": _string_or_none(cloud.get("provider")),
-        "cloud_region": _first_string(cloud.get("region"), cloud.get("location")),
+        "deployment_class": _deployment_class_from_contract(bundle),
+        "cloud_provider": _string_or_none(cloud.provider),
+        "cloud_region": _first_string(cloud.region, cloud.location),
         "instance_or_warehouse": _first_string(
-            compute.get("node_type"),
-            compute.get("warehouse_size"),
-            compute.get("warehouse"),
-            compute.get("cluster_id"),
-            compute.get("cluster_name"),
-            compute.get("rpu"),
-            compute.get("serverless_slots"),
-            compute.get("worker_shape"),
-            compute.get("driver_shape"),
+            compute.node_type,
+            compute.warehouse_size,
+            compute.warehouse,
+            compute.cluster_id,
+            compute.cluster_name,
+            compute.rpu,
+            compute.serverless_slots,
+            compute.worker_shape,
+            compute.driver_shape,
         ),
-        "storage_format": _string_or_none(storage.get("table_format")),
+        "storage_format": _string_or_none(storage.table_format),
     }
-    if _has_normalized_environment_contract(data) or normalized_cost is None:
+    if _has_normalized_environment_contract(bundle) or normalized_cost is None:
         return facets
     return _legacy_environment_facets_from_cost(normalized_cost)
 
 
-def _compliance_class(data: dict[str, Any]) -> str | None:
+def _compliance_class(bundle: BundleDocument) -> str | None:
     """Extract compliance class from the benchmark block of a schema-v2 bundle."""
-    benchmark = data.get("benchmark", {})
-    if not isinstance(benchmark, dict):
-        return None
-    val = benchmark.get("compliance_class")
-    return str(val) if val is not None else None
+    return bundle.benchmark.compliance_class
 
 
-def _phase_durations(data: dict[str, Any]) -> dict[str, float] | None:
+def _phase_durations(bundle: BundleDocument) -> dict[str, float] | None:
     """Extract per-phase durations (seconds) from a schema-v2 bundle phases block.
 
     Returns a dict keyed by phase name (e.g. "data_loading", "power_test") with
     values in seconds.  Returns None when no phase data is present.
     """
-    phases = data.get("phases", {})
-    if not isinstance(phases, dict):
-        return None
     result: dict[str, float] = {}
-    for phase_name, phase_data in phases.items():
-        if isinstance(phase_data, dict):
-            duration_ms = phase_data.get("duration_ms")
-            if duration_ms is not None:
-                try:
-                    result[str(phase_name)] = float(duration_ms) / 1000.0
-                except (TypeError, ValueError):
-                    pass
+    for phase_name, phase_data in bundle.phases.items():
+        duration_ms = phase_data.duration_ms
+        if duration_ms is not None:
+            try:
+                result[str(phase_name)] = float(duration_ms) / 1000.0
+            except (TypeError, ValueError):
+                pass
     return result if result else None
 
 
@@ -1196,44 +1171,35 @@ def _platform_percentile_stats(display_timings: list[QueryDisplayTiming]) -> Per
     )
 
 
-def _query_timings(data: dict[str, Any]) -> list[QueryTiming]:
+def _query_timings(bundle: BundleDocument) -> list[QueryTiming]:
     """Extract per-query timings from the queries list in a schema-v2 bundle.
 
     Includes measurement and warmup execution queries (or those without a run_type).
     Explicitly filters out non-execution pseudo-rows (metadata, summary).
     Preserves run_type, iter, and stream fields for provenance.
     """
-    raw_queries: list[dict[str, Any]] = data.get("queries", [])
     timings: list[QueryTiming] = []
-    for q in raw_queries:
-        if not isinstance(q, dict):
-            continue
-        run_type = q.get("run_type")
+    for q in bundle.queries:
         # Ingest both measurement and warmup executions. Narrow the filter to an
         # explicit allow-list; do not remove the check entirely, because the corpus
         # carries "metadata" and "summary" pseudo-rows (ms=0, status=SKIPPED) that
         # are not execution timings.
-        if run_type is not None and run_type not in _ALLOWED_EXECUTION_RUN_TYPES:
+        if q.run_type is not None and q.run_type not in _ALLOWED_EXECUTION_RUN_TYPES:
             continue
-        query_id = q.get("id") or q.get("query_id", "")
-        ms_raw = q.get("ms")
-        duration_ms_raw = ms_raw if ms_raw is not None else (q.get("execution_time_ms") or 0.0)
+        duration_ms_raw = q.ms if q.ms is not None else (q.execution_time_ms or 0.0)
         try:
             duration_ms = float(duration_ms_raw)
         except (TypeError, ValueError):
             duration_ms = 0.0
-        raw_status = q.get("status", "pass")
-        status = "pass" if raw_status in _PASS_STATUSES else "fail"
-        iter_val = q.get("iter")
-        stream_val = q.get("stream")
+        status = "pass" if q.status in _PASS_STATUSES else "fail"
         timings.append(
             QueryTiming(
-                query_id=str(query_id),
+                query_id=q.query_id,
                 duration_ms=duration_ms,
                 status=status,
-                run_type=run_type,
-                iter=int(iter_val) if iter_val is not None else None,
-                stream=int(stream_val) if stream_val is not None else None,
+                run_type=q.run_type,
+                iter=int(q.iter) if q.iter is not None else None,
+                stream=int(q.stream) if q.stream is not None else None,
             )
         )
     return timings
@@ -1351,38 +1317,33 @@ def _display_geomean_ms(display_timings: list[QueryDisplayTiming]) -> float | No
     return math.exp(sum(math.log(v) for v in values) / len(values))
 
 
-def _summary_query_count(data: dict[str, Any]) -> int:
-    summary = data.get("summary", {})
-    if not isinstance(summary, dict):
-        return 0
-    queries = summary.get("queries", {})
-    if not isinstance(queries, dict):
-        return 0
+def _summary_query_count(bundle: BundleDocument) -> int:
+    total = bundle.summary.queries.total
     try:
-        return int(queries.get("total", 0) or 0)
+        return int(total or 0)
     except (TypeError, ValueError):
         return 0
 
 
-def _logical_query_count(data: dict[str, Any], display_timings: list[QueryDisplayTiming]) -> int:
+def _logical_query_count(bundle: BundleDocument, display_timings: list[QueryDisplayTiming]) -> int:
     """Infer the logical query denominator without treating repeats as misses.
 
     ``summary.queries.total`` is retained as the raw sample count. For repeated
     benchmark runs it can be 3x/4x the logical benchmark query count, while
     ``display_timings`` has one row per logical query ID.
     """
-    dataframe_skip_total = _dataframe_skip_logical_query_count(data)
+    dataframe_skip_total = _dataframe_skip_logical_query_count(bundle)
     if dataframe_skip_total is not None:
         return dataframe_skip_total
 
-    raw_query_count = _summary_query_count(data)
+    raw_query_count = _summary_query_count(bundle)
     observed_query_count = len({timing.query_id for timing in display_timings if timing.query_id})
     if observed_query_count <= 0:
         return raw_query_count
     if raw_query_count <= observed_query_count:
         return raw_query_count or observed_query_count
 
-    benchmark = str(data.get("benchmark", {}).get("id", "unknown"))
+    benchmark = str(bundle.benchmark.id)
     known_count = _KNOWN_LOGICAL_QUERY_COUNTS.get(benchmark)
     if known_count and observed_query_count <= known_count and raw_query_count % known_count == 0:
         return known_count
@@ -1393,17 +1354,11 @@ def _logical_query_count(data: dict[str, Any], display_timings: list[QueryDispla
     return raw_query_count
 
 
-def _dataframe_skip_logical_query_count(data: dict[str, Any]) -> int | None:
+def _dataframe_skip_logical_query_count(bundle: BundleDocument) -> int | None:
     """Return executed+skipped logical query count for DataFrame partial runs."""
-    raw_queries = data.get("queries", [])
-    if not isinstance(raw_queries, list):
-        return None
-
     best_total: int | None = None
-    for query in raw_queries:
-        if not isinstance(query, dict):
-            continue
-        summary = query.get("dataframe_skip_summary")
+    for query in bundle.queries:
+        summary = query.dataframe_skip_summary
         if not isinstance(summary, dict):
             continue
         executed = _int_or_none(summary.get("executed_total"))
@@ -1429,6 +1384,60 @@ def _int_or_none(value: Any) -> int | None:
         except ValueError:
             return None
     return None
+
+
+def _to_finite_float_or_none(value: Any) -> float | None:
+    """Coerce a value to a finite float, or None when absent/invalid."""
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+        return parsed if math.isfinite(parsed) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _detail_environment(bundle: BundleDocument) -> ExplorerEnvironment:
+    """Build the detail environment model from the typed environment block.
+
+    Starts from the bundle's own environment keys verbatim, then normalizes
+    the CPU identity and projects the producer ``client_link`` shape
+    (``benchbox/platforms/base/adapter.py``) into flat derived fields.
+    """
+    env = bundle.environment
+    provided = dict(env.model_extra or {})
+    for key in ("os", "arch", "cpu_count", "memory_gb", "python", "cpu_model", "cpu_identity_provenance"):
+        if key in env.model_fields_set:
+            provided[key] = getattr(env, key)
+    # Nested contract blocks travel verbatim: exclude_unset reproduces the raw
+    # mapping exactly (declared fields were only defaults otherwise), so the
+    # environment copy keeps keys the typed projections never read.
+    for key in ("platform_runtime", "container", "client_link"):
+        if key in env.model_fields_set:
+            provided[key] = getattr(env, key).model_dump(exclude_unset=True)
+    if "environment" in bundle.model_fields_set:
+        raw_cpu = env.cpu_model
+        cleaned_cpu = raw_cpu.strip() if isinstance(raw_cpu, str) else None
+        if cleaned_cpu:
+            provided["cpu_model"] = cleaned_cpu
+            provided["cpu_family"] = normalize_cpu_family(cleaned_cpu)
+        else:
+            provided["cpu_model"] = None
+            provided["cpu_family"] = None
+
+    # Producer shape (benchbox/platforms/base/adapter.py): the bundle
+    # carries client_link:{collection_status, client_region,
+    # client_cloud, statement_overhead_ms:{samples,min,median}}. Read
+    # exactly that shape: earlier flattened fallbacks matched no
+    # producer and silently projected NULLs.
+    link = env.client_link
+    overhead = link.statement_overhead_ms
+    provided["client_region"] = _string_or_none(link.client_region)
+    provided["client_cloud"] = _string_or_none(link.client_cloud)
+    provided["link_status"] = _string_or_none(link.collection_status)
+    provided["statement_overhead_min_ms"] = _to_finite_float_or_none(overhead.min)
+    provided["statement_overhead_median_ms"] = _to_finite_float_or_none(overhead.median)
+    return ExplorerEnvironment(**provided)
 
 
 class BundleTransformer:
@@ -1472,12 +1481,16 @@ class BundleTransformer:
             bundle_data, file_raw = data, bundle_path.read_bytes()
         else:
             bundle_data, file_raw = _load_bundle(bundle_path)
+        bundle = _parse_bundle(bundle_data)
 
-        benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
-        platform = str(bundle_data.get("platform", {}).get("name", "unknown")).lower().replace(" ", "-")
-        scale_factor = bundle_data.get("benchmark", {}).get("scale_factor", 0.0)
-        timestamp = bundle_data.get("run", {}).get("timestamp")
-        run_date = _run_date_from_timestamp(timestamp)
+        # The id embeds the raw scale_factor rendering (int ``1`` stays
+        # ``sf1``); the typed float is only for the read-model fields below.
+        raw_benchmark = bundle_data.get("benchmark", {})
+        raw_benchmark = raw_benchmark if isinstance(raw_benchmark, dict) else {}
+        benchmark = bundle.benchmark.id
+        platform = str(bundle.platform.name).lower().replace(" ", "-")
+        scale_factor = raw_benchmark.get("scale_factor", 0.0)
+        run_date = _run_date_from_timestamp(bundle.run.timestamp)
         sha_prefix = _sha256_prefix(file_raw)
         return f"{benchmark}-{platform}-sf{scale_factor}-{run_date}-{sha_prefix}"
 
@@ -1493,30 +1506,29 @@ class BundleTransformer:
         """Extract manifest entry from a result bundle JSON file."""
         bundle_data = data if data is not None else self.load_bundle(bundle_path)
         _ensure_explorer_input_schema(bundle_data)
+        bundle = _parse_bundle(bundle_data)
         rid = result_id or self.result_id_from_bundle(bundle_path, data=bundle_data)
 
-        benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
-        scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
-        platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
-        timestamp = bundle_data.get("run", {}).get("timestamp")
-        run_date = _utc_run_date_from_timestamp(timestamp)
-        total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
-        total_duration_s = float(total_duration_ms) / 1000.0
+        benchmark = bundle.benchmark.id
+        scale_factor = float(bundle.benchmark.scale_factor)
+        platform = str(bundle.platform.name)
+        run_date = _utc_run_date_from_timestamp(bundle.run.timestamp)
+        total_duration_s = float(bundle.run.total_duration_ms) / 1000.0
 
-        query_count = _summary_query_count(bundle_data)
+        query_count = _summary_query_count(bundle)
         failed_query_count = bundle_failed_query_count(bundle_data)
 
         # Same _query_timings → _build_display_timings pass also runs in
         # to_detail_result; a shared intermediate could halve the work for
         # large bundles (≤99 queries makes this negligible today).
-        timings = _query_timings(bundle_data)
+        timings = _query_timings(bundle)
         display_timings = _build_display_timings(timings)
-        logical_query_count = _logical_query_count(bundle_data, display_timings)
+        logical_query_count = _logical_query_count(bundle, display_timings)
         timing_contract = timing_eligibility(display_timings, logical_query_count)
-        normalized_cost = _normalized_cost(bundle_data)
+        normalized_cost = _normalized_cost(bundle)
         environment_facets = _environment_facets(
-            bundle_data,
-            normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle_data) is not None else None,
+            bundle,
+            normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle) is not None else None,
         )
         override = _override_display(bundle_path)
         entry = ManifestEntry(
@@ -1525,11 +1537,11 @@ class BundleTransformer:
             scale_factor=scale_factor,
             platform=platform,
             platform_id=_platform_id(platform),
-            driver_version=_driver_version(bundle_data),
+            driver_version=_driver_version(bundle),
             run_date=run_date,
-            power_score=_power_score(bundle_data),
+            power_score=_power_score(bundle),
             total_duration_s=total_duration_s,
-            geomean_ms=_geomean_ms(bundle_data),
+            geomean_ms=_geomean_ms(bundle),
             display_geomean_ms=_display_geomean_ms(display_timings),
             query_count=int(query_count),
             logical_query_count=logical_query_count,
@@ -1541,31 +1553,31 @@ class BundleTransformer:
             comparison_exclusion_reason=timing_contract.comparison_exclusion_reason,
             trust_label=trust_label,
             visibility=visibility,
-            funding=_funding(bundle_data),
-            platform_version=_platform_version(bundle_data),
-            execution_mode=_execution_mode(bundle_data),
-            tuning_mode=_tuning_mode(bundle_data),
-            tuning_hash=_tuning_hash(bundle_data),
-            requested_config_hash=_requested_config_hash(bundle_data),
-            applied_ledger_hash=_applied_ledger_hash(bundle_data),
-            tuning_validation_status=_tuning_validation_status(bundle_data),
-            applied_receipt=_applied_receipt(bundle_path, bundle_data),
+            funding=_funding(bundle),
+            platform_version=_platform_version(bundle),
+            execution_mode=_execution_mode(bundle),
+            tuning_mode=_tuning_mode(bundle),
+            tuning_hash=_tuning_hash(bundle),
+            requested_config_hash=_requested_config_hash(bundle),
+            applied_ledger_hash=_applied_ledger_hash(bundle),
+            tuning_validation_status=_tuning_validation_status(bundle),
+            applied_receipt=_applied_receipt(bundle_path, bundle),
             override_rules=override["override_rules"],
             override_evidence=override["override_evidence"],
             override_approver=override["override_approver"],
             override_expires=override["override_expires"],
-            tuning_policy_generation=_tuning_policy_generation(bundle_data),
-            test_type=_test_type(bundle_data),
-            validation_status=_validation_status(bundle_data),
+            tuning_policy_generation=_tuning_policy_generation(bundle),
+            test_type=_test_type(bundle),
+            validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=failed_query_count,
             cost_usd=_cost_usd_alias(normalized_cost),
-            normalized_cost=normalized_cost.to_dict(),
+            normalized_cost=normalized_cost,
             deployment_class=environment_facets["deployment_class"],
             cloud_provider=environment_facets["cloud_provider"],
             cloud_region=environment_facets["cloud_region"],
             instance_or_warehouse=environment_facets["instance_or_warehouse"],
             storage_format=environment_facets["storage_format"],
-            compliance_class=_compliance_class(bundle_data),
+            compliance_class=_compliance_class(bundle),
             basis_availability=_compute_basis_availability(timings),
         )
         return entry.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(entry)})
@@ -1583,88 +1595,42 @@ class BundleTransformer:
         """Extract full detail from a result bundle JSON file."""
         bundle_data = data if data is not None else self.load_bundle(bundle_path)
         _ensure_explorer_input_schema(bundle_data)
+        bundle = _parse_bundle(bundle_data)
 
-        benchmark = bundle_data.get("benchmark", {}).get("id", "unknown")
-        scale_factor = float(bundle_data.get("benchmark", {}).get("scale_factor", 0.0))
-        platform = str(bundle_data.get("platform", {}).get("name", "unknown"))
-        timestamp = bundle_data.get("run", {}).get("timestamp")
-        run_date = _utc_run_date_from_timestamp(timestamp)
-        total_duration_ms = bundle_data.get("run", {}).get("total_duration_ms", 0.0)
-        total_duration_s = float(total_duration_ms) / 1000.0
+        benchmark = bundle.benchmark.id
+        scale_factor = float(bundle.benchmark.scale_factor)
+        platform = str(bundle.platform.name)
+        run_date = _utc_run_date_from_timestamp(bundle.run.timestamp)
+        total_duration_s = float(bundle.run.total_duration_ms) / 1000.0
 
-        environment: dict[str, Any] = {}
-        if isinstance(bundle_data.get("environment"), dict):
-            environment = dict(bundle_data["environment"])
-            raw_cpu = environment.get("cpu_model")
-            cleaned_cpu = raw_cpu.strip() if isinstance(raw_cpu, str) else None
-            if cleaned_cpu:
-                environment["cpu_model"] = cleaned_cpu
-                environment["cpu_family"] = normalize_cpu_family(cleaned_cpu)
-            else:
-                environment["cpu_model"] = None
-                environment["cpu_family"] = None
-
-        # Producer shape (benchbox/platforms/base/adapter.py): the bundle
-        # carries client_link:{collection_status, client_region,
-        # client_cloud, statement_overhead_ms:{samples,min,median}}. Read
-        # exactly that shape: earlier flattened fallbacks matched no
-        # producer and silently projected NULLs.
-        client_link = environment.get("client_link") if isinstance(environment.get("client_link"), dict) else {}
-        overhead = client_link.get("statement_overhead_ms")
-        overhead = overhead if isinstance(overhead, dict) else {}
-        client_region = client_link.get("client_region")
-        client_cloud = client_link.get("client_cloud")
-        link_status = client_link.get("collection_status")
-        stmt_min = overhead.get("min")
-        stmt_med = overhead.get("median")
-
-        def _to_finite_float_or_none(v: Any) -> float | None:
-            if v is None:
-                return None
-            try:
-                val = float(v)
-                return val if math.isfinite(val) else None
-            except (ValueError, TypeError):
-                return None
-
-        environment["client_region"] = (
-            str(client_region).strip() if client_region is not None and str(client_region).strip() else None
-        )
-        environment["client_cloud"] = (
-            str(client_cloud).strip() if client_cloud is not None and str(client_cloud).strip() else None
-        )
-        environment["link_status"] = (
-            str(link_status).strip() if link_status is not None and str(link_status).strip() else None
-        )
-        environment["statement_overhead_min_ms"] = _to_finite_float_or_none(stmt_min)
-        environment["statement_overhead_median_ms"] = _to_finite_float_or_none(stmt_med)
+        environment = _detail_environment(bundle)
 
         # Plans are still a companion file; the requested tuning is not. It rides
         # in `platform.tuning.requested`, with a retired `{stem}.tuning.json`
         # companion recognized for bundles published before the move.
         stem = bundle_path.stem
         has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
-        has_tuning = _has_requested_tuning(bundle_data) or bundle_path.with_name(f"{stem}.tuning.json").exists()
+        has_tuning = _has_requested_tuning(bundle) or bundle_path.with_name(f"{stem}.tuning.json").exists()
         override = _override_display(bundle_path)
 
-        timings = _query_timings(bundle_data)
+        timings = _query_timings(bundle)
         display_timings = _build_display_timings(timings)
-        query_count = _summary_query_count(bundle_data)
-        logical_query_count = _logical_query_count(bundle_data, display_timings)
+        query_count = _summary_query_count(bundle)
+        logical_query_count = _logical_query_count(bundle, display_timings)
         timing_contract = timing_eligibility(display_timings, logical_query_count)
-        normalized_cost = _normalized_cost(bundle_data)
+        normalized_cost = _normalized_cost(bundle)
         detail = DetailResult(
             result_id=result_id,
             benchmark=benchmark,
             scale_factor=scale_factor,
             platform=platform,
             platform_id=_platform_id(platform),
-            driver_version=_driver_version(bundle_data),
+            driver_version=_driver_version(bundle),
             run_date=run_date,
             total_duration_s=total_duration_s,
-            geomean_ms=_geomean_ms(bundle_data),
+            geomean_ms=_geomean_ms(bundle),
             display_geomean_ms=_display_geomean_ms(display_timings),
-            power_score=_power_score(bundle_data),
+            power_score=_power_score(bundle),
             has_display_timing=timing_contract.has_display_timing,
             logical_query_count=logical_query_count,
             valid_query_count=timing_contract.valid_query_count,
@@ -1680,28 +1646,28 @@ class BundleTransformer:
             bundle_download_url=bundle_download_url,
             trust_label=trust_label,
             visibility=visibility,
-            platform_version=_platform_version(bundle_data),
-            execution_mode=_execution_mode(bundle_data),
-            tuning_mode=_tuning_mode(bundle_data),
-            tuning_hash=_tuning_hash(bundle_data),
-            requested_config_hash=_requested_config_hash(bundle_data),
-            applied_ledger_hash=_applied_ledger_hash(bundle_data),
-            tuning_validation_status=_tuning_validation_status(bundle_data),
-            applied_receipt=_applied_receipt(bundle_path, bundle_data),
+            platform_version=_platform_version(bundle),
+            execution_mode=_execution_mode(bundle),
+            tuning_mode=_tuning_mode(bundle),
+            tuning_hash=_tuning_hash(bundle),
+            requested_config_hash=_requested_config_hash(bundle),
+            applied_ledger_hash=_applied_ledger_hash(bundle),
+            tuning_validation_status=_tuning_validation_status(bundle),
+            applied_receipt=_applied_receipt(bundle_path, bundle),
             override_rules=override["override_rules"],
             override_evidence=override["override_evidence"],
             override_approver=override["override_approver"],
             override_expires=override["override_expires"],
-            tuning_policy_generation=_tuning_policy_generation(bundle_data),
-            test_type=_test_type(bundle_data),
-            validation_status=_validation_status(bundle_data),
+            tuning_policy_generation=_tuning_policy_generation(bundle),
+            test_type=_test_type(bundle),
+            validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=bundle_failed_query_count(bundle_data),
             cost_usd=_cost_usd_alias(normalized_cost),
-            normalized_cost=normalized_cost.to_dict(),
-            compliance_class=_compliance_class(bundle_data),
-            phase_durations=_phase_durations(bundle_data),
-            physical_mechanisms=_physical_mechanisms(bundle_data),
-            physical_rendering_id=_physical_rendering_id(bundle_data),
+            normalized_cost=normalized_cost,
+            compliance_class=_compliance_class(bundle),
+            phase_durations=_phase_durations(bundle),
+            physical_mechanisms=_physical_mechanisms(bundle),
+            physical_rendering_id=_physical_rendering_id(bundle),
             basis_availability=_compute_basis_availability(timings),
         )
         manifest_peer = ManifestEntry(
@@ -1710,7 +1676,7 @@ class BundleTransformer:
             scale_factor=scale_factor,
             platform=platform,
             platform_id=_platform_id(platform),
-            driver_version=_driver_version(bundle_data),
+            driver_version=_driver_version(bundle),
             run_date=run_date,
             power_score=detail.power_score,
             total_duration_s=total_duration_s,

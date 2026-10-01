@@ -30,6 +30,7 @@ from benchbox.core.equivalence.cross_surface import (
     count_executed_cells,
     find_cross_surface_divergences,
 )
+from benchbox.core.joinorder.queries import CANONICAL_JOINORDER_QUERIES
 from benchbox.core.tpchavoc.validation import ResultValidator
 
 pytestmark = [
@@ -59,10 +60,11 @@ def test_joinorder_synthetic_dataframe_surface_equivalent_to_sql(tmp_path):
     finally:
         connection.close()
 
-    # Both gated backends must actually compare something - a fully-unimplemented
-    # backend would make the gate silently green by comparing nothing.
-    missing = sorted(backend for backend, count in coverage.items() if count == 0)
-    assert not missing, f"gated joinorder_synthetic backend(s) implement no queries: {missing}"
+    # A partial registry must not turn the full benchmark green by comparing
+    # only its implemented subset.
+    assert set(data.query_ids) == set(CANONICAL_JOINORDER_QUERIES)
+    expected_coverage = {backend: len(CANONICAL_JOINORDER_QUERIES) for backend in gate.backends}
+    assert coverage == expected_coverage, f"joinorder_synthetic backend coverage shrank: {coverage}"
 
     # Empty baseline: every query/backend cell must match.
     unexpected = {d.key for d in divergences} - set(gate.known_divergences)
