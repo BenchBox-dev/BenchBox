@@ -8,7 +8,7 @@ land silently and workarounds live forever.
 
 Behavior:
 
-* Resolve the locked sqlglot version from ``uv.lock`` at HEAD and at the
+* Resolve the locked sqlglot version from the working-tree ``uv.lock`` and at the
   merge-base with ``origin/develop`` (or a ``--base-ref`` override).
 * When the versions match, exit 0: no upgrade, nothing to re-run.
 * When they differ, run ``repro_all.py`` on the NEW lockfile version and
