@@ -85,11 +85,35 @@ those artifacts receive the same ownership check before dispatch.
 
 An ignored local task-set file freezes the live task IDs used by this run. The
 validator rejects any owner outside that set, without querying the tracker at
-runtime. An external entry names the exact path, provenance source, governing
-requirement, owner, and blocking disposition. A notice records the immutable
-blob SHA-256, retained byte range, retained-byte SHA-256, source identity,
-governing requirement, owner, and blocking disposition. Do not infer either
-from a vendor directory or replace it with a blanket SPDX label.
+runtime. A notice records the immutable blob SHA-256, retained byte range,
+retained-byte SHA-256, source identity, governing requirement, owner, and
+blocking disposition. Do not replace a notice with a blanket SPDX label.
+
+An external entry excludes a path or directory prefix that another party owns.
+It records the selector, provenance, the governing owner decision, the owner,
+and the disposition, and its selector must match a tracked path. It applies only
+to paths that no ownership rule, notice, or derived rule claims, and it marks
+them `excluded`. The TPC vendor trees are excluded this way as a whole, including
+the BenchBox patches inside them; the retained-notice rule still protects the
+exact bytes of their licence, notice, and patch records.
+
+A format class marks files `comment-free` when a verifier finds no comment
+syntax. The checks are deliberately conservative: a file that fails stays
+unowned, and ambiguity counts as failure.
+
+- `strict-json`: the file, or each line of a JSON-lines file, parses as JSON with
+  no duplicate keys, no `NaN` or `Infinity`, and no `comment`, `_comment`,
+  `__comment`, `$comment` or `//` key.
+- `png-signature`: the file starts with the PNG signature. It does not validate
+  the image or its metadata chunks.
+- `markdown-prose`: no code fence (also inside quotes and lists), indented line,
+  `<pre>`, `<code>`, `<script>` or `<style>` tag, HTML, link-reference, MDX,
+  MyST, Liquid or Jinja comment marker, or commented front matter.
+- `sql-without-comment-markers`: no `--`, `/*` or `#` anywhere in the file.
+
+A class applies only to unclaimed paths under its selectors with a listed
+extension. The final-enforcement task owns these files and confirms that none
+gained comments.
 
 A directive records its exact token, the number of occurrences in the file, its
 actual consumer, necessity, smaller alternative considered, owner, and removal

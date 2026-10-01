@@ -525,7 +525,14 @@ def find_cross_surface_divergences(
     def reference_rows(query_id: Any) -> list[tuple[Any, ...]]:
         rows = fetch_reference_rows(connection, reference_sql(query_id))
         if reference_row_counts is not None:
-            reference_row_counts[query_id] = len(rows)
+            # Scalar-aggregation queries (SELECT MIN(...) with no GROUP BY)
+            # collapse an empty join to one all-NULL row, which len() == 1
+            # misreads as discriminating. Treat all-NULL single rows as
+            # 0-row vacuous so None == None can never pass as coverage.
+            if len(rows) == 1 and all(value is None for value in rows[0]):
+                reference_row_counts[query_id] = 0
+            else:
+                reference_row_counts[query_id] = len(rows)
         return rows
 
     def candidate_cells(
@@ -914,6 +921,111 @@ _CLICKBENCH_VACUOUS = (
 )
 _CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
     ("Q20", "Q23", "Q28", "Q29", "Q39", "Q40", "Q41", "Q42"), _CLICKBENCH_VACUOUS
+)
+
+_DATAVAULT_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell: Q17 is a scalar SUM(...) with no "
+    "GROUP BY over the small-quantity-order conjunction (brand + container literals "
+    "against part/partsupp/lineitem). Verified 2026-09-26 by executing the reference "
+    "SQL over every brand/container combination present in the built cell (25 brands x "
+    "40 containers = 1000 combos): every combination returns the single all-NULL row, "
+    "so neither surface can discriminate anything. Data/literal artifact of the bounded "
+    "cell, not a load or logic bug. Tracked: plant a satisfying brand/container pair "
+    "in the generator or gate a larger cell (do NOT change the canonical Q17 query)."
+)
+_DATAVAULT_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q17",), _DATAVAULT_Q17_VACUOUS)
+
+_JOINORDER_SYNTHETIC_VACUOUS = (
+    "Synthetic selectivity, not a bug: the query's multi-table conjunction needs coordinated "
+    "real-world literals (specific keywords, notes, countries, ratings, link types) that the "
+    "bounded synthetic cell does not plant on one entity set, so the reference join is empty on "
+    "BOTH surfaces. Golden entities back the highest-traffic conjunctions (34 discriminating); "
+    "this tail stays classified until its literals are planted too. Any query NOT listed here "
+    "that goes vacuous fails the gate."
+)
+_JOINORDER_SYNTHETIC_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
+    (
+        "1a",
+        "1c",
+        "2b",
+        "2c",
+        "3b",
+        "5b",
+        "7a",
+        "7b",
+        "7c",
+        "8a",
+        "8b",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "11a",
+        "11b",
+        "11c",
+        "12b",
+        "13b",
+        "13c",
+        "14a",
+        "14b",
+        "14c",
+        "15a",
+        "15b",
+        "15c",
+        "15d",
+        "17a",
+        "17b",
+        "17c",
+        "17d",
+        "18a",
+        "18b",
+        "18c",
+        "19a",
+        "19b",
+        "19c",
+        "19d",
+        "20a",
+        "20b",
+        "20c",
+        "21a",
+        "21b",
+        "21c",
+        "22a",
+        "22b",
+        "22c",
+        "22d",
+        "23a",
+        "23b",
+        "23c",
+        "24a",
+        "24b",
+        "25a",
+        "25b",
+        "25c",
+        "26a",
+        "26b",
+        "26c",
+        "27a",
+        "27b",
+        "27c",
+        "28a",
+        "28b",
+        "28c",
+        "29a",
+        "29b",
+        "29c",
+        "30a",
+        "30b",
+        "30c",
+        "31a",
+        "31b",
+        "31c",
+        "32a",
+        "33a",
+        "33b",
+        "33c",
+    ),
+    _JOINORDER_SYNTHETIC_VACUOUS,
 )
 
 # H2O-DB bounded-cell scale. Its generator base is the 10M-row small tier, so the
@@ -1575,6 +1687,7 @@ GATES: dict[str, CrossSurfaceGate] = {
     "joinorder_synthetic": CrossSurfaceGate(
         name="joinorder_synthetic",
         build=build_joinorder_synthetic_duckdb,
+        legitimately_empty=_JOINORDER_SYNTHETIC_LEGITIMATELY_EMPTY,
         surface_independence=SURFACE_INDEPENDENCE_SHARED_SPEC,
         surface_independence_rationale=(
             "Both DataFrame families are generated through shared JoinOrder translation helpers, so the "
@@ -1656,6 +1769,7 @@ GATES: dict[str, CrossSurfaceGate] = {
     "datavault": CrossSurfaceGate(
         name="datavault",
         build=build_datavault_duckdb,
+        legitimately_empty=_DATAVAULT_LEGITIMATELY_EMPTY,
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
             "Data Vault expression and pandas DataFrame implementations are separately handwritten for each "
