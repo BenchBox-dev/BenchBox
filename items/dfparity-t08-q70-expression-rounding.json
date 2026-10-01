@@ -5,7 +5,7 @@
     "Q70 still matches at SF 0.01, 0.05 and 0.1",
     "No other query's status changes"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T8). Probe data showing the Q70 divergence pattern: expression diverges at SF 0.03 and 1.0, matches at 0.01, 0.05, 0.1. The latent top-5 filter is a separate item (dfparity-t08b-q70-top5-latent). The project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T8). Probe data showing the Q70 divergence pattern: expression diverges at SF 0.03 and 1.0, matches at 0.01, 0.05, 0.1. The latent top-5 filter is a separate item (dfparity-t08b-q70-top5-latent). The project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-01: fix published as PR #2499 (branch fix/tpcds-q70-expression-rounding, worktree ../BenchBox.wt-tpcds-q70-rounding, head 98d37a044), held, auto-merge withheld; make pr-preflight exit 0 on that head. TESTED with a Q70-only probe: before the change the expression family diverges at SF 0.03 (Value mismatch at row 0, column 1. Original: None, Variant: TN) and pandas matches; after the change both families match at SF 0.01, 0.03, 0.05 and 0.1. Staged gate at SF 0.01 unchanged (146 of 198 compared, 52 empty, 0 divergent). A unit test (tests/unit/core/tpcds/test_q70_expression_rounding.py) fails without the change. Not done: the SF=1.0 criterion needs explicit approval for the run (about 450 s and 3.5 GB); the sort-flip mechanism is still code-reading only. Remaining: hosted CI, maintainer merge, SF=1.0 run if approved, then finish.",
   "description": "q70_expression_impl (benchbox/core/tpcds/dataframe_queries/queries.py ~4640-4720) has no rounding, while q70_pandas_impl rounds total_sum to 2 decimals with a comment that subtotal and grand-total rows must keep the same equality and sort position as DuckDB's DECIMAL. Evidence (verified): Q70 SQL returns exactly 3 rows at every scale (one state), each row has a distinct lochierarchy, and the divergence is 'Value mismatch at row 0, column 1. Original: None, Variant: TN' at SF 0.03 and 1.0 only, which fits a one-ulp float difference flipping the comparator's order-insensitive sort (that last step is code-reading only, not run). Fix: round(2) in the expression impl. This replaces an earlier incorrect diagnosis (sort sentinel / per-state rank).",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "generation": "4bcda81e157147b1b59fa9e28654a4c2",
       "op": "take",
       "op_id": "540f4011ea9e4a5480128bbfe94e98fe",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T16:00:00Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7ea6be81140c42409ddb6ed00cb95fa3",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
