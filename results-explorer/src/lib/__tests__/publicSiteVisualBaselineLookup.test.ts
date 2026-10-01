@@ -279,6 +279,23 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
       expect(await find(github)).toBeUndefined();
       expect(calls.filter((path) => path.includes("/jobs?")).length).toBe(MAX_JOB_PAGES);
     });
+
+    it("does not trust a successful visual job when the bound hides a failing duplicate", async () => {
+      // The prefix read before the bound holds a success, but the failure sits beyond it, so the
+      // evidence is incomplete and must not count as success.
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [visual("completed", "success"), ...filler(MAX_JOB_PAGES * JOBS_PAGE_SIZE - 1), visual("completed", "failure")],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
+
+    it("does not trust a leader when a later page holds a malformed job entry", async () => {
+      // A success on the first page must not be enough when a later page cannot be read in full.
+      const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
+        10: [visual("completed", "success"), ...filler(JOBS_PAGE_SIZE - 1), {} as never],
+      });
+      expect(await find(github)).toBeUndefined();
+    });
   });
 
   it("never trusts a CI leader that finished without succeeding, even if its visual job passed", async () => {

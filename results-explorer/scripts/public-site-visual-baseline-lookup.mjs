@@ -101,10 +101,15 @@ async function listRunJobs(github, repository, runId) {
       `/repos/${repository}/actions/runs/${runId}/jobs?per_page=${JOBS_PAGE_SIZE}&page=${page}`,
     );
     if (!Array.isArray(data?.jobs)) throw new Error("GitHub API returned an invalid job list");
+    // An entry that cannot be read is not a job that passed, so a malformed one invalidates the list.
+    if (!data.jobs.every((job) => typeof job?.name === "string" && typeof job.status === "string")) {
+      throw new Error("GitHub API returned an invalid job entry");
+    }
     jobs.push(...data.jobs);
-    if (data.jobs.length < JOBS_PAGE_SIZE) break;
+    if (data.jobs.length < JOBS_PAGE_SIZE) return jobs;
   }
-  return jobs;
+  // Every allowed page was full, so jobs beyond the bound were never read and the list is incomplete.
+  throw new Error(`Run ${runId} has more than ${MAX_JOB_PAGES * JOBS_PAGE_SIZE} jobs`);
 }
 
 /**
