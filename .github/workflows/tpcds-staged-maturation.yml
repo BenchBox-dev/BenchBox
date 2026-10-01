@@ -47,10 +47,17 @@ jobs:
           uv venv
           uv sync --group dev
 
+      # Divergences are expected while the DataFrame surface matures, so the
+      # report step must not fail the workflow; continue-on-error keeps the
+      # real outcome visible in the summary instead of hiding crashes in a
+      # shell `|| true`.
       - name: Run full-99 TPC-DS staged report
-        run: |
-          make tpcds-cross-surface-equivalence-report || true
+        id: report
+        continue-on-error: true
+        run: make tpcds-cross-surface-equivalence-report
 
       - name: Summarize maturation signal
+        env:
+          REPORT_OUTCOME: ${{ steps.report.outcome }}
         run: |
-          echo "TPC-DS staged maturation report complete. See log for passing-query count." >> "$GITHUB_STEP_SUMMARY"
+          echo "TPC-DS staged maturation report step outcome: ${REPORT_OUTCOME}. See the report step log for the passing-query count and any harness errors." >> "$GITHUB_STEP_SUMMARY"

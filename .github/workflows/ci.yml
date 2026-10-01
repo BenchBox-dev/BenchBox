@@ -1355,15 +1355,19 @@ jobs:
         run: make datavault-cross-surface-equivalence-report
 
       - name: Run NYC Taxi cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make nyctaxi-cross-surface-equivalence-report
 
       - name: Run TSBS DevOps cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make tsbs-devops-cross-surface-equivalence-report
 
       - name: Run TPC-H Skew cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make tpch-skew-cross-surface-equivalence-report
 
       - name: Run TPC-H cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
         run: make tpch-cross-surface-equivalence-report
 
   plan-capture-gate:
