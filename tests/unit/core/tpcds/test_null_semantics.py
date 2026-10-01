@@ -60,6 +60,32 @@ def test_joined_aggregate_keeps_a_null_group_and_sorts_it_last(family):
 
 
 @pytest.mark.parametrize("family", FAMILIES)
+def test_joined_aggregate_orders_null_as_the_largest_value(family):
+    """The reference SQL is ASC (NULLS LAST by default) and DESC NULLS FIRST, so NULL is the largest value."""
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    spec = {
+        "query_id": 15,
+        "base": "t",
+        "joins": [],
+        "group_by": ["g", "k"],
+        "aggs": [["total", "v", "sum"]],
+        "sort_by": ["g", "k"],
+        "descending": [False, True],
+    }
+    data = {"g": ["x", "x", "x", "y", "y"], "k": ["b", None, "a", None, "c"], "v": [1.0, 2.0, 3.0, 4.0, 5.0]}
+    engine = queries._joined_agg_expression_impl if family == "expression" else queries._joined_agg_pandas_impl
+
+    assert _rows(engine(_context(family, {"t": data}), spec)) == [
+        ("x", None, 2.0),
+        ("x", "b", 1.0),
+        ("x", "a", 3.0),
+        ("y", None, 4.0),
+        ("y", "c", 5.0),
+    ]
+
+
+@pytest.mark.parametrize("family", FAMILIES)
 def test_q34_sorts_null_names_last_and_reports_them_as_none(family, monkeypatch):
     from benchbox.core.tpcds.dataframe_queries import queries
 
@@ -131,3 +157,40 @@ def test_set_operations_treat_null_names_as_equal(
     impl = getattr(queries, f"{impl_name}_{family}_impl")
 
     assert _rows(impl(ctx)) == [(expected,)]
+
+
+@pytest.mark.parametrize("family", FAMILIES)
+def test_q34_orders_a_null_preferred_flag_first_because_the_key_is_descending(family, monkeypatch):
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"year": 1998})
+    tickets = 15
+    flags = [None, "Y", "N"]  # three customers with identical names; c_preferred_cust_flag is DESC
+    count = len(flags)
+    tables = {
+        "store_sales": {
+            "ss_sold_date_sk": [1] * (count * tickets),
+            "ss_store_sk": [1] * (count * tickets),
+            "ss_hdemo_sk": [1] * (count * tickets),
+            "ss_ticket_number": [100 * (i + 1) for i in range(count) for _ in range(tickets)],
+            "ss_customer_sk": [i + 1 for i in range(count) for _ in range(tickets)],
+        },
+        "date_dim": {"d_date_sk": [1], "d_dom": [2], "d_year": [1998]},
+        "store": {"s_store_sk": [1], "s_county": ["Williamson County"]},
+        "household_demographics": {
+            "hd_demo_sk": [1],
+            "hd_buy_potential": [">10000"],
+            "hd_vehicle_count": [1],
+            "hd_dep_count": [2],
+        },
+        "customer": {
+            "c_customer_sk": [1, 2, 3],
+            "c_last_name": ["Baker"] * count,
+            "c_first_name": ["Andrew"] * count,
+            "c_salutation": ["Dr."] * count,
+            "c_preferred_cust_flag": flags,
+        },
+    }
+    impl = queries.q34_expression_impl if family == "expression" else queries.q34_pandas_impl
+
+    assert [row[3] for row in _rows(impl(_context(family, tables)))] == [None, "Y", "N"]

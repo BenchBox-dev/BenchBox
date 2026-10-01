@@ -1424,6 +1424,30 @@ def _joined_agg_pandas_condition(frame: Any, params: Any, condition: _JoinedAggC
     raise ValueError(f"Unsupported joined aggregate condition: {op}")
 
 
+def _sort_null_largest_expression(ctx: DataFrameContext, frame: Any, columns: list[str], descending: list[bool]) -> Any:
+    """ORDER BY with the NULL placement of the rendered reference SQL: NULL sorts as the largest value.
+
+    That is last for an ascending key (the engine's default) and first for a descending key (the
+    translated SQL says NULLS FIRST). A single ``nulls_last`` flag cannot express a mix of both, so
+    sort on an ``is_null`` flag ahead of each key, in the key's own direction.
+    """
+    flags = [f"_null_{index}" for index in range(len(columns))]
+    original = frame.columns
+    keyed = frame.with_columns(*(ctx.col(name).is_null().alias(flag) for name, flag in zip(columns, flags)))
+    by = [name for pair in zip(flags, columns) for name in pair]
+    flag_descending = [value for value in descending for _ in range(2)]
+    return keyed.sort(by, descending=flag_descending).select(original)
+
+
+def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[bool]) -> Any:
+    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort)."""
+    flags = [f"_null_{index}" for index in range(len(columns))]
+    keyed = frame.assign(**{flag: frame[name].isna() for name, flag in zip(columns, flags)})
+    by = [name for pair in zip(flags, columns) for name in pair]
+    ascending = [not value for value in descending for _ in range(2)]
+    return keyed.sort_values(by, ascending=ascending, na_position="last").drop(columns=flags)
+
+
 def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     params = get_parameters(spec["query_id"])
     frame = ctx.get_table(spec["base"])
@@ -1440,11 +1464,11 @@ def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> 
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result.filter(_joined_agg_expr_condition(ctx, params, post_filter))
-    # SQL orders NULLs last (the reference engine's default); Polars puts them first.
-    result = result.sort(
+    result = _sort_null_largest_expression(
+        ctx,
+        result,
         list(spec["sort_by"]),
-        descending=list(spec.get("descending", (False,) * len(spec["sort_by"]))),
-        nulls_last=True,
+        list(spec.get("descending", (False,) * len(spec["sort_by"]))),
     )
     limit = spec.get("limit", 100)
     return result if limit is None else result.limit(limit)
@@ -1470,9 +1494,7 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     if post_filter is not None:
         result = result[_joined_agg_pandas_condition(result, params, post_filter)]
     descending = spec.get("descending", (False,) * len(spec["sort_by"]))
-    result = result.sort_values(
-        list(spec["sort_by"]), ascending=[not value for value in descending], na_position="last"
-    )
+    result = _sort_null_largest_pandas(result, list(spec["sort_by"]), list(descending))
     limit = spec.get("limit", 100)
     return result if limit is None else result.head(limit)
 
@@ -3362,21 +3384,19 @@ def q34_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Join with customer
-    return (
-        ticket_agg.join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-        .select(
-            col("c_last_name"),
-            col("c_first_name"),
-            col("c_salutation"),
-            col("c_preferred_cust_flag"),
-            col("ss_ticket_number"),
-            col("cnt"),
-        )
-        .sort(
-            ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
-            descending=[False, False, False, True, False],
-            nulls_last=True,
-        )
+    result = ticket_agg.join(customer, left_on="ss_customer_sk", right_on="c_customer_sk").select(
+        col("c_last_name"),
+        col("c_first_name"),
+        col("c_salutation"),
+        col("c_preferred_cust_flag"),
+        col("ss_ticket_number"),
+        col("cnt"),
+    )
+    return _sort_null_largest_expression(
+        ctx,
+        result,
+        ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
+        [False, False, False, True, False],
     )
 
 
@@ -3430,12 +3450,11 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
         result[column] = result[column].astype(object).where(result[column].notna(), None)
 
     # Select and sort
-    return result[
-        ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]
-    ].sort_values(
+    result = result[["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]]
+    return _sort_null_largest_pandas(
+        result,
         ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
-        ascending=[True, True, True, False, True],
-        na_position="last",
+        [False, False, False, True, False],
     )
 
 
