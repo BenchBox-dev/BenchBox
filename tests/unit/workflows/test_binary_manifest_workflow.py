@@ -1,6 +1,5 @@
 """Require source and distribution binary verification before queue upload."""
 
-import re
 from pathlib import Path
 
 import pytest
@@ -29,43 +28,52 @@ def test_queue_artifact_verifies_exact_distributions_before_upload() -> None:
     assert "dist-artifact" in jobs["core"]["needs"]
 
 
-def _uv_commands(job: dict) -> list[list[str]]:
-    """Return every uv command the job runs, split on shell separators.
-
-    A segment that mentions uv anywhere but its first word (`env uv ...`, `sudo uv ...`, an
-    absolute path) is unsupported syntax and is returned as-is so the caller rejects it.
-    """
-    commands: list[list[str]] = []
-    for step in job["steps"]:
-        script = step.get("run", "").replace("\\\n", " ")
-        for line in script.splitlines():
-            code = line.split("#", 1)[0]
-            for segment in re.split(r"[;&|()`]|\$\(", code):
-                tokens = segment.split()
-                if any(Path(token).name == "uv" for token in tokens):
-                    commands.append(tokens)
-    return commands
+VERIFY_SOURCE_RUN = "uv run --locked --no-dev -- python scripts/bundled_binary_manifest.py"
+BUILD_AND_VERIFY_RUN = """\
+set -euo pipefail
+uv build
+wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+sdist_count=$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l | tr -d '[:space:]')
+if [ "$wheel_count" != "1" ] || [ "$sdist_count" != "1" ]; then
+  echo "::error::Expected exactly one wheel and one sdist, found $wheel_count wheel(s) and $sdist_count sdist(s)"
+  find dist -maxdepth 1 -type f -print
+  exit 1
+fi
+uv run --locked --no-dev -- python scripts/verify_distribution_binaries.py dist/*.whl dist/*.tar.gz
+(cd dist && sha256sum -- *.whl *.tar.gz > SHA256SUMS)
+cat dist/SHA256SUMS
+"""
 
 
 def test_queue_artifact_job_installs_runtime_dependencies_only() -> None:
-    # The job only runs two scripts that import the package, so it needs the runtime dependencies
-    # and not the dev group. A cold full sync inside a short limit timed the job out, and a failed
-    # dist-artifact fails the core unit and ejects the merge group. --locked makes a stale uv.lock
-    # fail the job instead of installing older versions than pyproject declares.
+    # This job only runs two scripts that import the package, so it needs the runtime dependencies
+    # and not the dev group or the `dev` extra. A cold full sync inside a short limit timed the job
+    # out, and a failed dist-artifact fails the core unit and ejects the merge group. --locked makes
+    # a stale uv.lock fail the job instead of installing older versions than pyproject declares.
+    #
+    # Rather than parse shell, pin the job's shape and the exact text of both scripts. Quoting,
+    # heredocs, extra options and extra commands are then all visible as a diff against this
+    # contract, so changing what the job runs is a deliberate edit to this test.
     job = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]["dist-artifact"]
+    assert set(job) == {"name", "needs", "if", "runs-on", "timeout-minutes", "steps"}
     assert job["timeout-minutes"] >= 20
-    commands = _uv_commands(job)
-    expected_scripts = [
-        "scripts/bundled_binary_manifest.py",
-        "scripts/verify_distribution_binaries.py",
+
+    shape = [(step["name"], step["uses"].split("@")[0] if "uses" in step else "run") for step in job["steps"]]
+    assert shape == [
+        ("Checkout code", "actions/checkout"),
+        ("Set up Python 3.12", "actions/setup-python"),
+        ("Install uv", "astral-sh/setup-uv"),
+        ("Verify source bundled binary manifest", "run"),
+        ("Build wheel and sdist", "run"),
+        ("Upload dist artifact", "actions/upload-artifact"),
     ]
-    runs = [command for command in commands if command[:2] == ["uv", "run"]]
-    builds = [command for command in commands if command == ["uv", "build"]]
-    # Exactly the two verifiers and one build: any other uv call (a third `uv run`, `uv sync`,
-    # an absolute path, `env uv`) re-syncs the dev group or is syntax this test cannot judge.
-    assert len(runs) == 2 and len(builds) == 1 and len(commands) == 3, commands
-    for script, command in zip(expected_scripts, runs, strict=True):
-        separator = command.index("--")
-        # The flags must be uv's own, so they have to come before the `--` that ends them.
-        assert {"--locked", "--no-dev"} <= set(command[2:separator]), command
-        assert command[separator + 1 : separator + 3] == ["python", script], command
+    runs = {step["name"]: step for step in job["steps"] if "run" in step}
+    for step in runs.values():
+        # No shell override, environment, or working directory can change how a script runs.
+        assert set(step) == {"name", "run"}, step
+    assert runs["Verify source bundled binary manifest"]["run"].strip() == VERIFY_SOURCE_RUN
+    assert runs["Build wheel and sdist"]["run"] == BUILD_AND_VERIFY_RUN
+    # The steps that install tools take no inputs that add dependencies.
+    uses = {step["name"]: step for step in job["steps"] if "uses" in step}
+    assert uses["Install uv"].keys() <= {"name", "uses"}
+    assert uses["Set up Python 3.12"]["with"] == {"python-version": "3.12"}
