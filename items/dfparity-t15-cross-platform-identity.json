@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A job produces per-table checksums and row counts on both platforms and fails on mismatch",
+    "dsqgen -LOG output for a pinned seed is compared across platforms for all 99 templates",
+    "The result of the first comparison is recorded in this item"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T15). Needs a CI runner; the author could only measure macOS. Informs owner decision D3 in dfparity-t00-owner-decisions. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Automated Codex reviews twice reported a Q70 divergence that did not reproduce on the author's macOS machine, and bundled dsqgen/dsdgen binaries differ per platform (benchbox/_binaries/tpc-ds/<platform>/). Add a CI job (or scheduled lane) that generates data at a small scale on Linux and macOS runners, records a per-table manifest checksum and row counts, and compares dsqgen -LOG output for a fixed seed across platforms. Until this exists, no scale or timing choice is trustworthy across platforms.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:05:10Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f584018b3a0c44e6b466def93a1a11c6",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}

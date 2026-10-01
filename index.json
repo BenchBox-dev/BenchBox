@@ -6078,6 +6078,13 @@
       "status": "open",
       "title": "Fix pandas Q78 performance (14 s at SF=0.1, over 180 s at SF=1)"
     },
+    "dfparity-t15-cross-platform-identity": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add a Linux vs macOS job comparing dsdgen data checksums and dsqgen -LOG output"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
