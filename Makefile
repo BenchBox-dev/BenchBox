@@ -1653,8 +1653,25 @@ pr-arm-auto-merge:
 # Arms a PR for its exact head after a live hold check and enqueues it into the merge queue.
 # `make pr-arm` (PR=<n> optional, HEAD=<sha> optional) refuses without merging when a hold label,
 # a requested change, a draft or closed state, or a head other than local HEAD applies.
+# The values reach the helper through the environment, never as words in a shell command, so a value
+# such as `PR='7 --pr 8'` cannot add arguments. `_SET` tells an omitted variable from an empty one and
+# is computed before `override`, which makes a variable look defined. Make expands a recursive
+# command-line value when it exports it, so a value like `$(shell ...)` would run; the overrides keep
+# PR, HEAD and REPO literal, as make/worktrees.mk does for its variables.
+PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)
+PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)
+PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)
+override PR := $(value PR)
+override HEAD := $(value HEAD)
+override REPO := $(value REPO)
+pr-arm: export PR_ARM_PR := $(PR)
+pr-arm: export PR_ARM_PR_SET := $(PR_ARM_PR_SET)
+pr-arm: export PR_ARM_HEAD := $(HEAD)
+pr-arm: export PR_ARM_HEAD_SET := $(PR_ARM_HEAD_SET)
+pr-arm: export PR_ARM_REPO := $(REPO)
+pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
-	@uv run -- python scripts/pr_arm.py $(if $(PR),--pr $(PR),) $(if $(HEAD),--head $(HEAD),) $(if $(REPO),--repo $(REPO),)
+	@uv run -- python scripts/pr_arm.py
 
 # Declares the branch final and arms auto-merge / queue enrollment.
 #

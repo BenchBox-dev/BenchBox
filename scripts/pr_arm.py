@@ -18,10 +18,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -84,6 +85,12 @@ def arm(
     unpublished: Callable[[Path], list[str]] = pr_landing.unpublished_work,
     threads: Callable[[Runner, str, int], bool] = pr_landing.unresolved_review_threads,
 ) -> int:
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo):
+        print(f"pr-arm: refusing: --repo must be owner/name, got {repo!r}", file=sys.stderr)
+        return 2
+    if head is not None and not re.fullmatch(r"[0-9a-f]{40}", head):
+        print(f"pr-arm: refusing: --head must be a full lowercase commit SHA, got {head!r}", file=sys.stderr)
+        return 2
     try:
         code, out = run(["git", "rev-parse", "HEAD"])
         if code != 0:
@@ -124,11 +131,20 @@ def arm(
         return 1
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def _environment_selection(env: Mapping[str, str]) -> dict[str, str | None]:
+    """Read the values `make pr-arm` exported; `_SET` distinguishes an omitted variable from an empty one."""
+    return {
+        name: env.get(f"PR_ARM_{name.upper()}") if env.get(f"PR_ARM_{name.upper()}_SET") == "1" else None
+        for name in ("pr", "head", "repo")
+    }
+
+
+def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None) -> int:
+    selected = _environment_selection(os.environ if env is None else env)
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--pr", help="pull request number; default: the open PR into develop for the current branch")
-    parser.add_argument("--head", help="expected head SHA; refused unless it equals local HEAD")
-    parser.add_argument("--repo", default=REPOSITORY)
+    parser.add_argument("--pr", default=selected["pr"], help="pull request number; default: the current branch's PR")
+    parser.add_argument("--head", default=selected["head"], help="expected head SHA; refused unless it is local HEAD")
+    parser.add_argument("--repo", default=selected["repo"] if selected["repo"] is not None else REPOSITORY)
     args = parser.parse_args(argv)
     return arm(args.pr, args.head, args.repo)
 

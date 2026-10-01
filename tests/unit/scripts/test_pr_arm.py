@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
+import subprocess
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -248,3 +250,112 @@ def test_makefile_exposes_pr_arm_through_the_helper_and_declares_it_phony() -> N
     assert "scripts/pr_arm.py" in makefile
     phony = next(line for line in makefile.splitlines() if line.startswith(".PHONY: pr-arm "))
     assert re.search(r"(?<![\w-])pr-arm(?![\w-])", phony)
+
+
+def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str, str]]:
+    """Run the real `make pr-arm` with a recording `uv` shim; return the shim's argv and PR_ARM_* environment."""
+    shim = tmp_path / "uv"
+    shim.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD/argv"\nenv | grep "^PR_ARM_" | sort > "$RECORD/env"\n')
+    shim.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k not in {"PR", "HEAD", "REPO"} and not k.startswith("PR_ARM_")}
+    env.update({"PATH": f"{tmp_path}{os.pathsep}{env['PATH']}", "RECORD": str(tmp_path)})
+    result = subprocess.run(
+        ["make", "--no-print-directory", "pr-arm", *assignments],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    argv = (tmp_path / "argv").read_text().splitlines()
+    pairs = [line.split("=", 1) for line in (tmp_path / "env").read_text().splitlines()]
+    return argv, dict(pairs)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "7 --pr 8",
+        "7 --repo another/repository",
+        "7; echo injected",
+        "$(echo injected)",
+        "'7'",
+        '"7"',
+        "7 ",  # make trims leading blanks off an assignment itself, but keeps trailing ones
+        "https://github.com/other-org/other-repo/pull/7",
+    ],
+)
+def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(tmp_path: Path, value: str) -> None:
+    argv, env = _make_pr_arm(tmp_path, f"PR={value}")
+    # The helper gets no extra command-line words, so a value cannot add `--pr 8` or `--repo x/y`.
+    assert argv == ["run", "--", "python", "scripts/pr_arm.py"]
+    assert env["PR_ARM_PR"] == value
+    assert env["PR_ARM_PR_SET"] == "1"
+
+
+def test_the_make_wrapper_does_not_run_a_shell_expansion_inside_a_value(tmp_path: Path) -> None:
+    marker = tmp_path / "ran"
+    _make_pr_arm(tmp_path, f"PR=7; touch {marker}")
+    _make_pr_arm(tmp_path, f"PR=$(shell touch {marker})")
+    assert not marker.exists()
+
+
+def test_the_make_wrapper_tells_an_omitted_variable_from_an_empty_one(tmp_path: Path) -> None:
+    _, omitted = _make_pr_arm(tmp_path)
+    assert omitted.get("PR_ARM_PR_SET", "") == ""
+    _, empty = _make_pr_arm(tmp_path, "PR=")
+    assert empty["PR_ARM_PR_SET"] == "1"
+    assert empty["PR_ARM_PR"] == ""
+
+
+def test_main_passes_the_raw_environment_values_to_arm(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[tuple] = []
+    monkeypatch.setattr(pr_arm, "arm", lambda pr, head, repo: seen.append((pr, head, repo)) or 0)
+    env = {
+        "PR_ARM_PR": "7 --pr 8",
+        "PR_ARM_PR_SET": "1",
+        "PR_ARM_HEAD": HEAD,
+        "PR_ARM_HEAD_SET": "1",
+        "PR_ARM_REPO": "other-org/other-repo",
+        "PR_ARM_REPO_SET": "1",
+    }
+    assert pr_arm.main([], env=env) == 0
+    assert seen == [("7 --pr 8", HEAD, "other-org/other-repo")]
+    seen.clear()
+    assert pr_arm.main([], env={}) == 0
+    assert seen == [(None, None, pr_arm.REPOSITORY)]
+    seen.clear()
+    assert pr_arm.main([], env={"PR_ARM_PR": "", "PR_ARM_PR_SET": "1"}) == 0
+    assert seen == [("", None, pr_arm.REPOSITORY)]  # an explicitly empty selector is not an omitted one
+
+
+@pytest.mark.parametrize("repo", ["other", "a/b/c", "a b/c", "a/b;c", "", "https://github.com/a/b"])
+def test_a_repository_that_is_not_owner_slash_name_is_refused_before_any_command(
+    repo: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[list[str]] = []
+
+    def run(cmd: Sequence[str]) -> tuple[int, str]:
+        calls.append(list(cmd))
+        return 0, ""
+
+    assert pr_arm.arm("7", None, repo=repo, run=run) == 2
+    assert calls == []
+    assert "owner/name" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("head", ["abc123", "A" * 40, "a" * 39, "a" * 41, "", "main", HEAD + " --force"])
+def test_a_head_that_is_not_a_full_lowercase_sha_is_refused_before_any_command(
+    head: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    calls: list[list[str]] = []
+
+    def run(cmd: Sequence[str]) -> tuple[int, str]:
+        calls.append(list(cmd))
+        return 0, ""
+
+    assert pr_arm.arm("7", head, run=run) == 2
+    assert calls == []
+    assert "full lowercase commit SHA" in capsys.readouterr().err

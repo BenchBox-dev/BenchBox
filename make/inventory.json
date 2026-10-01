@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "5a9d518126090ec290af75cf570bb1268a2f02eca928baad89ab3aac79528e79",
+  "contract_sha256": "b2b12afdbdff9ff806dff5bf3eb92af1e7f4d97b3a9ab5aba34eae3b135dd181",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1132,9 +1132,39 @@
     ],
     "pr-arm": [
       {
+        "header": "pr-arm: export PR_ARM_PR := $(PR)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: export PR_ARM_PR_SET := $(PR_ARM_PR_SET)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: export PR_ARM_HEAD := $(HEAD)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: export PR_ARM_HEAD_SET := $(PR_ARM_HEAD_SET)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: export PR_ARM_REPO := $(REPO)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "pr-arm:",
-        "recipe": "\t@uv run -- python scripts/pr_arm.py $(if $(PR),--pr $(PR),) $(if $(HEAD),--head $(HEAD),) $(if $(REPO),--repo $(REPO),)",
-        "recipe_sha256": "42e8128180cf7d0c2082b8d059351c453cc3b25f08dc4e31d4de3f20eeab17dc"
+        "recipe": "\t@uv run -- python scripts/pr_arm.py",
+        "recipe_sha256": "9e27f968fbcd559394867bb09c716426f82a3fc201e05e967a1d0ea349a4a2dc"
       }
     ],
     "pr-arm-auto-merge": [
@@ -2166,7 +2196,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "5b1b22e85f9afe752501a67a1e9686d35f86a4edda0c7edc7be757c320d1b42d",
+  "semantic_sha256": "d30c0dfb655ca3b8e41dbab4460b1c30b3fc34c961cd368deb237e31af2088d1",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3999,9 +4029,93 @@
       ]
     },
     {
-      "body": "pr-arm:\n\t@uv run -- python scripts/pr_arm.py $(if $(PR),--pr $(PR),) $(if $(HEAD),--head $(HEAD),) $(if $(REPO),--repo $(REPO),)",
+      "body": "PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)",
+      "kind": "variable",
+      "name": "PR_ARM_PR_SET",
+      "sha256": "17385abf58066e5f38511909d7bc319d747d60dd1be834c1b2240fff71705cb9"
+    },
+    {
+      "body": "PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)",
+      "kind": "variable",
+      "name": "PR_ARM_HEAD_SET",
+      "sha256": "547149faea638dd3a5ce70b7de9f025299059696913aa166b057b5f3aab203e0"
+    },
+    {
+      "body": "PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)",
+      "kind": "variable",
+      "name": "PR_ARM_REPO_SET",
+      "sha256": "b84e5c990c6bc5770585ab8f599e1b1ba2295fe817f93849d315fdce8ea83561"
+    },
+    {
+      "body": "override PR := $(value PR)",
+      "kind": "variable",
+      "name": "PR",
+      "sha256": "a24cb946e1233e8c20a7ac441ce8daf6c3d77fbc1abe4e54d4500fc05eac14c5"
+    },
+    {
+      "body": "override HEAD := $(value HEAD)",
+      "kind": "variable",
+      "name": "HEAD",
+      "sha256": "39949f58d2624683c7306d206ebb337f563c165ae16803e34e141b1e8a6dc12b"
+    },
+    {
+      "body": "override REPO := $(value REPO)",
+      "kind": "variable",
+      "name": "REPO",
+      "sha256": "0c56bf4249c75a430d4062c81d2fa3a11a2609ee87b74891730bbc37f50b3e68"
+    },
+    {
+      "body": "pr-arm: export PR_ARM_PR := $(PR)",
       "kind": "rule",
-      "sha256": "f85a551ac077e4b981030b049865a81321abfa8d12466df188c3509bbeb313ea",
+      "sha256": "b76e7b38b63f2d13927e97ba917822908900fd930aafd6cf67a64b24e882d652",
+      "targets": [
+        "pr-arm"
+      ]
+    },
+    {
+      "body": "pr-arm: export PR_ARM_PR_SET := $(PR_ARM_PR_SET)",
+      "kind": "rule",
+      "sha256": "eaedb48a676306889315672b8a035d4bde58a227b863961c508aab9a266599d5",
+      "targets": [
+        "pr-arm"
+      ]
+    },
+    {
+      "body": "pr-arm: export PR_ARM_HEAD := $(HEAD)",
+      "kind": "rule",
+      "sha256": "b1350591635b1623032f0a2ab2e1a1933b1af0805f52ddf951a0a4ad84e9bee5",
+      "targets": [
+        "pr-arm"
+      ]
+    },
+    {
+      "body": "pr-arm: export PR_ARM_HEAD_SET := $(PR_ARM_HEAD_SET)",
+      "kind": "rule",
+      "sha256": "ca16e7f85c9fa643e8d0f311294969475abd0867dc3ca4c4a260ab98a60d4970",
+      "targets": [
+        "pr-arm"
+      ]
+    },
+    {
+      "body": "pr-arm: export PR_ARM_REPO := $(REPO)",
+      "kind": "rule",
+      "sha256": "05e29fc9cb10f485abb5addb3965feb20af395988ca208b7b61d51ae50329dc7",
+      "targets": [
+        "pr-arm"
+      ]
+    },
+    {
+      "body": "pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)",
+      "kind": "rule",
+      "sha256": "0125f0a9d85cfa922bbc7efe85ead9e8c80ec9edac58ccc1f11f25e665d0b014",
+      "targets": [
+        "pr-arm"
+      ]
+    },
+    {
+      "body": "pr-arm:\n\t@uv run -- python scripts/pr_arm.py",
+      "kind": "rule",
+      "sha256": "7ef772dd21c8da8e2020baa21f912c4eb69ac869d51c93cb64192de6a4fd1832",
       "targets": [
         "pr-arm"
       ]
@@ -4787,6 +4901,13 @@
         "operator": ":="
       }
     ],
+    "HEAD": [
+      {
+        "body": "override HEAD := $(value HEAD)",
+        "directive": "override",
+        "operator": ":="
+      }
+    ],
     "JOINORDER_BUILD_DIR": [
       {
         "body": "JOINORDER_BUILD_DIR ?= $(HOME)/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1",
@@ -4829,11 +4950,39 @@
         "operator": "?="
       }
     ],
+    "PR": [
+      {
+        "body": "override PR := $(value PR)",
+        "directive": "override",
+        "operator": ":="
+      }
+    ],
     "PREFLIGHT_CMD": [
       {
         "body": "PREFLIGHT_CMD ?= make pr-preflight",
         "directive": "",
         "operator": "?="
+      }
+    ],
+    "PR_ARM_HEAD_SET": [
+      {
+        "body": "PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)",
+        "directive": "",
+        "operator": ":="
+      }
+    ],
+    "PR_ARM_PR_SET": [
+      {
+        "body": "PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)",
+        "directive": "",
+        "operator": ":="
+      }
+    ],
+    "PR_ARM_REPO_SET": [
+      {
+        "body": "PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)",
+        "directive": "",
+        "operator": ":="
       }
     ],
     "PR_FANOUT_JOBS": [
@@ -4917,6 +5066,13 @@
       {
         "body": "RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result",
         "directive": "",
+        "operator": ":="
+      }
+    ],
+    "REPO": [
+      {
+        "body": "override REPO := $(value REPO)",
+        "directive": "override",
         "operator": ":="
       }
     ],
