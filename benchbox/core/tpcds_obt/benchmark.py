@@ -132,6 +132,8 @@ class TPCDSOBTBenchmark(BaseBenchmark):
     # must not redirect its output_dir to the shared TPC-DS root: that would
     # hide the generated OBT parquet from the cloud loader.
     GENERATES_OWN_OUTPUT = True
+    # Every query reads this table; the TPC-DS source tables only feed its build.
+    REQUIRED_LOADED_TABLES = ("tpcds_sales_returns_obt",)
 
     def __init__(
         self,
