@@ -200,7 +200,7 @@ def _bundle_phase(data: dict) -> str:
 
     Mirrors ``_project/scripts/explorer_pipeline/transformer.py``: an
     explicit ``benchmark.test_type`` wins, otherwise the ``phases`` object
-    decides between power and throughput. ``or`` (not ``dict.get``
+    decides between power and throughput, ignoring ``NOT_RUN`` placeholders. ``or`` (not ``dict.get``
     defaults) so an explicit ``null`` can never poison downstream
     sorting with ``None``.
     """
@@ -209,11 +209,23 @@ def _bundle_phase(data: dict) -> str:
     if declared:
         return str(declared)
     phases = data.get("phases") or {}
-    if phases.get("power_test"):
+    if _phase_executed(phases.get("power_test")):
         return "power"
-    if phases.get("throughput_test"):
+    if _phase_executed(phases.get("throughput_test")):
         return "throughput"
     return "unknown"
+
+
+def _phase_executed(phase: object) -> bool:
+    """Whether a ``phases`` entry records a phase that actually ran.
+
+    Bundles list skipped phases as ``{"status": "NOT_RUN"}`` placeholders,
+    which are non-empty and therefore truthy; only a non-empty entry whose
+    status is not ``NOT_RUN`` counts.
+    """
+    if not isinstance(phase, dict) or not phase:
+        return False
+    return str(phase.get("status") or "").upper() != "NOT_RUN"
 
 
 def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:

@@ -349,15 +349,38 @@ class TestMain:
         assert phases["viaphases.json"] == "throughput"
         assert inventory["summary"]["by_phase"] == {"throughput": 1, "unknown": 1}
 
+    def test_phase_fallback_ignores_not_run_placeholders(self, tmp_path: Path) -> None:
+        throughput_only = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        throughput_only["phases"] = {
+            "power_test": {"status": "NOT_RUN"},
+            "throughput_test": {"status": "COMPLETED", "duration_ms": 10},
+        }
+        (tmp_path / "tp.json").write_text(json.dumps(throughput_only), encoding="utf-8")
+        power_only = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        power_only["phases"] = {
+            "power_test": {"status": "COMPLETED", "duration_ms": 10},
+            "throughput_test": {"status": "NOT_RUN"},
+        }
+        (tmp_path / "pw.json").write_text(json.dumps(power_only), encoding="utf-8")
+        neither = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0)
+        neither["phases"] = {"power_test": {"status": "NOT_RUN"}, "throughput_test": {"status": "NOT_RUN"}}
+        (tmp_path / "none.json").write_text(json.dumps(neither), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases == {"tp.json": "throughput", "pw.json": "power", "none.json": "unknown"}
+
     def test_throughput_runs_do_not_pollute_power_cohorts(self, tmp_path: Path) -> None:
         power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
         power["benchmark"]["test_type"] = "power"
         (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
-        tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        # A different platform per phase: a merged cohort would list both.
+        tp = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DataFusion")
         tp["benchmark"]["test_type"] = "throughput"
         (tmp_path / "throughput.json").write_text(json.dumps(tp), encoding="utf-8")
 
         inventory = script.generate_inventory(tmp_path)
 
         assert inventory["cohorts"]["tpch@sf1.0"] == ["DuckDB v1.0.0"]
-        assert inventory["cohorts"]["tpch@sf1.0#throughput"] == ["DuckDB v1.0.0"]
+        assert inventory["cohorts"]["tpch@sf1.0#throughput"] == ["DataFusion v1.0.0"]
