@@ -249,8 +249,8 @@ class TestBenchmarkWithActualCatalog:
 
         queries = benchmark.get_queries()
 
-        # Should have all queries (136 as of December 2025 with modern SQL features)
-        assert len(queries) >= 136
+        # Should have all queries (157 runtime SQL queries; 153 DuckDB-transpilable)
+        assert len(queries) >= 157
 
     def test_get_queries_with_duckdb_skips_known_non_comparable_queries(self):
         """Test DuckDB skips queries that cannot be compared with base semantics."""
