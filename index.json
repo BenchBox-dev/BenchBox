@@ -17871,6 +17871,13 @@
       "status": "open",
       "title": "Stop overriding Spark defaults in notuning runs; record harness settings"
     },
+    "spark-ddl-generator-delta-default-mismatch": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Stop mapping spark to the Delta DDL generator for Parquet/ORC tables"
+    },
     "spark-effective-config-preflight-capture": {
       "claim": null,
       "needs": [

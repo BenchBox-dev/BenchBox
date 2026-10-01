@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Dry-run DDL for a default native Spark run matches what the adapter actually executes for Parquet.",
+    "Delta and Iceberg table formats still use their generators.",
+    "Registry and generator agree for spark (covered by the capability drift test)."
+  ],
+  "context": "Defect found during the Spark tuning review (2026-09-30) via Opus review Consideration on ddl_generator.py:812. Separate from, and not blocking, the Spark tuning items; spark-tuning-discovery-cli notes the interim mismatch.",
+  "description": "benchbox/core/tuning/ddl_generator.py ~L812 maps \"spark\" to DeltaDDLGenerator, but native Spark defaults to Parquet (spark.py table_format default \"parquet\"). Dry-run DDL preview (core/dryrun.py ~L1047-1054 via get_ddl_generator) therefore renders Delta DDL for a default Parquet Spark run, and the capability registry (once spark has a row) would disagree with the generator. Also: constraint DDL is stripped only for Parquet/ORC; Delta and Iceberg use strip_v1_constraints=False (spark.py ~L638-647), so any registry note about constraints must be table-format aware. Decide generator selection by table_format (parquet/orc/delta/iceberg) rather than by platform name, keeping databricks and delta mapped as now.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:15:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "768b17ee3e874d889c8e0be4bb84adb9",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    }
+  ]
+}
