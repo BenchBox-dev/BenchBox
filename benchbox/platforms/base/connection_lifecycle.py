@@ -285,12 +285,24 @@ class ConnectionLifecycleMixin:
                     self.logger.warning(f"Deleted database directory: {db_path_obj}")
                 else:
                     self.logger.warning("Database path exists but is neither file nor directory")
+            elif self.reset_database_in_place(**connection_config):
+                self.logger.warning("Emptied existing tables in place; schema kept for reload")
             else:
                 self.drop_database(**connection_config)
                 self.logger.warning("Dropped database")
         except Exception as e:
             self.logger.error(f"Failed to remove database: {e}")
             raise RuntimeError(f"Could not remove existing database: {e}") from e
+
+    def reset_database_in_place(self, **connection_config) -> bool:
+        """Empty a server-side database for reload without dropping it.
+
+        Return True when the database was reset in place, so the caller skips
+        ``drop_database``. The default does nothing and returns False. Override
+        it where dropping objects is costly, for example where dropped tables
+        keep counting against a catalog quota.
+        """
+        return False
 
     def drop_database(self, **connection_config) -> None:
         """Drop/remove database on server (for server-based databases).
