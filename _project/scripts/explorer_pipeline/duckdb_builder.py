@@ -106,8 +106,8 @@ def _normalized_cost_column_values(entry: ManifestEntry) -> tuple:
     ``NormalizedCost`` dataclass instance bypassed that validation: the
     dataclass accepts out-of-vocabulary statuses and empty provenance
     strings, and ``ManifestEntry`` carries an already-created instance
-    without revalidation. Only finiteness of the numeric payload cannot be
-    checked at ingest time.
+    without revalidation. Finiteness of the numeric payload is enforced here
+    for the same reason.
     """
     cost = entry.normalized_cost
     return (
