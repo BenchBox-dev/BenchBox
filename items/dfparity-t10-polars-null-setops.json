@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Each of the four queries has a stated cause with evidence",
+    "Q15, Q34, Q38 and Q87 match on the expression family at SF=0.1 after the fix, or are reclassified with evidence",
+    "pandas results for these queries are unchanged"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T10). Hypothesis only. D4 (NULL-order policy) is recorded in dfparity-t00-owner-decisions: NULL order is fixed in implementations, not absorbed by the comparator. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Hypothesis from a prior review (not verified by me): Q15 and Q34 on the expression family put NULLs first at position 0, and Q38/Q87 (EXCEPT/INTERSECT) differ because a Polars join treats NULL keys as unequal while SQL set operations treat them as equal (pandas merge matches NaN keys and Q38/Q87 pass on pandas). Reproduce, then fix at the cause with NULL-safe set operations and explicit NULL ordering. If a case is actually parameter drift or a tie, reclassify it.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:03:07Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9741522b3c164c378c2c24b50c0ea7c9",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
