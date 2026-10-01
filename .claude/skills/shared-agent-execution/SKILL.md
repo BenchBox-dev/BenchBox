@@ -25,13 +25,13 @@ review; use `low` for mechanical bulk work. For `agy`, effort is the
 no `--effort` flag.
 
 - **Tier 1: Strategic**
-  - Models: `gpt-5.6-sol`, `claude-fable-5`, `grok-4.6`, `gemini-3.7-flash-high`
+  - Models: `gpt-6-astra`, `claude-fable-5`, `grok-4.6`, `gemini-3.8-flash-high`
   - Usage: Strategic planning, architecture, high-risk tradeoffs, and final adversarial review.
 - **Tier 2: Generalist**
-  - Models: `gpt-5.6-terra`, `claude-opus-5`, `grok-4.5`, `gemini-3.7-flash-medium`, `muse-spark-1.2`
+  - Models: `gpt-6.1-sol`, `claude-opus-5-5`, `grok-4.5`, `gemini-3.8-flash-medium`, `muse-spark-1.3`
   - Usage: Management, decomposition, integration, investigation, and routine review.
 - **Tier 3: Contributor**
-  - Models: `gpt-5.6-luna`, `claude-sonnet-5`, `gemini-3.7-flash-low`, `gemini-3.7-flash-tiered`, `muse-spark-1.2-contributor`
+  - Models: `gpt-6-luna`, `claude-sonnet-5-5`, `gemini-3.8-flash-low`, `gemini-3.8-flash-tiered`, `muse-spark-1.3-contributor`
   - Usage: Focused implementation, bounded research, bulk work, and parallel coverage.
 
 ## Reasoning Effort Reference
@@ -47,7 +47,7 @@ no `--effort` flag.
 | **prime-agent** | `--thinking <level>` | `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
 
 For `jcode`, `opencode`, `hermes`, `goose`, and `aider`, effort is selected via
-model variants (e.g. `gemini-3.7-flash-tiered`, `:thinking` suffix) or provider
+model variants (e.g. `gemini-3.8-flash-tiered`, `:thinking` suffix) or provider
 settings.
 
 ## Dispatch Rules
