@@ -6131,6 +6131,15 @@
       "status": "open",
       "title": "Spike a qualification-value SQL renderer and retire the generate_with_parameters stub"
     },
+    "dfparity-t21-tpch-seeded-path": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Investigate the TPC-H seeded-run reference-seed path (owner-contested; verify before any change)"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],

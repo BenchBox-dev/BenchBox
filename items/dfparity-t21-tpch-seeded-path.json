@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "One seeded SF=1 DataFrame-vs-SQL comparison with seed 17039360 is run (with approval for SF=1) and its parameter bindings and validation labels are reported",
+    "Findings are presented to the owner with a recommendation; no TPC-H code is changed without the owner's decision (D5)",
+    "The stale set_parameter_overrides docstring and the 'stream 0' comment are corrected only if the owner agrees"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T21). Owner stance: does NOT accept earlier reviewers' TPC-H claims. Treat this strictly as verification.",
+  "description": "The project owner does not accept earlier reviewers' TPC-H claims, so this item starts from facts I tested or verified and changes nothing without an owner decision. Tested with the bundled qgen on Q3: -d gives BUILDING / 1995-03-15; -r 17039360 (TPCH_SF1_REFERENCE_SEED, benchbox/core/tpch/benchmark.py:31-47, commented as the seed the official answer files used) gives HOUSEHOLD / 1995-03-24; -r 101000000 gives BUILDING / 1995-03-31. Verified: _tpch_reference_context (benchbox/core/dataframe/query_validation.py:209-215) returns true at SF=1 when the seed is None or equals the reference seed, and DataFrame runs bind the -d defaults. Also verified: the unseeded path is aligned by design (code comments; extracted qgen -d parameters equal get_tpch_parameters for all 22 queries at SF=1 and SF=0.01) and no production caller injects seed-derived TPC-H overrides (set_parameter_overrides docstring is stale). Not verified: a seeded end-to-end run, throughput-test seed handling, the 'stream 0' comment at cross_surface.py:1684.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:06:50Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ce3471d221cf49fc92245c55919bbaa1",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
