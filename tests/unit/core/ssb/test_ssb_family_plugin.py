@@ -91,4 +91,4 @@ def test_registry_wrapper_and_loader_counts_are_unchanged() -> None:
     assert summary["total"] == 23
     assert summary["loader"] == len(list_loader_benchmark_ids()) == 23
     assert summary["public"] == len(list_public_benchmark_ids()) == 22
-    assert summary["support_status"]["stable"] == 5
+    assert summary["support_status"]["stable"] == 6

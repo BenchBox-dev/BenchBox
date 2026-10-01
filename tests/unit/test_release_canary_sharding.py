@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import itertools
+import json
 import re
 from pathlib import Path
 
@@ -12,9 +13,11 @@ import yaml
 from scripts.release_canary_sharding import (
     DEFAULT_SHARD_COUNT,
     MARKER_EXPRESSION,
+    MEDIUM_MARKER_EXPRESSION,
     collect_node_ids,
     parse_collection_output,
     partition_node_ids,
+    verify_medium_shards,
     write_shard,
 )
 
@@ -114,6 +117,131 @@ def test_collection_and_shard_manifests_conserve_node_ids(tmp_path: Path):
     )
     assert len(assigned) == len(set(assigned)) == 7
     assert sorted(assigned) == sorted(nodeids.read_text(encoding="utf-8").splitlines())
+
+
+def _medium_artifacts(root: Path, sha: str) -> list[str]:
+    collection = root / f"t2-medium-nodeids-{sha}"
+    collection.mkdir()
+    raw = collection / "raw.txt"
+    ids = [f"tests/unit/test_a.py::test_{index}" for index in range(6)]
+    raw.write_text("\n".join(ids) + "\n6/100 tests collected\n")
+    collect_node_ids(
+        raw,
+        collection / "medium-nodeids.txt",
+        collection / "medium-collection.json",
+        expected_count=6,
+        shard_count=2,
+        checked_sha=sha,
+        workflow="ci.yml",
+        job="medium-collect",
+        marker_expression=MEDIUM_MARKER_EXPRESSION,
+    )
+    for index in range(2):
+        shard = root / f"t2-medium-shard-{index}-{sha}"
+        shard.mkdir()
+        write_shard(
+            collection / "medium-nodeids.txt",
+            shard / "assigned.txt",
+            shard / "summary.json",
+            shard_index=index,
+            shard_count=2,
+            workflow="ci.yml",
+            job="medium-test",
+            marker_expression=MEDIUM_MARKER_EXPRESSION,
+            collection_summary=collection / "medium-collection.json",
+            checked_sha=sha,
+        )
+        assigned = partition_node_ids(ids, index, 2)
+        (shard / f"shard-{index}-execution.json").write_text(
+            json.dumps(
+                {
+                    "commit_sha": sha,
+                    "complete": True,
+                    "pytest_exit_status": 0,
+                    "assigned_node_ids": assigned,
+                    "executed_node_ids": assigned,
+                    "collected_node_ids": [assigned, assigned],
+                    "node_outcomes": [
+                        {
+                            "node_id": node_id,
+                            "reports": [
+                                {"phase": phase, "outcome": "passed", "skip_reason": None, "xfail_reason": None}
+                                for phase in ("setup", "call", "teardown")
+                            ],
+                        }
+                        for node_id in assigned
+                    ],
+                }
+            )
+        )
+    return ids
+
+
+def test_medium_artifact_union_covers_the_exact_collection(tmp_path: Path) -> None:
+    _medium_artifacts(tmp_path, "a" * 40)
+    verify_medium_shards(tmp_path, "a" * 40)
+
+
+@pytest.mark.parametrize(
+    "defect", ["missing", "wrong-sha", "failure", "incomplete", "deselected", "duplicated", "wrong-collection"]
+)
+def test_medium_shard_evidence_refuses_missing_or_changed_coverage(tmp_path: Path, defect: str) -> None:
+    sha = "a" * 40
+    _medium_artifacts(tmp_path, sha)
+    path = tmp_path / f"t2-medium-shard-1-{sha}" / "shard-1-execution.json"
+    data = json.loads(path.read_text())
+    if defect == "missing":
+        path.unlink()
+    else:
+        if defect == "wrong-sha":
+            data["commit_sha"] = "b" * 40
+        elif defect == "failure":
+            data["pytest_exit_status"] = 1
+        elif defect == "incomplete":
+            data["complete"] = False
+        elif defect == "deselected":
+            data["executed_node_ids"].pop()
+        elif defect == "duplicated":
+            data["executed_node_ids"].append(data["executed_node_ids"][0])
+        else:
+            data["collected_node_ids"][1].pop()
+        path.write_text(json.dumps(data))
+    with pytest.raises((ValueError, FileNotFoundError)):
+        verify_medium_shards(tmp_path, sha)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("commit_sha", "b" * 40),
+        ("node_ids_sha256", "wrong"),
+        ("shard_count", 3),
+        ("total_count", 5),
+        ("marker_expression", MARKER_EXPRESSION),
+        ("workflow", "other.yml"),
+    ],
+)
+def test_medium_partition_refuses_a_changed_collection(tmp_path: Path, field: str, value: object) -> None:
+    sha = "a" * 40
+    _medium_artifacts(tmp_path, sha)
+    collection = tmp_path / f"t2-medium-nodeids-{sha}"
+    summary = collection / "medium-collection.json"
+    data = json.loads(summary.read_text())
+    data[field] = value
+    summary.write_text(json.dumps(data))
+    with pytest.raises(ValueError, match="does not match"):
+        write_shard(
+            collection / "medium-nodeids.txt",
+            tmp_path / "ids",
+            tmp_path / "summary",
+            shard_index=0,
+            shard_count=2,
+            workflow="ci.yml",
+            job="medium-test",
+            marker_expression=MEDIUM_MARKER_EXPRESSION,
+            collection_summary=summary,
+            checked_sha=sha,
+        )
 
 
 def test_release_canary_workflow_uses_collection_artifact_and_six_single_threaded_shards():
