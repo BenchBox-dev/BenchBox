@@ -4,7 +4,7 @@
     "Pandas Q78 completes at SF=1 without a timeout (needs explicit approval for the run) or the bound is stated",
     "Q78 pandas result status is recorded before and after"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T13). The SF=1 180.29 s figure is the probe's own 180 s alarm, so it is a lower bound. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T13). The SF=1 180.29 s figure is the probe's own 180 s alarm, so it is a lower bound. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-01: fixed and published as PR #2504 (branch fix/tpcds-q78-pandas-perf, worktree ../BenchBox.wt-tpcds-q78-perf, head 5e1d6dc99), held, auto-merge withheld; make pr-preflight exit 0 on that head. CAUSE (TESTED by cProfile at SF 0.1): essentially all time is the nine groupby agg calls using lambda values.sum(min_count=1) (_python_agg_general, one Python call per group). Fix: built-in sum plus count, masking empty groups (keeps SQL all-NULL SUM is NULL). Evidence: SF 0.1 pandas Q78 14.26 s before, 0.32 s after (single runs, loaded machine); output identical to before (assert_frame_equal, values, order and dtypes); full probe at 0.1: no cell changed status, pandas total 24.0 s to 9.9 s; staged gate at 0.01 unchanged; new unit test passes on old code, fails when the mask is removed. Q78 status before/after: still divergent on both families at 0.1 (separate cause: the committed baseline note shows None vs 0.0 in an ORDER BY key; not diagnosed here). NOT done: the SF=1 completion criterion needs explicit approval for the run (about 450 s and 3.5 GB); until then the bound is only that SF=0.1 is about 44x faster. Remaining: hosted CI, maintainer merge, SF=1 run if approved, then finish.",
   "description": "Measured (one run each, loaded machine): pandas Q78 takes 4.8 s at SF=0.03, 7.9 s at 0.05, 14.3 s at 0.1 and hit a 180 s probe timeout at SF=1, about half of all pandas time at those scales; it also diverges. Profile the pandas implementation (likely a non-vectorized or quadratic step), fix it, and keep results unchanged or corrected. This blocks the SF=1 oracle lane (dfparity-t18) and the pandas parallel job.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "f7da6d0a05684700bf04b90f38fa2d98",
       "op": "take",
       "op_id": "728822e4bf364301bd5d5bd4ed2d83e8",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T17:01:38Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "af6bfcb727f04ab483d434e8a1081af6",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
