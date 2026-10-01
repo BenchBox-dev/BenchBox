@@ -165,21 +165,32 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       approvedHeadSha: process.env.APPROVED_HEAD_SHA,
       currentHeadSha: process.env.PR_HEAD_SHA,
       reason: process.env.APPROVAL_REASON,
+      approvedChangeDigests: process.env.APPROVED_VISUAL_CHANGE_DIGESTS,
+      changeReason: process.env.VISUAL_CHANGE_APPROVAL_REASON,
     },
   );
-  const { missing, unexpected, changed } = comparison;
+  const { missing, unexpected, changed, changeDigest } = comparison;
+  // The digest is what a maintainer records after reviewing the diagnostics, so print it wherever a
+  // change is reported, approved or not.
+  if (changeDigest) console.info("Visual change digest: %s", changeDigest);
+  const digestHint = changeDigest ? `; visual change digest: ${changeDigest}` : "";
   expect(
     { missing, unexpected },
-    "visual baseline route/viewport matrix must match exactly",
+    `visual baseline route/viewport matrix must match exactly${digestHint}`,
   ).toEqual({ missing: [], unexpected: [] });
-  expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}`).toEqual([]);
+  expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}${digestHint}`).toEqual([]);
 
   if (comparison.approvalApplied) {
+    const reason =
+      comparison.approvalBasis === "change-digest"
+        ? process.env.VISUAL_CHANGE_APPROVAL_REASON
+        : process.env.APPROVAL_REASON;
     console.info(
-      "Exact-head visual approval accepted %d changed and %d unexpected capture(s). Reason: %s",
+      "Visual approval (%s) accepted %d changed and %d unexpected capture(s). Reason: %s",
+      comparison.approvalBasis,
       comparison.approvedChanged.length,
       comparison.approvedUnexpected.length,
-      JSON.stringify(process.env.APPROVAL_REASON?.trim()),
+      JSON.stringify(reason?.trim()),
     );
   }
 });

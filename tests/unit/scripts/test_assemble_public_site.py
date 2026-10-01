@@ -117,3 +117,5 @@ def test_docs_workflow_reuses_assembler_and_binds_visual_approval_to_event_head(
     assert "github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA" in workflow
     assert "github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON" in workflow
     assert "github.event_name == 'pull_request' && vars.APPROVAL_REASON" in workflow
+    assert "APPROVED_VISUAL_CHANGE_DIGESTS: ${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}" in workflow
+    assert "VISUAL_CHANGE_APPROVAL_REASON: ${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}" in workflow

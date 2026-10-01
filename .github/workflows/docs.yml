@@ -309,6 +309,10 @@ jobs:
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
           APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
           APPROVAL_REASON: ${{ github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON || github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
+          # Content-bound approval (this step runs only for pull_request and merge_group): recorded at PR
+          # review time and valid in the merge group, whose head SHA is unknown until the group runs.
+          APPROVED_VISUAL_CHANGE_DIGESTS: ${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}
+          VISUAL_CHANGE_APPROVAL_REASON: ${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 

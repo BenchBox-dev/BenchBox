@@ -81,6 +81,10 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     assert "merge_group.head_sha" in run["env"]["PR_HEAD_SHA"]
     assert "APPROVED_MERGE_GROUP_SHA" in run["env"]["APPROVED_HEAD_SHA"]
     assert "MERGE_GROUP_APPROVAL_REASON" in run["env"]["APPROVAL_REASON"]
+    # Content-bound approval is read the same way in both events, because the merge group's own
+    # head SHA is unknown until it runs, so only a digest recorded at review time can match it.
+    assert run["env"]["APPROVED_VISUAL_CHANGE_DIGESTS"] == "${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}"
+    assert run["env"]["VISUAL_CHANGE_APPROVAL_REASON"] == "${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}"
     assert run["env"]["E2E_PAGES_SHAPED"] == "1"
     assert "public-site-visual" in run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 
@@ -340,3 +344,11 @@ def test_input_classifier_uses_exact_base_diff(tmp_path: Path, event: str, chang
     assert result.returncode == 0, result.stderr
     assert f"changed={expected}" in output.read_text()
     assert f"base_sha={base_sha}" in output.read_text()
+
+
+def test_the_approval_procedure_documents_the_variables_the_workflow_reads() -> None:
+    # A maintainer follows the doc, so a variable the workflow reads and the doc omits would leave
+    # an intentional visual change with no way through the queue.
+    doc = (REPO_ROOT / "docs/development/results-explorer-browser-testing.md").read_text()
+    for variable in ("APPROVED_VISUAL_CHANGE_DIGESTS", "VISUAL_CHANGE_APPROVAL_REASON", "Visual change digest:"):
+        assert variable in doc, variable

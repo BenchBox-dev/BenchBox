@@ -104,19 +104,40 @@ finish, then rerun the failed workflow. A PR diagnostic artifact cannot serve
 as recovery input.
 
 An intentional visual change or route/viewport addition needs explicit
-maintainer acceptance. After reviewing the PR's `public-site-visual-diagnostics-*`
-artifact, set the repository variable `APPROVED_HEAD_SHA` to the PR's complete
-head SHA and set `APPROVAL_REASON` to a nonempty review note, then rerun the
-failed workflow. The approval applies only when both values are present and the
-approved SHA exactly equals GitHub's current PR head SHA. For a merge group,
-the maintainer must inspect that group's diagnostics, set
-`APPROVED_MERGE_GROUP_SHA` to its synthetic `merge_group.head_sha`, and set
-`MERGE_GROUP_APPROVAL_REASON` to a nonempty review note. PR approval variables
-cannot approve a merge group. Clear the group variables after the reviewed
-run. It may accept changed
-digests and unexpected new captures, but it never accepts a capture missing
-from the current matrix. Clear both variables after the approved run so only
-one reviewed head occupies the repository-wide approval slot.
+maintainer acceptance, recorded **before the PR is enqueued**. Approve the
+change by its content, not by a commit SHA:
+
+1. Open the PR's failing `Public-site visual regression` run. Its log prints
+   `Visual change digest: <64 hex characters>` and the same value appears in the
+   failure message. Download the `public-site-visual-diagnostics-*` artifact and
+   review every changed or new capture at every viewport.
+2. Add the digest to the repository variable `APPROVED_VISUAL_CHANGE_DIGESTS`
+   (several digests are separated by spaces or commas, so reviewed PRs do not
+   compete for one slot) and set `VISUAL_CHANGE_APPROVAL_REASON` to a nonempty
+   review note.
+3. Rerun the failed PR workflow, then enqueue the PR.
+
+The merge group recomputes the digest from its own captures and accepts the change
+only when it equals a recorded digest. The digest covers each changed capture as
+baseline digest to new digest, plus each new capture, so it matches only the
+exact change that was reviewed against the exact baseline it was reviewed
+against. It stops matching, and the group fails closed, when the group renders a
+reviewed capture differently, when another change appears, or when the base now
+renders the capture differently. In that case review the new diagnostics and
+record the new digest. A digest never accepts a capture missing from the current
+matrix. A recorded digest that no longer matches anything is inert, so it can
+stay until you tidy the variable.
+
+Why not approve a head SHA for the queue: a merge group's `head_sha` is a
+synthetic commit that does not exist until the group forms, and a group whose
+required check fails is removed from the queue within minutes. By the time a
+maintainer can read the group's diagnostics and set `APPROVED_MERGE_GROUP_SHA`,
+the group is usually gone, and a rerun cannot put it back. The PR-level exact-head approval (`APPROVED_HEAD_SHA` and
+`APPROVAL_REASON`, which must equal the PR's current head SHA) still works for
+the `pull_request` check but does not carry into the queue. The merge-group
+variables (`APPROVED_MERGE_GROUP_SHA`, `MERGE_GROUP_APPROVAL_REASON`) remain only
+for a group that is still running when its diagnostics are reviewed; do not rely
+on them for queued PRs.
 
 This approval does not replace a baseline. The protected `develop` push or its
 validated `workflow_dispatch` run uploads the SHA-bound baseline after the
