@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Two configs differing only in nested key order produce the same database name.",
+    "Names for configs without nested dicts are unchanged (golden test) or a documented migration is provided.",
+    "Callers listed in the description are covered by tests."
+  ],
+  "context": "Defect found during the Spark tuning review (2026-09-30), requested as its own item by the user. Not a prerequisite for the Spark tuning items.",
+  "description": "benchbox/utils/database_naming.py ~L206 builds the tuning hash from str(sorted(config_copy.items())), which sorts only top-level keys, so reordering a nested dict (e.g. a platform_optimizations map) changes the generated database name. The hash is md5 truncated to 6 characters. Production callers exist: build_adapter_config (benchbox/platforms/base/config_utils.py ~L239) when no database name is given, plus bigquery.py ~L198 and databricks/adapter.py ~L497. An earlier note that \"Spark does not use hash naming\" was not established; check which Spark-family adapters reach it through build_adapter_config. Fix with canonical JSON (recursive sort_keys) and decide, with the user, how to handle existing names: changing the digest renames databases for configs that contain nested dicts, so either keep the old digest for configs without nested dicts or provide a migration note. Until fixed, new nested maps (such as the spark tuning map) should be sorted when parsed, which spark-session-config-model already requires.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:15:15Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "446b4635da4e4bfdbd02addb2690ac80",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    }
+  ]
+}

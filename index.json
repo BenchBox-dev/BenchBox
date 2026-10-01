@@ -4999,6 +4999,13 @@
       "status": "done",
       "title": "✅ Database Management Boundaries"
     },
+    "database-naming-nested-key-order": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Make database-name tuning hash independent of nested key order"
+    },
     "database-reuse-optimization-for-primitives-and-tpchavoc-benchmarks": {
       "claim": null,
       "needs": [],
