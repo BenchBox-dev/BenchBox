@@ -516,7 +516,12 @@ class ResultIntegrityValidator:
         # from both sides before applying the spec floor.
         billable = total - skipped
         if billable == 0:
-            _pass(checks, _BELIEVABILITY, "success_rate", "All queries skipped by compatibility rules")
+            _fail(
+                checks,
+                _BELIEVABILITY,
+                "success_rate",
+                "No queries executed; all queries skipped by compatibility rules",
+            )
             return
         rate = passed / billable
         if spec is not None and spec.high_failure_expected:

@@ -146,7 +146,7 @@ describe("read-model version guard", () => {
       async query(sql: string): Promise<QueryResult> {
         queries.push(sql);
         if (sql.includes("bench.metadata") && queries.length === 1) {
-          throw new Error("RuntimeError: offset is out of bounds");
+          throw new Error("Cannot read fieldsLength while the snapshot is warming");
         }
         if (sql.includes("bench.metadata")) {
           return {

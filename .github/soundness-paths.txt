@@ -80,3 +80,7 @@ file	docs/operations/results-phase-3-runbook.md
 file	docs/reference/hosted-results-contract.md
 file	docs/reference/threat-model.md
 file	scripts/check_decision_records.py
+prefix	benchbox/_binaries/
+file	benchbox/utils/binary_manifest.py
+file	scripts/bundled_binary_manifest.py
+file	scripts/verify_distribution_binaries.py

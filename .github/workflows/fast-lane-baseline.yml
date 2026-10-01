@@ -44,7 +44,7 @@ jobs:
 
       - name: Count fast-lane tests
         run: |
-          uv run -- python _project/scripts/timing_policy_check.py --emit-fast-count > fast-lane-count.txt || echo "unknown" > fast-lane-count.txt
+          uv run -- python _project/scripts/fast_lane_ceiling_check.py --emit-fast-count > fast-lane-count.txt || echo "unknown" > fast-lane-count.txt
           cat fast-lane-count.txt
 
       - name: Cache fast-lane count

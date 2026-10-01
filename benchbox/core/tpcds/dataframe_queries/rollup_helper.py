@@ -34,6 +34,8 @@ def expand_rollup_expression(
     group_cols: list[str],
     agg_exprs: list[Any],
     ctx: Any,
+    *,
+    count_sources: dict[str, str] | None = None,
 ) -> Any:
     """Expand ROLLUP into multiple GROUP BYs for expression-family DataFrames.
 
@@ -50,6 +52,11 @@ def expand_rollup_expression(
         group_cols: Columns to include in ROLLUP (order matters)
         agg_exprs: List of aggregation expressions
         ctx: DataFrameContext for platform-specific operations
+        count_sources: Optional mapping of agg output name to its source column.
+            A guarded output is restored to NULL when its group has zero
+            non-null inputs, matching SQL (where SUM/AVG over all-NULL inputs
+            is NULL, not 0.0). Outputs without an entry keep the legacy
+            behavior, so existing callers are unaffected.
 
     Returns:
         Combined DataFrame with all rollup levels
@@ -57,6 +64,8 @@ def expand_rollup_expression(
     from benchbox.platforms.dataframe.unified_frame import UnifiedExpr, UnifiedLazyFrame
 
     lit = ctx.lit
+    col = ctx.col
+    count_sources = count_sources or {}
     results = []
     n = len(group_cols)
 
@@ -89,9 +98,23 @@ def expand_rollup_expression(
         # Columns to group by at this level
         current_group = group_cols[: n - i]
 
+        # Companion non-null counts for NULL-guarded outputs. The count shares
+        # the level's grouping so the guard below sees the same groups.
+        guarded = {out: src for out, src in count_sources.items() if out in agg_col_names}
+        count_exprs = [col(source).count().alias(f"__n_{output}") for output, source in guarded.items()]
+
         # Perform aggregation - use *args not list
         # Grand total (empty group) uses select for aggregation
-        grouped = df.group_by(*current_group).agg(*agg_exprs) if current_group else df.select(*agg_exprs)
+        if current_group:
+            grouped = df.group_by(*current_group).agg(*agg_exprs, *count_exprs)
+        else:
+            grouped = df.select(*agg_exprs, *count_exprs)
+
+        # Restore NULL for guarded outputs whose group has zero non-null inputs.
+        for output in guarded:
+            grouped = grouped.with_columns(
+                ctx.when(col(f"__n_{output}") > lit(0)).then(col(output)).otherwise(lit(None)).alias(output)
+            )
 
         # Add NULL for rolled-up columns
         rolled_up_cols = group_cols[n - i :]
@@ -120,6 +143,8 @@ def expand_rollup_pandas(
     group_cols: list[str],
     agg_dict: dict[str, tuple[str, str]],
     ctx: Any,
+    *,
+    count_sources: dict[str, str] | None = None,
 ) -> Any:
     """Expand ROLLUP into multiple GROUP BYs for pandas-family DataFrames.
 
@@ -131,6 +156,11 @@ def expand_rollup_pandas(
         agg_dict: Dictionary mapping output column names to (input_col, agg_func) tuples
                   Example: {"sum_sales": ("sales", "sum"), "avg_qty": ("qty", "mean")}
         ctx: DataFrameContext for platform-specific operations
+        count_sources: Optional mapping of agg output name to its source column.
+            A guarded output is restored to None when its group has zero
+            non-null inputs, matching SQL (where SUM/AVG over all-NULL inputs
+            is NULL, not 0.0). Outputs without an entry keep the legacy
+            behavior, so existing callers are unaffected.
 
     Returns:
         Combined DataFrame with all rollup levels
@@ -142,6 +172,7 @@ def expand_rollup_pandas(
 
     # Get adapter for platform-specific operations (handles Dask as_index=False)
     adapter = ctx._adapter if hasattr(ctx, "_adapter") else None
+    count_sources = count_sources or {}
 
     results = []
     n = len(group_cols)
@@ -150,21 +181,28 @@ def expand_rollup_pandas(
         # Columns to group by at this level
         current_group = group_cols[: n - i]
 
+        # Companion non-null counts for NULL-guarded outputs.
+        guarded = {out: src for out, src in count_sources.items() if out in agg_dict}
+        count_spec = {f"__n_{out}": (src, "count") for out, src in guarded.items()}
+
         # Perform aggregation
         if current_group:
             # Build pandas-style aggregation
             agg_spec = {out_col: (in_col, func) for out_col, (in_col, func) in agg_dict.items()}
-            # Use adapter's groupby_agg which handles Dask's lack of as_index support
+            agg_spec.update(count_spec)
+            # Use adapter's groupby_agg which handles Dask's lack of as_index support.
+            # SQL GROUP BY keeps NULL keys as a group; pass dropna=False so NaN
+            # keys (e.g. a NULL dimension id) survive like the reference query.
             if adapter is not None:
-                grouped = adapter.groupby_agg(native_df, current_group, agg_spec, as_index=False)
+                grouped = adapter.groupby_agg(native_df, current_group, agg_spec, as_index=False, dropna=False)
             else:
                 # Fallback for non-pandas contexts (shouldn't happen in practice)
-                grouped = native_df.groupby(current_group, as_index=False).agg(**agg_spec)
+                grouped = native_df.groupby(current_group, as_index=False, dropna=False).agg(**agg_spec)
         else:
             # Grand total - aggregate entire DataFrame
             # For Dask, we need to compute scalars differently
             result_data = {}
-            for out_col, (in_col, func) in agg_dict.items():
+            for out_col, (in_col, func) in {**agg_dict, **count_spec}.items():
                 col_data = native_df[in_col]
                 if func == "sum":
                     val = col_data.sum()
@@ -187,6 +225,25 @@ def expand_rollup_pandas(
             import pandas as pd
 
             grouped = pd.DataFrame(result_data)
+
+        # Restore None for guarded outputs whose group has zero non-null inputs.
+        # Assigning None into a float column coerces back to NaN, so build
+        # explicit object Series.
+        import pandas as _pd
+
+        for output in guarded:
+            grouped[output] = _pd.Series(
+                [value if count > 0 else None for value, count in zip(grouped[output], grouped[f"__n_{output}"])],
+                dtype=object,
+                index=grouped.index,
+            )
+        grouped = grouped.drop(columns=list(count_spec))
+
+        # Pandas materializes a None group key as NaN, which the order-key
+        # grouping distinguishes from SQL NULL: map NaN back to None so NULL
+        # keys group and compare equal across rollup levels.
+        for group_col in current_group:
+            grouped[group_col] = grouped[group_col].astype(object).where(grouped[group_col].notna(), None)
 
         # Add NULL for rolled-up columns
         rolled_up_cols = group_cols[n - i :]

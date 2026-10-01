@@ -8,9 +8,12 @@ issue-write permission held by the reporting job only, and SHA-pinned actions.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -223,6 +226,8 @@ def test_duration_measurement_keeps_assertion_reports_and_rejects_runner_failure
     result = _run_workflow_script(step["run"], tmp_path)
     assert result.returncode == expected, result.stdout + result.stderr
     assert (tmp_path / "t3-durations" / f"junit-{tier}.xml").read_text() == '<testsuite tests="1"/>'
+    if tee_exit == 0:
+        assert (tmp_path / "t3-durations" / f"pytest-{tier}.exit").read_text().strip() == str(pytest_exit)
 
 
 @pytest.mark.parametrize("compare_exit", [0, 1])
@@ -247,6 +252,67 @@ def test_perf_comparison_preserves_threshold_and_failure(tmp_path: Path, compare
         "--fail-on-regression",
         "10%",
     ]
+
+
+@pytest.mark.parametrize(
+    "fast, slow",
+    [("0", "0"), ("1", "0"), ("0", "1"), ("1", "1"), (None, "0"), ("0", None), ("", "0"), ("0", "invalid")],
+)
+def test_duration_final_verdict_rejects_failed_missing_or_malformed_samples(tmp_path: Path, fast, slow) -> None:
+    output = tmp_path / "t3-durations"
+    output.mkdir()
+    for tier, value in [("fast", fast), ("slow", slow)]:
+        if value is not None:
+            (output / f"pytest-{tier}.exit").write_text(value, encoding="utf-8")
+    steps = _steps(_load()["jobs"]["durations-refresh"])
+    final = next(step for step in steps if step.get("name") == "Require successful sampled tests")
+    upload = next(step for step in steps if step.get("name") == "Upload duration artifacts")
+    assert steps.index(final) > steps.index(upload)
+    assert "always()" in final["if"] and "always()" in upload["if"]
+    result = _run_workflow_script(final["run"], tmp_path)
+    assert (result.returncode == 0) == (fast == slow == "0"), result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("fast_exit, slow_exit", [(0, 0), (1, 0), (0, 1)])
+def test_failed_duration_samples_keep_both_reports_and_regenerated_artifact(
+    tmp_path: Path, fast_exit: int, slow_exit: int
+) -> None:
+    tool = tmp_path / "_project" / "scripts" / "update_test_durations.py"
+    tool.parent.mkdir(parents=True)
+    shutil.copyfile(REPO_ROOT / "_project/scripts/update_test_durations.py", tool)
+    (tmp_path / "tests").mkdir()
+    shutil.copyfile(REPO_ROOT / "tests/duration_policy.py", tmp_path / "tests/duration_policy.py")
+    (tmp_path / "tests/__init__.py").touch()
+    stub = tmp_path / "uv"
+    stub.write_text(
+        "#!/usr/bin/env bash\n"
+        'if [[ "$*" != *"-m pytest"* ]]; then shift; exec "$@"; fi\n'
+        'for arg in "$@"; do\n'
+        '  if [[ "$arg" == --junitxml=* ]]; then\n'
+        '    report="${arg#--junitxml=}"\n'
+        '    case "$report" in *fast*) tier=fast; rc="$FAST_EXIT" ;; *slow*) tier=slow; rc="$SLOW_EXIT" ;; esac\n'
+        '    printf \'<testsuite tests="1"><testcase classname="tests.unit.test_sample" '
+        'name="test_%s" time="1.2"/></testsuite>\' "$tier" > "$report"\n'
+        '  fi\ndone\necho "measurement $tier"\nexit "$rc"\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    steps = _steps(_load()["jobs"]["durations-refresh"])
+    env = {"FAST_EXIT": str(fast_exit), "SLOW_EXIT": str(slow_exit)}
+    for name in ["Measure fast tier durations", "Measure slow tier durations", "Regenerate duration file"]:
+        step = next(step for step in steps if step.get("name") == name)
+        script = step["run"].replace("uv run -- python", f"uv run -- {sys.executable}")
+        result = _run_workflow_script(script, tmp_path, env)
+        assert result.returncode == 0, result.stdout + result.stderr
+    output = tmp_path / "t3-durations"
+    for tier in ["fast", "slow"]:
+        assert (output / f"junit-{tier}.xml").is_file()
+        assert (output / f"durations-{tier}.txt").read_text().strip() == f"measurement {tier}"
+    artifact = json.loads((output / "test_durations.json").read_text())
+    assert len(artifact["tests"]) == 2
+    final = next(step for step in steps if step.get("name") == "Require successful sampled tests")
+    result = _run_workflow_script(final["run"], tmp_path)
+    assert (result.returncode == 0) == (fast_exit == slow_exit == 0), result.stdout + result.stderr
 
 
 def test_durations_job_emits_pytest_durations_artifact() -> None:
