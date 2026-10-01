@@ -1440,8 +1440,11 @@ def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> 
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result.filter(_joined_agg_expr_condition(ctx, params, post_filter))
+    # SQL orders NULLs last (the reference engine's default); Polars puts them first.
     result = result.sort(
-        list(spec["sort_by"]), descending=list(spec.get("descending", (False,) * len(spec["sort_by"])))
+        list(spec["sort_by"]),
+        descending=list(spec.get("descending", (False,) * len(spec["sort_by"]))),
+        nulls_last=True,
     )
     limit = spec.get("limit", 100)
     return result if limit is None else result.limit(limit)
@@ -1457,14 +1460,19 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     predicate = _joined_agg_pandas_condition(frame, params, ("and", *spec.get("filters", ())))
     if predicate is not None:
         frame = frame[predicate]
-    result = frame.groupby(list(spec["group_by"]), as_index=False).agg(
+    # SQL GROUP BY keeps a NULL key as its own group; pandas drops it unless told otherwise.
+    result = frame.groupby(list(spec["group_by"]), as_index=False, dropna=False).agg(
         **{alias: (source, func) for alias, source, func in spec["aggs"]}
     )
+    for column in spec["group_by"]:
+        result[column] = result[column].astype(object).where(result[column].notna(), None)
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result[_joined_agg_pandas_condition(result, params, post_filter)]
     descending = spec.get("descending", (False,) * len(spec["sort_by"]))
-    result = result.sort_values(list(spec["sort_by"]), ascending=[not value for value in descending])
+    result = result.sort_values(
+        list(spec["sort_by"]), ascending=[not value for value in descending], na_position="last"
+    )
     limit = spec.get("limit", 100)
     return result if limit is None else result.head(limit)
 
@@ -3367,6 +3375,7 @@ def q34_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(
             ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
             descending=[False, False, False, True, False],
+            nulls_last=True,
         )
     )
 
@@ -3417,7 +3426,8 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join with customer
     result = ticket_filtered.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-    result["c_last_name"] = result["c_last_name"].astype(object).where(result["c_last_name"].notna(), None)
+    for column in ("c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"):
+        result[column] = result[column].astype(object).where(result[column].notna(), None)
 
     # Select and sort
     return result[
@@ -3425,6 +3435,7 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
     ].sort_values(
         ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
         ascending=[True, True, True, False, True],
+        na_position="last",
     )
 
 
@@ -6741,7 +6752,21 @@ def _three_channel_customer_count_expression(ctx: DataFrameContext, query_id: in
         (col("d_month_seq") >= lit(dms)) & (col("d_month_seq") <= lit(dms + 11))
     )
     store_customers, catalog_customers, web_customers = _customer_date_sets_expression(ctx, date_filtered)
-    keys = ["c_last_name", "c_first_name", "d_date"]
+
+    # SQL INTERSECT and EXCEPT treat NULLs as equal, but a join does not match NULL keys. Key the
+    # names on a NULL indicator plus a filled value so NULL names compare equal to each other only.
+    def null_safe(frame: Any) -> Any:
+        return frame.with_columns(
+            col("c_last_name").is_null().alias("c_last_name_is_null"),
+            col("c_first_name").is_null().alias("c_first_name_is_null"),
+            col("c_last_name").fill_null(lit("")).alias("c_last_name"),
+            col("c_first_name").fill_null(lit("")).alias("c_first_name"),
+        )
+
+    keys = ["c_last_name", "c_first_name", "c_last_name_is_null", "c_first_name_is_null", "d_date"]
+    store_customers, catalog_customers, web_customers = (
+        null_safe(frame) for frame in (store_customers, catalog_customers, web_customers)
+    )
     if mode == "intersect":
         result = store_customers.join(catalog_customers, on=keys).join(web_customers, on=keys)
     else:
