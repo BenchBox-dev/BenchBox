@@ -583,3 +583,153 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
         if process.poll() is None:
             process.kill()
         process.communicate(timeout=3)
+
+
+def commit_snapshot_files(root: Path, files: dict[str, str]) -> str:
+    """Commit exactly these files as the tagged source and return the commit."""
+    for name, text in files.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+        git(root, "add", name)
+    git(root, "commit", "-m", "Snapshot boundary fixture")
+    git(root, "update-ref", "refs/remotes/origin/develop", "HEAD")
+    git(root, "tag", "-d", "v0.4.2")
+    git(root, "tag", "-a", "v0.4.2", "-m", "Snapshot boundary fixture")
+    return git(root, "rev-parse", "HEAD")
+
+
+VERIFIER_BOUNDARY_PROBE = """\
+import sys
+from benchbox.utils.binary_manifest import SOURCE
+
+assert sys.flags.isolated and sys.flags.no_site and sys.flags.dont_write_bytecode, sys.flags
+assert not any("site-packages" in entry for entry in sys.path), sys.path
+sys.exit(0 if SOURCE == "committed snapshot" else 23)
+"""
+
+
+def test_verifier_runs_committed_package_without_site_or_package_init(tagged_source):
+    # The package __init__ files import third-party modules, so they must never run, and `-I`
+    # removes the script directory from sys.path, so the import must be mapped to the snapshot.
+    commit = commit_snapshot_files(
+        tagged_source,
+        {
+            "scripts/verify_distribution_binaries.py": VERIFIER_BOUNDARY_PROBE,
+            "benchbox/__init__.py": "raise RuntimeError('package __init__ must not run')\n",
+            "benchbox/utils/__init__.py": "raise RuntimeError('package __init__ must not run')\n",
+            "benchbox/utils/binary_manifest.py": 'SOURCE = "committed snapshot"\n',
+        },
+    )
+    consumer._verify_committed_binaries(tagged_source, commit, [])
+
+
+def test_verifier_rejection_in_committed_module_is_not_masked(tagged_source):
+    commit = commit_snapshot_files(
+        tagged_source,
+        {
+            "scripts/verify_distribution_binaries.py": VERIFIER_BOUNDARY_PROBE,
+            "benchbox/utils/binary_manifest.py": 'SOURCE = "a different module"\n',
+        },
+    )
+    with pytest.raises(subprocess.CalledProcessError) as error:
+        consumer._verify_committed_binaries(tagged_source, commit, [])
+    assert error.value.returncode == 23
+
+
+def test_verifier_and_git_children_inherit_no_credentials(tagged_source, monkeypatch):
+    secrets = {
+        "GH_TOKEN": "synthetic-gh-token",
+        "GITHUB_TOKEN": "synthetic-github-token",
+        "GH_ENTERPRISE_TOKEN": "synthetic-enterprise-token",
+        "AWS_SECRET_ACCESS_KEY": "synthetic-aws-secret",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "core.fsmonitor",
+        "GIT_CONFIG_VALUE_0": "/nonexistent/helper",
+    }
+    probe = (
+        "import os, sys\n"
+        "leaked = [k for k in os.environ if k.startswith(('GH_', 'GITHUB_', 'GIT_', 'AWS_')) or 'TOKEN' in k]\n"
+        "sys.exit(23 if leaked else 0)\n"
+    )
+    commit = commit_snapshot_files(
+        tagged_source,
+        {"scripts/verify_distribution_binaries.py": probe, "benchbox/utils/binary_manifest.py": ""},
+    )
+    # Set after the fixture commit so the test's own git calls do not inherit the injected config.
+    for key, value in secrets.items():
+        monkeypatch.setenv(key, value)
+    consumer._verify_committed_binaries(tagged_source, commit, [])
+    environment = consumer._child_environment(**consumer._GIT_ENVIRONMENT)
+    assert not set(secrets) & set(environment)
+    assert environment["GIT_CONFIG_GLOBAL"] == os.devnull and environment["GIT_CONFIG_NOSYSTEM"] == "1"
+
+
+@pytest.mark.parametrize("route", ["local-config", "environment"])
+def test_git_children_do_not_run_configured_filesystem_monitor(tagged_source, monkeypatch, tmp_path, route):
+    marker = tmp_path / "helper-ran"
+    helper = tmp_path / "helper.sh"
+    helper.write_text(f"#!/bin/sh\necho ran >> {marker}\nexit 1\n")
+    helper.chmod(0o755)
+    if route == "local-config":
+        git(tagged_source, "config", "core.fsmonitor", str(helper))
+    else:
+        monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+        monkeypatch.setenv("GIT_CONFIG_KEY_0", "core.fsmonitor")
+        monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(helper))
+    # Control: plain Git runs the helper, so the scenario is real in this environment.
+    subprocess.run(["git", "-C", str(tagged_source), "status", "--porcelain"], capture_output=True, check=False)
+    assert marker.exists(), "control: configured helper should run under plain git"
+    marker.unlink()
+    consumer._run_git(tagged_source, "status", "--porcelain", check=True, stdout=subprocess.PIPE, timeout=60)
+    assert not marker.exists(), "hardened git must not run the configured filesystem monitor"
+
+
+def test_snapshot_budget_is_enforced_before_any_blob_is_written(tagged_source, monkeypatch, tmp_path):
+    commit = commit_snapshot_files(tagged_source, {"benchbox/payload.bin": "x" * 5000})
+    monkeypatch.setattr(consumer, "MAX_PAYLOAD_BYTES", 1000)
+    real_run = subprocess.run
+    commands = []
+
+    def record(argv, **kwargs):
+        commands.append(list(argv))
+        return real_run(argv, **kwargs)
+
+    monkeypatch.setattr(consumer.subprocess, "run", record)
+    destination = tmp_path / "snapshot"
+    destination.mkdir()
+    with pytest.raises(ValueError, match="exceeds size limit"):
+        consumer._committed_snapshot(tagged_source, commit, destination)
+    assert any("ls-tree" in command for command in commands)
+    assert not any("cat-file" in command for command in commands), "blob contents were read before the budget check"
+    assert not list(destination.rglob("*"))
+
+
+def test_download_fails_closed_without_posix_process_ownership(monkeypatch, tmp_path):
+    import types
+
+    monkeypatch.setattr(consumer, "os", types.SimpleNamespace(name="nt"))
+    archive = tmp_path / "artifact.zip"
+    with pytest.raises(ValueError, match="Windows is unsupported"):
+        consumer._download(1, archive)
+    assert not archive.exists()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups; Windows download is unsupported")
+def test_cleanup_tolerates_an_exited_unreaped_group_leader():
+    import threading
+
+    process = subprocess.Popen(["/bin/sh", "-c", "exit 0"], stdout=subprocess.PIPE, bufsize=0, start_new_session=True)
+    # Wait for the exit without reaping, so the group holds only a zombie leader. macOS answers
+    # killpg on such a group with EPERM instead of ESRCH, which must not escape the cleanup.
+    # os.waitid is missing from some interpreters, so poll the process state like the other tests.
+    for _ in range(500):
+        state = subprocess.run(["ps", "-p", str(process.pid), "-o", "stat="], capture_output=True, text=True)
+        if state.stdout.strip().startswith("Z"):
+            break
+        threading.Event().wait(0.01)
+    else:
+        pytest.fail("the child never became an unreaped zombie")
+    consumer._reap_download(process, None, threading.Event())
+    assert process.returncode == 0
+    assert process.stdout is not None and process.stdout.closed

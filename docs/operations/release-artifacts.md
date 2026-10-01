@@ -55,18 +55,31 @@ API reads and downloads explicitly use `github.com`, regardless of `GH_HOST`.
 Downloads have a 60-second whole-stream deadline, including blocked reads.
 Failed downloads reap their child process and remove only their owned partial
 file. Verification reads regular files from a private snapshot of the exact
-Git commit, not mutable checkout bytes or Git archive export filters. Git
-identity, ancestry, and object reads disable replacement objects. Downloads
-use an unbuffered pipe so closing a timed-out stream cannot wait on a reader's
-buffered lock. POSIX download processes own a separate session whose remaining
-pipe writers are terminated during cleanup. The
-verifier runs with isolated Python and without inherited Python configuration.
-The checkout is checked again before output publication.
+Git commit, not mutable checkout bytes or Git archive export filters. The
+snapshot's total size is checked from tree metadata before any blob is written,
+and each blob must match its declared size. Downloads use an unbuffered pipe so
+closing a timed-out stream cannot wait on a reader's buffered lock. Download
+processes own a separate POSIX session whose remaining pipe writers are
+terminated during cleanup, including when the direct child has already exited.
+The download fails closed on Windows, because tree termination after the direct
+child exits needs a Job Object that has no native test yet.
+
+Git children disable replacement objects, hooks, and the filesystem monitor,
+ignore system and global configuration, and do not inherit `GIT_CONFIG_*`
+variables. The verifier runs from the committed snapshot under `-I -S -B`: no
+site packages, `.pth` files, `sitecustomize`, or Python environment. Because
+`-I` removes the script directory from the import path, a bootstrap maps the
+`benchbox` and `benchbox.utils` packages to the snapshot without running their
+`__init__` files, so the committed `binary_manifest` is the one that executes.
+Git and verifier children receive only an allowlisted environment (`PATH`,
+locale, and temporary-directory variables). Credentials go to the `gh`
+transport alone. The checkout is checked again before output publication.
 
 Output publication uses an atomic no-replace directory rename: `renameat2` on
 Linux, `renamex_np` on macOS, and `os.rename` on Windows. An existing or racing
 destination, including an empty directory or dangling symlink, is never
-replaced. Platforms without the required operation fail closed.
+replaced. Platforms without the required operation fail closed. Because the
+download is POSIX-only, the Windows rename is not reachable through admission.
 
 An admission receipt is byte and producer evidence. It is not a cryptographic
 attestation or permission to release. Admission does not change hosted tag
