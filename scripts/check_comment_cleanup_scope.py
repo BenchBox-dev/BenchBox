@@ -776,8 +776,10 @@ def scan_python_sources(
 
 
 def unregistered_markers(markers: list[dict[str, Any]], policy: dict[str, Any]) -> tuple[int, int]:
-    directives = sum(marker["directives"] for marker in markers) - sum(entry["count"] for entry in policy["directives"])
-    todos = sum(marker["todos"] for marker in markers) - len(policy["obligations"])
+    registered_directives = sum(entry["count"] for entry in policy["directives"] if entry["path"].endswith(".py"))
+    registered_todos = sum(1 for entry in policy["obligations"] if entry["path"].endswith(".py"))
+    directives = sum(marker["directives"] for marker in markers) - registered_directives
+    todos = sum(marker["todos"] for marker in markers) - registered_todos
     return max(directives, 0), max(todos, 0)
 
 

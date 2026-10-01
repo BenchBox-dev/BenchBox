@@ -708,8 +708,8 @@ z = 2  # type: ignore[attr-defined]  TODO later
     assert scope.python_comment_markers(source) == (2, 2)
     assert scope.python_comment_markers(b"def (:\n") == (0, 0)
     markers = [{"path": "a.py", "directives": 5, "todos": 3}]
-    policy["directives"] = [{"count": 2}]
-    policy["obligations"] = [{}]
+    policy["directives"] = [{"path": "a.py", "count": 2}, {"path": "ci.yml", "count": 4}]
+    policy["obligations"] = [{"path": "a.py"}, {"path": "nightly.yml"}]
     assert scope.unregistered_markers(markers, policy) == (3, 2)
 
 
