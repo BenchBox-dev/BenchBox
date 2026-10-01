@@ -19,8 +19,10 @@ Behavior:
 * ``--check`` is the CI gate mode (same behavior; explicit for symmetry with
   sibling lint scripts). Default mode also runs the comparison.
 
-Exit status: 0 no upgrade or no retirement candidates; 1 upgrade contains a
-newly-passing repro that needs a retirement audit; 2 usage error.
+Exit status: 0 no upgrade or no retirement candidates; 1 the upgrade contains
+a newly-passing repro that needs a retirement audit, or the repro harness
+crashed or reported no summary so retirement cannot be assessed; 2 the locked
+version or merge-base could not be resolved.
 
 Usage:
     uv run -- python scripts/check_sqlglot_repro_retirement.py [--base-ref REF] [--check]

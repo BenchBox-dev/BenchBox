@@ -69,8 +69,9 @@ class TestNoUpgradePath:
 
         monkeypatch.setattr(checker, "merge_base", fake_merge_base)
         monkeypatch.setattr(checker, "locked_sqlglot_version", lambda ref=None: "30.18.0")
-        assert checker.main(["--base-ref", "origin/develop"]) == 0
-        assert seen["ref"] == "origin/develop"
+        assert checker.main(["--base-ref", "origin/release"]) == 0
+        # A ref that differs from merge_base's default proves --base-ref is forwarded.
+        assert seen["ref"] == "origin/release"
 
     def test_crash_without_summary_fails_closed(self, monkeypatch, capsys):
         monkeypatch.setattr(checker, "merge_base", lambda ref="origin/develop": "abc123")
@@ -94,3 +95,18 @@ class TestNoUpgradePath:
         monkeypatch.setattr(checker, "run_repros", lambda: (1, summary))
         assert checker.main([]) == 0
         assert "no retirement candidates" in capsys.readouterr().out
+
+    def test_upgrade_with_passing_repro_reports_candidate_and_fails(self, monkeypatch, capsys):
+        monkeypatch.setattr(checker, "merge_base", lambda ref="origin/develop": "abc123")
+        monkeypatch.setattr(
+            checker,
+            "locked_sqlglot_version",
+            lambda ref=None: "30.17.0" if ref else "30.18.0",
+        )
+        summary = "=== Summary\n  [FAIL] #1 x\n  [PASS] #6 questdb-dialect-missing (Tier A)\n"
+        monkeypatch.setattr(checker, "run_repros", lambda: (1, summary))
+        assert checker.main([]) == 1
+        out = capsys.readouterr().out
+        assert "RETIREMENT CANDIDATES" in out
+        assert "PASS #6 questdb-dialect-missing (Tier A)" in out
+        assert "PASS #1 x" not in out
