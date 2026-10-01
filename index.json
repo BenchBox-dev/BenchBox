@@ -6097,10 +6097,15 @@
       "title": "Enable parameter overrides in production DataFrame runs per query, behind a consumption check"
     },
     "dfparity-t08-q70-expression-rounding": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-02T15:31:56Z",
+        "generation": "4bcda81e157147b1b59fa9e28654a4c2",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Round Q70 expression total_sum to DECIMAL scale to match SQL ordering"
     },
     "dfparity-t08b-q70-top5-latent": {
