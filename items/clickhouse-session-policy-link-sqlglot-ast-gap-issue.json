@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "issue_url is set to a real, reachable GitHub issue URL for the q23a, q23b and q87 rules, or the reason for having none is recorded in the rule's reason text",
+    "The `TODO: link GitHub issue` comment is gone from clickhouse_session_policy.py",
+    "The sql_compat decision tests pass and the registered rules' rule_id, action and settings are unchanged",
+    "No SQL text, session setting or query behaviour changes"
+  ],
+  "context": "Origin: obligation registered by the comment-cleanup scope policy (quality/comment-cleanup-scope.json, obligations). Owner of the path under that program: comment-cleanup-sql-compat. This item is a follow-up and does not block the comment-removal program.",
+  "description": "benchbox/sql_compat/rules/query_adapter/clickhouse_session_policy.py registers three rules (TPC-DS q23a, q23b and q87) that set joined_subquery_requires_alias=0 as a session policy instead of rewriting the SQL, because AST-based alias injection corrupts Q23 GROUP BY and inserts aliases inside Q87 EXCEPT/INTERSECT. Each rule passes issue_url=None with a comment, `TODO: link GitHub issue documenting the sqlglot AST gap`, so the decision points at no issue. issue_url is a field of SetSessionPolicyPayload in benchbox/sql_compat/decision.py and this is the only rule that sets it.\n\nDo: find the upstream sqlglot issue that documents the AST gap, or file one with a minimal reproduction of the Q23 and Q87 cases, then set issue_url for the three rules and delete the TODO comment. If no upstream issue is appropriate, record the reason in the rule's reason text instead of a comment.\n\nCreated because the comment-removal program (comment-cleanup-scope-policy) found this as the only real action item among its 35 TODO/FIXME comments in Python sources. Deleting the comment alone does not satisfy this item.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-01T23:10:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1ac49860ed4346b68e14ac76e3de4dce",
+      "session_id": "bec2d032574a4742968b229c90460810"
+    }
+  ]
+}
