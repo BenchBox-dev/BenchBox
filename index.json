@@ -6150,6 +6150,15 @@
       "status": "open",
       "title": "Spike a qualification-value SQL renderer and retire the generate_with_parameters stub"
     },
+    "dfparity-t17-qualification-values-and-ans": {
+      "claim": null,
+      "needs": [
+        "dfparity-t16-qualification-renderer-spike"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Commit TPC-DS qualification values and parse official answer sets by value"
+    },
     "dfparity-t21-tpch-seeded-path": {
       "claim": null,
       "needs": [
