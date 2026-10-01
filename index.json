@@ -19597,6 +19597,13 @@
       "status": "done",
       "title": "Add TPC-DS-OBT (One Big Table) Benchmark Implementation"
     },
+    "tpcds-obt-cloud-staging-output-dir": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Load the OBT table on cloud-staged platforms and fail runs whose query tables are empty"
+    },
     "tpcds-obt-dataframe-sql-id-mapping-decision": {
       "claim": null,
       "needs": [],

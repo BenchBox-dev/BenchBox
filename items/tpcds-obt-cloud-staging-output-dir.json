@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Snowflake and BigQuery runs of tpcds_obt resolve their local cache to the OBT output folder, not the TPC-DS source folder; both orchestrator paths share one helper that honours GENERATES_OWN_OUTPUT, with a regression test on the cloud-staging path",
+    "A run fails before the power test when any table in the benchmark's get_schema() is missing or has zero rows after load",
+    "The bundle validator reports an error when the benchmark's schema tables are absent from the bundle's tables section",
+    "Existing OBT, TPC-DS and data-sharing tests pass; PR opened through make pr-open"
+  ],
+  "context": "Root cause analysis in session 9f842f2e (2026-10-01). Key code: benchbox/cli/orchestrator.py:158-163 (construction path, fixed by #2420) and :385-407 (_resolve_custom_output_root, unfixed); benchbox/core/runner/runner.py:322-350 and _resolve_manifest_allowed_names (reuse accepts data-source manifest); benchbox/core/tpcds_obt/benchmark.py:244-300 (generate_data registers the OBT table) and :520 (DDL creates sources + OBT); validation/engines.py:402 (post-load validation off by default, no OBT expectations).",
+  "description": "On Snowflake and BigQuery (platforms with a cloud default_output_location), tpcds_obt resolves its local cache to the TPC-DS source folder (datagen/tpcds_sf1). orchestrator._resolve_custom_output_root picks the cache from get_data_source_benchmark() and ignores GENERATES_OWN_OUTPUT; #2420 fixed the same redirect only on the construction path. When the TPC-DS manifest there is valid, the runner reuses it (the reuse gate accepts the data-source manifest), fills benchmark.tables with the 25 normalized TPC-DS tables, never calls OBT generate_data, and the loader never loads tpcds_sales_returns_obt. The DDL creates the OBT table empty, so all 89 queries run against an empty table and the run reports success (Snowflake bundle tpcds_obt_sf1_snowflake_sql_20261001_112551_a3b5cd41: Q2 returns 0 rows vs 52 on BigQuery/Databricks). Nothing checks before measurement that the benchmark's own schema tables are loaded with rows, and the bundle validator does not compare loaded tables with the benchmark schema.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:0a4b9763bf7a378092ce9843",
+      "at": "2026-10-01T16:47:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bb25c541b581443fb7aebda67ba74d52",
+      "session_id": "ac397368d948433dad892f7cb1695784"
+    }
+  ]
+}
