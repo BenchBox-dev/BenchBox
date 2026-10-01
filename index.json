@@ -17864,6 +17864,13 @@
       "status": "done",
       "title": "Add delta/iceberg/hudi loading to SparkDataLoadMixin and close shared Spark loader gaps"
     },
+    "spark-session-config-model": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add validated spark session-config map to PlatformOptimizationConfiguration"
+    },
     "spark-sql-tpchavoc-scalar-subquery-and-dual-rewrites": {
       "claim": null,
       "needs": [],
