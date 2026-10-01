@@ -29,12 +29,8 @@ from benchbox.core.dataframe.tuning import (
     MemoryConfiguration,
     ParallelismConfiguration,
 )
-from benchbox.platforms.pyspark import (
-    PYSPARK_AVAILABLE,
-    ensure_compatible_java,
-    get_java_skip_reason,
-    is_java_compatible,
-)
+from benchbox.platforms.pyspark import PYSPARK_AVAILABLE
+from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 
 pytestmark = [
     pytest.mark.unit,
@@ -46,13 +42,10 @@ pytestmark = [
 ]
 
 
-# Ensure compatible Java is configured at import time
-# This allows skipif decorators to evaluate correctly
-_java_version, _java_home = ensure_compatible_java()
-
-# Skip conditions for PySpark tests
-_SKIP_PYSPARK = not PYSPARK_AVAILABLE or not is_java_compatible(_java_version)
-_SKIP_REASON = get_java_skip_reason() or "PySpark tests enabled"
+# Check local Spark prerequisites: PySpark installed and a supported JDK
+# (the collection probe restores JAVA_HOME after compatibility detection).
+_SKIP_PYSPARK = not pyspark_usable()
+_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 # Check if PySpark is available and import adapter
 if PYSPARK_AVAILABLE:
@@ -69,7 +62,7 @@ class TestPySparkDataFrameAdapter:
     """Tests for PySparkDataFrameAdapter."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture with shared SparkSession."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -125,7 +118,7 @@ class TestPySparkDataFrameAdapter:
         assert ctx.platform == "PySpark"
         assert ctx.family == "expression"
 
-    def test_session_lifecycle(self):
+    def test_session_lifecycle(self, pyspark_test_environment):
         """Test SparkSession lifecycle management."""
         adapter = PySparkDataFrameAdapter(
             master="local[1]",
@@ -144,7 +137,7 @@ class TestPySparkDataFrameAdapter:
         adapter.close()
         assert adapter._spark is None
 
-    def test_context_manager(self):
+    def test_context_manager(self, pyspark_test_environment):
         """Test context manager protocol for automatic cleanup."""
         with PySparkDataFrameAdapter(
             master="local[1]",
@@ -286,7 +279,7 @@ class TestPySparkExpressionMethods:
     """Tests for PySpark expression methods."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -343,7 +336,7 @@ class TestPySparkAggregationMethods:
     """Tests for PySpark aggregation helper methods."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -426,7 +419,7 @@ class TestPySparkDataLoading:
     """Tests for PySpark data loading methods."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -506,7 +499,7 @@ class TestPySparkWindowFunctions:
     """Tests for PySpark window functions."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -830,7 +823,7 @@ class TestPySparkDataFrameOperations:
     """Tests for PySpark DataFrame operations."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -880,7 +873,7 @@ class TestPySparkQueryExecution:
     """Tests for query execution with PySpark."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -949,7 +942,7 @@ class TestPySparkTableLoading:
     """Tests for table loading functionality."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -994,7 +987,7 @@ class TestPySparkSpecificFeatures:
     """Tests for PySpark-specific features."""
 
     @pytest.fixture(scope="class")
-    def adapter(self):
+    def adapter(self, pyspark_test_environment):
         """Create adapter fixture."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",
@@ -1126,7 +1119,7 @@ class TestPySparkScalarExtraction:
     """Tests for PySpark scalar extraction optimization."""
 
     @pytest.fixture(scope="class")
-    def spark_adapter(self):
+    def spark_adapter(self, pyspark_test_environment):
         """Provide a shared adapter instance for scalar tests."""
         adapter = PySparkDataFrameAdapter(
             master="local[2]",

@@ -837,10 +837,15 @@ def q15_expression_impl(ctx: DataFrameContext) -> Any:
     # Find maximum revenue using optimized scalar extraction
     max_revenue = ctx.scalar(revenue.select(col("total_revenue").max().alias("max_rev")))
 
-    # Join with suppliers having maximum revenue
+    # Join with suppliers having maximum revenue. Compare with a small relative
+    # tolerance instead of exact float equality: the stored per-supplier
+    # aggregate and the scalar max can differ in the last ulp after separate
+    # float summation paths (observed: ...660600001 vs ...6606), which would
+    # otherwise filter out the true top supplier.
+    tolerance = abs(max_revenue) * 1e-9 if max_revenue else 1e-9
     return (
         supplier.join(revenue, left_on="s_suppkey", right_on="supplier_no")
-        .filter(col("total_revenue") == lit(max_revenue))
+        .filter((col("total_revenue") - lit(max_revenue)).abs() <= lit(tolerance))
         .select("s_suppkey", "s_name", "s_address", "s_phone", "total_revenue")
         .sort("s_suppkey")
     )
@@ -896,13 +901,24 @@ def q17_expression_impl(ctx: DataFrameContext) -> Any:
     # Calculate average quantity per part
     avg_qty_per_part = lineitem.group_by("l_partkey").agg((col("l_quantity").mean() * lit(0.2)).alias("avg_qty"))
 
-    # Main query
-    return (
+    # SQL SUM over an empty or all-NULL input returns NULL. Aggregate first,
+    # then project the conditional result so every backend infers its type
+    # from the native sum without constructing a NULL-only DataFrame.
+    filtered = (
         part.filter((col("p_brand") == lit(brand)) & (col("p_container") == lit(container)))
         .join(lineitem, left_on="p_partkey", right_on="l_partkey")
         .join(avg_qty_per_part, left_on="p_partkey", right_on="l_partkey")
         .filter(col("l_quantity") < col("avg_qty"))
-        .select((col("l_extendedprice").sum() / lit(7.0)).alias("avg_yearly"))
+    )
+    totals = filtered.select(
+        col("l_extendedprice").count().alias("__q17_price_count"),
+        col("l_extendedprice").sum().alias("__q17_price_sum"),
+    )
+    return totals.select(
+        ctx.when(col("__q17_price_count") > lit(0))
+        .then(col("__q17_price_sum") / lit(7.0))
+        .otherwise(lit(None))
+        .alias("avg_yearly")
     )
 
 
@@ -1749,7 +1765,11 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined[joined["l_quantity"] < joined["avg_qty"]]
 
     # Calculate result
-    # Note: compute() handles both lazy (Dask) and eager (Pandas) values
+    # Note: compute() handles both lazy (Dask) and eager (Pandas) values.
+    # SQL SUM over an empty set returns NULL, not 0: preserve that so the
+    # gate compares NULL-vs-NULL instead of manufacturing 0.0.
+    if len(joined) == 0:
+        return pd.DataFrame({"avg_yearly": [None]})
     avg_yearly = joined["l_extendedprice"].sum() / 7.0
     avg_yearly_val = avg_yearly.compute() if hasattr(avg_yearly, "compute") else avg_yearly
 

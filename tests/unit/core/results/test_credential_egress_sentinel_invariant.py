@@ -7,7 +7,7 @@ rejects any credential or identifier sentinel that survives.
 
 Coverage layers (R8 permanent invariant + expansion):
 
-* 47-adapter platform_config / raw_config construct-and-export sweep with
+* 49-adapter platform_config / raw_config construct-and-export sweep with
   explicit optional-dependency skip accounting: a platform may only skip when
   benchbox.utils.dependencies (dependencies.yaml) recognizes it as carrying
   an optional SDK/driver dependency; the pass/skip split otherwise tracks
@@ -51,7 +51,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 # Reviewed adapter corpus size. Drift means a platform was added/removed without
 # updating the permanent egress invariant.
-EXPECTED_REGISTERED_PLATFORM_COUNT = 47
+EXPECTED_REGISTERED_PLATFORM_COUNT = 49
 
 
 def _catalog_required_packages(platform_name: str) -> tuple[str, ...] | None:
@@ -246,7 +246,7 @@ def _export_chokepoints(result: BenchmarkResults, tmp_path: Path) -> tuple[str, 
     return public, private, db_path.read_bytes()
 
 
-def test_registered_platform_count_is_forty_seven() -> None:
+def test_registered_platform_count_is_forty_nine() -> None:
     """Registry size is an explicit invariant of the permanent sweep corpus."""
     PlatformRegistry.clear_cache()
     platforms = PlatformRegistry.get_available_platforms()

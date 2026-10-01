@@ -8,8 +8,9 @@ related squash-merge mechanics). That makes head-SHA check-run status useless
 as a CI-failure signal. The real failure cost shows up upstream of the merge:
 fix-forward pushes after a PR is opened, PRs that touch the shared fast-test
 guard file (`_project/config/fast_test_lane_policy.json`, a frequent
-composition-conflict hotspot), and whether the PR's *first* "Develop PR"
-workflow run (the required-lane gate, `.github/workflows/pr.yml`) went green
+composition-conflict hotspot), and whether the PR's *first* required-lane
+workflow run ("CI", `.github/workflows/ci.yml`; "Develop PR", the retired
+`pr.yml`, for older PRs) went green
 without a fix-forward push.
 
 This script computes, per merged `develop` PR in a trailing window:
@@ -20,8 +21,8 @@ This script computes, per merged `develop` PR in a trailing window:
   - open_to_merge_seconds: PR created_at -> merged_at wall time.
   - touched_fast_test_lane_policy: whether the PR's file list includes
     _project/config/fast_test_lane_policy.json.
-  - first_pass_green: whether the PR's FIRST "Develop PR" (.github/workflows/
-    pr.yml) workflow run on its head branch concluded "success" -- i.e. the
+  - first_pass_green: whether the PR's FIRST required-lane ("CI" or, for older
+    PRs, "Develop PR") workflow run on its head branch concluded "success" -- i.e. the
     required lane went green without a fix-forward push. Uses per-branch
     Actions run history (event=pull_request), not the always-green head-SHA
     check runs.
@@ -71,12 +72,13 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 FAST_LANE_POLICY_PATH = "_project/config/fast_test_lane_policy.json"
-REQUIRED_LANE_WORKFLOW_NAME = "Develop PR"
+REQUIRED_LANE_WORKFLOW_NAMES = ("CI", "Develop PR")
 FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
 # medium-test is the other required lane and the one that runs closest to its
 # timeout, so its wall time is tracked here to make the next resize proactive
-# rather than a reaction to a cancelled job (see pr.yml medium-test).
+# rather than a reaction to a cancelled job (see ci.yml medium-test).
 MEDIUM_TEST_JOB_NAME = "medium-test"
+MEDIUM_SHARD_JOB_NAMES = ("medium-test (shard 0)", "medium-test (shard 1)")
 API_RETRY_ATTEMPTS = 3
 # Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
 # keys stay unchanged so current consumers keep working.
@@ -101,19 +103,45 @@ BATCH_DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
 REFRESH_REASON_TIMING = "prior_check_not_success"
 REFRESH_REASON_IDENTITY = "prior_check_unbound"
 REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
+    "core",
+    "explorer",
+    "results-data",
+    "docs",
+    "landing",
+    "tooling",
+)
+# Contexts required before the six-unit CI. PRs merged in the baseline window
+# were green under these names, so historical measurement keeps resolving them.
+LEGACY_REQUIRED_CONTEXT_NAMES: tuple[str, ...] = (
     "ci-required-result",
+    "tooling",
     "Results Explorer browser gate",
     "ruleset-drift",
     "Public-site visual acceptance",
 )
 SYNCHRONIZE_WORKFLOW_NAMES: tuple[str, ...] = (
+    "CI",
+    "Auto-merge revocation",
     "Develop PR",
     "Results Explorer browser tests",
     "Develop ruleset drift",
     "Documentation",
-    "Auto-merge revocation",
     "PR base guard",
 )
+
+
+def resolve_required_contexts(check_runs: list[dict]) -> tuple[str, ...]:
+    """The required-context set that applies to one head's check runs.
+
+    A head that carries a ``core`` check ran the six-unit CI. Anything else is
+    measured against the contexts that were required when it ran.
+    """
+
+    if any(run.get("name") == "core" for run in check_runs):
+        return REQUIRED_CONTEXT_NAMES
+    return LEGACY_REQUIRED_CONTEXT_NAMES
+
+
 # Public GitHub-hosted standard runners are free for public repositories.
 PUBLIC_STANDARD_RUNNER_USD = 0.0
 _SETUP_STEP_PREFIXES: tuple[str, ...] = (
@@ -375,15 +403,44 @@ def touched_fast_test_lane_policy(client: GitHubClient, number: int) -> bool:
     return any(f.get("filename") == FAST_LANE_POLICY_PATH for f in files)
 
 
+def _partitioned_medium_seconds(jobs: list[dict]) -> float | None:
+    """Measure the complete collection-to-last-shard wall time, excluding censored runs."""
+    names = ("medium-collect", *MEDIUM_SHARD_JOB_NAMES)
+    selected = [job for job in jobs if job.get("name") in names or str(job.get("name")).startswith("medium-test (")]
+    if len(selected) != len(names) or {job.get("name") for job in selected} != set(names):
+        return None
+    intervals = {}
+    for job in selected:
+        if job.get("status") != "completed" or job.get("conclusion") != "success":
+            return None
+        if not isinstance(job.get("started_at"), str) or not isinstance(job.get("completed_at"), str):
+            return None
+        try:
+            started = _iso_to_dt(job["started_at"])
+            completed = _iso_to_dt(job["completed_at"])
+            if completed < started:
+                return None
+        except (KeyError, TypeError, ValueError):
+            return None
+        intervals[job["name"]] = (started, completed)
+    collector_start, collector_end = intervals["medium-collect"]
+    try:
+        if any(intervals[name][0] < collector_end for name in MEDIUM_SHARD_JOB_NAMES):
+            return None
+        return (max(intervals[name][1] for name in MEDIUM_SHARD_JOB_NAMES) - collector_start).total_seconds()
+    except TypeError:
+        return None
+
+
 def first_pass_green_and_job_seconds(
     client: GitHubClient, head_ref: str
 ) -> tuple[bool | None, float | None, float | None]:
-    """First "Develop PR" run on head_ref: (green?, fast-test seconds, medium-test seconds)."""
+    """First CI run on head_ref: (green?, fast-test seconds, complete medium-lane seconds)."""
     runs = client.get_paginated(
         f"/repos/{client.repo}/actions/runs?branch={head_ref}&event=pull_request",
         item_key="workflow_runs",
     )
-    candidates = [r for r in runs if r.get("name") == REQUIRED_LANE_WORKFLOW_NAME]
+    candidates = [r for r in runs if r.get("name") in REQUIRED_LANE_WORKFLOW_NAMES]
     if not candidates:
         return None, None, None
     first_run = min(candidates, key=lambda r: _iso_to_dt(r["created_at"]))
@@ -405,7 +462,10 @@ def first_pass_green_and_job_seconds(
             # timestamps. They are censored observations, not completed lane
             # runtimes, so keep them out of the p95 distribution.
             seconds_by_job.setdefault(name, (completed - started).total_seconds())
-    return green, seconds_by_job.get(FAST_TEST_JOB_NAME), seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
+    medium_seconds = seconds_by_job.get(MEDIUM_TEST_JOB_NAME)
+    if any(str(job.get("name")).startswith("medium-test (") or job.get("name") == "medium-collect" for job in jobs):
+        medium_seconds = _partitioned_medium_seconds(jobs)
+    return green, seconds_by_job.get(FAST_TEST_JOB_NAME), medium_seconds
 
 
 def event_fanout_for_pr(client: GitHubClient, pr: dict) -> dict:
@@ -460,7 +520,7 @@ def _pct(values: list[float], p: int) -> float | None:
     return s[idx]
 
 
-MEDIUM_TEST_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "pr.yml"
+MEDIUM_TEST_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 _MEDIUM_TEST_TIMEOUT_RE = re.compile(r"(?ms)^  medium-test:\s*$.*?^\s{4}timeout-minutes:\s*(\d+)\s*$")
 # Warn once p95 eats into the headroom the timeout was sized to provide.
 MEDIUM_TEST_BUDGET_WARN_FRACTION = 0.75
@@ -505,7 +565,7 @@ def latest_named_check_runs(check_runs: list[dict], name: str) -> dict | None:
 
 def required_gate_seconds(
     check_runs: list[dict],
-    required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES,
+    required: tuple[str, ...] | None = None,
 ) -> float | None:
     """Wall from first required-check start to last required success.
 
@@ -513,6 +573,7 @@ def required_gate_seconds(
     Reruns: only the latest same-named check counts.
     """
 
+    required = required or resolve_required_contexts(check_runs)
     latest: list[dict] = []
     starts: list[datetime] = []
     ends: list[datetime] = []
@@ -539,7 +600,7 @@ def required_gate_seconds(
 
 def merge_unblock_seconds(
     check_runs: list[dict],
-    required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES,
+    required: tuple[str, ...] | None = None,
 ) -> float | None:
     """Time until every live required context is latest-success.
 
@@ -567,7 +628,8 @@ def queue_delay_seconds(required_gate_end: datetime | None, merged_at: str | Non
     return delay if delay >= 0 else None
 
 
-def required_gate_end(check_runs: list[dict], required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES) -> datetime | None:
+def required_gate_end(check_runs: list[dict], required: tuple[str, ...] | None = None) -> datetime | None:
+    required = required or resolve_required_contexts(check_runs)
     ends: list[datetime] = []
     for name in required:
         run = latest_named_check_runs(check_runs, name)
@@ -712,7 +774,7 @@ def event_fanout_metrics(
     jobs: list[dict],
     check_runs: list[dict],
     merged_at: str | None = None,
-    required: tuple[str, ...] = REQUIRED_CONTEXT_NAMES,
+    required: tuple[str, ...] | None = None,
 ) -> dict:
     """Correlate one synchronize head SHA's workflows into fan-out metrics."""
 
@@ -2111,6 +2173,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.event_fanout:
             payload[EVENT_FANOUT_SCHEMA] = {
                 "required_contexts": list(REQUIRED_CONTEXT_NAMES),
+                "legacy_required_contexts": list(LEGACY_REQUIRED_CONTEXT_NAMES),
                 "synchronize_workflows": list(SYNCHRONIZE_WORKFLOW_NAMES),
                 "public_standard_runner_usd": PUBLIC_STANDARD_RUNNER_USD,
                 "pr_count_with_fanout": sum(m.event_fanout is not None for m in metrics),

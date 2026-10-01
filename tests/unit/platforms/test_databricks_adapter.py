@@ -360,6 +360,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_databricks_sql.connect.return_value = mock_connection
 
         adapter = DatabricksAdapter(
@@ -388,7 +389,7 @@ class TestDatabricksAdapter:
         for expected_call in expected_calls:
             mock_cursor.execute.assert_any_call(expected_call.args[0])
 
-        # Note: cursor is not closed in create_connection - connection stays open
+        mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_skips_create_schema_when_reused(self, mock_databricks_sql):
@@ -402,6 +403,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_databricks_sql.connect.return_value = mock_connection
 
         adapter = DatabricksAdapter(
@@ -435,6 +437,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_databricks_sql.connect.return_value = mock_connection
 
         adapter = DatabricksAdapter(
@@ -548,8 +551,8 @@ class TestDatabricksAdapter:
             assert isinstance(table_stats, dict)
             assert isinstance(load_time, float)
             assert load_time >= 0
-            assert "TEST_TABLE" in table_stats
-            assert table_stats["TEST_TABLE"] == 100
+            assert "test_table" in table_stats
+            assert table_stats["test_table"] == 100
 
             # Should execute COPY INTO statements without temporary views or insert-select
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -590,7 +593,7 @@ class TestDatabricksAdapter:
 
             stats, load_time, _ = adapter.create_external_tables(benchmark, mock_connection, Path("dbfs:/tmp/data"))
 
-            assert stats["ORDERS"] == 123
+            assert stats["orders"] == 123
             assert load_time >= 0
 
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
@@ -619,6 +622,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
 
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
@@ -630,7 +634,7 @@ class TestDatabricksAdapter:
 
         # Should execute cache control setting by default
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-        assert len(execute_calls) == 1, "Should set cache control"
+        assert len(execute_calls) == 2, "Should set and read back cache control"
         assert "use_cached_result = false" in execute_calls[0]
 
         # Should create cursor to apply cache control
@@ -642,6 +646,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
 
         # Create adapter with custom Spark configs
         adapter = DatabricksAdapter(
@@ -672,6 +677,7 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1, "test"), (2, "test2")]
 
         adapter = DatabricksAdapter(
@@ -711,8 +717,8 @@ class TestDatabricksAdapter:
         assert result["query_id"] == "q1"
         assert result["status"] == "FAILED"
         assert result["rows_returned"] == 0
-        assert result["error"] == "Query failed"
-        assert result["error_type"] == "Exception"
+        assert result["error"] == "Databricks session cache control failed"
+        assert result["error_type"] == "ConfigurationError"
         assert isinstance(result["execution_time_seconds"], float)
 
         mock_cursor.close.assert_called_once()
@@ -727,7 +733,10 @@ class TestDatabricksAdapter:
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        mock_cursor.fetchall.side_effect = [[], [(60,)]]
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        # Fresh sessions first emit SET use_cached_result = false (session
+        # cache disable), then the batch statements in order.
+        mock_cursor.fetchall.side_effect = [[], [], [(60,)]]
 
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
@@ -745,6 +754,8 @@ class TestDatabricksAdapter:
         assert result["rows_returned"] == 1
         executed = [call.args[0] for call in mock_cursor.execute.call_args_list]
         assert executed == [
+            "SET use_cached_result = false",
+            "SET use_cached_result",
             "DELETE FROM t WHERE k BETWEEN 1 AND 10",
             "INSERT INTO t SELECT * FROM s WHERE k BETWEEN 1 AND 10",
         ]
@@ -753,6 +764,7 @@ class TestDatabricksAdapter:
     def test_execute_query_accepts_stream_cursor(self, mock_databricks_sql):
         """TPC power harness passes a per-stream cursor without cursor()."""
         mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
 
         adapter = DatabricksAdapter(

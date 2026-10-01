@@ -36,13 +36,14 @@ from benchbox.core.tuning.introspection import corroborate
 from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
 from benchbox.platforms.clickhouse.client import ClickHouseLocalClient
 from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
+from tests.utilities.optional_engines import require_chdb
 
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.fast,
 ]
 
-chdb = pytest.importorskip("chdb", exc_type=ImportError)
+chdb = require_chdb()
 
 SOURCE_DDL = "CREATE TABLE lineitem (l_orderkey INTEGER, l_linenumber INTEGER, l_shipdate DATE)"
 TUNED_PARTITION_CLAUSE = " PARTITION BY (toYYYYMM(l_shipdate))"

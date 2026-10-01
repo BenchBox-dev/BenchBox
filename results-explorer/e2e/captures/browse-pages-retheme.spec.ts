@@ -25,7 +25,7 @@ const OUT = path.join(
 );
 
 const ROUTES: Array<{ slug: string; url: string }> = [
-  { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=standard" },
+  { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=power" },
   { slug: "benchmark-star-schema-sf01", url: "/results/star_schema/?sf=0.1&phase=power" },
   { slug: "platform-duckdb", url: "/results/p/duckdb/" },
   { slug: "platform-polars", url: "/results/p/polars/" },

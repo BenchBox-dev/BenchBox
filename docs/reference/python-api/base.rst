@@ -230,6 +230,7 @@ Properties
    Data scale factor (1.0 = standard size, 0.01 = 1% size, 10 = 10x size).
 
 .. autoattribute:: benchbox.base.BaseBenchmark.output_dir
+   :noindex:
    :annotation: Path
 
    Directory where generated data files are stored.
@@ -267,5 +268,5 @@ See Also
 
 - :doc:`/usage/getting-started` - Getting started guide with complete examples
 - :doc:`/platforms/platform-selection-guide` - Platform adapter documentation
-- :doc:`/benchmarks/README` - Available benchmark implementations
-- :doc:`/usage/api-reference` - High-level API overview
+- :doc:`/benchmarks/index` - Available benchmark implementations
+- :doc:`/reference/api-reference` - High-level API overview

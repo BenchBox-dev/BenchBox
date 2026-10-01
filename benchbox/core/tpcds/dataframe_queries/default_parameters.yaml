@@ -6,21 +6,22 @@
   year: 2001
 3:
   agg_column: ss_ext_sales_price
-  manufact_id: 128
-  month: 11
+  manufact_id: 436
+  month: 12
 4:
   year: 2001
 5:
+  sales_date: '1998-08-04'
   year: 2000
 6:
-  month: 1
-  year: 2001
+  month: 2
+  year: 2000
 7:
   channel_promo: channel_demo
-  education: College
-  gender: M
-  marital_status: S
-  year: 2000
+  education: Primary
+  gender: F
+  marital_status: W
+  year: 1998
 8:
   year: 1998
   zip_codes:
@@ -41,6 +42,12 @@
     - 80
   - - 81
     - 100
+  thresholds:
+  - 25437
+  - 22746
+  - 9387
+  - 10098
+  - 18213
 10:
   gender: F
   month: 2
@@ -49,94 +56,148 @@
   year: 2001
 12:
   item_categories:
+  - Jewelry
   - Sports
   - Books
-  - Home
   month: 2
+  sales_date: '2001-01-12'
   year: 1999
 13:
+  demo1_education: 2 yr Degree
+  demo1_marital: D
+  demo2_education: Secondary
+  demo2_marital: S
+  demo3_education: Advanced Degree
+  demo3_marital: W
   education: Advanced Degree
   marital_status: M
+  states1:
+  - CO
+  - IL
+  - MN
+  states2:
+  - OH
+  - MT
+  - NM
+  states3:
+  - TX
+  - MO
+  - MI
   year: 2001
 14:
   day: 11
-  year: 1999
+  year: 1998
 15:
+  min_price: 500
   quarter: 2
-  year: 2001
-  zip_prefix: '85'
+  states:
+  - CA
+  - WA
+  - GA
+  year: 2000
+  zip_codes:
+  - '85669'
+  - '86197'
+  - '88274'
+  - '83405'
+  - '86475'
+  - '85392'
+  - '85460'
+  - '80348'
+  - '81792'
 16:
   call_center: Bill Bowden
   county: Williamson County
   months:
-  - 3
-  state: TN
-  year: 2002
+  - 2
+  state: IL
+  year: 1999
 17:
   quarter: 1
   state: OK
-  year: 2001
+  year: 1998
 18:
+  birth_months:
+  - 9
+  - 5
+  - 12
+  - 4
+  - 1
+  - 10
   cd_education_status: College
   cd_gender: M
   cd_marital_status: S
   states:
-  - TX
-  - OH
-  - TX
-  - OR
-  - NM
-  - KY
-  - VA
+  - ND
+  - WI
+  - AL
+  - NC
+  - OK
+  - MS
+  - TN
   year: 2001
 19:
-  manager_id: 8
+  manager_id: 7
   month: 11
   year: 1999
 20:
   item_categories:
+  - Jewelry
   - Sports
   - Books
-  - Home
   month: 2
+  sales_date: '2001-01-12'
   year: 1999
 21:
   month: 1
+  sales_date: '1998-04-08'
   warehouse_id: 2
   year: 2000
 22:
-  months:
-  - 1
-  - 2
-  - 3
-  - 4
-  - 5
-  - 6
+  dms: 1212
   year: 2001
 23:
-  year: 2000
+  month: 1
+  year: 1999
 24:
   color: chiffon
   market_id: 8
 25:
+  month: 4
   quarters:
   - 1
   - 2
   - 3
-  year: 2001
-26:
-  education: College
-  gender: M
-  marital_status: S
-  promo_channel: channel_demo
   year: 2000
+26:
+  education: Primary
+  gender: F
+  marital_status: W
+  promo_channel: channel_demo
+  year: 1998
 27:
-  education: College
-  gender: M
-  marital_status: S
+  education: Primary
+  gender: F
+  marital_status: W
   state: TN
-  year: 2002
+  states:
+  - TN
+  year: 1998
 28:
+  coupon_amts:
+  - 460
+  - 1430
+  - 920
+  - 3054
+  - 14180
+  - 2513
+  list_prices:
+  - 11
+  - 91
+  - 66
+  - 142
+  - 135
+  - 28
   quantity_ranges:
   - - 0
     - 5
@@ -150,33 +211,44 @@
     - 25
   - - 26
     - 30
+  wholesale_costs:
+  - 14
+  - 32
+  - 4
+  - 80
+  - 38
+  - 42
 29:
   months:
-  - 1
-  - 2
-  - 3
+  - 4
+  - 5
+  - 6
   year: 1999
 30:
-  state: GA
+  state: IL
   year: 2002
 31:
   gmt_offset: -5.0
   year: 2000
 32:
   days: 90
+  sales_date: '1998-03-18'
   year: 2000
 33:
   categories:
   - Books
   gmt_offset: -5.0
   manufacturer_id: 88
-  year: 1998
+  month: 3
+  year: 1999
 34:
+  buy_potential_1: '>10000'
+  buy_potential_2: Unknown
   county: Williamson County
   state: TN
   year: 1998
 35:
-  year: 2002
+  year: 1999
   years:
   - 1999
   - 2000
@@ -184,14 +256,23 @@
   - 2002
 36:
   state: TN
-  year: 2001
+  states:
+  - TN
+  year: 2000
 37:
-  current_price_max: 98
-  current_price_min: 68
+  current_price_max: 52
+  current_price_min: 22
+  manufact_ids:
+  - 678
+  - 964
+  - 918
+  - 849
   month_end: 6
   month_start: 1
+  sales_date: '2001-06-02'
   year: 2000
 38:
+  dms: 1212
   year: 2002
 39:
   months:
@@ -199,6 +280,7 @@
   - 2
   year: 2001
 40:
+  sales_date: '1998-04-08'
   year: 2000
 41:
   manufact_ids:
@@ -207,46 +289,80 @@
   - 830
   - 540
 42:
-  month: 11
-  year: 2000
+  month: 12
+  year: 1998
 43:
   gmt_offset: -5.0
-  year: 2000
+  year: 1998
 44:
   null_col: ss_addr_sk
   store_sk: 4
   year: 2001
 45:
+  qoy: 2
   quarters:
   - 1
   - 2
   - 3
-  year: 2001
+  year: 2000
   zip_codes:
   - '85669'
   - '86197'
   - '88274'
   - '83405'
   - '86475'
+  - '85392'
+  - '85460'
+  - '80348'
+  - '81792'
 46:
   cities:
-  - Fairview
   - Midway
   - Fairview
   - Fairview
   - Fairview
-  year: 2001
+  - Fairview
+  dep_count: 5
+  dow:
+  - 6
+  - 0
+  vehicle_count: 3
+  year: 1999
+  year_offsets:
+  - 0
+  - 1
+  - 2
 47:
   year: 2000
 48:
-  year: 2000
+  demo1_education: 4 yr Degree
+  demo1_marital: M
+  demo2_education: Primary
+  demo2_marital: D
+  demo3_education: Advanced Degree
+  demo3_marital: U
+  states1:
+  - KY
+  - GA
+  - NM
+  states2:
+  - MT
+  - OR
+  - IN
+  states3:
+  - WI
+  - MO
+  - WV
+  year: 1998
 49:
   year: 2001
 50:
   channel: store channel
   days: 30
-  year: 2001
+  month: 9
+  year: 2000
 51:
+  dms: 1212
   months:
   - 1
   - 2
@@ -254,63 +370,68 @@
   - 4
   year: 2001
 52:
-  month: 11
-  year: 2000
+  month: 12
+  year: 1998
 53:
-  manufacturer_ids:
-  - 88
-  - 33
-  - 160
-  - 129
+  dms: 1212
   month: 11
 54:
   month: 4
   year: 2000
 55:
-  manager_id: 28
-  month: 11
-  year: 1999
+  manager_id: 36
+  month: 12
+  year: 2001
 56:
   colors:
-  - slate
-  - blanched
-  - burnished
-  gmt_offset: -5.0
-  year: 2001
+  - orchid
+  - chiffon
+  - lace
+  gmt_offset: -8.0
+  month: 1
+  year: 2000
 57:
-  year: 1999
+  year: 2000
 58:
   day: 1
+  sales_date: '1998-02-19'
   year: 2000
 59:
-  d_month_seq: 1212
+  d_month_seq: 1185
   year: 1999
 60:
   categories:
-  - Music
-  gmt_offset: -5.0
-  year: 2001
+  - Children
+  category: Children
+  gmt_offset: -6.0
+  month: 9
+  year: 1999
 61:
-  category: Jewelry
-  gmt_offset: -5.0
+  category: Books
+  gmt_offset: -7.0
   month: 11
-  year: 1998
+  year: 1999
 62:
+  dms: 1212
   months:
   - 11
   - 12
   year: 1999
 63:
-  manufacturer_ids:
-  - 88
-  - 33
-  - 160
-  - 129
+  dms: 1212
   month: 11
 64:
-  income_band: 38128
-  year: 1999
+  colors:
+  - maroon
+  - burnished
+  - dim
+  - steel
+  - navajo
+  - chocolate
+  price_min: 35
+  year: 2000
 65:
+  dms: 1212
   year: 2000
 66:
   month_end: 4
@@ -318,79 +439,113 @@
   ship_carriers:
   - DIAMOND
   - AIRBORNE
+  time_start: 49530
   web_names:
   - pri
-  year: 2001
+  year: 2002
 67:
+  dms: 1212
   year: 2001
 68:
   cities:
   - Midway
   - Fairview
-  year: 2001
+  dep_count: 5
+  vehicle_count: 3
+  year: 1999
+  year_offsets:
+  - 0
+  - 1
+  - 2
 69:
-  month: 4
+  month: 1
   states:
-  - KY
-  - GA
-  - NM
-  year: 2001
+  - CO
+  - IL
+  - MN
+  year: 1999
 70:
+  dms: 1212
   year: 2001
 71:
   brand: 'amalgexporti #1'
   manager_id: 1
-  month: 11
-  year: 1999
+  month: 12
+  year: 2000
 72:
-  buy_potential: '>10000'
-  marital_status: D
-  year: 1999
+  buy_potential: 1001-5000
+  marital_status: M
+  year: 2001
 73:
   county: Williamson County
   state: TN
-  year: 1999
+  year: 1998
+  year_offsets:
+  - 0
+  - 1
+  - 2
 74:
   year: 2001
 75:
-  category: Books
-  year: 1999
+  category: Sports
+  year: 2002
 76:
   channel: store
+  null_col_cs: cs_warehouse_sk
+  null_col_ss: ss_addr_sk
+  null_col_ws: ws_web_page_sk
   year: 2001
 77:
   channel_type: store channel
+  sales_date: '1998-08-04'
   year: 2001
 78:
   year: 2000
 79:
+  dep_count: 8
+  dow: 1
+  emp_max: 295
+  emp_min: 200
   household_dep_count: 6
-  year: 2000
+  year: 1998
+  year_offsets:
+  - 0
+  - 1
+  - 2
 80:
+  sales_date: '1998-08-04'
   year: 2000
 81:
-  state: GA
-  year: 2000
+  state: IL
+  year: 1998
 82:
+  manufact_ids:
+  - 437
+  - 129
+  - 727
+  - 663
   month_end: 6
   month_start: 1
-  price_max: 92
-  price_min: 62
+  price_max: 60
+  price_min: 30
+  sales_date: '2002-05-30'
   year: 2000
 83:
   dates:
-  - '2000-06-30'
-  - '2000-09-27'
-  - '2000-11-17'
-  year: 2000
+  - '1998-01-02'
+  - '1998-10-15'
+  - '1998-11-10'
+  year: 1998
 84:
-  city: Edgewood
-  income_band: 38128
+  city: Hopewell
+  income_band: 32287
 85:
   year: 1998
 86:
+  dms: 1212
   year: 2001
 87:
+  dms: 1212
   month: 4
   year: 2001
 88:
@@ -398,47 +553,53 @@
 89:
   category_id: 1
   class_id: 1
-  year: 1999
+  year: 2000
 90:
   hours:
-  - - 8
-    - 9
-  - - 19
-    - 20
+  - - 6
+    - 7
+  - - 14
+    - 15
+  dep_count: 8
   year: 2001
 91:
+  buy_potential: 0-500
   month: 11
-  year: 1998
+  year: 1999
 92:
   days: 90
+  sales_date: '1998-03-18'
   year: 2000
 93:
   reason: reason 28
 94:
+  month: 5
   states:
   - TX
-  - OR
-  - AZ
   year: 1999
 95:
+  month: 5
   states:
   - TX
-  - OR
-  - AZ
   year: 1999
 96:
+  dep_count: 5
   hours:
   - - 8
     - 9
+  store_name: ese
 97:
+  dms: 1212
   month: 4
   year: 2002
 98:
   categories:
+  - Jewelry
   - Sports
   - Books
-  - Home
+  sales_date: '2001-01-12'
   year: 1999
 99:
+  dms: 1212
   month: 2
   year: 1999

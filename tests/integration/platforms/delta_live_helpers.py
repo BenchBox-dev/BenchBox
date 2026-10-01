@@ -33,11 +33,11 @@ def delta_live_skip_reason() -> str | None:
     except ImportError as exc:
         return f"PySpark + Delta Lake runtime not installed: {exc}"
 
-    from benchbox.platforms.pyspark import get_java_skip_reason
+    from tests.utilities.optional_engines import pyspark_skip_reason
 
-    reason = get_java_skip_reason()
+    reason = pyspark_skip_reason()
     if reason:
-        return f"No compatible Java for PySpark: {reason}"
+        return f"PySpark unusable: {reason}"
 
     return None
 

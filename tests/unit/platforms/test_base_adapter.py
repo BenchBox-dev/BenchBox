@@ -248,6 +248,15 @@ class BenchmarkWithStrictTranslationFailure:
         raise SQLTranslationError("strict translation failed", outcome)
 
 
+class BenchmarkWithUnexpectedTranslationFailure:
+    """Benchmark stub whose dialect-aware path raises an unexpected error."""
+
+    def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
+        if dialect is None:
+            return {"Q1": "SELECT fallback"}
+        raise ValueError("unexpected translation failure")
+
+
 class TestPowerResultConversionHelpers:
     def test_power_query_result_preserves_warmup_fields(self):
         result = _power_query_result(
@@ -709,6 +718,107 @@ def mock_benchmark():
 
 class TestPlatformAdapterWorkflow:
     """Test complete platform adapter workflow."""
+
+    @pytest.mark.parametrize(
+        "requested_type,effective_type,dry_run,capture_plans,expected_power_ms",
+        [
+            ("standard", "standard", False, False, 12000),
+            ("power", "power", False, False, 12000),
+            ("throughput", "power", False, False, 12000),
+            ("combined", "power", False, False, 12000),
+            ("maintenance", "power", False, False, 12000),
+            ("combined", "combined", False, False, 2500),
+            ("maintenance", "maintenance", False, False, 2500),
+            ("throughput", "throughput", False, False, None),
+            ("power", "power", True, False, 2500),
+            ("power", "power", False, True, 12000),
+        ],
+    )
+    def test_power_wall_boundary_preserves_query_metrics_and_probe_exclusion(
+        self, mock_benchmark, tmp_path, requested_type, effective_type, dry_run, capture_plans, expected_power_ms
+    ):
+        from datetime import datetime, timedelta
+
+        from benchbox.core.results.result_factory import build_enhanced_benchmark_result
+        from benchbox.core.results.schema import build_result_payload
+
+        adapter = MockPlatformAdapter()
+        adapter.dry_run = dry_run
+        adapter.capture_plans = capture_plans
+        mock_benchmark.output_dir = tmp_path
+        mock_benchmark.benchmark_name = "ClickBench"
+        mock_benchmark.compliance_class = None
+        mock_benchmark.create_enhanced_benchmark_result.side_effect = lambda **kwargs: build_enhanced_benchmark_result(
+            benchmark=mock_benchmark, **kwargs
+        )
+        clock = [100.0]
+        epoch = datetime(2026, 9, 30, 10, 0, 0)
+        boundaries = []
+        rows = [
+            {"query_id": "q1", "status": "SUCCESS", "execution_time_seconds": 2.0, "run_type": "warmup"},
+            {"query_id": "q1", "status": "SUCCESS", "execution_time_seconds": 0.5, "run_type": "measurement"},
+            {"query_id": "q2", "status": "FAILED", "execution_time_seconds": 1.0, "run_type": "measurement"},
+        ]
+        for row in rows:
+            row["resource_usage"] = {"execution_time_seconds": row["execution_time_seconds"], "bytes_billed": 100}
+
+        def execute(_benchmark, _connection, config):
+            boundaries.append(clock[0])
+            config["_effective_execution_type"] = effective_type
+            # Preparation and serial history lookup are workload time, not query latency.
+            for seconds in (3.0, 2.0, 0.5, 5.5, 1.0):
+                clock[0] += seconds
+            boundaries.append(clock[0])
+            return rows
+
+        def capture(_connection, _queries, _results):
+            assert clock[0] == boundaries[1]
+            assert adapter._plan_capture_phase_active is False
+            clock[0] += 13.0
+
+        def probe(_connection, _config):
+            assert clock[0] == boundaries[1] + (13.0 if capture_plans else 0.0)
+            clock[0] += 7.0
+            return 7.0
+
+        def definitions(*_args, **_kwargs):
+            clock[0] += 4.0
+            return {}
+
+        with (
+            patch("benchbox.platforms.base.adapter.mono_time", side_effect=lambda: clock[0]),
+            patch("benchbox.platforms.base.adapter.elapsed_seconds", side_effect=lambda start: clock[0] - start),
+            patch("benchbox.platforms.base.execution.mono_time", side_effect=lambda: clock[0]),
+            patch("benchbox.platforms.base.execution.elapsed_seconds", side_effect=lambda start: clock[0] - start),
+            patch("benchbox.platforms.base.execution.datetime") as wall_clock,
+            patch.object(adapter, "_dispatch_queries_by_type", side_effect=execute),
+            patch.object(adapter, "_capture_plans_post_measurement", side_effect=capture) as capture_phase,
+            patch.object(adapter, "_collect_post_measurement_metadata", side_effect=probe),
+            patch.object(adapter, "_get_dialect_queries", side_effect=definitions),
+        ):
+            wall_clock.now.side_effect = lambda: epoch + timedelta(seconds=clock[0] - 100.0)
+            result = adapter.run_benchmark(mock_benchmark, test_execution_type=requested_type)
+
+        phase = result.execution_phases.power_test
+        if expected_power_ms is None:
+            assert phase is None
+        else:
+            assert phase.duration_ms == expected_power_ms
+            if effective_type in {"standard", "power"} and not dry_run:
+                assert phase.start_time == epoch.isoformat()
+                assert phase.end_time == (epoch + timedelta(seconds=12)).isoformat()
+            # Existing successful-query aggregate remains separate from wall accounting.
+            assert phase.geometric_mean_time == 1.25
+        payload = build_result_payload(result)
+        assert payload["run"]["total_duration_ms"] == (29000 if capture_plans else 16000)
+        assert capture_phase.call_count == int(capture_plans)
+        assert payload["run"]["query_time_ms"] == 500
+        assert payload["summary"]["timing"]["total_ms"] == 500
+        assert [q["ms"] for q in payload["queries"]] == [2000, 500, 1000]
+        assert [q["resource_usage"]["execution_time_seconds"] for q in result.query_results] == [2.0, 0.5, 1.0]
+        assert payload["summary"]["cost"]["total_bytes_billed"] == 300
+        if expected_power_ms is not None:
+            assert payload["phases"]["power_test"]["duration_ms"] == expected_power_ms
 
     def test_run_benchmark_success(self, mock_benchmark, tmp_path):
         """Test successful benchmark execution."""
@@ -3564,6 +3674,19 @@ class TestDialectQuerySelection:
                 benchmark_slug="tpch",
                 connection=Mock(name="strict_translation_connection"),
             )
+
+    def test_get_dialect_queries_can_reject_generic_fallbacks(self):
+        adapter = MockPlatformAdapterWithDialect()
+        benchmark = BenchmarkWithUnexpectedTranslationFailure()
+
+        with pytest.raises(RuntimeError, match="Dialect query extraction failed for benchmark tpchavoc"):
+            adapter._get_dialect_queries(
+                benchmark,
+                benchmark_slug="tpchavoc",
+                strict_translation=True,
+            )
+
+        assert adapter._get_dialect_queries(benchmark, benchmark_slug="tpchavoc") == {"Q1": "SELECT fallback"}
 
 
 class TestStatisticsPhase:
