@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The cause is stated with evidence (row counts for SQL and both families)",
+    "Q98 matches on both families at SF=0.1 after the fix, or the item is closed with evidence that no defect exists",
+    "No regression in other queries using the same helper"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T9). Hypothesis, not a confirmed bug. Parameter alignment (dfparity-t04/t05) may change which queries diverge; re-check before fixing. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Hypothesis from a prior review (not verified by me): the shared helper path used by Q98 imposes a LIMIT 100 where the SQL returns all 269 rows, identically on both families. Reproduce first with the existing probe data (scratchpad pq_<sf>.jsonl shows Q98 divergent at SF 0.1 and 1.0); if the cause is different, record it and fix that instead; if there is no defect, close with evidence. Fix in the shared helper, not per query.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:02:47Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "696c24d45fca4b4aa9b1e15241f95cf2",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}

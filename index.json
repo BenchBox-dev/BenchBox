@@ -6050,6 +6050,13 @@
       "status": "open",
       "title": "Round Q70 expression total_sum to DECIMAL scale to match SQL ordering"
     },
+    "dfparity-t09-q98-limit": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Reproduce and fix Q98 DataFrame returning 100 rows where SQL has no LIMIT"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
