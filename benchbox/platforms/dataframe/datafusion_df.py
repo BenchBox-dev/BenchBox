@@ -812,7 +812,7 @@ class DataFusionDataFrameAdapter(ExpressionFamilyAdapter[DataFusionDF, DataFusio
         # Convert to PyArrow table
         table = pa.table({k: [v] for k, v in data.items()})
         # Create DataFusion DataFrame from the table
-        return self._session_context.from_arrow(table)
+        return self.session_ctx.from_arrow(table)
 
     # =========================================================================
     # Window Functions

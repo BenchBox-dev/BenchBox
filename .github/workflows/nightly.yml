@@ -1198,7 +1198,7 @@ jobs:
     # Auto-ratchet signal for the fast-lane test-count ceiling (see
     # fast-lane-decouple-ceiling-contention-2 and
     # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
-    # ci.yml's guard-timing-policy step uses and, when headroom drops below
+    # ci.yml's guard-fast-lane-ceiling step uses and, when headroom drops below
     # the warning threshold, files/updates ONE marker-tagged tracking issue
     # with the current numbers and the exact edit to make -- it does NOT
     # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no

@@ -243,8 +243,14 @@ def test_surface_provenance_column_present(rows):
         assert "surface_provenance_rationale" in r and r["surface_provenance_rationale"], (
             f"{r['benchmark']} missing surface_provenance_rationale"
         )
-        # The axis only applies to cross-surface gates; everything else reports `—`.
-        if r["primary_oracle"] != ORACLE_CROSS_SURFACE:
+        # The axis discloses the authorship distance of any registered
+        # cross-surface gate (enforced or staged), even when a
+        # higher-priority oracle is primary; benchmarks with no registered
+        # gate report `—`.
+        from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
+
+        has_gate = r["benchmark"] in GATES or r["benchmark"] in STAGED_GATES
+        if r["primary_oracle"] != ORACLE_CROSS_SURFACE and not has_gate:
             assert r["surface_provenance"] == PROVENANCE_NONE, (
                 f"{r['benchmark']} is not cross-surface but discloses provenance={r['surface_provenance']}"
             )
@@ -292,6 +298,8 @@ def test_surface_provenance_is_read_live_from_gate_metadata(rows):
 
     by_id = {r["benchmark"]: r for r in rows}
     for benchmark_id, gate in {**GATES, **STAGED_GATES}.items():
+        # Every registered gate discloses its provenance, including those whose
+        # primary oracle is higher priority (e.g. tpch's expected-results).
         assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
             f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
         )

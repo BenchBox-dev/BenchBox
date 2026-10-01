@@ -345,10 +345,17 @@ class DatabricksAdapter(PlatformAdapter):
         force_upload_val = config.get("force_upload")
         self.force_upload = bool(force_upload_val if force_upload_val is not None else False)
 
-        # Result cache control - disable by default for accurate benchmarking
-        self.disable_result_cache = config.get("disable_result_cache", True)
+        # Result cache control - disable by default for accurate benchmarking.
+        # None-safe: the config builder inserts every platform field with None
+        # when no source provides it, so config.get(key, True) returns None
+        # (key present) and a bare truthiness gate would skip the disable.
+        disable_result_cache = config.get("disable_result_cache", True)
+        self.disable_result_cache = True if disable_result_cache is None else bool(disable_result_cache)
         self._liquid_clustering_operations: list[dict[str, Any]] = []
         self._z_order_operations: list[dict[str, Any]] = []
+        self._cache_disabled_sessions: Any = None
+        self._cache_disable_failed = False
+        self._cache_control_receipt: dict[str, Any] | None = None
         self._applied_layout_operations: list[dict[str, Any]] = []
         self._skipped_layout_operations: list[dict[str, Any]] = []
 
@@ -376,6 +383,9 @@ class DatabricksAdapter(PlatformAdapter):
 
     def _reset_run_scoped_state(self) -> None:
         super()._reset_run_scoped_state()
+        self._cache_disabled_sessions = None
+        self._cache_disable_failed = False
+        self._cache_control_receipt = None
         self._liquid_clustering_operations = []
         self._z_order_operations = []
         self._applied_layout_operations = []
@@ -893,9 +903,17 @@ class DatabricksAdapter(PlatformAdapter):
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
         compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
 
+        from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+
+        receipt = sanitize_cache_control_receipt(self._cache_control_receipt)
+        config = dict(cast(Mapping[str, Any], config))
+        config["result_cache_enabled"] = not receipt["cache_disabled"] if receipt and receipt["validated"] else None
+
         metadata["platform_deployment"] = self._databricks_deployment_metadata(config, compute)
         metadata["platform_cloud"] = self._databricks_cloud_metadata(config)
         metadata["platform_compute"] = self._databricks_compute_metadata(config, compute)
+        if receipt is not None:
+            metadata["platform_compute"]["cache_control"] = receipt
         metadata["platform_storage"] = self._databricks_storage_metadata(config)
         return metadata
 
@@ -1205,6 +1223,14 @@ class DatabricksAdapter(PlatformAdapter):
                     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
+
+            try:
+                self._ensure_session_cache_disabled(cursor, session=connection)
+            except Exception:
+                connection.close()
+                raise
+            finally:
+                cursor.close()
 
             self.log_operation_complete(
                 "Databricks connection",
@@ -2542,20 +2568,30 @@ class DatabricksAdapter(PlatformAdapter):
 
         Applies result cache control first, then any user-provided custom Spark configurations.
         """
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.platforms.cloud_shared import empty_cache_control_receipt
+
+        configs = getattr(self, "spark_configs", {}) or {}
+        if self.disable_result_cache and any(
+            str(key).strip().lower() == "use_cached_result" and str(value).lower() != "false"
+            for key, value in configs.items()
+        ):
+            receipt = empty_cache_control_receipt()
+            receipt["errors"].append("Custom Spark configuration conflicts with required result cache disable")
+            self._cache_disable_failed = True
+            self._cache_control_receipt = receipt
+            raise ConfigurationError(receipt["errors"][0], details=receipt)
+
         cursor = connection.cursor()
 
         try:
-            # Apply result cache control - disable by default for accurate benchmarking
-            if self.disable_result_cache:
-                try:
-                    cursor.execute("SET use_cached_result = false")
-                    self.logger.debug("Disabled result cache (use_cached_result = false)")
-                except Exception as e:
-                    self.logger.warning(f"Failed to disable result cache: {e}")
+            self._ensure_session_cache_disabled(cursor, session=connection)
 
             # Apply user-provided configurations if specified
             if hasattr(self, "spark_configs") and self.spark_configs:
                 for config_key, config_value in self.spark_configs.items():
+                    if self.disable_result_cache and str(config_key).strip().lower() == "use_cached_result":
+                        continue  # The validated session helper owns this setting.
                     try:
                         cursor.execute(f"SET {config_key} = {config_value}")
                         self.logger.debug(f"Set {config_key} = {config_value}")
@@ -2566,6 +2602,105 @@ class DatabricksAdapter(PlatformAdapter):
 
         finally:
             cursor.close()
+
+    def _ensure_session_cache_disabled(self, cursor: Any, *, session: Any | None = None) -> None:
+        """Disable and read back cache state once per connection, or refuse execution."""
+        import inspect
+        import weakref
+
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.core.tuning.applied_ledger import (
+            PHASE_SESSION,
+            RecordingConnection,
+            _RecordingCursor,
+            recording_connection,
+        )
+        from benchbox.platforms.cloud_shared import empty_cache_control_receipt, explicit_cache_enabled_receipt
+
+        if not self.disable_result_cache:
+            self._cache_control_receipt = explicit_cache_enabled_receipt("use_cached_result", "true")
+            return
+
+        # Real attributes avoid connections invented by dynamic proxies.
+        # Unwrap known recording proxies to keep one capture owner per SET.
+        while isinstance(cursor, _RecordingCursor):
+            cursor = cursor._cur
+        while isinstance(session, RecordingConnection):
+            session = session.raw_connection
+        if session is None:
+            for attr in ("connection", "_connection"):
+                if inspect.getattr_static(cursor, attr, None) is not None:
+                    session = getattr(cursor, attr)
+                    break
+        key = session if session is not None else cursor
+        if self._cache_disabled_sessions is None:
+            self._cache_disabled_sessions = weakref.WeakSet()
+        receipt = empty_cache_control_receipt()
+        try:
+            weakref.ref(key)
+            hash(key)
+            if key in self._cache_disabled_sessions:
+                return
+        except TypeError as exc:
+            receipt["errors"].append("Unsupported session identity: cache initialization cannot be tracked")
+            self._cache_disable_failed = True
+            self._cache_control_receipt = receipt
+            raise ConfigurationError(receipt["errors"][0], details=receipt) from exc
+
+        capture = recording_connection(cursor, getattr(self, "_applied_tuning_ledger", None), PHASE_SESSION)
+        try:
+            capture.execute("SET use_cached_result = false")
+            cursor.fetchall()
+            cursor.execute("SET use_cached_result")
+            row = cursor.fetchone()
+            if row is None or len(row) != 2 or str(row[0]).lower() != "use_cached_result":
+                raise ValueError("Unsupported cache readback: expected (use_cached_result, value)")
+            value = str(row[1]).lower()
+            receipt["settings"]["use_cached_result"] = value
+            if value != "false":
+                raise ValueError(f"Expected use_cached_result=false, observed {value}")
+            receipt["validated"] = True
+            receipt["cache_disabled"] = True
+        except Exception as exc:
+            receipt["errors"].append(str(exc))
+            self._cache_disable_failed = True
+            self._cache_control_receipt = receipt
+            raise ConfigurationError("Databricks session cache control failed", details=receipt) from exc
+
+        # A later successful session cannot erase an earlier failed receipt.
+        if not self._cache_disable_failed:
+            self._cache_control_receipt = receipt
+        self._cache_disabled_sessions.add(key)
+
+    def _initialize_query_session(self, connection: Any) -> None:
+        """Prepare a session before a power or throughput harness starts timing."""
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            try:
+                self._ensure_session_cache_disabled(cursor, session=connection)
+            finally:
+                cursor.close()
+        else:
+            self._ensure_session_cache_disabled(connection)
+
+    def _make_direct_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float) -> Any:
+        self._initialize_query_session(connection)
+        return super()._make_direct_power_connection_adapter(connection, benchmark_id, scale_factor)
+
+    def _make_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float) -> Any:
+        self._initialize_query_session(connection)
+        return super()._make_power_connection_adapter(connection, benchmark_id, scale_factor)
+
+    def _execute_tpch_throughput_test(self, benchmark: Any, connection: Any, run_config: dict) -> list[dict[str, Any]]:
+        # Databricks currently uses shared cursors. Initialize the actual
+        # connection before the parent harness starts its throughput window.
+        self._initialize_query_session(connection)
+        return super()._execute_tpch_throughput_test(benchmark, connection, run_config)
+
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
+        stream = super().new_stream_connection(connection, benchmark_type=benchmark_type)
+        self._initialize_query_session(stream)
+        return stream
 
     def execute_query(
         self,
@@ -2583,16 +2718,32 @@ class DatabricksAdapter(PlatformAdapter):
         power harness passes a per-stream cursor through the facade, which has
         no ``cursor()`` method of its own.
         """
-        start_time = mono_time()
-        self.log_verbose(f"Executing query {query_id}")
-        self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
-
         own_cursor = False
         if hasattr(connection, "cursor"):
             cursor = connection.cursor()
             own_cursor = True
         else:
             cursor = connection
+
+        # Fallback for direct callers. Harness factories prepare this session
+        # before their outer timer, even when no warmup is requested.
+        try:
+            self._ensure_session_cache_disabled(cursor, session=connection if own_cursor else None)
+        except Exception as exc:
+            if own_cursor:
+                cursor.close()
+            return {
+                "query_id": query_id,
+                "status": "FAILED",
+                "execution_time_seconds": 0.0,
+                "rows_returned": 0,
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            }
+
+        start_time = mono_time()
+        self.log_verbose(f"Executing query {query_id}")
+        self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
         try:
             # Schema context is already set in create_connection() and persists for the session
