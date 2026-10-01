@@ -39,11 +39,43 @@ Api = Callable[[str], dict[str, Any]]
 # injection variable, and Python setting is dropped; only the transport receives credentials.
 _CHILD_ENVIRONMENT_KEYS = frozenset({"PATH", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TEMP", "TMP", "SYSTEMROOT"})
 _GIT_ENVIRONMENT = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull, "GIT_TERMINAL_PROMPT": "0"}
+TAG_PATTERN = r"v[0-9][A-Za-z0-9.+-]*"
+_DENIED_TRANSPORTS = ("ext", "file", "git", "http", "ssh")
+# What `gh` needs beyond that allowlist: its own authentication, its configuration location, and
+# the proxy and CA settings a runner may require. `GH_HOST` is left out because the host is pinned.
+_GH_ENVIRONMENT_KEYS = frozenset(
+    {
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "HOME",
+        "XDG_CONFIG_HOME",
+        "GH_CONFIG_DIR",
+        "HTTPS_PROXY",
+        "HTTP_PROXY",
+        "NO_PROXY",
+        "ALL_PROXY",
+        "https_proxy",
+        "http_proxy",
+        "no_proxy",
+        "all_proxy",
+        "SSL_CERT_FILE",
+        "SSL_CERT_DIR",
+        "CURL_CA_BUNDLE",
+        "REQUESTS_CA_BUNDLE",
+    }
+)
 
 
 def _child_environment(**extra: str) -> dict[str, str]:
     environment = {key: value for key, value in os.environ.items() if key in _CHILD_ENVIRONMENT_KEYS}
     environment.update(extra)
+    return environment
+
+
+def _gh_environment() -> dict[str, str]:
+    """The transport's environment: the allowlist plus its authentication and network settings."""
+    environment = _child_environment(GH_PROMPT_DISABLED="1", GH_NO_UPDATE_NOTIFIER="1")
+    environment.update({key: value for key, value in os.environ.items() if key in _GH_ENVIRONMENT_KEYS})
     return environment
 
 
@@ -62,8 +94,11 @@ def _run_git(root: Path, *args: str, **options: Any) -> subprocess.CompletedProc
         f"core.hooksPath={os.devnull}",
         # Only HTTPS may be used, so repository-local `core.sshCommand`, `core.gitProxy` and
         # other transport helpers never run. Local credential and askpass helpers are cleared.
+        # A repository-local `protocol.<name>.allow` outranks the general `protocol.allow`, so
+        # each non-HTTPS transport is denied by name; `-c` outranks repository configuration.
         "-c",
         "protocol.allow=never",
+        *[item for name in _DENIED_TRANSPORTS for item in ("-c", f"protocol.{name}.allow=never")],
         "-c",
         "protocol.https.allow=always",
         "-c",
@@ -118,7 +153,11 @@ def github_json(path: str) -> dict[str, Any]:
     """Read a constructed repository API path using gh's credential handling."""
     endpoint = f"repos/{REPOSITORY}" + (f"/{path}" if path else "")
     result = subprocess.run(
-        ["gh", "api", "--hostname", "github.com", endpoint], capture_output=True, check=True, timeout=60
+        ["gh", "api", "--hostname", "github.com", endpoint],
+        capture_output=True,
+        check=True,
+        timeout=60,
+        env=_gh_environment(),
     )
     value = json.loads(result.stdout, object_pairs_hook=_object)
     _require(isinstance(value, dict), "API response is not an object")
@@ -333,7 +372,7 @@ def verify_producer_receipt(directory: Path, run: dict[str, Any], job: dict[str,
 
 def resolve_tag(root: Path, tag: str, develop_ref: str = "refs/remotes/origin/develop") -> dict[str, str]:
     """Require an annotated version tag and an exact checked-out develop ancestor."""
-    _require(bool(re.fullmatch(r"v[0-9][A-Za-z0-9.+-]*", tag)), "invalid version tag")
+    _require(bool(re.fullmatch(TAG_PATTERN, tag)), "invalid version tag")
 
     def git(*args: str) -> str:
         return _run_git(root, *args, check=True, text=True, stdout=subprocess.PIPE, timeout=60).stdout.strip()
@@ -558,6 +597,7 @@ def _download(artifact_id: int, archive: Path) -> None:
                 stdout=subprocess.PIPE,
                 bufsize=0,
                 start_new_session=True,
+                env=_gh_environment(),
             )
             assert process.stdout is not None
 
@@ -604,6 +644,29 @@ def _download(artifact_id: int, archive: Path) -> None:
         if created:
             archive.unlink(missing_ok=True)
         raise
+
+
+def hosted_refspecs(tag: str) -> list[str]:
+    """Refspecs that refresh develop and force the local tag to the hosted tag object."""
+    _require(bool(re.fullmatch(TAG_PATTERN, tag)), "invalid version tag")
+    return ["develop:refs/remotes/origin/develop", f"+refs/tags/{tag}:refs/tags/{tag}"]
+
+
+def fetch_hosted_refs(source: Path, tag: str) -> None:
+    """Fetch develop and the tag from the fixed repository URL, not the checkout's `origin`.
+
+    Local remote configuration cannot redirect it. Forcing the tag means a hosted tag that was
+    moved after checkout changes the local tag, so `resolve_tag` then refuses the stale checkout.
+    """
+    _run_git(
+        source,
+        "fetch",
+        "--no-tags",
+        f"https://github.com/{REPOSITORY}.git",
+        *hosted_refspecs(tag),
+        check=True,
+        timeout=600,
+    )
 
 
 def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[str, Any]:
@@ -683,17 +746,7 @@ def main(argv: list[str] | None = None) -> int:
             receipt = producer_receipt(args.dist, run, matches[0])
             (args.dist / PRODUCER_RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n")
         else:
-            # A fixed repository URL, not the checkout's `origin`, so local remote configuration
-            # cannot redirect the fetch that establishes the develop ancestor.
-            _run_git(
-                args.source,
-                "fetch",
-                "--no-tags",
-                f"https://github.com/{REPOSITORY}.git",
-                "develop:refs/remotes/origin/develop",
-                check=True,
-                timeout=600,
-            )
+            fetch_hosted_refs(args.source, args.tag)
             print(json.dumps(admit(args.source.resolve(), args.tag, args.output.absolute()), indent=2))
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
         parser.exit(1, f"Release artifact admission failed: {exc}\n")

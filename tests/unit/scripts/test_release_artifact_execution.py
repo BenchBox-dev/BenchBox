@@ -812,3 +812,95 @@ def test_swapped_staging_directory_is_refused_before_publication(
     with pytest.raises(ValueError, match="staging directory changed during admission"):
         consumer.admit(tagged_source, "v0.4.2", output, metadata["api"])
     assert not output.exists()
+
+
+def test_moved_hosted_tag_changes_the_local_tag_so_the_stale_checkout_is_refused(tagged_source, tmp_path):
+    first = consumer.resolve_tag(tagged_source, "v0.4.2")
+    # The hosted repository moves v0.4.2 to a different commit that declares the same version.
+    hosted = tmp_path / "hosted"
+    subprocess.run(["git", "clone", "-q", str(tagged_source), str(hosted)], check=True)
+    git(hosted, "config", "user.name", "Test Fixture")
+    git(hosted, "config", "user.email", "fixture@example.invalid")
+    (hosted / "moved.txt").write_text("a different commit\n")
+    git(hosted, "add", "moved.txt")
+    git(hosted, "commit", "-m", "Commit the hosted tag now points at")
+    git(hosted, "tag", "-d", "v0.4.2")
+    git(hosted, "tag", "-a", "v0.4.2", "-m", "Moved hosted tag")
+    # Control: a fetch that ignores tags leaves the local tag, and the stale checkout still admits.
+    subprocess.run(["git", "-C", str(tagged_source), "fetch", "-q", "--no-tags", str(hosted), "develop"], check=True)
+    assert consumer.resolve_tag(tagged_source, "v0.4.2") == first
+    # The refspecs the consumer uses force the local tag to the hosted tag object.
+    subprocess.run(
+        ["git", "-C", str(tagged_source), "fetch", "-q", "--no-tags", str(hosted), *consumer.hosted_refspecs("v0.4.2")],
+        check=True,
+    )
+    with pytest.raises(ValueError, match="checkout differs from tagged source"):
+        consumer.resolve_tag(tagged_source, "v0.4.2")
+
+
+@pytest.mark.parametrize("tag", ["", "0.4.2", "v", "v1;touch x", "../v1", "v1 --upload-pack=x", "v1\n"])
+def test_hosted_fetch_refuses_a_malformed_tag(tag):
+    with pytest.raises(ValueError, match="invalid version tag"):
+        consumer.hosted_refspecs(tag)
+
+
+def test_hosted_fetch_uses_the_fixed_url_and_forces_the_tag(monkeypatch, tmp_path):
+    calls = []
+
+    def spy(root, *args, **options):
+        calls.append((root, args, options))
+
+    monkeypatch.setattr(consumer, "_run_git", spy)
+    consumer.fetch_hosted_refs(tmp_path, "v0.4.2")
+    ((root, args, options),) = calls
+    assert root == tmp_path
+    assert args == (
+        "fetch",
+        "--no-tags",
+        "https://github.com/BenchBox-dev/BenchBox.git",
+        "develop:refs/remotes/origin/develop",
+        "+refs/tags/v0.4.2:refs/tags/v0.4.2",
+    )
+    assert options == {"check": True, "timeout": 600}
+
+
+def test_local_url_rewrite_cannot_reach_an_ext_transport(tagged_source, tmp_path):
+    marker = tmp_path / "ext-helper-ran"
+    helper = tmp_path / "ext-helper.sh"
+    helper.write_text(f"#!/bin/sh\necho ran >> {marker}\nexit 1\n")
+    helper.chmod(0o755)
+    url = "https://github.com/BenchBox-dev/BenchBox.git"
+    # A specific `protocol.ext.allow` in repository config outranks the general default.
+    git(tagged_source, "config", f"url.ext::{helper}.insteadOf", url)
+    git(tagged_source, "config", "protocol.ext.allow", "always")
+    # Control: plain Git rewrites the URL and runs the helper.
+    subprocess.run(["git", "-C", str(tagged_source), "ls-remote", url], capture_output=True, check=False, timeout=60)
+    assert marker.exists(), "control: the rewritten ext transport should run under plain git"
+    marker.unlink()
+    result = consumer._run_git(tagged_source, "ls-remote", url, capture_output=True, text=True, check=False, timeout=60)
+    assert result.returncode != 0
+    assert not marker.exists(), "hardened git must not run an ext transport named by repository configuration"
+
+
+def test_gh_children_get_only_authentication_and_network_settings(tmp_path, monkeypatch):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    seen = tmp_path / "gh-environment.json"
+    stub = bin_dir / "gh"
+    stub.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os\n"
+        f"open({str(seen)!r}, 'w').write(json.dumps(sorted(os.environ)))\n"
+        "print('{}')\n"
+    )
+    stub.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+    monkeypatch.setenv("GH_TOKEN", "synthetic-token")
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.invalid:3128")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "synthetic-aws-secret")
+    monkeypatch.setenv("GH_HOST", "evil.example")
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    assert consumer.github_json("") == {}
+    names = set(json.loads(seen.read_text()))
+    assert {"PATH", "GH_TOKEN", "HTTPS_PROXY"} <= names
+    assert not {"AWS_SECRET_ACCESS_KEY", "GH_HOST", "GIT_CONFIG_COUNT"} & names
