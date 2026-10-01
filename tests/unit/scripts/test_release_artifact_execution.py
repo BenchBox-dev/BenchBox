@@ -733,3 +733,82 @@ def test_cleanup_tolerates_an_exited_unreaped_group_leader():
     consumer._reap_download(process, None, threading.Event())
     assert process.returncode == 0
     assert process.stdout is not None and process.stdout.closed
+
+
+def test_git_children_do_not_run_repository_local_transport_helpers(tagged_source, tmp_path):
+    marker = tmp_path / "ssh-helper-ran"
+    helper = tmp_path / "ssh-helper.sh"
+    helper.write_text(f"#!/bin/sh\necho ran >> {marker}\nexit 1\n")
+    helper.chmod(0o755)
+    git(tagged_source, "config", "core.sshCommand", str(helper))
+    # Control: plain Git runs the configured helper for an ssh remote.
+    subprocess.run(
+        ["git", "-C", str(tagged_source), "ls-remote", "ssh://invalid.example/repository"],
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+    assert marker.exists(), "control: configured ssh helper should run under plain git"
+    marker.unlink()
+    result = consumer._run_git(
+        tagged_source,
+        "ls-remote",
+        "ssh://invalid.example/repository",
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "not allowed" in result.stderr
+    assert not marker.exists(), "hardened git must not run a repository-local transport helper"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX permission bits")
+@pytest.mark.parametrize(
+    "mode, accepted",
+    [(0o700, True), (0o755, True), (0o777, False), (0o775, False), (0o1777, True)],
+)
+def test_output_parent_must_not_let_other_users_swap_entries(tmp_path, mode, accepted):
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    parent.chmod(mode)
+    try:
+        if accepted:
+            consumer._require_private_parent(parent)
+        else:
+            with pytest.raises(ValueError, match="writable by other users"):
+                consumer._require_private_parent(parent)
+    finally:
+        parent.chmod(0o700)
+
+
+def test_swapped_staging_directory_is_refused_before_publication(
+    tmp_path, monkeypatch, tagged_source, distributions, metadata
+):
+    commit_snapshot_files(
+        tagged_source,
+        {
+            "scripts/verify_distribution_binaries.py": "import sys\nsys.exit(0)\n",
+            "benchbox/utils/binary_manifest.py": "",
+        },
+    )
+    bind_admission_fixture(tagged_source, distributions, metadata, tmp_path, monkeypatch)
+    output = tmp_path / "admitted"
+    real_resolve_tag = consumer.resolve_tag
+    calls = []
+
+    def resolve_then_swap(*args, **kwargs):
+        result = real_resolve_tag(*args, **kwargs)
+        calls.append(1)
+        if len(calls) == 2:
+            # Verification is complete. Another writer now replaces the staging directory.
+            stage = next(tmp_path.glob("release-admission-*"))
+            stage.rename(tmp_path / "moved-away")
+            stage.mkdir()
+        return result
+
+    monkeypatch.setattr(consumer, "resolve_tag", resolve_then_swap)
+    with pytest.raises(ValueError, match="staging directory changed during admission"):
+        consumer.admit(tagged_source, "v0.4.2", output, metadata["api"])
+    assert not output.exists()

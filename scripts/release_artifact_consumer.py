@@ -60,11 +60,34 @@ def _run_git(root: Path, *args: str, **options: Any) -> subprocess.CompletedProc
         "core.fsmonitor=false",
         "-c",
         f"core.hooksPath={os.devnull}",
+        # Only HTTPS may be used, so repository-local `core.sshCommand`, `core.gitProxy` and
+        # other transport helpers never run. Local credential and askpass helpers are cleared.
+        "-c",
+        "protocol.allow=never",
+        "-c",
+        "protocol.https.allow=always",
+        "-c",
+        "credential.helper=",
+        "-c",
+        "core.askPass=",
         "-C",
         str(root),
         *args,
     ]
     return subprocess.run(command, env=_child_environment(**_GIT_ENVIRONMENT), **options)
+
+
+def _require_private_parent(parent: Path) -> None:
+    """Refuse an output parent that another user could use to swap the staging directory."""
+    if not hasattr(os, "getuid"):
+        return
+    info = parent.stat()
+    writable_by_others = bool(info.st_mode & (stat.S_IWGRP | stat.S_IWOTH))
+    # A sticky directory stops other users renaming entries they do not own, so it is acceptable.
+    _require(
+        info.st_uid in {os.getuid(), 0} and (not writable_by_others or bool(info.st_mode & stat.S_ISVTX)),
+        "output parent directory is writable by other users",
+    )
 
 
 def _require(condition: bool, message: str) -> None:
@@ -589,8 +612,12 @@ def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[st
     run, job, artifact = select_producer(source["head_sha"], api)
     _require(not output.exists(), "output already exists")
     output.parent.mkdir(parents=True, exist_ok=True)
+    # Bind to the real parent directory and require that no other user can rename entries in it.
+    output = output.parent.resolve(strict=True) / output.name
+    _require_private_parent(output.parent)
     with tempfile.TemporaryDirectory(prefix="release-admission-", dir=output.parent) as temporary:
         stage = Path(temporary)
+        staged = stage.stat()
         archive = stage / "download.zip"
         _download(artifact["id"], archive)
         payloads = verify_archive(archive, artifact)
@@ -619,6 +646,11 @@ def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[st
         }
         (stage / "admission-receipt.json").write_text(json.dumps(summary, indent=2) + "\n")
         _require(not output.exists(), "output appeared during admission")
+        now = stage.stat()
+        _require(
+            not stage.is_symlink() and (now.st_dev, now.st_ino) == (staged.st_dev, staged.st_ino),
+            "staging directory changed during admission",
+        )
         _publish_output(stage, output)
     return summary
 
@@ -651,7 +683,17 @@ def main(argv: list[str] | None = None) -> int:
             receipt = producer_receipt(args.dist, run, matches[0])
             (args.dist / PRODUCER_RECEIPT).write_text(json.dumps(receipt, indent=2) + "\n")
         else:
-            _run_git(args.source, "fetch", "--no-tags", "origin", "develop", check=True, timeout=600)
+            # A fixed repository URL, not the checkout's `origin`, so local remote configuration
+            # cannot redirect the fetch that establishes the develop ancestor.
+            _run_git(
+                args.source,
+                "fetch",
+                "--no-tags",
+                f"https://github.com/{REPOSITORY}.git",
+                "develop:refs/remotes/origin/develop",
+                check=True,
+                timeout=600,
+            )
             print(json.dumps(admit(args.source.resolve(), args.tag, args.output.absolute()), indent=2))
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError, zipfile.BadZipFile) as exc:
         parser.exit(1, f"Release artifact admission failed: {exc}\n")

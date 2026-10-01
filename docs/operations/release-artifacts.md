@@ -75,6 +75,30 @@ Git and verifier children receive only an allowlisted environment (`PATH`,
 locale, and temporary-directory variables). Credentials go to the `gh`
 transport alone. The checkout is checked again before output publication.
 
+The `fetch` that establishes the develop ancestor uses the fixed repository URL
+over HTTPS only. Repository-local `core.sshCommand`, proxy commands, credential
+helpers and askpass settings therefore cannot run, and a local `remote.origin`
+cannot redirect it. Publication requires an output parent that no other user
+can use to rename entries (owned by the caller, and not group- or
+world-writable unless sticky), resolves that parent to its real path, and
+refuses to publish if the staging directory's device and inode changed.
+
+### Threat model
+
+Admission defends against artifacts and metadata that do not belong to the
+tagged commit: another run or attempt, a forged or edited receipt, a tampered
+archive or distribution, a stale or rewritten tag, and a verifier that is not
+the committed one. It is not a defense against a hostile writer on the same
+filesystem while it runs. Run it on an ephemeral, single-tenant runner, from a
+checkout that no other principal can write.
+
+Specifically, `release_flow.py` and `benchbox/utils/clock.py` are loaded into
+the credential-bearing process from the consumer's own directory, so they are
+trusted exactly as the consumer script is. The clean-checkout re-check detects
+the state at that instant, not an edit that is made and reverted. Repository
+configuration that is not an executable transport helper, such as proxy
+settings, CA bundles and includes, is still honored.
+
 Output publication uses an atomic no-replace directory rename: `renameat2` on
 Linux, `renamex_np` on macOS, and `os.rename` on Windows. An existing or racing
 destination, including an empty directory or dangling symlink, is never
