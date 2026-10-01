@@ -71,6 +71,24 @@ def _resolve_tpcds_tool_and_template_paths() -> tuple[Path, Path]:
     return tools_path, templates_path
 
 
+_PARAMETER_NAME_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)\.(\d+)$")
+
+
+def _substitute_parameters(template: str, parameters: dict[str, Any], query: str) -> str:
+    """Replace dsqgen ``[NAME.k]`` (and ``[NAME]`` for k == 1) tokens with the given values."""
+    for key, value in parameters.items():
+        name, index = _PARAMETER_NAME_RE.match(key).groups()
+        position = int(index)
+        text = str(value)
+        patterns = [rf"\[{re.escape(name)}\.{position}\]"]
+        if position == 1:
+            patterns.append(rf"\[{re.escape(name)}\]")
+        template, count = re.subn("|".join(patterns), lambda _match, text=text: text, template)
+        if count == 0:
+            raise ValueError(f"Query {query} has no substitution for parameter {key!r}")
+    return template
+
+
 class TPCDSError(Exception):
     """Exception for TPC-DS operations."""
 
@@ -889,38 +907,68 @@ class DSQGenBinary:
 
     def generate_with_parameters(
         self,
-        query_id: int,
+        query_id: Union[int, str],
         parameters: dict[str, Any],
         *,
         scale_factor: float = 1.0,
         dialect: str = "netezza",
+        seed: Optional[int] = 1,
     ) -> str:
-        """Generate query with specific parameter values.
+        """Render a query with explicit substitution values.
 
-        Args:
-            query_id: Query number (1-99)
-            parameters: Dictionary of parameter names to values
-            scale_factor: Scale factor for calculations
-            dialect: SQL dialect
+        ``parameters`` maps dsqgen's own names, as ``-LOG`` writes them (``YEAR.01``, ``ZIP.17``), to
+        values. dsqgen substitutes each ``[NAME.k]`` token in the template, and ``[NAME]`` for the
+        first value, so those tokens are replaced with the given value before dsqgen runs. Anything
+        not given is drawn as usual from ``seed``, so passing every value a seed produces gives that
+        seed's SQL, and the values win over the seed for the names given.
 
-        Returns:
-            SQL query string with parameters substituted
+        Raises:
+            ValueError: If a name is not of the form ``NAME.NN`` or the template has no such
+                substitution (so a mistyped name cannot silently do nothing).
+            TPCDSError: If dsqgen fails.
         """
-        # For TPC-DS, we'll need to use template processing with custom parameters
-        # This is a simplified implementation that uses dsqgen with a fixed seed
-        # and then post-processes the result with custom parameters
+        try:
+            base_query_id, variant = self._parse_query_id(query_id)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid query_id: {e}") from e
+        if not (1 <= base_query_id <= 99):
+            raise ValueError(f"Query ID must be 1-99, got {base_query_id}")
+        for name in parameters:
+            if not _PARAMETER_NAME_RE.match(name):
+                raise ValueError(f"Parameter name must look like 'YEAR.01' (as dsqgen -LOG writes it), got {name!r}")
 
-        # Generate base query first
-        base_sql = self.generate(query_id, seed=1, scale_factor=scale_factor, dialect=dialect)
+        dialect = self._validate_dialect(dialect)
+        is_multi_part = base_query_id in (14, 23, 24, 39) and variant in ("a", "b")
+        cmd, opt = self._build_dsqgen_cmd(base_query_id, variant, seed, scale_factor, dialect, is_multi_part)
+        q = f"{base_query_id}{variant or ''}"
 
-        # Apply custom parameter substitutions
-        for param_name, param_value in parameters.items():
-            # Convert parameter name to template format
-            template_param = f"[{param_name.upper()}]"
-            if template_param in base_sql:
-                base_sql = base_sql.replace(template_param, str(param_value))
+        import tempfile
 
-        return self._clean_sql(base_sql)
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                env = self._stage_dsqgen_workdir(temp_path)
+                template = (
+                    temp_path / "q" / self._resolve_template_arg(base_query_id, variant, is_multi_part)
+                ).resolve()
+                template.write_text(
+                    _substitute_parameters(template.read_text(encoding="utf-8"), parameters, q), encoding="utf-8"
+                )
+
+                cmd.extend([f"{opt}INPUT", "q/templates.lst", f"{opt}DIRECTORY", "q"])
+                result = subprocess.run(cmd, cwd=temp_dir, capture_output=True, text=True, timeout=30, env=env)
+        except subprocess.TimeoutExpired:
+            raise TPCDSError(f"dsqgen timed out for query {q}") from None
+        except FileNotFoundError:
+            raise TPCDSError(f"dsqgen binary not found at {self.dsqgen_path}") from None
+
+        if result.returncode != 0:
+            raise TPCDSError(
+                f"dsqgen failed for query {q} with parameters (exit code {result.returncode}): "
+                f"{(result.stderr or 'Unknown error').strip()}"
+            )
+        sql_query = self._extract_sql_from_output(result.stdout, base_query_id, variant)
+        return self._select_multi_part(sql_query, base_query_id, variant) if is_multi_part else sql_query
 
 
 class TPCDSQueries:
