@@ -2516,3 +2516,28 @@ def test_populate_staging_tables_count_exception_treats_as_zero(fast_bench):
         result = fast_bench._populate_staging_tables(conn, {"update_ops_orders": "orders"})
 
     assert result.get("update_ops_orders", 0) >= 0
+
+
+def test_population_sql_runs_one_statement_per_call_on_databricks(fast_bench):
+    """Databricks rejects multi-statement batches, so SCD2 staging must be split."""
+
+    class _OneStatementConnection:
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, sql):
+            if ";" in sql.strip().rstrip(";"):
+                raise AssertionError(f"multi-statement batch sent: {sql!r}")
+            self.statements.append(sql.strip())
+            return None
+
+    fast_bench._setup_dialect = "databricks"
+    connection = _OneStatementConnection()
+    sql = fast_bench._get_population_sql("scd2_ops_stage_customer", "customer")
+
+    fast_bench._execute_population_sql(connection, sql)
+
+    assert len(connection.statements) == 3
+    assert all(stmt.upper().startswith("INSERT INTO") for stmt in connection.statements)
+    # Databricks rejects VARCHAR without a length, so the fingerprint casts to STRING.
+    assert all("AS STRING)" in stmt and "AS VARCHAR)" not in stmt for stmt in connection.statements)
