@@ -17903,6 +17903,18 @@
       "status": "done",
       "title": "Spark SQL TPCHavoc scalar subquery and dual rewrites"
     },
+    "spark-tuned-template-measured": {
+      "claim": null,
+      "needs": [
+        "spark-session-config-runtime",
+        "spark-baseline-no-default-overrides",
+        "spark-effective-config-preflight-capture",
+        "spark-tuning-discovery-cli"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Ship curated Spark tuning templates with measured non-default values"
+    },
     "spark-tuning-discovery-cli": {
       "claim": null,
       "needs": [
