@@ -42,7 +42,10 @@ describe("benchmarkSupportRank", () => {
   it("orders stable before beta before experimental before deprecated", () => {
     const ordered = ["stable", "beta", "experimental", "deprecated", "document_only", "repo_only"];
     const ranks = ordered.map(benchmarkSupportRank);
-    expect([...ranks].sort((left, right) => left - right)).toEqual(ranks);
+    // Strictly increasing: a constant or duplicated rank would still pass a sort-equality check.
+    ranks.slice(1).forEach((rank, index) => {
+      expect(rank).toBeGreaterThan(ranks[index]);
+    });
   });
 
   it("sorts unclassified statuses last", () => {

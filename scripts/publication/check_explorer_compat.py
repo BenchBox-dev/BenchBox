@@ -23,7 +23,7 @@ Usage:
     uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb
 
     # Check specific schema versions (only 12 is supported):
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 11
+    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 12
 
     # Output machine-readable JSON:
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json
