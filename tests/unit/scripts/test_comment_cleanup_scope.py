@@ -782,6 +782,79 @@ def test_external_entry_must_match_a_tracked_path(policy: dict) -> None:
         scope.validate_external_entries(policy, {"src/a.py"})
 
 
+def _format_class(**overrides: object) -> dict:
+    entry = {
+        "id": "c",
+        "verifier": "strict-json",
+        "extensions": [".json"],
+        "selectors": [{"prefix": "a/"}],
+        "owner": "comment-cleanup-final-enforcement",
+        "blocking_disposition": "d",
+    }
+    entry.update(overrides)
+    return entry
+
+
+def test_blocked_format_class_needs_a_blocking_verifier_and_the_reverse(policy: dict) -> None:
+    policy["format_classes"] = [_format_class(state="blocked")]
+    with pytest.raises(scope.PolicyError, match="blocking verifier"):
+        scope.validate_format_classes(policy)
+    policy["format_classes"] = [_format_class(verifier="any-content")]
+    with pytest.raises(scope.PolicyError, match="blocking verifier"):
+        scope.validate_format_classes(policy)
+    policy["format_classes"] = [_format_class(verifier="any-content", state="blocked")]
+    assert scope.validate_format_classes(policy)
+    policy["format_classes"] = [_format_class(state="done")]
+    with pytest.raises(scope.PolicyError, match="unknown state"):
+        scope.validate_format_classes(policy)
+
+
+def test_blocked_classes_claim_only_what_the_clean_classes_left_unowned(tmp_path: Path, policy: dict) -> None:
+    root, base = _git_repo_with(
+        tmp_path,
+        {
+            "a/prose.md": "plain prose\n",
+            "a/sample.md": "text\n\n```sh\nls\n```\n",
+            "a/ref.md": "[todo]: target\n",
+            "a/.keep": "",
+            "a/tool.py": "x = 1\n",
+        },
+    )
+    policy["format_classes"] = [
+        _format_class(id="prose", verifier="markdown-prose", extensions=[".md"]),
+        _format_class(id="empty", verifier="empty-file", extensions=[".keep"]),
+        _format_class(
+            id="review",
+            verifier="markdown-needs-review",
+            extensions=[".md"],
+            owner="comment-cleanup-documentation-samples",
+            state="blocked",
+        ),
+        _format_class(
+            id="helpers",
+            verifier="any-content",
+            extensions=[".py"],
+            owner="comment-cleanup-project-tooling",
+            state="blocked",
+        ),
+    ]
+    resolved = [_resolved(path, None) for path in ("a/prose.md", "a/sample.md", "a/ref.md", "a/.keep", "a/tool.py")]
+    for record in resolved:
+        record["rule"] = None
+    scope.apply_format_classes(resolved, scope.validate_format_classes(policy), root, base)
+    states = {record["path"]: (record["owner"], record["state"]) for record in resolved}
+    assert states["a/prose.md"] == ("comment-cleanup-final-enforcement", "comment-free")
+    assert states["a/.keep"] == ("comment-cleanup-final-enforcement", "comment-free")
+    assert states["a/sample.md"] == ("comment-cleanup-documentation-samples", "blocked")
+    assert states["a/ref.md"] == ("comment-cleanup-documentation-samples", "blocked")
+    assert states["a/tool.py"] == ("comment-cleanup-project-tooling", "blocked")
+
+
+def test_empty_file_verifier_accepts_only_zero_bytes() -> None:
+    assert scope.verify_empty_file("a/.gitkeep", b"")
+    assert not scope.verify_empty_file("a/.gitkeep", b"\n")
+
+
 @pytest.mark.parametrize(
     "path,blob,expected",
     [

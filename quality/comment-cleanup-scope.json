@@ -499,6 +499,7 @@
         {"path": "benchbox/core/connection.py"},
         {"path": "benchbox/core/dataframe_manager_factory.py"},
         {"path": "benchbox/core/dryrun.py"},
+        {"path": "benchbox/core/loaded_tables.py"},
         {"path": "benchbox/core/plan_capture_phase.py"},
         {"path": "benchbox/core/power_harnesses.py"},
         {"path": "benchbox/core/run_service.py"},
@@ -1192,6 +1193,53 @@
         {"prefix": "tests/system/"},
         {"prefix": "tests/databases/"}
       ]
+    },
+    {
+      "id": "root-test-support",
+      "owner": "comment-cleanup-test-support",
+      "state": "blocked",
+      "blocking_disposition": "Root-level pytest helpers and runners outside tests/unit. The owner confirms each file's consumers before any edit, and tests/duration_policy.py follows the shared-infrastructure owner.",
+      "priority": 30,
+      "selectors": [
+        {"path": "tests/__init__.py"},
+        {"path": "tests/duration_policy.py"},
+        {"path": "tests/run_coverage.py"},
+        {"path": "tests/run_tpcds_tests.py"},
+        {"path": "tests/run_tpch_tests.py"}
+      ]
+    },
+    {
+      "id": "root-legacy-tests",
+      "owner": "comment-cleanup-cross-module-unit-tests",
+      "state": "blocked",
+      "blocking_disposition": "Legacy root-level tests that sit outside tests/unit and so are not covered by the derived import rule. The owner reassigns each to the module owner its imports name, or keeps it here, before any edit.",
+      "priority": 30,
+      "selectors": [
+        {"path": "tests/test_amplab.py"},
+        {"path": "tests/test_base.py"},
+        {"path": "tests/test_benchbox.py"},
+        {"path": "tests/test_benchmark_validator.py"},
+        {"path": "tests/test_clickbench.py"},
+        {"path": "tests/test_error_handling_consistency.py"},
+        {"path": "tests/test_h2odb.py"},
+        {"path": "tests/test_root_tpcds_streams.py"},
+        {"path": "tests/test_ssb.py"},
+        {"path": "tests/test_tpcdi.py"},
+        {"path": "tests/test_tpcds_direct.py"},
+        {"path": "tests/test_tpch_official.py"},
+        {"path": "tests/test_unified_runner.py"}
+      ]
+    },
+    {
+      "id": "corpus-validator-files",
+      "owner": "comment-cleanup-publication-tooling",
+      "state": "blocked",
+      "blocking_disposition": "results-data/validate_corpus.py is run by ci.yml, corpus-drift-check.yml, nightly-v2.yml and the results sync workflow, so it belongs with publication tooling. The task description names other publication helpers but not this path, so it needs adding there before any edit; the directory's .gitignore has real comments and goes with it.",
+      "priority": 30,
+      "selectors": [
+        {"path": "results-data/validate_corpus.py"},
+        {"path": "results-data/.gitignore"}
+      ]
     }
   ],
   "external_entries": [
@@ -1229,7 +1277,7 @@
       "id": "json-data",
       "verifier": "strict-json",
       "extensions": [".json", ".jsonl"],
-      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}],
+      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}, {"prefix": ".todo-db/"}],
       "owner": "comment-cleanup-final-enforcement",
       "blocking_disposition": "Parses as strict JSON, which has no comment syntax. The final scan confirms none of these files gained comments."
     },
@@ -1245,7 +1293,7 @@
       "id": "markdown-prose",
       "verifier": "markdown-prose",
       "extensions": [".md"],
-      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}],
+      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}, {"prefix": "_sources/"}, {"prefix": "tests/"}],
       "owner": "comment-cleanup-final-enforcement",
       "blocking_disposition": "Markdown with no code, comment markers or commented front matter, so it holds prose only. The final scan confirms this still holds."
     },
@@ -1256,6 +1304,41 @@
       "selectors": [{"prefix": "_project/"}],
       "owner": "comment-cleanup-final-enforcement",
       "blocking_disposition": "Contains no --, /* or # marker, so it holds no SQL comment. The final scan confirms this still holds."
+    },
+    {
+      "id": "empty-files",
+      "verifier": "empty-file",
+      "extensions": [".gitkeep"],
+      "selectors": [{"prefix": "results-data/"}],
+      "owner": "comment-cleanup-final-enforcement",
+      "blocking_disposition": "A zero-byte placeholder has no comment syntax. The final scan confirms none gained content."
+    },
+    {
+      "id": "markdown-pages-to-classify",
+      "verifier": "markdown-needs-review",
+      "extensions": [".md"],
+      "selectors": [{"prefix": "results-data/"}, {"prefix": "_blog/"}, {"prefix": "_project/"}, {"prefix": "_sources/"}, {"prefix": "tests/"}],
+      "owner": "comment-cleanup-documentation-samples",
+      "state": "blocked",
+      "blocking_disposition": "The page has a code fence, indented code, an HTML or template comment marker, or a link reference definition, so it is not provably comment-free. The owner classifies each page as maintained documentation with runnable samples (clean the samples, keep the explanation in prose) or frozen historical evidence (excluded by an explicit owner decision) before any edit."
+    },
+    {
+      "id": "blog-research-code",
+      "verifier": "any-content",
+      "extensions": [".py", ".sh"],
+      "selectors": [{"prefix": "_blog/"}],
+      "owner": "comment-cleanup-documentation-samples",
+      "state": "blocked",
+      "blocking_disposition": "Research scripts that ship with blog posts. The owner decides by provenance whether each is a maintained executable asset or frozen evidence for its post before any edit."
+    },
+    {
+      "id": "project-helper-files",
+      "verifier": "any-content",
+      "extensions": [".py", ".txt", ".yaml", ".yml", ".toml", ".ini", ".lock", ".json"],
+      "selectors": [{"prefix": "_project/analysis/"}, {"prefix": "_project/audits/"}, {"prefix": "_project/sqlglot-upstream/"}, {"prefix": "_project/sql-translation-ml/"}, {"prefix": "_project/planning/"}, {"prefix": "_project/specs/"}, {"prefix": "_project/_archive/"}],
+      "owner": "comment-cleanup-project-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Helper code and data under _project. The owner classifies each file by provenance as a current tool, frozen evidence or external reproducer source before any edit, and maps its consumer first: detect_orphaned_commits.py reads _project/analysis/known-stranded-commits.txt and treats # lines as comments, uat_loc_table.py reads _project/specs/uat-loc-budget.json, and test_visible_metrics_registry.py reads _project/planning/visible_metrics.yaml. The task description names analysis, audit and sqlglot-upstream helpers but not _project/sql-translation-ml; its description needs that scope added or the directory reassigned."
     }
   ],
   "payloads": [

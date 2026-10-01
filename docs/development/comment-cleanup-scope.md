@@ -112,10 +112,22 @@ unowned, and ambiguity counts as failure.
   can hold hidden text), or commented front matter. Footnote definitions and
   inline links are allowed.
 - `sql-without-comment-markers`: no `--`, `/*` or `#` anywhere in the file.
+- `empty-file`: the file has zero bytes, such as a `.gitkeep` placeholder.
 
 A class applies only to unclaimed paths under its selectors with a listed
-extension. The final-enforcement task owns these files and confirms that none
+extension. A file with no suffix, such as `.gitkeep`, matches by its whole name.
+The final-enforcement task owns the comment-free files and confirms that none
 gained comments.
+
+A class with `"state": "blocked"` does the opposite: it hands a file that no
+verifier can clear to a named owner, with a specific disposition, instead of
+leaving it unowned. It must use `markdown-needs-review` (the Markdown file fails
+`markdown-prose`) or `any-content` (every file with a listed extension under the
+selectors). A comment-free class must use a verifier that proves cleanliness, and
+a blocked class must not, so a blocked class can never mark a file clean. List
+the clean classes first, because a class claims only paths that earlier classes
+left unowned. Owners of a blocked class decide by provenance whether each file is
+maintained, frozen evidence or an external source before any edit.
 
 A directive records its exact token, the number of occurrences in the file, its
 actual consumer, necessity, smaller alternative considered, owner, and removal
