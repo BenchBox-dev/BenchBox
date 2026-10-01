@@ -5,7 +5,7 @@
     "A migration note covers baselines and tests whose expected SQL or results change at SF!=1",
     "A test asserts get_queries and get_query render the same parameters at the same scale"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T22). Owner decision D1 (recorded in dfparity-t00-owner-decisions): fix production as well as the gate, so this item implements the change; it is separate from the gate-only change in dfparity-t03. The change alters the SQL every platform runs at SF!=1, so keep it in its own PR and say so. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T22). Owner decision D1 (recorded in dfparity-t00-owner-decisions): fix production as well as the gate, so this item implements the change; it is separate from the gate-only change in dfparity-t03. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-01: implemented and published as PR #2509 (branch fix/tpcds-get-queries-data-scale, worktree ../BenchBox.wt-tpcds-queries-scale, head 80788d476), held, auto-merge withheld; make pr-preflight exit 0 on that head. IMPACT (TESTED): rendering all 99 templates at SCALE=1 vs the data scale changes 4 templates at SF 0.01 and 0.1 (Q9, Q44, Q46, Q68), 10 at SF 10 (Q1, Q9, Q16, Q27, Q34, Q36, Q44, Q46, Q68, Q73), 12 at SF 100 and above (adds Q33, Q43), none at SF 1. Only the platform adapters' standard run type goes through get_queries (platforms/base/execution.py _get_dialect_queries, query_kwargs carries dialect/base_dialect/platform_version and no scale, verified by reading the code); power and throughput runs use dsqgen -STREAMS, which already receives the scale; power_test.py:217 and throughput_test.py:423 use get_queries only for query IDs. All 25 stored TPC-DS bundles in results-data (12 SF=1, 10 SF=10, 3 OBT SF=1) are test_type power, so none was produced through the changed path; results held outside the repo from standard runs at SF!=1 are not checked. Tests: test double asserts the data scale is passed (0.01, 1, 10); real dsqgen at SF=10: get_queries equals get_query and differs from the SF=1 rendering for Q9 and Q44; all fail without the change; 9695 tests across tpcds and platforms pass. Remaining: hosted CI, maintainer merge, then finish.",
   "description": "Production TPC-DS SQL runs at SF!=1 use SF=1 dsqgen parameters because runner.get_queries (benchbox/core/tpcds/benchmark/runner.py:235) takes no scale, while runner.get_query renders at the data's scale. Callers: platforms/base/execution.py ~1033-1049, tpcds/power_test.py:217, tpcds/throughput_test.py:423 (whether query_kwargs carries a scale is unverified). Changing it alters the queries every SQL platform runs, so baselines and published comparability change. Produce an impact statement (which stored results and published comparisons use SF!=1 TPC-DS), then implement the owner's decision D1, or record 'no change' with reason.",
   "sessions": [
     {
@@ -31,6 +31,14 @@
       "generation": "dde1cb70dfaa43208beed0bda44e56c6",
       "op": "take",
       "op_id": "f9b8208e2a3349ffa0c2f303adf4817f",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-01T18:06:34Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "00028572837f4aabbed07bcdcb66055e",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
