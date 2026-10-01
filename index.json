@@ -2698,17 +2698,12 @@
       "title": "Fix BigQuery per-statement qualification and alias positions"
     },
     "cloud-executor-catalog-versioning": {
-      "claim": {
-        "expires_at": "2026-10-02T14:58:23Z",
-        "generation": "eb6634c076d843cc8d163d065cb0072e",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:8995e2100042cfa8b56876be"
-      },
+      "claim": null,
       "needs": [
         "cloud-executor-rebase-reverify"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Version the operations catalog change and land it separately"
     },
     "cloud-executor-failed-payload-coverage": {
