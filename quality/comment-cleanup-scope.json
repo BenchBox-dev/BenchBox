@@ -1,0 +1,1607 @@
+{
+  "version": 1,
+  "maintained_roots": [
+    {"id": "package", "selector": {"prefix": "benchbox/"}, "kind": "source"},
+    {"id": "tests", "selector": {"prefix": "tests/"}, "kind": "test"},
+    {"id": "docs", "selector": {"prefix": "docs/"}, "kind": "reference"},
+    {"id": "scripts", "selector": {"prefix": "scripts/"}, "kind": "source"},
+    {"id": "tools", "selector": {"prefix": "tools/"}, "kind": "source"},
+    {"id": "project-scripts", "selector": {"prefix": "_project/scripts/"}, "kind": "source"},
+    {"id": "explorer", "selector": {"prefix": "results-explorer/"}, "kind": "source"},
+    {"id": "docker", "selector": {"prefix": "docker/"}, "kind": "config"},
+    {"id": "make", "selector": {"prefix": "make/"}, "kind": "config"},
+    {"id": "github", "selector": {"prefix": ".github/"}, "kind": "config"},
+    {"id": "examples", "selector": {"prefix": "examples/"}, "kind": "reference"},
+    {"id": "compilation", "selector": {"prefix": "_sources/compilation/"}, "kind": "source"},
+    {"id": "repository", "selector": {"prefix": ""}, "kind": "unclassified"}
+  ],
+  "ownership_rules": [
+    {
+      "id": "scope-policy-integration",
+      "owner": "comment-cleanup-scope-policy",
+      "state": "blocked",
+      "blocking_disposition": "Validate draft artifacts against the post-commit immutable snapshot before dispatch.",
+      "priority": 100,
+      "selectors": [
+        {"path": "quality/comment-cleanup-scope.json"},
+        {"path": "scripts/check_comment_cleanup_scope.py"},
+        {"path": "tests/unit/scripts/test_comment_cleanup_scope.py"},
+        {"path": "docs/development/comment-cleanup-scope.md"},
+        {"path": "docs/index.rst"},
+        {"path": "docs/development/dev-loop-property-ledger.md"}
+      ]
+    },
+    {
+      "id": "tpch-source-slice",
+      "owner": "comment-cleanup-tpch",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpch/"}, {"path": "benchbox/tpch.py"}]
+    },
+    {
+      "id": "tpcds-dataframe-source-slice",
+      "owner": "comment-cleanup-tpcds-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; resolve docstring readers before producer edits.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpcds/dataframe_queries/"}]
+    },
+    {
+      "id": "tpcds-generation-source-slice",
+      "owner": "comment-cleanup-tpcds-generation",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve generated payload identity and consumer evidence.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpcds/generator/"}, {"prefix": "benchbox/core/tpcds/schema/"}]
+    },
+    {
+      "id": "tpcds-runtime-source-slice",
+      "owner": "comment-cleanup-tpcds-runtime",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; defer stream, RNG, timing, and caller migrations.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/tpcds/__init__.py"},
+        {"path": "benchbox/core/tpcds/c_tools.py"},
+        {"path": "benchbox/core/tpcds/compliance.py"},
+        {"path": "benchbox/core/tpcds/constants.py"},
+        {"path": "benchbox/core/tpcds/maintenance_operations.py"},
+        {"path": "benchbox/core/tpcds/maintenance_test.py"},
+        {"path": "benchbox/core/tpcds/official_benchmark.py"},
+        {"path": "benchbox/core/tpcds/parameter_extractor.py"},
+        {"path": "benchbox/core/tpcds/platform_power.py"},
+        {"path": "benchbox/core/tpcds/power_test.py"},
+        {"path": "benchbox/core/tpcds/queries.py"},
+        {"path": "benchbox/core/tpcds/reporting.py"},
+        {"path": "benchbox/core/tpcds/streams.py"},
+        {"path": "benchbox/core/tpcds/throughput_test.py"},
+        {"prefix": "benchbox/core/tpcds/benchmark/"},
+        {"path": "benchbox/tpcds.py"}
+      ]
+    },
+    {
+      "id": "tpcds-obt-source-slice",
+      "owner": "comment-cleanup-tpcds-obt",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve useful generated query references.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpcds_obt/"}, {"path": "benchbox/tpcds_obt.py"}]
+    },
+    {
+      "id": "tpcdi-generation-source-slice",
+      "owner": "comment-cleanup-tpcdi-generation",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve generator and manifest contracts.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpcdi/generator/"}]
+    },
+    {
+      "id": "tpcdi-runtime-source-slice",
+      "owner": "comment-cleanup-tpcdi-runtime",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; resolve runtime readers before producer edits.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/tpcdi/__init__.py"},
+        {"path": "benchbox/core/tpcdi/benchmark.py"},
+        {"path": "benchbox/core/tpcdi/config.py"},
+        {"path": "benchbox/core/tpcdi/financial_data.py"},
+        {"path": "benchbox/core/tpcdi/loader.py"},
+        {"path": "benchbox/core/tpcdi/metrics.py"},
+        {"path": "benchbox/core/tpcdi/queries.py"},
+        {"path": "benchbox/core/tpcdi/query_analytics.py"},
+        {"path": "benchbox/core/tpcdi/query_etl.py"},
+        {"path": "benchbox/core/tpcdi/query_validation.py"},
+        {"path": "benchbox/core/tpcdi/schema.py"},
+        {"path": "benchbox/core/tpcdi/schema_extension_specs.yaml"},
+        {"path": "benchbox/core/tpcdi/schema_extensions.py"},
+        {"path": "benchbox/core/tpcdi/schema_specs.yaml"},
+        {"path": "benchbox/core/tpcdi/source_generators.py"},
+        {"path": "benchbox/core/tpcdi/validation.py"},
+        {"prefix": "benchbox/core/tpcdi/etl/"},
+        {"path": "benchbox/tpcdi.py"}
+      ]
+    },
+    {
+      "id": "tpch-skew-source-slice",
+      "owner": "comment-cleanup-tpch-skew",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and payload consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tpch_skew/"}, {"path": "benchbox/tpch_skew.py"}]
+    },
+    {
+      "id": "tpchavoc-dataframe-source-slice",
+      "owner": "comment-cleanup-tpchavoc-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; preserve query payload identity and readers.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpchavoc/dataframe_queries/"}]
+    },
+    {
+      "id": "tpchavoc-runtime-source-slice",
+      "owner": "comment-cleanup-tpchavoc-runtime",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; variants and sibling consumers remain separately blocked.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/tpchavoc/DATAFRAME_VARIANTS.md"},
+        {"path": "benchbox/core/tpchavoc/README.md"},
+        {"path": "benchbox/core/tpchavoc/__init__.py"},
+        {"path": "benchbox/core/tpchavoc/benchmark.py"},
+        {"path": "benchbox/core/tpchavoc/cloud_compat.py"},
+        {"path": "benchbox/core/tpchavoc/dataframe_equivalence.py"},
+        {"path": "benchbox/core/tpchavoc/dialect_compat.py"},
+        {"path": "benchbox/core/tpchavoc/equivalence.py"},
+        {"path": "benchbox/core/tpchavoc/queries.py"},
+        {"path": "benchbox/core/tpchavoc/spark_query_transformer.py"},
+        {"path": "benchbox/core/tpchavoc/validation.py"},
+        {"path": "benchbox/core/tpchavoc/variant_base.py"},
+        {"path": "benchbox/core/tpchavoc/variants.py"},
+        {"path": "benchbox/tpchavoc.py"}
+      ]
+    },
+    {
+      "id": "ssb-source-slice",
+      "owner": "comment-cleanup-ssb",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests, outputs, and readers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/ssb/"}, {"path": "benchbox/ssb.py"}]
+    },
+    {
+      "id": "clickbench-source-slice",
+      "owner": "comment-cleanup-clickbench",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and generated references before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/clickbench/"}, {"path": "benchbox/clickbench.py"}]
+    },
+    {
+      "id": "coffeeshop-source-slice",
+      "owner": "comment-cleanup-coffeeshop",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/coffeeshop/"}, {"prefix": "benchbox/data/coffeeshop/"}, {"path": "benchbox/coffeeshop.py"}]
+    },
+    {
+      "id": "amplab-source-slice",
+      "owner": "comment-cleanup-amplab",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/amplab/"}, {"path": "benchbox/amplab.py"}]
+    },
+    {
+      "id": "datavault-source-slice",
+      "owner": "comment-cleanup-datavault",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/datavault/"}, {"path": "benchbox/datavault.py"}]
+    },
+    {
+      "id": "flightdata-source-slice",
+      "owner": "comment-cleanup-flightdata",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and consumers before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/flightdata/"}, {"path": "benchbox/flightdata.py"}]
+    },
+    {
+      "id": "h2odb-source-slice",
+      "owner": "comment-cleanup-h2odb",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/h2odb/"}, {"path": "benchbox/h2odb.py"}]
+    },
+    {
+      "id": "nyctaxi-source-slice",
+      "owner": "comment-cleanup-nyctaxi",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and generated references before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/nyctaxi/"}, {"path": "benchbox/nyctaxi.py"}]
+    },
+    {
+      "id": "tsbs-devops-source-slice",
+      "owner": "comment-cleanup-tsbs-devops",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; map tests and outputs before cleanup.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tsbs_devops/"}, {"path": "benchbox/tsbs_devops.py"}]
+    },
+    {
+      "id": "read-primitives-source-slice",
+      "owner": "comment-cleanup-read-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Source slice is verified; resolve docstring readers before producer edits.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/read_primitives/"}, {"path": "benchbox/read_primitives.py"}]
+    },
+    {
+      "id": "tpchavoc-variants-scope",
+      "owner": "comment-cleanup-tpchavoc-variants",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 20,
+      "selectors": [{"prefix": "benchbox/core/tpchavoc/variant_sets/"}]
+    },
+    {
+      "id": "ai-primitives-scope",
+      "owner": "comment-cleanup-ai-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/ai_primitives/"}]
+    },
+    {
+      "id": "joinorder-scope",
+      "owner": "comment-cleanup-joinorder",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/joinorder/"}, {"path": "benchbox/joinorder.py"}]
+    },
+    {
+      "id": "joinorder-prototypes-scope",
+      "owner": "comment-cleanup-joinorder",
+      "state": "blocked",
+      "blocking_disposition": "Added after the task definition was written. joinorder_sampled came in with #2386 and joinorder_replicated with #2388, both feat(joinorder) changes, and the live joinorder task now lists both. They import only the standard library and no registry names them, so no import evidence points to another owner.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/joinorder_replicated/"}, {"prefix": "benchbox/core/joinorder_sampled/"}]
+    },
+    {
+      "id": "joinorder-synthetic-scope",
+      "owner": "comment-cleanup-joinorder-synthetic",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/joinorder_synthetic/"}]
+    },
+    {
+      "id": "metadata-primitives-scope",
+      "owner": "comment-cleanup-metadata-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/metadata_primitives/"}, {"path": "benchbox/metadata_primitives.py"}]
+    },
+    {
+      "id": "transaction-primitives-scope",
+      "owner": "comment-cleanup-transaction-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/transaction_primitives/"}, {"path": "benchbox/transaction_primitives.py"}]
+    },
+    {
+      "id": "vector-search-scope",
+      "owner": "comment-cleanup-vector-search",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/vector_search/"}, {"path": "benchbox/vector_search.py"}]
+    },
+    {
+      "id": "write-primitives-scope",
+      "owner": "comment-cleanup-write-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/write_primitives/"}, {"path": "benchbox/write_primitives.py"}]
+    },
+    {
+      "id": "cli-foundation-scope",
+      "owner": "comment-cleanup-cli-foundation",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/cli/__init__.py"},
+        {"path": "benchbox/cli/app.py"},
+        {"path": "benchbox/cli/benchmark_hooks.py"},
+        {"path": "benchbox/cli/benchmarks.py"},
+        {"path": "benchbox/cli/cloud_storage.py"},
+        {"path": "benchbox/cli/common_types.py"},
+        {"path": "benchbox/cli/composite_params.py"},
+        {"path": "benchbox/cli/config.py"},
+        {"path": "benchbox/cli/database.py"},
+        {"path": "benchbox/cli/display.py"},
+        {"path": "benchbox/cli/dryrun.py"},
+        {"path": "benchbox/cli/exceptions.py"},
+        {"path": "benchbox/cli/help.py"},
+        {"path": "benchbox/cli/logo.py"},
+        {"path": "benchbox/cli/main.py"},
+        {"path": "benchbox/cli/onboarding.py"},
+        {"path": "benchbox/cli/orchestrator.py"},
+        {"path": "benchbox/cli/output.py"},
+        {"path": "benchbox/cli/platform.py"},
+        {"path": "benchbox/cli/platform_checks.py"},
+        {"path": "benchbox/cli/platform_defaults.py"},
+        {"path": "benchbox/cli/platform_hooks.py"},
+        {"path": "benchbox/cli/platform_readiness.py"},
+        {"path": "benchbox/cli/preferences.py"},
+        {"path": "benchbox/cli/progress.py"},
+        {"path": "benchbox/cli/run_resolution.py"},
+        {"path": "benchbox/cli/shared.py"},
+        {"path": "benchbox/cli/submit_auth.py"},
+        {"path": "benchbox/cli/submit_service.py"},
+        {"path": "benchbox/cli/system.py"},
+        {"path": "benchbox/cli/tuning.py"},
+        {"path": "benchbox/cli/tuning_resolver.py"},
+        {"path": "benchbox/cli/tuning_runtime.py"},
+        {"path": "benchbox/cli/verbose_logging.py"},
+        {"prefix": "benchbox/cli/presentation/"},
+        {"path": "benchbox/data/cli_help_catalog.yaml"}
+      ]
+    },
+    {
+      "id": "cli-commands-scope",
+      "owner": "comment-cleanup-cli-commands",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/cli/commands/"}]
+    },
+    {
+      "id": "mcp-infrastructure-scope",
+      "owner": "comment-cleanup-mcp-infrastructure",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/mcp/__init__.py"},
+        {"path": "benchbox/mcp/__main__.py"},
+        {"path": "benchbox/mcp/cli.py"},
+        {"path": "benchbox/mcp/errors.py"},
+        {"path": "benchbox/mcp/jobs.py"},
+        {"path": "benchbox/mcp/readiness.py"},
+        {"path": "benchbox/mcp/schemas.py"},
+        {"path": "benchbox/mcp/security.py"},
+        {"path": "benchbox/mcp/server.py"},
+        {"path": "benchbox/mcp/telemetry.py"},
+        {"path": "benchbox/mcp/transport.py"}
+      ]
+    },
+    {
+      "id": "mcp-interaction-scope",
+      "owner": "comment-cleanup-mcp-interaction",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/mcp/tools/"}, {"prefix": "benchbox/mcp/resources/"}, {"prefix": "benchbox/mcp/prompts/"}]
+    },
+    {
+      "id": "core-bootstrap-scope",
+      "owner": "comment-cleanup-core-bootstrap",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/__init__.py"},
+        {"path": "benchbox/core/base_benchmark.py"},
+        {"path": "benchbox/core/benchmark_loader.py"},
+        {"path": "benchbox/core/benchmark_mixins.py"},
+        {"path": "benchbox/core/constants.py"},
+        {"path": "benchbox/core/errors.py"},
+        {"path": "benchbox/core/exceptions.py"},
+        {"path": "benchbox/core/labels.py"},
+        {"path": "benchbox/core/simple_benchmark_mixin.py"},
+        {"path": "benchbox/core/system.py"},
+        {"path": "benchbox/__init__.py"},
+        {"path": "benchbox/base.py"}
+      ]
+    },
+    {
+      "id": "core-configuration-scope",
+      "owner": "comment-cleanup-core-configuration",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/core/config.py"}, {"path": "benchbox/core/config_inheritance.py"}, {"path": "benchbox/core/config_utils.py"}, {"path": "benchbox/core/platform_config.py"}]
+    },
+    {
+      "id": "core-registries-scope",
+      "owner": "comment-cleanup-core-registries",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/benchmark_registry.py"},
+        {"path": "benchbox/core/benchmark_registry.yaml"},
+        {"path": "benchbox/core/manifest_utils.py"},
+        {"path": "benchbox/core/platform_manifest.py"},
+        {"path": "benchbox/core/platform_registry.py"}
+      ]
+    },
+    {
+      "id": "core-catalogs-scope",
+      "owner": "comment-cleanup-core-catalogs",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/catalog_schema.py"},
+        {"path": "benchbox/core/query_catalog.py"},
+        {"path": "benchbox/core/query_catalog_base.py"},
+        {"path": "benchbox/core/query_hints.py"},
+        {"path": "benchbox/core/query_manager.py"},
+        {"path": "benchbox/core/query_utils.py"},
+        {"path": "benchbox/core/schema_primitives.py"},
+        {"path": "benchbox/core/schema_utils.py"},
+        {"path": "benchbox/core/schemas.py"},
+        {"path": "benchbox/core/sql_utils.py"},
+        {"path": "benchbox/core/static_query_catalog.py"},
+        {"path": "benchbox/core/primitives_benchmark_utils.py"},
+        {"path": "benchbox/core/primitives_utils.py"},
+        {"prefix": "benchbox/core/primitives/"}
+      ]
+    },
+    {
+      "id": "core-execution-scope",
+      "owner": "comment-cleanup-core-execution",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/core/connection.py"},
+        {"path": "benchbox/core/dataframe_manager_factory.py"},
+        {"path": "benchbox/core/dryrun.py"},
+        {"path": "benchbox/core/plan_capture_phase.py"},
+        {"path": "benchbox/core/power_harnesses.py"},
+        {"path": "benchbox/core/run_service.py"},
+        {"path": "benchbox/core/runtime_paths.py"},
+        {"prefix": "benchbox/core/runner/"},
+        {"prefix": "benchbox/core/throughput/"},
+        {"prefix": "benchbox/core/hooks/"},
+        {"prefix": "benchbox/core/operations/"},
+        {"prefix": "benchbox/core/transactional/"},
+        {"prefix": "benchbox/core/databases/"},
+        {"prefix": "benchbox/core/contracts/"},
+        {"prefix": "benchbox/core/utils/"}
+      ]
+    },
+    {
+      "id": "core-dataframe-scope",
+      "owner": "comment-cleanup-core-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/dataframe/"}]
+    },
+    {
+      "id": "validation-scope",
+      "owner": "comment-cleanup-validation",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"prefix": "benchbox/core/expected_results/"},
+        {"prefix": "benchbox/core/validation/"},
+        {"prefix": "benchbox/validation/"},
+        {"path": "benchbox/core/benchmark_result_validation.py"},
+        {"path": "benchbox/core/tpc_patterns.py"},
+        {"path": "benchbox/core/tpc_validation.py"},
+        {"path": "benchbox/core/upload_validation.py"}
+      ]
+    },
+    {
+      "id": "results-scope",
+      "owner": "comment-cleanup-results",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/results/"}]
+    },
+    {
+      "id": "manifest-scope",
+      "owner": "comment-cleanup-manifest",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/manifest/"}]
+    },
+    {
+      "id": "publishing-scope",
+      "owner": "comment-cleanup-publishing",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/publishing/"}]
+    },
+    {
+      "id": "equivalence-scope",
+      "owner": "comment-cleanup-equivalence",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/equivalence/"}]
+    },
+    {
+      "id": "analysis-comparison-scope",
+      "owner": "comment-cleanup-analysis-comparison",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/analysis/"}, {"prefix": "benchbox/core/comparison/"}, {"path": "benchbox/core/reports.py"}, {"path": "benchbox/core/pg_extension_comparison.py"}]
+    },
+    {
+      "id": "tuning-scope",
+      "owner": "comment-cleanup-tuning",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/tuning/"}]
+    },
+    {
+      "id": "cost-scope",
+      "owner": "comment-cleanup-cost",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/cost/"}]
+    },
+    {
+      "id": "pricing-consumer-scope",
+      "owner": "comment-cleanup-pricing-consumer",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 30,
+      "selectors": [{"path": "scripts/generate_pricing_data.py"}, {"path": "benchbox/core/cost/pricing_data.yaml"}, {"path": "tests/unit/core/cost/test_pricing_generator.py"}]
+    },
+    {
+      "id": "query-plans-scope",
+      "owner": "comment-cleanup-query-plans",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/query_plans/"}]
+    },
+    {
+      "id": "visualization-scope",
+      "owner": "comment-cleanup-visualization",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/visualization/"}]
+    },
+    {
+      "id": "sql-compat-scope",
+      "owner": "comment-cleanup-sql-compat",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/sql_compat/"}]
+    },
+    {
+      "id": "data-fetch-organization-scope",
+      "owner": "comment-cleanup-data-fetch-organization",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/core/data_fetch/"}, {"prefix": "benchbox/core/data_organization/"}]
+    },
+    {
+      "id": "utilities-scope",
+      "owner": "comment-cleanup-utilities",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/utils/"}, {"path": "benchbox/data/__init__.py"}]
+    },
+    {
+      "id": "security-credentials-scope",
+      "owner": "comment-cleanup-security-credentials",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/security/"}, {"prefix": "benchbox/platforms/credentials/"}]
+    },
+    {
+      "id": "monitoring-scope",
+      "owner": "comment-cleanup-monitoring",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/monitoring/"}]
+    },
+    {
+      "id": "experimental-scope",
+      "owner": "comment-cleanup-experimental",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/experimental/"}]
+    },
+    {
+      "id": "platform-registry-scope",
+      "owner": "comment-cleanup-platform-registry",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/__init__.py"}, {"path": "benchbox/platforms/adapter_factory.py"}, {"path": "benchbox/platforms/manifest.py"}, {"path": "benchbox/platforms/cloud_shared.py"}]
+    },
+    {
+      "id": "platform-base-scope",
+      "owner": "comment-cleanup-platform-base",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/platforms/base/"}]
+    },
+    {
+      "id": "dataframe-expressions-scope",
+      "owner": "comment-cleanup-dataframe-expressions",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/dataframe/unified_frame.py"}, {"path": "benchbox/platforms/dataframe/expression_family.py"}, {"path": "benchbox/platforms/dataframe/protocol.py"}]
+    },
+    {
+      "id": "dataframe-pandas-scope",
+      "owner": "comment-cleanup-dataframe-pandas",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/dataframe/unified_pandas_frame.py"}, {"path": "benchbox/platforms/dataframe/pandas_family.py"}]
+    },
+    {
+      "id": "dataframe-adapters-scope",
+      "owner": "comment-cleanup-dataframe-adapters",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/dataframe/cudf_df.py"},
+        {"path": "benchbox/platforms/dataframe/dask_df.py"},
+        {"path": "benchbox/platforms/dataframe/datafusion_df.py"},
+        {"path": "benchbox/platforms/dataframe/lakesail_df.py"},
+        {"path": "benchbox/platforms/dataframe/pandas_df.py"},
+        {"path": "benchbox/platforms/dataframe/polars_df.py"},
+        {"path": "benchbox/platforms/dataframe/pyspark_df.py"}
+      ]
+    },
+    {
+      "id": "dataframe-maintenance-scope",
+      "owner": "comment-cleanup-dataframe-maintenance",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/dataframe/delta_lake_maintenance.py"},
+        {"path": "benchbox/platforms/dataframe/ducklake_maintenance.py"},
+        {"path": "benchbox/platforms/dataframe/hudi_maintenance.py"},
+        {"path": "benchbox/platforms/dataframe/iceberg_maintenance.py"},
+        {"path": "benchbox/platforms/dataframe/polars_maintenance.py"},
+        {"path": "benchbox/platforms/dataframe/pyspark_maintenance.py"}
+      ]
+    },
+    {
+      "id": "dataframe-support-scope",
+      "owner": "comment-cleanup-dataframe-support",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/dataframe/__init__.py"},
+        {"path": "benchbox/platforms/dataframe/_result_helpers.py"},
+        {"path": "benchbox/platforms/dataframe/benchmark_mixin.py"},
+        {"path": "benchbox/platforms/dataframe/platform_checker.py"},
+        {"path": "benchbox/platforms/dataframe/shared_loading.py"},
+        {"path": "benchbox/platforms/dataframe/tuning_mixin.py"}
+      ]
+    },
+    {
+      "id": "duckdb-family-scope",
+      "owner": "comment-cleanup-duckdb-family",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/duckdb.py"}, {"path": "benchbox/platforms/duckdb_introspection.py"}, {"path": "benchbox/platforms/ducklake.py"}, {"path": "benchbox/platforms/motherduck.py"}]
+    },
+    {
+      "id": "postgresql-family-scope",
+      "owner": "comment-cleanup-postgresql-family",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/postgresql.py"},
+        {"path": "benchbox/platforms/cedardb.py"},
+        {"path": "benchbox/platforms/citus.py"},
+        {"path": "benchbox/platforms/paradedb.py"},
+        {"path": "benchbox/platforms/pg_duckdb.py"},
+        {"path": "benchbox/platforms/pg_mooncake.py"},
+        {"path": "benchbox/platforms/timescaledb.py"},
+        {"path": "benchbox/platforms/pg_mooncake_type_compat.yaml"}
+      ]
+    },
+    {
+      "id": "clickhouse-family-scope",
+      "owner": "comment-cleanup-clickhouse-family",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/platforms/clickhouse/"}, {"path": "benchbox/platforms/clickhouse_cloud.py"}, {"path": "benchbox/platforms/clickhouse_local.py"}, {"path": "benchbox/platforms/clickhouse_server.py"}]
+    },
+    {
+      "id": "spark-family-scope",
+      "owner": "comment-cleanup-spark-family",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/_spark_helpers.py"},
+        {"path": "benchbox/platforms/spark.py"},
+        {"path": "benchbox/platforms/spark_query_transformer.py"},
+        {"path": "benchbox/platforms/lakesail.py"},
+        {"path": "benchbox/platforms/snowpark_connect.py"},
+        {"path": "benchbox/platforms/velox.py"},
+        {"prefix": "benchbox/platforms/pyspark/"},
+        {"prefix": "benchbox/platforms/databricks/"},
+        {"prefix": "benchbox/platforms/onehouse/"}
+      ]
+    },
+    {
+      "id": "microsoft-cloud-scope",
+      "owner": "comment-cleanup-microsoft-cloud",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/azure_synapse.py"},
+        {"path": "benchbox/platforms/fabric_lakehouse.py"},
+        {"path": "benchbox/platforms/fabric_spark.py"},
+        {"path": "benchbox/platforms/fabric_warehouse.py"},
+        {"prefix": "benchbox/platforms/azure/"}
+      ]
+    },
+    {
+      "id": "aws-cloud-scope",
+      "owner": "comment-cleanup-aws-cloud",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/athena.py"}, {"path": "benchbox/platforms/redshift.py"}, {"prefix": "benchbox/platforms/aws/"}]
+    },
+    {
+      "id": "gcp-cloud-scope",
+      "owner": "comment-cleanup-gcp-cloud",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/bigquery.py"}, {"prefix": "benchbox/platforms/gcp/"}]
+    },
+    {
+      "id": "managed-warehouses-scope",
+      "owner": "comment-cleanup-managed-warehouses",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/snowflake.py"}, {"path": "benchbox/platforms/snowflake_introspection.py"}, {"path": "benchbox/platforms/firebolt.py"}, {"path": "benchbox/platforms/singlestore.py"}]
+    },
+    {
+      "id": "local-native-adapters-scope",
+      "owner": "comment-cleanup-local-native-adapters",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/datafusion.py"},
+        {"path": "benchbox/platforms/datafusion_query_transformer.py"},
+        {"path": "benchbox/platforms/datafusion_write_transformer.py"},
+        {"path": "benchbox/platforms/polars_platform.py"},
+        {"path": "benchbox/platforms/sqlite.py"}
+      ]
+    },
+    {
+      "id": "presto-trino-scope",
+      "owner": "comment-cleanup-presto-trino",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"path": "benchbox/platforms/presto.py"},
+        {"path": "benchbox/platforms/trino.py"},
+        {"path": "benchbox/platforms/starburst.py"},
+        {"path": "benchbox/platforms/presto_trino_adapter_base.py"},
+        {"path": "benchbox/platforms/presto_trino_utils.py"}
+      ]
+    },
+    {
+      "id": "distributed-engines-scope",
+      "owner": "comment-cleanup-distributed-engines",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/doris.py"}, {"prefix": "benchbox/platforms/databend/"}, {"prefix": "benchbox/platforms/starrocks/"}]
+    },
+    {
+      "id": "timeseries-adapters-scope",
+      "owner": "comment-cleanup-timeseries-adapters",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and tests, payloads, and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"path": "benchbox/platforms/questdb.py"}, {"path": "benchbox/platforms/questdb_rewriter.py"}, {"prefix": "benchbox/platforms/influxdb/"}]
+    },
+    {
+      "id": "pilot-budget-examples-package",
+      "owner": "comment-cleanup-pilot-budget",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "benchbox/examples/"}]
+    },
+    {
+      "id": "generators-scope",
+      "owner": "comment-cleanup-generators",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [
+        {"path": "scripts/generate_compat_docs.py"},
+        {"path": "scripts/generate_query_docs.py"},
+        {"path": "scripts/generate_landing_quickstarts.py"},
+        {"path": "scripts/generate_corpus_inventory.py"},
+        {"path": "scripts/generate_changelog_entry.py"}
+      ]
+    },
+    {
+      "id": "windows-consumer-scope",
+      "owner": "comment-cleanup-windows-consumer",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [{"path": "scripts/check_windows_antipatterns.py"}, {"path": "tests/unit/scripts/test_check_windows_antipatterns.py"}]
+    },
+    {
+      "id": "compilation-scope",
+      "owner": "comment-cleanup-compilation",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [{"prefix": "_sources/compilation/"}, {"path": "tests/unit/scripts/test_compile_all_platforms.py"}]
+    },
+    {
+      "id": "publication-tooling-directory",
+      "owner": "comment-cleanup-publication-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 20,
+      "selectors": [{"prefix": "scripts/publication/"}, {"prefix": "publication/"}]
+    },
+    {
+      "id": "publication-tooling-release-helpers",
+      "owner": "comment-cleanup-publication-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [
+        {"path": "scripts/validate_submission.py"},
+        {"path": "scripts/assemble_public_site.py"},
+        {"path": "scripts/release_canary_incident.py"},
+        {"path": "scripts/release_canary_sharding.py"},
+        {"path": "scripts/release_finalize.py"},
+        {"path": "scripts/release_flow.py"},
+        {"path": "scripts/release_readiness_check.py"},
+        {"path": "scripts/check_release_curation.py"},
+        {"path": "scripts/check_submission_validator_sync.py"},
+        {"path": "scripts/update_version.py"},
+        {"path": "scripts/release_cut_abort.sh"},
+        {"path": "scripts/release_cut_start.sh"}
+      ]
+    },
+    {
+      "id": "lifecycle-tooling-scripts",
+      "owner": "comment-cleanup-lifecycle-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [
+        {"path": "scripts/agent_pre_commit_guard.sh"},
+        {"path": "scripts/agent_write_preflight.sh"},
+        {"path": "scripts/check_agent_trailers.sh"},
+        {"path": "scripts/set_worktree_identity.sh"},
+        {"path": "scripts/worktree_lifecycle.sh"},
+        {"path": "scripts/worktree_finish.py"},
+        {"path": "scripts/worktree_lifecycle_metadata.py"},
+        {"path": "scripts/branch_prune_merged.py"},
+        {"path": "scripts/pr_landing.py"},
+        {"path": "scripts/pr_refresh_certification.py"},
+        {"path": "scripts/pr_refresh_replay.py"},
+        {"path": "scripts/queue_certification.py"}
+      ]
+    },
+    {
+      "id": "lifecycle-tooling-claude-config",
+      "owner": "comment-cleanup-lifecycle-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 20,
+      "selectors": [{"prefix": ".claude/commands/"}, {"path": ".claude/settings.json"}]
+    },
+    {
+      "id": "operational-tooling-scripts",
+      "owner": "comment-cleanup-operational-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 5,
+      "selectors": [{"prefix": "scripts/"}, {"prefix": "quality/"}]
+    },
+    {
+      "id": "project-tooling-scripts",
+      "owner": "comment-cleanup-project-tooling",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "_project/scripts/"}]
+    },
+    {
+      "id": "uat-framework-tests",
+      "owner": "comment-cleanup-uat-framework",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "tests/uat/"}]
+    },
+    {
+      "id": "uat-framework-scripts",
+      "owner": "comment-cleanup-uat-framework",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 20,
+      "selectors": [{"prefix": "scripts/uat-bring-up/"}]
+    },
+    {
+      "id": "explorer-build-tree",
+      "owner": "comment-cleanup-explorer-build",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 5,
+      "selectors": [{"prefix": "results-explorer/"}]
+    },
+    {
+      "id": "explorer-data-scope",
+      "owner": "comment-cleanup-explorer-data",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 20,
+      "selectors": [{"prefix": "results-explorer/src/lib/"}, {"path": "results-explorer/src/db.ts"}, {"path": "results-explorer/src/types.ts"}, {"path": "results-explorer/src/utils.ts"}]
+    },
+    {
+      "id": "explorer-ui-scope",
+      "owner": "comment-cleanup-explorer-ui",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 20,
+      "selectors": [
+        {"prefix": "results-explorer/src/pages/"},
+        {"prefix": "results-explorer/src/components/"},
+        {"path": "results-explorer/src/App.tsx"},
+        {"path": "results-explorer/src/main.tsx"},
+        {"path": "results-explorer/src/index.css"}
+      ]
+    },
+    {
+      "id": "examples-tree",
+      "owner": "comment-cleanup-examples",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "examples/"}]
+    },
+    {
+      "id": "site-assets-tree",
+      "owner": "comment-cleanup-site-assets",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 10,
+      "selectors": [{"prefix": "landing/"}, {"prefix": "docker/"}, {"path": "index.html"}]
+    },
+    {
+      "id": "shared-infrastructure-config",
+      "owner": "comment-cleanup-shared-infrastructure",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 10,
+      "selectors": [
+        {"prefix": ".github/"},
+        {"prefix": "make/"},
+        {"path": "Makefile"},
+        {"path": ".codespell-ignore.txt"},
+        {"path": ".dockerignore"},
+        {"path": ".env.example"},
+        {"path": ".gitattributes"},
+        {"path": ".gitignore"},
+        {"path": ".importlinter"},
+        {"path": ".mcp.json"},
+        {"path": ".pre-commit-config.yaml"},
+        {"path": "codecov.yml"},
+        {"path": "MANIFEST.in"},
+        {"path": "pyproject.toml"},
+        {"path": "pytest-ci.ini"},
+        {"path": "pytest.ini"},
+        {"path": "tox.ini"},
+        {"path": "uv.lock"},
+        {"path": "skill-sync.conf"},
+        {"path": "AGENTS.md"},
+        {"path": "CLAUDE.md"},
+        {"path": "GEMINI.md"},
+        {"path": "ANTIGRAVITY.md"}
+      ]
+    },
+    {
+      "id": "shared-infrastructure-consumer-tests",
+      "owner": "comment-cleanup-shared-infrastructure",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [{"path": "tests/unit/scripts/test_mirror_partial_validation_policy.py"}, {"path": "tests/unit/test_release_infrastructure.py"}, {"path": "tests/unit/platforms/test_advertised_platform_options.py"}, {"path": "tests/uat/test_cli_dispatch.py"}]
+    },
+    {
+      "id": "contracts-gate-docs-conf",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [{"path": "docs/conf.py"}]
+    },
+    {
+      "id": "documentation-samples-tree",
+      "owner": "comment-cleanup-documentation-samples",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 5,
+      "selectors": [
+        {"prefix": "docs/"},
+        {"path": "README.md"},
+        {"path": "CHANGELOG.md"},
+        {"path": "CONTRIBUTING.md"},
+        {"path": "DISCLAIMER.md"}
+      ]
+    },
+    {
+      "id": "external-ownership-mirrors",
+      "owner": "comment-cleanup-external-ownership",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 20,
+      "selectors": [{"prefix": "tools/"}, {"prefix": ".claude/skills/"}]
+    },
+    {
+      "id": "test-support-files",
+      "owner": "comment-cleanup-test-support",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 30,
+      "selectors": [
+        {"path": "tests/conftest.py"},
+        {"path": "_benchbox_pytest_xdist_safety.py"},
+        {"prefix": "tests/utilities/"},
+        {"prefix": "tests/e2e/utils/"},
+        {"path": "tests/unit/fixtures/test_database_fixtures.py"},
+        {"path": "tests/contracts/visualization/conftest.py"},
+        {"path": "tests/e2e/conftest.py"},
+        {"path": "tests/integration/platforms/conftest.py"},
+        {"path": "tests/uat/conftest.py"},
+        {"path": "tests/unit/conftest.py"},
+        {"path": "tests/unit/core/conftest.py"},
+        {"path": "tests/unit/core/load_testing/conftest.py"},
+        {"path": "tests/unit/core/multiregion/conftest.py"},
+        {"path": "tests/unit/core/nyctaxi/conftest.py"},
+        {"path": "tests/unit/core/tpcdi/conftest.py"},
+        {"path": "tests/unit/core/tsbs_devops/conftest.py"},
+        {"path": "tests/unit/platforms/aws/conftest.py"},
+        {"path": "tests/unit/platforms/conftest.py"},
+        {"path": "tests/unit/platforms/dataframe/conftest.py"},
+        {"path": "tests/unit/platforms/gcp/conftest.py"},
+        {"path": "tests/unit/platforms/onehouse/conftest.py"},
+        {"path": "tests/unit/platforms/pyspark/conftest.py"},
+        {"path": "tests/unit/scripts/conftest.py"},
+        {"path": "tests/unit/scripts/explorer_pipeline/conftest.py"},
+        {"path": "tests/fixtures/__init__.py"},
+        {"path": "tests/fixtures/benchmark_fixtures.py"},
+        {"path": "tests/fixtures/benchmark_test_mixin.py"},
+        {"path": "tests/fixtures/data_fixtures.py"},
+        {"path": "tests/fixtures/database_fixtures.py"},
+        {"path": "tests/fixtures/duckdb_plans_by_version.py"},
+        {"path": "tests/fixtures/platform_fixtures.py"},
+        {"path": "tests/fixtures/result_dict_fixtures.py"},
+        {"path": "tests/fixtures/test_data_fixtures.py"},
+        {"path": "tests/fixtures/test_scenarios.py"},
+        {"path": "tests/fixtures/tpcds_test_data.py"},
+        {"path": "tests/fixtures/utility_fixtures.py"}
+      ]
+    },
+    {
+      "id": "cross-module-unit-tests-tree",
+      "owner": "comment-cleanup-cross-module-unit-tests",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 5,
+      "selectors": [{"prefix": "tests/unit/"}]
+    },
+    {
+      "id": "cross-module-integration-tests-tree",
+      "owner": "comment-cleanup-cross-module-integration-tests",
+      "state": "blocked",
+      "blocking_disposition": "Candidate scope is frozen from the task definition; blocked until its prerequisites are delivered and consumers are mapped.",
+      "priority": 5,
+      "selectors": [
+        {"prefix": "tests/integration/"},
+        {"prefix": "tests/e2e/"},
+        {"prefix": "tests/performance/"},
+        {"prefix": "tests/fixtures/"},
+        {"prefix": "tests/parity/"},
+        {"prefix": "tests/validation/"},
+        {"prefix": "tests/contracts/"},
+        {"prefix": "tests/examples/"},
+        {"prefix": "tests/docs/"},
+        {"prefix": "tests/system/"},
+        {"prefix": "tests/databases/"}
+      ]
+    }
+  ],
+  "external_entries": [],
+  "payloads": [
+    {
+      "id": "benchmark-class-docstring-reader",
+      "path": "benchbox/core/results/display.py",
+      "carrier": "benchmark_class.__doc__",
+      "owner": "comment-cleanup-results",
+      "state": "blocked",
+      "blocking_disposition": "Map every benchmark-class producer before changing the display reader."
+    },
+    {
+      "id": "sphinx-autodoc-reader",
+      "path": "docs/conf.py",
+      "carrier": "sphinx.ext.autodoc",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Preserve useful interface reference content before source docstring deletion."
+    },
+    {
+      "id": "pricing-runtime-docstring-writer",
+      "path": "benchbox/core/cost/pricing.py",
+      "carrier": "_resolve.__doc__",
+      "owner": "comment-cleanup-cost",
+      "state": "blocked",
+      "blocking_disposition": "Identify a real consumer or remove the writer without inert replacement data."
+    },
+    {
+      "id": "tpcds-generated-docstring-writer",
+      "path": "benchbox/core/tpcds/dataframe_queries/queries.py",
+      "carrier": "impl.__doc__",
+      "owner": "comment-cleanup-tpcds-dataframe",
+      "state": "blocked",
+      "blocking_disposition": "Preserve runtime behavior and resolve readers without changing stream, RNG, timing, or query semantics."
+    },
+    {
+      "id": "joinorder-generated-docstring-writer",
+      "path": "benchbox/core/joinorder/dataframe_queries.py",
+      "carrier": "_impl.__doc__",
+      "owner": "comment-cleanup-joinorder",
+      "state": "blocked",
+      "blocking_disposition": "Identify real consumers before producer deletion."
+    },
+    {
+      "id": "query-catalog-source-reader",
+      "path": "benchbox/core/query_catalog.py",
+      "carrier": "inspect.getsource(impl)",
+      "owner": "comment-cleanup-core-catalogs",
+      "state": "blocked",
+      "blocking_disposition": "Inventory implementations consumed as source text before editing producers."
+    },
+    {
+      "id": "mcp-source-reader",
+      "path": "benchbox/mcp/tools/benchmark.py",
+      "carrier": "inspect.getsource(impl)",
+      "owner": "comment-cleanup-mcp-interaction",
+      "state": "blocked",
+      "blocking_disposition": "Inventory implementations consumed as source text before editing producers."
+    },
+    {
+      "id": "dry-run-source-reader",
+      "path": "benchbox/core/dryrun.py",
+      "carrier": "inspect.getsource(impl)",
+      "owner": "comment-cleanup-core-execution",
+      "state": "blocked",
+      "blocking_disposition": "Inventory implementations consumed as source text before editing producers."
+    },
+    {
+      "id": "datafusion-deferred-filter-boundary",
+      "path": "benchbox/platforms/dataframe/unified_frame.py",
+      "carrier": "deferred filter constructor and types",
+      "owner": "comment-cleanup-datafusion-typing",
+      "state": "blocked",
+      "blocking_disposition": "Edit only the deferred-filter boundary before the expression cleanup task owns the rest of the file."
+    },
+    {
+      "id": "expected-results-wrapper",
+      "path": "benchbox/core/expected_results/registry.py",
+      "carrier": "_get_benchmark_results wrapper",
+      "owner": "comment-cleanup-expected-wrapper",
+      "state": "blocked",
+      "blocking_disposition": "Edit only the private wrapper before the validation cleanup task owns the rest of the file."
+    },
+    {
+      "id": "interrogate-configuration",
+      "path": "pyproject.toml",
+      "carrier": "tool.interrogate",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Replace the hardcoded coverage threshold atomically with its Make and workflow consumers before the shared-infrastructure task owns the rest of the file."
+    },
+    {
+      "id": "interrogate-make-target",
+      "path": "Makefile",
+      "carrier": "docstring-coverage target",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Replace the docstring coverage target atomically with its configuration and workflow consumers."
+    },
+    {
+      "id": "interrogate-make-help",
+      "path": "make/help.mk",
+      "carrier": "docstring-coverage help text",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Update the help text together with the target it describes."
+    },
+    {
+      "id": "make-inventory-receipt",
+      "path": "make/inventory.json",
+      "carrier": "generated Make inventory",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Regenerate through the supported helper; preserve the historical monolith baseline."
+    },
+    {
+      "id": "interrogate-docs-workflow",
+      "path": ".github/workflows/docs.yml",
+      "carrier": "docstring coverage job and badge",
+      "owner": "comment-cleanup-contracts-gate",
+      "state": "blocked",
+      "blocking_disposition": "Replace the coverage job and badge generation atomically."
+    },
+    {
+      "id": "joinorder-synthetic-generated-docstring-writer",
+      "path": "benchbox/core/joinorder_synthetic/dataframe_queries.py",
+      "carrier": "_impl.__doc__",
+      "owner": "comment-cleanup-joinorder-synthetic",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writer; do not replace it with inert data."
+    },
+    {
+      "id": "read-primitives-generated-docstring-writer",
+      "path": "benchbox/core/read_primitives/dataframe_queries.py",
+      "carrier": "impl.__doc__",
+      "owner": "comment-cleanup-read-primitives",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writer; do not replace it with inert data."
+    },
+    {
+      "id": "ssb-generated-docstring-writer",
+      "path": "benchbox/core/ssb/dataframe_queries/queries.py",
+      "carrier": "impl.__doc__ and globals() docstring writes",
+      "owner": "comment-cleanup-ssb",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writers; do not replace them with inert data."
+    },
+    {
+      "id": "platform-config-builder-docstring-writer",
+      "path": "benchbox/platforms/base/config_utils.py",
+      "carrier": "_builder.__doc__",
+      "owner": "comment-cleanup-platform-base",
+      "state": "blocked",
+      "blocking_disposition": "Identify real readers before removing the writer; do not replace it with inert data."
+    },
+    {
+      "id": "windows-noqa-source-reader",
+      "path": "scripts/check_windows_antipatterns.py",
+      "carrier": "_has_noqa source-line scan",
+      "owner": "comment-cleanup-windows-consumer",
+      "state": "blocked",
+      "blocking_disposition": "Preserve or replace the suppression rule before any noqa directive is deleted."
+    },
+    {
+      "id": "pricing-section-marker-reader",
+      "path": "scripts/generate_pricing_data.py",
+      "carrier": "BEGIN_PREFIX and END_PREFIX section markers in the pricing text",
+      "owner": "comment-cleanup-pricing-consumer",
+      "state": "blocked",
+      "blocking_disposition": "Migrate the section markers to structured data before their comments are deleted."
+    },
+    {
+      "id": "ci-units-comment-delimiter-reader",
+      "path": "scripts/ci_units.py",
+      "carrier": "text after a hash in unit rule files",
+      "owner": "comment-cleanup-shared-infrastructure",
+      "state": "blocked",
+      "blocking_disposition": "Replace the delimiter convention before any rule-file comment is deleted."
+    }
+  ],
+  "derived_rules": [
+    {
+      "id": "python-test-import-owner",
+      "method": "python-imports",
+      "state": "blocked",
+      "blocking_disposition": "Assigned to the single owner of every production module the test imports; tests with no or mixed production owners remain with their directory owner.",
+      "priority": 20,
+      "selectors": [{"prefix": "tests/unit/"}, {"prefix": "tests/integration/"}]
+    }
+  ],
+  "consumer_edges": [
+    {
+      "producer": "benchbox/core/tpcds_obt/dataframe_queries.py",
+      "consumer": "scripts/generate_query_docs.py",
+      "owner": "comment-cleanup-tpcds-obt",
+      "state": "blocked",
+      "blocking_disposition": "Preserve useful nonempty SQL and DataFrame references without asserting equivalence or changing algorithms.",
+      "proof": "_query_page calls query_description, get_sql_render, and get_dataframe_render."
+    }
+  ],
+  "directives": [
+    {"path": "benchbox/cli/app.py", "token": "# noqa: F401", "count": 1, "consumer": "Ruff rule F401", "necessity": "The import runs benchbox.cli.platform_defaults only for its module-level platform hook registrations; the imported name is otherwise unused.", "alternative": "Have the entrypoint call an explicit registration function; platform_defaults has none today, so that is an executable change.", "owner": "comment-cleanup-cli-foundation", "removal_trigger": "Default platform hooks register through an explicit function that the CLI entrypoint calls."},
+    {"path": "_project/scripts/platform_manifest.py", "token": "# noqa: N815", "count": 2, "consumer": "Ruff rule N815", "necessity": "ast.NodeVisitor dispatches on method names such as visit_AsyncFunctionDef and visit_ImportFrom, and the two aliases must keep those mixed-case names.", "alternative": "Define both methods explicitly and delegate to visit_FunctionDef and visit_Import, which removes the suppression.", "owner": "comment-cleanup-project-tooling", "removal_trigger": "The aliases are replaced by delegating methods."},
+    {"path": "_project/scripts/platform_manifest.py", "token": "# noqa: C901", "count": 1, "consumer": "Ruff rule C901", "necessity": "_validate_semantic_surfaces exceeds the cyclomatic complexity limit; this is a discretionary suppression.", "alternative": "Split the function into one validator per semantic surface.", "owner": "comment-cleanup-project-tooling", "removal_trigger": "The function is split below the complexity limit."}
+  ],
+  "notices": [
+    {
+      "path": "LICENSE",
+      "blob_sha256": "8a051ce0007bd890d5268188bcfd5eabd5a648b6824ec51dcad54fd0f3c9e4ec",
+      "byte_start": 0,
+      "byte_end": 1086,
+      "retained_sha256": "8a051ce0007bd890d5268188bcfd5eabd5a648b6824ec51dcad54fd0f3c9e4ec",
+      "governing_requirement": "The immutable license text expressly requires inclusion in copies or substantial portions; retain exact bytes pending per-artifact provenance decisions.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:LICENSE",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Retain exact immutable bytes; do not infer which derived artifacts are covered without provenance evidence."
+    },
+    {
+      "path": "_binaries/tpc-ds/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "The distribution notice references the TPC End User License Agreement and platform EULA files; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-arm64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/darwin-arm64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-x86_64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/darwin-x86_64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-arm64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/linux-arm64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-x86_64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/linux-x86_64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-arm64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-arm64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-x86_64/EULA.txt",
+      "blob_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "byte_start": 0,
+      "byte_end": 17730,
+      "retained_sha256": "adc6ad576e1723eac91ff83ec2d016ef254202286f5a767b99558c8e4e3c61e3",
+      "governing_requirement": "Distributed TPC EULA candidate; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-x86_64/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending provenance review; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_sources/tpc-h/EULA.txt",
+      "blob_sha256": "1171fea59c4472ebd04cdb87d77d6652949fe8bc77d2601248e3c3e68bcdb6b9",
+      "byte_start": 0,
+      "byte_end": 17809,
+      "retained_sha256": "1171fea59c4472ebd04cdb87d77d6652949fe8bc77d2601248e3c3e68bcdb6b9",
+      "governing_requirement": "Distributed TPC EULA candidate in its source-tree representation with mixed CRLF and LF endings; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-h/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve these exact bytes, which differ from the platform EULA representation; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_sources/tpc-ds/EULA.txt",
+      "blob_sha256": "1171fea59c4472ebd04cdb87d77d6652949fe8bc77d2601248e3c3e68bcdb6b9",
+      "byte_start": 0,
+      "byte_end": 17809,
+      "retained_sha256": "1171fea59c4472ebd04cdb87d77d6652949fe8bc77d2601248e3c3e68bcdb6b9",
+      "governing_requirement": "Distributed TPC EULA candidate in its source-tree representation with mixed CRLF and LF endings; governing authenticity and permitted transformation remain unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-ds/EULA.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve these exact bytes, which differ from the platform EULA representation; do not claim line-ending or encoding conversion."
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-arm64/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "Per-platform copy of the distribution notice that references the TPC End User License Agreement; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/darwin-arm64/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-x86_64/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "Per-platform copy of the distribution notice that references the TPC End User License Agreement; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/darwin-x86_64/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-arm64/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "Per-platform copy of the distribution notice that references the TPC End User License Agreement; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/linux-arm64/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-x86_64/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "Per-platform copy of the distribution notice that references the TPC End User License Agreement; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/linux-x86_64/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-arm64/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "Per-platform copy of the distribution notice that references the TPC End User License Agreement; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-arm64/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-x86_64/NOTICE.txt",
+      "blob_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "byte_start": 0,
+      "byte_end": 966,
+      "retained_sha256": "32ffe22022b6484520f72b76ae09d92a0f8b0c9eee26435a61059b4f26ce36a3",
+      "governing_requirement": "Per-platform copy of the distribution notice that references the TPC End User License Agreement; governing retention remains unresolved.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_binaries/tpc-ds/windows-x86_64/NOTICE.txt",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Preserve exact bytes pending governing-instrument and provenance confirmation; no SPDX substitution."
+    },
+    {
+      "path": "_sources/tpc-h/PATCHES.md",
+      "blob_sha256": "f02a3e3126a2f2e65c0d31dbcd9d7180f35b7a6dcb730934c2e46904a04be203",
+      "byte_start": 0,
+      "byte_end": 5991,
+      "retained_sha256": "f02a3e3126a2f2e65c0d31dbcd9d7180f35b7a6dcb730934c2e46904a04be203",
+      "governing_requirement": "The patch record accompanies the TPC-H tool source, but no independent governing-notice obligation is established.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-h/PATCHES.md",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Classify separately from required notices; preserve exact bytes until provenance is resolved."
+    },
+    {
+      "path": "_sources/tpc-ds/PATCHES.md",
+      "blob_sha256": "a8143165f64c4327931c79e656cd2732c7ae56675e2c3ff549b3190fc74ca290",
+      "byte_start": 0,
+      "byte_end": 14788,
+      "retained_sha256": "a8143165f64c4327931c79e656cd2732c7ae56675e2c3ff549b3190fc74ca290",
+      "governing_requirement": "The distribution notice points to patch context, but no independent governing-notice obligation is established.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:_sources/tpc-ds/PATCHES.md",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Classify separately from required notices; preserve exact bytes until provenance is resolved."
+    },
+    {
+      "path": "COPYRIGHT.md",
+      "blob_sha256": "5a58d51af167ced82fa2f9d8de1c03a8ad14cd3842ca24c0becdca2e0cf5e935",
+      "byte_start": 0,
+      "byte_end": 6262,
+      "retained_sha256": "5a58d51af167ced82fa2f9d8de1c03a8ad14cd3842ca24c0becdca2e0cf5e935",
+      "governing_requirement": "This authored summary repeats legal and benchmark acknowledgements but is not independently established as a governing instrument.",
+      "source_identity": "ed5c263c513ba65499f4918d3a7de607f280c65b:COPYRIGHT.md",
+      "owner": "comment-cleanup-scope-policy",
+      "blocking_disposition": "Keep distinct from governing license files; do not infer blanket retention or removal."
+    }
+  ],
+  "obligations": [
+    {"path": ".github/workflows/nightly-v2.yml", "token": "TODO: drop the registration guard", "destination": "Drop the quarantine registration guard in the nightly workflow, or record a tracked follow-up first. The quarantine marker is now registered in pytest.ini and pytest-ci.ini, and dlv2-13-durations-budget-quarantine enforces owner, expiry and issue metadata.", "tracker_reference": "dlv2-13-durations-budget-quarantine", "approved_destination": "", "owner": "comment-cleanup-shared-infrastructure", "blocking_disposition": "The trigger condition appears met. The shared-infrastructure owner decides whether to drop the guard; deleting the comment alone earns no credit."}
+  ],
+  "review_dispositions": [
+    {"id": "R1", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["individual-notice-provenance"], "rationale": "Resolve notices in derived first-party material by provenance and governing requirement; no blanket SPDX substitution or legal prose exception.", "acceptance_refs": ["Notice/provenance ledger resolves first-party derived material and upstream exceptions individually, with governing requirement and retained bytes; no wholesale legal or vendor-directory carve-out."], "owner": "comment-cleanup-scope-policy"},
+    {"id": "R2", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["consumer-before-producer"], "rationale": "Migrate Click, FastMCP, argparse, API, display, and known runtime __doc__ consumers before removing producers.", "acceptance_refs": ["Benchmark-list runtime descriptions use existing canonical registry data before any benchmark class docstring removal. All other cross-module consumers have migrated or have a verified consumer-before-producer dependency; local consumers are explicitly owned."], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R3", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["source-text-reader-inventory"], "rationale": "Inventory source-text guards, delimiters, and parsed output records while preserving meaningful rejected and nonempty cases.", "acceptance_refs": ["Comment-based workflow/Make extraction tests use stable structural/executable boundaries, preserving the original fragment and rejected trust behavior; no test becomes vacuous."], "owner": "comment-cleanup-shared-infrastructure"},
+    {"id": "R4", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["useful-reference-content"], "rationale": "Sphinx rendering alone is insufficient; useful per-interface reference content must precede source deletion.", "acceptance_refs": ["Generated reference pages retain useful signatures, parameter/default distinctions, behavior, errors and examples; deliberate removal of filler/false claims is recorded and public facade forwarding remains intact."], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R5", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["payload-identity-by-slice"], "rationale": "Accept raw SQL and ledger identity risk, but reject a permanent exemption for explanatory SQL; disclose payload identity by slice without normalization or historical-result rewriting.", "acceptance_refs": ["Source-only slices pass narrow executable parity and byte-identical SQL/data/output-input comparisons. SQL/output identity changes use separately disclosed payload batches with raw-hash, non-comment token/order/parameter/hint and relevant correctness/plan/timing evidence; historical bundles and identity algorithms are not rewritten."], "owner": "comment-cleanup-generators"},
+    {"id": "R6", "disposition": "rebutted", "original_verdict": "rebutted", "requirements": ["remove-unsupported-claims"], "rationale": "Unsupported claims are scheduled for deletion; TPC-H compliance assurance and false TPC-DS equivalence claims must disappear, not relocate as provenance.", "acceptance_refs": ["Existing TTT cursor-counting and seed/parameter tests remain effective; generated output consumers accept explicit provenance without unsupported assurance, with raw identity migration disclosed."], "owner": "comment-cleanup-tpch"},
+    {"id": "R7", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["defer-stream-rng-migration"], "rationale": "Evaluate every legacy TPC-DS power, runner, throughput, and DataFrame caller and global RNG effect; ordering, parameters, RNG, and timing changes require a separate migration.", "acceptance_refs": ["Approved/no-change/rejected disposition is explicit. Any accepted algorithm change waits for later authorization and separate scoped implementation; source-only cleanup remains unchanged."], "owner": "comment-cleanup-tpcds-stream-decision"},
+    {"id": "R8", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["repair-active-references-only"], "rationale": "Repair active references while rejecting rewrites of historical snapshots, counts, and SHA citations.", "acceptance_refs": ["All required knowledge/TODO obligations and active navigation have reviewed owning destinations; unsupported claims are gone, and historical citations/baselines/result bundles are unchanged."], "owner": "comment-cleanup-final-enforcement"},
+    {"id": "R9", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["exact-directive-grammar"], "rationale": "Require exact per-language directive grammar, minimal syntax, stable exception identity, owner and trigger, while acknowledging static limits on dynamic prose and simplicity.", "acceptance_refs": ["Exceptions remain precise and provenance-bound; no blanket prefix, directory, file or 'fixture' exemptions; permanent interpreter requirements are not arbitrarily expired.", "Checker limits are explicit: it does not prove simplicity, legal permission, arbitrary dynamic prose absence or benchmark equivalence."], "owner": "comment-cleanup-checker"},
+    {"id": "R10", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["control-file-inventory"], "rationale": "Include compiler references, Vitest environments, formatting, and ignore or coverage controls without wider waivers.", "acceptance_refs": ["All owned maintained configuration/workflows lose discretionary comments and generator reintroduction; relevant policy prose is external and no lint/type/coverage gate is weakened."], "owner": "comment-cleanup-shared-infrastructure"},
+    {"id": "R11", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["safe-deletion-comparator"], "rationale": "Replace sole-docstring bodies with pass only where required; executable comparison must not ignore arbitrary strings or control flow.", "acceptance_refs": ["Python comparison rejects all executable drift except exactly specified removal and empty-body repair; unrelated strings and controls are never normalized away."], "owner": "comment-cleanup-checker"},
+    {"id": "R12", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["measured-batch-budget"], "rationale": "Refresh volume and classification, then choose measured file, PR, review, and CI budgets before broad cleanup; independent soundness and native review remain required.", "acceptance_refs": ["Concrete module file/batch/PR/reviewer/CI budget is selected and recorded from pilot evidence before broad deletion; estimated counts are not delivery commitments. Pause and revise the plan if the agreed scope, cost limit or required reviews cannot be met. Existing implementation authorization is not requested again."], "owner": "comment-cleanup-pilot-budget"},
+    {"id": "R13", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["demonstrated-regression-gaps"], "rationale": "Map invariants to effective tests, including timed cursor counting and all-chunk CRLF carry; add only demonstrated gaps such as joined-slot replacement races.", "acceptance_refs": ["Concurrency coverage rejects publication/replacement violations; reuse existing tests and add a deterministic race case only if a real gap is demonstrated."], "owner": "comment-cleanup-validation"},
+    {"id": "R14", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["missing-count-behavior-proof"], "rationale": "Investigate exact missing counts versus lookup failures and publication; preserve current SKIP and warning behavior without endorsing fail-open policy.", "acceptance_refs": ["Current verdict/warning/publication behavior is traced across intentional absence, lookup miss, known expectations, mismatch, failure and timeout; callers and contracts are named."], "owner": "comment-cleanup-missing-count-decision"},
+    {"id": "R15", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["expected-wrapper-use-proof"], "rationale": "Remove the private expected-results wrapper only after direct and dynamic-use proof, preserving the actual loader and historical classification record.", "acceptance_refs": ["Direct, dynamic, reflection/plugin and public-contract use is checked at the current head. Disposition is removal only if genuinely unused; otherwise document the demonstrated retention requirement externally."], "owner": "comment-cleanup-expected-wrapper"},
+    {"id": "R16", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["datafusion-boundary-typing-proof"], "rationale": "Assess existing DataFusionExpr typing at the deferred filter boundary; preserve filter build behavior and lazy imports without blind casts or wrappers.", "acceptance_refs": ["Actual caller/dispatch, existing TYPE_CHECKING DataFusionExpr and sibling implementation establish a concrete type change or no-change disposition; Any is not justified by prose alone."], "owner": "comment-cleanup-datafusion-typing"},
+    {"id": "R17", "disposition": "narrowed", "original_verdict": "narrowed", "requirements": ["obsolete-consumer-proof"], "rationale": "Remove obsolete interrogate and badge consumers and regenerate the current Make inventory, without rewriting historical baselines or proofs.", "acceptance_refs": ["Interrogate configuration, both hardcoded gate consumers, Make public target/help behavior and docs workflow badge are reconciled atomically with meaningful replacement validation.", "Current Make inventory regenerates through the supported entrypoint; historical monolith baseline/migration evidence is byte-preserved and any current receipt diff is explained."], "owner": "comment-cleanup-contracts-gate"},
+    {"id": "R18", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["consumer-generator-dependency"], "rationale": "Consumer and generator migrations precede deletion; each batch must prove completed prerequisites and owning destinations.", "acceptance_refs": ["Consumer→producer ordering covers cross-module runtime/source-test reads, not only directory ownership: either the prerequisite migrates the reader or an explicit dependency blocks producer deletion.", "Implementation and parallel-write authorization boundaries, ownership freeze, shared test lock and independent PR/review requirements are written into the dispatch contract."], "owner": "comment-cleanup-scope-policy"}
+  ]
+}

@@ -1,4 +1,9 @@
 export const DOCS_WORKFLOW_PATH: string;
+export const CI_WORKFLOW_PATH: string;
+export const MERGE_QUEUE_WORKFLOW_PATHS: string[];
+export const VISUAL_JOB_NAME: string;
+export const JOBS_PAGE_SIZE: number;
+export const MAX_JOB_PAGES: number;
 export const MERGE_QUEUE_BRANCH_PREFIX: string;
 export const ARTIFACT_PAGE_SIZE: number;
 export const LEGACY_BASELINE_NAME: string;
@@ -21,6 +26,11 @@ export function trustedBaselineSource(
   run: Record<string, unknown> | undefined,
   context: { repository: string; baseSha: string },
 ): BaselineSource | undefined;
+
+export function isQueueLeaderRun(
+  run: Record<string, unknown> | undefined,
+  context: { repository: string; baseSha: string },
+): boolean;
 
 export function baselineNames(baseSha: string): string[];
 
