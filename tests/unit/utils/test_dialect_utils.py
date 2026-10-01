@@ -81,6 +81,11 @@ class TestSQLiteDiscountBoundaries:
             "l_discount BETWEEN 0.01 - 0.06 AND 0.06 + 0.01",
             "l_discount BETWEEN 6e-2 - 1e-2 AND 6e-2 + 1e-2",
             "l_discount BETWEEN (10000000000000000000000000000.0 + 9.0 - 10000000000000000000000000000.0) AND (20.0 + 0.0)",
+            "l_discount BETWEEN (100000000.0 + 0.0000000001 - 100000000.0) AND (0.06 + 0.01)",
+            f"l_discount BETWEEN (1{'0' * 400}.0 - 1{'0' * 400}.0) AND (0.06 + 0.01)",
+            "l_discount BETWEEN 0.01 + 0.01 + 0.01 + 0.01 + 0.01 AND 0.06 + 0.01",
+            "l_discount BETWEEN 0.0000001 + 0.0000001 AND 0.06 + 0.01",
+            "l_discount BETWEEN 100.0 - 99.0 AND 0.06 + 0.01",
         ],
     )
     def test_unrelated_or_nonliteral_expressions_are_unchanged(self, predicate):
@@ -121,21 +126,38 @@ class TestSQLiteDiscountBoundaries:
         finally:
             connection.close()
 
-    def test_large_magnitude_decimal_cancellation_keeps_sqlite_semantics(self):
+    @pytest.mark.parametrize(
+        "rows, low, high, expected",
+        [
+            # Doubles lose the 9.0, so SQLite's lower bound is 0.0 and both rows match.
+            (
+                (8.0, 9.0),
+                "(10000000000000000000000000000.0 + 9.0 - 10000000000000000000000000000.0)",
+                "(20.0 + 0.0)",
+                [8.0, 9.0],
+            ),
+            # Doubles lose the 1e-10, so the lower bound is 0.0 and the zero row matches.
+            ((0.0, 0.05), "(100000000.0 + 0.0000000001 - 100000000.0)", "(0.06 + 0.01)", [0.0, 0.05]),
+            # inf - inf is NULL in SQLite, so no row matches.
+            ((0.05,), f"(1{'0' * 400}.0 - 1{'0' * 400}.0)", "(0.06 + 0.01)", []),
+        ],
+    )
+    def test_cancellation_and_overflow_bounds_keep_sqlite_semantics(self, rows, low, high, expected):
         import sqlite3
 
+        from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
+
+        values = " UNION ALL ".join(f"SELECT {value} AS l_discount" for value in rows)
         query = (
-            "WITH t AS (SELECT 8.0 AS l_discount UNION ALL SELECT 9.0) SELECT * FROM t WHERE l_discount BETWEEN "
-            "(10000000000000000000000000000.0 + 9.0 - 10000000000000000000000000000.0) AND (20.0 + 0.0) "
-            "ORDER BY l_discount"
+            f"WITH t AS ({values}) SELECT l_discount FROM t "
+            f"WHERE l_discount BETWEEN {low} AND {high} ORDER BY l_discount"
         )
+        assert _fix_sqlite_unsupported_syntax(query) == query
         connection = sqlite3.connect(":memory:")
         try:
-            # REAL arithmetic loses the 9.0, so the lower bound is 0.0 and both rows match.
-            expected = connection.execute(query).fetchall()
-            assert expected == [(8.0,), (9.0,)]
+            assert [value for (value,) in connection.execute(query).fetchall()] == expected
             translated = translate_sql_query(query, target_dialect="sqlite")
-            assert connection.execute(translated).fetchall() == expected
+            assert [value for (value,) in connection.execute(translated).fetchall()] == expected
         finally:
             connection.close()
 

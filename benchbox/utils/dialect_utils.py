@@ -5,6 +5,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import hashlib
+import math
 import re
 from collections import Counter
 from collections.abc import Iterator, Sequence
@@ -277,11 +278,12 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
 def _fold_sqlite_discount_bounds(query: str) -> str:
     """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic.
 
-    A bound is folded only when it is a ``+``/``-`` expression of plain decimal literals
-    (``0.06 - 0.01``), which SQLite evaluates as REAL. The exact decimal result is computed
-    with a trapped-inexact context, and the bound is replaced only when SQLite's own double
-    arithmetic differs from it by rounding noise. Integer or mixed bounds, other operators,
-    and expressions where doubles lose the answer (large-magnitude cancellation) keep SQLite's
+    A bound is folded only when it is a ``+``/``-`` expression of at most four plain decimal
+    literals (``0.06 - 0.01``), each below 100 with at most six decimals. SQLite evaluates
+    those as REAL. At that size double rounding error is about 1e-14, so the exact decimal
+    result is computed in a trapped-inexact context and the bound is replaced only when the
+    double result is finite and within 1e-12 of it. Integer or mixed bounds, other operators,
+    larger or longer literals, scientific notation and negative results keep SQLite's
     semantics and are left alone. The rewrite is not benchmark-scoped: any SQLite query with
     such an ``l_discount`` bound is folded, including the TPC-Havoc Q6 variants.
     """
@@ -293,12 +295,17 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
     from sqlglot import exp
 
     context = Context(prec=60, traps=[Inexact])
+    max_leaves = 4
+    noise = 1e-12
+    leaves = 0
 
     def evaluate(node: "exp.Expression") -> "tuple[Decimal, float] | None":
         """Return the exact decimal value and the IEEE-double value of a decimal +/- tree."""
+        nonlocal leaves
         node = node.unnest()
         if isinstance(node, exp.Literal):
-            if not node.is_number or not re.fullmatch(r"\d+\.\d+", node.name):
+            leaves += 1
+            if leaves > max_leaves or not node.is_number or not re.fullmatch(r"\d{1,2}\.\d{1,6}", node.name):
                 return None
             return Decimal(node.name), float(node.name)
         if isinstance(node, (exp.Add, exp.Sub)):
@@ -320,11 +327,12 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
             continue
         folded: list[Decimal] = []
         for bound in (between.args["low"], between.args["high"]):
+            leaves = 0
             value = evaluate(bound) if isinstance(bound.unnest(), (exp.Add, exp.Sub)) else None
             if value is None:
                 break
             exact, real = value
-            if exact < 0 or abs(real - float(exact)) > 1e-9 * max(1.0, abs(float(exact))):
+            if exact < 0 or not math.isfinite(real) or abs(real - float(exact)) > noise:
                 break
             folded.append(exact)
         else:
