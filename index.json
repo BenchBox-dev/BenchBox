@@ -6198,6 +6198,17 @@
       "status": "open",
       "title": "Add a scheduled, non-blocking SF=1 qualification oracle lane for both families"
     },
+    "dfparity-t19-emptiness-rebaseline": {
+      "claim": null,
+      "needs": [
+        "dfparity-t05-adapter-batches",
+        "dfparity-t03-gate-scale-threading",
+        "dfparity-t17-qualification-values-and-ans"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Re-baseline TPC-DS legitimately-empty classification with scale-scoped criteria"
+    },
     "dfparity-t21-tpch-seeded-path": {
       "claim": null,
       "needs": [
