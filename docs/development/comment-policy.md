@@ -1,153 +1,98 @@
 # Comments and docstrings
 
-Maintained first-party code must contain no explanatory comments or docstrings.
-Clarify the code by simplifying it, removing unnecessary branches, or improving
-names and types. Put a useful public contract in the canonical API reference.
-Retain design rationale outside source only when future work needs the reason.
-Do not move removed prose into inert strings, fake metadata, or runtime `__doc__`
-assignments. A help string or protocol record must have an actual reader.
+Maintained first-party code has no explanatory comments or docstrings. When the
+check fails, delete the text and clarify the code: simplify it, or improve names
+and types. A useful public contract goes in the canonical API reference. Keep
+design rationale outside source only when future work needs the reason. Do not
+move removed prose into inert strings, fake metadata or runtime `__doc__`
+assignments. A help string or protocol record needs an actual reader.
 
-## Checks
+## Commands
 
-- `make comment-policy-check` rejects new violations against `origin/develop`.
-  Set `BASE_REF` to an immutable commit SHA to reproduce a CI comparison.
-- `make comment-policy-strict` checks the full maintained source inventory.
-  It will fail until the module cleanup is complete.
-- `make comment-policy-report` reports remaining violations without rejecting
+- `make comment-policy-check` rejects new violations against `origin/develop`,
+  then runs the native parser regressions. Set `BASE_REF` to an immutable
+  commit SHA to reproduce a CI comparison.
+- `make comment-policy-strict` checks the whole inventory. It fails until
+  cleanup is complete.
+- `make comment-policy-report` lists remaining violations without rejecting
   legacy debt. Configuration and parser setup failures still fail.
-- The pre-commit hook checks staged content. The transition runner needs Python,
-  `uv`, Node and npm. It installs a small isolated parser environment from
-  reviewed, hash-pinned specifications. `comment-policy-check` also runs the
-  native parser regressions.
+- The pre-commit hook checks staged content.
+- `scripts/check_comment_policy.py --path` checks one file or directory prefix.
 
-Source enforcement completes before any candidate native test executes. A
-rejection exits without running those tests, so a test cannot replace the
-trusted checker or hide source before it is checked. Native test failures still
-fail the command after a successful source check.
+The check target and hook need Python, `uv`, Node and npm. Without `BASE_REF`,
+if `origin/develop` is not an ancestor of `HEAD`, a local run uses their merge
+base; an explicit or CI base must be an ancestor. Native tests run only after
+the source check passes, so they cannot replace the checker, but they can still
+fail the command.
 
-The CI job runs on every pull request and merge group. The required tooling
-result consumes it even when other code lint is skipped. CI takes its base SHA
-from the platform event and rejects an override. After the initial rollout, the
-launcher, checker and language adapter scripts come from that immutable base
-commit. Parser dependency specifications also come from the base: Python wheels
-require exact versions and hashes; TypeScript uses a separate npm integrity lock.
-The isolated process clears import and installer overrides, ignores project
-configuration, and never loads candidate `node_modules` or a candidate Python
-environment. Bootstrap is
-restricted to the explicitly pinned initial commit; a missing checker elsewhere
-fails. Changes to this wiring remain subject to the repository's independent
-soundness review.
+## Exceptions
 
-## Mechanical exceptions
+`quality/comment-policy.json` lists exceptions. Each names the file, qualified
+symbol or payload, complete text, actual consumer, necessity, smaller
+alternative considered, owner and removal condition; suppressions need an
+unexpired `expires` date. Line numbers are not identities. An entry permits one
+occurrence unless an approved positive `count` says otherwise. Three kinds:
 
-`quality/comment-policy.json` records exact exceptions. An entry identifies the
-file, qualified symbol or payload, and complete comment text. It names an actual
-consumer file, explains necessity and the smaller alternative considered, and
-records an owner and removal condition. Suppressions also need an unexpired
-review date. Line numbers are not exception identities. Each entry permits one occurrence
-unless an explicit positive `count` has been approved. Extra copies fail.
+- **Directive:** a whole registered token, such as `# noqa: E501`, with no
+  explanatory text.
+- **Notice:** exact required text, with its governing source as consumer.
+- **Fixture:** exact parser input that a named test consumes.
 
-Only three exception kinds exist:
+A first-line shebang needs no entry; an encoding cookie is accepted only in the
+first two lines for a non-UTF-8 Python encoding. The check target, hook and CI
+use the base policy, so add an exception in an earlier change than the source
+it permits. Review its real need and reader first; syntax checks cannot. Remove
+unused exceptions during module review. The one current fixture lets a test run
+Makefile-derived conditions to prove a broken gate still runs the guard. It
+grants no comment text, and changing its consumer code invalidates it (the AST
+digest ignores only empty type-parameter lists, so Python versions agree).
 
-- **Directive:** the whole token must match a registered grammar. Examples are
-  specific `noqa` codes, specific type-ignore codes, formatting and coverage
-  directives, ShellCheck codes, TypeScript references, and registered SQL hints.
-  Extra explanatory text fails. A matching spelling alone grants no exception.
-- **Notice:** retain only the exact required text, with its governing source
-  named as the consumer. Do not substitute a shorter notice without checking
-  that governing source.
-- **Fixture:** exact parser inputs or tokens deliberately consumed by a test. Record
-  the test consumer, complete `payload` or consumer AST digest, `finding_kind`,
-  and exact token or parser-error `text`; ordinary test explanations do not qualify.
+## Scopes and comparison
 
-A first-line interpreter shebang is accepted without registry metadata. A
-valid encoding cookie is accepted only in the first two lines and only for a
-non-UTF-8 Python source encoding. UTF-8 cookies are unnecessary.
+The checker compares a multiset of exact file, kind, symbol and text
+identities. Deleting an unrelated comment does not pay for a new one; adding a
+copy, changing text or moving prose to another symbol fails. No archive of
+removed prose is kept. Base comparisons inspect changed files and completed
+scopes; report and strict modes inspect everything.
 
-New exceptions cannot authorize source in the same change: transition checks
-use the base policy. Introduce and review the evidence first, then use the
-approved exception in a later change. The initial registry contains one mechanical fixture permission: a test executes
-conditions derived from the checked Makefile to prove a broken gate still runs
-the guard. Its unresolved program argument is bound to the entire consumer AST
-digest. The digest preserves every AST field except empty type-parameter lists
-introduced in Python 3.12, so supported Python versions agree. Nonempty type
-parameters remain part of the identity. Changing contributing consumer code
-invalidates that permission.
-It permits no comment or docstring text.
-Unused and unnecessary exceptions must be removed during module review.
+- Add a cleaned file or directory prefix to `completed`. Every violation there
+  then fails, including inherited ones. Completed scopes cannot be removed.
+- External exclusions name upstream owners and provenance files. A candidate
+  policy cannot expand them or overlap them with completed scopes, and new
+  files under them are not exempt in a base comparison.
+- Generated first-party code and `_sources/compilation` scripts are included;
+  TPC templates and catalog-owned skill mirrors have separate provenance.
+- The 90% docstring gate stays until useful API contracts move and a
+  replacement is approved. Existing module docstrings are transition debt, not
+  an endorsement.
 
-## Transition and ownership
+## CI trust model
 
-The checker compares a multiset of exact file, kind, symbol and text identities.
-Deleting an unrelated comment does not pay for a new comment. Adding another
-copy, changing text, or moving prose into a different symbol fails. Unchanged
-legacy content in checked scopes is reported. Transition checks inspect changed
-files and every completed scope; report and strict modes inspect the full
-inventory. No permanent archive of removed prose is stored. Use `--path` with
-the checker to select an exact file or directory prefix for a local check.
-
-Add a cleaned file or directory prefix to `completed`. Every violation in that
-scope then fails, including inherited violations. Completed scopes cannot be
-removed. Candidate policies cannot expand the external exclusions. Exclusions
-name canonical upstream owners and existing provenance files. New files under an
-excluded directory do not inherit its exemption in a transition comparison.
-Completed and external scopes cannot overlap. Compilation scripts under
-`_sources/compilation` are included; TPC templates and catalog-owned skill
-mirrors have separate provenance. Generated first-party code is included.
-
-The existing 90% docstring gate remains in force until useful API contracts have
-been migrated and its replacement is approved. Existing module docstrings are
-transition debt, not an endorsement that they are useful.
+The `comment-policy` job runs on every pull request and merge group and feeds
+the required tooling result. Its base SHA comes from the platform event and
+cannot be overridden. The launcher, checker, adapters and hash-pinned parser
+dependency specifications come from that immutable base. The checker runs
+isolated from project configuration, import and installer overrides, candidate
+`node_modules` and candidate Python environments. The candidate's own checker is used only to bootstrap a
+base that contains the rollout commit `ed5c263c513ba65499f4918d3a7de607f280c65b`
+and holds no trusted checker files, launcher or policy registry; on any other
+base, a missing checker fails. `.github/soundness-paths.txt` and
+`.github/CODEOWNERS` protect these files, and changes to this wiring need the
+repository's independent soundness review.
 
 ## Coverage and limits
 
-Python uses its AST and tokenizer; standalone literal strings and direct runtime
-docstring assignment forms are rejected too. SQL strings assigned to SQL-valued names or passed to registered execution
-sinks are scanned once, including static portions of f-strings. Ordinary
-docstrings are not interpreted as SQL. JavaScript and TypeScript use the isolated TypeScript parser,
-protecting strings, regular expressions, template text and JSX text while
-examining executable expressions and retaining qualified symbol identities.
-Registered process and query sinks route reconstructable strings to their
-language adapters; unresolved executable payloads fail coverage. SQL scanning handles quoted values, dollar
-strings and nested block comments. Bracket syntax containing comment delimiters
-requires an explicit dialect when its meaning is ambiguous. Other registered source formats use Pygments
-lexers, with explicit coverage failures for unrecognized syntax. YAML/JSON SQL fields, platform SQL overrides, GitHub Script bodies, shell `run`
-values, HTML script/style bodies, notebook code cells, interpreter-fed shell
-heredocs, and language-tagged Markdown/RST examples are routed to their language
-checks. Shell ASTs identify redirection consumers and supported pipelines.
-MyST metadata directives are distinguished from code and nested examples.
-Unknown formats in maintained code roots fail coverage; named configuration
-files and interpreter scripts are included.
+Python is read with its AST and tokenizer, including standalone strings and
+runtime docstring assignments; JavaScript and TypeScript with the isolated
+TypeScript parser; SQL-valued strings and execution-sink arguments as SQL; other
+formats with Pygments lexers; embedded code with its own language check.
+Unknown input is a coverage error, never a pass, and changed files and
+completed scopes always reject it. Parsers are used because text search would
+confuse strings with comments, and Ruff has no cross-language ban.
 
-This is a syntax rule, not proof that arbitrary strings have readers or that code
-is simple. Direct JavaScript `eval`/`Function`, known Node command-execution imports,
-Python `exec`/`eval`/`compile`, and supported subprocess or shell command strings
-are routed too. Unknown executable strings produce errors.
-Dynamic SQL construction, notebook magics, custom template languages,
-and unusual shell or Make constructs require module review and adapter work.
-An unsupported or malformed source produces a coverage error. Changed files and
-completed scopes always reject these errors; report mode exposes inherited
-errors elsewhere. Highlighting without an error is not full grammar validation.
-Add regression fixtures when extending a language adapter. Never treat an
-unrecognized runnable format as successfully checked.
-
-
-## Prior art and maintenance
-
-`scripts/check_windows_antipatterns.py` already uses Python AST inspection for a
-repository policy. This checker extends that pattern with token inspection.
-The hosted soundness job in `.github/workflows/ci.yml` already extracts its
-checker from the immutable base; comment enforcement extends that trust model
-to parser libraries. `.github/soundness-paths.txt` and `.github/CODEOWNERS`
-protect the policy, adapters, launcher and dependency specifications.
-
-The new multiset comparison allows module cleanup to proceed independently
-without a permanent archive of deleted prose. A plain text search would confuse
-strings with comments; existing Ruff rules do not implement the required
-cross-language ban. Native syntax parsers and established lexers supply grammar
-handling; custom code routes repository payloads and checks the policy.
-
-When introducing a language, executable carrier, interpreter wrapper, parser
-version or new upstream artifact, extend its adapter or reviewed inventory and
-add a reproducing regression. Review an exception's actual necessity and reader
-before registration. Syntax checks cannot establish those facts themselves.
+This syntax rule cannot prove a string has a reader or that code is simple.
+Dynamic SQL, notebook magics, custom template languages and unusual shell or
+Make constructs need review and adapter work. Details are in
+`scripts/comment_syntax.py`, `comment_payloads.py` and `comment_execution.py`;
+add a regression fixture to `tests/unit/scripts/test_comment_policy.py` when
+extending an adapter.
