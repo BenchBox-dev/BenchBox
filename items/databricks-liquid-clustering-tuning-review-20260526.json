@@ -1,5 +1,5 @@
 {
-  "description": "REVALIDATED 2026-08-17. Still blocked at w4 ('Run live Databricks SF 0.01 executions ... with valid credentials'), unchanged since 2026-05-26 - roughly twelve weeks stalled on credential access rather than on engineering. Databricks Free Edition (which replaced Community Edition on 2026-01-01) is free indefinitely, provides serverless compute and a 2X-Small SQL warehouse, and needs no paid contract; LinkedIn verification raises the per-account quotas. SF 0.01 is trivially inside those quotas, so w4 is unblockable today at zero cost. w2 and w3 are pure engineering and need no credentials at all - they can proceed immediately and independently.",
+  "description": "REVALIDATED 2026-10-01. Credentials are no longer the blocker: Databricks credentials are configured in ~/.benchbox/credentials.yaml and live Databricks runs are executing from develop. The item was imported as Blocked on w4 (live SF 0.01 runs) and had been stalled since 2026-05-26.\n\nRemaining work, in order:\n- w2: reject liquid_clustering_columns over 4 keys in manual mode. Table-level clustering is capped at 4 in platforms/databricks/tuning_validation.py, but the platform_optimizations path (core/tuning/interface.py, liquid_clustering_columns) has no 4-key check, and the item's own note records a 5-key manual config being accepted.\n- w3: runtime compatibility checks (DBR, channel, warehouse, Unity Catalog, optimize-full eligibility) before liquid-clustering SQL is emitted. w2 and w3 are engineering and need no credentials.\n- w4: live Databricks SF 0.01 tpch/tpcds liquid-template runs; needs w3 and an explicit live-run approval stating command, maximum runtime, log path and stop condition. Check the 500-table Unity Catalog metastore quota first.\n- w5: verify the result metadata carries the liquid-specific fields.",
   "legacy": {
     "item_meta": {
       "blocked_reason": "imported from YAML status: Blocked",
@@ -146,5 +146,15 @@
         "wid": "w5"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8995e2100042cfa8b56876be",
+      "at": "2026-10-01T15:03:40Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "537ba2c81f46449299ce151f3d0099d1",
+      "session_id": "a90fbddb3b8e47b781e3c8bf731c4a32"
+    }
+  ]
 }

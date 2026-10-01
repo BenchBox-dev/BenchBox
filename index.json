@@ -5082,7 +5082,7 @@
       "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "blocked",
+      "status": "open",
       "title": "Databricks liquid clustering review follow-up: runtime compatibility, validation gaps, and live certification"
     },
     "databricks-liquid-clustering-tuning-support": {
