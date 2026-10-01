@@ -278,8 +278,8 @@ benchmark_metadata:
     description: Read operation benchmarks testing SELECT queries
     category: Primitives
     support_status: beta
-    num_queries: 136
-    query_description: Multiple read test queries
+    num_queries: 157
+    query_description: 157 SQL queries (153 DuckDB-transpilable); 152 DataFrame queries, 148 gateable
     supports_streams: false
     default_scale: 0.01
     scale_options:
