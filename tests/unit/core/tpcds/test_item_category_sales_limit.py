@@ -87,3 +87,18 @@ def test_all_null_group_keeps_a_null_ratio_and_a_zero_group_stays_zero(family, m
     assert by_item["ITEM0001"] == (None, None)
     assert by_item["ITEM0002"] == (0.0, 0.0)
     assert by_item["ITEM0003"] == (5.0, 100.0)
+
+
+@pytest.mark.parametrize("family", ["expression", "pandas"])
+def test_zero_total_class_keeps_nan_ratios(family, monkeypatch):
+    """A class whose revenue sums to a real 0 gives 0/0 = NaN in SQL; only an all-NULL group is NULL."""
+    import math
+
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"sales_date": "2001-01-12"})
+
+    rows = _run(family, 98, "ss", "store_sales", prices=[0.0, 0.0])
+
+    assert [row[-2] for row in rows] == [0.0, 0.0]
+    assert all(isinstance(row[-1], float) and math.isnan(row[-1]) for row in rows)

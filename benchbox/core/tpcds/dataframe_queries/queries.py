@@ -293,8 +293,10 @@ def _item_category_sales_pandas(
     grouped["revenueratio"] = grouped["itemrevenue"] * 100 / grouped.groupby("i_class")["itemrevenue"].transform("sum")
     ordered = grouped.sort_values(list(sort_by))
     result = ordered if limit is None else ordered.head(limit)
+    # Only a group with no non-NULL input is NULL; a zero-total class gives NaN (0/0) in SQL too.
+    null_groups = result["itemrevenue"].isna()
     for column in ("itemrevenue", "revenueratio"):
-        result[column] = result[column].astype(object).where(result[column].notna(), None)
+        result[column] = result[column].astype(object).where(~null_groups, None)
     return result
 
 
