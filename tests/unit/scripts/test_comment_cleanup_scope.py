@@ -396,6 +396,18 @@ def test_every_tracked_eula_and_notice_file_has_a_notice_entry() -> None:
     assert notice_files <= listed
 
 
+def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    tracked = set(scope.git(ROOT, "ls-files", "-z").decode().split("\0"))
+    edges = policy["consumer_edges"]
+    assert edges
+    for edge in edges:
+        assert edge["producer"] in tracked and edge["consumer"] in tracked
+    pairs = {(edge["producer"], edge["consumer"]) for edge in edges}
+    assert ("benchbox/mcp/tools/visualization.py", "tests/unit/mcp/test_surface_defect_regressions.py") in pairs
+    assert ("benchbox/core/tpch/dataframe_queries.py", "benchbox/core/query_catalog.py") in pairs
+
+
 def _derived_rule(priority: int = 20) -> dict:
     return {
         "id": "test-import-owner",

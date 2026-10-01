@@ -146,7 +146,17 @@ assurance.
 ## Dispatch boundaries
 
 Consumer migration precedes deletion of its producer. An edge with a blocked
-consumer blocks the producer. Scope validation is limited to ownership, evidence,
+consumer blocks the producer.
+
+The committed edges cover two kinds of reader, each traced to its source. Three
+production readers (`benchbox/core/query_catalog.py`, `benchbox/core/dryrun.py`
+and `benchbox/mcp/tools/benchmark.py`) return `inspect.getsource` of the
+registered DataFrame implementations, so each of the 38 files that define them
+(resolved from the live registry) is a producer for all three. Three tests
+assert that specific docstring text is present. A test that only asserts
+absence or a code token cannot be broken by deleting a comment, so it is not an
+edge. The list is not exhaustive: Click and FastMCP help, Sphinx autodoc and
+readers reached through dynamic names are still the owners' to inventory. Scope validation is limited to ownership, evidence,
 and dependency data. The checker owns deletion comparison, syntax and parser
 coverage, directive grammar, and strict/report enforcement. Shared tooling owns
 public command and CI wiring.
