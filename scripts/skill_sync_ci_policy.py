@@ -59,12 +59,12 @@ EXPECTED_GROUPS = [
             "docs",
             "tidy-perms",
             "todo",
-            "shared-agent-execution",
             "shared-change-framework",
             "shared-investigation-framework",
             "shared-review-protocol",
         ],
     },
+    {"skills": ["shared-agent-execution"]},
     {"skills": ["skill-sync"]},
 ]
 EXPECTED_SKILLS = frozenset(skill for group in EXPECTED_GROUPS for skill in group["skills"])

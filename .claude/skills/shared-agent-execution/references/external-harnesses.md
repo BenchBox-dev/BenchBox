@@ -19,16 +19,16 @@ from flag drift. Do not run those checks proactively.
 - **codex**
   - Worker (Write): `codex exec -C "$WORKSPACE" --model "$MODEL" --sandbox workspace-write "$PROMPT"`
   - Reviewer (Hard Read-Only): `codex exec -C "$WORKSPACE" --model "$MODEL" --sandbox read-only "$PROMPT"`
-  - Known-good models: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`
+  - Known-good models: `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6-luna`
   - Effort: Optional `-c model_reasoning_effort="<level>"`
 - **claude**
   - Worker (Write): `(cd "$WORKSPACE" && claude --print --model "$MODEL" --effort "$EFFORT" "$PROMPT")`
   - Reviewer (Hard Read-Only): `(cd "$WORKSPACE" && claude --print --tools Read,Grep,Glob --model "$MODEL" --effort "$EFFORT" "$PROMPT")`
-  - Known-good models: `claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`
+  - Known-good models: `claude-fable-5`, `claude-opus-5-5`, `claude-sonnet-5-5`
 - **agy**
   - Worker (Write): `(cd "$WORKSPACE" && agy --model "$MODEL" --print="$PROMPT")`
   - Reviewer (Soft Read-Only): `(cd "$WORKSPACE" && agy --model "$MODEL" --mode plan --print="$PROMPT")`
-  - Known-good models: `gemini-3.7-flash-high`, `gemini-3.7-flash-medium`, `gemini-3.7-flash-low`
+  - Known-good models: `gemini-3.8-flash-high`, `gemini-3.8-flash-medium`, `gemini-3.8-flash-low`
   - Note: Tier is the `-low` / `-medium` / `-high` model suffix. Never pass
     `--effort` alongside a suffixed model: `agy` rejects the pair
     (`--model X conflicts with --effort=Y`), including `--effort max`.
@@ -44,7 +44,7 @@ from flag drift. Do not run those checks proactively.
 - **muse**
   - Worker (Write): `muse exec --workspace "$WORKSPACE" --disable-approval --model "$MODEL" --reasoning-effort "$EFFORT" "$PROMPT"`
   - Reviewer (Hard Read-Only): `muse exec --workspace "$WORKSPACE" --disable-approval --disable-write --disable-shell --model "$MODEL" --reasoning-effort "$EFFORT" "$PROMPT"`
-  - Known-good models: `muse-spark-1.2-contributor`, `muse-spark-1.2`
+  - Known-good models: `muse-spark-1.3-contributor`, `muse-spark-1.3`
   - Note: Unset invalid credentials with `env -u META_API_KEY` before execution.
 
 ## Extensible and Community Harnesses
@@ -52,11 +52,13 @@ from flag drift. Do not run those checks proactively.
 - **pi**
   - Worker (Write): `(cd "$WORKSPACE" && pi --print --model "$MODEL" --thinking "$EFFORT" "$PROMPT")`
   - Reviewer (Hard Read-Only): `(cd "$WORKSPACE" && pi --print --tools read,grep,find,ls --model "$MODEL" --thinking "$EFFORT" "$PROMPT")`
-  - Known-good models: `openai-codex/gpt-5.6-sol`, `openai-codex/gpt-5.6-terra`, `openai-codex/gpt-5.6-luna`, `anthropic/claude-fable-5`, `anthropic/claude-opus-5`, `anthropic/claude-sonnet-5`, `xai/grok-4.6`, `xai/grok-4.5`, `muse-spark/muse-spark-1.2-contributor`
+  - Known-good models: `openai-codex/gpt-6-astra`, `openai-codex/gpt-6-sol`, `openai-codex/gpt-6-luna`, `anthropic/claude-fable-5`, `anthropic/claude-opus-5-5`, `anthropic/claude-sonnet-5`, `xai/grok-4.6`, `xai/grok-4.5`, `muse-spark/muse-spark-1.2-contributor`
+  - Note: pi's catalog lags the native CLIs. Use only IDs that
+    `pi --list-models` reports.
 - **jcode**
   - Worker (Write): `jcode run -C "$WORKSPACE" --model "$MODEL" "$PROMPT"`
   - Reviewer (Hard Read-Only): `jcode run -C "$WORKSPACE" --disable-base-tools --tools read --model "$MODEL" "$PROMPT"`
-  - Known-good models: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `claude-fable-5`, `claude-opus-5`, `claude-sonnet-5`, `gemini-3.7-flash-tiered`, `muse-spark-1.2-contributor`
+  - Known-good models: `gpt-6-astra`, `gpt-6.1-sol`, `gpt-6-luna`, `claude-fable-5`, `claude-opus-5-5`, `claude-sonnet-5-5`, `gemini-3.8-flash-tiered`, `muse-spark-1.3-contributor`
 - **goose**
   - Worker (Write): `(cd "$WORKSPACE" && goose run --text "$PROMPT" --no-session --provider "$PROVIDER" --model "$MODEL")`
   - Reviewer (Soft Read-Only): `(cd "$WORKSPACE" && goose review --prompt "$CRITERIA_FILE" --model "$MODEL")`
