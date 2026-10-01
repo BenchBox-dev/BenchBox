@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "Each question in the description has a recommendation with evidence (paths, check names, or PR examples).",
+    "The soundness path list is classified into correctness-critical entries and merely sensitive ones, with a keep, narrow, or split decision for each group.",
+    "A decision is recorded on whether the review requirement should bind to a head SHA or reviewer identity.",
+    "A decision is recorded on whether an attested, head-pinned enqueue path is acceptable, or why not.",
+    "Any approved change is filed as its own tracker item; no gate is changed as part of the review."
+  ],
+  "context": "Created as a follow-up while clearing a PR backlog. Related items already done: dlv2-32-codeowners-soundness-hold, auto-merge-review-gate-admin-enforcement, soundness-surface-widening. Open and adjacent: soundness-classifier-prefix-vs-exact-file (prefix matching gates sibling files; likely inflates the surface this item reviews).",
+  "description": "Evaluate whether the process for merging PRs that touch soundness paths is proportionate to the risk it controls, and whether it works for agent-assisted delivery.\n\nToday a PR touching any path in .github/soundness-paths.txt (or matched by _project/scripts/auto_merge_soundness_paths.py) needs three things: a `Soundness review:` section in the PR body naming an external reviewer, linking the review comment, and stating all Critical/High findings are resolved; exclusion from auto-merge; and a manual enqueue by the maintainer. `make pr-ready` and `make pr-arm-auto-merge` refuse these PRs, and agent sessions are denied a direct `gh pr merge --auto` as a merge without review.\n\nObserved effect: in a backlog of 14 open non-draft develop PRs, 12 touched soundness paths. The surface reaches beyond equivalence and expected-results code: .github/workflows/ci.yml, publication/ledger-seed.json, scripts/publication/verify_lane_isolation.py, the explorer pipeline under _project/scripts/explorer_pipeline/, scripts/generate_corpus_inventory.py, and comment-only edits to an equivalence builder. Green PRs with an external review link therefore waited on one human enqueue each, and one PR (comment-only change to benchbox/core/equivalence/builders/datavault.py) failed soundness-flag purely for lack of the review section.\n\nQuestions to answer:\n- Is the path set too broad? Which entries guard comparator or oracle correctness, and which only reflect that the file is sensitive (CI wiring, data seeds, publication tooling)? Should purely generated-data, comment-only, or docs-only changes be classified differently?\n- Is the review requirement checkable as written? soundness-flag verifies the section's presence and shape, not that a real review exists or covers the final head. Decide whether it should bind the review to the head SHA or reviewer identity.\n- Is a single human enqueue per PR the right control once review evidence is present, or can a narrower, auditable enqueue path exist (for example an attested, head-pinned enqueue after the soundness gate passes) without weakening the gate?\n- Should an agent be able to prepare soundness PRs to the point of enqueue and hand off a ready list, and is that handoff documented?\n- Is the queue and drain reporting (soundness drain digest, green-unmerged sweep) enough to keep reviewed PRs from stalling?\n\nOutput: a short written recommendation per question, and either follow-up items for approved changes or a decision to keep the ceremony as is, with the reason.",
+  "links": [
+    "docs/operations/merge-queue-governance.md",
+    "docs/operations/repo-admin-settings.md",
+    "docs/operations/pr-triage.md",
+    "_project/scripts/auto_merge_soundness_paths.py",
+    ".github/soundness-paths.txt",
+    "scripts/pr_landing.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:58d8f889bff1b41c73ac8118",
+      "at": "2026-10-01T17:04:13Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a6bdad7fd6e5425b9e9dd7f40d81b2e9",
+      "session_id": "be827e2e8463490eb180715f4d7c80a6"
+    }
+  ]
+}

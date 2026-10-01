@@ -16945,6 +16945,13 @@
       "status": "done",
       "title": "Verify remediation across affected instances and downstream consumers"
     },
+    "review-soundness-merge-ceremony": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Review the soundness-path merge ceremony for proportionality and agent-workflow fit"
+    },
     "revisit-extras-naming-topology-e-g-dataframe-pandas-vs-panda": {
       "claim": null,
       "needs": [],
