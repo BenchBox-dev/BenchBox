@@ -608,8 +608,9 @@
   }
  },
  "notes": [
+  "Historical pre-fix baseline recorded before the TPC-DS parity fixes landed; it is not the current gate result. After those fixes the staged gate compares 146 of 198 query-backend cells, classifies 52 as empty-vs-empty, and reports no divergent cells. Run `python -m benchbox.core.equivalence.cross_surface --benchmark tpcds` for the current result.",
   "Q67 passes on pandas only; counted DIVERGENT because both backends must pass.",
   "Q37/Q55 have 0 SQL rows but nonzero DF rows; counted VACUOUS by sql_rows==0 rule with DF over-return noted.",
-  "Source: staged tpcds gate SF=0.01 report; log /tmp/tpcds_baseline_run.log."
+  "Source: staged tpcds gate SF=0.01 report captured during the baseline diagnosis."
  ]
 }
