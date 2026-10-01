@@ -109,6 +109,78 @@ def test_runtime_metrics_only_include_successful_jobs() -> None:
     assert result == (True, 20.0, 45.0)
 
 
+def _partitioned_jobs() -> list[dict]:
+    return [
+        _check("medium-collect", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
+        _check("medium-test (shard 0)", started="2026-07-27T10:03:00Z", completed="2026-07-27T10:18:00Z"),
+        _check("medium-test (shard 1)", started="2026-07-27T10:02:30Z", completed="2026-07-27T10:14:00Z"),
+    ]
+
+
+def _partitioned_result(jobs: list[dict]) -> tuple:
+    runs = [{"id": 42, "name": "CI", "created_at": "2026-07-27T10:00:00Z", "conclusion": "success"}]
+    return metrics.first_pass_green_and_job_seconds(_FakeClient(runs, jobs), "feature/partitions")
+
+
+def test_partitioned_medium_metric_includes_collector_and_wait_without_summing_parallel_shards() -> None:
+    jobs = _partitioned_jobs()
+    jobs.append(_check(metrics.FAST_TEST_JOB_NAME, started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"))
+    assert _partitioned_result(list(reversed(jobs))) == (True, 300.0, 1080.0)
+    assert metrics._medium_budget_warning(1080.0) is None
+
+
+@pytest.mark.parametrize("missing", [0, 1, 2])
+def test_partitioned_medium_metric_requires_collector_and_both_shards(missing: int) -> None:
+    jobs = _partitioned_jobs()
+    jobs.pop(missing)
+    assert _partitioned_result(jobs)[2] is None
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled", "skipped", None])
+def test_partitioned_medium_metric_excludes_censored_observations(index: int, conclusion: str | None) -> None:
+    jobs = _partitioned_jobs()
+    jobs[index]["conclusion"] = conclusion
+    assert _partitioned_result(jobs)[2] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("status", "in_progress"),
+        ("started_at", None),
+        ("completed_at", "invalid"),
+        ("completed_at", "2026-07-27T09:00:00Z"),
+        ("started_at", "2026-07-27T09:00:00Z"),
+    ],
+)
+def test_partitioned_medium_metric_rejects_incomplete_or_invalid_intervals(field: str, value: str | None) -> None:
+    jobs = _partitioned_jobs()
+    jobs[1][field] = value
+    assert _partitioned_result(jobs)[2] is None
+
+
+@pytest.mark.parametrize("name", ["medium-test (shard 0)", "medium-test (shard 2)"])
+def test_partitioned_medium_metric_rejects_duplicate_or_unaccounted_shards(name: str) -> None:
+    jobs = _partitioned_jobs()
+    jobs.append(_check(name, started="2026-07-27T10:03:00Z", completed="2026-07-27T10:25:00Z"))
+    assert _partitioned_result(jobs)[2] is None
+
+
+def test_partitioned_medium_metric_does_not_fall_back_to_stale_literal_job() -> None:
+    jobs = _partitioned_jobs()[:2]
+    jobs.append(_check("medium-test", started="2026-07-27T10:03:00Z", completed="2026-07-27T10:05:00Z"))
+    assert _partitioned_result(jobs)[2] is None
+
+
+def test_partitioned_medium_metric_reaches_existing_timeout_warning() -> None:
+    jobs = _partitioned_jobs()
+    jobs[1]["completed_at"] = "2026-07-27T10:39:00Z"
+    seconds = _partitioned_result(jobs)[2]
+    assert seconds == 2340.0
+    assert "39.0 min" in metrics._medium_budget_warning(seconds)
+
+
 def test_event_fanout_for_pr_fetches_same_head_runs_jobs_and_checks() -> None:
     checks = [
         _check("ci-required-result", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"),

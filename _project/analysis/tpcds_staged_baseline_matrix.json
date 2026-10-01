@@ -1,0 +1,615 @@
+{
+ "benchmark": "tpcds",
+ "scale_factor": 0.01,
+ "backends": [
+  "expression",
+  "pandas"
+ ],
+ "counts": {
+  "DIVERGENT": 71,
+  "VACUOUS": 26,
+  "PASS": 2
+ },
+ "queries": {
+  "1": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q1.0: Row count mismatch. Original: 100, Variant: 2",
+   "pandas": "Q1.0: Row count mismatch. Original: 100, Variant: 2"
+  },
+  "2": {
+   "status": "DIVERGENT",
+   "sql_rows": 1974,
+   "expression": "Q2.0: Row count mismatch. Original: 1974, Variant: 42",
+   "pandas": "Q2.0: Row count mismatch. Original: 1974, Variant: 42"
+  },
+  "3": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "4": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "5": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q5.0: Column count mismatch at row 0. Original: 5, Variant: 6",
+   "pandas": "Q5.0: Column count mismatch at row 0. Original: 5, Variant: 6"
+  },
+  "6": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "7": {
+   "status": "DIVERGENT",
+   "sql_rows": 63,
+   "expression": "Q7.0: Row count mismatch. Original: 63, Variant: 56",
+   "pandas": "Q7.0: Row count mismatch. Original: 63, Variant: 56"
+  },
+  "8": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "9": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q9.0: Value mismatch at row 0, column 0. Original: -169.47546845838, Variant: 39.36634514925373; also columns [1, 2, 3, 4]",
+   "pandas": "Q9.0: Value mismatch at row 0, column 0. Original: -169.47546845838, Variant: 39.36634514925373; also columns [1, 2, 3, 4]"
+  },
+  "10": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "11": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "12": {
+   "status": "DIVERGENT",
+   "sql_rows": 6,
+   "expression": "Q12.0: Column count mismatch at row 0. Original: 7, Variant: 6",
+   "pandas": "Q12.0: Column count mismatch at row 0. Original: 7, Variant: 6"
+  },
+  "13": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q13.0: Value mismatch at row 0, column 3. Original: None, Variant: 0.0",
+   "pandas": "Q13.0: Value mismatch at row 0, column 0. Original: None, Variant: nan; also columns [1, 2, 3]"
+  },
+  "14": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q14.0: Column count mismatch at row 0. Original: 6, Variant: 7",
+   "pandas": "Q14.0: Column count mismatch at row 0. Original: 6, Variant: 7"
+  },
+  "15": {
+   "status": "DIVERGENT",
+   "sql_rows": 5,
+   "expression": "Q15.0: Row count mismatch. Original: 5, Variant: 0",
+   "pandas": "Q15.0: Row count mismatch. Original: 5, Variant: 0"
+  },
+  "16": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q16.0: Value mismatch at row 0, column 1. Original: None, Variant: 0.0; also columns [2]",
+   "pandas": "Q16.0: Value mismatch at row 0, column 1. Original: None, Variant: 0.0; also columns [2]"
+  },
+  "17": {
+   "status": "DIVERGENT",
+   "sql_rows": 2,
+   "expression": "Q17.0: Row count mismatch. Original: 2, Variant: 3",
+   "pandas": "Q17.0: Row count mismatch. Original: 2, Variant: 3"
+  },
+  "18": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q18.0: Column count mismatch at row 0. Original: 11, Variant: 12",
+   "pandas": "Q18.0: Column count mismatch at row 0. Original: 11, Variant: 12"
+  },
+  "19": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q19.0: Row count mismatch. Original: 1, Variant: 0",
+   "pandas": "Q19.0: Row count mismatch. Original: 1, Variant: 0"
+  },
+  "20": {
+   "status": "DIVERGENT",
+   "sql_rows": 27,
+   "expression": "Q20.0: Row count mismatch. Original: 27, Variant: 21",
+   "pandas": "Q20.0: Row count mismatch. Original: 27, Variant: 21"
+  },
+  "21": {
+   "status": "DIVERGENT",
+   "sql_rows": 7,
+   "expression": "Q21.0: Row count mismatch. Original: 7, Variant: 4",
+   "pandas": "Q21.0: Row count mismatch. Original: 7, Variant: 4"
+  },
+  "22": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q22.0: Column count mismatch at row 0. Original: 5, Variant: 6",
+   "pandas": "Q22.0: Column count mismatch at row 0. Original: 5, Variant: 6"
+  },
+  "23": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q23.0: Value mismatch at row 0, column 0. Original: None, Variant: 0.0",
+   "pandas": "Q23.0: Value mismatch at row 0, column 0. Original: None, Variant: 0.0"
+  },
+  "24": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "25": {
+   "status": "DIVERGENT",
+   "sql_rows": 2,
+   "expression": "Q25.0: Row count mismatch. Original: 2, Variant: 0",
+   "pandas": "Q25.0: Row count mismatch. Original: 2, Variant: 0"
+  },
+  "26": {
+   "status": "DIVERGENT",
+   "sql_rows": 37,
+   "expression": "Q26.0: Row count mismatch. Original: 37, Variant: 30",
+   "pandas": "Q26.0: Row count mismatch. Original: 37, Variant: 30"
+  },
+  "27": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q27.0: ORDER BY key mismatch at position 0. Original key: ('AAAAAAAAABAAAAAA', 'TN'), Variant key: ('AAAAAAAAACAAAAAA', 'TN') (order-key columns [0, 1]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q27.0: ORDER BY key mismatch at position 0. Original key: ('AAAAAAAAABAAAAAA', 'TN'), Variant key: ('AAAAAAAAACAAAAAA', 'TN') (order-key columns [0, 1]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "28": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q28.0: Value mismatch at row 0, column 0. Original: 32.0101749271137, Variant: 45.510085714285715; also columns [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]",
+   "pandas": "Q28.0: Value mismatch at row 0, column 0. Original: 32.0101749271137, Variant: 45.510085714285715; also columns [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]"
+  },
+  "29": {
+   "status": "DIVERGENT",
+   "sql_rows": 2,
+   "expression": "Q29.0: Row count mismatch. Original: 2, Variant: 1",
+   "pandas": "Q29.0: Row count mismatch. Original: 2, Variant: 1"
+  },
+  "30": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q30.0: Row count mismatch. Original: 1, Variant: 4",
+   "pandas": "Q30.0: Row count mismatch. Original: 1, Variant: 4"
+  },
+  "31": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "error: \"None of [Index(['ca_county', 'd_year', 'web_q1_q2_increase', 'store_q1_q2_increase',\\n       'web_q2_q3_increase', 'store_q2_q3_increase'],\\n      dtype='str')] are in the [columns]\""
+  },
+  "32": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q32.0: Value mismatch at row 0, column 0. Original: None, Variant: 0.0",
+   "pandas": "Q32.0: Value mismatch at row 0, column 0. Original: None, Variant: 0.0"
+  },
+  "33": {
+   "status": "DIVERGENT",
+   "sql_rows": 15,
+   "expression": "Q33.0: Row count mismatch. Original: 15, Variant: 14",
+   "pandas": "Q33.0: Row count mismatch. Original: 15, Variant: 14"
+  },
+  "34": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q34.0: Row count mismatch. Original: 1, Variant: 3",
+   "pandas": "Q34.0: Row count mismatch. Original: 1, Variant: 3"
+  },
+  "35": {
+   "status": "DIVERGENT",
+   "sql_rows": 54,
+   "expression": "Q35.0: Row count mismatch. Original: 54, Variant: 12",
+   "pandas": "Q35.0: Row count mismatch. Original: 54, Variant: 12"
+  },
+  "36": {
+   "status": "DIVERGENT",
+   "sql_rows": 65,
+   "expression": "Q36.0: Row count mismatch. Original: 65, Variant: 60",
+   "pandas": "Q36.0: Row count mismatch. Original: 65, Variant: 60"
+  },
+  "37": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q37.0: Row count mismatch. Original: 0, Variant: 4",
+   "pandas": "Q37.0: Row count mismatch. Original: 0, Variant: 4"
+  },
+  "38": {
+   "status": "PASS",
+   "sql_rows": 1,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "39": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "40": {
+   "status": "DIVERGENT",
+   "sql_rows": 8,
+   "expression": "Q40.0: Row count mismatch. Original: 8, Variant: 7",
+   "pandas": "error: Invalid comparison between dtype=date32[day][pyarrow] and Timestamp"
+  },
+  "41": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "42": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q42.0: ORDER BY key mismatch at position 0. Original key: (23070.08, 1998, 7, 'Home'), Variant key: (16663.55, 2000, 7, 'Home') (order-key columns [3, 0, 1, 2]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q42.0: ORDER BY key mismatch at position 0. Original key: (23070.08, 1998, 7, 'Home'), Variant key: (16663.55, 2000, 7, 'Home') (order-key columns [3, 0, 1, 2]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "43": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q43.0: Row count mismatch. Original: 1, Variant: 7",
+   "pandas": "Q43.0: Row count mismatch. Original: 1, Variant: 7"
+  },
+  "44": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "45": {
+   "status": "DIVERGENT",
+   "sql_rows": 9,
+   "expression": "Q45.0: Row count mismatch. Original: 9, Variant: 17",
+   "pandas": "Q45.0: Row count mismatch. Original: 9, Variant: 15"
+  },
+  "46": {
+   "status": "DIVERGENT",
+   "sql_rows": 92,
+   "expression": "Q46.0: Row count mismatch. Original: 92, Variant: 0",
+   "pandas": "Q46.0: Row count mismatch. Original: 92, Variant: 0"
+  },
+  "47": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q47.0: Column count mismatch at row 0. Original: 8, Variant: 11",
+   "pandas": "error: 'diff'"
+  },
+  "48": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q48.0: Value mismatch at row 0, column 0. Original: 271, Variant: 396",
+   "pandas": "Q48.0: Value mismatch at row 0, column 0. Original: 271, Variant: 396.0"
+  },
+  "49": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "50": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q50.0: Column count mismatch at row 0. Original: 15, Variant: 7",
+   "pandas": "Q50.0: Column count mismatch at row 0. Original: 15, Variant: 7"
+  },
+  "51": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q51.0: Value mismatch at row 0, column 0. Original: 5, Variant: 7; also columns [1, 2, 3, 4, 5]",
+   "pandas": "Q51.0: Value mismatch at row 0, column 0. Original: 5, Variant: 1; also columns [1, 2, 3, 4, 5]"
+  },
+  "52": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q52.0: ORDER BY key mismatch at position 0. Original key: (1998, 23070.08, 7008009), Variant key: (2000, 16663.55, 'namelessbrand #9') (order-key columns [0, 3, 1]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q52.0: ORDER BY key mismatch at position 0. Original key: (1998, 23070.08, 7008009), Variant key: (2000, 16663.55, 'namelessbrand #9') (order-key columns [0, 3, 1]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "53": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "54": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "55": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q55.0: Row count mismatch. Original: 0, Variant: 1",
+   "pandas": "Q55.0: Row count mismatch. Original: 0, Variant: 1"
+  },
+  "56": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q56.0: Row count mismatch. Original: 1, Variant: 3",
+   "pandas": "Q56.0: Row count mismatch. Original: 1, Variant: 3"
+  },
+  "57": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q57.0: Column count mismatch at row 0. Original: 7, Variant: 10",
+   "pandas": "error: 'diff'"
+  },
+  "58": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "error: single positional indexer is out-of-bounds"
+  },
+  "59": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q59.0: Row count mismatch. Original: 100, Variant: 52",
+   "pandas": "Q59.0: Row count mismatch. Original: 100, Variant: 52"
+  },
+  "60": {
+   "status": "DIVERGENT",
+   "sql_rows": 17,
+   "expression": "Q60.0: ORDER BY key mismatch at position 0. Original key: ('AAAAAAAAACAAAAAA', 17738.73), Variant key: ('AAAAAAAAACAAAAAA', 16560.29) (order-key columns [0, 1]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q60.0: ORDER BY key mismatch at position 0. Original key: ('AAAAAAAAACAAAAAA', 17738.73), Variant key: ('AAAAAAAAACAAAAAA', 16560.29) (order-key columns [0, 1]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "61": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q61.0: ORDER BY key mismatch at position 0. Original key: (None, None), Variant key: (55567.01999999999, 55684.21999999999) (order-key columns [0, 1]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q61.0: ORDER BY key mismatch at position 0. Original key: (None, None), Variant key: (55567.02, 55684.22) (order-key columns [0, 1]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "62": {
+   "status": "DIVERGENT",
+   "sql_rows": 6,
+   "expression": "Q62.0: Value mismatch at row 0, column 3. Original: 77, Variant: 75; also columns [4, 5, 6]",
+   "pandas": "Q62.0: Value mismatch at row 0, column 3. Original: 77, Variant: 75; also columns [4, 5, 6]"
+  },
+  "63": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "64": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q64.0: Row count mismatch. Original: 0, Variant: 92",
+   "pandas": "Q64.0: Row count mismatch. Original: 0, Variant: 80"
+  },
+  "65": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q65.0: Row count mismatch. Original: 0, Variant: 90",
+   "pandas": "Q65.0: Row count mismatch. Original: 0, Variant: 90"
+  },
+  "66": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q66.0: Column count mismatch at row 0. Original: 44, Variant: 32",
+   "pandas": "Q66.0: Column count mismatch at row 0. Original: 44, Variant: 32"
+  },
+  "67": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q67.0: Value mismatch at row 0, column 0. Original: Books, Variant: None; also columns [8]",
+   "pandas": "MATCH",
+   "note": "single-backend match only; both backends required per guardrails"
+  },
+  "68": {
+   "status": "DIVERGENT",
+   "sql_rows": 17,
+   "expression": "Q68.0: Row count mismatch. Original: 17, Variant: 0",
+   "pandas": "Q68.0: Row count mismatch. Original: 17, Variant: 0"
+  },
+  "69": {
+   "status": "DIVERGENT",
+   "sql_rows": 5,
+   "expression": "Q69.0: Row count mismatch. Original: 5, Variant: 8",
+   "pandas": "Q69.0: Row count mismatch. Original: 5, Variant: 8"
+  },
+  "70": {
+   "status": "DIVERGENT",
+   "sql_rows": 3,
+   "expression": "Q70.0: Value mismatch at row 0, column 0. Original: -4485006.79, Variant: -4693922.67",
+   "pandas": "Q70.0: Value mismatch at row 0, column 0. Original: -4485006.79, Variant: -4693922.67"
+  },
+  "71": {
+   "status": "DIVERGENT",
+   "sql_rows": 10,
+   "expression": "Q71.0: Row count mismatch. Original: 10, Variant: 9",
+   "pandas": "Q71.0: Row count mismatch. Original: 10, Variant: 9"
+  },
+  "72": {
+   "status": "DIVERGENT",
+   "sql_rows": 4,
+   "expression": "Q72.0: Row count mismatch. Original: 4, Variant: 7",
+   "pandas": "Q72.0: Row count mismatch. Original: 4, Variant: 7"
+  },
+  "73": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q73.0: Row count mismatch. Original: 0, Variant: 1",
+   "pandas": "Q73.0: Row count mismatch. Original: 0, Variant: 1"
+  },
+  "74": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q74.0: Row count mismatch. Original: 1, Variant: 0",
+   "pandas": "Q74.0: Row count mismatch. Original: 1, Variant: 0"
+  },
+  "75": {
+   "status": "DIVERGENT",
+   "sql_rows": 3,
+   "expression": "Q75.0: Row count mismatch. Original: 3, Variant: 1",
+   "pandas": "Q75.0: Row count mismatch. Original: 3, Variant: 1"
+  },
+  "76": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q76.0: ORDER BY key mismatch at position 0. Original key: ('catalog', 'cs_warehouse_sk', 1998, 1, 'Books'), Variant key: ('catalog', 'cs_bill_customer_sk', 1998, 1, 'Home') (order-key columns [0, 1, 2, 3, 4]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q76.0: ORDER BY key mismatch at position 0. Original key: ('catalog', 'cs_warehouse_sk', 1998, 1, 'Books'), Variant key: ('catalog', 'cs_bill_customer_sk', 1998, 1, 'Home') (order-key columns [0, 1, 2, 3, 4]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "77": {
+   "status": "DIVERGENT",
+   "sql_rows": 8,
+   "expression": "Q77.0: Row count mismatch. Original: 8, Variant: 7",
+   "pandas": "Q77.0: Row count mismatch. Original: 8, Variant: 7"
+  },
+  "78": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q78.0: ORDER BY key mismatch at position 31. Original key: (2000, 26, 498, 50, 55.44, None, 29, 55.87, 32.97, 1.72), Variant key: (2000, 26, 498, 50, 55.44, 0.0, 29, 55.87, 32.97, 1.72) (order-key columns [0, 1, 2, 4, 5, 6, 7, 8, 9, 3]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q78.0: ORDER BY key mismatch at position 31. Original key: (2000, 26, 498, 50, 55.44, None, 29, 55.87, 32.97, 1.72), Variant key: (2000, 26, 498.0, 50.0, 55.44, 0.0, 29.0, 55.87, 32.97, 1.72) (order-key columns [0, 1, 2, 4, 5, 6, 7, 8, 9, 3]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "79": {
+   "status": "DIVERGENT",
+   "sql_rows": 100,
+   "expression": "Q79.0: Row count mismatch. Original: 100, Variant: 21",
+   "pandas": "Q79.0: Row count mismatch. Original: 100, Variant: 18"
+  },
+  "80": {
+   "status": "DIVERGENT",
+   "sql_rows": 22,
+   "expression": "Q80.0: Row count mismatch. Original: 22, Variant: 32",
+   "pandas": "Q80.0: Row count mismatch. Original: 22, Variant: 32"
+  },
+  "81": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q81.0: Row count mismatch. Original: 1, Variant: 9",
+   "pandas": "Q81.0: Row count mismatch. Original: 1, Variant: 9"
+  },
+  "82": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q82.0: Row count mismatch. Original: 0, Variant: 4",
+   "pandas": "Q82.0: Row count mismatch. Original: 0, Variant: 4"
+  },
+  "83": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "84": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q84.0: Row count mismatch. Original: 1, Variant: 0",
+   "pandas": "Q84.0: Row count mismatch. Original: 1, Variant: 0"
+  },
+  "85": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "Q85.0: Row count mismatch. Original: 0, Variant: 1",
+   "pandas": "Q85.0: Row count mismatch. Original: 0, Variant: 1"
+  },
+  "86": {
+   "status": "DIVERGENT",
+   "sql_rows": 60,
+   "expression": "Q86.0: Row count mismatch. Original: 60, Variant: 65",
+   "pandas": "Q86.0: Row count mismatch. Original: 60, Variant: 65"
+  },
+  "87": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q87.0: Value mismatch at row 0, column 0. Original: 514, Variant: 494",
+   "pandas": "Q87.0: Value mismatch at row 0, column 0. Original: 514, Variant: 494"
+  },
+  "88": {
+   "status": "PASS",
+   "sql_rows": 1,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "89": {
+   "status": "DIVERGENT",
+   "sql_rows": 54,
+   "expression": "Q89.0: Row count mismatch. Original: 54, Variant: 0",
+   "pandas": "Q89.0: Row count mismatch. Original: 54, Variant: 0"
+  },
+  "90": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q90.0: ORDER BY key mismatch at position 0. Original key: (nan,), Variant key: (None,) (order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q90.0: ORDER BY key mismatch at position 0. Original key: (nan,), Variant key: (None,) (order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "91": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "92": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q92.0: ORDER BY key mismatch at position 0. Original key: (None,), Variant key: (0.0,) (order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q92.0: ORDER BY key mismatch at position 0. Original key: (None,), Variant key: (0.0,) (order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "93": {
+   "status": "VACUOUS",
+   "sql_rows": 0,
+   "expression": "MATCH",
+   "pandas": "MATCH"
+  },
+  "94": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q94.0: Value mismatch at row 0, column 1. Original: None, Variant: 0.0; also columns [2]",
+   "pandas": "error: Invalid comparison between dtype=date32[day][pyarrow] and Timestamp"
+  },
+  "95": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q95.0: Value mismatch at row 0, column 1. Original: None, Variant: 0.0; also columns [2]",
+   "pandas": "Q95.0: Value mismatch at row 0, column 1. Original: None, Variant: 0.0; also columns [2]"
+  },
+  "96": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q96.0: ORDER BY key mismatch at position 0. Original key: (0,), Variant key: (74,) (order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY).",
+   "pandas": "Q96.0: ORDER BY key mismatch at position 0. Original key: (0,), Variant key: (74,) (order-key columns [0]) - the returned order differs (e.g. a reversed ORDER BY)."
+  },
+  "97": {
+   "status": "DIVERGENT",
+   "sql_rows": 1,
+   "expression": "Q97.0: Value mismatch at row 0, column 0. Original: 5328, Variant: 5098; also columns [1, 2]",
+   "pandas": "Q97.0: Value mismatch at row 0, column 0. Original: 5328, Variant: 5098; also columns [1, 2]"
+  },
+  "98": {
+   "status": "DIVERGENT",
+   "sql_rows": 27,
+   "expression": "Q98.0: Row count mismatch. Original: 27, Variant: 24",
+   "pandas": "Q98.0: Row count mismatch. Original: 27, Variant: 24"
+  },
+  "99": {
+   "status": "DIVERGENT",
+   "sql_rows": 6,
+   "expression": "Q99.0: Value mismatch at row 0, column 3. Original: 198, Variant: 245; also columns [4, 5]",
+   "pandas": "Q99.0: Value mismatch at row 0, column 3. Original: 198, Variant: 245; also columns [4, 5]"
+  }
+ },
+ "notes": [
+  "Q67 passes on pandas only; counted DIVERGENT because both backends must pass.",
+  "Q37/Q55 have 0 SQL rows but nonzero DF rows; counted VACUOUS by sql_rows==0 rule with DF over-return noted.",
+  "Source: staged tpcds gate SF=0.01 report; log /tmp/tpcds_baseline_run.log."
+ ]
+}

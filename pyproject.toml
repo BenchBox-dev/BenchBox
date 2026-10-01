@@ -838,10 +838,12 @@ ignore_rules = [
     # _assemble_simple_duckdb_cell that must remain distinct public names for
     # gate wiring. Shared assembly lives in the helper; residual similarity
     # is benchmark binding arity, not logic.
-    { function_names = ["build_tpcds_duckdb", "build_tpch_duckdb", "build_tpch_skew_duckdb"], path_contains = [
+    { function_names = ["build_tpcds_duckdb", "build_tpch_duckdb", "build_tpch_skew_duckdb", "build_nyctaxi_duckdb", "build_tsbs_devops_duckdb"], path_contains = [
         "benchbox/core/equivalence/builders/tpcds.py",
         "benchbox/core/equivalence/builders/tpch.py",
         "benchbox/core/equivalence/builders/tpch_skew.py",
+        "benchbox/core/equivalence/builders/nyctaxi.py",
+        "benchbox/core/equivalence/builders/tsbs_devops.py",
     ] },
 
     # --- Boilerplate ignore rules added 2026-02-21 (groups G1-G28 from duplicate-check triage) ---
@@ -1045,7 +1047,13 @@ ignore_rules = [
 
     # G6,G19,G30: TPC-DS spec-mandated structurally similar query pairs (Q62/Q99, Q38/Q87)
     # w3-G27: extend with Q7/Q26 spec pair (promotional item-joined fact table aggregation)
-    { function_names = ["q62_expression_impl", "q99_expression_impl", "q38_expression_impl", "q87_expression_impl", "q62_pandas_impl", "q99_pandas_impl", "q7_expression_impl", "q26_expression_impl"], path_contains = ["benchbox/core/tpcds/dataframe_queries/"] },
+    # Q47/Q57: spec-mirrored rolling-average queries (store vs catalog channel);
+    # thin per-query delegations over shared _rolling_average_*_impl helpers.
+    # Q46/Q68: spec-mirrored ticket-household queries (weekend vs day-of-month
+    # window); thin per-query delegations over shared _ticket_household_* helpers.
+    # Q77: three-channel sales-returns; thin family delegations over shared
+    # _sales_returns_rollup_* helpers with per-channel specs.
+    { function_names = ["q62_expression_impl", "q99_expression_impl", "q38_expression_impl", "q87_expression_impl", "q62_pandas_impl", "q99_pandas_impl", "q7_expression_impl", "q26_expression_impl", "q47_expression_impl", "q57_expression_impl", "q47_pandas_impl", "q57_pandas_impl", "q46_expression_impl", "q68_expression_impl", "q77_expression_impl", "q77_pandas_impl"], path_contains = ["benchbox/core/tpcds/dataframe_queries/"] },
 
     # G14: Compression protocol stubs matching canonical implementations
     { function_names = ["compress_file", "decompress_file", "open_for_read"], path_contains = [
