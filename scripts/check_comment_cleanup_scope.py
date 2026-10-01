@@ -708,7 +708,7 @@ DOC_CALL_READERS = {"getdoc", "getsource", "getcomments", "getsourcelines", "cle
 IMPLICIT_DOC_DECORATORS = {"command", "group", "tool", "resource", "prompt"}
 IMPLICIT_HELP_KEYWORDS = {"help", "description"}
 DIRECTIVE_COMMENT = re.compile(r"#\s*(?:noqa|type:\s*ignore|pragma:|fmt:|isort:|ruff:|pylint:|pyright:|mypy:)")
-TODO_COMMENT = re.compile(r"\b(?:TODO|FIXME)\b")
+TODO_COMMENT = re.compile(r"^#+\s*(?:TODO|FIXME)\b(?!\s*\))|(?:#|;|\s{2,})\s*(?:TODO|FIXME)(?:\([^)]*\))?:")
 
 
 def _target_name(value: ast.expr) -> str | None:

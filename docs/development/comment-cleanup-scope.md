@@ -57,9 +57,14 @@ The directive and TODO/FIXME registers are incomplete. A directive or TODO/FIXME
 that is not registered keeps its text: no task may delete it until it is
 registered with its consumer, necessity and owner, or an existing tracker item.
 The validator counts the Python comments that are not yet registered and prints
-the totals; the base has 1,093 directive comments and 35 TODO/FIXME comments in
-Python sources. Other languages need the grammar-aware checker before they can
-be counted.
+the totals; the base has about 1,100 directive comments, and every TODO/FIXME
+marker is registered. A TODO/FIXME marker is a comment that starts with the
+word, or has it after `#`, `;` or two spaces followed by a colon, such as
+`# TODO: link the issue` or `# noqa: E501  TODO: later`. A comment that only
+mentions the word in prose, such as "see the renderer TODO", is an ordinary
+comment that its owner removes with the rest, and the same goes for a mention
+that is part of a sentence. Other languages need the grammar-aware checker
+before they can be counted.
 
 The policy does not create a permanent path ledger. Before dispatch, run the
 validator against the immutable source commit and write the resolved manifest to

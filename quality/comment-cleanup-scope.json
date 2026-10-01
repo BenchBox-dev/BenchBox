@@ -64,7 +64,7 @@
       "selectors": [
         {"path": "benchbox/core/tpcds/__init__.py"},
         {"path": "benchbox/core/tpcds/c_tools.py"},
-        {"path": "benchbox/core/tpcds/compliance.py"},
+        {"path": "benchbox/core/tpcds/compliance.py"}, {"path": "benchbox/core/tpcds/parameter_log.py"},
         {"path": "benchbox/core/tpcds/constants.py"},
         {"path": "benchbox/core/tpcds/maintenance_operations.py"},
         {"path": "benchbox/core/tpcds/maintenance_test.py"},
@@ -1917,7 +1917,8 @@
     }
   ],
   "obligations": [
-    {"path": ".github/workflows/nightly-v2.yml", "token": "TODO: drop the registration guard", "destination": "Drop the quarantine registration guard in the nightly workflow, or record a tracked follow-up first. The quarantine marker is now registered in pytest.ini and pytest-ci.ini, and dlv2-13-durations-budget-quarantine enforces owner, expiry and issue metadata.", "tracker_reference": "dlv2-13-durations-budget-quarantine", "approved_destination": "", "owner": "comment-cleanup-shared-infrastructure", "blocking_disposition": "The trigger condition appears met. The shared-infrastructure owner decides whether to drop the guard; deleting the comment alone earns no credit."}
+    {"path": ".github/workflows/nightly-v2.yml", "token": "TODO: drop the registration guard", "destination": "Drop the quarantine registration guard in the nightly workflow, or record a tracked follow-up first. The quarantine marker is now registered in pytest.ini and pytest-ci.ini, and dlv2-13-durations-budget-quarantine enforces owner, expiry and issue metadata.", "tracker_reference": "dlv2-13-durations-budget-quarantine", "approved_destination": "", "owner": "comment-cleanup-shared-infrastructure", "blocking_disposition": "The trigger condition appears met. The shared-infrastructure owner decides whether to drop the guard; deleting the comment alone earns no credit."},
+    {"path": "benchbox/sql_compat/rules/query_adapter/clickhouse_session_policy.py", "token": "TODO: link GitHub issue documenting the sqlglot AST gap", "destination": "Link the GitHub issue that documents the sqlglot AST gap behind the ClickHouse joined-subquery session policy, or record why none exists in the rules' reason text, then delete the comment. issue_url is a field of SetSessionPolicyPayload and this is the only rule that sets it.", "tracker_reference": "clickhouse-session-policy-link-sqlglot-ast-gap-issue", "approved_destination": "", "owner": "comment-cleanup-sql-compat", "blocking_disposition": "A real action item, not explanation. The sql-compat owner may delete the comment only after the tracked item lands or the reason is recorded; deleting the comment alone earns no credit."}
   ],
   "review_dispositions": [
     {"id": "R1", "disposition": "accepted", "original_verdict": "accepted", "requirements": ["individual-notice-provenance"], "rationale": "Resolve notices in derived first-party material by provenance and governing requirement; no blanket SPDX substitution or legal prose exception.", "acceptance_refs": ["Notice/provenance ledger resolves first-party derived material and upstream exceptions individually, with governing requirement and retained bytes; no wholesale legal or vendor-directory carve-out."], "owner": "comment-cleanup-scope-policy"},

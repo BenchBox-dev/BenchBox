@@ -718,12 +718,32 @@ y = 1  # noqa: E501
 z = 2  # type: ignore[attr-defined]  TODO later
 # FIXME remove
 """
-    assert scope.python_comment_markers(source) == (2, 2)
+    assert scope.python_comment_markers(source) == (2, 1)
     assert scope.python_comment_markers(b"def (:\n") == (0, 0)
     markers = [{"path": "a.py", "directives": 5, "todos": 3}]
     policy["directives"] = [{"path": "a.py", "count": 2}, {"path": "ci.yml", "count": 4}]
     policy["obligations"] = [{"path": "a.py"}, {"path": "nightly.yml"}]
     assert scope.unregistered_markers(markers, policy) == (3, 2)
+
+
+@pytest.mark.parametrize(
+    "comment,counted",
+    [
+        ("# TODO: link the issue", True),
+        ("# TODO(name): link the issue", True),
+        ("# FIXME remove", True),
+        ("#TODO later", True),
+        ("x = 1  # noqa: E501  TODO: later", True),
+        ("# see the renderer-consolidation TODO", False),
+        ("# TODO) only for a divergence", False),
+        ("# Confirmed (TODO w5): only the cells", False),
+        ("# _project/TODO/main/planning/item.yaml", False),
+        ("# the TODO's w4 stays pure", False),
+        ("# Per the tuning-keys TODO: do not add new aliases", False),
+    ],
+)
+def test_todo_counter_counts_marker_comments_and_not_prose_mentions(comment: str, counted: bool) -> None:
+    assert scope.python_comment_markers(f"{comment}\n".encode())[1] == int(counted)
 
 
 def test_facade_imports_are_ambiguous_but_submodule_imports_resolve() -> None:
