@@ -6,7 +6,7 @@ import { type Browser, expect, test } from "@playwright/test";
 
 import {
   compareVisualManifests,
-  pullRequestNumberFromRef,
+  pullRequestNumbers,
   PUBLIC_SITE_CAPTURE_PROFILE,
   type VisualCapture,
   type VisualManifest,
@@ -168,14 +168,16 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
       reason: process.env.APPROVAL_REASON,
       approvedChangeDigests: process.env.APPROVED_VISUAL_CHANGE_DIGESTS,
       changeReason: process.env.VISUAL_CHANGE_APPROVAL_REASON,
-      pullRequestRef: process.env.VISUAL_APPROVAL_PR_REF,
+      pullRequests: process.env.VISUAL_APPROVAL_PULL_REQUESTS,
     },
   );
   const { missing, unexpected, changed, changeDigest } = comparison;
   // The approval entry is what a maintainer records after reviewing the diagnostics, so print it
-  // wherever a change is reported, approved or not. It is bound to this pull request's number.
-  const pullRequest = pullRequestNumberFromRef(process.env.VISUAL_APPROVAL_PR_REF);
-  const approvalEntry = changeDigest && pullRequest ? `${pullRequest}:${changeDigest}` : "";
+  // wherever a change is reported, approved or not. It is bound to a pull request's number: on a
+  // pull request run that is the PR itself, and in a merge group any of the PRs it contains.
+  const pullRequests = pullRequestNumbers(process.env.VISUAL_APPROVAL_PULL_REQUESTS);
+  const approvalEntries = changeDigest ? pullRequests.map((pullRequest) => `${pullRequest}:${changeDigest}`) : [];
+  const approvalEntry = approvalEntries.join(" or ");
   if (changeDigest) console.info("Visual change digest: %s; approval entry: %s", changeDigest, approvalEntry || "(no pull request)");
   const digestHint = changeDigest
     ? `; visual change digest: ${changeDigest}${approvalEntry ? `; approval entry: ${approvalEntry}` : ""}`

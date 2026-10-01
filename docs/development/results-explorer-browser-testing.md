@@ -117,10 +117,13 @@ change by its content and its pull request, not by a commit SHA:
    review note.
 3. Rerun the failed PR workflow, then enqueue the PR.
 
-The merge group recomputes the digest from its own captures and reads the pull
-request number from the name of the queue branch GitHub builds for it
-(`gh-readonly-queue/<base>/pr-<number>-<sha>`), then accepts the change only
-when `<number>:<digest>` is a recorded entry. The digest covers each changed
+The merge group recomputes the digest from its own captures. It lists the pull
+requests the group contains from the commits the group adds on top of its base
+(each squash commit ends with the `(#<number>)` GitHub appends), and accepts the
+change only when `<number>:<digest>` is a recorded entry for one of them. The
+queue can compose several PRs into one group (`max_entries_to_merge`), and the
+queue branch name carries only the last one, so the branch name is not used. The
+digest covers each changed
 capture as baseline digest to new digest, plus each new capture, so it matches
 only the exact change that was reviewed against the exact baseline it was
 reviewed against. It stops matching, and the group fails closed, when the group
@@ -128,6 +131,13 @@ renders a reviewed capture differently, when another change appears, or when the
 base now renders the capture differently. In that case review the new
 diagnostics and record the new entry. A digest never accepts a capture missing
 from the current matrix.
+
+A group's digest covers the whole group's change, so a group in which two or more
+PRs each change what renders matches no single PR's entry and fails closed; it is
+never approved on part of its change. Let such PRs land one at a time: dequeue one
+and enqueue it again after the other merges. If the list of PRs cannot be read in
+full (a commit without a PR number, a truncated or failed comparison), no PR is
+named and no digest approval applies, though the comparison itself still runs.
 
 Because the entry names the pull request, it cannot approve the same pixels in
 another PR, for example one that reapplies a reverted change. It does stay valid

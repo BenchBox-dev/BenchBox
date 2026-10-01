@@ -5,7 +5,7 @@ import {
   hasChangeDigestVisualApproval,
   hasExactHeadVisualApproval,
   PUBLIC_SITE_CAPTURE_PROFILE,
-  pullRequestNumberFromRef,
+  pullRequestNumbers,
   VISUAL_CHANGE_DIGEST_VERSION,
   visualChangeDigest,
   type VisualManifest,
@@ -132,7 +132,8 @@ describe("content-bound visual change approval", () => {
   };
   const reason = "Reviewed the section indexes at all captured widths";
   const prRef = "2385";
-  const groupRef = `refs/heads/gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`;
+  // A merge group can hold several PRs; its members come from the commits the group adds.
+  const groupMembers = "2384 2385 2386";
 
   // What the PR run prints, which a maintainer records after reviewing the diagnostics.
   const digest = compareVisualManifests(baseline, reviewed).changeDigest;
@@ -140,7 +141,7 @@ describe("content-bound visual change approval", () => {
   const approve = (overrides: Record<string, string> = {}) => ({
     approvedChangeDigests: entry,
     changeReason: reason,
-    pullRequestRef: prRef,
+    pullRequests: prRef,
     ...overrides,
   });
 
@@ -150,9 +151,9 @@ describe("content-bound visual change approval", () => {
   });
 
   it("accepts the reviewed change in a merge group that has a different head SHA", () => {
-    // Approved on the PR run, then recomputed from the group's own captures under the group's
-    // branch name, which carries the same pull request number.
-    const result = compareVisualManifests(baseline, reviewed, approve({ pullRequestRef: groupRef }));
+    // Approved on the PR run, then recomputed from the group's own captures. The group holds other
+    // PRs too, none of which change what renders, so the whole group's change is the reviewed one.
+    const result = compareVisualManifests(baseline, reviewed, approve({ pullRequests: groupMembers }));
     expect(result).toMatchObject({
       changed: [],
       unexpected: [],
@@ -163,21 +164,53 @@ describe("content-bound visual change approval", () => {
     });
   });
 
+  it("accepts the reviewed change whichever position its PR has in the group", () => {
+    // The queue branch is named for the last entry only, so the reviewed PR can be any member.
+    for (const members of ["2385", "2385 2390", "2380 2385", "2380 2385 2390"]) {
+      expect(compareVisualManifests(baseline, reviewed, approve({ pullRequests: members })).approvalApplied).toBe(true);
+    }
+  });
+
   it("does not approve the same pixels for a different pull request", () => {
     // The replay scenario: the change is approved, merged and reverted, and another PR reapplies it.
-    for (const ref of ["2386", `gh-readonly-queue/develop/pr-2386-${"a".repeat(40)}`]) {
-      const result = compareVisualManifests(baseline, reviewed, approve({ pullRequestRef: ref }));
+    for (const members of ["2386", "2386 2387", "2386,2387"]) {
+      const result = compareVisualManifests(baseline, reviewed, approve({ pullRequests: members }));
       expect(result.approvalApplied).toBe(false);
       expect(result.changed).toEqual(["/@390"]);
     }
   });
 
+  it("fails closed when a group's change is the union of several reviewed PRs", () => {
+    // Two members each change a different capture. Each has an entry for its own change, but the group's
+    // digest covers both, so it matches neither entry and the group is rejected, not half approved.
+    const second: VisualManifest = {
+      ...reviewed,
+      captures: reviewed.captures.map((capture) =>
+        capture.route === "/docs/" ? { ...capture, digest: "docs-reviewed" } : capture,
+      ),
+    };
+    const firstOnly = compareVisualManifests(baseline, reviewed).changeDigest;
+    const secondOnly = compareVisualManifests(baseline, { ...baseline, captures: second.captures.map((capture) =>
+      capture.route === "/" ? { ...captures[0]! } : capture,
+    ) }).changeDigest;
+    expect(secondOnly).not.toBe("");
+    const result = compareVisualManifests(
+      baseline,
+      second,
+      approve({ pullRequests: "2385 2386", approvedChangeDigests: `2385:${firstOnly} 2386:${secondOnly}` }),
+    );
+    expect(result.approvalApplied).toBe(false);
+    expect(result.changed.length).toBeGreaterThan(1);
+  });
+
   it.each([
-    ["no pull request reference", { pullRequestRef: "" }],
-    ["an unreadable reference", { pullRequestRef: "refs/heads/feature/pr-2385" }],
-    ["a branch that only looks like a queue branch", { pullRequestRef: `gh-readonly-queue/develop/pr-2385-${"a".repeat(39)}` }],
+    ["no pull requests", { pullRequests: "" }],
+    ["a list with an item that is not a number", { pullRequests: "2385 pr-2386" }],
+    ["a list that names the reviewed PR only as a branch", { pullRequests: "refs/heads/feature/pr-2385" }],
+    ["the reviewed PR written with a sign", { pullRequests: "+2385" }],
     ["a bare digest with no pull request", { approvedChangeDigests: digest }],
-    ["an entry with an empty pull request number and no reference", { approvedChangeDigests: `:${digest}`, pullRequestRef: "" }],
+    ["an entry with an empty pull request number and no pull requests", { approvedChangeDigests: `:${digest}`, pullRequests: "" }],
+    ["pull request zero", { approvedChangeDigests: `0:${digest}`, pullRequests: "0" }],
     ["another pull request's entry", { approvedChangeDigests: `2386:${digest}` }],
     ["a missing reason", { changeReason: "" }],
     ["a blank reason", { changeReason: "   " }],
@@ -318,29 +351,33 @@ describe("content-bound visual change approval", () => {
   });
 });
 
-describe("pull request reference", () => {
+describe("pull request numbers", () => {
   it.each([
-    ["2385", "2385"],
-    ["  2385 ", "2385"],
-    [`gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`, "2385"],
-    [`refs/heads/gh-readonly-queue/develop/pr-17-${"0".repeat(40)}`, "17"],
-  ])("reads the number from %s", (ref, expected) => {
-    expect(pullRequestNumberFromRef(ref)).toBe(expected);
+    ["2385", ["2385"]],
+    ["  2385 ", ["2385"]],
+    ["2384 2385 2386", ["2384", "2385", "2386"]],
+    ["2384,2385\n2386", ["2384", "2385", "2386"]],
+    ["2385 2385", ["2385"]],
+  ])("reads %j", (list, expected) => {
+    expect(pullRequestNumbers(list)).toEqual(expected);
   });
 
   it.each([
     undefined,
     "",
+    "   ",
     "0",
     "-5",
     "12abc",
     "pr-2385",
-    `gh-readonly-queue/develop/pr-0-${"a".repeat(40)}`,
-    `gh-readonly-queue/develop/pr-2385-${"A".repeat(40)}`,
-    `gh-readonly-queue/develop/pr-2385-${"a".repeat(41)}`,
-    `gh-readonly-queue/develop/extra/pr-2385-${"a".repeat(40)}`,
-    `feature/gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`,
-  ])("rejects %s", (ref) => {
-    expect(pullRequestNumberFromRef(ref)).toBe("");
+    "2385 pr-2386",
+    "2385 0",
+    "2385 +7",
+    "1e3",
+    "2385.5",
+    `gh-readonly-queue/develop/pr-2385-${"a".repeat(40)}`,
+  ])("reads nothing from %j, so no approval can apply", (list) => {
+    // One unreadable item voids the whole list: a partial list must not grant an approval.
+    expect(pullRequestNumbers(list)).toEqual([]);
   });
 });

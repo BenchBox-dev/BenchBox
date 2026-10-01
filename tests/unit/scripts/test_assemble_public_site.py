@@ -119,7 +119,8 @@ def test_docs_workflow_reuses_assembler_and_binds_visual_approval_to_event_head(
     assert "github.event_name == 'pull_request' && vars.APPROVAL_REASON" in workflow
     assert "APPROVED_VISUAL_CHANGE_DIGESTS: ${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}" in workflow
     assert "VISUAL_CHANGE_APPROVAL_REASON: ${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}" in workflow
-    assert (
-        "VISUAL_APPROVAL_PR_REF: ${{ github.event.pull_request.number || github.event.merge_group.head_ref || '' }}"
-        in workflow
-    )
+    assert "VISUAL_APPROVAL_PULL_REQUESTS: ${{ steps.approval_members.outputs.pull_requests }}" in workflow
+    assert "VISUAL_APPROVAL_PR_REF" not in workflow
+    assert "run: node scripts/resolve-public-site-visual-approval-members.mjs" in workflow
+    assert "APPROVAL_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}" in workflow
+    assert "APPROVAL_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}" in workflow

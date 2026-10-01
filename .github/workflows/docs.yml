@@ -295,6 +295,19 @@ jobs:
         run: node scripts/download-public-site-visual-baseline.mjs
         working-directory: results-explorer
 
+      - name: Resolve pull requests a visual approval may name
+        id: approval_members
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          APPROVAL_EVENT: ${{ github.event_name }}
+          APPROVAL_PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          APPROVAL_BASE_SHA: ${{ github.event.merge_group.base_sha || '' }}
+          APPROVAL_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+        run: node scripts/resolve-public-site-visual-approval-members.mjs
+        working-directory: results-explorer
+
       - name: Compare public site with exact base
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:
@@ -313,8 +326,9 @@ jobs:
           # review time and valid in the merge group, whose head SHA is unknown until the group runs.
           APPROVED_VISUAL_CHANGE_DIGESTS: ${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}
           VISUAL_CHANGE_APPROVAL_REASON: ${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}
-          # The approval is bound to a pull request number: the PR's own, or the one GitHub puts in a merge group's branch name.
-          VISUAL_APPROVAL_PR_REF: ${{ github.event.pull_request.number || github.event.merge_group.head_ref || '' }}
+          # The approval is bound to pull request numbers: the PR's own, or every PR with a commit in the merge
+          # group, because a group can compose several PRs while its branch name carries only the last one.
+          VISUAL_APPROVAL_PULL_REQUESTS: ${{ steps.approval_members.outputs.pull_requests }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 

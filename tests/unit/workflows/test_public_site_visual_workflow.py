@@ -86,13 +86,24 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     # head SHA is unknown until it runs, so only a digest recorded at review time can match it.
     assert run["env"]["APPROVED_VISUAL_CHANGE_DIGESTS"] == "${{ vars.APPROVED_VISUAL_CHANGE_DIGESTS || '' }}"
     assert run["env"]["VISUAL_CHANGE_APPROVAL_REASON"] == "${{ vars.VISUAL_CHANGE_APPROVAL_REASON || '' }}"
-    # The approval is bound to a pull request number: the PR's own, or the one GitHub puts in the name
-    # of the queue branch it builds for a group. Without it a retained approval would authorize the same
-    # pixels in any later PR.
-    assert (
-        run["env"]["VISUAL_APPROVAL_PR_REF"]
-        == "${{ github.event.pull_request.number || github.event.merge_group.head_ref || '' }}"
+    # The approval is bound to pull request numbers: the PR's own, or every PR with a commit in the merge
+    # group. A group can compose several PRs while its branch name carries only the last one, so the
+    # numbers come from the group's commits, not from the branch name. Without a number a retained
+    # approval would authorize the same pixels in any later PR.
+    assert run["env"]["VISUAL_APPROVAL_PULL_REQUESTS"] == "${{ steps.approval_members.outputs.pull_requests }}"
+    assert "VISUAL_APPROVAL_PR_REF" not in run["env"]
+    members = next(step for step in steps if step.get("name") == "Resolve pull requests a visual approval may name")
+    assert members["id"] == "approval_members"
+    assert names.index("Resolve pull requests a visual approval may name") < names.index(
+        "Compare public site with exact base"
     )
+    assert "merge_group" in members["if"] and "pull_request" in members["if"]
+    assert "continue-on-error" not in members
+    assert members["run"] == "node scripts/resolve-public-site-visual-approval-members.mjs"
+    assert members["env"]["APPROVAL_EVENT"] == "${{ github.event_name }}"
+    assert members["env"]["APPROVAL_PR_NUMBER"] == "${{ github.event.pull_request.number || '' }}"
+    assert members["env"]["APPROVAL_BASE_SHA"] == "${{ github.event.merge_group.base_sha || '' }}"
+    assert members["env"]["APPROVAL_HEAD_SHA"] == "${{ github.event.merge_group.head_sha || '' }}"
     assert run["env"]["E2E_PAGES_SHAPED"] == "1"
     assert "public-site-visual" in run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 

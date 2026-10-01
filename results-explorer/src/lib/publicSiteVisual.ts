@@ -26,9 +26,11 @@ export type VisualApproval = {
   // approval from authorizing the same pixels in a different PR, for example after a revert.
   approvedChangeDigests?: string;
   changeReason?: string;
-  // The pull request number, or the merge-queue branch name `gh-readonly-queue/<base>/pr-<n>-<sha>`
-  // that GitHub generates for a group, which carries the number of the PR it was built for.
-  pullRequestRef?: string;
+  // The pull requests this run covers, as whitespace- or comma-separated numbers: the PR itself on a
+  // pull request run, and every PR that has a commit in a merge group. A group can compose several
+  // PRs while its branch name carries only the last one, so the members come from the group's commits.
+  // An approval applies only when one of them has a recorded entry for the group's whole change.
+  pullRequests?: string;
 };
 
 export type VisualComparison = {
@@ -78,20 +80,29 @@ export function visualChangeDigest(
     .digest("hex");
 }
 
-/** The pull request number from a number or a merge-queue branch name, or "" when it cannot be read. */
-export function pullRequestNumberFromRef(ref: string | undefined): string {
-  const value = ref?.trim() ?? "";
-  if (/^[1-9]\d*$/.test(value)) return value;
-  return /^(?:refs\/heads\/)?gh-readonly-queue\/[^/]+\/pr-([1-9]\d*)-[0-9a-f]{40}$/.exec(value)?.[1] ?? "";
+/**
+ * The pull request numbers in a whitespace- or comma-separated list, or [] when the list is empty or
+ * any item is not a plain positive integer. A list that cannot be read in full names no PR, so no
+ * approval applies.
+ */
+export function pullRequestNumbers(list: string | undefined): string[] {
+  const items = (list ?? "").split(/[\s,]+/).filter((item) => item.length > 0);
+  if (items.length === 0 || !items.every((item) => /^[1-9]\d*$/.test(item))) return [];
+  return [...new Set(items)];
 }
 
+/**
+ * Whether one of the covered pull requests has a recorded entry for exactly this change. The digest
+ * covers the whole change in the run, so a merge group in which several PRs change what renders
+ * matches no single PR's entry and fails closed: those PRs must land one at a time.
+ */
 export function hasChangeDigestVisualApproval(approval: VisualApproval | undefined, changeDigest: string): boolean {
   if (!approval || changeDigest.length === 0) return false;
   const reason = approval.changeReason?.trim() ?? "";
-  const pullRequest = pullRequestNumberFromRef(approval.pullRequestRef);
-  if (reason.length === 0 || pullRequest.length === 0) return false;
-  const approved = (approval.approvedChangeDigests ?? "").split(/[\s,]+/).filter((entry) => entry.length > 0);
-  return approved.includes(`${pullRequest}:${changeDigest}`);
+  const members = pullRequestNumbers(approval.pullRequests);
+  if (reason.length === 0 || members.length === 0) return false;
+  const approved = new Set((approval.approvedChangeDigests ?? "").split(/[\s,]+/).filter((entry) => entry.length > 0));
+  return members.some((pullRequest) => approved.has(`${pullRequest}:${changeDigest}`));
 }
 
 export function compareVisualManifests(
