@@ -84,7 +84,9 @@ def _substitute_parameters(template: str, parameters: dict[str, Any], query: str
         if position == 1:
             patterns.append(rf"\[{re.escape(name)}\]")
         template, count = re.subn("|".join(patterns), lambda _match, text=text: text, template)
-        if count == 0:
+        # dsqgen -LOG also reports values a template defines but does not use (Q10 draws ten counties and
+        # uses five), so a defined name is accepted; only a name the template does not define is a typo.
+        if count == 0 and not re.search(rf"\bdefine\s+{re.escape(name)}\s*=", template):
             raise ValueError(f"Query {query} has no substitution for parameter {key!r}")
     return template
 

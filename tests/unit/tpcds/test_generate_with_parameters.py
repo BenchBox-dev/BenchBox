@@ -84,7 +84,7 @@ def test_multi_part_variant_selects_its_part(dsqgen):
     assert sql != dsqgen.generate_with_parameters("39b", {"YEAR.01": 2001, "MONTH.01": 1})
 
 
-@pytest.mark.parametrize("query_id", [8, 39, 44, 89, 93, 98])
+@pytest.mark.parametrize("query_id", [8, 10, 39, 44, 73, 88, 89, 93, 98])
 def test_values_from_a_seed_reproduce_that_seed(dsqgen, query_id):
     values = _logged_values(dsqgen, query_id, seed=7)
     reference = dsqgen.generate(query_id, seed=7)
@@ -100,11 +100,20 @@ def test_malformed_names_are_rejected(dsqgen, name):
         dsqgen.generate_with_parameters(39, {name: 1})
 
 
-@pytest.mark.parametrize("name", ["NOPE.01", "year.01", "YEAR.02"])
-def test_a_name_the_template_does_not_use_is_rejected(dsqgen, name):
-    # Names are case-sensitive, and Q39 has only one YEAR value.
+@pytest.mark.parametrize("name", ["NOPE.01", "year.01"])
+def test_a_name_the_template_does_not_define_is_rejected(dsqgen, name):
+    # Names are case-sensitive.
     with pytest.raises(ValueError, match=f"no substitution for parameter '{name}'"):
         dsqgen.generate_with_parameters(39, {name: 1})
+
+
+def test_a_defined_value_the_template_does_not_use_is_accepted(dsqgen):
+    # Q10 defines ten COUNTY values (and dsqgen -LOG reports ten) but its SQL uses only five.
+    used = _squash(dsqgen.generate_with_parameters(10, {"COUNTY.01": "Aa County"}))
+    with_unused = _squash(dsqgen.generate_with_parameters(10, {"COUNTY.01": "Aa County", "COUNTY.10": "Zz County"}))
+
+    assert "Aa County" in used
+    assert with_unused == used
 
 
 def test_invalid_query_id_is_rejected(dsqgen):
