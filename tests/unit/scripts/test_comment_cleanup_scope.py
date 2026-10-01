@@ -406,6 +406,7 @@ def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers()
     pairs = {(edge["producer"], edge["consumer"]) for edge in edges}
     assert ("benchbox/mcp/tools/visualization.py", "tests/unit/mcp/test_surface_defect_regressions.py") in pairs
     assert ("benchbox/core/tpch/dataframe_queries.py", "benchbox/core/query_catalog.py") in pairs
+    assert ("benchbox/core/benchmark_result_validation.py", "docs/reference/python-api/base.rst") in pairs
 
 
 def _derived_rule(priority: int = 20) -> dict:

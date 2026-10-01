@@ -153,10 +153,14 @@ production readers (`benchbox/core/query_catalog.py`, `benchbox/core/dryrun.py`
 and `benchbox/mcp/tools/benchmark.py`) return `inspect.getsource` of the
 registered DataFrame implementations, so each of the 38 files that define them
 (resolved from the live registry) is a producer for all three. Three tests
-assert that specific docstring text is present. A test that only asserts
-absence or a code token cannot be broken by deleting a comment, so it is not an
-edge. The list is not exhaustive: Click and FastMCP help, Sphinx autodoc and
-readers reached through dynamic names are still the owners' to inventory. Scope validation is limited to ownership, evidence,
+assert that specific docstring text is present. Sphinx autodoc renders the
+docstring of every object named by an `auto*` directive in `docs/`, so each
+defining file, found by importing the object and calling `inspect.getsourcefile`,
+is a producer for the page that names it. A test that only asserts absence or a
+code token cannot be broken by deleting a comment, so it is not an edge. The
+list is not exhaustive: Click and FastMCP help read a docstring in the same
+file, which an edge cannot express, and readers reached through dynamic names
+are still the owners' to inventory. Scope validation is limited to ownership, evidence,
 and dependency data. The checker owns deletion comparison, syntax and parser
 coverage, directive grammar, and strict/report enforcement. Shared tooling owns
 public command and CI wiring.
