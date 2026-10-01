@@ -74,6 +74,10 @@ def parse_dsqgen_parameter_log(log_text: str) -> dict[int, list[TemplateParamete
 
         begin = _DSQGEN_BEGIN_STREAM_RE.match(line)
         if begin:
+            if current_stream is not None:
+                raise ValueError(
+                    f"dsqgen log line {line_number}: BEGIN STREAM {begin.group(1)} before END STREAM {current_stream}"
+                )
             current_stream = int(begin.group(1))
             if current_stream in streams:
                 raise ValueError(f"dsqgen log line {line_number}: stream {current_stream} appears twice")

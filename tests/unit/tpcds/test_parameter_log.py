@@ -105,6 +105,7 @@ class TestParseDsqgenParameterLog:
             "BEGIN STREAM 0\nBEGIN STREAM 0\nEND STREAM 0\n",
             "BEGIN STREAM 0\nTemplate: query1.tpl\n\tnot a parameter line\nEND STREAM 0\n",
             "BEGIN STREAM 0\nTemplate: query1.tpl\nEND STREAM 1\n",
+            "BEGIN STREAM 0\nTemplate: query1.tpl\n\tYEAR.01 = 2000\nBEGIN STREAM 1\nTemplate: query1.tpl\nEND STREAM 1\n",
         ],
     )
     def test_malformed_logs_raise(self, log):

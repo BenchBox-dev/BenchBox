@@ -235,6 +235,11 @@ class DSQGenBinary:
         scale. A stream's values do not depend on how many streams are
         generated, so stream ``n`` is produced by asking dsqgen for ``n + 1``.
 
+        ``stream_id`` is dsqgen's own ``-STREAMS`` stream. ``generate(..., stream_id=n)`` does not
+        select a stream (it renders stream 0), so for ``n > 0`` the values here do not match the
+        SQL ``generate`` returns; render the SQL for stream ``n`` from these values (or with
+        ``generate_dsqgen_streams``) when the two must agree.
+
         Raises:
             TPCDSError: If dsqgen fails or its log lacks the requested stream.
             ValueError: If query_id or stream_id is invalid.
