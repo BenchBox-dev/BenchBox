@@ -43,6 +43,7 @@ from benchbox.core.tpchavoc.equivalence import (
     find_clickhouse_divergences,
 )
 from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+from tests.utilities.optional_engines import chdb_skip_reason
 
 pytestmark = [
     pytest.mark.integration,
@@ -60,7 +61,9 @@ def clickhouse_divergences(tmp_path_factory):
     import-only skip). The executable-variant sweep is the expensive part, so it is
     computed a single time at module scope and shared across the assertions below.
     """
-    pytest.importorskip("chdb", reason="chDB (clickhouse-local) not installed")
+    reason = chdb_skip_reason()
+    if reason is not None:
+        pytest.skip(f"chDB (clickhouse-local) unavailable: {reason}")
     output_dir = tmp_path_factory.mktemp("tpchavoc_ch_equivalence")
     connection, tpchavoc, tpch = build_clickhouse_with_tpch(EQUIVALENCE_SCALE, output_dir)
     try:

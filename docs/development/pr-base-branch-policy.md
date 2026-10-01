@@ -14,9 +14,9 @@ after each parent lands.
 
 Any other base (including a sibling feature branch) is out of policy.
 
-## Why stacked bases get zero CI
+## Why stacked bases used to get zero CI
 
-Almost every PR workflow filters on those integration branches:
+Before the single `ci.yml`, almost every PR workflow filtered on those integration branches:
 
 ```yaml
 on:
@@ -24,32 +24,38 @@ on:
     branches: [develop]   # or release / published-results
 ```
 
-A PR opened against `fix/parent` therefore triggers **no** `pr.yml`, no
-`ci-required-result`, and no browser lane. The GitHub PR page looks calm
-(empty check list) rather than broken, and the change can reach `develop`
-only when the parent merges — never validated on its own and attributed to
-the parent's PR.
+A PR opened against `fix/parent` triggered **no** required checks. The GitHub
+PR page looked calm (empty check list) rather than broken, and the change could
+reach `develop` only when the parent merged — never validated on its own and
+attributed to the parent's PR.
 
-That silence is intentional branch-filter design, not a CI outage. We do
-**not** widen every workflow's branch filter to "support" stacking; that
-would dilute the integration-branch contract and still leave squash-merge
-chains needing rebases.
+`.github/workflows/ci.yml` has **no** `branches:` filter on `pull_request`, so
+a PR against any base now gets the six unit results. We still do not support
+stacking: squash-merge chains need rebases, and running the units against a
+feature base would not validate the tree that lands on `develop`.
 
-## Loud failure: `pr-base-guard.yml`
+## Loud failure: the `base-guard` job
 
-`.github/workflows/pr-base-guard.yml` is the one PR workflow **without** a
-`branches:` filter. It always reports:
+The `base-guard` job in `.github/workflows/ci.yml` runs on every
+`pull_request` and is a `needs` of the `tooling` unit, so a bad base turns the
+required `tooling` check red. It always reports:
 
 - Base is `develop` / `release` / `published-results` → pass in seconds; the
   normal CI lanes apply.
 - Base is anything else → fail with an explicit message to retarget or fold
   into the parent.
 
-It also listens for `edited` so retargeting an open PR re-evaluates (a PR
-opened on `develop` and later pointed at a feature branch must not keep a
-stale green result).
+`ci.yml` also listens for `edited` so retargeting an open PR re-evaluates (a
+PR opened on `develop` and later pointed at a feature branch must not keep a
+stale green result). On a PR against a non-integration base, `tooling` is red
+by design and the other five units still report, which is expected, not a
+separate defect.
 
 Unit pins live in `tests/unit/workflows/test_stacked_pr_base_guard.py`.
+
+`published-results` carries only its own workflow, so the guard does not run
+there. Porting it is a manual maintainer step (see
+`docs/operations/results-phase-2-runbook.md`).
 
 ## After a parent merges
 
@@ -77,12 +83,9 @@ same problem as `dirty` (conflicts) or `blocked` (unfinished gates) on
 `develop`.
 
 On a conflicting PR, GitHub cannot build the merge ref, so `pull_request`
-workflows (`pr.yml` and most other lanes) never start. That is not the same as
-"no workflows at all": `develop-refresh-shadow.yml` and
-`develop-ruleset-drift.yml` use `pull_request_target` against trusted `develop`
-and can still report. Diagnose with `gh pr view <N> --json mergeable` plus the
-expected workflow names — do not infer conflicts, or a filter bug, from an
-empty or partial check list alone.
+workflows, including `ci.yml`, never start and no unit reports. Diagnose with
+`gh pr view <N> --json mergeable` plus the expected check names — do not infer
+conflicts, or a filter bug, from an empty or partial check list alone.
 
 ## Agent checklist
 

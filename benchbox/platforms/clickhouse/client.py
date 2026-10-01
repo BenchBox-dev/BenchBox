@@ -86,16 +86,15 @@ class ClickHouseLocalClient:
     def __init__(self, db_path: str | None = None):
         """Initialize local client with optional persistent storage path."""
         self._initialized = True
+        from ._dependencies import import_chdb, import_chdb_session
+
         # Use persistent session if path provided, otherwise use in-memory connection
         if db_path:
-            from chdb.session import Session
-
+            Session = import_chdb_session().Session
             self._conn = Session(path=db_path)
             self._is_persistent = True
         else:
-            import chdb
-
-            self._conn = chdb.connect()
+            self._conn = import_chdb().connect()
             self._is_persistent = False
 
     def execute(self, query: str, params=None):

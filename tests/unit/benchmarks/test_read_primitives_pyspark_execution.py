@@ -17,12 +17,8 @@ from datetime import date
 
 import pytest
 
-from benchbox.platforms.pyspark import (
-    PYSPARK_AVAILABLE,
-    ensure_compatible_java,
-    get_java_skip_reason,
-    is_java_compatible,
-)
+from benchbox.platforms.pyspark import PYSPARK_AVAILABLE
+from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 
 pytestmark = [
     pytest.mark.unit,
@@ -33,9 +29,8 @@ pytestmark = [
     ),
 ]
 
-_java_version, _java_home = ensure_compatible_java()
-_SKIP_PYSPARK = not PYSPARK_AVAILABLE or not is_java_compatible(_java_version)
-_SKIP_REASON = get_java_skip_reason() or "PySpark tests enabled"
+_SKIP_PYSPARK = not pyspark_usable()
+_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 if PYSPARK_AVAILABLE:
     from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
@@ -240,7 +235,7 @@ def _create_tpch_test_data(spark):
 
 
 @pytest.fixture(scope="module")
-def pyspark_ctx():
+def pyspark_ctx(pyspark_test_environment):
     """Create a PySpark adapter context with TPC-H test data registered."""
     adapter = PySparkDataFrameAdapter(
         master="local[2]",

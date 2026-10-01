@@ -43,7 +43,7 @@ pytestmark = [
 
 
 @pytest.fixture(scope="module")
-def spark(tmp_path_factory):
+def spark(tmp_path_factory, pyspark_test_environment):
     """Module-scoped real Spark session with Delta support."""
     warehouse = tmp_path_factory.mktemp("delta_clickhouse_warehouse")
     session = make_delta_spark_session(warehouse, app_name="benchbox-delta-clickhouse")

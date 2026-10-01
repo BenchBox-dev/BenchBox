@@ -1,0 +1,9 @@
+{
+  "manifest_version": "1.0",
+  "fixture_bundle": "tpch-polars-sf0.01-20260824-51ccc406.json",
+  "source_bundle": "results-data/bundles/tpch_sf001_polars_df_20260824_074104_51ccc406.json",
+  "bundle_hash": "4127b1b242b0e6f77ff78ba9f103bce8b9d3adada7aac6d5b8e6a3bbb0af6cbf",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "note": "Genuine TPC-H SF 0.01 power run (partial query subset); byte-for-byte copy of the source bundle."
+}
