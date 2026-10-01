@@ -1,10 +1,12 @@
-"""Pin CONTRIBUTING.md to the post-#1567/#1592 auto-merge enablement policy.
+"""Pin CONTRIBUTING.md to the arm-the-exact-head, monitor-to-merge policy.
 
-``make pr-open`` withholds auto-merge; arming is explicit via ``make pr-ready``
-or ``make pr-open READY=1`` when reusing an already-open, reviewed PR (the only arm paths — the workflow is revoke-only
-since auto-merge-policy-consolidation-2026-08-06, D2). CONTRIBUTING used to
-teach the opposite (``gh pr merge --auto --squash`` as part of pr-open). This
-module is a cheap docs contract so that drift fails in the fast unit lane.
+A PR is done when it is merged. The author arms the exact head with
+``gh pr merge <n> --squash --match-head-commit <head>`` and monitors the queue; a
+push after arming is handled by arming the new head, not by holding PRs back.
+``auto-merge-on-open.yml`` is revoke-only. CONTRIBUTING used to teach that
+``make pr-open`` withholds auto-merge until a human runs ``make pr-ready``, which
+turned every green PR into a hand-back. This module is a cheap docs contract so
+that drift back to that wording fails in the fast unit lane.
 """
 
 from __future__ import annotations
@@ -37,11 +39,22 @@ def test_contributing_does_not_claim_pr_open_arms_auto_merge(contributing_text: 
     assert "open the PR with auto-merge in one shot" not in contributing_text
 
 
-def test_contributing_documents_withhold_and_reviewed_reuse_arm_path(contributing_text: str) -> None:
-    """Finished-branch path must stay documented: pr-ready / reviewed reuse / withhold."""
-    for required in ("withhold", "pr-ready", "READY=1"):
-        assert required in contributing_text, f"CONTRIBUTING missing arm cue {required!r}"
-    assert "reuses an already-open, reviewed PR" in contributing_text
-    assert "newly created PR remains held until review" in contributing_text
-    # The workflow must be documented as revoke-only: no draft→ready arm path.
-    assert "revoke-only" in contributing_text
+def test_contributing_documents_arming_the_exact_head_and_monitoring_to_merge(contributing_text: str) -> None:
+    """The finished-branch path is: arm the exact head, then monitor until merged."""
+    contributing_text = " ".join(contributing_text.split())  # tolerate reflowed lines
+    for required in (
+        "--match-head-commit",
+        "monitor to merge",
+        "You are done when the PR is merged",
+        "[WRITE-CLOSEOUT-001]",
+    ):
+        assert required in contributing_text, f"CONTRIBUTING missing cue {required!r}"
+    # The workflow is documented as revoke-only: there is no draft-to-ready arm path.
+    assert "only revokes and never arms" in contributing_text
+
+
+def test_contributing_does_not_teach_holding_a_finished_pr(contributing_text: str) -> None:
+    """No wording that withholds auto-merge or waits for a human to mark a PR ready."""
+    lowered = contributing_text.lower()
+    for forbidden in ("withhold", "remains held", "stays held", "when the branch is final", "marked final"):
+        assert forbidden not in lowered, f"CONTRIBUTING still teaches holding a finished PR: {forbidden!r}"

@@ -104,16 +104,41 @@ PROJECT_REVIEW_ANCHORS = {
 AGENT_REVIEW_ANCHORS = {"REVIEW-AUTH-001": ("zero tracked worktree-content changes", "do not review and then edit")}
 AGENT_WRITE_ANCHORS = {
     "WRITE-CLOSEOUT-001": (
-        "authorized write workflow closes at a named branch",
+        "authorized write workflow closes at a merged pull request",
         "make pr-open",
-        "auto-merge stays withheld until",
-        "make pr-ready",
-        "required close-out steps of write authorization, not separate permissions",
+        "match-head-commit",
+        "monitor to merge",
+        "close-out steps are part of write authorization, not separate permissions",
+        "never hand a green, reviewed pr back",
+        "owner-only action",
         "do not stop before",
         "explicitly forbids publication",
         "authorizes only a local commit",
         "gate fails",
     )
+}
+# Agent-facing text must not tell an agent or operator to stop and hand a finished PR back to a
+# human. A PR that passed its checks and required review is merged by the agent; the narrow cases
+# that do need a human are the owner-only list in [WRITE-CLOSEOUT-001], and a line that names one is
+# exempt. Scripts that print guidance (Makefile, pr_landing.py) are added to this list as they are fixed.
+HANDBACK_TEXT = (
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    ".claude/commands/*.md",
+    "docs/agent/*.md",
+    "docs/development/development.md",
+)
+HANDBACK_EXEMPT_MARKER = "owner-only"
+HANDBACK_PATTERNS = {
+    "auto-merge withheld": r"\bauto-merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
+    "withheld until": r"\bwithheld until\b",
+    "mark a PR ready": r"\bmark(?:ing|ed)?\s+(?:the\s+|a\s+|an\s+)?(?:pr|pull request)s?\b[^.\n]{0,40}\bready\b",
+    "decisions are yours": r"\bdecisions?\s+(?:are|is)\s+yours\b",
+    "pending is terminal": r"\bpending is terminal\b",
+    "do not poll CI": r"\bdo not poll ci\b",
+    "run make pr-ready when": r"\brun\s+[`'\"]?make pr-ready[`'\"]?\s+when\b",
+    "PR stays held": r"\bpr (?:created and held|stays held|remains held)\b",
+    "when the branch is final": r"\bwhen the branch is final\b",
 }
 CODE_REVIEW_RULE_ANCHORS = (
     "Do not report commit identity.",
@@ -607,6 +632,29 @@ def audit_docs_placement(project: Path) -> list[str]:
     return errors
 
 
+def audit_handback_wording(project: Path) -> list[str]:
+    """Fail agent-facing text that hands a finished PR back to a human."""
+    errors: list[str] = []
+    compiled = {label: re.compile(pattern, re.IGNORECASE) for label, pattern in HANDBACK_PATTERNS.items()}
+    paths: list[Path] = []
+    for entry in HANDBACK_TEXT:
+        paths.extend(sorted(project.glob(entry)))
+    for path in paths:
+        if not path.is_file():
+            continue
+        relative = path.relative_to(project).as_posix()
+        for number, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1):
+            if HANDBACK_EXEMPT_MARKER in line.casefold():
+                continue
+            for label, pattern in compiled.items():
+                if pattern.search(line):
+                    errors.append(
+                        f"{relative}:{number} tells a reader to hand a finished PR back ({label}); "
+                        "arm and merge it, or name the owner-only action that needs a human"
+                    )
+    return errors
+
+
 def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     """Run every non-Git check and return its errors tagged with the check name.
 
@@ -667,6 +715,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
     policy_text = _read(project, "AGENTS.md") + "\n" + _read(project, ACTIVE_REVIEW_PROTOCOL)
     errors.extend(_tag("review-policy", audit_review_policy(project)))
     errors.extend(_tag("docs-placement", audit_docs_placement(project)))
+    errors.extend(_tag("handback", audit_handback_wording(project)))
     errors.extend(_tag("commit-policy", audit_commit_policy(project)))
     errors.extend(_tag("dependency-caps", audit_dependency_caps(project)))
     errors.extend(_tag("scenarios", audit_scenarios(corpus["scenarios"], policy_text)))

@@ -48,7 +48,7 @@ Required CI on `develop` reports six unit results (`core`, `explorer`, `results-
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready`; `make pr-open READY=1` may arm only when it reuses an already-open, reviewed PR. A newly created PR remains held until review; then walk away — don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it for its exact head with `gh pr merge <n> --squash --match-head-commit "$(git rev-parse HEAD)"`; the merge queue lands it when its checks are green. You are done when the PR is merged, not when it is open or green: re-enqueue after a spurious ejection and fix and push after a real failure. Stop and hand back only for an owner-only action (see `AGENTS.md` `[WRITE-CLOSEOUT-001]`).
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -78,30 +78,25 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
    git commit -m "fix: resolve race in foo loader"
    ```
 
-4. **Run the local preflight, then open the PR (auto-merge withheld):**
+4. **Run the local preflight, then open the PR:**
 
    ```bash
    make pr-preflight      # local lint + path-aware content guard / fast tests
-   make pr-open           # push + gh pr create --base develop (does NOT arm auto-merge)
+   make pr-open           # push + gh pr create --base develop
    ```
 
-   `make pr-open` refuses to run from `develop` or `release`. The PR stays open without auto-merge so you can push follow-ups safely.
+   `make pr-open` refuses to run from `develop` or `release`.
 
-5. **When the branch is final, run the readiness transaction** (hands-free finish path):
+5. **Arm it and monitor until it merges:**
 
    ```bash
-   make pr-ready PR=123 HEAD=$(git rev-parse HEAD) EVIDENCE=/tmp/readiness.json
-   # Or reuse an already-open, reviewed PR and arm it in one step:
-   # make pr-open READY=1 EVIDENCE=/tmp/readiness.json
+   gh pr merge 123 --squash --match-head-commit "$(git rev-parse HEAD)"   # enqueue the exact head
    ```
 
-   The evidence file must declare `delivery_mode` (`serial` or `batch`); batch
-   mode must include the complete prepared-batch binding. `make pr-ready` (or
-   `READY=1` while reusing an already-open, reviewed PR) is the only arm path:
-   `auto-merge-on-open.yml` is revoke-only and never arms. Once the exact readiness transaction passes, the PR
-   squash-merges when required checks turn green — don't poll.
-   Soundness-critical paths and the `no-auto-merge` hold label stay withheld
-   pending review (see `docs/operations/repo-admin-settings.md`).
+   A push after arming runs the checks again; arm the new head. `make pr-ready` remains only for
+   delivering a prepared batch, where its evidence file must declare `delivery_mode` and the complete
+   prepared-batch binding; a single PR does not need it. `auto-merge-on-open.yml` only revokes and never
+   arms. The `no-auto-merge` label is a deliberate opt-out (see `docs/operations/repo-admin-settings.md`).
 
 6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 

@@ -72,6 +72,15 @@ def _candidate(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _with_repo_file(project: Path, relative: str) -> Path:
+    """Copy one repository file into a candidate project and return its path there."""
+    target = project / relative
+    if not target.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / relative, target)
+    return target
+
+
 def test_repository_candidate_passes() -> None:
     metrics, errors = audit(ROOT, CORPUS)
     assert errors == []
@@ -139,12 +148,13 @@ def test_project_commit_coauthor_consent_drift_fails(tmp_path: Path) -> None:
 def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
-    agents.write_text(
-        agents.read_text().replace(
-            "required close-out steps of write authorization, not separate permissions",
-            "optional suggestions that require separate user approval",
-        )
+    pattern = re.compile(
+        r"close-out\s+steps\s+are\s+part\s+of\s+write\s+authorization,\s+not\s+separate\s+permissions",
+        re.IGNORECASE,
     )
+    content, count = pattern.subn("optional suggestions that require separate user approval", agents.read_text())
+    assert count == 1
+    agents.write_text(content)
     _, errors = audit(project, CORPUS)
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
 
@@ -156,18 +166,68 @@ def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
         "authorizes only a local commit",
         "gate fails",
         "do not stop before",
+        "match-head-commit",
+        "monitor to merge",
+        "owner-only action",
+        "never hand a green, reviewed PR back",
+        "closes at a merged pull request",
     ],
 )
 def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: str) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
     content = agents.read_text()
-    pattern = re.compile(r"\s+".join(re.escape(w) for w in phrase.split()))
+    pattern = re.compile(r"\s+".join(re.escape(w) for w in phrase.split()), re.IGNORECASE)
     new_content, count = pattern.subn("deleted constraint", content)
     assert count > 0, f"Pattern {phrase} was not found in AGENTS.md"
     agents.write_text(new_content)
     _, errors = audit(project, CORPUS)
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
+
+
+def test_agent_facing_text_does_not_hand_a_finished_pr_back() -> None:
+    """The repository's own instructions must not tell anyone to stop with a green PR."""
+    assert agent_instruction_audit.audit_handback_wording(ROOT) == []
+
+
+HANDBACK_LINES = [
+    "Auto-merge stays withheld until `make pr-ready`.",
+    "Mark PR 12 ready when CI is green.",
+    "Then mark the pull request as ready for the queue.",
+    "The next decisions are yours:",
+    "Do not poll CI: pending is terminal.",
+    "Run 'make pr-ready' when the branch is final.",
+    "A newly created PR stays held until review.",
+]
+
+
+@pytest.mark.parametrize("line", HANDBACK_LINES)
+@pytest.mark.parametrize(
+    "target",
+    [
+        "AGENTS.md",
+        "CONTRIBUTING.md",
+        ".claude/commands/pr.md",
+        "docs/agent/review-protocol.md",
+        "docs/development/development.md",
+    ],
+)
+def test_handback_wording_fails_in_every_scanned_location(tmp_path: Path, line: str, target: str) -> None:
+    project = _candidate(tmp_path)
+    path = _with_repo_file(project, target)
+    path.write_text(path.read_text() + "\n" + line + "\n")
+    _, errors = audit(project, CORPUS)
+    assert any(error.startswith("handback:") and target in error for error in errors), errors
+
+
+def test_handback_line_naming_an_owner_only_action_is_exempt(tmp_path: Path) -> None:
+    project = _candidate(tmp_path)
+    contributing = _with_repo_file(project, "CONTRIBUTING.md")
+    contributing.write_text(
+        contributing.read_text()
+        + "\nAn owner-only ruleset change: mark the PR ready only after the owner applies it.\n"
+    )
+    assert agent_instruction_audit.audit_handback_wording(project) == []
 
 
 def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
