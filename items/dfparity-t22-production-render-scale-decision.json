@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "An impact statement lists affected platforms, entry points and published results",
+    "The owner's decision is recorded; if change is approved, get_queries renders at the data scale with a migration note for baselines and tests",
+    "If no change, the inconsistency between get_query and get_queries is documented"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T22). Separate from the gate-only change in dfparity-t03. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Production TPC-DS SQL runs at SF!=1 use SF=1 dsqgen parameters because runner.get_queries (benchbox/core/tpcds/benchmark/runner.py:235) takes no scale, while runner.get_query renders at the data's scale. Callers: platforms/base/execution.py ~1033-1049, tpcds/power_test.py:217, tpcds/throughput_test.py:423 (whether query_kwargs carries a scale is unverified). Changing it alters the queries every SQL platform runs, so baselines and published comparability change. Produce an impact statement (which stored results and published comparisons use SF!=1 TPC-DS), then implement the owner's decision D1, or record 'no change' with reason.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:08:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b81d9c8445034ddb862b94d08810ab20",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}

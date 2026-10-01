@@ -6140,6 +6140,15 @@
       "status": "open",
       "title": "Investigate the TPC-H seeded-run reference-seed path (owner-contested; verify before any change)"
     },
+    "dfparity-t22-production-render-scale-decision": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide whether production TPC-DS get_queries should render at the data's scale"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
