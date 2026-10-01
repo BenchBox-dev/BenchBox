@@ -6113,15 +6113,10 @@
       "title": "Resolve the latent Q70 top-5 state filter in both DataFrame families"
     },
     "dfparity-t09-q98-limit": {
-      "claim": {
-        "expires_at": "2026-10-02T16:01:12Z",
-        "generation": "1fdd5565a9004057b263342a515f4761",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "open",
       "title": "Reproduce and fix Q98 DataFrame returning 100 rows where SQL has no LIMIT"
     },
     "dfparity-t10-polars-null-setops": {
