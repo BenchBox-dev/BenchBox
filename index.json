@@ -6143,15 +6143,10 @@
       "title": "Fix NULL ordering in Q71 and Q76 DataFrame implementations against the explicit ORDER BY"
     },
     "dfparity-t13-pandas-q78-perf": {
-      "claim": {
-        "expires_at": "2026-10-02T16:44:19Z",
-        "generation": "f7da6d0a05684700bf04b90f38fa2d98",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Fix pandas Q78 performance (14 s at SF=0.1, over 180 s at SF=1)"
     },
     "dfparity-t14-divergence-classifier": {
