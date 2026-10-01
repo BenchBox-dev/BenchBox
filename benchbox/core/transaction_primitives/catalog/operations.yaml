@@ -235,6 +235,9 @@ operations:
     expected_rows: 1
   cleanup_sql: "DELETE FROM txn_orders WHERE o_orderkey BETWEEN 9990001 AND 9990010\n"
   expected_rows_affected: 10
+  platform_overrides:
+    snowflake: "BEGIN TRANSACTION;\nINSERT INTO txn_orders\nWITH order_data AS (\n  SELECT 9990000 + n AS o_orderkey,\n         1 AS o_custkey,\n         'O' AS o_orderstatus,\n         1000.0 * n AS o_totalprice,\n         DATE '1998-01-01' AS o_orderdate,\n         '5-LOW' AS o_orderpriority,\n         'Clerk#000000001' AS o_clerk,\n         0 AS o_shippriority,\n         'cte_test' AS o_comment\n  FROM (SELECT unnest(generate_series(1, 10)) AS n) t\n)\nSELECT * FROM order_data;\nUPDATE txn_orders SET o_totalprice = o_totalprice * 2 WHERE o_orderkey BETWEEN 9990001 AND 9990010;\nCOMMIT;\n"
+    bigquery: "BEGIN TRANSACTION;\nINSERT INTO txn_orders\nWITH order_data AS (\n  SELECT 9990000 + n AS o_orderkey,\n         1 AS o_custkey,\n         'O' AS o_orderstatus,\n         1000.0 * n AS o_totalprice,\n         DATE '1998-01-01' AS o_orderdate,\n         '5-LOW' AS o_orderpriority,\n         'Clerk#000000001' AS o_clerk,\n         0 AS o_shippriority,\n         'cte_test' AS o_comment\n  FROM (SELECT unnest(generate_series(1, 10)) AS n) t\n)\nSELECT * FROM order_data;\nUPDATE txn_orders SET o_totalprice = o_totalprice * 2 WHERE o_orderkey BETWEEN 9990001 AND 9990010;\nCOMMIT;\n"
 - id: transaction_nested_subquery_updates
   category: advanced
   description: Tests UPDATE with nested subqueries within transaction

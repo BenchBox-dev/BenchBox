@@ -70,34 +70,34 @@ publication-help:
 
 test-all:
 	@echo "Running non-resource-heavy tests in parallel..."
-	uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not (slow or stress or resource_heavy or live_integration)" --timeout=300
 	@echo "Running slow and resource-heavy tests serially..."
-	uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "(slow or resource_heavy) and not (stress or live_integration)" -n 0 --timeout=1200
 
 test-unit:
-	uv run -- python -m pytest -m "unit" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "unit" --tb=short
 
 test-integration:
-	uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "integration and not live_integration and not stress" --tb=short
 
 test-tpch:
-	uv run -- python -m pytest -m "tpch" --tb=short
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "tpch" --tb=short
 
 # Curated lightweight smoke lane
 test-quick:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
 
 # Verbose test output for all tests
 test-verbose:
-	uv run -- python -m pytest -v
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v
 
 # Enhanced pytest commands using comprehensive marker system
 test-pytest:
-	uv run -- python -m pytest -m "not stress"
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not stress"
 
 # Speed-based testing
 test-fast:
-	uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
 test-unlock:
 	@LOCK_DIR="$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}"; \
@@ -109,26 +109,26 @@ test-unlock:
 	python3 scripts/local_validation.py clear-test-lock "$$LOCK_PATH"
 
 test-medium:
-	uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
+	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "medium and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=60 -n 5
 
 test-medium-selected:
 	@set -eu; \
 	OUTPUT=$$(mktemp); \
 	trap 'rm -f "$$OUTPUT"' EXIT; \
-	uv run -- python scripts/canary_impact.py \
+	BENCHBOX_TEST_TIER=t2 uv run -- python scripts/canary_impact.py \
 		--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \
 		--marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" --cant-affect-list empty \
 		--product-code-only --run-selected --output "$$OUTPUT"
 
 test-slow:
-	uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "slow and not (stress or live_integration)" -n 0 --tb=short -v --timeout=1200
 
 test-stress:
-	uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
+	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
 # Development cycle testing using the curated fast unit subset
 test-dev:
-	uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
 
 # Smoke tests (alias for test-quick)
 test-smoke: test-quick
@@ -251,7 +251,7 @@ coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
 # Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (datavault remains staged) and run in the blocking correctness-gate (pr.yml);
+# In GATES (datavault remains staged) and run in the blocking correctness-gate (ci.yml);
 # exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
 # classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
@@ -259,7 +259,7 @@ clickbench-cross-surface-equivalence-report:
 
 # Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
 # cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
-# (pr.yml); exits non-zero on any unclassified divergence (see
+# (ci.yml); exits non-zero on any unclassified divergence (see
 # _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic
@@ -662,7 +662,7 @@ skill-sync-check:
 	fi; \
 	echo "skill-sync-check: tracked mirror up to date."
 
-# Fail-closed local counterpart of pr.yml's required skill-integrity job. The
+# Fail-closed local counterpart of ci.yml's required skill-integrity job. The
 # tool pin comes from the same policy module as CI; the vendored wrapper
 # needs no network, no Node, and no build, so verification runs directly
 # against the committed payload. A missing wrapper is a hard failure.
@@ -773,14 +773,14 @@ guards-fix:
 # These targets mirror GitHub Actions workflows for local validation
 
 # CI lint check - superset covering both lint.yml (release-branch gate) and
-# the pr.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
+# the ci.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
 # few extra local-only conveniences (lint-explorer-tokens,
 # lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
-# pr.yml `lint` job runs (after dependency install) must also run here at the
+# ci.yml `lint` job runs (after dependency install) must also run here at the
 # COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
 # docs/operations/ci-local-parity.md.
 #
-# Report-all: mirrors pr.yml's `lint-guard-summary` design. Every guard runs
+# Report-all: mirrors ci.yml's `lint-guard-summary` design. Every guard runs
 # to completion in one pass (no stopping at the first failure) with its
 # output streamed live as it runs; failures are collected into `failed` and
 # a single consolidated FAILED-guards list prints at the end, with a
@@ -856,6 +856,8 @@ ci-lint:
 	fi; \
 	uv run -- python _project/scripts/timing_policy_check.py --strict; \
 	[ $$? -eq 0 ] || failed="$$failed timing-policy"; \
+	uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \
+	[ $$? -eq 0 ] || failed="$$failed fast-lane-ceiling"; \
 	uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \
 	[ $$? -eq 0 ] || failed="$$failed uat-loc-table"; \
 	$(MAKE) compat-docs-check; \
@@ -902,11 +904,11 @@ ci-test:
 	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
-# CI docs build - exact match for docs.yml workflow
+# CI docs build - exact match for the ci.yml docs-build job
 ci-docs:
 	@echo "Running CI docs checks..."
 	@$(MAKE) docs-validate
-	@cd docs && uv run sphinx-build -b html --keep-going . _build/html
+	@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html
 	@echo "✅ CI docs build passed"
 
 # Security audit - exact match for test.yml security job
@@ -1020,7 +1022,7 @@ ci-local:
 	@echo "========================================"
 
 # --- Apple container Linux CI-parity sandbox (opt-in; Apple silicon + macOS 26) ---
-# Reproduce the Linux pr.yml gate locally inside a `container machine`. Motivated by a
+# Reproduce the Linux ci.yml gate locally inside a `container machine`. Motivated by a
 # MEASURED macOS<->Linux divergence: on identical DuckDB 1.3.2/arm64, TPC-H Q2/Q10/Q15
 # value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
 # silicon (the pinned digest references are Linux-generated). This wrapper is the only way
@@ -1187,13 +1189,13 @@ release-cut: .release-cut-tree-required
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
 	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	git rm -f --ignore-unmatch tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py
-	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
+	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
 	git rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py
 	@# The v0.4.1 release PR exposed these tests for PR landing, worktree, queue, tracker,
 	@# publication, and submission-workflow tooling; they import or read curated-away paths.
 	git rm -f --ignore-unmatch tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_timing_policy_modes.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
@@ -1288,6 +1290,21 @@ release-finalize:
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
+# Tag-on-develop release flow. release-prep produces one ordinary PR diff (version
+# markers, uv.lock, CHANGELOG draft); release-check verifies the pre-tag state and
+# runs in the required CI classifier for release-content changes. Neither target
+# touches the release-cut path above or enables develop-tag publication.
+# Usage: make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
+#        make release-check VERSION=X.Y.Z
+.PHONY: release-prep release-check
+release-prep:
+	@test -n "$(VERSION)" || (echo "Usage: make release-prep VERSION=X.Y.Z" && exit 1)
+	uv run --frozen -- python scripts/release_flow.py prep --version "$(VERSION)" $(if $(SINCE_REF),--since-ref "$(SINCE_REF)",)
+
+release-check:
+	@test -n "$(VERSION)" || (echo "Usage: make release-check VERSION=X.Y.Z" && exit 1)
+	uv run --locked -- python scripts/release_flow.py check --version "$(VERSION)" $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
+
 # =============================================================================
 # PR + worktree workflow
 # Solo-dev develop is PR-gated (CI must be green; linear history; squash).
@@ -1295,7 +1312,7 @@ release-finalize:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests lane-isolation-check pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1429,18 +1446,6 @@ pr-preflight-medium-tests:
 # that exact artifact instead of reimplementing path classification or asking
 # the working tree to infer a base. Keep it in the content guard, where
 # PATH_LISTS is mandatory and the caller has already selected the PR lanes.
-lane-isolation-check:
-	@set -eu; \
-	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required" >&2; exit 2; }; \
-	[ -d "$(PATH_LISTS)" ] || { echo "PATH_LISTS directory not found: $(PATH_LISTS)" >&2; exit 2; }; \
-	CHANGED_PATHS="$(PATH_LISTS)/changed.txt"; \
-	[ -s "$$CHANGED_PATHS" ] || { echo "non-empty changed paths artifact is required: $$CHANGED_PATHS" >&2; exit 2; }; \
-	status=0; \
-	for lane in site explorer corpus; do \
-		uv run -- python scripts/publication/verify_lane_isolation.py --lane "$$lane" --changed-paths-file "$$CHANGED_PATHS" || status=$$?; \
-	done; \
-	exit "$$status"
-
 # Local validation singleflight. Runs CMD once per identical validated input
 # across worktrees; identical repeats reuse the recorded receipt instead of
 # re-executing and colliding on the shared test lock. Receipts never certify
@@ -1506,7 +1511,6 @@ pr-followup-resume:
 pr-content-guard:
 	@set -eu; \
 	[ -n "$(PATH_LISTS)" ] || { echo "PATH_LISTS is required"; exit 2; }; \
-	$(MAKE) -s lane-isolation-check PATH_LISTS="$(PATH_LISTS)"; \
 	EXISTING=$$(mktemp); \
 	trap 'rm -f "$$EXISTING"' EXIT; \
 	$(MAKE) artifact-hygiene; \

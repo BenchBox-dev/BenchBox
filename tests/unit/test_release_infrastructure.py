@@ -206,7 +206,7 @@ class TestReleaseInfrastructure:
     def test_required_fast_marker_expression_is_consistent(self):
         """Pin required PR fast-test marker selection across local and CI surfaces."""
         makefile_content = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-        develop_pr_run_text = _workflow_job_run_text("pr.yml", "code-test")
+        develop_pr_run_text = _workflow_job_run_text("ci.yml", "code-test")
         main_pr_run_text = _workflow_job_run_text("test.yml", "test")
 
         expected_marker_flag = f'-m "{CI_FAST_EXPRESSION}"'
@@ -854,7 +854,9 @@ class TestReleaseInfrastructure:
             "tests/unit/scripts/test_results_explorer_snapshot_invariants.py",
             "tests/unit/scripts/test_skill_sync_ci_policy.py",
             "tests/unit/scripts/test_soundness_drain_report.py",
-            "tests/unit/scripts/test_timing_policy_modes.py",
+            # test_timing_policy_modes.py was split into these two project-dependent tests.
+            "tests/unit/scripts/test_fast_lane_ceiling_check.py",
+            "tests/unit/scripts/test_timing_policy_check.py",
             "tests/unit/scripts/test_todo_db_shadow.py",
             "tests/unit/scripts/test_todo_db_standalone_compat.py",
             "tests/unit/scripts/test_todo_schema_migration_check.py",
@@ -872,7 +874,7 @@ class TestReleaseInfrastructure:
             "tests/unit/workflows/test_validate_submission_changed_bundles.py",
             "tests/unit/workflows/test_validate_submission_fail_open.py",
         }
-        assert len(v040_missed_paths) == 37
+        assert len(v040_missed_paths) == 38
         assert v040_missed_paths <= curated_paths, (
             "release-cut is missing tests that had to be curated manually in the v0.4.0 release PR: "
             f"{sorted(v040_missed_paths - curated_paths)}"

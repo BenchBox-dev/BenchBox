@@ -1,0 +1,2434 @@
+name: CI
+
+# One workflow, six always-reporting unit results: core, explorer, results-data,
+# docs, landing, and tooling. The classifier maps changed paths to units
+# (.github/ci-units.yml); an untouched unit reports success immediately, and a
+# touched unit must succeed in every job it required (a skipped required job
+# fails the unit). There is deliberately no branch filter on pull_request, so a
+# change opened against any base gets CI instead of an empty check list.
+
+env:
+  BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  merge_group:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  # Base guard: stacked PRs get CI from this workflow (no branch filter),
+  # so an unsupported feature-branch base must fail loudly here instead of
+  # sliding into develop unvalidated under a parent PR.
+  base-guard:
+    name: PR base branch is an integration branch
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          case "$BASE_REF" in
+            develop|release|published-results)
+              echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
+              ;;
+            *)
+              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
+              echo "Retarget this PR at develop, or fold the change into the parent PR."
+              exit 1
+              ;;
+          esac
+
+  # Classifier: shared with the legacy path rules, plus the six-unit ownership map.
+  ci-paths:
+    name: ci-paths
+    runs-on: ubuntu-latest
+    outputs:
+      safe-content-only: ${{ steps.classify.outputs.safe-content-only }}
+      needs-code-ci: ${{ steps.classify.outputs.needs-code-ci }}
+      content-guard-needed: ${{ steps.classify.outputs.content-guard-needed }}
+      skill-integrity-needed: ${{ steps.classify.outputs.skill-integrity-needed }}
+      skill-integrity-only: ${{ steps.classify.outputs.skill-integrity-only }}
+      changed-paths: ${{ steps.classify.outputs.changed-paths }}
+      code-paths: ${{ steps.classify.outputs.code-paths }}
+      unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
+      estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
+      packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      heavy-needed: ${{ steps.heavy.outputs.heavy-needed }}
+      viz-needed: ${{ steps.classify.outputs.viz-needed }}
+      explorer-vitest-needed: ${{ steps.classify.outputs.explorer-vitest-needed }}
+      explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
+      explorer-tokens-needed: ${{ steps.classify.outputs.explorer-tokens-needed }}
+      site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
+      unit-core: ${{ steps.units.outputs.unit-core }}
+      unit-explorer: ${{ steps.units.outputs.unit-explorer }}
+      unit-results-data: ${{ steps.units.outputs.unit-results-data }}
+      unit-docs: ${{ steps.units.outputs.unit-docs }}
+      unit-landing: ${{ steps.units.outputs.unit-landing }}
+      unit-tooling: ${{ steps.units.outputs.unit-tooling }}
+      code-tests-needed: ${{ steps.units.outputs.code-tests-needed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Validate TODO JSON/Git state contract
+        # Bare python is intentional: this static guard is stdlib-only and
+        # must run for every PR without tracker credentials or dependencies.
+        run: python _project/scripts/todo_state_contract_check.py
+
+      - name: Select release candidate
+        id: release
+        env:
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid event base SHA" >&2; exit 1; }
+          git fetch --no-tags origin "$EVENT_BASE_SHA"
+          python -I -S scripts/release_flow.py select --base-sha "$EVENT_BASE_SHA" --github-output "$GITHUB_OUTPUT"
+
+      - name: Install uv for release checks
+        if: steps.release.outputs.release-check-needed == 'true'
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Check release content
+        if: steps.release.outputs.release-check-needed == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.release-version }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: make release-check VERSION="$RELEASE_VERSION" BASE_REF="$EVENT_BASE_SHA"
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
+
+      - name: Classify changed paths
+        id: classify
+        # Bare python is intentional: the classifier is stdlib-only so
+        # content-only PRs do not pay a dependency-sync cost before deciding.
+        run: |
+          # Bind classification to the immutable pull-request event base. A
+          # later develop merge may make this PR BEHIND, but must not change
+          # the tree whose paths and manifest structure this run certifies.
+          python scripts/path_filter_decision.py \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --json-out ci-path-decision.json \
+            --lists-dir .ci-paths \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Classify merge units
+        id: units
+        # Bare python is intentional: stdlib-only, no dependency sync. The
+        # classifier fails closed: a diff error or an unowned path runs core.
+        run: |
+          python scripts/ci_units.py \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --json-out ci-unit-decision.json \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload path decision
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ci-path-decision
+          path: |
+            ci-path-decision.json
+            ci-unit-decision.json
+          retention-days: 30
+
+      - name: Decide heavy-tier need
+        id: heavy
+        # Bare python is intentional: stdlib-only, no dependency sync. The
+        # event gate lives in the script (not a step `if:`): downstream jobs
+        # read this output on every event, and references to a skipped
+        # step's outputs do not evaluate reliably. Fail-closed: any lookup
+        # error reports heavy-needed=true so the tier runs.
+        run: |
+          set -euo pipefail
+          python scripts/heavy_tier_needed.py \
+            --decision-in ci-path-decision.json \
+            --event "${{ github.event_name }}" \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --github-output "$GITHUB_OUTPUT" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+  # Tooling: soundness review flag (unit-independent; runs on every event).
+  soundness-flag:
+    name: soundness-flag
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch pull request base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: git fetch --no-tags origin "${BASE_SHA}:refs/remotes/origin/ci-v2-base"
+
+      - name: Collect changed paths
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/changed-paths.txt"
+
+      - name: soundness-flag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          PR_BODY: ${{ github.event.pull_request.body || '' }}
+          MERGE_GROUP_PRS: ${{ toJson(github.event.merge_group.pull_requests) }}
+        run: |
+          set -euo pipefail
+
+          check_one() {
+            local paths_file="$1"
+            local body_file="$2"
+            local trusted_root="$RUNNER_TEMP/trusted-soundness"
+            local result
+            rm -rf "$trusted_root"
+            mkdir -p "$trusted_root/_project/scripts"
+            mkdir -p "$trusted_root/.github"
+
+            # After this rollout lands, the base revision contains the checker
+            # and manifest. Execute those immutable base files, never the PR
+            # checkout, so a PR cannot narrow its own soundness predicate.
+            if git cat-file -e "${BASE_SHA}:_project/scripts/check_soundness_review.py" 2>/dev/null \
+              && git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null \
+              && git cat-file -e "${BASE_SHA}:.github/soundness-paths.txt" 2>/dev/null; then
+              git show "${BASE_SHA}:_project/scripts/check_soundness_review.py" \
+                > "$trusted_root/_project/scripts/check_soundness_review.py"
+              git show "${BASE_SHA}:_project/scripts/soundness_paths.py" \
+                > "$trusted_root/_project/scripts/soundness_paths.py"
+              git show "${BASE_SHA}:.github/soundness-paths.txt" \
+                > "$trusted_root/.github/soundness-paths.txt"
+              python "$trusted_root/_project/scripts/check_soundness_review.py" \
+                --paths-file "$paths_file" \
+                --body-file "$body_file"
+              return
+            fi
+
+            # Bootstrap compatibility for this first rollout: develop does not
+            # yet contain the new checker. Use the immutable legacy predicate
+            # plus the fixed gate-file list, then validate the required body
+            # fields without executing any PR-side path predicate. Once this
+            # workflow is on develop, this branch is unreachable.
+            git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" \
+              > "$trusted_root/auto_merge_soundness_paths.py"
+            result="$(python "$trusted_root/auto_merge_soundness_paths.py" \
+              --paths-file "$paths_file" --format github-output)"
+            case "$result" in
+              soundness_path=true|soundness_path=false) ;;
+              *)
+                echo "soundness-flag: trusted bootstrap predicate returned an invalid result" >&2
+                return 1
+                ;;
+            esac
+
+            for protected_path in \
+              "AGENTS.md" \
+              ".github/CODEOWNERS" \
+              ".github/PULL_REQUEST_TEMPLATE.md" \
+              ".github/soundness-paths.txt" \
+              ".github/workflows/ci.yml" \
+              "_project/scripts/auto_merge_soundness_paths.py" \
+              "_project/scripts/check_soundness_review.py" \
+              "_project/scripts/soundness_paths.py"; do
+              if ! grep -qxF "$protected_path" "$paths_file"; then
+                continue
+              fi
+              result="soundness_path=true"
+              break
+            done
+            if [ "$result" = "soundness_path=false" ]; then
+              return
+            fi
+
+            grep -Eiq '^[[:space:]]*(#{1,6}[[:space:]]+)?Soundness review:[[:space:]]*$' "$body_file" \
+              || { echo "soundness-flag: missing Soundness review section" >&2; return 1; }
+            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?(External[[:space:]]+)?reviewer:[[:space:]]*(codex|muse|agy)\b' "$body_file" \
+              || { echo "soundness-flag: missing approved external reviewer" >&2; return 1; }
+            grep -Eiq 'https://github\.com/[^/[:space:])]+/[^/[:space:])]+/pull/[0-9]+#issuecomment-[0-9]+' "$body_file" \
+              || { echo "soundness-flag: missing external review PR comment link" >&2; return 1; }
+            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?all[[:space:]]+(critical/high|critical[[:space:]]+and[[:space:]]+high)[[:space:]]+findings[[:space:]]+(are[[:space:]]+)?resolved[.!]?[[:space:]]*$' "$body_file" \
+              || { echo "soundness-flag: missing resolved Critical/High finding statement" >&2; return 1; }
+            echo "soundness-flag: passed (trusted bootstrap path)"
+          }
+
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
+              echo "soundness-flag: merge_group payload has no pull_requests; resolving anchor from queue ref" >&2
+              QUEUE_REF="${{ github.ref }}"
+              ANCHOR_NUMBER="$(printf '%s' "$QUEUE_REF" | grep -oE 'pr-[0-9]+' | head -1 | cut -d- -f2)"
+              if [ -z "$ANCHOR_NUMBER" ]; then
+                echo "soundness-flag: cannot parse anchor PR from queue ref $QUEUE_REF; failing closed" >&2
+                exit 1
+              fi
+              ANCHOR_HEAD="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.head.sha')"
+              if [ -z "$ANCHOR_HEAD" ]; then
+                echo "soundness-flag: cannot resolve head of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
+                exit 1
+              fi
+              # The queue squashes the anchor PR onto the group base, so the
+              # anchor head is never an ancestor of the group HEAD. Verify the
+              # squash by content: every file the anchor PR changed (relative
+              # to its own base) must be byte-identical between the anchor
+              # head and the group HEAD. A mismatch means the queued content
+              # is not what reviewers approved. Files the group base changed
+              # identically do not matter; files only the group changed are
+              # covered by the group-base diff check below.
+              git fetch --no-tags origin "$ANCHOR_HEAD" 2>/dev/null || true
+              ANCHOR_BASE="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.base.sha')"
+              if [ -z "$ANCHOR_BASE" ]; then
+                echo "soundness-flag: cannot resolve base of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
+                exit 1
+              fi
+              git fetch --no-tags origin "$ANCHOR_BASE" 2>/dev/null || true
+              ANCHOR_FILES="$(git diff --name-only --no-renames "${ANCHOR_BASE}...${ANCHOR_HEAD}")"
+              if [ -z "$ANCHOR_FILES" ]; then
+                echo "soundness-flag: anchor #$ANCHOR_NUMBER changed no files; failing closed" >&2
+                exit 1
+              fi
+              MISMATCH=0
+              while IFS= read -r f; do
+                [ -n "$f" ] || continue
+                if ! git diff --quiet "$ANCHOR_HEAD" HEAD -- "$f"; then
+                  echo "soundness-flag: anchor #$ANCHOR_NUMBER file differs in queue: $f" >&2
+                  MISMATCH=1
+                fi
+              done <<< "$ANCHOR_FILES"
+              if [ "$MISMATCH" != "0" ]; then
+                echo "soundness-flag: anchor #$ANCHOR_NUMBER content mismatch in queue; failing closed" >&2
+                exit 1
+              fi
+              echo "soundness-flag: anchor #$ANCHOR_NUMBER content verified in queue" >&2
+              printf '%s\n' "$ANCHOR_NUMBER" > "$RUNNER_TEMP/merge-group-prs.txt"
+              echo "soundness-flag: payload empty; validating anchor PR #$ANCHOR_NUMBER with group base diff" >&2
+            else
+              printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
+            fi
+            if [ ! -s "$RUNNER_TEMP/merge-group-prs.txt" ]; then
+              echo "soundness-flag: merge_group has no pull requests to validate" >&2
+              exit 1
+            fi
+            while IFS= read -r pr_number; do
+              gh api "repos/$REPO/pulls/$pr_number" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
+              gh api --paginate "repos/$REPO/pulls/$pr_number/files" \
+                --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
+              check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
+            done < "$RUNNER_TEMP/merge-group-prs.txt"
+            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
+              echo "soundness-flag: also validating full group base diff for soundness paths" >&2
+              git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/group-diff-paths.txt"
+              gh api "repos/$REPO/pulls/$(head -1 "$RUNNER_TEMP/merge-group-prs.txt")" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
+              check_one "$RUNNER_TEMP/group-diff-paths.txt" "$RUNNER_TEMP/pr-body.md"
+            fi
+            exit 0
+          fi
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
+
+  # Cross-platform TPC-H binary framing: the only pre-merge macOS/Windows
+  # execution of the bundled dbgen framing guard. The merge queue runs direct
+  # macOS and Windows execution on every code-routed tree, while pull_request
+  # runs skip it unless a carve-out applies (merge_group event, soundness
+  # paths, or packaging paths via the heavy-needed output). Nightly retains
+  # the complete three-platform matrix.
+  tpch-binary-framing:
+    name: TPC-H binary framing (${{ matrix.os }})
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify bundled dbgen binaries emit clean framing
+        run: uv run -- python -m pytest tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py -m 'unit or slow' -v
+
+  content-guard:
+    name: content-guard
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.content-guard-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Recreate path lists
+        # Bare python is intentional: the classifier is stdlib-only.
+        run: |
+          python scripts/path_filter_decision.py \
+            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --json-out ci-path-decision.json \
+            --lists-dir .ci-paths
+
+      - name: Validate YAML hygiene
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/yaml.txt ]; then
+            echo "No YAML content paths changed."
+            exit 0
+          fi
+          mapfile -t yaml_paths < .ci-paths/yaml.txt
+          # The changed-path lists include deletions; a deleted file path passed
+          # to check-yaml would fail the hook on a legitimate deletion-only PR
+          # (mirrors the TODO-graph step's deleted-path skip below).
+          existing_yaml_paths=()
+          for yaml_path in "${yaml_paths[@]}"; do
+            if [ -e "$yaml_path" ]; then
+              existing_yaml_paths+=("$yaml_path")
+            else
+              echo "Skipping deleted YAML path: $yaml_path"
+            fi
+          done
+          if [ ${#existing_yaml_paths[@]} -eq 0 ]; then
+            echo "No existing YAML content paths to lint."
+            exit 0
+          fi
+          uv run -- pre-commit run check-yaml --files "${existing_yaml_paths[@]}"
+
+      - name: Validate artifact hygiene
+        run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
+
+      - name: Validate markdown hygiene
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/markdown.txt ]; then
+            echo "No markdown content paths changed."
+            exit 0
+          fi
+          mapfile -t markdown_paths < .ci-paths/markdown.txt
+          # Skip deleted paths so a deletion-only markdown PR doesn't fail the
+          # hook on a path that no longer exists (see the YAML step above).
+          existing_markdown_paths=()
+          for markdown_path in "${markdown_paths[@]}"; do
+            if [ -e "$markdown_path" ]; then
+              existing_markdown_paths+=("$markdown_path")
+            else
+              echo "Skipping deleted markdown path: $markdown_path"
+            fi
+          done
+          if [ ${#existing_markdown_paths[@]} -eq 0 ]; then
+            echo "No existing markdown content paths to lint."
+            exit 0
+          fi
+          uv run -- pre-commit run markdownlint --files "${existing_markdown_paths[@]}"
+
+      - name: Validate docs references
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/docs.txt ]; then
+            echo "No docs paths changed."
+            exit 0
+          fi
+          make docs-validate
+
+      - name: Validate public contract drift guard
+        shell: bash
+        run: |
+          if [ ! -s .ci-paths/docs.txt ] && [ ! -s .ci-paths/markdown.txt ]; then
+            echo "No docs or markdown paths changed."
+            exit 0
+          fi
+          uv run -- python - <<'PY'
+          from pathlib import Path
+
+          contract = Path("docs/reference/public-contracts.md").read_text(encoding="utf-8")
+          readme = Path("README.md").read_text(encoding="utf-8")
+
+          forbidden_readme_count_claims = [
+              "Twenty-Two Benchmarks",
+              "SQL Platforms (",
+              "DataFrame Platforms (",
+          ]
+          offenders = [phrase for phrase in forbidden_readme_count_claims if phrase in readme]
+          if offenders:
+              raise SystemExit(
+                  "README.md has exact hand-maintained count claims; use registry-derived checks "
+                  f"or mark them non-authoritative: {offenders}"
+              )
+
+          required_surfaces = [
+              "CLI commands and documented options",
+              "Top-level Python wrapper facades",
+              "`benchbox.base.BaseBenchmark`",
+              "`BaseBenchmark.run_with_platform`",
+              "Adapter subclassing hooks and base mixins",
+              "Platform registry metadata",
+              "MCP tools",
+              "Result JSON bundles",
+              "Explorer read model and generated browser inputs",
+              "Public submission validator behavior",
+              "SQL compatibility rule catalog",
+              "Generated compatibility docs",
+              "`benchbox.experimental` namespace",
+              "`_project` scripts, audits, and analysis artifacts",
+              "TODO, DONE, and ADR/future-state docs",
+          ]
+          missing_surfaces = [surface for surface in required_surfaces if surface not in contract]
+          if missing_surfaces:
+              raise SystemExit(f"public-contracts.md missing required surfaces: {missing_surfaces}")
+
+          required_statuses = [
+              "`stable`",
+              "`beta`",
+              "`experimental`",
+              "`repo_only`",
+              "`deprecated`",
+              "`document_only`",
+          ]
+          missing_statuses = [status for status in required_statuses if status not in contract]
+          if missing_statuses:
+              raise SystemExit(f"public-contracts.md missing support_status values: {missing_statuses}")
+
+          from benchbox.core.benchmark_registry import list_benchmark_ids, list_loader_benchmark_ids
+          from benchbox.core.platform_registry import PlatformRegistry
+          from benchbox.core.results.schema import SCHEMA_VERSION
+
+          platforms = PlatformRegistry.get_all_platform_metadata()
+          sql_capable = sum(1 for item in platforms.values() if item.get("capabilities", {}).get("supports_sql"))
+          dataframe_capable = sum(
+              1 for item in platforms.values() if item.get("capabilities", {}).get("supports_dataframe")
+          )
+          dual_mode = sum(
+              1
+              for item in platforms.values()
+              if item.get("capabilities", {}).get("supports_sql")
+              and item.get("capabilities", {}).get("supports_dataframe")
+          )
+
+          source_fragments = [
+              f"{len(list_benchmark_ids())} benchmark metadata entries",
+              f"{len(list_loader_benchmark_ids())} loader-resolved IDs",
+              f"{len(platforms)} platform metadata entries",
+              f"{sql_capable} SQL-capable",
+              f"{dataframe_capable} DataFrame-capable",
+              f"{dual_mode} dual-mode",
+              f"Current result schema version: `{SCHEMA_VERSION}`",
+          ]
+          missing_fragments = [fragment for fragment in source_fragments if fragment not in contract]
+          if missing_fragments:
+              raise SystemExit(f"public-contracts.md source-derived claims are stale: {missing_fragments}")
+          PY
+
+  skill-integrity:
+    name: skill-integrity
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate skill config, receipt, and tool pin
+        # Stdlib-only and offline: checks skill-sync.conf shape and skill
+        # selection, the committed receipt's approved source URLs, and the
+        # vendored tools/skill-sync bytes against the pinned tool revision.
+        run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf
+
+      - name: Clone skill sources to the configured checkout paths
+        # The wrapper resolves every configured rev from these checkouts and
+        # fails closed when one is absent, so a transient local SHA can never
+        # pass: only published upstream commits survive this step.
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/skill-home/Developer"
+          git clone --quiet https://github.com/joeharris76/skill-sync-skills.git \
+            "$RUNNER_TEMP/skill-home/Developer/skill-sync-skills"
+          git clone --quiet https://github.com/joeharris76/todo-db.git \
+            "$RUNNER_TEMP/skill-home/Developer/todo-db"
+          git clone --quiet https://github.com/joeharris76/skill-sync.git \
+            "$RUNNER_TEMP/skill-home/Developer/skill-sync"
+
+      - name: Preview, apply, verify, and re-check the skill mirrors
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HOME="$RUNNER_TEMP/skill-home"
+          echo "--- preview (read-only) ---"
+          sh tools/skill-sync preview
+          echo "--- apply ---"
+          sh tools/skill-sync apply
+          echo "--- the committed snapshot must be untouched by apply ---"
+          # Apply may only write gitignored paths (the agents mirror and the
+          # curated-out blog skill). Any tracked modification means the PR's
+          # committed snapshot drifted from its own config.
+          test -z "$(git status --porcelain)"
+          echo "--- verify the payload offline against its manifest ---"
+          sh tools/skill-sync verify
+          echo "--- second check must be clean ---"
+          sh tools/skill-sync check
+
+      - name: Enforce untracked mirror boundary
+        run: sh scripts/check_untracked_skill_mirrors.sh
+
+      - name: Audit instruction authority and PR commit identity
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          python3 _project/scripts/agent_instruction_audit.py
+          python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install focused test dependencies
+        run: uv sync --group dev
+
+      - name: Run skill policy and instruction audit contracts
+        run: |
+          uv run -- python -m pytest \
+            tests/unit/scripts/test_skill_sync_ci_policy.py \
+            tests/unit/scripts/test_path_filter_decision.py \
+            tests/unit/scripts/test_ci_lint_environment_boundary.py \
+            tests/unit/scripts/test_agent_instruction_audit.py \
+            -q
+
+      - name: Validate tracked artifact hygiene
+        run: uv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked
+
+  audit-sha:
+    name: audit-sha
+    needs: ci-paths
+    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        env:
+          BASE_REF: ${{ github.base_ref || 'develop' }}
+        run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+      - name: Fetch PR head for audit ancestry (merge queue only)
+        # Merge-queue runs check out a squashed preview commit whose
+        # single-parent history never contains the PR's branch commits, so an
+        # audit measured on the branch tree cannot descend from HEAD. Fetch
+        # the PR head (parsed from the queue's gh-readonly-queue/.../pr-N-...
+        # branch name) and validate measurement ancestry against it instead.
+        # Falls back to HEAD with a warning if the PR number cannot be parsed.
+        if: github.event_name == 'merge_group'
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" =~ /pr-([0-9]+)- ]]; then
+            git fetch --no-tags origin "pull/${BASH_REMATCH[1]}/head:refs/remotes/origin/audit-ancestry-pr-head"
+          else
+            echo "::warning::Could not parse PR number from ${GITHUB_REF:-}; audit measurement ancestry falls back to HEAD."
+          fi
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Validate changed audit develop SHA stamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --name-only --diff-filter=ACMRT "origin/${{ github.base_ref || 'develop' }}...HEAD" \
+            | grep -E '^_project/audits/.*\.md$' > /tmp/changed-audits.txt || true
+          if [ ! -s /tmp/changed-audits.txt ]; then
+            echo "No changed audit Markdown files to validate."
+            exit 0
+          fi
+          ANCESTRY_REF="HEAD"
+          if [ "${{ github.event_name }}" = "merge_group" ] && git rev-parse --verify --quiet origin/audit-ancestry-pr-head >/dev/null; then
+            ANCESTRY_REF="origin/audit-ancestry-pr-head"
+          fi
+          while IFS= read -r audit_path; do
+            make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}" AUDIT_SHA_ANCESTRY_REF="$ANCESTRY_REF"
+          done < /tmp/changed-audits.txt
+
+  ruleset-drift:
+    name: ruleset-drift
+    needs: ci-paths
+    # Queue-only: the job reads a token that can see hosted governance. PR
+    # events never receive it. The script and the expected settings are read
+    # from the trusted base revision, never from the change under test.
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout trusted base policy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ github.event.merge_group.base_sha }}
+          persist-credentials: false
+
+      - name: Compare live governance with the trusted runbook
+        env:
+          RULESET_DRIFT_TOKEN: ${{ secrets.RULESET_DRIFT_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/ruleset_drift_check.py \
+            --token "${RULESET_DRIFT_TOKEN}" \
+            --require-bypass-actor-visibility \
+            --output ruleset-drift.json
+
+      - name: Upload drift evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: ci-ruleset-drift-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ruleset-drift.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Core: light tier (runs on pull_request and merge_group).
+  code-lint:
+    name: lint
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.code-tests-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      # --- Lint guards ------------------------------------------------
+      # Every guard below is independent: `id: guard-*` (the naming
+      # convention the `lint-guard-summary` step and
+      # tests/system/test_ci_lint_parity.py both key off of) plus
+      # `continue-on-error: true` so one guard's failure doesn't hide the
+      # others' results behind a stopped job. The job as a whole still
+      # fails iff any guard failed -- see the `lint-guard-summary` step,
+      # which is what the `core` unit actually gates on. Setup steps
+      # above (checkout/setup-python/setup-uv/install deps) are not
+      # guards and carry neither `id: guard-*` nor `continue-on-error`.
+      - name: Validate uv.lock revision against the PR base
+        id: guard-uv-lock-revision
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: make uv-lock-revision-check
+
+      - name: Stale _project/ reference check
+        id: guard-project-references
+        continue-on-error: true
+        run: uv run -- python _project/scripts/check_project_references.py
+
+      - name: Lint and format check with ruff
+        id: guard-ruff
+        continue-on-error: true
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check with ty
+        id: guard-ty
+        continue-on-error: true
+        run: uv run ty check
+
+      - name: Strict type check for quality-governance island
+        id: guard-quality-governance-typecheck
+        continue-on-error: true
+        run: make quality-governance-typecheck
+
+      - name: Validate test marker annotations
+        id: guard-lint-markers
+        continue-on-error: true
+        run: make lint-markers
+
+      - name: Validate import layering
+        id: guard-lint-imports
+        continue-on-error: true
+        run: make lint-imports
+
+      - name: Validate Windows antipatterns
+        id: guard-windows-antipatterns
+        continue-on-error: true
+        run: make windows-antipatterns-check
+
+      - name: Validate artifact hygiene
+        id: guard-artifact-hygiene
+        continue-on-error: true
+        run: make artifact-hygiene
+
+      - name: Validate agent instruction authority and efficiency
+        id: guard-agent-instructions
+        continue-on-error: true
+        run: make agent-instructions-check
+
+      # There is deliberately no CI counterpart to `make agent-identity-check`
+      # (which ci-lint still runs locally). That target resolves identity from
+      # git config, and on an ephemeral runner the config is the runner's own,
+      # so the check can say nothing about what the branch carries. Supplying a
+      # known-good identity to make it runnable only made it incapable of
+      # failing, and a guard that cannot fail is worse than an absent one --
+      # lint-guard-summary reports it as coverage. The commit-range guard below
+      # is the real merge-time control: it reads the commits themselves.
+      # Locally the identity IS the developer's or the agent's, so ci-lint and
+      # the pre-commit hook keep enforcing it where the answer is meaningful.
+      - name: Validate no agent authorship or attribution in PR commits
+        id: guard-agent-commit-range
+        continue-on-error: true
+        run: make agent-commit-range-check
+
+      - name: Timing policy (wall-clock allowlist)
+        id: guard-timing-policy
+        continue-on-error: true
+        run: uv run -- python _project/scripts/timing_policy_check.py --strict
+
+      - name: Fast lane ceiling
+        id: guard-fast-lane-ceiling
+        continue-on-error: true
+        # A merge group composes independently green PRs, so an overage of up
+        # to one delta limit per possible queued entry warns instead of
+        # ejecting the group. The script grants the grace only when the runner's own event file
+        # says merge_group, so a PR cannot self-grant it by editing this line:
+        # ci.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
+        # written by the runner. The delta guard below stays pull_request-only,
+        # so a composed overage cannot slip through it either.
+        run: |
+          args=(--strict)
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            # APPROVED_MERGE_QUEUE permits five entries; 150 per entry keeps
+            # every independently compliant composition from being ejected.
+            args+=(--ceiling-grace 750)
+          fi
+          uv run -- python _project/scripts/fast_lane_ceiling_check.py "${args[@]}"
+
+      - name: Restore fast-lane develop baseline count
+        # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
+        # naming-convention comment above): a cache miss here is not itself a
+        # failure, but the delta guard below reports it as a blocking baseline
+        # error. The key is the PR event's actual develop base SHA; a prefix
+        # restore would compare the PR against an unrelated develop tip when
+        # merges or baseline jobs complete out of order.
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: fast-lane-count.txt
+          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+
+      - name: Fast lane ceiling delta vs develop
+        # Pull requests only: in a merge group the delta is the sum of every
+        # composed PR, so it would eject groups whose members each fit.
+        if: github.event_name == 'pull_request'
+        # Additive to guard-fast-lane-ceiling above, never a replacement: that
+        # step enforces the absolute max_fast_tests ceiling unconditionally.
+        # The pull-request lane requires the exact develop baseline so every
+        # queued member proves its +150 per-PR delta before composition grace
+        # is allowed. A missing cache fails closed instead of weakening that
+        # prerequisite.
+        id: guard-fast-lane-delta
+        continue-on-error: true
+        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
+
+      - name: UAT spec LOC table drift check
+        # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
+        # develop PR path is the routine dev-flow gate, so without this a UAT
+        # LOC/table doc that drifts from source could merge through a normal
+        # develop PR, leaving the drift guard dependent on the local pre-commit
+        # hook alone.
+        id: guard-uat-loc-table
+        continue-on-error: true
+        run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
+
+      - name: Compatibility governance drift check
+        id: guard-compat-docs
+        continue-on-error: true
+        run: make compat-docs-check
+
+      - name: Platform manifest drift check
+        id: guard-platform-manifest
+        continue-on-error: true
+        run: make platform-manifest-check
+
+      - name: Oracle coverage map drift check
+        id: guard-oracle-coverage-map
+        continue-on-error: true
+        run: make oracle-coverage-map-check
+
+      - name: Pricing data drift check
+        id: guard-pricing-data
+        continue-on-error: true
+        run: make pricing-data-check
+
+      - name: Public contract drift check
+        id: guard-public-contract-drift
+        continue-on-error: true
+        run: uv run -- python scripts/check_public_contract_drift.py
+
+      - name: Dependency audit (no unused declarations)
+        id: guard-audit-deps
+        continue-on-error: true
+        run: make audit-deps
+
+      - name: Dependency inventory drift check
+        id: guard-audit-raw
+        continue-on-error: true
+        run: make audit-raw-check
+
+      - name: Release curation list drift check
+        id: guard-release-curation
+        continue-on-error: true
+        run: uv run -- python scripts/check_release_curation.py
+
+      - name: Untracked skill-mirror drift guard (cloud parity)
+        # The agents mirror and the curated-out `blog` skill are deliberately
+        # untracked: cloud is Claude-only and `blog` is published separately.
+        # `skill-sync verify` checks payload bytes, not Git tracking state, so
+        # it cannot catch these being force-added. Fail the build if any
+        # become git-tracked.
+        # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
+        id: guard-skill-mirror-drift
+        continue-on-error: true
+        run: sh scripts/check_untracked_skill_mirrors.sh
+
+      - name: Duplicate code delta vs PR base
+        # Fail only when this PR increases AST Type-2 duplicated lines vs the
+        # merge-base with the PR base (not an absolute repo-wide ceiling).
+        # Absolute ceiling remains `make duplicate-check` / pyproject threshold.
+        id: guard-duplicate-delta
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: make duplicate-check-delta
+
+      - name: Complexity policy and report
+        # Keeps CC >=12 visible and fails stale/expired exception metadata or
+        # unexcepted CC >20. Configured Ruff above remains the stricter
+        # production-scope C901 gate (it fails CC >18); the mechanisms do not
+        # share exceptions or silently weaken one another.
+        id: guard-complexity-policy
+        continue-on-error: true
+        run: make complexity-check
+
+      # --- Aggregator ---------------------------------------------------
+      # Reports every guard's pass/fail in one CI cycle instead of stopping
+      # at the first failure. Derives the guard set programmatically from
+      # the `guard-*` id prefix (never hand-list ids here -- a guard added
+      # above without the prefix silently escapes aggregation, which is
+      # exactly what tests/system/test_ci_lint_parity.py now checks for).
+      - name: lint-guard-summary
+        id: lint-guard-summary
+        if: always()
+        env:
+          STEPS_CONTEXT: ${{ toJSON(steps) }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
+
+          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
+          # jq parse failure or an empty guard set must fail the job -- never
+          # fall through to "all passed" with zero guards inspected.
+          ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
+            echo "aggregator: jq failed to parse the steps context" >&2
+            exit 1
+          }
+          if [ -z "$ids" ]; then
+            echo "aggregator: no guard-* steps found in the steps context" >&2
+            exit 1
+          fi
+
+          {
+            echo "## Lint guard summary"
+            echo
+            echo "| Guard | Outcome |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          for id in $ids; do
+            outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
+            if [ "$outcome" = "success" ]; then
+              echo "| $id | ✅ success |" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$id" = "guard-fast-lane-delta" ] \
+              && [ "${GITHUB_EVENT_NAME:-}" = "merge_group" ] \
+              && [ "$outcome" = "skipped" ]; then
+              # This guard is intentionally pull_request-only because its
+              # aggregate delta is not meaningful for a composed merge group.
+              echo "| $id | ✅ skipped (merge_group composition) |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| $id | ⚠️ $outcome |" >> "$GITHUB_STEP_SUMMARY"
+              echo "FAILED: $id ($outcome)"
+              failed=1
+            fi
+          done
+
+          if [ "$failed" -eq 1 ]; then
+            echo "One or more lint guards failed -- see the table above and the" \
+              "per-step logs for details." >&2
+            exit 1
+          fi
+          echo "All lint guards passed."
+
+  code-test:
+    name: test (ubuntu-latest, 3.12)
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.code-tests-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run cross-surface mutation target drift guard
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/test_cross_surface_mutation_sensitivity.py::test_targets_cover_every_enforced_gate \
+            -m "slow" -n 0 --tb=short -q
+
+      - name: Run cross-surface GATES Make/CI pinning guard
+        run: |
+          # Medium-marked ratchet, so the fast-lane selection below skips it;
+          # invoke the node explicitly so a new GATES entry without its Make
+          # target + correctness-gate CI step fails required CI.
+          uv run -- python -m pytest \
+            tests/unit/test_standardized_test_commands.py::TestMakefileCommands::test_cross_surface_gates_are_pinned_in_make_and_ci \
+            -m "medium" -n 0 --tb=short -q
+
+      - name: Run promoted h2odb mutation-catch reproducer (#901)
+        run: |
+          # #901's mutation-sensitivity catch assertions are slow-marked, so the
+          # fast-lane selection below skips them; invoke the h2odb cell (the gate
+          # whose scale fidelity #901 fixed: gate.scale_factor=0.01 matching
+          # production) explicitly so a regression in its mutation catch fails
+          # required CI instead of only at the main-release boundary (test.yml).
+          # Bounded: the single load-bearing gate cell, not the full slow matrix.
+          uv run -- python -m pytest \
+            tests/integration/test_cross_surface_mutation_sensitivity.py \
+            -m "slow" -n 0 -k "h2odb" --tb=short -q
+
+      - name: Run promoted plan-capture-phase reproducers (#909)
+        run: |
+          # #909's connection-fencing and plan-identity reproducers are
+          # medium-marked and otherwise run only in test.yml; invoke them here so
+          # they execute in the required develop-PR gate, not one ring out.
+          uv run -- python -m pytest \
+            tests/integration/test_plan_capture_phase.py \
+            -m "medium" -n 0 --tb=short -q
+
+      - name: Run promoted TPC-DS power-test drain-before-commit reproducer
+        run: |
+          # This file is 100% slow-marked and otherwise never runs in ANY CI
+          # workflow (make test-slow/test-stress are invoked by no workflow).
+          # The TPC-H side of this exact fix (#1137/#1144: draining a raw
+          # DB-API cursor must happen BEFORE commit(), some drivers reject/
+          # invalidate commit() on unread SELECT results) is already required
+          # via the fast-marked test_tpc_power_tests.py, but TPC-DS has a
+          # separate, parallel implementation (benchbox/core/tpcds/power_test.py
+          # _execute_one_query - the only call site TPCDSPowerTest.run() uses)
+          # with no coverage anywhere. Bounded: the single reproducer node.
+          uv run -- python -m pytest \
+            tests/integration/test_tpcds_power_test.py \
+            -m "slow" -n 0 -k "test_execute_one_query_drains_raw_cursor_before_commit" --tb=short -q
+
+      - name: Run DuckLake in-process adapter integration tests
+        run: |
+          # Exercise cursor catalog scoping, ATTACH, catalog reuse, SQLite
+          # catalog operation, and representative write primitives. The
+          # service-dependent PostgreSQL and S3 cases remain live-only.
+          # Bounded: one file, 8 tests at SF=0.01.
+          uv run -- python -m pytest \
+            tests/integration/test_ducklake_integration.py \
+            -m "slow and not live_integration" -n 0 --tb=short -q
+
+      - name: Run promoted DuckDB FK tuning load-ordering reproducers
+        run: |
+          # tuning-fk-load-ordering-fix-20260716: TPCHBenchmark.get_table_loading_order
+          # derives a FK-topological load order so a tuned run with
+          # foreign_keys.enabled really loads under real FK enforcement; without
+          # it, DataLoader falls back to alphabetical order, which zeros out
+          # every FK-dependent table under DuckDB constraint enforcement. This
+          # file is 100% slow-marked and otherwise never runs in ANY CI
+          # workflow. Bounded: one small (SF=0.01) file, 3 tests, ~5s.
+          uv run -- python -m pytest \
+            tests/integration/tuning/test_duckdb_fk_load_ordering.py \
+            -m "slow" -n 0 --tb=short -q
+
+      - name: Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers
+        run: |
+          # The w0 defect: with a custom (non-reference) seed at SF=1.0, TPC-H's
+          # answer-set-boundary queries (Q11/16/18/20) came back falsely FAILED.
+          # The shared validator exclusion is already unit-tested in the
+          # required fast lane (test_validation_engine.py), but the
+          # set_reference_seed_context() WIRING at each call site
+          # (benchbox/core/tpch/power_test.py and .../throughput_test.py - two
+          # separate production code paths) is not: breaking either site's
+          # wiring is invisible to the unit test and only caught here. Both
+          # files are 100% slow-marked and otherwise never run in ANY CI
+          # workflow. Bounded: the single boundary_query reproducer node(s) in
+          # each file, not the surrounding slow suites.
+          uv run -- python -m pytest \
+            tests/integration/test_tpch_power_test.py \
+            -m "slow" -n 0 -k "boundary_query" --tb=short -q
+          uv run -- python -m pytest \
+            tests/integration/test_tpch_throughput_test.py \
+            -m "slow" -n 0 -k "boundary_query" --tb=short -q
+
+      - name: Run fast tests
+        run: |
+          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
+          uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # Core: heavy tier (merge queue, plus soundness/packaging carve-outs from heavy_tier_needed.py).
+  medium-collect:
+    name: medium-collect
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Full history: the canary live-tree tests diff historical
+          # regression commits, which a shallow checkout cannot resolve.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Collect the complete medium tier
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p t2-artifacts
+          BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest --collect-only -q -n 0 \
+            -m "medium and not (slow or stress or resource_heavy or live_integration)" \
+            > t2-artifacts/medium-collect.txt
+          count=$(grep -Eo '^[0-9]+/[0-9]+ tests collected' t2-artifacts/medium-collect.txt | tail -1 | cut -d/ -f1)
+          test -n "$count"
+          uv run -- python scripts/release_canary_sharding.py collect \
+            --input t2-artifacts/medium-collect.txt \
+            --nodeids-output t2-artifacts/medium-nodeids.txt \
+            --summary-output t2-artifacts/medium-collection.json \
+            --expected-count "$count" --shard-count 2 \
+            --workflow ci.yml --job medium-collect \
+            --marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" \
+            --checked-ref "${{ github.ref }}" --checked-sha "${{ github.sha }}"
+
+      - name: Upload medium collection evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t2-medium-nodeids-${{ github.sha }}
+          path: t2-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  medium-test:
+    name: medium-test (shard ${{ matrix.shard_index }})
+    needs: [ci-paths, medium-collect]
+    if: ${{ !cancelled() && needs.medium-collect.result == 'success' && needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard_index: [0, 1]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Full history: the canary live-tree tests diff historical
+          # regression commits, which a shallow checkout cannot resolve.
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Download medium collection evidence
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: t2-medium-nodeids-${{ github.sha }}
+          path: t2-artifacts
+
+      - name: Partition the complete medium tier
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
+        run: |
+          uv run -- python scripts/release_canary_sharding.py shard \
+            --input t2-artifacts/medium-nodeids.txt \
+            --nodeids-output "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
+            --summary-output "t2-artifacts/shard-${SHARD_INDEX}-summary.json" \
+            --shard-index "$SHARD_INDEX" --shard-count 2 \
+            --workflow ci.yml --job medium-test \
+            --marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" \
+            --collection-summary t2-artifacts/medium-collection.json --checked-sha "${{ github.sha }}"
+
+      - name: Run medium speed tier
+        shell: bash
+        env:
+          SHARD_INDEX: ${{ matrix.shard_index }}
+        run: |
+          set -euo pipefail
+          test -s "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          mapfile -t node_ids < "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest \
+            -m "medium and not (slow or stress or resource_heavy or live_integration)" \
+            --tb=short --timeout=60 -n 5 \
+            -p scripts.pytest_shard_evidence \
+            --assigned-nodeids "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
+            --shard-evidence "t2-artifacts/shard-${SHARD_INDEX}-execution.json" \
+            --checked-sha "${{ github.sha }}" "${node_ids[@]}"
+
+      - name: Upload medium shard evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: t2-medium-shard-${{ matrix.shard_index }}-${{ github.sha }}
+          path: t2-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  correctness-gate:
+    name: correctness-gate (${{ matrix.partition }})
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    # Preserve every gate; split measured work across standard Linux runners.
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [a, b]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run bounded real-result correctness gate
+        if: matrix.partition == 'b'
+        run: make test-correctness-gate
+
+      - name: Run TPC-Havoc variant-equivalence gate
+        if: matrix.partition == 'b'
+        run: make tpchavoc-equivalence-report
+
+      - name: Run TPC-Havoc DataFrame variant-equivalence gate
+        if: matrix.partition == 'a'
+        run: make tpchavoc-dataframe-equivalence-report
+
+      - name: Run SSB cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
+        run: make ssb-cross-surface-equivalence-report
+
+      - name: Run AMPLab cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
+        run: make amplab-cross-surface-equivalence-report
+
+      - name: Run CoffeeShop cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
+        run: make coffeeshop-cross-surface-equivalence-report
+
+      - name: Run ClickBench cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
+        run: make clickbench-cross-surface-equivalence-report
+
+      - name: Run JoinOrder-synthetic cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
+        run: make joinorder-synthetic-cross-surface-equivalence-report
+
+      - name: Run H2O-DB cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
+        run: make h2odb-cross-surface-equivalence-report
+
+      - name: Run Read Primitives cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
+        run: make read-primitives-cross-surface-equivalence-report
+
+      - name: Run FlightData cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'a'
+        run: make flightdata-cross-surface-equivalence-report
+
+      - name: Run Data Vault cross-surface SQL<->DataFrame equivalence gate
+        if: matrix.partition == 'b'
+        run: make datavault-cross-surface-equivalence-report
+
+      - name: Run NYC Taxi cross-surface SQL<->DataFrame equivalence gate
+        run: make nyctaxi-cross-surface-equivalence-report
+
+      - name: Run TSBS DevOps cross-surface SQL<->DataFrame equivalence gate
+        run: make tsbs-devops-cross-surface-equivalence-report
+
+      - name: Run TPC-H Skew cross-surface SQL<->DataFrame equivalence gate
+        run: make tpch-skew-cross-surface-equivalence-report
+
+      - name: Run TPC-H cross-surface SQL<->DataFrame equivalence gate
+        run: make tpch-cross-surface-equivalence-report
+
+  plan-capture-gate:
+    name: plan-capture-gate
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run in-process plan-capture gate
+        run: make plan-capture-gate
+
+  datafusion-integration:
+    name: datafusion-integration
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Non-blocking: this is the THIRD-engine equivalence SAMPLE, not a gate.
+    # The DuckDB SQL gate (correctness-gate job) stays the hard blocker.
+    # DataFusion is in-process (no service container), and its execution gaps
+    # DIFFER from Postgres's, so this samples translation-induced divergence a
+    # third engine over. continue-on-error keeps it a sample, not a blocker.
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      # Third-engine equivalence SAMPLE plus the DataFusion .tbl trailing-delimiter
+      # load regression. Both canonical and variants are translated to the
+      # datafusion dialect and compared on the same in-process session (shared
+      # translation cancels out); DATAFUSION_TPCHAVOC_SKIPS variants are excluded,
+      # never marked equivalent. Both files are slow-marked, so -m "slow" selects
+      # them (overriding the default fast-lane deselect).
+      - name: Run TPC-Havoc DataFusion variant-equivalence sample and .tbl load regression
+        run: |
+          uv run -- python -m pytest \
+            tests/integration/platforms/test_tpchavoc_datafusion_equivalence.py \
+            tests/integration/platforms/test_datafusion_tbl_load.py \
+            -m "slow" -n 0 --tb=short -v
+
+  package-smoke:
+    name: package-smoke
+    needs: ci-paths
+    # Path-filtered: only runs when packaging metadata changed (pyproject.toml,
+    # MANIFEST.in, setup.py/cfg, benchbox/__init__.py, uv.lock). Steps below are
+    # copied from nightly.yml's test-package job (ubuntu/3.12 leg only - the
+    # full ubuntu+windows matrix stays nightly-only, see nightly.yml:261-311).
+    if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Build package
+        run: |
+          uv build
+
+      - name: Test package installation
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel, found $wheel_count"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
+          tmpdir=$(mktemp -d)
+          cd "$tmpdir"
+          # Minimal-surface gate: a clean core install must import benchbox AND
+          # must not pull pandas (optional engine/DataFrame dep). This is the
+          # contract whose absence let v0.3.0 ship a broken clean install.
+          uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
+          uv run --isolated --no-project --with "$wheel" -- benchbox --help
+
+  dist-artifact:
+    name: dist-artifact
+    needs: ci-paths
+    # Merge-group only: builds the exact wheel+sdist the release workflow
+    # publishes (docs/operations/release-artifacts.md). Runs on every merge
+    # group so the tag commit always has a dist-<sha> artifact; never gated
+    # on packaging paths because release needs it for every merge.
+    if: ${{ github.event_name == 'merge_group' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Verify source bundled binary manifest
+        run: uv run -- python scripts/bundled_binary_manifest.py
+
+      - name: Build wheel and sdist
+        run: |
+          set -euo pipefail
+          uv build
+          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
+          sdist_count=$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l | tr -d '[:space:]')
+          if [ "$wheel_count" != "1" ] || [ "$sdist_count" != "1" ]; then
+            echo "::error::Expected exactly one wheel and one sdist, found $wheel_count wheel(s) and $sdist_count sdist(s)"
+            find dist -maxdepth 1 -type f -print
+            exit 1
+          fi
+          uv run -- python scripts/verify_distribution_binaries.py dist/*.whl dist/*.tar.gz
+          (cd dist && sha256sum -- *.whl *.tar.gz > SHA256SUMS)
+          cat dist/SHA256SUMS
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: dist-${{ github.sha }}
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 90
+
+  dependency-audit:
+    name: dependency-audit
+    needs: ci-paths
+    # Path-filtered on the same packaging group as package-smoke (pyproject.toml
+    # / uv.lock changes are the common case that shifts the dependency graph).
+    if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
+      # Keep empty unless triage is documented in the TODO item.
+      # PYSEC-2026-3696..3699 and PYSEC-2026-3923 (sqlparse):
+      # firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
+      # PYSEC-2026-3447 (setuptools MANIFEST.in exclusion bypass in sdist
+      # builds, macOS-only): torch==2.11.0 requires setuptools<82 while the
+      # fix needs >=83.0.0, so the lock cannot take the fix. Accepted because
+      # the flaw only affects building sdists from projects with a malicious
+      # MANIFEST.in on macOS; BenchBox builds its own project.
+      PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699,PYSEC-2026-3923,PYSEC-2026-3447"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: |
+          uv sync --group dev
+
+      - name: Run security audit
+        run: |
+          # `uvx pip-audit` runs pip-audit in its own isolated tool environment,
+          # auditing pip-audit's dependencies, not BenchBox's. `uv run --with` layers
+          # pip-audit onto the project environment `uv sync --group dev` just built,
+          # so the dependency graph actually audited is the one pyproject.toml/uv.lock
+          # produce.
+          if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
+            IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
+            uv run --with pip-audit -- pip-audit ${IGNORE_ARGS}
+          else
+            uv run --with pip-audit -- pip-audit
+          fi
+
+  # Explorer.
+  explorer-tokens:
+    name: explorer-tokens
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.explorer-paths-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
+
+      - name: Run explorer token scan
+        # Bare python is intentional: the scan is stdlib-only so this gate
+        # does not pay a dependency-sync cost before deciding.
+        run: make lint-explorer-tokens
+
+  explorer-vitest:
+    name: explorer-vitest
+    needs: ci-paths
+    # The Explorer contract includes frontend source/tests, package metadata,
+    # read-model/build-contract code, curated inputs, and the fixture/publish
+    # scripts. The path-filter group keeps unrelated Python-only PRs from
+    # installing Node while ensuring every input Vitest can exercise is gated.
+    if: ${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install Python dependencies
+        run: uv sync --group dev
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Run Explorer Vitest suite
+        run: npm test -- --run
+        working-directory: results-explorer
+
+  parity-check:
+    name: parity-check
+    needs: ci-paths
+    # Path-filtered on results-explorer/viz source changes (see
+    # tracker item `parity-check-develop-ring`). `make parity-check`
+    # is Python-only (no npm/vitest install), measured at well under a second
+    # locally, so it is cheap enough to block develop PRs.
+    #
+    # PROMOTED TO THE REQUIRED LANE 2026-07-05 (parity-check-promotion): the
+    # job is now observed by the explorer unit via PARITY_CHECK_RESULT with
+    # the package-smoke skipped-counts-as-pass rule, and continue-on-error is
+    # dropped. Both promotion criteria met: (1) one green run on a real
+    # GitHub runner (PR #973, run 28742318825 job 85227174150 - the runner's
+    # `make parity-check` printed "fixtures match Python source"); (2) the
+    # geomean_ms 2e-13 last-bit drift seen locally did NOT reproduce on the
+    # runner, so it is a local libm transcendental-precision artifact, not a
+    # fixture error - exact comparison is kept and the drift is documented in
+    # tests/parity/README.md. Path-filtering stays: a non-viz PR skips this
+    # job and passes via skipped-counts-as-pass.
+    if: ${{ needs.ci-paths.outputs.viz-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Verify parity fixtures match Python source
+        run: make parity-check
+
+  explorer-e2e:
+    needs: ci-paths
+    name: Chromium (full suite, blocking)
+    if: ${{ needs.ci-paths.outputs.unit-explorer == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install Python dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Typecheck explorer e2e harness
+        run: npm run typecheck:e2e
+        working-directory: results-explorer
+
+      - name: Audit frontend dependencies
+        run: npm run audit:high
+        working-directory: results-explorer
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('results-explorer/package-lock.json') }}
+
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+        working-directory: results-explorer
+
+      - name: Run Chromium suite
+        # Shared deterministic entrypoint: regenerate fixtures, rebuild dist,
+        # then run the blocking Chromium project against the real server.
+        run: npm run test:e2e:chromium
+        working-directory: results-explorer
+
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: playwright-report-chromium
+          path: |
+            results-explorer/playwright-report
+            results-explorer/test-results
+          if-no-files-found: ignore
+          retention-days: 3
+
+  # Landing.
+  site-theme-tokens:
+    name: site-theme-tokens
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-theme-needed == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
+
+      - name: Run public site theme token scan
+        # Bare python is intentional: the scan is stdlib-only so this gate
+        # does not pay a dependency-sync cost before deciding.
+        run: make lint-site-theme-tokens
+
+  # Results data.
+  results-data-check:
+    name: results-data-check
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.unit-results-data == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      - name: Install dependencies
+        run: uv sync --group dev
+      - name: Corpus inventory is current
+        run: uv run -- python scripts/generate_corpus_inventory.py --check
+      - name: Corpus validation
+        run: uv run -- python results-data/validate_corpus.py
+      - name: Submission validator stays in sync
+        # Judges this change, not external branch state: fail only when the
+        # change touches the validator or its checker. Standing drift against
+        # published-results is reported by submission-validator-drift-check.yml
+        # (weekly and on develop pushes), so it cannot block unrelated changes.
+        if: ${{ contains(needs.ci-paths.outputs.changed-paths, '.github/workflows/validate-submission.yml') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_submission_validator_sync.py') }}
+        run: |
+          git fetch --no-tags --depth=1 origin published-results
+          git show FETCH_HEAD:.github/workflows/validate-submission.yml \
+            > /tmp/published-validate-submission.yml
+          uv run -- python scripts/check_submission_validator_sync.py \
+            --develop .github/workflows/validate-submission.yml \
+            --published /tmp/published-validate-submission.yml
+      - name: Corpus, submission, and explorer-pipeline contract tests
+        run: |
+          uv run -- python -m pytest -p no:cacheprovider -o addopts='' -q \
+            tests/unit/scripts/test_generate_corpus_inventory.py \
+            tests/unit/scripts/test_validate_submission.py \
+            tests/unit/scripts/explorer_pipeline \
+            tests/unit/workflows/test_corpus_trust_boundary.py \
+            tests/unit/publication \
+            tests/unit/explorer
+
+  # Docs and landing: the public-site build and exact-base visual comparison.
+  visual-inputs:
+    needs: ci-paths
+    name: Public-site visual inputs
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.paths.outputs.changed }}
+      render_changed: ${{ steps.paths.outputs.render_changed }}
+      source_sha: ${{ steps.paths.outputs.source_sha }}
+      base_sha: ${{ steps.paths.outputs.base_sha }}
+      baseline_candidates: ${{ steps.paths.outputs.baseline_candidates }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify site inputs and validate recovery source
+        id: paths
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          RECOVERY_SOURCE_SHA: ${{ inputs.baseline_source_sha }}
+          CURRENT_SHA: ${{ github.sha }}
+          CURRENT_REF: ${{ github.ref }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$CURRENT_SHA"
+          if [ -n "$RECOVERY_SOURCE_SHA" ]; then
+            if [ "$EVENT_NAME" != workflow_dispatch ] || [ "$CURRENT_REF" != refs/heads/develop ] || [[ ! "$RECOVERY_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Recovery requires a full lowercase SHA dispatched on develop."
+              exit 1
+            fi
+            git fetch origin develop
+            git merge-base --is-ancestor "$RECOVERY_SOURCE_SHA" origin/develop || {
+              echo "::error::Recovery source must be an ancestor of protected develop."
+              exit 1
+            }
+            SOURCE_SHA="$RECOVERY_SOURCE_SHA"
+          fi
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          BASE_SHA="${PR_BASE_SHA:-$GROUP_BASE_SHA}"
+          echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" != pull_request ] && [ "$EVENT_NAME" != merge_group ]; then
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+            echo 'render_changed=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Missing exact PR or merge-group base SHA."
+            exit 1
+          fi
+          git cat-file -e "$BASE_SHA^{commit}" || {
+            echo "::error::Exact base commit is unavailable."
+            exit 1
+          }
+          # Preserve every former pull_request path-filter input. A change to
+          # this list must explain which rendered dependency is being removed.
+          # The build runs uv sync and npm ci, so the lockfiles pin the
+          # rendered output as much as any source file. uv.lock and
+          # results-explorer/package-lock.json must stay in this list.
+          SITE_PATHS=(
+            benchbox/ docs/ examples/ landing/
+            _project/scripts/explorer_pipeline/
+            _project/scripts/explorer_publish.py
+            _project/scripts/results_explorer_snapshot_invariants.py
+            results-data/ results-explorer/ scripts/
+            .github/workflows/ci.yml .github/workflows/docs.yml Makefile README.md pyproject.toml uv.lock
+          )
+          # The build (Sphinx warnings-as-errors, autodoc) keeps the broad list
+          # above. The visual comparison captures only the routes below, so it
+          # and the baseline ancestor walk use the narrow rendered-input list.
+          # Keep this a subset of SITE_PATHS.
+          RENDER_PATHS=(
+            docs/ landing/ examples/ results-data/ results-explorer/
+            _project/scripts/explorer_pipeline/
+            _project/scripts/explorer_publish.py
+            _project/scripts/results_explorer_snapshot_invariants.py
+            scripts/assemble_public_site.py scripts/generate_landing_quickstarts.py
+            scripts/generate_query_docs.py scripts/generate_compat_docs.py
+            benchbox/__init__.py benchbox/cli/ benchbox/core/platform_registry.py
+            benchbox/core/benchmark_registry.py benchbox/platforms/manifest.py
+            .github/workflows/ci.yml .github/workflows/docs.yml README.md pyproject.toml uv.lock
+          )
+          CHANGED_PATHS=$(git diff --name-only "$BASE_SHA"...HEAD -- "${SITE_PATHS[@]}")
+          if [ -z "$CHANGED_PATHS" ]; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+          RENDER_CHANGED_PATHS=$(git diff --name-only "$BASE_SHA"...HEAD -- "${RENDER_PATHS[@]}")
+          if [ -z "$RENDER_CHANGED_PATHS" ]; then
+            echo 'render_changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'render_changed=true' >> "$GITHUB_OUTPUT"
+          fi
+          # Baselines bound to the exact base come first. A first-parent
+          # ancestor is also a valid baseline source when every public-site
+          # input is byte-identical to the base, because it renders the same
+          # site; this is the premise that lets unchanged trees skip the gate.
+          # The walk stops at the first ancestor whose site inputs differ, so a
+          # differently rendered tree is never used. This covers a queue group
+          # ahead that changed no site inputs and therefore published nothing.
+          CANDIDATES="$BASE_SHA"
+          ANCESTORS=$(git rev-list --first-parent --max-count=25 "$BASE_SHA^" 2>/dev/null || true)
+          for ANCESTOR in $ANCESTORS; do
+            git diff --quiet "$ANCESTOR" "$BASE_SHA" -- "${RENDER_PATHS[@]}" || break
+            CANDIDATES="$CANDIDATES $ANCESTOR"
+          done
+          echo "baseline_candidates=$CANDIDATES" >> "$GITHUB_OUTPUT"
+
+  docs-build:
+    needs: visual-inputs
+    if: needs.visual-inputs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ needs.visual-inputs.outputs.source_sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Cache Sphinx build artifacts
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: |
+            docs/_build
+          key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**', 'pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-sphinx-
+
+      - name: Build documentation
+        # -W turns every Sphinx warning into a failure, including unknown
+        # :doc: targets, so a broken cross-reference fails the docs unit
+        # instead of shipping. --keep-going still reports every warning.
+        run: |
+          cd docs
+          uv run sphinx-build -b html -W --keep-going . _build/html
+
+      # --- Results Explorer ---
+      # Steps gate on package.json as a sentinel so the workflow degrades
+      # gracefully if the explorer directory is ever removed or renamed.
+      # The curated release retains results-explorer/, results-data/, and the
+      # three publication helpers under _project/scripts/. A release that
+      # includes the application must carry the complete publication input set.
+      - name: Validate results-explorer lockfile
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          test -f results-explorer/package-lock.json || {
+            echo "results-explorer/package-lock.json is required for npm ci" >&2
+            exit 1
+          }
+
+      - name: Set up Node.js
+        if: hashFiles('results-explorer/package.json') != ''
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Install results-explorer dependencies
+        if: hashFiles('results-explorer/package.json') != ''
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Verify curated Explorer publication inputs
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          test -d results-data/bundles
+          test -d _project/scripts/explorer_pipeline
+          test -f _project/scripts/explorer_publish.py
+          test -f _project/scripts/results_explorer_snapshot_invariants.py
+
+      - name: Typecheck results-explorer
+        if: hashFiles('results-explorer/package.json') != ''
+        run: npm run typecheck
+        working-directory: results-explorer
+
+      - name: Build explorer data (static pipeline)
+        if: hashFiles('results-explorer/package.json') != ''
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      # Gate the built read model before it is bundled into the deployed site.
+      - name: Validate explorer snapshot invariants
+        if: hashFiles('results-explorer/package.json') != ''
+        run: |
+          test -s results-explorer/public/data/results.duckdb
+          uv run -- python _project/scripts/results_explorer_snapshot_invariants.py results-explorer/public/data/results.duckdb
+
+      - name: Build results-explorer
+        if: hashFiles('results-explorer/package.json') != ''
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Assemble public site
+        run: uv run -- python scripts/assemble_public_site.py --site-dir site
+
+      - name: Scan assembled site for privacy leaks
+        run: uv run python scripts/publication/check_artifact_privacy.py site
+
+      - name: Upload HTML artifacts
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+          include-hidden-files: true
+
+      # The visual job consumes the exact assembled tree without rebuilding it.
+      # This is a short-lived transport artifact, not a publication baseline.
+      - name: Upload assembled site for visual acceptance
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: public-site-assembled-${{ github.run_id }}
+          path: site
+          retention-days: 3
+
+  public-site-visual-regression:
+    name: Public-site visual regression
+    if: ${{ needs.visual-inputs.outputs.render_changed == 'true' && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
+    needs: [visual-inputs, docs-build]
+    runs-on: ubuntu-latest
+    # Build (about 15 minutes) plus this job must fit inside the 60-minute
+    # merge-queue check timeout with room for runner queueing, so the job
+    # never idles long on a runner waiting for a baseline.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ needs.visual-inputs.outputs.source_sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: results-explorer/package-lock.json
+
+      - name: Download assembled site
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: public-site-assembled-${{ github.run_id }}
+          path: site
+
+      - name: Install explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: results-explorer
+
+      - name: Capture public site
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_PHASE: capture
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
+        run: npm run test:e2e:public-site
+        working-directory: results-explorer
+
+      # A merge-queue follower's base is the head of the group ahead of it. That
+      # group publishes a candidate baseline for its exact head once its own
+      # comparison passes. When the group ahead changed no site inputs it
+      # publishes nothing, so the lookup also accepts the nearest ancestor whose
+      # site inputs are byte-identical to the base, which is found at once. The
+      # bounded queue wait only matters when the group ahead did change site
+      # inputs; both groups build concurrently, so its candidate usually lands
+      # within minutes of this capture. Pull requests keep the short retry only.
+      - name: Download visual baseline for base or site-equivalent ancestor
+        id: baseline
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
+          PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES: ${{ needs.visual-inputs.outputs.baseline_candidates }}
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+          PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS: ${{ github.event_name == 'merge_group' && '600' || '0' }}
+        run: node scripts/download-public-site-visual-baseline.mjs
+        working-directory: results-explorer
+
+      - name: Compare public site with exact base
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_PHASE: compare
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.baseline.outputs.baseline_sha }}
+          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
+          APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
+          APPROVAL_REASON: ${{ github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON || github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
+        run: npm run test:e2e:public-site
+        working-directory: results-explorer
+
+      - name: Upload protected-develop visual baseline
+        if: >-
+          (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop')
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
+          path: ${{ runner.temp }}/public-site-visual-current
+          retention-days: 30
+
+      # Runs only after this group's exact-base comparison passed. The capture
+      # is of `merge_group.head_sha`, the exact tree the next queue group merges
+      # onto, and the download script trusts it only from a merge_group run of
+      # this workflow on this repository's develop queue branch.
+      - name: Upload merge-queue candidate visual baseline
+        if: github.event_name == 'merge_group'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
+          path: ${{ runner.temp }}/public-site-visual-current
+          retention-days: 7
+
+      - name: Upload visual diagnostics
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: public-site-visual-diagnostics-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/public-site-visual-current
+            results-explorer/test-results
+            results-explorer/playwright-report
+          if-no-files-found: ignore
+          retention-days: 3
+
+  example-validation:
+    needs: visual-inputs
+    if: needs.visual-inputs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Validate example file references
+        run: uv run python scripts/validate_example_references.py
+
+      - name: Check example file syntax
+        run: uv run python scripts/check_example_syntax.py
+
+      - name: Validate visualization screenshot sync
+        run: uv run python scripts/validate_visualization_images.py
+
+      - name: Check /prompts/ catalog is fresh
+        # Fails if landing/prompts/catalog.generated.js is stale or invalid.
+        # Must use the main project env (not --project _project/scripts) so
+        # benchbox is importable; see landing-prompts-catalog-generator
+        # decision and anti_patterns.
+        run: uv run -- python scripts/generate_landing_quickstarts.py --check
+
+      - name: Check for unsafe patch() string paths in tests
+        run: uv run python scripts/check_patch_safety.py
+
+  spellcheck:
+    needs: visual-inputs
+    if: needs.visual-inputs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Run codespell
+        uses: codespell-project/actions-codespell@e3258cca84ce02b0bb36a3d41f2c18f719a0cc1a # v2.4.3
+        with:
+          ignore_words_file: .codespell-ignore.txt
+          skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
+
+  docstring-coverage:
+    needs: visual-inputs
+    if: needs.visual-inputs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install interrogate
+
+      - name: Check docstring coverage
+        run: |
+          interrogate -c pyproject.toml --fail-under 90 benchbox/
+
+      - name: Generate docstring coverage badge
+        run: |
+          mkdir -p docs/_static
+          interrogate -c pyproject.toml --generate-badge docs/_static/ benchbox/
+
+  # Unit result: core. Required by the merge ruleset; reports on every event and passes when untouched.
+  core:
+    name: core
+    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dist-artifact, dependency-audit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the result helper
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/ci_unit_result.py
+            scripts/release_canary_sharding.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download complete medium shard evidence
+        if: needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: t2-medium-*-${{ github.sha }}
+          path: t2-evidence
+          merge-multiple: false
+
+      - name: Verify complete medium shard coverage
+        if: needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true'
+        run: python scripts/release_canary_sharding.py verify-medium --artifacts t2-evidence --checked-sha "${{ github.sha }}"
+
+      - name: Aggregate core result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python scripts/ci_unit_result.py \
+            --unit core \
+            --needs "$NEEDS_JSON" \
+            --always ci-paths \
+            --expect code-lint=${{ needs.ci-paths.outputs.code-tests-needed == 'true' }} \
+            --expect code-test=${{ needs.ci-paths.outputs.code-tests-needed == 'true' }} \
+            --expect medium-collect=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect medium-test=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect correctness-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }} \
+            --expect datafusion-integration=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect package-smoke=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} \
+            --expect dist-artifact=${{ github.event_name == 'merge_group' }} \
+            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+
+  # Unit result: explorer.
+  explorer:
+    name: explorer
+    needs: [ci-paths, explorer-tokens, explorer-vitest, parity-check, explorer-e2e, visual-inputs, public-site-visual-regression]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the result helper
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/ci_unit_result.py
+          sparse-checkout-cone-mode: false
+
+      - name: Aggregate explorer result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python scripts/ci_unit_result.py \
+            --unit explorer \
+            --needs "$NEEDS_JSON" \
+            --always ci-paths \
+            --expect explorer-tokens=${{ needs.ci-paths.outputs.explorer-paths-needed == 'true' }} \
+            --expect explorer-vitest=${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }} \
+            --expect parity-check=${{ needs.ci-paths.outputs.viz-needed == 'true' }} \
+            --expect explorer-e2e=${{ needs.ci-paths.outputs.unit-explorer == 'true' }} \
+            --expect visual-inputs=${{ true }} \
+            --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-explorer == 'true' }}
+
+  # Unit result: results-data.
+  results-data:
+    name: results-data
+    needs: [ci-paths, results-data-check]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the result helper
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/ci_unit_result.py
+          sparse-checkout-cone-mode: false
+
+      - name: Aggregate results-data result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python scripts/ci_unit_result.py \
+            --unit results-data \
+            --needs "$NEEDS_JSON" \
+            --always ci-paths \
+            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }}
+
+  # Unit result: docs.
+  docs:
+    name: docs
+    needs: [ci-paths, visual-inputs, docs-build, public-site-visual-regression, example-validation, spellcheck, docstring-coverage]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the result helper
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/ci_unit_result.py
+          sparse-checkout-cone-mode: false
+
+      - name: Aggregate docs result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python scripts/ci_unit_result.py \
+            --unit docs \
+            --needs "$NEEDS_JSON" \
+            --always ci-paths \
+            --expect visual-inputs=${{ true }} \
+            --expect docs-build=${{ needs.visual-inputs.outputs.changed == 'true' }} \
+            --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-docs == 'true' }} \
+            --expect example-validation=${{ needs.visual-inputs.outputs.changed == 'true' }} \
+            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }} \
+            --expect docstring-coverage=${{ needs.visual-inputs.outputs.changed == 'true' }}
+
+  # Unit result: landing.
+  landing:
+    name: landing
+    needs: [ci-paths, site-theme-tokens, visual-inputs, public-site-visual-regression]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the result helper
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/ci_unit_result.py
+          sparse-checkout-cone-mode: false
+
+      - name: Aggregate landing result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python scripts/ci_unit_result.py \
+            --unit landing \
+            --needs "$NEEDS_JSON" \
+            --always ci-paths \
+            --expect site-theme-tokens=${{ needs.ci-paths.outputs.site-theme-needed == 'true' }} \
+            --expect visual-inputs=${{ true }} \
+            --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-landing == 'true' }}
+
+  # Unit result: tooling.
+  tooling:
+    name: tooling
+    needs: [ci-paths, base-guard, soundness-flag, content-guard, skill-integrity, audit-sha, ruleset-drift]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout the result helper
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/ci_unit_result.py
+          sparse-checkout-cone-mode: false
+
+      - name: Aggregate tooling result
+        env:
+          NEEDS_JSON: ${{ toJson(needs) }}
+        run: |
+          set -euo pipefail
+          python scripts/ci_unit_result.py \
+            --unit tooling \
+            --needs "$NEEDS_JSON" \
+            --always ci-paths \
+            --always soundness-flag \
+            --expect base-guard=${{ github.event_name == 'pull_request' }} \
+            --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
+            --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
+            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} \
+            --expect ruleset-drift=${{ github.event_name == 'merge_group' }}

@@ -629,6 +629,7 @@ databricks|uc_volume|Unity Catalog volume name for staging data|{}
 databricks|staging_root|Cloud storage path for staging data (e.g., dbfs:/Volumes/..., s3://..., abfss://...)|{}
 databricks|databricks_clustering_strategy|Databricks SQL tuning strategy override (z_order, liquid_clustering, liquid_clustering_auto, none)|{'choices': ('z_order', 'liquid_clustering', 'liquid_clustering_auto', 'none')}
 databricks|liquid_clustering_columns|Comma-separated Databricks liquid clustering columns|{}
+databricks|disable_result_cache|Disable Databricks serverless result cache during benchmark execution|{'parser': 'parse_bool', 'default': True}
 bigquery|staging_root|GCS path for staging data (e.g., gs://bucket/path)|{}
 bigquery|storage_bucket|GCS bucket name for data staging (alternative to staging_root)|{}
 bigquery|storage_prefix|GCS path prefix within bucket for data staging|{}

@@ -714,7 +714,9 @@ class UnifiedDtExpr:
 
             # DataFusion dow: 0=Sunday..6=Saturday; convert to ISO
             return UnifiedExpr((df_f.date_part("dow", self._expr) + 6) % 7)
-        return UnifiedExpr(self._expr.dt.weekday())
+        # Polars dt.weekday(): 1=Monday..7=Sunday; convert to ISO 0=Monday..6=Sunday
+        # so every backend matches the documented convention.
+        return UnifiedExpr(self._expr.dt.weekday() - 1)
 
     def truncate(self, every: str) -> UnifiedExpr:
         """Truncate datetime to given interval.
@@ -1028,12 +1030,6 @@ class UnifiedExpr:
             # self._expr is the divisor here
             return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
         return UnifiedExpr(other_expr / self._expr)
-
-    def __mod__(self, other: Any) -> UnifiedExpr:
-        return UnifiedExpr(self._expr % self._unwrap(other))
-
-    def __rmod__(self, other: Any) -> UnifiedExpr:
-        return UnifiedExpr(self._unwrap(other) % self._expr)
 
     # =========================================================================
     # Comparison Operations

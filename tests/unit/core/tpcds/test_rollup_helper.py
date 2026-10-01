@@ -56,16 +56,62 @@ class _FakeFrame:
         return self
 
 
+class _FakeColExpr:
+    def __init__(self, name):
+        self.name = name
+
+    def count(self):
+        return _FakeCountExpr(self.name)
+
+
+class _FakeCountExpr:
+    def __init__(self, name):
+        self.name = name
+
+    def alias(self, name: str):
+        return ("count-alias", self.name, name)
+
+
 class _FakeExprCtx:
     def lit(self, value):
         return _LitExpr(value)
+
+    def col(self, name):
+        return _FakeColExpr(name)
+
+    def when(self, condition):
+        return _FakeWhen(condition)
 
     def concat(self, frames):
         return frames
 
 
+class _FakeWhen:
+    def __init__(self, condition):
+        self.condition = condition
+
+    def then(self, value):
+        return _FakeThen(value)
+
+
+class _FakeThen:
+    def __init__(self, value):
+        self.value = value
+
+    def otherwise(self, value):
+        return _FakeOtherwise(value)
+
+
+class _FakeOtherwise:
+    def __init__(self, value):
+        self.value = value
+
+    def alias(self, name: str):
+        return ("when-alias", name)
+
+
 class _PandasAdapter:
-    def groupby_agg(self, df, group_cols, agg_spec, as_index=False):  # noqa: ARG002
+    def groupby_agg(self, df, group_cols, agg_spec, as_index=False, dropna=True):  # noqa: ARG002
         return df.groupby(group_cols, as_index=False).agg(**agg_spec)
 
 

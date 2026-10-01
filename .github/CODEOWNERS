@@ -65,9 +65,25 @@ scripts/publication/verify_lane_isolation.py @joeharris76
 # SOUNDNESS_PREFIXES (auto-merge withholding) and route review requests.
 # .github/workflows/pr.yml deliberately excluded
 # (high churn; its required check is pinned by the ruleset-drift canary).
+.github/CODEOWNERS @joeharris76
 scripts/heavy_tier_needed.py @joeharris76
+AGENTS.md @joeharris76
+.github/PULL_REQUEST_TEMPLATE.md @joeharris76
+.github/soundness-paths.txt @joeharris76
+_project/scripts/soundness_paths.py @joeharris76
+_project/scripts/check_soundness_review.py @joeharris76
+.github/workflows/ci.yml @joeharris76
+.github/ci-units.yml @joeharris76
+scripts/ci_units.py @joeharris76
+scripts/ci_unit_result.py @joeharris76
+scripts/release_flow.py @joeharris76
+scripts/update_version.py @joeharris76
+scripts/generate_changelog_entry.py @joeharris76
+scripts/check_release_curation.py @joeharris76
+scripts/check_dependency_bounds.py @joeharris76
+_project/scripts/check_uv_lock_revision.py @joeharris76
+_project/decisions/single-repo-migration.md @joeharris76
 _project/scripts/auto_merge_soundness_paths.py @joeharris76
-.github/workflows/auto-merge-on-open.yml @joeharris76
 .github/workflows/release.yml @joeharris76
 # Independent-publication authority and trust-policy surfaces. These exact
 # paths mirror SOUNDNESS_FILES so policy changes route to manual maintainer
@@ -86,3 +102,7 @@ docs/reference/threat-model.md @joeharris76
 scripts/check_decision_records.py @joeharris76
 publication/** @joeharris76
 scripts/publication/** @joeharris76
+benchbox/_binaries/** @joeharris76
+benchbox/utils/binary_manifest.py @joeharris76
+scripts/bundled_binary_manifest.py @joeharris76
+scripts/verify_distribution_binaries.py @joeharris76

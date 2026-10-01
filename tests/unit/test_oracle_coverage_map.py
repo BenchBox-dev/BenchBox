@@ -292,11 +292,16 @@ def test_surface_provenance_is_read_live_from_gate_metadata(rows):
 
     by_id = {r["benchmark"]: r for r in rows}
     for benchmark_id, gate in {**GATES, **STAGED_GATES}.items():
-        if by_id[benchmark_id]["primary_oracle"] == ORACLE_CROSS_SURFACE:
-            assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
-                f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
-            )
-            assert by_id[benchmark_id]["surface_provenance_rationale"] == gate.surface_independence_rationale
+        # Only rows whose PRIMARY oracle is cross-surface disclose provenance;
+        # a registered gate with a higher-priority primary (e.g. tpch's
+        # expected-results) correctly reports PROVENANCE_NONE.
+        if by_id[benchmark_id]["primary_oracle"] != ORACLE_CROSS_SURFACE:
+            assert by_id[benchmark_id]["surface_provenance"] == PROVENANCE_NONE
+            continue
+        assert by_id[benchmark_id]["surface_provenance"] == gate.surface_independence, (
+            f"{benchmark_id} provenance is not read live from CrossSurfaceGate metadata"
+        )
+        assert by_id[benchmark_id]["surface_provenance_rationale"] == gate.surface_independence_rationale
 
 
 def test_provenance_never_changes_independence(rows):

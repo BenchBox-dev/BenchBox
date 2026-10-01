@@ -27,10 +27,6 @@ class CrossSurfaceData:
     # comparison stays a single bounded cell.
     benchmark: Any
     data_dir: Path
-    # Optional gate-run teardown (for example restoring process-global
-    # parameter overrides a builder installed). run_gate() invokes it after
-    # the comparison finishes.
-    cleanup: Callable[[], None] | None = None
 
 
 def _assemble_simple_duckdb_cell(
