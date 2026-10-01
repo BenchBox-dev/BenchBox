@@ -6030,15 +6030,10 @@
       "title": "Add DataFrame execution support to Transaction Primitives benchmark"
     },
     "dfparity-t00-owner-decisions": {
-      "claim": {
-        "expires_at": "2026-10-02T14:50:20Z",
-        "generation": "a073fa6810f3483f97f759ff9df4053e",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Record owner decisions D1-D5 gating the DataFrame parity work"
     },
     "dfparity-t01-dsqgen-log-parser": {
