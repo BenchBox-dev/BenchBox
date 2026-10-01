@@ -15,7 +15,10 @@ import yaml
 
 from scripts import release_artifact_consumer as consumer
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+# Medium tier: these 81 nodes would take the fast-lane count past its ceiling, and this module is
+# imported by the medium execution tests. The medium tier runs on every merge group and on pull
+# requests that change soundness paths, which this change does.
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ROOT = Path(__file__).resolve().parents[3]
 SHA = "a" * 40
 WHEEL = "benchbox-0.4.2-py3-none-any.whl"

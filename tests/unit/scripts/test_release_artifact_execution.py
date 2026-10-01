@@ -401,18 +401,22 @@ def test_atomic_output_publishes_whole_directory(tmp_path):
 @pytest.mark.parametrize("behavior", ["stall", "oversize", "failure"])
 def test_download_failure_reaps_real_child_and_removes_partial(tmp_path, monkeypatch, behavior):
     executable = tmp_path / "gh"
+    # A shell stub, not a Python one: a freshly created Python script occasionally takes about three
+    # seconds to start on macOS, which these process-lifetime tests must not depend on.
     executable.write_text(
-        f"#!{sys.executable}\nimport sys,time\n"
-        "assert sys.argv[1:4] == ['api','--hostname','github.com']\n"
+        "#!/bin/sh\n"
+        '[ "$1 $2 $3" = "api --hostname github.com" ] || exit 9\n'
         + {
-            "stall": "time.sleep(30)\n",
-            "oversize": "sys.stdout.buffer.write(b'x'*128);sys.stdout.flush();time.sleep(30)\n",
-            "failure": "sys.stdout.buffer.write(b'partial');sys.stdout.flush();sys.exit(4)\n",
+            "stall": "sleep 30\n",
+            "oversize": "head -c 128 /dev/zero\nsleep 30\n",
+            "failure": "printf partial\nexit 4\n",
         }[behavior]
     )
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ.get("PATH", ""))
-    monkeypatch.setattr(consumer, "DOWNLOAD_TIMEOUT_SECONDS", 0.3)
+    # Only the stall case needs a short deadline. The other two need the child to start and
+    # write before it, so a short deadline races process startup on a loaded machine.
+    monkeypatch.setattr(consumer, "DOWNLOAD_TIMEOUT_SECONDS", 0.3 if behavior == "stall" else 30.0)
     monkeypatch.setattr(consumer, "MAX_PAYLOAD_BYTES", 16)
     real_popen = subprocess.Popen
     children = []
@@ -526,12 +530,13 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
 
     pidfile = tmp_path / "descendant.pid"
     executable = tmp_path / "gh"
+    # A shell stub, not a Python one, so its startup is deterministic; the background `sleep`
+    # inherits the stub's stdout pipe, which is exactly the descendant cleanup must not wait on.
     executable.write_text(
-        f"#!{sys.executable}\nimport os,subprocess,sys,time\n"
-        "assert sys.argv[1:4] == ['api','--hostname','github.com']\n"
-        "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(30)'])\n"
-        f"open({str(pidfile)!r},'w').write(str(child.pid))\n"
-        + ("sys.exit(0)\n" if parent_exits else "time.sleep(30)\n")
+        "#!/bin/sh\n"
+        '[ "$1 $2 $3" = "api --hostname github.com" ] || exit 9\n'
+        "sleep 30 &\n"
+        f"echo $! > {pidfile}\n" + ("exit 0\n" if parent_exits else "sleep 30\n")
     )
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path) + os.pathsep + os.environ.get("PATH", ""))
@@ -541,7 +546,10 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
         "import importlib.util,pathlib,sys\n"
         f"spec=importlib.util.spec_from_file_location('consumer',{str(ROOT / 'scripts/release_artifact_consumer.py')!r})\n"
         "module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)\n"
-        "module.DOWNLOAD_TIMEOUT_SECONDS=0.3\n"
+        # Spawning a fresh script child has been measured to stall for about three seconds on a
+        # loaded macOS machine, before the script runs at all. The deadline needs margin over that
+        # so the child is up and has written its pid file, and is still far below its 30 second sleeps.
+        "module.DOWNLOAD_TIMEOUT_SECONDS=8.0\n"
         f"archive=pathlib.Path({str(archive)!r})\n"
         "try:\n module._download(11,archive)\n"
         "except ValueError as exc:\n assert 'deadline' in str(exc)\n"
@@ -555,9 +563,9 @@ def test_inherited_pipe_writer_cannot_hold_download_cleanup(tmp_path, monkeypatc
         start_new_session=os.name != "nt",
     )
     try:
-        stdout, stderr = process.communicate(timeout=3)
+        stdout, stderr = process.communicate(timeout=40)
         assert process.returncode == 0, (stdout, stderr)
-        assert pidfile.exists()
+        assert pidfile.exists(), "the stub gh never started within the download deadline"
         descendant = int(pidfile.read_text())
         started = mono_time()
         while True:
@@ -904,3 +912,34 @@ def test_gh_children_get_only_authentication_and_network_settings(tmp_path, monk
     names = set(json.loads(seen.read_text()))
     assert {"PATH", "GH_TOKEN", "HTTPS_PROXY"} <= names
     assert not {"AWS_SECRET_ACCESS_KEY", "GH_HOST", "GIT_CONFIG_COUNT"} & names
+
+
+def test_cli_fetches_hosted_refs_before_it_admits(monkeypatch, tmp_path, capsys):
+    order = []
+    monkeypatch.setattr(consumer, "fetch_hosted_refs", lambda source, tag: order.append(("fetch", source, tag)))
+
+    def record_admission(root, tag, output, *args, **kwargs):
+        order.append(("admit", root, tag))
+        return {"tag": tag}
+
+    monkeypatch.setattr(consumer, "admit", record_admission)
+    argv = ["admit", "--source", str(tmp_path), "--tag", "v0.4.2", "--output", str(tmp_path / "admitted")]
+    assert consumer.main(argv) == 0
+    # Without the fetch a stale local tag could admit the previous commit's artifact.
+    assert order == [("fetch", tmp_path, "v0.4.2"), ("admit", tmp_path.resolve(), "v0.4.2")]
+    assert '"tag": "v0.4.2"' in capsys.readouterr().out
+
+
+def test_cli_refuses_to_admit_when_the_hosted_fetch_fails(monkeypatch, tmp_path):
+    admitted = []
+
+    def failing_fetch(source, tag):
+        raise subprocess.CalledProcessError(128, ["git", "fetch"])
+
+    monkeypatch.setattr(consumer, "fetch_hosted_refs", failing_fetch)
+    monkeypatch.setattr(consumer, "admit", lambda *args, **kwargs: admitted.append(args))
+    argv = ["admit", "--source", str(tmp_path), "--tag", "v0.4.2", "--output", str(tmp_path / "admitted")]
+    with pytest.raises(SystemExit) as error:
+        consumer.main(argv)
+    assert error.value.code == 1
+    assert not admitted
