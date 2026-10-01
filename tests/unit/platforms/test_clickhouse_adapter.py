@@ -14,7 +14,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter
-from benchbox.platforms.clickhouse._dependencies import import_chdb
+from tests.utilities.optional_engines import chdb_skip_reason, chdb_usable
 
 pytestmark = [
     pytest.mark.unit,
@@ -22,13 +22,9 @@ pytestmark = [
 ]
 
 
-# Check for optional dependencies, including native-load usability.
-try:
-    import_chdb()
-except ImportError:
-    CHDB_AVAILABLE = False
-else:
-    CHDB_AVAILABLE = True
+# chDB must be installed and its native library loadable, not merely present.
+CHDB_AVAILABLE = chdb_usable()
+CHDB_SKIP_REASON = chdb_skip_reason() or "chDB is usable"
 
 
 @pytest.fixture(autouse=True)
@@ -408,7 +404,7 @@ class TestClickHouseAdapter:
         grace_stmt = next((s for s in executed_statements if "grace_hash" in s), None)
         assert grace_stmt is not None, "join_algorithm = grace_hash setting was not applied"
 
-    @pytest.mark.skipif(not CHDB_AVAILABLE, reason="chDB not installed (required for embedded mode test)")
+    @pytest.mark.skipif(not CHDB_AVAILABLE, reason=f"{CHDB_SKIP_REASON} (required for embedded mode test)")
     def test_configure_for_benchmark_embedded_mode(self):
         """Test benchmark optimization in embedded mode skips problematic settings."""
         # Skip if chdb is not available - this test specifically tests embedded mode behavior
@@ -442,7 +438,7 @@ class TestClickHouseAdapter:
             assert "max_memory_usage" in executed_sql
             assert "max_threads" in executed_sql
 
-    @pytest.mark.skipif(not CHDB_AVAILABLE, reason="chDB not installed (required to execute real ClickHouse DDL)")
+    @pytest.mark.skipif(not CHDB_AVAILABLE, reason=f"{CHDB_SKIP_REASON} (required to execute real ClickHouse DDL)")
     def test_tuned_ddl_executes_against_real_chdb(self, tmp_path):
         """ClickHouse (via chdb) actually accepts the tuned PARTITION BY/ORDER BY DDL, not just string-matches it.
 
@@ -538,7 +534,7 @@ class TestClickHouseAdapter:
             result = adapter.get_database_path(database_path="some/path.duckdb")
             assert result is None
 
-    @pytest.mark.skipif(not CHDB_AVAILABLE, reason="chDB not installed (required for embedded mode)")
+    @pytest.mark.skipif(not CHDB_AVAILABLE, reason=f"{CHDB_SKIP_REASON} (required for embedded mode)")
     def test_apply_setting_with_validation_embedded_mode(self):
         """Test setting validation in embedded mode."""
         with patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"):
