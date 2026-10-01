@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A report labels every divergent cell at SF 0.03 and 0.1 with a cause and the evidence string",
+    "Q4, Q11, Q20 and Q78 are classified",
+    "The comparator's strictness (tolerance 1e-10, NaN vs NULL) is unchanged by this item"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T14). Owner decision D4 in dfparity-t00-owner-decisions. Probe results exist only in a session scratchpad; regenerate with the gate. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Build a classifier (script or report mode) that labels each divergent cell as parameter drift, tie, NULL order, DECIMAL/float, or logic, using the full divergence detail text (the earlier probe truncated at 200 characters, so Q4, Q11, Q20 and Q78 could not be judged). Known examples: Q71 NULL ordering, Q76 NULL ordering (no ties possible), Q70 float tie, Q11 pandas row-count difference (not a tie). Tie canonicalization in the comparator is allowed only for causes this classifier proves are true ties, applied to both sides; NULL ordering is fixed in implementations, not the comparator.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:09:27Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e0ff28b1ecc341a19925d4abc6324c7e",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}

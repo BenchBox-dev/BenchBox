@@ -6125,6 +6125,15 @@
       "status": "open",
       "title": "Fix pandas Q78 performance (14 s at SF=0.1, over 180 s at SF=1)"
     },
+    "dfparity-t14-divergence-classifier": {
+      "claim": null,
+      "needs": [
+        "dfparity-t03-gate-scale-threading"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Classify every gate divergence by cause using full detail strings"
+    },
     "dfparity-t15-cross-platform-identity": {
       "claim": null,
       "needs": [],
