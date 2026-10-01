@@ -1165,6 +1165,38 @@ class DatabricksAdapter(PlatformAdapter):
             if "connection" in locals():
                 connection.close()
 
+    def reset_database_in_place(self, **connection_config) -> bool:
+        """Truncate the schema's tables instead of dropping the schema.
+
+        Unity Catalog keeps dropped tables recoverable for about seven days,
+        and they count against the metastore table quota until then, so a
+        drop-and-recreate on every reload exhausts small quotas. Schema
+        creation replaces tables with ``CREATE OR REPLACE``, which does not add
+        to the quota. Tables created with ``IF NOT EXISTS`` keep their
+        structure and start empty. Returns False, and the caller drops the
+        schema as before, when the schema is absent or any table cannot be
+        truncated.
+        """
+        catalog = connection_config.get("catalog", self.catalog)
+        schema = connection_config.get("schema", self.schema)
+        connection = None
+        try:
+            connection = self._create_admin_connection(**connection_config)
+            cursor = connection.cursor()
+            cursor.execute(f"SHOW TABLES IN {catalog}.{schema}")
+            tables = [row[1] for row in cursor.fetchall() if not (len(row) > 2 and row[2])]
+            for table in tables:
+                cursor.execute(f"TRUNCATE TABLE {catalog}.{schema}.`{table}`")
+            self.log_verbose(f"Truncated {len(tables)} tables in {catalog}.{schema} for reload")
+            self._schema_reset_in_place = True
+            return True
+        except Exception as e:
+            self.log_verbose(f"In-place reset of {catalog}.{schema} failed, dropping instead: {e}")
+            return False
+        finally:
+            if connection is not None:
+                connection.close()
+
     def drop_database(self, **connection_config) -> None:
         """Drop schema in Databricks catalog."""
         try:
@@ -2420,21 +2452,27 @@ class DatabricksAdapter(PlatformAdapter):
         else:
             column_list = self._get_column_list_for_table(benchmark, table_name, cursor)
 
+        # COPY INTO skips files it has already loaded into the target table.
+        # Staging file URIs are reused across runs, and a reload can target a
+        # table that was truncated rather than dropped, so force every load;
+        # the row count check below still catches a double load.
+        copy_options = " COPY_OPTIONS('force' = 'true')"
         copy_time = 0.0
         for source_uri in copy_sources:
             if is_parquet:
                 copy_sql = (
                     f"COPY INTO {table_name_upper} FROM (SELECT {cast_select} FROM '{source_uri}') FILEFORMAT = PARQUET"
+                    f"{copy_options}"
                 )
             elif copy_dialect.has_header:
                 copy_sql = (
                     f"COPY INTO {table_name_upper} FROM (SELECT {cast_select} FROM '{source_uri}') "
-                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options}){copy_options}"
                 )
             else:
                 copy_sql = (
                     f"COPY INTO {table_name_upper}{column_list} FROM '{source_uri}' "
-                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options})"
+                    f"FILEFORMAT = CSV FORMAT_OPTIONS({format_options}){copy_options}"
                 )
             copy_start = mono_time()
             cursor.execute(copy_sql)
@@ -3062,6 +3100,12 @@ class DatabricksAdapter(PlatformAdapter):
         if "CREATE TABLE" in body.upper() and "OR REPLACE" not in body.upper():
             if "IF NOT EXISTS" not in body.upper():
                 body = body.replace("CREATE TABLE", "CREATE OR REPLACE TABLE", 1)
+            elif getattr(self, "_schema_reset_in_place", False):
+                # After an in-place reset the table still exists with its old
+                # definition; replace it so the current DDL applies.
+                body = re.sub(
+                    r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS", "CREATE OR REPLACE TABLE", body, count=1, flags=re.IGNORECASE
+                )
         statement = prefix + body
 
         if self.table_format == "hudi":
