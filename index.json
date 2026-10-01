@@ -17857,6 +17857,13 @@
       "status": "done",
       "title": "Fix Spark adapter AQE toggle: CLI flag cannot disable, run-time config force-re-enables"
     },
+    "spark-baseline-no-default-overrides": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Stop overriding Spark defaults in notuning runs; record harness settings"
+    },
     "spark-mixin-open-table-format-loading": {
       "claim": null,
       "needs": [],

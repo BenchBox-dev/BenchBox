@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A notuning Spark, Velox and LakeSail run issues no conf.set for AQE/CBO/shuffle/broadcast values that merely restate or alter engine defaults; tuned runs still get them.",
+    "Engine-mandatory harness settings are still applied and appear in the ledger as harness-required.",
+    "Velox records its session settings through the shared path.",
+    "overall_status for a baseline run is unchanged in meaning (documented and tested).",
+    "The generation-seam decision (bump or not) is recorded with the user's agreement, and results docs state which Spark baselines are comparable.",
+    "uv run -- pytest tests/unit/platforms tests/unit/core/tuning -q -k spark passes."
+  ],
+  "context": "Origin: user decision 2026-09-30, from Opus review finding C1 (verified in source: the OLAP helper is called regardless of tuning_enabled). Independent of the session-config model/runtime items but touches the same helper; coordinate ordering with spark-session-config-runtime to avoid merge conflicts. Must be settled before spark-tuned-template-measured, because curated values can only be chosen once the effective baseline is known.",
+  "description": "User decision 2026-09-30: a `notuning` run must not override Spark's default configuration. Today `configure_for_benchmark` (spark.py ~L659, lakesail.py ~L526) always calls `apply_spark_olap_runtime_conf` (_spark_helpers.py ~L70-101), which sets five AQE/CBO keys in every mode; Spark's defaults for spark.sql.cbo.enabled and spark.sql.cbo.joinReorder.enabled are false. That is a curated optimisation pack running in the baseline, the same inversion ADR-003 (docs/development/tuning-adr-003-baseline-and-single-renderer.md) fixed for ClickHouse (see benchbox/platforms/clickhouse/tuning.py ~L44-99: harness settings in every mode, optimisation pack gated on self.tuning_enabled). Velox's configure_for_benchmark (velox.py ~L563-576) sets the CBO keys inline, records nothing and does not use the shared helper.\n\nScope:\n- Gate the CBO pack (and any AQE/shuffle values that differ from the engine default on the supported Spark versions) on tuning_enabled, for spark, velox and lakesail.\n- Review other BenchBox-originated session values set in every mode: `adaptive_enabled` default at session build (spark.py ~L453-459), `shuffle_partitions` default 200, and the joinorder-only `broadcast_threshold = -1` (spark.py ~L349-356). Keep only engine-mandatory settings (warehouse dir, table-format extensions/catalogs, the Gluten plugin and off-heap settings) and record them in the ledger as harness-required so they are visible and not mistaken for tuning.\n- Route Velox through the shared helper so its session settings are recorded.\n- Baseline Spark and LakeSail bundles will gain a ledger payload; keep `overall_status` meaningful (Opus suggested a `harness_default` mechanism excluded from overall_status) - decide and document.\n- This changes baseline numbers. ADR-003 reconciliation: decide whether TUNING_POLICY_GENERATION (benchbox/core/tuning/policy_generation.py) needs a new generation, and ask the user before bumping it. Document the comparability break for old Spark baselines.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:407197ffef805719e81c0b47",
+      "at": "2026-10-01T00:13:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "be04b88040e949cbb00285ebed68e734",
+      "session_id": "84cb9f884244423988b9cef251a0c248"
+    }
+  ]
+}
