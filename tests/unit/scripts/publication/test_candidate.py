@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -9,7 +11,9 @@ import pytest
 
 from scripts.publication.assembler import compute_tree_digest
 from scripts.publication.candidate import (
+    DEFAULT_DEVELOP_MAX_BEHIND_COMMITS,
     CandidateValidationError,
+    check_develop_freshness,
     create_candidate_metadata,
     extract_candidate_archive,
     manifest_digest,
@@ -254,3 +258,115 @@ def test_main_create_writes_output_without_summary_flag(tmp_path: Path) -> None:
         == 0
     )
     assert json.loads(output_path.read_text(encoding="utf-8"))["producer_run_id"] == "123"
+
+
+def _linear_repo(path: Path, commits: int) -> list[str]:
+    """Create a linear git repo; returns oldest-first commit SHAs."""
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=path, check=True)
+    shas: list[str] = []
+    for index in range(commits):
+        (path / "file.txt").write_text(f"commit {index}\n", encoding="utf-8")
+        subprocess.run(["git", "add", "file.txt"], cwd=path, check=True)
+        subprocess.run(
+            ["git", "commit", "-q", "-m", f"commit {index}"],
+            cwd=path,
+            check=True,
+        )
+        result = subprocess.run(["git", "rev-parse", "HEAD"], cwd=path, capture_output=True, text=True, check=True)
+        shas.append(result.stdout.strip())
+    return shas
+
+
+def test_develop_freshness_accepts_exact_tip(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    shas = _linear_repo(repo, 2)
+    check_develop_freshness(shas[1], shas[1], repo=repo)
+
+
+def test_develop_freshness_accepts_recent_ancestor(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    shas = _linear_repo(repo, 3)
+    check_develop_freshness(shas[0], shas[2], max_behind_commits=2, repo=repo)
+
+
+def test_develop_freshness_rejects_candidate_beyond_bound(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    shas = _linear_repo(repo, 4)
+    with pytest.raises(CandidateValidationError, match="stale"):
+        check_develop_freshness(shas[0], shas[3], max_behind_commits=2, repo=repo)
+
+
+def test_develop_freshness_rejects_unreachable_candidate(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    shas = _linear_repo(repo, 2)
+    subprocess.run(["git", "checkout", "-q", "-b", "side", shas[0]], cwd=repo, check=True)
+    (repo / "file.txt").write_text("side branch\n", encoding="utf-8")
+    subprocess.run(["git", "add", "file.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "side"], cwd=repo, check=True)
+    side = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True, check=True
+    ).stdout.strip()
+    with pytest.raises(CandidateValidationError, match="stale"):
+        check_develop_freshness(side, shas[1], repo=repo)
+
+
+def test_develop_freshness_rejects_malformed_or_unknown_sha(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    shas = _linear_repo(repo, 1)
+    with pytest.raises(CandidateValidationError, match="stale"):
+        check_develop_freshness("not-a-sha", shas[0], repo=repo)
+    with pytest.raises(CandidateValidationError, match="stale"):
+        check_develop_freshness("d" * 40, shas[0], repo=repo)
+
+
+def test_develop_max_behind_default_is_bounded() -> None:
+    assert DEFAULT_DEVELOP_MAX_BEHIND_COMMITS > 0
+
+
+def _bundle_with_parent(tmp_path: Path) -> tuple[Path, dict, dict, dict]:
+    """Generation-2 bundle bound to a durable parent."""
+    root, artifact_metadata, run_metadata, manifest = _bundle(tmp_path)
+    manifest = dict(manifest)
+    manifest["generation"] = 2
+    manifest["parent_sha"] = "e" * 40
+    manifest["parent_generation"] = 1
+    manifest["manifest_digest"] = manifest_digest(manifest)
+    (root / "desired-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    metadata = json.loads((root / "candidate.json").read_text(encoding="utf-8"))
+    metadata["manifest_digest"] = manifest["manifest_digest"]
+    (root / "candidate.json").write_text(json.dumps(metadata), encoding="utf-8")
+    return root, artifact_metadata, run_metadata, manifest
+
+
+def test_candidate_rejects_stale_parent_generation(tmp_path: Path) -> None:
+    root, artifact_metadata, run_metadata, manifest = _bundle_with_parent(tmp_path)
+    with pytest.raises(CandidateValidationError, match="parent"):
+        validate_candidate_directory(
+            root,
+            artifact_id=456,
+            artifact_metadata=artifact_metadata,
+            run_metadata=run_metadata,
+            expected_develop_sha=manifest["develop_sha"],
+            expected_generation=2,
+            expected_parent_sha="e" * 40,
+            expected_parent_generation=2,
+        )
+
+
+def test_candidate_accepts_matching_parent_binding(tmp_path: Path) -> None:
+    root, artifact_metadata, run_metadata, manifest = _bundle_with_parent(tmp_path)
+    summary = validate_candidate_directory(
+        root,
+        artifact_id=456,
+        artifact_metadata=artifact_metadata,
+        run_metadata=run_metadata,
+        expected_develop_sha=manifest["develop_sha"],
+        expected_generation=2,
+        expected_parent_sha="e" * 40,
+        expected_parent_generation=1,
+    )
+    assert summary.expected_parent_sha == "e" * 40
+    assert summary.expected_parent_generation == 1
