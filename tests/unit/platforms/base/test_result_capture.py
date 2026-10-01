@@ -140,3 +140,53 @@ class TestLogPlanCaptureSummary:
         host._log_plan_capture_summary(query_results)
         host.logger.warning.assert_called_once_with("Query plans: 1/2 captured, 1 failed")
         host.logger.info.assert_not_called()
+
+
+class TestExecuteQueryWithPlanCapture:
+    """The shared idiom behind the five thin adapter overrides."""
+
+    def test_delegates_then_merges(self):
+        host = _Host(capture_plans=True, plan=_make_plan())
+        calls = []
+
+        def execute(connection, query, query_id, **kwargs):
+            calls.append((connection, query, query_id, kwargs))
+            return {"status": "SUCCESS"}
+
+        result = host.execute_query_with_plan_capture(
+            execute,
+            "conn",
+            "SELECT 1",
+            "q1",
+            benchmark_type="tpch",
+            scale_factor=0.01,
+            validate_row_count=False,
+            stream_id=3,
+        )
+        assert calls == [
+            (
+                "conn",
+                "SELECT 1",
+                "q1",
+                {
+                    "benchmark_type": "tpch",
+                    "scale_factor": 0.01,
+                    "validate_row_count": False,
+                    "stream_id": 3,
+                },
+            )
+        ]
+        assert result["status"] == "SUCCESS"
+        assert result["plan_fingerprint"] == "fp123"
+        assert host.capture_calls == [("conn", "SELECT 1", "q1")]
+
+    def test_merge_noop_without_capture_plans(self):
+        host = _Host(capture_plans=False, plan=_make_plan())
+        result = host.execute_query_with_plan_capture(
+            lambda connection, query, query_id, **kwargs: {"status": "SUCCESS"},
+            "conn",
+            "SELECT 1",
+            "q1",
+        )
+        assert result == {"status": "SUCCESS"}
+        assert host.capture_calls == []

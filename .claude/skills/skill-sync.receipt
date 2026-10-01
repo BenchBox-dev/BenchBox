@@ -13,13 +13,17 @@ dir = skills
 skill = blog
 skill = code
 skill = docs
-skill = shared-agent-execution
 skill = shared-change-framework
 skill = shared-investigation-framework
 skill = shared-review-protocol
 skill = test
 skill = tidy-perms
 skill = todo
+
+source = https://github.com/joeharris76/skill-sync-skills.git
+rev = 48be0487de361c0f12e0b5ac5bc84cf832da1dd0
+dir = skills
+skill = shared-agent-execution
 
 source = https://github.com/joeharris76/skill-sync.git
 rev = 25e1e47693d8b0b2aba91d3ad3dbc0c14b8d3c4c
