@@ -6029,6 +6029,13 @@
       "status": "done",
       "title": "Add DataFrame execution support to Transaction Primitives benchmark"
     },
+    "dfparity-t00-owner-decisions": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Record owner decisions D1-D5 gating the DataFrame parity work"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],

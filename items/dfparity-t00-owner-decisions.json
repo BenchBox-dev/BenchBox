@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Each of D1-D5 has a written decision (or an explicit deferral with reason) in this item's context",
+    "D3 records the result of comparing -LOG output from the bundled dsqgen binaries across platforms, or states it could not be checked",
+    "Dependent items (t03, t07, t12, t16, t21, t22) are updated if a decision changes their scope"
+  ],
+  "context": "Source: DataFrame query parity proposal v3, produced after two adversarial reviews (session scratchpad proposal_v3.md; not durable). Parity means same table data (already shared), same parameters (the gap), same results (to be confirmed). Gate code: benchbox/core/equivalence/cross_surface.py; TPC-DS is a staged report-only gate at SF=0.01. The project owner does NOT accept earlier reviewers' TPC-H claims; change nothing in TPC-H without an owner decision. Related existing items tpcds-parity-b1..b6 are left untouched. Heavy runs (SF=1: about 450 s and 3.5 GB) need explicit approval; the machine is shared.",
+  "description": "Five decisions only the project owner can make, each with the evidence and a recommendation, recorded in the item context before dependent items start. D1 render scale: gate-only (recommended) vs also production get_queries. TPC-DS runner.get_queries (benchbox/core/tpcds/benchmark/runner.py:235) renders dsqgen at SCALE=1 regardless of data scale while get_query (line ~279) uses the data scale; platform adapters (platforms/base/execution.py ~1033-1049), tpcds/power_test.py:217 and throughput_test.py:423 call get_queries, so production SQL runs at SF!=1 use SF=1 parameters today; changing it alters baselines and published comparability. D2 provenance: (binary identity, seed, scale, stream); recommend stream 0 only (dsqgen -LOG emits BEGIN STREAM n). D3 runtime dsqgen -LOG (about 30 ms/query, 3 s for 99) vs committed defaults plus drift test; first check that the bundled dsqgen binaries under benchbox/_binaries/tpc-ds/ give identical logs across platforms. D4 NULL-order and tie policy: recommend fixing NULL order in implementations against the explicit ORDER BY, and canonicalizing ties in the comparator only where the classifier proves a true tie. D5 TPC-H reference-seed semantics (contested by the owner; see dfparity-t21).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:01:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4d5f739b15b24941bb2f25db1eb4ee2c",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
