@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Pandas Q78 runs in under 2 s at SF=0.1",
+    "Pandas Q78 completes at SF=1 without a timeout (needs explicit approval for the run) or the bound is stated",
+    "Q78 pandas result status is recorded before and after"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T13). The SF=1 180.29 s figure is the probe's own 180 s alarm, so it is a lower bound. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Measured (one run each, loaded machine): pandas Q78 takes 4.8 s at SF=0.03, 7.9 s at 0.05, 14.3 s at 0.1 and hit a 180 s probe timeout at SF=1, about half of all pandas time at those scales; it also diverges. Profile the pandas implementation (likely a non-vectorized or quadratic step), fix it, and keep results unchanged or corrected. This blocks the SF=1 oracle lane (dfparity-t18) and the pandas parallel job.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:03:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d944a4ca08f54737b133449634be7253",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}

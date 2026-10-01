@@ -6071,6 +6071,13 @@
       "status": "open",
       "title": "Check w_warehouse_name coming back None on the expression family (Q21, Q62, Q66, Q99)"
     },
+    "dfparity-t13-pandas-q78-perf": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix pandas Q78 performance (14 s at SF=0.1, over 180 s at SF=1)"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
