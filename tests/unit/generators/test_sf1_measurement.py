@@ -90,6 +90,54 @@ def test_sum_paths_skips_parquet_footprints(tmp_path):
     assert count == 0
 
 
+def test_sum_paths_counts_parquet_for_parquet_native_benchmarks(tmp_path):
+    """joinorder ships only Parquet: its documented size is the on-disk footprint."""
+    mod = _load_script()
+    (tmp_path / "cast_info.parquet").write_bytes(b"y" * 50)
+    total, count = mod._sum_paths(tmp_path, count_parquet=True)
+    assert total == 50
+    assert count == 1
+
+
+def test_only_joinorder_counts_parquet():
+    mod = _load_script()
+    flagged = [bid for bid, _, _, extra in mod.GENERATORS + mod.BENCHMARK_LEVEL if extra.get("count_parquet")]
+    assert flagged == ["joinorder"]
+
+
+def test_measure_many_parallel_resolves_alias_without_regenerating(monkeypatch):
+    """Aliases reuse the parent-process record instead of re-running the source generator."""
+    mod = _load_script()
+    calls: list[str] = []
+
+    def fake_run(module, cls_name, extra):
+        calls.append(cls_name)
+        return 10, 1, None, 0.0
+
+    monkeypatch.setattr(mod, "_run_generator", fake_run)
+    mod._RECORD_CACHE.clear()
+
+    class _InlinePool:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def map(self, fn, items):
+            return [fn(item) for item in items]
+
+    monkeypatch.setattr(mod.concurrent.futures, "ProcessPoolExecutor", _InlinePool)
+    records = mod.measure_many(["tpchavoc", "tpch"], jobs=2)
+    mod._RECORD_CACHE.clear()
+    assert [r.benchmark for r in records] == ["tpchavoc", "tpch"]
+    assert all(r.error is None and r.total_bytes == 10 for r in records)
+    assert len(calls) == 1
+
+
 def test_measure_unknown_benchmark_records_error():
     mod = _load_script()
     record = mod.measure_one("no-such-benchmark")
@@ -105,9 +153,11 @@ def test_main_rejects_unknown_subset():
 def test_calibrated_table_covers_all_measured_benchmarks():
     mod = _load_script()
     table = Path(__file__).resolve().parents[3] / "docs" / "benchmarks" / "sf1-calibrated-sizes.md"
-    text = table.read_text()
-    for benchmark in mod.all_benchmark_ids() + ["ai_primitives", "metadata_primitives"]:
-        assert benchmark in text, f"{benchmark} missing from calibrated size table"
+    assert table.is_file()
+    expected = set(mod.all_benchmark_ids()) | {"ai_primitives", "metadata_primitives"}
+    # Compare against parsed table rows, not a substring search: a benchmark
+    # mentioned only in prose must not satisfy the coverage check.
+    assert expected <= set(_parse_calibrated_table()), "benchmark missing from calibrated size table rows"
 
 
 def _parse_calibrated_table() -> dict[str, int]:

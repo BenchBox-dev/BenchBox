@@ -51,9 +51,10 @@ _MANIFEST_TABLES_KEY = "tables"
 # after extraction. They are excluded so the same logical data is not
 # counted twice against the uncompressed contract. Columnar Parquet files
 # are dictionary-encoded and compressed on disk: they cannot stand in for
-# uncompressed bytes and are excluded everywhere; Parquet-native
-# benchmarks (joinorder, tpcds_obt) are documented as on-disk Parquet
-# footprints, not uncompressed source sizes.
+# uncompressed bytes and are excluded unless the benchmark ships only Parquet
+# (joinorder, via ``count_parquet``), in which case the documented size is the
+# on-disk Parquet footprint, not an uncompressed source size. tpcds_obt is
+# forced to ``.dat`` and measured uncompressed.
 _ARCHIVE_SUFFIXES = (".tar.zst", ".tar.gz", ".tgz", ".tar", ".zip")
 _COMPRESSED_SUFFIXES = (".gz", ".zst", ".bz2", ".snappy", ".lz4", ".parquet", ".lock")
 # Generator-emitted run metadata (timestamps, environment fingerprints)
@@ -116,37 +117,43 @@ BENCHMARK_LEVEL: list[tuple[str, str, str, dict]] = [
     ("tpcdi", "benchbox.core.tpcdi.benchmark", "TPCDIBenchmark", {}),
     ("nyctaxi", "benchbox.core.nyctaxi.benchmark", "NYCTaxiBenchmark", {}),
     ("flightdata", "benchbox.core.flightdata.benchmark", "FlightDataBenchmark", {}),
-    ("joinorder", "benchbox.core.joinorder.benchmark", "JoinOrderBenchmark", {}),
+    ("joinorder", "benchbox.core.joinorder.benchmark", "JoinOrderBenchmark", {"count_parquet": True}),
     ("tpcds_obt", "benchbox.core.tpcds_obt.benchmark", "TPCDSOBTBenchmark", {"output_format": "dat"}),
     ("datavault", "benchbox.core.datavault.benchmark", "DataVaultBenchmark", {}),
 ]
 
 
-def _is_counted_file(path: Path) -> bool:
-    """Return whether a file counts toward the uncompressed source total."""
+def _is_counted_file(path: Path, *, count_parquet: bool = False) -> bool:
+    """Return whether a file counts toward the uncompressed source total.
+
+    ``count_parquet`` admits ``.parquet`` files for benchmarks whose canonical
+    data has no uncompressed form (the documented on-disk Parquet footprint).
+    """
     name = path.name
     if name == MANIFEST_FILENAME or name in _METADATA_FILENAMES:
         return False
     lowered = name.lower()
     if any(lowered.endswith(suffix) for suffix in _ARCHIVE_SUFFIXES):
         return False
+    if count_parquet and lowered.endswith(".parquet"):
+        return True
     return not any(lowered.endswith(suffix) for suffix in _COMPRESSED_SUFFIXES)
 
 
-def _sum_tree(root: Path, seen: set[str]) -> tuple[int, int]:
+def _sum_tree(root: Path, seen: set[str], *, count_parquet: bool = False) -> tuple[int, int]:
     """Sum every data file under a generator-owned output root."""
     total = 0
     count = 0
     for child in sorted(root.rglob("*")):
         child_key = str(child)
-        if child.is_file() and child_key not in seen and _is_counted_file(child):
+        if child.is_file() and child_key not in seen and _is_counted_file(child, count_parquet=count_parquet):
             seen.add(child_key)
             total += child.stat().st_size
             count += 1
     return total, count
 
 
-def _sum_paths(paths: object) -> tuple[int, int]:
+def _sum_paths(paths: object, *, count_parquet: bool = False) -> tuple[int, int]:
     """Sum file bytes under generator return values (dict | list | nested).
 
     Some generators return only table paths while emitting additional corpora
@@ -170,11 +177,11 @@ def _sum_paths(paths: object) -> tuple[int, int]:
                 continue
             seen.add(key)
             candidate = Path(key)
-            if candidate.is_file() and _is_counted_file(candidate):
+            if candidate.is_file() and _is_counted_file(candidate, count_parquet=count_parquet):
                 total += candidate.stat().st_size
                 count += 1
             elif candidate.is_dir():
-                dir_total, dir_count = _sum_tree(candidate, seen)
+                dir_total, dir_count = _sum_tree(candidate, seen, count_parquet=count_parquet)
                 total += dir_total
                 count += dir_count
     return total, count
@@ -195,7 +202,7 @@ def _flatten_paths(paths: object) -> list[str | Path]:
     return leaves
 
 
-def _sum_tree_excluding(root: Path, skip: set[Path], seen: set[str]) -> tuple[int, int]:
+def _sum_tree_excluding(root: Path, skip: set[Path], seen: set[str], *, count_parquet: bool = False) -> tuple[int, int]:
     """Walk an output root, skipping staging subtrees already excluded."""
     total = 0
     count = 0
@@ -205,7 +212,7 @@ def _sum_tree_excluding(root: Path, skip: set[Path], seen: set[str]) -> tuple[in
         if any(resolved == skipped or resolved.is_relative_to(skipped) for skipped in skip_resolved):
             continue
         child_key = str(child)
-        if child.is_file() and child_key not in seen and _is_counted_file(child):
+        if child.is_file() and child_key not in seen and _is_counted_file(child, count_parquet=count_parquet):
             seen.add(child_key)
             total += child.stat().st_size
             count += 1
@@ -255,6 +262,8 @@ def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, i
     """Instantiate a generator at SF=1 uncompressed and sum its output."""
     module_obj = __import__(module, fromlist=[cls_name])
     cls = getattr(module_obj, cls_name)
+    extra = dict(extra)
+    count_parquet = bool(extra.pop("count_parquet", False))
     with tempfile.TemporaryDirectory(prefix="sf1measure-") as tmp:
         start = mono_time()
         # Benchmarks with auxiliary source datasets (TPC-DS-OBT's TPC-DS
@@ -303,7 +312,7 @@ def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, i
         # Returned paths are table files, so also walk the output root for
         # auxiliary corpora the return value omits (primitives bulk-load
         # files); the walk skips the source cache subtree explicitly.
-        total, count = _sum_paths(paths)
+        total, count = _sum_paths(paths, count_parquet=count_parquet)
         # Collect the returned table files so the auxiliary walk below does
         # not double count them. `_sum_paths` keys files by str(path),
         # so expand directory leaves to their contained files here.
@@ -314,7 +323,7 @@ def _run_generator(module: str, cls_name: str, extra: dict) -> tuple[int, int, i
                 seen.update(str(child) for child in sorted(candidate.rglob("*")) if child.is_file())
             else:
                 seen.add(str(leaf))
-        aux_total, aux_count = _sum_tree_excluding(tmp_path, {source_dir}, seen)
+        aux_total, aux_count = _sum_tree_excluding(tmp_path, {source_dir}, seen, count_parquet=count_parquet)
         total += aux_total
         count += aux_count
         rows = _sum_manifest_rows(tmp_path)
@@ -405,8 +414,26 @@ def measure_many(benchmarks: list[str], jobs: int = 1) -> list[SizeRecord]:
         raise ValueError(f"--jobs must be >= 1, got {jobs}")
     if jobs == 1 or len(benchmarks) <= 1:
         return [measure_one(benchmark) for benchmark in benchmarks]
-    with concurrent.futures.ProcessPoolExecutor(max_workers=jobs) as pool:
-        return list(pool.map(measure_one, benchmarks))
+    # Aliases (tpchavoc -> tpch) resolve from the in-process record cache. Worker
+    # processes do not share it, so measure real generators in the pool, seed the
+    # parent cache with their results, and resolve aliases here without regenerating.
+    aliased = {b for b in benchmarks if _is_alias(b)}
+    real = [b for b in benchmarks if b not in aliased]
+    results: dict[str, SizeRecord] = {}
+    if real:
+        with concurrent.futures.ProcessPoolExecutor(max_workers=jobs) as pool:
+            for benchmark, record in zip(real, pool.map(measure_one, real), strict=True):
+                results[benchmark] = record
+                if record.error is None:
+                    _RECORD_CACHE[benchmark] = record
+    for benchmark in aliased:
+        results[benchmark] = measure_one(benchmark)
+    return [results[b] for b in benchmarks]
+
+
+def _is_alias(benchmark: str) -> bool:
+    entry = next((g for g in (*GENERATORS, *BENCHMARK_LEVEL) if g[0] == benchmark), None)
+    return entry is not None and entry[1].startswith("__alias__:")
 
 
 def main(argv: list[str] | None = None) -> int:
