@@ -6209,6 +6209,21 @@
       "status": "open",
       "title": "Re-baseline TPC-DS legitimately-empty classification with scale-scoped criteria"
     },
+    "dfparity-t20-promote-polars-gate": {
+      "claim": null,
+      "needs": [
+        "dfparity-t19-emptiness-rebaseline",
+        "dfparity-t08-q70-expression-rounding",
+        "dfparity-t09-q98-limit",
+        "dfparity-t10-polars-null-setops",
+        "dfparity-t11-warehouse-name-none",
+        "dfparity-t12-q71-q76-null-order",
+        "dfparity-t14-divergence-classifier"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Promote the TPC-DS Polars-family gate to enforced with its CI pinning guards"
+    },
     "dfparity-t21-tpch-seeded-path": {
       "claim": null,
       "needs": [

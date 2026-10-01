@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Three Ubuntu CI runner runs each finish in 20 s or less of gate wall time with zero unclassified divergences",
+    "Mutation-target drift and Make/CI pinning guards pass in the same PR",
+    "known_divergences is empty and legitimately-empty entries meet dfparity-t19's criteria",
+    "A maintainer signs off on promotion"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T20). Add every batch item created by dfparity-t05 to this item's needs when they exist. Relates to existing tracker item tpcds-parity-b6-promote (left untouched); coordinate so the two are not both implemented. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Move the Polars ('expression') family gate to GATES at about SF=0.1 over all queries, as ONE PR that also lands the mutation-target and Make/CI pinning guards (ci.yml ~1045-1057: test_targets_cover_every_enforced_gate and test_cross_surface_gates_are_pinned_in_make_and_ci), the Make report target and the CI step, and refreshes the oracle coverage map. Promotion is a reviewer-signed decision, not an automatic step, and requires zero unexplained divergences with no large known_divergences list. Pandas becomes a separate parallel job (measured about 27 s at SF=0.1 without Q78). Measured on one loaded Mac, one run: expression-only all 99 queries at SF=0.1 about 14 s including a 2.1 s import, against a 20 s budget; the Polars family only (the expression cell is the Polars adapter, not DataFusion).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:15:09Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "eb5cbb9f2a59485da792cb6a5c005c40",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
