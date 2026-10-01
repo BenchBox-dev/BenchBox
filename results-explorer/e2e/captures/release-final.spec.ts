@@ -33,7 +33,7 @@ const MANIFEST = path.join(OUT, `capture-manifest-${TODAY}.json`);
 
 const ROUTES: Array<{ slug: string; url: string; readyText: RegExp }> = [
   { slug: "home", url: "/results/", readyText: /Cross-benchmark rankings/ },
-  { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=standard", readyText: /TPC-H Results/ },
+  { slug: "benchmark-tpch-sf001", url: "/results/tpch/?sf=0.01&phase=power", readyText: /TPC-H Results/ },
   {
     slug: "benchmark-star-schema-sf01",
     url: "/results/star_schema/?sf=0.1&phase=power",

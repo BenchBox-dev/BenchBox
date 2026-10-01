@@ -272,7 +272,7 @@ class TestDtWeekday:
     """Tests for UnifiedDtExpr.weekday()."""
 
     def test_weekday_returns_iso_weekday(self, pl):
-        """weekday() returns ISO 8601 weekday (1=Monday .. 7=Sunday)."""
+        """weekday() returns ISO 8601 weekday (0=Monday .. 6=Sunday)."""
         expr_factory = _get_unified_expr()
         ULF = _get_unified_lazy_frame()
         adapter = _create_mock_adapter()
@@ -290,9 +290,9 @@ class TestDtWeekday:
         expr = expr_factory(pl.col("d")).dt.weekday()
         result = frame.with_columns(expr.alias("wd")).collect()
         weekdays = result["wd"].to_list()
-        assert weekdays[0] == 1  # Monday
-        assert weekdays[1] == 6  # Saturday
-        assert weekdays[2] == 7  # Sunday
+        assert weekdays[0] == 0  # Monday
+        assert weekdays[1] == 5  # Saturday
+        assert weekdays[2] == 6  # Sunday
 
 
 # =========================================================================

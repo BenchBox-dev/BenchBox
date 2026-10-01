@@ -73,7 +73,7 @@ integrity spec, query count, dataset/source, scales, and DataFrame capability.
 | `tsbs_devops` | `beta` | 18-query time-series DevOps workload; generated; integrity spec; docs; DataFrame-capable. | Time-series engine coverage breadth still expanding. |
 | `nyctaxi` | `beta` | 25-query real-world OLAP; external NYC TLC data; integrity spec; docs; DataFrame-capable. | External-dataset availability and a pinned source contract before `stable`. |
 | `flightdata` | `beta` | 20-query real-world aviation OLAP; external BTS data; integrity spec; docs; DataFrame-capable. | External-dataset availability and a pinned source contract before `stable`. |
-| `vector_search` | `beta` | 6-query vector similarity; synthetic embeddings; docs; not DataFrame-capable. | **No integrity spec** and ANN-recall validation still pending; capability is SQL-only. |
+| `vector_search` | `stable` | 6-query vector similarity; synthetic embeddings; integrity spec; docs; not DataFrame-capable (SQL-only by recorded routing decision, `supports_dataframe: false`). Q5 measures the same brute-force kNN SQL as Q1: no loader or adapter builds an HNSW index today, so ANN-index acceleration is not part of the measured workload. | None — maintain. |
 | `tpcds_obt` | `experimental` | 17-query denormalized One-Big-Table; derived from `tpcds`; integrity spec; docs; SF1 only; DataFrame-capable. | Single-scale subset of TPC-DS; still on the deprecated core base. |
 | `ai_primitives` | `experimental` | 16-query SQL AI functions; derived from TPC-H text; docs; core-only ID; not DataFrame-capable. | Cloud-only AI functions, cost-gated, no integrity spec; intentionally research-only. |
 | `tpchavoc` | `experimental` | 220-variant optimizer stress (22 queries × 10 syntax variants); generated; integrity spec; docs; DataFrame-capable. | Optimizer-stress research tool, not a standard comparison workload. |
@@ -86,10 +86,6 @@ integrity spec, query count, dataset/source, scales, and DataFrame capability.
 Recorded as explicit follow-up work rather than reviewer memory. None of these
 are applied here: this matrix documents status, it does not change it.
 
-- **`vector_search` (beta → stable candidate, blocked):** the only missing piece
-  for the integrity dimension is a `BenchmarkSpec`. Adding one (and a DataFrame
-  routing decision) is the concrete blocker. Tracked as a deferred follow-up on
-  `benchmark-support-status-criteria-matrix`.
 - **External-dataset betas (`nyctaxi`, `flightdata`):** promotion is gated on a
   complete set of reviewed SHA-256 pins for the default external corpus, not
   on query coverage. Until those maps are populated, generated corpora record

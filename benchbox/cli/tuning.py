@@ -276,7 +276,7 @@ def run_tuning_wizard(
 
     if not interactive:
         # Non-interactive: use defaults
-        return _apply_defaults_to_config(config, defaults, platform)
+        return _apply_defaults_to_config(config, defaults, platform, benchmark)
 
     # Step 1: Select tuning mode (simple/advanced/baseline)
     console.print("\n[bold cyan]Step 1: Tuning Mode[/bold cyan]")
@@ -357,19 +357,19 @@ def _run_simple_wizard(
 
     elif platform == "snowflake" and defaults.get("enable_clustering"):
         if Confirm.ask("Enable clustering keys for improved query performance?", default=True):
-            config.enable_platform_optimization(TuningType.CLUSTERING)
+            config.enable_platform_optimization(TuningType.CLUSTERING, benchmark=benchmark)
             console.print("[green]✓ Clustering enabled[/green]")
 
     elif platform == "bigquery":
         if Confirm.ask("Enable partitioning and clustering?", default=True):
-            config.enable_platform_optimization(TuningType.PARTITIONING)
-            config.enable_platform_optimization(TuningType.CLUSTERING)
+            config.enable_platform_optimization(TuningType.PARTITIONING, benchmark=benchmark)
+            config.enable_platform_optimization(TuningType.CLUSTERING, benchmark=benchmark)
             console.print("[green]✓ Partitioning and clustering enabled[/green]")
 
     elif platform == "redshift":
         if Confirm.ask("Enable distribution and sort keys?", default=True):
-            config.enable_platform_optimization(TuningType.DISTRIBUTION)
-            config.enable_platform_optimization(TuningType.SORTING)
+            config.enable_platform_optimization(TuningType.DISTRIBUTION, benchmark=benchmark)
+            config.enable_platform_optimization(TuningType.SORTING, benchmark=benchmark)
             console.print("[green]✓ Distribution and sort keys enabled[/green]")
 
     # Show summary
@@ -419,15 +419,15 @@ def _run_advanced_wizard(
     if platform == "databricks":
         _configure_databricks_optimizations(config)
     elif platform == "snowflake":
-        _configure_snowflake_optimizations(config)
+        _configure_snowflake_optimizations(config, benchmark)
     elif platform == "bigquery":
-        _configure_bigquery_optimizations(config)
+        _configure_bigquery_optimizations(config, benchmark)
     elif platform == "redshift":
-        _configure_redshift_optimizations(config)
+        _configure_redshift_optimizations(config, benchmark)
     elif platform == "duckdb":
-        _configure_duckdb_optimizations(config, defaults)
+        _configure_duckdb_optimizations(config, defaults, benchmark)
     elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
-        _configure_clickhouse_optimizations(config)
+        _configure_clickhouse_optimizations(config, benchmark)
 
     # Step 4: Validation Options
     console.print("\n[bold cyan]Step 4: Data Validation[/bold cyan]")
@@ -439,6 +439,29 @@ def _run_advanced_wizard(
     render_tuning_summary(config, platform)
 
     return config
+
+
+def _confirm_table_layout(
+    config: UnifiedTuningConfiguration,
+    prompt: str,
+    tuning_type: TuningType,
+    success_message: str,
+    benchmark: str = "tpch",
+    default: bool = True,
+) -> None:
+    """Confirm one table-layout choice and persist it to the config.
+
+    Args:
+        config: Configuration to populate
+        prompt: Confirm prompt shown to the user
+        tuning_type: Table-layout tuning type to enable on confirmation
+        success_message: Message printed when the choice is confirmed
+        benchmark: Benchmark name for default table layouts
+        default: Default answer for the confirm prompt
+    """
+    if Confirm.ask(prompt, default=default):
+        config.enable_platform_optimization(tuning_type, benchmark=benchmark)
+        console.print(f"[green]{success_message}[/green]")
 
 
 def _configure_databricks_optimizations(config: UnifiedTuningConfiguration) -> None:
@@ -460,53 +483,53 @@ def _configure_databricks_optimizations(config: UnifiedTuningConfiguration) -> N
         console.print("[green]✓ Auto Compact enabled[/green]")
 
 
-def _configure_snowflake_optimizations(config: UnifiedTuningConfiguration) -> None:
+def _configure_snowflake_optimizations(config: UnifiedTuningConfiguration, benchmark: str = "tpch") -> None:
     """Configure Snowflake-specific optimizations.
 
     Args:
         config: Configuration to populate
+        benchmark: Benchmark name for default table layouts
     """
-    if Confirm.ask("Enable clustering keys?", default=True):
-        config.enable_platform_optimization(TuningType.CLUSTERING)
-        console.print("[green]✓ Clustering keys enabled[/green]")
+    _confirm_table_layout(
+        config, "Enable clustering keys?", TuningType.CLUSTERING, "✓ Clustering keys enabled", benchmark
+    )
 
 
-def _configure_bigquery_optimizations(config: UnifiedTuningConfiguration) -> None:
+def _configure_bigquery_optimizations(config: UnifiedTuningConfiguration, benchmark: str = "tpch") -> None:
     """Configure BigQuery-specific optimizations.
 
     Args:
         config: Configuration to populate
+        benchmark: Benchmark name for default table layouts
     """
-    if Confirm.ask("Enable table partitioning?", default=True):
-        config.enable_platform_optimization(TuningType.PARTITIONING)
-        console.print("[green]✓ Partitioning enabled[/green]")
-
-    if Confirm.ask("Enable clustering?", default=True):
-        config.enable_platform_optimization(TuningType.CLUSTERING)
-        console.print("[green]✓ Clustering enabled[/green]")
+    _confirm_table_layout(
+        config, "Enable table partitioning?", TuningType.PARTITIONING, "✓ Partitioning enabled", benchmark
+    )
+    _confirm_table_layout(config, "Enable clustering?", TuningType.CLUSTERING, "✓ Clustering enabled", benchmark)
 
 
-def _configure_redshift_optimizations(config: UnifiedTuningConfiguration) -> None:
+def _configure_redshift_optimizations(config: UnifiedTuningConfiguration, benchmark: str = "tpch") -> None:
     """Configure Redshift-specific optimizations.
 
     Args:
         config: Configuration to populate
+        benchmark: Benchmark name for default table layouts
     """
-    if Confirm.ask("Enable distribution keys?", default=True):
-        config.enable_platform_optimization(TuningType.DISTRIBUTION)
-        console.print("[green]✓ Distribution keys enabled[/green]")
-
-    if Confirm.ask("Enable sort keys?", default=True):
-        config.enable_platform_optimization(TuningType.SORTING)
-        console.print("[green]✓ Sort keys enabled[/green]")
+    _confirm_table_layout(
+        config, "Enable distribution keys?", TuningType.DISTRIBUTION, "✓ Distribution keys enabled", benchmark
+    )
+    _confirm_table_layout(config, "Enable sort keys?", TuningType.SORTING, "✓ Sort keys enabled", benchmark)
 
 
-def _configure_duckdb_optimizations(config: UnifiedTuningConfiguration, defaults: dict[str, Any]) -> None:
+def _configure_duckdb_optimizations(
+    config: UnifiedTuningConfiguration, defaults: dict[str, Any], benchmark: str = "tpch"
+) -> None:
     """Configure DuckDB-specific optimizations.
 
     Args:
         config: Configuration to populate
         defaults: Default settings
+        benchmark: Benchmark name for default table layouts
     """
     # Show system recommendations first
     memory_limit = defaults.get("memory_limit_str", "4GB")
@@ -517,35 +540,32 @@ def _configure_duckdb_optimizations(config: UnifiedTuningConfiguration, defaults
 
     # Prompt for table-level optimizations
     if Confirm.ask("Enable partitioning for large tables?", default=False):
-        config.enable_platform_optimization(TuningType.PARTITIONING)
+        config.enable_platform_optimization(TuningType.PARTITIONING, benchmark=benchmark)
         console.print("[green]✓ Partitioning enabled[/green]")
         console.print("[dim]  Tables will be partitioned by appropriate columns (e.g., date)[/dim]")
 
     if Confirm.ask("Enable sorting (ORDER BY) for query optimization?", default=True):
-        config.enable_platform_optimization(TuningType.SORTING)
+        config.enable_platform_optimization(TuningType.SORTING, benchmark=benchmark)
         console.print("[green]✓ Sorting enabled[/green]")
         console.print("[dim]  Tables will be sorted by frequently queried columns[/dim]")
 
 
-def _configure_clickhouse_optimizations(config: UnifiedTuningConfiguration) -> None:
+def _configure_clickhouse_optimizations(config: UnifiedTuningConfiguration, benchmark: str = "tpch") -> None:
     """Configure ClickHouse-specific optimizations.
 
     Args:
         config: Configuration to populate
+        benchmark: Benchmark name for default table layouts
     """
-    if Confirm.ask("Enable partitioning?", default=True):
-        config.enable_platform_optimization(TuningType.PARTITIONING)
-        console.print("[green]✓ Partitioning enabled[/green]")
-
-    if Confirm.ask("Enable sorting (ORDER BY)?", default=True):
-        config.enable_platform_optimization(TuningType.SORTING)
-        console.print("[green]✓ Sorting enabled[/green]")
+    _confirm_table_layout(config, "Enable partitioning?", TuningType.PARTITIONING, "✓ Partitioning enabled", benchmark)
+    _confirm_table_layout(config, "Enable sorting (ORDER BY)?", TuningType.SORTING, "✓ Sorting enabled", benchmark)
 
 
 def _apply_defaults_to_config(
     config: UnifiedTuningConfiguration,
     defaults: dict[str, Any],
     platform: str,
+    benchmark: str = "tpch",
 ) -> UnifiedTuningConfiguration:
     """Apply default settings to configuration for non-interactive mode.
 
@@ -553,6 +573,7 @@ def _apply_defaults_to_config(
         config: Configuration to populate
         defaults: Default settings
         platform: Target platform
+        benchmark: Benchmark name for default table layouts
 
     Returns:
         Configured tuning settings
@@ -565,13 +586,13 @@ def _apply_defaults_to_config(
         config.enable_platform_optimization(TuningType.Z_ORDERING)
         config.enable_platform_optimization(TuningType.AUTO_OPTIMIZE)
     elif platform == "snowflake":
-        config.enable_platform_optimization(TuningType.CLUSTERING)
+        config.enable_platform_optimization(TuningType.CLUSTERING, benchmark=benchmark)
     elif platform == "bigquery":
-        config.enable_platform_optimization(TuningType.PARTITIONING)
-        config.enable_platform_optimization(TuningType.CLUSTERING)
+        config.enable_platform_optimization(TuningType.PARTITIONING, benchmark=benchmark)
+        config.enable_platform_optimization(TuningType.CLUSTERING, benchmark=benchmark)
     elif platform == "redshift":
-        config.enable_platform_optimization(TuningType.DISTRIBUTION)
-        config.enable_platform_optimization(TuningType.SORTING)
+        config.enable_platform_optimization(TuningType.DISTRIBUTION, benchmark=benchmark)
+        config.enable_platform_optimization(TuningType.SORTING, benchmark=benchmark)
 
     return config
 

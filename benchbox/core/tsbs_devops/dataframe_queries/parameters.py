@@ -55,4 +55,20 @@ class TSBSDevOpsParameters:
 def get_parameters(query_id: str) -> TSBSDevOpsParameters:
     """Get parameters for a TSBS DevOps query."""
     params = TSBS_DEVOPS_DEFAULT_PARAMS.get(query_id, {}).copy()
+    if _parameter_overrides is not None and query_id in _parameter_overrides:
+        params.update(_parameter_overrides[query_id])
     return TSBSDevOpsParameters(query_id=query_id, params=params)
+
+
+_parameter_overrides: dict[str, dict[str, Any]] | None = None
+
+
+def set_parameter_overrides(overrides: dict[str, dict[str, Any]] | None) -> None:
+    """Inject seed-derived parameters for a gate run.
+
+    Called by the cross-surface builder before query execution so the DataFrame
+    surface reads the same windows the SQL surface rendered. Pass None to clear
+    and revert to static defaults.
+    """
+    global _parameter_overrides
+    _parameter_overrides = overrides

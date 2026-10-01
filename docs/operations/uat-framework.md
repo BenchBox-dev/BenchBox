@@ -345,8 +345,8 @@ line with no named platform.
 ## Explorer smoke (browser)
 
 `make uat-explorer-smoke` invokes Playwright directly against a freshly
-built Explorer app, mirroring the `results-explorer-browser.yml` workflow
-entrypoint. Each invocation runs three steps inside `results-explorer/`
+built Explorer app, mirroring the entrypoint of the `explorer-e2e` job in
+`ci.yml`. Each invocation runs three steps inside `results-explorer/`
 in order:
 
 1. `npm ci` — clean install of Explorer JS dependencies.

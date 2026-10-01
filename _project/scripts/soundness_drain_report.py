@@ -16,8 +16,8 @@ the missing "someone should look at this" signal:
     (a) required-lane green  -- EVERY develop-ruleset required status
         context in ``REQUIRED_CHECK_NAMES`` has its LATEST check run on the
         PR's head SHA completed with conclusion ``success``. Today that is
-        ``ci-required-result``, ``Results Explorer browser gate``, and
-        ``ruleset-drift``
+        ``ci-required-result``, ``tooling``, ``Results Explorer browser gate``,
+        ``ruleset-drift``, and ``Public-site visual acceptance``
         (docs/operations/repo-admin-settings.md; live ruleset
         develop-squash-only). Partial green -- one context success, another
         red or never reported -- is NOT required-green; a missing run is

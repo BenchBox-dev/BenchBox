@@ -126,12 +126,10 @@ diagnostic artifacts remain short-lived and non-promotable.
 
 ## What CI gates
 
-[`.github/workflows/results-explorer-browser.yml`](../../.github/workflows/results-explorer-browser.yml)
-runs on **pull requests** (to `release` or `develop`) across all paths (with no top-level paths
-filter so the required status check always reports; the `explorer-changes` job skips browser runs
-when no relevant files change), and on **pushes to `release` or `develop`** that touch
-`results-explorer/`, `_project/scripts/explorer_pipeline/`, `_project/scripts/explorer_publish.py`,
-`results-data/`, or the workflow file itself.
+The `explorer-e2e` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+(Chromium full suite, blocking) runs on **pull requests** and **merge groups**
+when the change touches the explorer unit (with the `explorer` unit result
+always reporting; the job is skipped when no relevant files change).
 
 - **Blocking:** `chromium` job - full suite must pass.
 - **Non-blocking:** `firefox-smoke` and `webkit-smoke` jobs - `@smoke`-tagged

@@ -25,6 +25,16 @@ const hoisted = vi.hoisted(() => {
     return { toArray: () => data.map((row) => ({ toJSON: () => row, ...row })) };
   }
 
+  const membershipAttempts = new Map<string, number>();
+  const bundleSelections: string[] = [];
+  const bundles = {
+    mvp: { mainModule: "duckdb-mvp.wasm", mainWorker: "duckdb-mvp.worker.js" },
+    eh: { mainModule: "duckdb-eh.wasm", mainWorker: "duckdb-eh.worker.js" },
+    coi: { mainModule: "duckdb-coi.wasm", mainWorker: "duckdb-coi.worker.js", pthreadWorker: "pthread.js" },
+  };
+  let membershipQuery:
+    ((sql: string, params: unknown[], attempt: number) => Array<Record<string, unknown>>) | null = null;
+
   // Answers every SQL shape the readiness ladder and typed queries in db.ts
   // issue. Deliberately permissive: matches by SQL shape rather than pinning
   // exact table lists, so it doesn't need updating when SNAPSHOT_READY_SCANS
@@ -48,10 +58,16 @@ const hoisted = vi.hoisted(() => {
     query: (...params: unknown[]) => Promise<FakeRows>;
     close: () => Promise<void>;
 
-    constructor(dead: boolean) {
+    constructor(dead: boolean, sql: string) {
       this.dead = dead;
-      this.query = () => {
+      this.query = (...params: unknown[]) => {
         if (this.dead) return new Promise(() => {});
+        if (membershipQuery && /FROM bench\.result_detail_metrics/i.test(sql)) {
+          const key = params.join(",");
+          const attempt = (membershipAttempts.get(key) ?? 0) + 1;
+          membershipAttempts.set(key, attempt);
+          return Promise.resolve(rows(membershipQuery(sql, params, attempt)));
+        }
         return Promise.resolve(healthyQueryImpl("prepared"));
       };
       this.close = () => {
@@ -93,7 +109,7 @@ const hoisted = vi.hoisted(() => {
         if (this.dead) return new Promise(() => {}); // cleanup on a dead worker hangs too
         return Promise.resolve();
       };
-      this.prepare = async () => new FakeStatement(this.dead);
+      this.prepare = async (sql: string) => new FakeStatement(this.dead, sql);
     }
   }
 
@@ -107,6 +123,10 @@ const hoisted = vi.hoisted(() => {
     | "healthy"
     | "dead-after-init"
     | "dead-during-init"
+    | "buffer-error-on-metadata"
+    | "buffer-error-on-readiness"
+    | "coi-buffer-errors"
+    | "old-snapshot"
     | "terminated-after-init"
     | "slow-query";
   const nextInstanceBehaviors: InstanceBehavior[] = [];
@@ -115,8 +135,10 @@ const hoisted = vi.hoisted(() => {
   class FakeAsyncDuckDB {
     id: number;
     behavior: InstanceBehavior;
+    bundleModule: string;
     terminate: () => Promise<void>;
     connectCount = 0;
+    queryCalls: string[] = [];
     // Flipped by a connection's query() in the "terminated-after-init"
     // scenario, and by `terminate()` itself - mirrors the real bridge's
     // `isDetached()`, which is exactly `!this._worker`.
@@ -124,6 +146,7 @@ const hoisted = vi.hoisted(() => {
 
     constructor() {
       this.behavior = nextInstanceBehaviors.shift() ?? "healthy";
+      this.bundleModule = bundleSelections.at(-1) ?? "";
       this.id = instances.length + 1;
       this.terminate = vi.fn(async () => {
         this.terminated = true;
@@ -151,6 +174,21 @@ const hoisted = vi.hoisted(() => {
       const terminatedBy =
         this.behavior === "terminated-after-init" && this.connectCount > 1 ? this : null;
       const conn = new FakeConnection(isDead, terminatedBy);
+      const query = conn.query;
+      conn.query = async (sql: string) => {
+        this.queryCalls.push(sql);
+        if (this.behavior === "old-snapshot" && /read_model_version/i.test(sql)) {
+          return rows([{ read_model_version: 10 }]);
+        }
+        if (
+          (this.behavior === "coi-buffer-errors" && this.bundleModule === bundles.coi.mainModule) ||
+          (this.behavior === "buffer-error-on-metadata" && /read_model_version/i.test(sql)) ||
+          (this.behavior === "buffer-error-on-readiness" && /^SELECT result_id FROM bench.results LIMIT 1/.test(sql))
+        ) {
+          throw new RangeError("offset is out of bounds");
+        }
+        return query(sql);
+      };
       if (this.behavior === "slow-query" && this.connectCount === 2) {
         conn.query = async () => {
           await new Promise((resolve) => setTimeout(resolve, 10_000));
@@ -161,11 +199,25 @@ const hoisted = vi.hoisted(() => {
     }
   }
 
-  return { nextInstanceBehaviors, instances, FakeAsyncDuckDB };
+  return {
+    nextInstanceBehaviors,
+    bundleSelections,
+    bundles,
+    instances,
+    FakeAsyncDuckDB,
+    membershipAttempts,
+    setMembershipQuery: (query: typeof membershipQuery) => {
+      membershipQuery = query;
+    },
+  };
 });
 
 vi.mock("@duckdb/duckdb-wasm", () => ({
-  selectBundle: vi.fn(async () => ({ mainModule: "duckdb.wasm", mainWorker: "duckdb-worker.js" })),
+  selectBundle: vi.fn(async (bundles: typeof hoisted.bundles) => {
+    const bundle = bundles.coi ?? bundles.eh ?? bundles.mvp;
+    hoisted.bundleSelections.push(bundle.mainModule);
+    return bundle;
+  }),
   ConsoleLogger: class {},
   LogLevel: { WARNING: 3 },
   DuckDBDataProtocol: { HTTP: 1 },
@@ -173,7 +225,7 @@ vi.mock("@duckdb/duckdb-wasm", () => ({
 }));
 
 vi.mock("@/lib/duckdbBundles", () => ({
-  LOCAL_DUCKDB_BUNDLES: {},
+  LOCAL_DUCKDB_BUNDLES: hoisted.bundles,
 }));
 
 vi.mock("@/lib/performanceMarks", () => ({
@@ -192,6 +244,7 @@ import {
   getDb,
   queryRows,
 } from "@/db";
+import { getExistingResultIds } from "@/lib/duckdbQueries";
 
 class FakeWorker {
   addEventListener(): void {}
@@ -203,6 +256,9 @@ beforeEach(() => {
   _resetDbStateForTest();
   hoisted.nextInstanceBehaviors.length = 0;
   hoisted.instances.length = 0;
+  hoisted.membershipAttempts.clear();
+  hoisted.bundleSelections.length = 0;
+  hoisted.setMembershipQuery(null);
 
   vi.stubGlobal("Worker", FakeWorker);
   vi.stubGlobal(
@@ -223,6 +279,114 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
+});
+
+describe("Initialization with a stale worker memory view", () => {
+  it("uses the supported single-threaded bundle after persistent COI buffer errors", async () => {
+    vi.useFakeTimers();
+    hoisted.nextInstanceBehaviors.push("coi-buffer-errors", "coi-buffer-errors", "coi-buffer-errors");
+    hoisted.setMembershipQuery((_sql, params) => params.map((result_id) => ({ result_id })));
+    const pending = Promise.all([getExistingResultIds(["real-a"]), getExistingResultIds(["real-b"])])
+      .catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(await pending).toEqual([new Set(["real-a"]), new Set(["real-b"])]);
+    expect(hoisted.bundleSelections).toEqual([hoisted.bundles.coi.mainModule, hoisted.bundles.eh.mainModule]);
+    expect(hoisted.instances[0]?.terminate).toHaveBeenCalledOnce();
+    expect(hoisted.instances[1]?.terminated).toBe(false);
+    resetDuckDbInitializationFailures();
+    expect(await getDb()).toBe(hoisted.instances[1]);
+  });
+
+  it.each(["network", "version"] as const)("does not exclude COI after a %s failure", async (failure) => {
+    if (failure === "network") {
+      vi.mocked(fetch).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    } else {
+      hoisted.nextInstanceBehaviors.push("old-snapshot");
+    }
+    await expect(getDb()).rejects.toThrow();
+    await getDb();
+    expect(hoisted.bundleSelections).toEqual([hoisted.bundles.coi.mainModule, hoisted.bundles.coi.mainModule]);
+  });
+
+  it.each(["buffer-error-on-metadata", "buffer-error-on-readiness"] as const)(
+    "replaces %s promptly and preserves concurrent real-ID reads",
+    async (behavior) => {
+      vi.useFakeTimers();
+      hoisted.nextInstanceBehaviors.push(behavior, "healthy");
+      hoisted.setMembershipQuery((_sql, params) => params.map((result_id) => ({ result_id })));
+      const pending = Promise.all([getExistingResultIds(["real-a"]), getExistingResultIds(["real-b"])]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(hoisted.instances[0]?.terminate).toHaveBeenCalledOnce();
+      const failingSql = behavior === "buffer-error-on-metadata"
+        ? /read_model_version/i
+        : /^SELECT result_id FROM bench.results LIMIT 1/;
+      expect(hoisted.instances[0]?.queryCalls.filter((sql) => failingSql.test(sql))).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(await pending).toEqual([new Set(["real-a"]), new Set(["real-b"])]);
+      expect(hoisted.instances).toHaveLength(2);
+      expect(hoisted.instances[1]?.terminated).toBe(false);
+      expect(_getInitFailuresForTest()).toBe(0);
+    },
+  );
+
+  it.each(["buffer-error-on-metadata", "buffer-error-on-readiness"] as const)(
+    "bounds repeated %s failures without retrying SQL on broken workers",
+    async (behavior) => {
+      vi.useFakeTimers();
+      hoisted.nextInstanceBehaviors.push(behavior, behavior, behavior);
+      let failure: unknown;
+      const pending = queryRows("SELECT 1").catch((error: unknown) => { failure = error; });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(failure).toBeInstanceOf(RangeError);
+      await pending;
+      expect(hoisted.instances).toHaveLength(3);
+      expect(hoisted.instances.every((instance) => instance.terminated)).toBe(true);
+      expect(_getInitFailuresForTest()).toBe(3);
+      await expect(getDb()).rejects.toThrow("offset is out of bounds");
+      expect(hoisted.instances).toHaveLength(3);
+    },
+  );
+});
+
+describe("Compare membership with cold reads", () => {
+  it("confirms a missing ID once after a complete scan", async () => {
+    vi.useFakeTimers();
+    hoisted.setMembershipQuery((sql, params) => {
+      if (params.length === 2) return [{ result_id: "known-a" }];
+      return /HAVING COUNT\(DISTINCT result_id\)/i.test(sql) ? [{ result_id: null }] : [];
+    });
+    const initialMatches = vi.fn();
+    const pending = getExistingResultIds(["known-a", "missing-b"], initialMatches);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual(new Set(["known-a"]));
+    expect(initialMatches).toHaveBeenCalledWith(new Set(["known-a"]));
+    expect(hoisted.membershipAttempts.get("missing-b")).toBe(1);
+  });
+
+  it("retries an incomplete confirmation and keeps the recovered real ID", async () => {
+    vi.useFakeTimers();
+    hoisted.setMembershipQuery((_sql, params, attempt) => {
+      if (params.length === 2) return [{ result_id: "known-a" }];
+      return attempt === 1 ? [] : [{ result_id: "cold-b" }];
+    });
+    const pending = getExistingResultIds(["known-a", "cold-b"]);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual(new Set(["known-a", "cold-b"]));
+    expect(hoisted.membershipAttempts.get("cold-b")).toBe(2);
+  });
+
+  it("recovers from a transient confirmation error before reporting absence", async () => {
+    vi.useFakeTimers();
+    hoisted.setMembershipQuery((_sql, params, attempt) => {
+      if (params.length === 2) return [{ result_id: "known-a" }];
+      if (attempt === 1) throw new RangeError("offset is out of bounds");
+      return [{ result_id: null }];
+    });
+    const pending = getExistingResultIds(["known-a", "missing-b"]);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual(new Set(["known-a"]));
+    expect(hoisted.membershipAttempts.get("missing-b")).toBe(2);
+  });
 });
 
 describe("DuckDB instance eviction and recovery", () => {

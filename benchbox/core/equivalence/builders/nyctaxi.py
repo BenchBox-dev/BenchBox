@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duckdb_cell
+
+if TYPE_CHECKING:
+    from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
 
 # Builder-local SQL-slug to DataFrame-ID map. The SQL surface uses slug IDs
 # (for example ``trips-per-hour``) while the DataFrame surface uses ``Q<N>``
@@ -42,49 +48,74 @@ NYCTAXI_SQL_TO_DF_IDS: dict[str, str] = {
 NYCTAXI_DF_TO_SQL_IDS: dict[str, str] = {df_id: sql_id for sql_id, df_id in NYCTAXI_SQL_TO_DF_IDS.items()}
 
 
-def _nyctaxi_sql_overrides(df_id: str) -> dict[str, object]:
-    """Render SQL overrides from the DataFrame default parameters.
+def _force_offline_synthesis(downloader: NYCTaxiDataDownloader) -> None:
+    """Replace the network download with direct synthetic generation.
 
-    The DataFrame implementations read fixed ``NYCTAXI_DEFAULT_PARAMS``
-    (datetimes for the window bounds, int for ``zone_id``) while the SQL
-    query manager randomizes its windows and zones. Passing the DataFrame
-    values through ``get_query(params=...)`` binds both surfaces to the
-    same predicates; the manager formats dates as ``%Y-%m-%d`` strings,
-    so datetimes are formatted here to match.
+    The gate must stay offline and hermetic: patching ``_process_parquet_file``
+    to call ``_generate_synthetic_month`` directly means no
+    ``urllib.request.urlretrieve`` ever runs, so the gate passes with network
+    disabled. ``taxi_zones`` generation is already local (embedded
+    ``TAXI_ZONES_DATA``), so only the trips path needs forcing.
     """
-    from benchbox.core.nyctaxi.dataframe_queries.parameters import NYCTAXI_DEFAULT_PARAMS
 
-    params = NYCTAXI_DEFAULT_PARAMS.get(df_id, {})
-    overrides: dict[str, object] = {}
-    start = params.get("start_date")
-    end = params.get("end_date")
-    if start is not None:
-        overrides["start_date"] = start.strftime("%Y-%m-%d") if hasattr(start, "strftime") else start
-    if end is not None:
-        overrides["end_date"] = end.strftime("%Y-%m-%d") if hasattr(end, "strftime") else end
-    if "zone_id" in params:
-        overrides["zone_id"] = params["zone_id"]
+    def _synthetic_only(self: NYCTaxiDataDownloader, url: str, writer: Any, start_trip_id: int) -> int:
+        return self._generate_synthetic_month(writer, start_trip_id)
+
+    downloader._process_parquet_file = _synthetic_only.__get__(downloader)  # type: ignore[method-assign]
+
+
+# Fixed query seed so SQL windows are deterministic across gate runs. The
+# query manager draws random date offsets and zone picks per query; without a
+# seed the SQL and DF surfaces can never share a window.
+NYCTAXI_GATE_SEED = 42
+
+
+def _extract_sql_windows(sql_queries: dict[str, str]) -> dict[str, dict[str, Any]]:
+    """Parse each rendered SQL query's date window and zone into DF overrides."""
+    overrides: dict[str, dict[str, Any]] = {}
+    for sql_id, sql in sql_queries.items():
+        df_id = NYCTAXI_SQL_TO_DF_IDS[sql_id]
+        dates = re.findall(r"'(\d{4}-\d{2}-\d{2})(?: \d{2}:\d{2}:\d{2})?'", sql)
+        params: dict[str, Any] = {}
+        if len(dates) >= 2:
+            params["start_date"] = datetime.fromisoformat(dates[0])
+            params["end_date"] = datetime.fromisoformat(dates[1])
+        zone = re.search(r"pickup_location_id = (\d+)", sql)
+        if zone:
+            params["zone_id"] = int(zone.group(1))
+        if params:
+            overrides[df_id] = params
     return overrides
 
 
 def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate NYC Taxi data, load it into in-memory DuckDB, and wire both surfaces."""
+    """Generate NYC Taxi data offline, load it into in-memory DuckDB, and wire both surfaces."""
+    import urllib.request
+
     from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
     from benchbox.core.nyctaxi.dataframe_queries import NYCTAXI_DATAFRAME_QUERIES
+    from benchbox.core.nyctaxi.dataframe_queries.parameters import set_parameter_overrides
 
     output_dir = Path(output_dir)
-    benchmark = NYCTaxiBenchmark(scale_factor=scale_factor, output_dir=output_dir)
-    benchmark.generate_data()
+    benchmark = NYCTaxiBenchmark(scale_factor=scale_factor, output_dir=output_dir, seed=NYCTAXI_GATE_SEED)
+    _force_offline_synthesis(benchmark.downloader)
 
-    # Load only the benchmark's active tables: the default Yellow-only
-    # configuration generates taxi_zones and trips, while TABLE_ORDER also
-    # lists green/hvfhv/fhv tables that are intentionally absent.
-    connection = _load_duckdb_cell(benchmark, output_dir, benchmark._get_active_tables(), label="NYC Taxi")
+    def _forbidden_urlretrieve(*args: object, **kwargs: object) -> object:
+        raise AssertionError("nyctaxi gate must not touch the network")
+
+    urllib.request.urlretrieve = _forbidden_urlretrieve  # type: ignore[method-assign]
+    try:
+        benchmark.generate_data()
+    finally:
+        import importlib
+
+        importlib.reload(urllib.request)
+
+    connection = _load_duckdb_cell(benchmark, output_dir, ["taxi_zones", "trips"], label="NYC Taxi")
+    sql_queries = benchmark.get_queries()
+    # Align the DF surface with the seeded SQL windows before wiring queries.
+    set_parameter_overrides(_extract_sql_windows(sql_queries))
     queries = NYCTAXI_DATAFRAME_QUERIES
-    sql_queries = {
-        sql_id: benchmark.get_query(sql_id, params=_nyctaxi_sql_overrides(df_id))
-        for sql_id, df_id in NYCTAXI_SQL_TO_DF_IDS.items()
-    }
     return CrossSurfaceData(
         connection=connection,
         query_ids=list(sql_queries.keys()),
