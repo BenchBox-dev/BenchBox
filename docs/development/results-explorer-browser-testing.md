@@ -157,9 +157,10 @@ when its diagnostics are reviewed; do not rely on them for queued PRs.
 A group stacked behind a leader that changed the site compares against the
 leader's candidate baseline, which the lookup accepts from the CI workflow's
 merge-queue run (see the follower baseline policy in
-`docs/operations/merge-queue-governance.md`). Until that lookup change is on
-`develop`, only a PR at the front of the queue, with a protected baseline for its
-base, can use this approval.
+`docs/operations/merge-queue-governance.md`), so an approved PR can also be a
+follower. A leader that is itself removed from the queue rebuilds its followers
+on a new base, and an approval stops matching if that base renders a reviewed
+capture differently.
 
 This approval does not replace a baseline. The protected `develop` push or its
 validated `workflow_dispatch` run uploads the SHA-bound baseline after the
