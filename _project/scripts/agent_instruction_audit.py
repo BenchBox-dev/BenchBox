@@ -156,7 +156,7 @@ HANDBACK_PATTERNS = {
         r"(?:merge|arm|mark)\b"
     ),
     "ask the user to arm or merge": (
-        r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|approve|mark)\b"
+        r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|mark)\b"
     ),
 }
 _MARKDOWN_EMPHASIS = re.compile(r"[*_`]")

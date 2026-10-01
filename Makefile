@@ -1656,14 +1656,17 @@ pr-arm-auto-merge:
 # The values reach the helper through the environment, never as words in a shell command, so a value
 # such as `PR='7 --pr 8'` cannot add arguments. `_SET` tells an omitted variable from an empty one and
 # is computed before `override`, which makes a variable look defined. Make expands a recursive
-# command-line value when it exports it, so a value like `$(shell ...)` would run; the overrides keep
-# PR, HEAD and REPO literal, as make/worktrees.mk does for its variables.
+# command-line value when it exports it, so a `$(shell ...)` typed on the command line runs for every
+# target in this Makefile; that is the invoker's own input and is not something a wrapper can prevent.
+# The target-specific overrides keep PR, HEAD and REPO literal in this target's environment. A global
+# override would also change how every other target's recipe sees them (an unexpanded `$(cmd)` would
+# reach their shell), which test_pr_arm.py pins.
 PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)
 PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)
 PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)
-override PR := $(value PR)
-override HEAD := $(value HEAD)
-override REPO := $(value REPO)
+pr-arm: override PR := $(value PR)
+pr-arm: override HEAD := $(value HEAD)
+pr-arm: override REPO := $(value REPO)
 pr-arm: export PR_ARM_PR := $(PR)
 pr-arm: export PR_ARM_PR_SET := $(PR_ARM_PR_SET)
 pr-arm: export PR_ARM_HEAD := $(HEAD)

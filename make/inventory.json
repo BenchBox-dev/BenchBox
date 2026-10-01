@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "b2b12afdbdff9ff806dff5bf3eb92af1e7f4d97b3a9ab5aba34eae3b135dd181",
+  "contract_sha256": "0697e691c2992226d49c1033696dd6afa497ec9701b0593f5796bf8838320236",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1132,6 +1132,21 @@
     ],
     "pr-arm": [
       {
+        "header": "pr-arm: override PR := $(value PR)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: override HEAD := $(value HEAD)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "header": "pr-arm: override REPO := $(value REPO)",
+        "recipe": "",
+        "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
         "header": "pr-arm: export PR_ARM_PR := $(PR)",
         "recipe": "",
         "recipe_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -2196,7 +2211,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "d30c0dfb655ca3b8e41dbab4460b1c30b3fc34c961cd368deb237e31af2088d1",
+  "semantic_sha256": "ae5977b2fa1ca054fe2546931e6e34f2223b9aa1326ed43e6c5d9e3542299d8f",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -4047,22 +4062,28 @@
       "sha256": "b84e5c990c6bc5770585ab8f599e1b1ba2295fe817f93849d315fdce8ea83561"
     },
     {
-      "body": "override PR := $(value PR)",
-      "kind": "variable",
-      "name": "PR",
-      "sha256": "a24cb946e1233e8c20a7ac441ce8daf6c3d77fbc1abe4e54d4500fc05eac14c5"
+      "body": "pr-arm: override PR := $(value PR)",
+      "kind": "rule",
+      "sha256": "0b59373658ddd7f898192a14432b6324977946874020b78d7034fbd1a85f5ed7",
+      "targets": [
+        "pr-arm"
+      ]
     },
     {
-      "body": "override HEAD := $(value HEAD)",
-      "kind": "variable",
-      "name": "HEAD",
-      "sha256": "39949f58d2624683c7306d206ebb337f563c165ae16803e34e141b1e8a6dc12b"
+      "body": "pr-arm: override HEAD := $(value HEAD)",
+      "kind": "rule",
+      "sha256": "96ebb79c6e4d4ba1923a228c3d75b4659ffea26fa0f3d4c8133a25a2d2bffb19",
+      "targets": [
+        "pr-arm"
+      ]
     },
     {
-      "body": "override REPO := $(value REPO)",
-      "kind": "variable",
-      "name": "REPO",
-      "sha256": "0c56bf4249c75a430d4062c81d2fa3a11a2609ee87b74891730bbc37f50b3e68"
+      "body": "pr-arm: override REPO := $(value REPO)",
+      "kind": "rule",
+      "sha256": "68ad3e28974eb54a5332e9c2b402f515b0e58a20e65febdd8731b6f05a2ab18b",
+      "targets": [
+        "pr-arm"
+      ]
     },
     {
       "body": "pr-arm: export PR_ARM_PR := $(PR)",
@@ -4901,13 +4922,6 @@
         "operator": ":="
       }
     ],
-    "HEAD": [
-      {
-        "body": "override HEAD := $(value HEAD)",
-        "directive": "override",
-        "operator": ":="
-      }
-    ],
     "JOINORDER_BUILD_DIR": [
       {
         "body": "JOINORDER_BUILD_DIR ?= $(HOME)/Developer/benchmark_runs/joinorder/build/joinorder-imdb-2013-v1",
@@ -4948,13 +4962,6 @@
         "body": "PARITY_PLATFORMS ?= questdb postgresql",
         "directive": "",
         "operator": "?="
-      }
-    ],
-    "PR": [
-      {
-        "body": "override PR := $(value PR)",
-        "directive": "override",
-        "operator": ":="
       }
     ],
     "PREFLIGHT_CMD": [
@@ -5066,13 +5073,6 @@
       {
         "body": "RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result",
         "directive": "",
-        "operator": ":="
-      }
-    ],
-    "REPO": [
-      {
-        "body": "override REPO := $(value REPO)",
-        "directive": "override",
         "operator": ":="
       }
     ],

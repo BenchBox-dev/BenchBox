@@ -295,11 +295,48 @@ def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(
     assert env["PR_ARM_PR_SET"] == "1"
 
 
-def test_the_make_wrapper_does_not_run_a_shell_expansion_inside_a_value(tmp_path: Path) -> None:
+def test_the_make_wrapper_does_not_run_shell_metacharacters_in_a_value(tmp_path: Path) -> None:
+    """The recipe has no shell word for the value, so `;` and backticks stay text.
+
+    A `$(shell ...)` typed on the make command line is expanded by make itself for every target in this
+    Makefile; that is the invoker's own input and is deliberately not asserted here.
+    """
     marker = tmp_path / "ran"
-    _make_pr_arm(tmp_path, f"PR=7; touch {marker}")
-    _make_pr_arm(tmp_path, f"PR=$(shell touch {marker})")
+    for value in (f"7; touch {marker}", f"7`touch {marker}`", f"7 && touch {marker}", f"7 | touch {marker}"):
+        _, env = _make_pr_arm(tmp_path, f"PR={value}")
+        assert env["PR_ARM_PR"] == value
     assert not marker.exists()
+
+
+def _make_other_target(tmp_path: Path, target: str, *assignments: str) -> subprocess.CompletedProcess[str]:
+    shim = tmp_path / "uv"
+    shim.write_text("#!/bin/sh\nexit 0\n")
+    shim.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k not in {"PR", "HEAD", "REPO"} and not k.startswith("PR_ARM_")}
+    env["PATH"] = f"{tmp_path}{os.pathsep}{env['PATH']}"
+    return subprocess.run(
+        ["make", "--no-print-directory", target, *assignments],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+
+
+@pytest.mark.parametrize(
+    ("target", "variable"),
+    [("pr-landing-withdraw", "PR"), ("pr-landing-ready", "PR"), ("pr-ready", "HEAD"), ("pr-ready", "PR")],
+)
+def test_making_pr_arm_literal_does_not_change_how_other_targets_see_a_value(
+    tmp_path: Path, target: str, variable: str
+) -> None:
+    """A global `override` would hand `$(cmd)` text to these targets' double-quoted shell recipes."""
+    marker = tmp_path / "ran"
+    result = _make_other_target(tmp_path, target, f"{variable}=$(touch {marker})")
+    assert not marker.exists(), result.stderr
+    assert result.returncode != 0  # each refuses for a missing PR, head or evidence, as before
 
 
 def test_the_make_wrapper_tells_an_omitted_variable_from_an_empty_one(tmp_path: Path) -> None:

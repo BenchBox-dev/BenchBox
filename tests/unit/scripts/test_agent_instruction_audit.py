@@ -274,6 +274,7 @@ def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: s
         # Release and publication authorization is an explicit exception, not a PR hand-back.
         "Wait for the owner to approve the production release before publishing.",
         "For a release, wait for the owner to approve deployment.",
+        "Ask the owner to approve the production release before publishing.",
         # A list item must not join the next one into a phrase.
         "- mark the PR\n- ready to arm after the checks",
     ],
