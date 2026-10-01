@@ -21847,7 +21847,7 @@
         "write-primitives-architecture-fixes"
       ],
       "priority": "low",
-      "status": "blocked",
+      "status": "open",
       "title": "Write Primitives sketch: cloud verification of Snowflake / BigQuery / Databricks / Redshift platform_overrides"
     },
     "write-primitives-sketch-duckdb-cpc-req-families": {
