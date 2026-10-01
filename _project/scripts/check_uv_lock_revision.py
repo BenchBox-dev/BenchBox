@@ -48,7 +48,7 @@ def check(old: int, new: int) -> int:
 
 def _committed_lock_text(repo_root: Path, ref: str = "HEAD") -> str | None:
     result = subprocess.run(
-        ["git", "show", f"{ref}:uv.lock"],
+        ["git", "--no-replace-objects", "show", f"{ref}:uv.lock"],
         cwd=repo_root,
         capture_output=True,
         text=True,

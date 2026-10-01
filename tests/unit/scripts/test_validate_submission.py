@@ -965,7 +965,7 @@ class TestCacheControlGate:
     def test_absent_receipt_with_declared_enabled_cache_refused(self):
         # A receipt-capable platform declaring result_cache_enabled without a
         # receipt advertises cached timings with no disabling evidence.
-        for platform_name in ("Snowflake", "Redshift"):
+        for platform_name in ("Snowflake", "Redshift", "Databricks"):
             vr = ValidationResult("test")
             data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
             _validate_bundle(data, vr)
@@ -979,10 +979,10 @@ class TestCacheControlGate:
         assert vr.ok, vr.errors
 
     def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
-        # Platforms that never record a receipt (e.g. Databricks) keep the
+        # Platforms that never record a receipt (e.g. DuckDB) keep the
         # legacy exemption even when they declare an enabled cache.
         vr = ValidationResult("test")
-        data = _bundle_with_cache_control(None, platform_name="Databricks", result_cache_enabled=True)
+        data = _bundle_with_cache_control(None, platform_name="DuckDB", result_cache_enabled=True)
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
 
@@ -1646,6 +1646,7 @@ class TestSubmissionDeterministicGates:
         from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
         from benchbox.core.tpchavoc.variant_sets import VARIANT_REGISTRY
         from benchbox.sql_compat.rules.execution_filter.clickhouse_tpchavoc import CLICKHOUSE_TPCHAVOC_SKIPS
+        from benchbox.sql_compat.rules.execution_filter.cloud_tpchavoc import CLOUD_TPCHAVOC_SKIPS
         from benchbox.sql_compat.rules.execution_filter.datafusion_tpchavoc import DATAFUSION_TPCHAVOC_SKIPS
         from benchbox.sql_compat.rules.execution_filter.lakesail_tpchavoc import LAKESAIL_TPCHAVOC_SKIPS
         from benchbox.sql_compat.rules.execution_filter.postgres_tpchavoc import POSTGRES_TPCHAVOC_SKIPS
@@ -1663,6 +1664,9 @@ class TestSubmissionDeterministicGates:
             "datafusion": frozenset(DATAFUSION_TPCHAVOC_SKIPS),
             "lakesail": frozenset(LAKESAIL_TPCHAVOC_SKIPS),
             "postgres": frozenset(POSTGRES_TPCHAVOC_SKIPS),
+            "snowflake": frozenset(CLOUD_TPCHAVOC_SKIPS["snowflake"]),
+            "databricks": frozenset(CLOUD_TPCHAVOC_SKIPS["databricks"]),
+            "bigquery": frozenset(CLOUD_TPCHAVOC_SKIPS["bigquery"]),
         } == TPCHAVOC_DOCUMENTED_SKIPS
         benchmark = object.__new__(TPCHavocBenchmark)
         for platform in (
@@ -1673,6 +1677,9 @@ class TestSubmissionDeterministicGates:
             "PG-DuckDB",
             "TimescaleDB",
             "DuckDB",
+            "Snowflake",
+            "Databricks",
+            "BigQuery",
         ):
             assert _tpchavoc_documented_skips(platform) == frozenset(benchmark.get_platform_skip_queries(platform))
 

@@ -1,12 +1,10 @@
 name: Documentation
 
 on:
+  # Pull-request and merge-queue validation lives in ci.yml. This workflow keeps
+  # the protected-develop baseline capture and the release Pages deploy.
   push:
     branches: [release, develop]
-  pull_request:
-    branches: [release, develop]
-  merge_group:
-    types: [checks_requested]
   workflow_dispatch:
     inputs:
       baseline_source_sha:
@@ -34,6 +32,7 @@ jobs:
       changed: ${{ steps.paths.outputs.changed }}
       source_sha: ${{ steps.paths.outputs.source_sha }}
       base_sha: ${{ steps.paths.outputs.base_sha }}
+      baseline_candidates: ${{ steps.paths.outputs.baseline_candidates }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -81,18 +80,37 @@ jobs:
           }
           # Preserve every former pull_request path-filter input. A change to
           # this list must explain which rendered dependency is being removed.
-          CHANGED_PATHS=$(git diff --name-only "$BASE_SHA"...HEAD -- \
-            benchbox/ docs/ examples/ landing/ \
-            _project/scripts/explorer_pipeline/ \
-            _project/scripts/explorer_publish.py \
-            _project/scripts/results_explorer_snapshot_invariants.py \
-            results-data/ results-explorer/ scripts/ \
-            .github/workflows/docs.yml Makefile README.md pyproject.toml)
+          # The build runs uv sync and npm ci, so the lockfiles pin the
+          # rendered output as much as any source file. uv.lock and
+          # results-explorer/package-lock.json must stay in this list.
+          SITE_PATHS=(
+            benchbox/ docs/ examples/ landing/
+            _project/scripts/explorer_pipeline/
+            _project/scripts/explorer_publish.py
+            _project/scripts/results_explorer_snapshot_invariants.py
+            results-data/ results-explorer/ scripts/
+            .github/workflows/docs.yml Makefile README.md pyproject.toml uv.lock
+          )
+          CHANGED_PATHS=$(git diff --name-only "$BASE_SHA"...HEAD -- "${SITE_PATHS[@]}")
           if [ -z "$CHANGED_PATHS" ]; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
           else
             echo 'changed=true' >> "$GITHUB_OUTPUT"
           fi
+          # Baselines bound to the exact base come first. A first-parent
+          # ancestor is also a valid baseline source when every public-site
+          # input is byte-identical to the base, because it renders the same
+          # site; this is the premise that lets unchanged trees skip the gate.
+          # The walk stops at the first ancestor whose site inputs differ, so a
+          # differently rendered tree is never used. This covers a queue group
+          # ahead that changed no site inputs and therefore published nothing.
+          CANDIDATES="$BASE_SHA"
+          ANCESTORS=$(git rev-list --first-parent --max-count=25 "$BASE_SHA^" 2>/dev/null || true)
+          for ANCESTOR in $ANCESTORS; do
+            git diff --quiet "$ANCESTOR" "$BASE_SHA" -- "${SITE_PATHS[@]}" || break
+            CANDIDATES="$CANDIDATES $ANCESTOR"
+          done
+          echo "baseline_candidates=$CANDIDATES" >> "$GITHUB_OUTPUT"
 
   # Build HTML documentation with warnings as errors
   build:
@@ -216,7 +234,10 @@ jobs:
       github.event_name == 'merge_group'
     needs: [visual-inputs, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Build (about 15 minutes) plus this job must fit inside the 60-minute
+    # merge-queue check timeout with room for runner queueing, so the job
+    # never idles long on a runner waiting for a baseline.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -243,25 +264,47 @@ jobs:
         run: npx playwright install --with-deps chromium
         working-directory: results-explorer
 
-      - name: Download exact base visual baseline
+      - name: Capture public site
+        env:
+          E2E_PAGES_SHAPED: "1"
+          E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_PHASE: capture
+          PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
+          PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
+        run: npm run test:e2e:public-site
+        working-directory: results-explorer
+
+      # A merge-queue follower's base is the head of the group ahead of it. That
+      # group publishes a candidate baseline for its exact head once its own
+      # comparison passes. When the group ahead changed no site inputs it
+      # publishes nothing, so the lookup also accepts the nearest ancestor whose
+      # site inputs are byte-identical to the base, which is found at once. The
+      # bounded queue wait only matters when the group ahead did change site
+      # inputs; both groups build concurrently, so its candidate usually lands
+      # within minutes of this capture. Pull requests keep the short retry only.
+      - name: Download visual baseline for base or site-equivalent ancestor
         id: baseline
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
+          PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES: ${{ needs.visual-inputs.outputs.baseline_candidates }}
           PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+          PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS: ${{ github.event_name == 'merge_group' && '600' || '0' }}
         run: node scripts/download-public-site-visual-baseline.mjs
         working-directory: results-explorer
 
-      - name: Capture and compare public site
+      - name: Compare public site with exact base
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         env:
           E2E_PAGES_SHAPED: "1"
           E2E_SITE_DIR: ${{ github.workspace }}/site
+          PUBLIC_SITE_VISUAL_PHASE: compare
           PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
-          PUBLIC_SITE_VISUAL_BASELINE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && format('{0}/public-site-visual-baseline', runner.temp) || '' }}
-          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
-          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && '1' || '0' }}
+          PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
+          PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.baseline.outputs.baseline_sha }}
+          PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
           PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
           APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
@@ -278,6 +321,18 @@ jobs:
           name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
           path: ${{ runner.temp }}/public-site-visual-current
           retention-days: 30
+
+      # Runs only after this group's exact-base comparison passed. The capture
+      # is of `merge_group.head_sha`, the exact tree the next queue group merges
+      # onto, and the download script trusts it only from a merge_group run of
+      # this workflow on this repository's develop queue branch.
+      - name: Upload merge-queue candidate visual baseline
+        if: github.event_name == 'merge_group'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
+          path: ${{ runner.temp }}/public-site-visual-current
+          retention-days: 7
 
       - name: Upload visual diagnostics
         if: failure()

@@ -109,9 +109,82 @@ def test_runtime_metrics_only_include_successful_jobs() -> None:
     assert result == (True, 20.0, 45.0)
 
 
+def _partitioned_jobs() -> list[dict]:
+    return [
+        _check("medium-collect", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
+        _check("medium-test (shard 0)", started="2026-07-27T10:03:00Z", completed="2026-07-27T10:18:00Z"),
+        _check("medium-test (shard 1)", started="2026-07-27T10:02:30Z", completed="2026-07-27T10:14:00Z"),
+    ]
+
+
+def _partitioned_result(jobs: list[dict]) -> tuple:
+    runs = [{"id": 42, "name": "CI", "created_at": "2026-07-27T10:00:00Z", "conclusion": "success"}]
+    return metrics.first_pass_green_and_job_seconds(_FakeClient(runs, jobs), "feature/partitions")
+
+
+def test_partitioned_medium_metric_includes_collector_and_wait_without_summing_parallel_shards() -> None:
+    jobs = _partitioned_jobs()
+    jobs.append(_check(metrics.FAST_TEST_JOB_NAME, started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"))
+    assert _partitioned_result(list(reversed(jobs))) == (True, 300.0, 1080.0)
+    assert metrics._medium_budget_warning(1080.0) is None
+
+
+@pytest.mark.parametrize("missing", [0, 1, 2])
+def test_partitioned_medium_metric_requires_collector_and_both_shards(missing: int) -> None:
+    jobs = _partitioned_jobs()
+    jobs.pop(missing)
+    assert _partitioned_result(jobs)[2] is None
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("conclusion", ["failure", "cancelled", "skipped", None])
+def test_partitioned_medium_metric_excludes_censored_observations(index: int, conclusion: str | None) -> None:
+    jobs = _partitioned_jobs()
+    jobs[index]["conclusion"] = conclusion
+    assert _partitioned_result(jobs)[2] is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("status", "in_progress"),
+        ("started_at", None),
+        ("completed_at", "invalid"),
+        ("completed_at", "2026-07-27T09:00:00Z"),
+        ("started_at", "2026-07-27T09:00:00Z"),
+    ],
+)
+def test_partitioned_medium_metric_rejects_incomplete_or_invalid_intervals(field: str, value: str | None) -> None:
+    jobs = _partitioned_jobs()
+    jobs[1][field] = value
+    assert _partitioned_result(jobs)[2] is None
+
+
+@pytest.mark.parametrize("name", ["medium-test (shard 0)", "medium-test (shard 2)"])
+def test_partitioned_medium_metric_rejects_duplicate_or_unaccounted_shards(name: str) -> None:
+    jobs = _partitioned_jobs()
+    jobs.append(_check(name, started="2026-07-27T10:03:00Z", completed="2026-07-27T10:25:00Z"))
+    assert _partitioned_result(jobs)[2] is None
+
+
+def test_partitioned_medium_metric_does_not_fall_back_to_stale_literal_job() -> None:
+    jobs = _partitioned_jobs()[:2]
+    jobs.append(_check("medium-test", started="2026-07-27T10:03:00Z", completed="2026-07-27T10:05:00Z"))
+    assert _partitioned_result(jobs)[2] is None
+
+
+def test_partitioned_medium_metric_reaches_existing_timeout_warning() -> None:
+    jobs = _partitioned_jobs()
+    jobs[1]["completed_at"] = "2026-07-27T10:39:00Z"
+    seconds = _partitioned_result(jobs)[2]
+    assert seconds == 2340.0
+    assert "39.0 min" in metrics._medium_budget_warning(seconds)
+
+
 def test_event_fanout_for_pr_fetches_same_head_runs_jobs_and_checks() -> None:
     checks = [
         _check("ci-required-result", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:05:00Z"),
+        _check("tooling", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:00:30Z"),
         _check("Results Explorer browser gate", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:01:00Z"),
         _check("ruleset-drift", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
         _check("Public-site visual acceptance", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:03:00Z"),
@@ -179,12 +252,37 @@ def test_required_gate_uses_latest_rerun_and_ignores_stale_failure() -> None:
             "ci-required-result", conclusion="failure", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"
         ),
         _check("ci-required-result", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:20:00Z"),
+        _check("tooling", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
         _check("ruleset-drift", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:12:30Z"),
         _check("Public-site visual acceptance", started="2026-08-14T00:12:00Z", completed="2026-08-14T00:13:00Z"),
     ]
     assert metrics.required_gate_seconds(checks) == 8 * 60.0
     assert metrics.merge_unblock_seconds(checks) == 8 * 60.0
+
+
+def test_required_gate_resolves_six_unit_contexts_when_core_is_present() -> None:
+    checks = [
+        _check("core", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:09:00Z"),
+        _check("explorer", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:02:00Z"),
+        _check("results-data", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:00Z"),
+        _check("docs", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:03:00Z"),
+        _check("landing", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:00Z"),
+        _check("tooling", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:30Z"),
+    ]
+
+    assert metrics.resolve_required_contexts(checks) == metrics.REQUIRED_CONTEXT_NAMES
+    assert metrics.required_gate_seconds(checks) == 9 * 60.0
+    assert metrics.required_gate_end(checks) is not None
+
+
+def test_required_gate_does_not_count_a_partial_six_unit_head_as_green() -> None:
+    checks = [
+        _check("core", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:09:00Z"),
+        _check("tooling", started="2026-09-29T00:00:00Z", completed="2026-09-29T00:01:30Z"),
+    ]
+
+    assert metrics.required_gate_seconds(checks) is None
 
 
 def test_missing_required_context_yields_no_merge_unblock() -> None:
@@ -288,6 +386,7 @@ def test_cancelled_jobs_are_excluded_from_completed_runner_minutes() -> None:
 def test_event_fanout_separates_required_gate_from_documentation() -> None:
     checks = [
         _check("ci-required-result", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:10:00Z"),
+        _check("tooling", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:15Z"),
         _check("Results Explorer browser gate", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:20Z"),
         _check("ruleset-drift", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:00:30Z"),
         _check("Public-site visual acceptance", started="2026-08-14T00:00:00Z", completed="2026-08-14T00:05:00Z"),

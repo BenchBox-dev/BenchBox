@@ -12,6 +12,7 @@ import {
   HEADER_TOGGLE_ARIA_LABEL,
 } from "@/components/headerContract";
 import { LocalResultPicker } from "@/components/LocalResultPicker";
+import { RESULTS_NAV_SECTIONS, activeResultsNavSection, isLocalResultPath } from "@/components/resultsNav";
 
 interface LayoutProps {
   children: ComponentChildren;
@@ -36,6 +37,8 @@ function Header() {
   const rawUrl = typeof window === "undefined" ? "/results/" : getCurrentUrl();
   const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
   const inResults = currentPath === "/" || currentPath === "/results" || currentPath.startsWith("/results/");
+  const activeSection = activeResultsNavSection(currentPath);
+  const inLocalResult = isLocalResultPath(currentPath);
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -103,27 +106,14 @@ function Header() {
             data-testid="results-explorer-nav"
             class="flex min-w-0 min-h-12 flex-wrap items-center gap-x-5 gap-y-1 py-1 text-sm"
           >
-            <ExplorerNavLink href="/results/" active={currentPath === "/results" || currentPath === "/results/"}>
-              Overview
-            </ExplorerNavLink>
-            <ExplorerNavLink href="/results/benchmarks/" active={isBenchmarkPath(currentPath)}>
-              Benchmarks
-            </ExplorerNavLink>
-            <ExplorerNavLink
-              href="/results/platforms/"
-              active={currentPath.startsWith("/results/p/") || /^\/results\/platforms\/?$/.test(currentPath)}
-            >
-              Platforms
-            </ExplorerNavLink>
-            <ExplorerNavLink href="/results/compare" active={currentPath.startsWith("/results/compare")}>
-              Compare
-            </ExplorerNavLink>
-            <ExplorerNavLink href="/results/query" active={currentPath.startsWith("/results/query")}>
-              Find runs
-            </ExplorerNavLink>
+            {RESULTS_NAV_SECTIONS.map((section) => (
+              <ExplorerNavLink key={section.id} href={section.href} active={activeSection?.id === section.id}>
+                {section.label}
+              </ExplorerNavLink>
+            ))}
             <LocalResultPicker
               className={`whitespace-nowrap rounded-sm border-b-2 bg-transparent py-3 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--bb-focus-ring-on-dark)] ${
-                currentPath.startsWith("/results/local/")
+                inLocalResult
                   ? "border-[var(--bb-accent)] text-[var(--bb-fg-primary)]"
                   : "border-transparent text-[var(--bb-fg-muted)] hover:border-[var(--bb-border-default)] hover:text-[var(--bb-fg-primary)]"
               }`}
@@ -183,10 +173,6 @@ function ExplorerNavLink({
       {children}
     </a>
   );
-}
-
-function isBenchmarkPath(path: string): boolean {
-  return /^\/results\/(?!compare\/?$|query\/?$|platforms\/?$|p\/|r\/|local\/)[^/]+\/?$/.test(path);
 }
 
 function Footer() {

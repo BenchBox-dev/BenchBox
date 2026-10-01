@@ -27,6 +27,7 @@ recursive-include _sources/tpc-h/dbgen/variants *.sql
 # Binaries are included inside the benchbox package for proper installation
 recursive-include benchbox/_binaries/tpc-h *
 recursive-include benchbox/_binaries/tpc-ds *
+include benchbox/_binaries/SHA256MANIFEST.json
 # Exclude macOS metadata files
 global-exclude .DS_Store
 

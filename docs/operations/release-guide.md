@@ -364,15 +364,64 @@ See `release-recovery-v0-3-1` for the worked example of diagnosing a broken
 PyPI-latest release, confirming the fix on `develop`, and cutting the
 recovery version through this same flow.
 
+## Preparing and checking a release on develop
+
+`release-prep` and `release-check` prepare release content in an ordinary pull
+request against `develop`. They do not replace `release-cut` and
+`release-finalize` above. Do not tag the merged develop commit until the
+replacement publisher has passed its exact merge-group artifact, attestation,
+installed-artifact matrix, and release acceptance checks. The legacy
+`release.yml` publisher requires `origin/release` ancestry and rejects develop
+tags. Passing the content check alone does not authorize tagging or publication.
+
+```bash
+make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
+# hand-curate the [X.Y.Z] section of CHANGELOG.md, then
+make release-check VERSION=X.Y.Z [BASE_REF=<immutable-predecessor-sha>]
+```
+
+`release-prep` runs `scripts/update_version.py` (`pyproject.toml`,
+`benchbox/__init__.py`, the documentation release markers, and the landing-page
+badge), then `uv lock`, then `scripts/generate_changelog_entry.py`. The changelog
+lower bound defaults to the newest final `vX.Y.Z` tag; `SINCE_REF` overrides it.
+Commit the changed files as one PR.
+
+`release-check` (`scripts/release_flow.py check`) exits non-zero and lists every
+problem it finds. It verifies that:
+
+- the version in `pyproject.toml`, `benchbox/__init__.py`, the documentation
+  markers, the landing badge, and the `uv.lock` package entry equals `VERSION`;
+- `CHANGELOG.md` has a dated, hand-curated `## [X.Y.Z]` section;
+- the `uv.lock` schema revision was not downgraded
+  (`_project/scripts/check_uv_lock_revision.py`);
+- every top-level path is accounted for (`scripts/check_release_curation.py`);
+- no capped dependency reached its bound
+  (`scripts/check_dependency_bounds.py --fail-on=cap-reached`).
+
+Both targets need the full development tree, because the lock-revision check
+lives under `_project/`.
+The check uses a locked environment and leaves `uv.lock` unchanged. Its revision
+baseline defaults to the newest final release tag older than `VERSION`; that
+tag is resolved once to a commit. CI selects changes to managed release markers,
+the current version's changelog section, the lock schema, or release enforcement
+inputs. Its always-required `ci-paths` job runs the check with the immutable
+pull-request or merge-group event base SHA as `BASE_REF`; a failed check blocks
+`core`. Unchanged release identity avoids the dependency installation and check.
+Missing baseline history fails the check. Preparation uses a frozen environment
+until its explicit `uv lock` step. It validates the date and changelog lower
+bound before changing version markers; a later command failure can leave
+partial changes for inspection.
+
 ## Reference
 
-- Makefile targets: `release-cut`, `release-finalize`.
+- Makefile targets: `release-cut`, `release-finalize`, `release-prep`, `release-check`.
 - Workflow: `.github/workflows/release.yml`.
 - Canary workflow: `.github/workflows/release-canary.yml`.
 - Release-readiness gate: `scripts/release_readiness_check.py`.
 - Ruleset drift gate: `scripts/ruleset_drift_check.py`.
 - Curation drift guard: `scripts/check_release_curation.py` (runs in
   `lint.yml` on every PR).
+- Release preparation and pre-tag check: `scripts/release_flow.py`.
 - Version updater: `scripts/update_version.py`.
 - Changelog generator: `scripts/generate_changelog_entry.py`.
 - Architecture record: `_project/decisions/single-repo-migration.md`

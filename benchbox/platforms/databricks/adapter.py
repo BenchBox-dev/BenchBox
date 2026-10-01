@@ -345,10 +345,17 @@ class DatabricksAdapter(PlatformAdapter):
         force_upload_val = config.get("force_upload")
         self.force_upload = bool(force_upload_val if force_upload_val is not None else False)
 
-        # Result cache control - disable by default for accurate benchmarking
-        self.disable_result_cache = config.get("disable_result_cache", True)
+        # Result cache control - disable by default for accurate benchmarking.
+        # None-safe: the config builder inserts every platform field with None
+        # when no source provides it, so config.get(key, True) returns None
+        # (key present) and a bare truthiness gate would skip the disable.
+        disable_result_cache = config.get("disable_result_cache", True)
+        self.disable_result_cache = True if disable_result_cache is None else bool(disable_result_cache)
         self._liquid_clustering_operations: list[dict[str, Any]] = []
         self._z_order_operations: list[dict[str, Any]] = []
+        self._cache_disabled_sessions: Any = None
+        self._cache_disable_failed = False
+        self._cache_control_receipt: dict[str, Any] | None = None
         self._applied_layout_operations: list[dict[str, Any]] = []
         self._skipped_layout_operations: list[dict[str, Any]] = []
 
@@ -376,6 +383,9 @@ class DatabricksAdapter(PlatformAdapter):
 
     def _reset_run_scoped_state(self) -> None:
         super()._reset_run_scoped_state()
+        self._cache_disabled_sessions = None
+        self._cache_disable_failed = False
+        self._cache_control_receipt = None
         self._liquid_clustering_operations = []
         self._z_order_operations = []
         self._applied_layout_operations = []
@@ -893,9 +903,17 @@ class DatabricksAdapter(PlatformAdapter):
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
         compute = info.get("compute_configuration") if isinstance(info.get("compute_configuration"), Mapping) else {}
 
+        from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
+
+        receipt = sanitize_cache_control_receipt(self._cache_control_receipt)
+        config = dict(cast(Mapping[str, Any], config))
+        config["result_cache_enabled"] = not receipt["cache_disabled"] if receipt and receipt["validated"] else None
+
         metadata["platform_deployment"] = self._databricks_deployment_metadata(config, compute)
         metadata["platform_cloud"] = self._databricks_cloud_metadata(config)
         metadata["platform_compute"] = self._databricks_compute_metadata(config, compute)
+        if receipt is not None:
+            metadata["platform_compute"]["cache_control"] = receipt
         metadata["platform_storage"] = self._databricks_storage_metadata(config)
         return metadata
 
@@ -1077,6 +1095,9 @@ class DatabricksAdapter(PlatformAdapter):
         - ``CAST(x AS VARCHAR)`` -> ``CAST(x AS STRING)`` (Databricks
           VARCHAR requires a length parameter; verified live with
           DATATYPE_MISSING_SIZE on batch inserts)
+        - ``unnest(generate_series(a, b))`` -> ``explode(sequence(a, b))``
+          (Databricks has neither function; verified live with
+          UNRESOLVED_ROUTINE ``unnest``)
         """
         import re
 
@@ -1087,6 +1108,12 @@ class DatabricksAdapter(PlatformAdapter):
                 return None
         else:
             base = operation.write_sql
+        base = re.sub(
+            r"\bunnest\(\s*generate_series\(([^()]*)\)\s*\)",
+            r"explode(sequence(\1))",
+            base,
+            flags=re.IGNORECASE,
+        )
         return re.sub(
             r"\bCAST\(([^()]+?)\s+AS\s+VARCHAR\s*\)",
             r"CAST(\1 AS STRING)",
@@ -1196,6 +1223,14 @@ class DatabricksAdapter(PlatformAdapter):
                     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
+
+            try:
+                self._ensure_session_cache_disabled(cursor, session=connection)
+            except Exception:
+                connection.close()
+                raise
+            finally:
+                cursor.close()
 
             self.log_operation_complete(
                 "Databricks connection",
@@ -1963,7 +1998,7 @@ class DatabricksAdapter(PlatformAdapter):
                         existing_tables,
                         data_source,
                     )
-                    table_stats[table_name.upper()] = row_count
+                    table_stats[table_name.lower()] = row_count
                     load_time = elapsed_seconds(load_start)
 
                     per_table_timings[table_name.upper()] = {
@@ -1977,7 +2012,7 @@ class DatabricksAdapter(PlatformAdapter):
 
                 except Exception as e:
                     self.logger.error(f"Failed to load {table_name}: {str(e)[:200]}")
-                    table_stats[table_name.upper()] = 0
+                    table_stats[table_name.lower()] = 0
                     per_table_timings[table_name.upper()] = {
                         "copy_into_ms": 0,
                         "optimize_ms": 0,
@@ -2223,29 +2258,70 @@ class DatabricksAdapter(PlatformAdapter):
         """
         return self._resolve_copy_dialect(data_source, table_name, file_path, benchmark).null_marker
 
-    def _get_column_list_for_table(self, benchmark, table_name: str) -> str:
-        """Get explicit column mapping from benchmark schema for COPY INTO."""
-        if not hasattr(benchmark, "get_schema"):
+    def _get_column_list_for_table(self, benchmark, table_name: str, cursor: Any | None = None) -> str:
+        """Get the explicit column list for a headerless COPY INTO.
+
+        Without a column list COPY INTO maps CSV fields by position against
+        the Delta schema and rejects the load with
+        COPY_INTO_SCHEMA_MISMATCH_WITH_TARGET_TABLE. Columns come from the
+        benchmark schema when it describes the table (dict entries or schema
+        objects with a ``columns`` attribute). Benchmarks also load tables
+        their ``get_schema()`` omits, such as the TPC-H base tables behind
+        Transaction Primitives or the TPC-DS sources behind TPC-DS OBT, so
+        the target table's own DESCRIBE output is the fallback.
+        """
+        table_name_upper = table_name.upper()
+        columns = self._schema_columns_for_table(benchmark, table_name)
+        if not columns and cursor is not None:
+            columns = self._describe_table_columns(cursor, table_name_upper)
+        if not columns:
+            self.logger.warning(
+                f"No column list resolved for {table_name_upper}; COPY INTO will map CSV fields by position"
+            )
             return ""
+        self.log_very_verbose(f"Using explicit column mapping for {table_name_upper}: {len(columns)} columns")
+        return f" ({', '.join(columns)})"
+
+    def _schema_columns_for_table(self, benchmark, table_name: str) -> list[str]:
+        """Return column names for a table from ``benchmark.get_schema()``, or []."""
+        if not hasattr(benchmark, "get_schema"):
+            return []
         try:
             schema = benchmark.get_schema()
-            table_name_upper = table_name.upper()
-            table_schema = schema.get(table_name.lower())
-            if not table_schema:
-                table_schema = schema.get(table_name_upper.lower())
-            if not table_schema:
-                table_schema = schema.get(table_name)
-
-            if table_schema and "columns" in table_schema:
-                columns = [col["name"] for col in table_schema["columns"]]
-                if columns:
-                    self.log_very_verbose(
-                        f"Using explicit column mapping for {table_name_upper}: {len(columns)} columns"
-                    )
-                    return f" ({', '.join(columns)})"
         except Exception as e:
-            self.log_very_verbose(f"Could not get column list for {table_name}: {e}")
-        return ""
+            self.logger.warning(f"Could not read benchmark schema for {table_name}: {e}")
+            return []
+        if not isinstance(schema, dict):
+            return []
+        table_schema = schema.get(table_name.lower()) or schema.get(table_name)
+        if table_schema is None:
+            return []
+        raw_columns = (
+            table_schema.get("columns") if isinstance(table_schema, dict) else getattr(table_schema, "columns", None)
+        )
+        names = []
+        for col in raw_columns or []:
+            name = col.get("name") if isinstance(col, dict) else getattr(col, "name", None)
+            if name:
+                names.append(str(name))
+        return names
+
+    def _describe_table_columns(self, cursor: Any, table_name_upper: str) -> list[str]:
+        """Return the target table's column names in declaration order, or []."""
+        try:
+            cursor.execute(f"DESCRIBE TABLE {table_name_upper}")
+            rows = list(cursor.fetchall() or [])
+        except Exception as e:
+            self.logger.warning(f"DESCRIBE TABLE {table_name_upper} failed while resolving COPY columns: {e}")
+            return []
+        names = []
+        for row in rows:
+            col = str(row[0]).strip() if len(row) > 0 and row[0] is not None else ""
+            # DESCRIBE appends partition/metadata sections after a blank or '#' row.
+            if not col or col.startswith("#"):
+                break
+            names.append(col)
+        return names
 
     def _target_cast_select(self, cursor: Any, table_name_upper: str) -> str:
         """Build a SELECT list casting source fields to the Delta column types.
@@ -2302,7 +2378,6 @@ class DatabricksAdapter(PlatformAdapter):
             data_source=data_source,
             benchmark=benchmark,
         )
-        column_list = self._get_column_list_for_table(benchmark, table_name)
         # Mirror the dialect-path derivation in _resolve_file_uri_and_delimiter so
         # the null marker resolves for the same file the delimiter came from.
         if isinstance(file_path, list) and file_path:
@@ -2338,9 +2413,12 @@ class DatabricksAdapter(PlatformAdapter):
         is_parquet = copy_sources[0].lower().split("?")[0].endswith(".parquet") if copy_sources else False
         use_cast_select = is_parquet or copy_dialect.has_header
         cast_select = ""
+        column_list = ""
         if use_cast_select:
             self.log_very_verbose(f"Using cast SELECT load for {table_name_upper}")
             cast_select = self._target_cast_select(cursor, table_name_upper)
+        else:
+            column_list = self._get_column_list_for_table(benchmark, table_name, cursor)
 
         copy_time = 0.0
         for source_uri in copy_sources:
@@ -2477,7 +2555,7 @@ class DatabricksAdapter(PlatformAdapter):
                 cursor.execute(f"CREATE TABLE {table_name_upper} USING PARQUET LOCATION '{location}'")
                 cursor.execute(f"SELECT COUNT(*) FROM {table_name_upper}")
                 result = cursor.fetchone()
-                table_stats[table_name_upper] = int(result[0]) if result else 0
+                table_stats[table_name_lower] = int(result[0]) if result else 0
 
         finally:
             cursor.close()
@@ -2490,20 +2568,30 @@ class DatabricksAdapter(PlatformAdapter):
 
         Applies result cache control first, then any user-provided custom Spark configurations.
         """
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.platforms.cloud_shared import empty_cache_control_receipt
+
+        configs = getattr(self, "spark_configs", {}) or {}
+        if self.disable_result_cache and any(
+            str(key).strip().lower() == "use_cached_result" and str(value).lower() != "false"
+            for key, value in configs.items()
+        ):
+            receipt = empty_cache_control_receipt()
+            receipt["errors"].append("Custom Spark configuration conflicts with required result cache disable")
+            self._cache_disable_failed = True
+            self._cache_control_receipt = receipt
+            raise ConfigurationError(receipt["errors"][0], details=receipt)
+
         cursor = connection.cursor()
 
         try:
-            # Apply result cache control - disable by default for accurate benchmarking
-            if self.disable_result_cache:
-                try:
-                    cursor.execute("SET use_cached_result = false")
-                    self.logger.debug("Disabled result cache (use_cached_result = false)")
-                except Exception as e:
-                    self.logger.warning(f"Failed to disable result cache: {e}")
+            self._ensure_session_cache_disabled(cursor, session=connection)
 
             # Apply user-provided configurations if specified
             if hasattr(self, "spark_configs") and self.spark_configs:
                 for config_key, config_value in self.spark_configs.items():
+                    if self.disable_result_cache and str(config_key).strip().lower() == "use_cached_result":
+                        continue  # The validated session helper owns this setting.
                     try:
                         cursor.execute(f"SET {config_key} = {config_value}")
                         self.logger.debug(f"Set {config_key} = {config_value}")
@@ -2514,6 +2602,105 @@ class DatabricksAdapter(PlatformAdapter):
 
         finally:
             cursor.close()
+
+    def _ensure_session_cache_disabled(self, cursor: Any, *, session: Any | None = None) -> None:
+        """Disable and read back cache state once per connection, or refuse execution."""
+        import inspect
+        import weakref
+
+        from benchbox.core.exceptions import ConfigurationError
+        from benchbox.core.tuning.applied_ledger import (
+            PHASE_SESSION,
+            RecordingConnection,
+            _RecordingCursor,
+            recording_connection,
+        )
+        from benchbox.platforms.cloud_shared import empty_cache_control_receipt, explicit_cache_enabled_receipt
+
+        if not self.disable_result_cache:
+            self._cache_control_receipt = explicit_cache_enabled_receipt("use_cached_result", "true")
+            return
+
+        # Real attributes avoid connections invented by dynamic proxies.
+        # Unwrap known recording proxies to keep one capture owner per SET.
+        while isinstance(cursor, _RecordingCursor):
+            cursor = cursor._cur
+        while isinstance(session, RecordingConnection):
+            session = session.raw_connection
+        if session is None:
+            for attr in ("connection", "_connection"):
+                if inspect.getattr_static(cursor, attr, None) is not None:
+                    session = getattr(cursor, attr)
+                    break
+        key = session if session is not None else cursor
+        if self._cache_disabled_sessions is None:
+            self._cache_disabled_sessions = weakref.WeakSet()
+        receipt = empty_cache_control_receipt()
+        try:
+            weakref.ref(key)
+            hash(key)
+            if key in self._cache_disabled_sessions:
+                return
+        except TypeError as exc:
+            receipt["errors"].append("Unsupported session identity: cache initialization cannot be tracked")
+            self._cache_disable_failed = True
+            self._cache_control_receipt = receipt
+            raise ConfigurationError(receipt["errors"][0], details=receipt) from exc
+
+        capture = recording_connection(cursor, getattr(self, "_applied_tuning_ledger", None), PHASE_SESSION)
+        try:
+            capture.execute("SET use_cached_result = false")
+            cursor.fetchall()
+            cursor.execute("SET use_cached_result")
+            row = cursor.fetchone()
+            if row is None or len(row) != 2 or str(row[0]).lower() != "use_cached_result":
+                raise ValueError("Unsupported cache readback: expected (use_cached_result, value)")
+            value = str(row[1]).lower()
+            receipt["settings"]["use_cached_result"] = value
+            if value != "false":
+                raise ValueError(f"Expected use_cached_result=false, observed {value}")
+            receipt["validated"] = True
+            receipt["cache_disabled"] = True
+        except Exception as exc:
+            receipt["errors"].append(str(exc))
+            self._cache_disable_failed = True
+            self._cache_control_receipt = receipt
+            raise ConfigurationError("Databricks session cache control failed", details=receipt) from exc
+
+        # A later successful session cannot erase an earlier failed receipt.
+        if not self._cache_disable_failed:
+            self._cache_control_receipt = receipt
+        self._cache_disabled_sessions.add(key)
+
+    def _initialize_query_session(self, connection: Any) -> None:
+        """Prepare a session before a power or throughput harness starts timing."""
+        if hasattr(connection, "cursor"):
+            cursor = connection.cursor()
+            try:
+                self._ensure_session_cache_disabled(cursor, session=connection)
+            finally:
+                cursor.close()
+        else:
+            self._ensure_session_cache_disabled(connection)
+
+    def _make_direct_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float) -> Any:
+        self._initialize_query_session(connection)
+        return super()._make_direct_power_connection_adapter(connection, benchmark_id, scale_factor)
+
+    def _make_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float) -> Any:
+        self._initialize_query_session(connection)
+        return super()._make_power_connection_adapter(connection, benchmark_id, scale_factor)
+
+    def _execute_tpch_throughput_test(self, benchmark: Any, connection: Any, run_config: dict) -> list[dict[str, Any]]:
+        # Databricks currently uses shared cursors. Initialize the actual
+        # connection before the parent harness starts its throughput window.
+        self._initialize_query_session(connection)
+        return super()._execute_tpch_throughput_test(benchmark, connection, run_config)
+
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
+        stream = super().new_stream_connection(connection, benchmark_type=benchmark_type)
+        self._initialize_query_session(stream)
+        return stream
 
     def execute_query(
         self,
@@ -2531,16 +2718,32 @@ class DatabricksAdapter(PlatformAdapter):
         power harness passes a per-stream cursor through the facade, which has
         no ``cursor()`` method of its own.
         """
-        start_time = mono_time()
-        self.log_verbose(f"Executing query {query_id}")
-        self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
-
         own_cursor = False
         if hasattr(connection, "cursor"):
             cursor = connection.cursor()
             own_cursor = True
         else:
             cursor = connection
+
+        # Fallback for direct callers. Harness factories prepare this session
+        # before their outer timer, even when no warmup is requested.
+        try:
+            self._ensure_session_cache_disabled(cursor, session=connection if own_cursor else None)
+        except Exception as exc:
+            if own_cursor:
+                cursor.close()
+            return {
+                "query_id": query_id,
+                "status": "FAILED",
+                "execution_time_seconds": 0.0,
+                "rows_returned": 0,
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            }
+
+        start_time = mono_time()
+        self.log_verbose(f"Executing query {query_id}")
+        self.log_very_verbose(f"Query SQL (first 200 chars): {query[:200]}{'...' if len(query) > 200 else ''}")
 
         try:
             # Schema context is already set in create_connection() and persists for the session

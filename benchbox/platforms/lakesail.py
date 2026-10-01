@@ -527,7 +527,14 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
         """Apply Sail-specific optimizations based on benchmark type."""
         self.apply_olap_runtime_conf(connection, benchmark_type, "LakeSail Sail")
 
-    def _get_dialect_queries(self, benchmark: Any, benchmark_slug: str, connection: Any | None = None) -> dict:
+    def _get_dialect_queries(
+        self,
+        benchmark: Any,
+        benchmark_slug: str,
+        connection: Any | None = None,
+        *,
+        strict_translation: bool = False,
+    ) -> dict:
         """Use LakeSail-specific query rules where Spark syntax compatibility diverges."""
         if benchmark_slug == "vector_search" and hasattr(benchmark, "get_queries"):
             try:
@@ -537,7 +544,12 @@ class LakeSailAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecu
                 )
             except TypeError:
                 return benchmark.get_queries(dialect="lakesail")
-        return super()._get_dialect_queries(benchmark, benchmark_slug, connection)
+        return super()._get_dialect_queries(
+            benchmark,
+            benchmark_slug,
+            connection,
+            strict_translation=strict_translation,
+        )
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
         """Get query execution plan from Sail server."""

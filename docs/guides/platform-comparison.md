@@ -350,13 +350,17 @@ benchbox compare \
 
 The JSON output includes:
 
-```json
+```text
 {
+  "benchmark_suite": "unified_comparison",
+  "timestamp": "2026-01-01T00:00:00+00:00",
   "config": {
     "platform_type": "sql",
-    "benchmark": "tpch",
     "scale_factor": 0.01,
-    "iterations": 3
+    "benchmark": "tpch",
+    "query_ids": null,
+    "warmup_iterations": 1,
+    "benchmark_iterations": 3
   },
   "results": [
     {

@@ -38,13 +38,13 @@ repos:
         files: ^(tests/uat/.*\.py|_project/specs/uat-framework\.md|_project/specs/uat-loc-budget\.json|_project/scripts/uat_loc_table\.py)$
 
       # Fast (<1s) allowlist-only scan. Runs on every commit.
-      # The pytest-collection fast-lane checks moved to `timing-policy-fast-lane`
-      # (pre-push stage) because a ~30s hook at commit time was racing with
-      # concurrent working-tree edits, causing spurious "files were modified by
-      # this hook" aborts.
+      # The pytest-collection fast-lane checks live in `fast_lane_ceiling_check.py`
+      # and run from `timing-policy-fast-lane` (pre-push stage) because a ~30s
+      # hook at commit time was racing with concurrent working-tree edits,
+      # causing spurious "files were modified by this hook" aborts.
       - id: timing-policy-check
         name: timing policy (wall-clock allowlist)
-        entry: uv run -- python _project/scripts/timing_policy_check.py --strict --skip-fast-lane
+        entry: uv run -- python _project/scripts/timing_policy_check.py --strict
         language: system
         pass_filenames: false
         stages: [pre-commit]
@@ -52,7 +52,7 @@ repos:
 
       - id: timing-policy-fast-lane
         name: timing policy (fast-lane collect)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python _project/scripts/timing_policy_check.py --strict --only-fast-lane; else echo "SKIPPED (timing policy fast lane is pre-push only)"; fi'
+        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; else echo "SKIPPED (timing policy fast lane is pre-push only)"; fi'
         language: system
         pass_filenames: false
         stages: [pre-push]

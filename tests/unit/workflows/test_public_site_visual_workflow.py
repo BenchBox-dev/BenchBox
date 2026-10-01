@@ -52,15 +52,32 @@ def test_develop_pushes_produce_a_public_site_visual_baseline() -> None:
 def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     visual = _workflow()["jobs"]["public-site-visual-regression"]
     steps = visual["steps"]
-    download = next(step for step in steps if step.get("name") == "Download exact base visual baseline")
-    run = next(step for step in steps if step.get("name") == "Capture and compare public site")
+    names = [step.get("name") for step in steps]
+    download = next(
+        step for step in steps if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
+    )
+    capture = next(step for step in steps if step.get("name") == "Capture public site")
+    run = next(step for step in steps if step.get("name") == "Compare public site with exact base")
+
+    # Capture before waiting so a follower's own tree is ready when the base appears.
+    assert names.index("Capture public site") < names.index(
+        "Download visual baseline for base or site-equivalent ancestor"
+    )
+    assert names.index("Download visual baseline for base or site-equivalent ancestor") < names.index(
+        "Compare public site with exact base"
+    )
+    assert capture["env"]["PUBLIC_SITE_VISUAL_PHASE"] == "capture"
+    assert "if" not in capture
+    assert run["env"]["PUBLIC_SITE_VISUAL_PHASE"] == "compare"
+    assert "merge_group" in run["if"] and "pull_request" in run["if"]
+    assert run["env"]["PUBLIC_SITE_VISUAL_REQUIRE_BASELINE"] == "1"
+    assert run["env"]["PUBLIC_SITE_VISUAL_OUTPUT"] == capture["env"]["PUBLIC_SITE_VISUAL_OUTPUT"]
 
     assert download["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ needs.visual-inputs.outputs.base_sha }}"
     assert "merge_group" in download["if"]
     assert "continue-on-error" not in download
     assert "download-public-site-visual-baseline.mjs" in download["run"]
-    assert "PUBLIC_SITE_VISUAL_REQUIRE_BASELINE" in run["env"]
-    assert "merge_group" in run["env"]["PUBLIC_SITE_VISUAL_BASELINE"]
+    assert run["env"]["PUBLIC_SITE_VISUAL_BASELINE"] == download["env"]["PUBLIC_SITE_VISUAL_BASELINE"]
     assert "merge_group.head_sha" in run["env"]["PR_HEAD_SHA"]
     assert "APPROVED_MERGE_GROUP_SHA" in run["env"]["APPROVED_HEAD_SHA"]
     assert "MERGE_GROUP_APPROVAL_REASON" in run["env"]["APPROVAL_REASON"]
@@ -70,6 +87,95 @@ def test_pull_requests_and_merge_groups_require_exact_base_comparison() -> None:
     assert not any(step.get("name") == "Determine baseline mode" for step in steps)
 
 
+def test_merge_queue_followers_wait_briefly_within_the_queue_timeout() -> None:
+    visual = _workflow()["jobs"]["public-site-visual-regression"]
+    download = next(
+        step
+        for step in visual["steps"]
+        if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
+    )
+    wait = download["env"]["PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS"]
+    assert wait == "${{ github.event_name == 'merge_group' && '600' || '0' }}"
+    # The wait holds a runner, so it must leave room for capture and compare
+    # inside the job timeout, and build (about 15 minutes) plus this job must
+    # leave runner-queueing slack inside the 60-minute merge-queue timeout.
+    assert 600 / 60 + 10 <= visual["timeout-minutes"] <= 30
+
+
+def test_download_accepts_site_equivalent_ancestors_and_compare_binds_the_used_sha() -> None:
+    workflow = _workflow()
+    assert workflow["jobs"]["visual-inputs"]["outputs"]["baseline_candidates"] == (
+        "${{ steps.paths.outputs.baseline_candidates }}"
+    )
+    steps = workflow["jobs"]["public-site-visual-regression"]["steps"]
+    download = next(
+        step for step in steps if step.get("name") == "Download visual baseline for base or site-equivalent ancestor"
+    )
+    compare = next(step for step in steps if step.get("name") == "Compare public site with exact base")
+    assert download["id"] == "baseline"
+    assert download["env"]["PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES"] == (
+        "${{ needs.visual-inputs.outputs.baseline_candidates }}"
+    )
+    # The compare step checks the downloaded manifest against the SHA the
+    # lookup actually used, which the download step publishes.
+    assert compare["env"]["PUBLIC_SITE_VISUAL_BASE_SHA"] == "${{ steps.baseline.outputs.baseline_sha }}"
+
+
+def _commit(repo: Path, path: str, content: str, message: str) -> str:
+    target = repo / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content)
+    for args in (
+        ["add", path],
+        ["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", message],
+    ):
+        subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True)
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    _commit(tmp_path, "docs/index.md", "v1\n", "root")
+    site_change = _commit(tmp_path, "docs/index.md", "v2\n", "site change")
+    quiet_one = _commit(tmp_path, "tests/a.py", "a\n", "non-site change")
+    base = _commit(tmp_path, "tests/b.py", "b\n", "another non-site change")
+    head = _commit(tmp_path, "tests/c.py", "c\n", "group head")
+
+    classifier = _workflow()["jobs"]["visual-inputs"]["steps"][1]["run"]
+    output = tmp_path / "github-output"
+    env = dict(os.environ)
+    env.update(
+        EVENT_NAME="merge_group",
+        PR_BASE_SHA="",
+        GROUP_BASE_SHA=base,
+        RECOVERY_SOURCE_SHA="",
+        CURRENT_SHA=head,
+        CURRENT_REF="refs/heads/gh-readonly-queue/develop/pr-1",
+        GITHUB_OUTPUT=str(output),
+    )
+    result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    lines = dict(line.split("=", 1) for line in output.read_text().splitlines())
+    # The base, then non-site ancestors, then the last commit that changed a
+    # site input (identical site inputs from that commit onward); nothing older.
+    assert lines["baseline_candidates"].split() == [base, quiet_one, site_change]
+
+
+def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> None:
+    steps = _workflow()["jobs"]["public-site-visual-regression"]["steps"]
+    names = [step.get("name") for step in steps]
+    upload = next(step for step in steps if step.get("name") == "Upload merge-queue candidate visual baseline")
+    assert upload["if"] == "github.event_name == 'merge_group'"
+    assert upload["with"]["name"] == "public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}"
+    # Default success() gating: no candidate after a failed or skipped comparison.
+    assert "always()" not in upload["if"] and "failure()" not in upload["if"]
+    assert names.index("Compare public site with exact base") < names.index(
+        "Upload merge-queue candidate visual baseline"
+    )
+
+
 def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     script = REPO_ROOT / "results-explorer" / "scripts" / "download-public-site-visual-baseline.mjs"
     package = __import__("json").loads((REPO_ROOT / "results-explorer" / "package.json").read_text(encoding="utf-8"))
@@ -77,11 +183,16 @@ def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
 
     assert script.is_file()
     assert "bootstrap=true" not in script_source
-    assert "actions/runs/${runId}" in script_source
-    assert "manifest.source_sha !== baseSha" in script_source
-    assert "page=${page}" in script_source
-    assert "BASELINE_LOOKUP_ATTEMPTS" in script_source
-    assert "lastLookupError = undefined" in script_source
+    assert "manifest.source_sha !== baselineSha" in script_source
+    assert "baseline_sha=${baselineSha}" in script_source
+    assert "/^[0-9a-f]{40}$/" in script_source
+    assert "waitForTrustedBaseline" in script_source
+    lookup_source = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert "page=${page}" in lookup_source
+    assert "actions/runs/${runId}" in lookup_source
+    assert "lastLookupError = undefined" in lookup_source
     assert "test:e2e:public-site" in package["scripts"]
     assert "e2e/captures/public-site-pages.spec.ts" in package["scripts"]["test:e2e:public-site"]
 
@@ -95,15 +206,26 @@ def test_public_results_capture_waits_for_data_before_digesting() -> None:
     assert "coldResultsLoad" not in source
 
 
-def test_every_develop_pr_and_merge_group_reports_the_required_context() -> None:
+def test_docs_workflow_keeps_baselines_and_ci_reports_the_comparison() -> None:
+    """docs.yml captures protected-develop baselines on push; ci.yml runs the comparison."""
     workflow = _workflow()
     triggers = workflow.get("on", workflow.get(True))
-    assert "paths" not in triggers["pull_request"]
-    assert triggers["merge_group"]["types"] == ["checks_requested"]
+    assert "pull_request" not in triggers
+    assert "merge_group" not in triggers
+    assert set(triggers) >= {"push", "workflow_dispatch"}
     gate = workflow["jobs"]["public-site-visual-required"]
     assert gate["name"] == "Public-site visual acceptance"
     assert gate["if"] == "always()"
     assert set(gate["needs"]) == {"visual-inputs", "build", "public-site-visual-regression"}
+
+    ci = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    ci_triggers = ci.get("on", ci.get(True))
+    assert "paths" not in ci_triggers["pull_request"]
+    assert "merge_group" in ci_triggers
+    visual = ci["jobs"]["public-site-visual-regression"]
+    assert visual["name"] == "Public-site visual regression"
+    assert "render_changed" in visual["if"]
+    assert "merge_group" in visual["if"]
 
 
 @pytest.mark.parametrize(
