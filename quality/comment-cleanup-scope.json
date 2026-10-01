@@ -27,7 +27,8 @@
         {"path": "scripts/check_comment_cleanup_scope.py"},
         {"path": "tests/unit/scripts/test_comment_cleanup_scope.py"},
         {"path": "docs/development/comment-cleanup-scope.md"},
-        {"path": "docs/index.rst"}
+        {"path": "docs/index.rst"},
+        {"path": "docs/development/dev-loop-property-ledger.md"}
       ]
     },
     {
@@ -60,7 +61,24 @@
       "state": "blocked",
       "blocking_disposition": "Source slice is verified; defer stream, RNG, timing, and caller migrations.",
       "priority": 10,
-      "selectors": [{"prefix": "benchbox/core/tpcds/"}, {"path": "benchbox/tpcds.py"}]
+      "selectors": [
+        {"path": "benchbox/core/tpcds/__init__.py"},
+        {"path": "benchbox/core/tpcds/c_tools.py"},
+        {"path": "benchbox/core/tpcds/compliance.py"},
+        {"path": "benchbox/core/tpcds/constants.py"},
+        {"path": "benchbox/core/tpcds/maintenance_operations.py"},
+        {"path": "benchbox/core/tpcds/maintenance_test.py"},
+        {"path": "benchbox/core/tpcds/official_benchmark.py"},
+        {"path": "benchbox/core/tpcds/parameter_extractor.py"},
+        {"path": "benchbox/core/tpcds/platform_power.py"},
+        {"path": "benchbox/core/tpcds/power_test.py"},
+        {"path": "benchbox/core/tpcds/queries.py"},
+        {"path": "benchbox/core/tpcds/reporting.py"},
+        {"path": "benchbox/core/tpcds/streams.py"},
+        {"path": "benchbox/core/tpcds/throughput_test.py"},
+        {"prefix": "benchbox/core/tpcds/benchmark/"},
+        {"path": "benchbox/tpcds.py"}
+      ]
     },
     {
       "id": "tpcds-obt-source-slice",
@@ -84,7 +102,26 @@
       "state": "blocked",
       "blocking_disposition": "Source slice is verified; resolve runtime readers before producer edits.",
       "priority": 10,
-      "selectors": [{"prefix": "benchbox/core/tpcdi/"}, {"path": "benchbox/tpcdi.py"}]
+      "selectors": [
+        {"path": "benchbox/core/tpcdi/__init__.py"},
+        {"path": "benchbox/core/tpcdi/benchmark.py"},
+        {"path": "benchbox/core/tpcdi/config.py"},
+        {"path": "benchbox/core/tpcdi/financial_data.py"},
+        {"path": "benchbox/core/tpcdi/loader.py"},
+        {"path": "benchbox/core/tpcdi/metrics.py"},
+        {"path": "benchbox/core/tpcdi/queries.py"},
+        {"path": "benchbox/core/tpcdi/query_analytics.py"},
+        {"path": "benchbox/core/tpcdi/query_etl.py"},
+        {"path": "benchbox/core/tpcdi/query_validation.py"},
+        {"path": "benchbox/core/tpcdi/schema.py"},
+        {"path": "benchbox/core/tpcdi/schema_extension_specs.yaml"},
+        {"path": "benchbox/core/tpcdi/schema_extensions.py"},
+        {"path": "benchbox/core/tpcdi/schema_specs.yaml"},
+        {"path": "benchbox/core/tpcdi/source_generators.py"},
+        {"path": "benchbox/core/tpcdi/validation.py"},
+        {"prefix": "benchbox/core/tpcdi/etl/"},
+        {"path": "benchbox/tpcdi.py"}
+      ]
     },
     {
       "id": "tpch-skew-source-slice",
@@ -108,7 +145,22 @@
       "state": "blocked",
       "blocking_disposition": "Source slice is verified; variants and sibling consumers remain separately blocked.",
       "priority": 10,
-      "selectors": [{"prefix": "benchbox/core/tpchavoc/"}, {"path": "benchbox/tpchavoc.py"}]
+      "selectors": [
+        {"path": "benchbox/core/tpchavoc/DATAFRAME_VARIANTS.md"},
+        {"path": "benchbox/core/tpchavoc/README.md"},
+        {"path": "benchbox/core/tpchavoc/__init__.py"},
+        {"path": "benchbox/core/tpchavoc/benchmark.py"},
+        {"path": "benchbox/core/tpchavoc/cloud_compat.py"},
+        {"path": "benchbox/core/tpchavoc/dataframe_equivalence.py"},
+        {"path": "benchbox/core/tpchavoc/dialect_compat.py"},
+        {"path": "benchbox/core/tpchavoc/equivalence.py"},
+        {"path": "benchbox/core/tpchavoc/queries.py"},
+        {"path": "benchbox/core/tpchavoc/spark_query_transformer.py"},
+        {"path": "benchbox/core/tpchavoc/validation.py"},
+        {"path": "benchbox/core/tpchavoc/variant_base.py"},
+        {"path": "benchbox/core/tpchavoc/variants.py"},
+        {"path": "benchbox/tpchavoc.py"}
+      ]
     },
     {
       "id": "ssb-source-slice",

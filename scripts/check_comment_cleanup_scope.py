@@ -3,10 +3,12 @@ from __future__ import annotations
 import argparse
 import ast
 import hashlib
+import io
 import json
 import re
 import subprocess
 import sys
+import tokenize
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -428,7 +430,8 @@ def imported_modules(source: bytes) -> set[str]:
             modules.update(alias.name for alias in node.names if alias.name.split(".")[0] == "benchbox")
         elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
             if node.module.split(".")[0] == "benchbox":
-                modules.add(node.module)
+                if node.module != "benchbox":
+                    modules.add(node.module)
                 modules.update(f"{node.module}.{alias.name}" for alias in node.names)
         elif isinstance(node, ast.Constant) and isinstance(node.value, str) and MODULE_LITERAL.fullmatch(node.value):
             modules.add(node.value)
@@ -450,8 +453,10 @@ def import_owner(source: bytes, path_owners: dict[str, str | None]) -> str | Non
     owners = set()
     for module in imported_modules(source):
         candidate = module_path(module, path_owners)
-        if candidate is None or candidate == "benchbox/__init__.py":
+        if candidate is None:
             continue
+        if candidate == "benchbox/__init__.py":
+            return None
         owner = path_owners[candidate]
         if owner is None:
             return None
@@ -506,58 +511,137 @@ def apply_notice_owners(resolved: list[dict[str, Any]], notices: list[dict[str, 
     return findings
 
 
-def doc_carriers(source: bytes) -> list[tuple[int, str, str]]:
+DOC_CALL_READERS = {"getdoc", "getsource", "getcomments", "getsourcelines", "cleandoc", "render_doc"}
+IMPLICIT_DOC_DECORATORS = {"command", "group", "tool", "resource", "prompt"}
+IMPLICIT_HELP_KEYWORDS = {"help", "description"}
+DIRECTIVE_COMMENT = re.compile(r"#\s*(?:noqa|type:\s*ignore|pragma:|fmt:|isort:|ruff:|pylint:|pyright:|mypy:)")
+TODO_COMMENT = re.compile(r"\b(?:TODO|FIXME)\b")
+
+
+def _target_name(value: ast.expr) -> str | None:
+    if isinstance(value, ast.Name):
+        return value.id
+    if isinstance(value, ast.Subscript) and isinstance(value.value, ast.Call):
+        function = getattr(value.value.func, "id", "")
+        return f"{function}()" if function in {"globals", "locals", "vars"} else None
+    return None
+
+
+def _call_carrier(node: ast.Call) -> tuple[int, str, str, str | None] | None:
+    name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
+    arguments = [argument.value for argument in node.args if isinstance(argument, ast.Constant)]
+    if name == "setattr" and "__doc__" in arguments:
+        return node.lineno, "writer", "setattr", _target_name(node.args[0]) if node.args else None
+    if name == "getattr" and "__doc__" in arguments:
+        return node.lineno, "reader", "getattr", None
+    if name in DOC_CALL_READERS:
+        return node.lineno, "reader", name, None
+    return None
+
+
+def _decorator_carrier(node: ast.FunctionDef | ast.AsyncFunctionDef) -> tuple[int, str, str, str | None] | None:
+    if ast.get_docstring(node) is None:
+        return None
+    for decorator in node.decorator_list:
+        call = decorator if isinstance(decorator, ast.Call) else None
+        function = call.func if call else decorator
+        name = function.attr if isinstance(function, ast.Attribute) else getattr(function, "id", "")
+        if name in IMPLICIT_DOC_DECORATORS and not (
+            call and any(keyword.arg in IMPLICIT_HELP_KEYWORDS for keyword in call.keywords)
+        ):
+            return node.lineno, "reader", "decorator-docstring", None
+    return None
+
+
+def doc_carriers(source: bytes) -> list[tuple[int, str, str, str | None]]:
     try:
         tree = ast.parse(source)
     except (SyntaxError, ValueError, MemoryError, RecursionError):
         return []
-    found = []
+    found: list[tuple[int, str, str, str | None]] = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)):
             targets = node.targets if isinstance(node, ast.Assign) else [node.target]
             found.extend(
-                (target.lineno, "writer", "attribute-assignment")
+                (target.lineno, "writer", "attribute-assignment", _target_name(target.value))
                 for target in targets
                 if isinstance(target, ast.Attribute) and target.attr == "__doc__"
             )
         elif isinstance(node, ast.Attribute) and node.attr == "__doc__" and isinstance(node.ctx, ast.Load):
-            found.append((node.lineno, "reader", "attribute-read"))
+            found.append((node.lineno, "reader", "attribute-read", None))
         elif isinstance(node, ast.Name) and node.id == "__doc__" and isinstance(node.ctx, ast.Load):
-            found.append((node.lineno, "reader", "module-docstring-read"))
+            found.append((node.lineno, "reader", "module-docstring-read", None))
         elif isinstance(node, ast.Call):
-            name = node.func.attr if isinstance(node.func, ast.Attribute) else getattr(node.func, "id", "")
-            arguments = [argument.value for argument in node.args if isinstance(argument, ast.Constant)]
-            if name == "setattr" and "__doc__" in arguments:
-                found.append((node.lineno, "writer", "setattr"))
-            elif name == "getattr" and "__doc__" in arguments:
-                found.append((node.lineno, "reader", "getattr"))
-            elif name in {"getdoc", "getsource", "getcomments", "getsourcelines"}:
-                found.append((node.lineno, "reader", name))
-    return sorted(found)
+            carrier = _call_carrier(node)
+            if carrier:
+                found.append(carrier)
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            carrier = _decorator_carrier(node)
+            if carrier:
+                found.append(carrier)
+    return sorted(found, key=lambda item: (item[0], item[1], item[2]))
 
 
-def detect_carriers(resolved: list[dict[str, Any]], root: Path, base: str) -> list[dict[str, Any]]:
+def python_comment_markers(source: bytes) -> tuple[int, int]:
+    directives = todos = 0
+    try:
+        for token in tokenize.tokenize(io.BytesIO(source).readline):
+            if token.type == tokenize.COMMENT:
+                directives += bool(DIRECTIVE_COMMENT.search(token.string))
+                todos += bool(TODO_COMMENT.search(token.string))
+    except (tokenize.TokenError, SyntaxError, IndentationError, UnicodeError):
+        return 0, 0
+    return directives, todos
+
+
+def scan_python_sources(
+    resolved: list[dict[str, Any]], root: Path, base: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     by_path = {record["path"]: record for record in resolved if record["path"].endswith(".py")}
     blobs = read_blobs(root, base, sorted(by_path))
     carriers = []
+    markers = []
     for path, record in by_path.items():
-        for line, role, form in doc_carriers(blobs[path]):
-            carriers.append({"path": path, "line": line, "role": role, "form": form, "owner": record["owner"]})
-    return carriers
+        for line, role, form, target in doc_carriers(blobs[path]):
+            carriers.append(
+                {"path": path, "line": line, "role": role, "form": form, "target": target, "owner": record["owner"]}
+            )
+        directives, todos = python_comment_markers(blobs[path])
+        if directives or todos:
+            markers.append({"path": path, "directives": directives, "todos": todos, "owner": record["owner"]})
+    return carriers, markers
+
+
+def unregistered_markers(markers: list[dict[str, Any]], policy: dict[str, Any]) -> tuple[int, int]:
+    directives = sum(marker["directives"] for marker in markers) - sum(entry["count"] for entry in policy["directives"])
+    todos = sum(marker["todos"] for marker in markers) - len(policy["obligations"])
+    return max(directives, 0), max(todos, 0)
+
+
+def _names_target(carrier_text: str, target: str) -> bool:
+    if target.endswith("()"):
+        return target in carrier_text
+    return re.search(rf"(?<![\w]){re.escape(target)}\.__doc__", carrier_text) is not None
 
 
 def carrier_findings(carriers: list[dict[str, Any]], policy: dict[str, Any]) -> list[Finding]:
-    registered = {payload["path"] for payload in policy["payloads"]}
+    by_path: dict[str, list[str]] = {}
+    for payload in policy["payloads"]:
+        by_path.setdefault(payload["path"], []).append(payload["carrier"])
     findings = []
     for carrier in carriers:
-        if carrier["role"] == "writer" and carrier["path"] not in registered:
-            findings.append(
-                Finding(
-                    "SCOPE006",
-                    carrier["path"],
-                    f"runtime docstring write at line {carrier['line']} has no payload record",
-                )
+        if carrier["role"] != "writer":
+            continue
+        registered = by_path.get(carrier["path"])
+        if not registered:
+            detail = f"runtime docstring write at line {carrier['line']} has no payload record"
+        elif carrier.get("target") and not any(_names_target(text, carrier["target"]) for text in registered):
+            detail = (
+                f"runtime docstring write to {carrier['target']} at line {carrier['line']} has no payload naming it"
             )
+        else:
+            continue
+        findings.append(Finding("SCOPE006", carrier["path"], detail))
     return findings
 
 
@@ -707,8 +791,9 @@ def main(argv: list[str] | None = None) -> int:
         findings = [finding for finding in findings if finding.subject not in owned]
         findings.extend(notice_findings)
         findings.extend(evidence_owner_findings(policy, resolved))
-        carriers = detect_carriers(resolved, root, args.base)
+        carriers, markers = scan_python_sources(resolved, root, args.base)
         findings.extend(carrier_findings(carriers, policy))
+        open_directives, open_todos = unregistered_markers(markers, policy)
         findings.extend(dependency_findings(policy, resolved))
         output = output_path(root, args.output)
         report = {
@@ -717,6 +802,8 @@ def main(argv: list[str] | None = None) -> int:
             "sha256": hashlib.sha256(json.dumps(resolved, sort_keys=True).encode()).hexdigest(),
             "carriers": carriers,
             "carriers_sha256": hashlib.sha256(json.dumps(carriers, sort_keys=True).encode()).hexdigest(),
+            "python_markers": markers,
+            "unregistered_python_markers": {"directives": open_directives, "todo_fixme": open_todos},
         }
         if output:
             output.parent.mkdir(parents=True, exist_ok=True)
@@ -725,11 +812,15 @@ def main(argv: list[str] | None = None) -> int:
             print(finding, file=sys.stderr)
         print(
             f"comment-cleanup-scope: {len(resolved)} resolved paths, {len(carriers)} docstring carriers, "
+            f"{open_directives} directive and {open_todos} TODO/FIXME comments in Python sources not yet registered, "
             f"{len(findings)} findings"
         )
         return int(bool(findings))
     except (OSError, UnicodeError, json.JSONDecodeError, PolicyError, subprocess.CalledProcessError) as error:
         print(f"comment-cleanup-scope: configuration failure: {error}", file=sys.stderr)
+        return 2
+    except (KeyError, TypeError, AttributeError, IndexError) as error:
+        print(f"comment-cleanup-scope: configuration failure: malformed policy: {error!r}", file=sys.stderr)
         return 2
 
 
