@@ -6122,6 +6122,15 @@
       "status": "open",
       "title": "Add a Linux vs macOS job comparing dsdgen data checksums and dsqgen -LOG output"
     },
+    "dfparity-t16-qualification-renderer-spike": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Spike a qualification-value SQL renderer and retire the generate_with_parameters stub"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
