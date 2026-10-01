@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The gate builder renders SQL at the data's scale; runner.get_queries is unchanged",
+    "Report-mode gate at SF=0.01 and SF=0.1 runs; every classified-empty entry still returns 0 rows or is removed, with the new empty set recorded",
+    "A test asserts the gate renders at the gate scale"
+  ],
+  "context": "Source: DataFrame query parity proposal v3 (item T3). If owner decision D1 chooses production scope, that is a separate item (dfparity-t22). Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "Pass the gate's scale into the TPC-DS SQL render inside benchbox/core/equivalence/builders/tpcds.py only. Do NOT change runner.get_queries or any production path (see owner decision D1): production SQL runs at SF!=1 currently use SF=1 parameters and changing that alters baselines. About 10 templates use rowcount(...) so their dsqgen values depend on scale (Q44's differ at every other scale; tested). After rendering at the data's scale, _TPCDS_LEGITIMATELY_EMPTY (benchbox/core/equivalence/cross_surface.py ~1410, 26 entries, described as the bounded SF=0.01 cell) must be re-derived because emptiness is not monotonic in scale (23 queries are empty at some scales and not others).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:89a5799ab67252454cfa312e",
+      "at": "2026-10-01T14:05:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6b0fde31f7cd42a2b3328a70afa2ddad",
+      "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    }
+  ]
+}
