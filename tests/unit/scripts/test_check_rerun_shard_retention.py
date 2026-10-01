@@ -64,7 +64,10 @@ class TestExpiry:
         assert checker.find_expired(date(2026, 9, 25), 180) == ([], [])
 
     def test_main_reports_ok_when_current(self, tmp_path, monkeypatch, capsys):
-        (tmp_path / "sweep-20260901.yaml").write_text("name: x\n", encoding="utf-8")
+        # Stamp with the live date: main() reads the real clock, so a fixed
+        # date would eventually expire and fail this test.
+        stamp = date.today().strftime("%Y%m%d")
+        (tmp_path / f"sweep-{stamp}.yaml").write_text("name: x\n", encoding="utf-8")
         monkeypatch.setattr(checker, "SHARD_DIR", tmp_path)
         assert checker.main([]) == 0
         assert "OK" in capsys.readouterr().out
@@ -76,3 +79,8 @@ class TestExpiry:
         out = capsys.readouterr().out
         assert "expired" in out
         assert "mkdir -p" in out and "git mv" in out
+
+    def test_main_fails_closed_when_shard_directory_missing(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(checker, "SHARD_DIR", tmp_path / "renamed-away")
+        assert checker.main([]) == 2
+        assert "not found" in capsys.readouterr().err

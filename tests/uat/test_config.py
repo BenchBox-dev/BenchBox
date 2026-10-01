@@ -709,6 +709,9 @@ def test_corpus_config_paths_cover_generated_rerun_shards():
     valid post-archival state (see scripts/check_rerun_shard_retention.py);
     only a discovery/glob mismatch fails."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
+    # The directory itself must survive archival (its README anchors it); an
+    # empty set from a renamed or deleted directory must not pass vacuously.
+    assert shard_dir.is_dir(), f"{shard_dir} is missing; discovery would compare two empty sets"
     discovered = set(_corpus_config_paths())
     shards = {p for p in discovered if shard_dir in p.parents}
     assert shards == _glob_configs(shard_dir, recursive=False)

@@ -12,8 +12,8 @@ the exact archive command. Archival is ``git mv`` into
 ``_project/_archive/generated-rerun-shards-<YYYYMMDD>/`` (tracked evidence
 outside corpus discovery) plus a README note naming the sweep.
 
-Exit status: 0 all shards within retention; 1 expired shard(s) need archival;
-2 usage error.
+Exit status: 0 all shards within retention; 1 expired or undated shard(s) need
+action; 2 the shard directory is missing.
 
 Usage:
     uv run -- python scripts/check_rerun_shard_retention.py            # check (CI mode)
@@ -59,8 +59,6 @@ def find_expired(today: date, retention_days: int) -> tuple[list[tuple[Path, dat
     """
     expired: list[tuple[Path, date, int]] = []
     undated: list[Path] = []
-    if not SHARD_DIR.is_dir():
-        return expired, undated
     for path in sorted(SHARD_DIR.glob("*.yaml")) + sorted(SHARD_DIR.glob("*.yml")):
         sweep = shard_sweep_date(path)
         if sweep is None:
@@ -81,6 +79,12 @@ def main(argv: list[str] | None = None) -> int:
         help=f"Days after the sweep date before a shard expires (default {RETENTION_DAYS}).",
     )
     args = parser.parse_args(argv)
+
+    if not SHARD_DIR.is_dir():
+        # A missing directory would otherwise read as "no expired shards" and
+        # disable the policy silently; its README keeps it tracked when empty.
+        print(f"rerun shards: shard directory not found: {SHARD_DIR}", file=sys.stderr)
+        return 2
 
     expired, undated = find_expired(date.today(), args.retention_days)
     if not expired and not undated:
