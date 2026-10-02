@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Republished bundles show no mismatch verdicts; the old ones are replaced or annotated per policy."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan Phase 6 (finding A1.12).",
+  "description": "## Problem\nThe published corpus has 5 tuned bundles (DuckDB tpch, ssb, joinorder, clickbench and amplab, all from 2026-08-29), and every one carries false `mismatch` receipts from the index-binding defect. Explorer users see them as unverified.\n\n## Change\nAfter the liveness gate is green, re-run these configurations on the current code and republish through the normal publication workflow. Replace the old bundles, or annotate them as superseded, per publication policy.\n\n## Guardrails (must preserve)\n- Follow publication policy; maintainer approval is required.\n- Never edit published bundle contents by hand.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "results-data/bundles"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:35:10Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c737f872373a4e828cd12be8e8445fc8",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}

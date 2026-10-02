@@ -20321,6 +20321,15 @@
       "status": "done",
       "title": "Drop pre-provenance 'tuned' seed-corpus bundles (physically untuned runs)"
     },
+    "tuning-corpus-rerun-duckdb-tuned-bundles-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-liveness-e2e-gates-20261001"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Re-run and republish the five published DuckDB tuned bundles that carry false mismatch receipts"
+    },
     "tuning-corroboration-gate-failed-and-dropped-20260801": {
       "claim": null,
       "needs": [],
