@@ -1,14 +1,10 @@
 """Tests for ``DSQGenBinary.generate_with_parameters``: rendering a query with explicit values.
 
 Values are keyed by the names dsqgen's ``-LOG`` writes (``YEAR.01``). The round-trip test renders
-a seed, reads its ``-LOG`` values, renders again from those values with a different seed, and
-requires the same SQL, so it pins that the explicit values fully determine the substitutions.
+a seed for every one of the 99 queries, reads its ``-LOG`` values, renders again from those values
+with a different seed, and requires the same SQL, so it pins that the explicit values fully determine
+the substitutions.
 """
-
-import re
-import subprocess
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -31,23 +27,6 @@ def dsqgen():
 
 def _squash(sql):
     return " ".join(sql.split())
-
-
-def _logged_values(dsqgen, query_id, seed):
-    """The values dsqgen draws for ``seed``, read from its -LOG file, without the bookkeeping names."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_path = Path(temp_dir)
-        env = dsqgen._stage_dsqgen_workdir(temp_path)
-        log = temp_path / "parameters.log"
-        cmd, opt = dsqgen._build_dsqgen_cmd(query_id, None, seed, 1.0, "netezza", False)
-        cmd.extend([f"{opt}INPUT", "q/templates.lst", f"{opt}DIRECTORY", "q", f"{opt}LOG", str(log)])
-        subprocess.run(cmd, cwd=temp_dir, env=env, capture_output=True, text=True, timeout=30, check=True)
-        values = {}
-        for line in log.read_text().splitlines():
-            match = re.match(r"\s+(\S+)\s*=\s?(.*)$", line)
-            if match and not match.group(1).startswith("_"):
-                values[match.group(1)] = match.group(2).strip()
-        return values
 
 
 def test_explicit_values_win_over_the_seed(dsqgen):
@@ -84,9 +63,9 @@ def test_multi_part_variant_selects_its_part(dsqgen):
     assert sql != dsqgen.generate_with_parameters("39b", {"YEAR.01": 2001, "MONTH.01": 1})
 
 
-@pytest.mark.parametrize("query_id", [8, 10, 39, 44, 73, 88, 89, 93, 98])
+@pytest.mark.parametrize("query_id", range(1, 100))
 def test_values_from_a_seed_reproduce_that_seed(dsqgen, query_id):
-    values = _logged_values(dsqgen, query_id, seed=7)
+    values = dsqgen.generate_parameter_log(query_id, seed=7, scale_factor=1.0).substitutions
     reference = dsqgen.generate(query_id, seed=7)
 
     rendered = dsqgen.generate_with_parameters(query_id, values, seed=99)
