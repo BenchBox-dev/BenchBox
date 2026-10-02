@@ -6159,17 +6159,12 @@
       "title": "Stabilize or classify the flaky Q36 expression cell and detect flaky cells in the gate"
     },
     "dfparity-n04-dask-cudf-null-limits": {
-      "claim": {
-        "expires_at": "2026-10-03T22:38:08Z",
-        "generation": "7030bafab51e41fcad815ac9963377c4",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "open",
       "title": "Support or document Dask mixed-direction NULL placement and cuDF numeric NULL handling"
     },
     "dfparity-n05-dedupe-null-and-dsqgen-run": {
