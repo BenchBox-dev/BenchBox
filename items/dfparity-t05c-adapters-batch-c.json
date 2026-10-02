@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Each listed query has an adapter and its implementation reads every value the SQL varies",
+    "The inventory test's lists lose these queries and the test passes",
+    "With the adapter binding, each query matches the DuckDB reference on both families at SF 0.1, or the reason is documented",
+    "No other query's status changes in the SF 0.1 per-query probe"
+  ],
+  "description": "For each listed query: add an adapter in benchbox/core/tpcds/dataframe_queries/parameter_adapters.py from dsqgen -LOG names to the DataFrame keys (reproduce template arithmetic); make the implementation read the mapped keys with no literal fallback (Q33, Q34 and Q45 currently have literal fallbacks); delete dead YAML keys in default_parameters.yaml; remove the query from BINDING_GAP (and LITERAL_FALLBACK) in tests/unit/core/tpcds/test_parameter_consumption_inventory.py. Follow the t04 pattern. Q32 is one of the six all-NULL empties (see dfparity-n10). queries.py PRs queue one at a time. Effort about 2 days (judgement).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea",
+      "at": "2026-10-02T18:13:58Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3047982f552b4a5ea1c88cea623cd378",
+      "session_id": "9731d44c64f34c7d82551352fec356a5"
+    }
+  ]
+}
