@@ -7,6 +7,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from collections import Counter
 from decimal import Decimal
 from pathlib import Path
@@ -18,6 +20,7 @@ from tests import required_local_cases as required
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 MATRIX = required.MATRIX_MODULE
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_inventory_is_exact_original_four_plus_sqlite() -> None:
@@ -31,11 +34,35 @@ def test_inventory_is_exact_original_four_plus_sqlite() -> None:
     required.check_inventory(required.REQUIRED_LOCAL_CASES)
 
 
-def test_sqlite_node_exists_in_matrix_module() -> None:
-    from tests.integration import test_local_platform_benchmark_matrix as matrix
+def test_every_required_case_is_a_node_pytest_collects() -> None:
+    """The inventory is compared with pytest's own collection, not with a copy of itself."""
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "-o", "addopts=", "-p", "no:cacheprovider", MATRIX],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    required.check_collected(line.strip() for line in result.stdout.splitlines() if "::" in line)
 
-    name = required.SQLITE_VALUE_PARITY_NODE.split("::", 1)[1]
-    assert callable(getattr(matrix, name))
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda nodes: [node for node in nodes if "[tpch-duckdb]" not in node],
+        lambda nodes: [node.replace("[tpch-polars-df]", "[tpch-polars]") for node in nodes],
+        lambda nodes: [
+            node.replace("::test_sqlite_tpch_fixed_seed_value_parity", "::test_sqlite_renamed") for node in nodes
+        ],
+    ],
+    ids=["removed", "reparametrized", "renamed"],
+)
+def test_a_removed_renamed_or_reparametrized_case_is_rejected(mutation) -> None:
+    required.check_collected(required.REQUIRED_LOCAL_CASES)
+    with pytest.raises(required.RequiredCaseError, match="not collected"):
+        required.check_collected(mutation(required.REQUIRED_LOCAL_CASES))
 
 
 @pytest.mark.parametrize("compressed", [False, True], ids=["tbl", "tbl-zst"])

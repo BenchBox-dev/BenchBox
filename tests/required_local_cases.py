@@ -66,6 +66,18 @@ def check_inventory(node_ids: Iterable[str]) -> None:
         )
 
 
+def check_collected(collected: Iterable[str]) -> None:
+    """Require every required case to be a node ID that pytest actually collects.
+
+    The inventory is a list of strings, so on its own it cannot notice that a matrix
+    case was renamed, removed, or given a different parameter ID.
+    """
+    present = set(collected)
+    missing = sorted(node for node in REQUIRED_LOCAL_CASES if node not in present)
+    if missing:
+        raise RequiredCaseError(f"required local cases are not collected by pytest: {missing}")
+
+
 def expected_measurement_multiset(
     query_ids: Sequence[str] = SQLITE_CASE_QUERY_IDS,
     iterations: int = SQLITE_CASE_ITERATIONS,
