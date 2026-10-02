@@ -18185,6 +18185,18 @@
       "status": "done",
       "title": "Snowflake clustering: dead pre-ALTER comparison (LINEAR vs bare parens) re-fires ALTER+RESUME RECLUSTER on every reuse; introspector schema filter is case-sensitive raw interpolation"
     },
+    "snowflake-tuned-live-certification-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-no-midrun-destructive-db-handling-20261001",
+        "tuning-portable-metadata-store-20261001",
+        "tuning-sort-realized-by-ddl-no-drop-20261001",
+        "tuning-requested-vs-rendered-reconciliation-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Live-certify a tuned Snowflake run (no mid-run DROP, metadata persists, CLUSTERING_KEY shape, applied_verified)"
+    },
     "snowpark-connect-platform": {
       "claim": null,
       "needs": [],
