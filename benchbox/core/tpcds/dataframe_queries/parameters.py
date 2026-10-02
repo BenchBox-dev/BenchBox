@@ -7,6 +7,8 @@ and are valid for SF >= 1.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -58,6 +60,21 @@ def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None
     """Set parameter overrides for the current benchmark run."""
     global _parameter_overrides
     _parameter_overrides = overrides
+
+
+@contextmanager
+def parameter_overrides(overrides: dict[int, dict[str, Any]]) -> Iterator[None]:
+    """Apply per-query parameter overrides for the duration of the block, then restore what was there.
+
+    The overrides are process-wide, so this is for code that runs one query at a time; it merges with any
+    overrides already set and puts them back afterwards, even if the block raises.
+    """
+    previous = _parameter_overrides
+    set_parameter_overrides({**(previous or {}), **overrides})
+    try:
+        yield
+    finally:
+        set_parameter_overrides(previous)
 
 
 def get_parameters(query_id: int) -> TPCDSParameters:
