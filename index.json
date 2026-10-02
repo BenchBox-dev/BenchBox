@@ -6195,12 +6195,17 @@
       "title": "Fix CI fragility found during the parity work"
     },
     "dfparity-n08-render-scale-user-note": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T22:55:32Z",
+        "generation": "5aadba88d6534c35bfa10c0a9a34269d",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea"
+      },
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Note that standard TPC-DS runs at SF other than 1 now render at the data scale, and check results kept outside the repository"
     },
     "dfparity-n09-identity-job-scope": {
