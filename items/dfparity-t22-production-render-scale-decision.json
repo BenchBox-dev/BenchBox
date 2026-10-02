@@ -49,6 +49,15 @@
       "op": "release",
       "op_id": "a6d3ed7c93d940fb8e89bce15cfc345f",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T01:49:58Z",
+      "client": "claude-code",
+      "generation": "15aa2750817a4a4d9312d8678ca96184",
+      "op": "take",
+      "op_id": "a044770bccac45298a0b791a132cbb40",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
 }
