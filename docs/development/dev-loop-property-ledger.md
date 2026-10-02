@@ -153,6 +153,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_check_makefile_inventory.py` | tooling |
 | `test_check_project_references.py` | product-safety |
 | `test_check_release_curation.py` | product-safety |
+| `test_check_rerun_shard_retention.py` | tooling |
 | `test_check_sqlglot_repro_retirement.py` | tooling |
 | `test_check_submission_validator_sync.py` | product-safety |
 | `test_check_uv_lock_revision.py` | tooling |

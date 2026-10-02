@@ -527,7 +527,10 @@ def apply_external_entries(resolved: list[dict[str, Any]], entries: list[dict[st
         for entry in entries:
             if matches(record["path"], entry["selector"]):
                 record.update(
-                    owner=entry["owner"], state="excluded", blocking_disposition=entry["provenance"], rule="external"
+                    owner=entry["owner"],
+                    state="excluded",
+                    blocking_disposition=entry["blocking_disposition"],
+                    rule="external",
                 )
                 break
 
@@ -562,6 +565,7 @@ def verify_png_signature(path: str, blob: bytes) -> bool:
 
 
 MARKDOWN_BLOCK_PREFIX = re.compile(r"^\s*(?:>\s*)*(?:(?:[-*+]|\d+[.)])\s+)*")
+MARKDOWN_LINK_REFERENCE = re.compile(r"\[(?!\^)[^\]]+\]:")
 MARKDOWN_COMMENT_MARKERS = re.compile(
     r"<!--|\{/\*|\{%|\{#|<(?:pre|code|script|style)\b|\[(?://|comment)\]\s*:\s*(?:#|<>)", re.IGNORECASE
 )
@@ -584,7 +588,8 @@ def verify_markdown_prose(path: str, blob: bytes) -> bool:
             return False
         if MARKDOWN_COMMENT_MARKERS.search(line):
             return False
-        if MARKDOWN_BLOCK_PREFIX.sub("", line).startswith(("```", "~~~")):
+        block = MARKDOWN_BLOCK_PREFIX.sub("", line)
+        if block.startswith(("```", "~~~")) or MARKDOWN_LINK_REFERENCE.match(block):
             return False
     return True
 
@@ -597,12 +602,29 @@ def verify_sql_without_comment_markers(path: str, blob: bytes) -> bool:
     return not any(marker in text for marker in ("--", "/*", "#"))
 
 
+def verify_empty_file(path: str, blob: bytes) -> bool:
+    return blob == b""
+
+
+def verify_markdown_needs_review(path: str, blob: bytes) -> bool:
+    return not verify_markdown_prose(path, blob)
+
+
+def verify_any_content(path: str, blob: bytes) -> bool:
+    return True
+
+
 FORMAT_VERIFIERS = {
     "strict-json": verify_strict_json,
     "png-signature": verify_png_signature,
     "markdown-prose": verify_markdown_prose,
     "sql-without-comment-markers": verify_sql_without_comment_markers,
+    "empty-file": verify_empty_file,
+    "markdown-needs-review": verify_markdown_needs_review,
+    "any-content": verify_any_content,
 }
+BLOCKING_VERIFIERS = {"markdown-needs-review", "any-content"}
+FORMAT_STATES = {"comment-free", "blocked"}
 
 
 def validate_format_classes(policy: dict[str, Any], task_ids: set[str] | None = None) -> list[dict[str, Any]]:
@@ -612,13 +634,20 @@ def validate_format_classes(policy: dict[str, Any], task_ids: set[str] | None = 
     for index, entry in enumerate(policy["format_classes"]):
         if not isinstance(entry, dict):
             raise PolicyError(f"format_classes[{index}] must be an object")
-        require_fields(entry, fields, f"format_classes[{index}]")
+        require_fields(entry, fields | ({"state"} & set(entry)), f"format_classes[{index}]")
         class_id = check_string(entry["id"], f"format_classes[{index}].id")
         if class_id in ids:
             raise PolicyError(f"duplicate format class: {class_id}")
         ids.add(class_id)
         if entry["verifier"] not in FORMAT_VERIFIERS:
             raise PolicyError(f"format class {class_id} has an unknown verifier")
+        state = entry.get("state", "comment-free")
+        if state not in FORMAT_STATES:
+            raise PolicyError(f"format class {class_id} has an unknown state")
+        if (state == "blocked") != (entry["verifier"] in BLOCKING_VERIFIERS):
+            raise PolicyError(
+                f"format class {class_id}: a blocked class needs a blocking verifier, and a comment-free class a proving one"
+            )
         extensions = entry["extensions"]
         if not isinstance(extensions, list) or not extensions:
             raise PolicyError(f"format class {class_id} needs extensions")
@@ -642,7 +671,8 @@ def apply_format_classes(resolved: list[dict[str, Any]], classes: list[dict[str,
             for record in resolved
             if record["owner"] is None
             and not isinstance(record["rule"], list)
-            and PurePosixPath(record["path"]).suffix.lower() in entry["extensions"]
+            and (PurePosixPath(record["path"]).suffix or PurePosixPath(record["path"]).name).lower()
+            in entry["extensions"]
             and any(matches(record["path"], selector) for selector in entry["selectors"])
         ]
         blobs = read_blobs(root, base, [record["path"] for record in eligible])
@@ -651,7 +681,7 @@ def apply_format_classes(resolved: list[dict[str, Any]], classes: list[dict[str,
             if verifier(record["path"], blobs[record["path"]]):
                 record.update(
                     owner=entry["owner"],
-                    state="comment-free",
+                    state=entry.get("state", "comment-free"),
                     blocking_disposition=entry["blocking_disposition"],
                     rule=f"format:{entry['id']}",
                 )
@@ -678,7 +708,7 @@ DOC_CALL_READERS = {"getdoc", "getsource", "getcomments", "getsourcelines", "cle
 IMPLICIT_DOC_DECORATORS = {"command", "group", "tool", "resource", "prompt"}
 IMPLICIT_HELP_KEYWORDS = {"help", "description"}
 DIRECTIVE_COMMENT = re.compile(r"#\s*(?:noqa|type:\s*ignore|pragma:|fmt:|isort:|ruff:|pylint:|pyright:|mypy:)")
-TODO_COMMENT = re.compile(r"\b(?:TODO|FIXME)\b")
+TODO_COMMENT = re.compile(r"^#+\s*(?:TODO|FIXME)\b(?!\s*\))|(?:#|;|\s{2,})\s*(?:TODO|FIXME)(?:\([^)]*\))?:")
 
 
 def _target_name(value: ast.expr) -> str | None:
