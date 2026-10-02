@@ -1493,3 +1493,31 @@ class TestLegacyAnonymizationSchemeIsGone:
                 assert dropped not in out
             if "submission_path" in payload:
                 assert _is_public_pseudonym(out["submission_path"], "path")
+
+
+class TestCloudWarehouseAndOutputLocation:
+    """Databricks warehouse ids and saved cloud output locations never publish raw."""
+
+    def test_databricks_warehouse_id_is_pseudonymised_everywhere(self):
+        payload = {
+            "platform": {
+                "config": {"warehouse_id": "04851bf1f1d8ff51"},
+                "compute": {"warehouse_id": "04851bf1f1d8ff51"},
+                "raw_metadata": {"compute_configuration": {"warehouse_id": "04851bf1f1d8ff51"}},
+            }
+        }
+        public = AnonymizationManager().anonymize_result_payload(payload)
+        text = json.dumps(public)
+        assert "04851bf1f1d8ff51" not in text
+        assert public["platform"]["config"]["warehouse_id"].startswith("warehouse_")
+
+    def test_cloud_default_output_location_is_pseudonymised(self):
+        payload = {"config": {"platform_options": {"default_output_location": "gs://benchbox_uploads/"}}}
+        public = AnonymizationManager().anonymize_result_payload(payload)
+        assert "benchbox_uploads" not in json.dumps(public)
+
+    def test_pseudonymised_values_are_a_fixed_point(self):
+        manager = AnonymizationManager()
+        payload = {"platform": {"config": {"warehouse_id": "04851bf1f1d8ff51"}}}
+        once = manager.anonymize_result_payload(payload)
+        assert manager.anonymize_result_payload(once) == once

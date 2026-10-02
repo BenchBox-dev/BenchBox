@@ -64,6 +64,8 @@ identifier_keys:
   workspacename: workspace
   warehouse: warehouse
   warehousename: warehouse
+  # Databricks SQL warehouse id (platform config, compute and raw metadata).
+  warehouseid: warehouse
   workgroup: workgroup
   workgroupname: workgroup
   cluster: cluster
@@ -122,6 +124,8 @@ path_keys:
 - httppath
 - outputdirectory
 - outputlocation
+# Saved cloud output location (gs://, s3://, @stage); names a private bucket or stage.
+- defaultoutputlocation
 - outputpath
 - path
 - s3stagingurl
