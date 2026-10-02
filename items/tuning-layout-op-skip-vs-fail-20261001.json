@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Unit test: a Databricks fake-driver run with Hudi skips yields dropped intents and overall status != 'failed'.",
+    "Unit test: record() with phase 'pre_load' is normalized/rejected per D-6; overall_status considers every physical phase."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P2.3 (A1.6). Coordinates with databricks-liquid-clustering-tuning-review-20260526 (its live w4 run should wait for this item).",
+  "description": "## Problem\n`_fold_layout_operations_into_ledger` (`benchbox/platforms/base/adapter.py:1487-1512`) maps every non-\"applied\" op to `STATEMENT_FAILED`. Databricks records deliberate Hudi and Delta-only skips as status \"skipped\" (`databricks/adapter.py:2489-2496, 3640-3700`), so intentional skips can flip the run to `failed`.\n\nDatabricks also emits phase `\"pre_load\"`. `overall_status` filters physical statements by `{ddl, post_load}` (`applied_ledger.py:291`), so those statements escape the all-failed check, and `record()` never validates phase.\n\n## Change (per the D-6 decision)\n- Mapping: `applied` → executed; `failed` → failed; `skipped` → `record_dropped(statement, reason)`; anything else → failed, logged.\n- `record()` normalizes phases to the decided closed set.\n- Map Databricks `pre_load` per the decision. After the post-load seam lands, its OPTIMIZE becomes `post_load`.\n\n## Guardrails (must preserve)\n- Skips still block `applied_verified`, as drops.\n- Real failures still record as failed.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.\n- This item touches paths listed in the soundness manifest by `tuning-trust-paths-soundness-manifest-20261001`. The PR needs an external `Soundness review:` section (AGENTS.md) and must not auto-merge.",
+  "links": [
+    "benchbox/platforms/base/adapter.py",
+    "benchbox/core/tuning/applied_ledger.py",
+    "benchbox/platforms/databricks/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:18:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3e343d8b2cfe415eb7a0b14aebfcc187",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}

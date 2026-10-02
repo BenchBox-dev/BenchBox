@@ -20391,6 +20391,16 @@
       "status": "done",
       "title": "Post-load schema introspection receipts: upgrade applied_unverified to applied_verified"
     },
+    "tuning-layout-op-skip-vs-fail-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-gate-ledger-outcome-vocabulary-20261001",
+        "tuning-trust-paths-soundness-manifest-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Fold skipped layout ops as dropped intents (not failures) and enforce the ledger phase vocabulary"
+    },
     "tuning-metadata-drift-gaps-20260801": {
       "claim": null,
       "needs": [],
