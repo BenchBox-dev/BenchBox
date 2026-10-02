@@ -12,6 +12,7 @@ import yaml
 
 from tests.uat import _cli
 from tests.uat.config import validate_config
+from tests.utilities.paths import REPO_ROOT
 
 pytestmark = pytest.mark.fast
 
@@ -255,7 +256,7 @@ def test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides(monke
     rc = _cli.main(["stress", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.5"])
 
     assert rc == 0
-    default_config_path = Path("tests/uat/_cli.py").resolve().parent / "configs" / "stress-default.yaml"
+    default_config_path = REPO_ROOT / "tests" / "uat" / "configs" / "stress-default.yaml"
     assert calls == [(default_config_path, {"platform": "duckdb", "benchmark": "tpch", "scale": 0.5})]
     out = capsys.readouterr().out
     assert '"phase_exit_codes"' in out
@@ -263,7 +264,7 @@ def test_stress_main_forwards_platform_benchmark_scale_as_stress_overrides(monke
 
 
 def test_make_uat_sweep_forwards_dry_run_variable():
-    makefile = Path("Makefile").read_text(encoding="utf-8")
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     target = makefile.split("uat-sweep:", maxsplit=1)[1].split("# make uat-stress", maxsplit=1)[0]
 
     assert "[DRY_RUN=1]" in target
@@ -273,14 +274,14 @@ def test_make_uat_sweep_forwards_dry_run_variable():
 def test_make_uat_docker_cleanup_defaults_to_dry_run_and_supports_apply():
     dry_run = subprocess.run(
         ["make", "--no-print-directory", "-n", "uat-docker-cleanup"],
-        cwd=Path.cwd(),
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=30,
     )
     apply = subprocess.run(
         ["make", "--no-print-directory", "-n", "uat-docker-cleanup", "APPLY=1", "PREFIX=benchbox-uat-test"],
-        cwd=Path.cwd(),
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=30,
@@ -312,7 +313,7 @@ def test_make_uat_docker_cleanup_defaults_to_dry_run_and_supports_apply():
 def test_make_uat_targets_accept_non_bring_up_platforms(target, variables, expected_fragment):
     result = subprocess.run(
         ["make", "--no-print-directory", "-n", target, *variables],
-        cwd=Path.cwd(),
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=30,
@@ -326,7 +327,7 @@ def test_make_uat_targets_accept_non_bring_up_platforms(target, variables, expec
 def test_make_uat_bring_up_unknown_platform_still_fails_clearly():
     result = subprocess.run(
         ["make", "--no-print-directory", "uat-bring-up", "PLATFORM=does-not-exist"],
-        cwd=Path.cwd(),
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         timeout=30,

@@ -159,6 +159,8 @@ def _sentinel_config(tmp_path: Path) -> dict[str, object]:
         "gcs_bucket": "EGRESS_BUCKET_SENTINEL",
         "gcs_path": "EGRESS_PATH_SENTINEL",
         "aws_region": "us-east-1",
+        "aws_access_key_id": "EGRESS_AWS_KEY_SENTINEL",
+        "aws_secret_access_key": "EGRESS_AWS_SECRET_SENTINEL",
         "storage_account_name": "EGRESS_STORAGE_SENTINEL",
         "storage_account": "EGRESS_STORAGE_SENTINEL",
         "application_id": "EGRESS_APPLICATION_SENTINEL",
