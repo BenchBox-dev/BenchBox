@@ -1,10 +1,10 @@
 {
   "acceptance": [
-    "One dsqgen run path in c_tools.py",
-    "The inline NULL-to-None loops use _none_for_null",
-    "Existing tests pass and the per-query probe is unchanged"
+    "No inline NULL-to-None loop remains where _none_for_null applies",
+    "The SF 0.1 per-query probe on both families is unchanged for every cell",
+    "Existing tests pass; Dask runs of the touched queries still work"
   ],
-  "description": "generate_with_parameters in c_tools.py duplicates about 15 lines of the log-capable dsqgen runner. Several implementations convert NULL to None with inline loops that _none_for_null already covers. Replace both with the shared helper without changing behaviour.",
+  "description": "The dsqgen half of this item is done and merged: #2542 (42dd35db8) folded generate_with_parameters into the shared dsqgen runner (all 99 templates replay to identical SQL). What remains: several implementations in benchbox/core/tpcds/dataframe_queries/queries.py still convert NULL to None with inline loops that _none_for_null already covers (note _none_for_null now returns a lazy Dask frame unchanged). Replace them without changing behaviour. queries.py PR: queue it alone, after #2539 and #2541 have merged.",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
@@ -21,6 +21,14 @@
       "generation": "60e17e9756a141fd834f097918a3c805",
       "op": "take",
       "op_id": "178062a9303a4725ad267bb405ef1d1b",
+      "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea",
+      "at": "2026-10-02T20:54:47Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7bb305fed5984f038c68badb49304d34",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
     }
   ]

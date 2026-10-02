@@ -6179,7 +6179,7 @@
       ],
       "priority": "low",
       "status": "active",
-      "title": "Fold the duplicated dsqgen run in generate_with_parameters and the inline NULL-to-None loops into shared helpers"
+      "title": "Replace the inline NULL-to-None loops in queries.py with the shared _none_for_null helper"
     },
     "dfparity-n06-replay-99-logs-test": {
       "claim": null,
