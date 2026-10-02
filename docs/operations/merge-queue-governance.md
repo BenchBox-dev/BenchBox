@@ -121,16 +121,18 @@ Disabling the queue restores immediate single-PR squash merges under the `SHADOW
 
 ## 5. Post-Merge Soundness Digest
 
-`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that touch `.github/soundness-paths.txt`. For each one it finds the merged pull request and records which review signal followed the pull request's last content commit:
+`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that change a path on `.github/soundness-paths.txt`, counting both sides of a rename. For each one it finds the pull request that merged into `develop` as that commit and records which review signal applies to the pull request's final content:
 
-- the Codex connector's submitted review,
-- the connector's thumbs-up reaction, or
-- an external review posted as a PR comment that names its reviewer (`Reviewer: codex`, `muse` or `agy`).
+- the Codex connector's submitted review of the last content commit, or of a merge that only refreshed the base after it;
+- the connector's thumbs-up reaction made after the last content commit, or
+- an external review posted as a PR comment that names its reviewer (`Reviewer: codex`, `muse` or `agy`) after the last content commit.
 
-A merge of `develop` into the branch does not count as a content commit, so refreshing a branch keeps its signal. An "eyes" reaction is not a signal.
+A merge of `develop` into the branch is a refresh, not content, when its tree equals what merging its two parents mechanically produces. A merge that needed conflict resolution, carries any other change, or has more than two parents counts as content. An "eyes" reaction is not a signal.
+
+The connector review names a commit, so it cannot be backdated. A reaction or posted review cannot name a commit, so it is compared with commit dates, which the author of a branch controls. A posted review is also text the author can write. These two signals show that a review was recorded, not what it examined.
 
 A commit gets an issue labelled `soundness-review-gap` when it has no signal, no merged pull request, or a reviewer thread that was resolved with no commit after it. An agent runs the external review and either records a clean result on the issue or opens a fix or revert pull request.
 
-The checkpoint is stored in the body of the issue labelled `soundness-merge-digest`. The first run records the current head and reports nothing. A read that fails or comes back incomplete fails the run and leaves the checkpoint where it was.
+The checkpoint is stored in the body of the one issue labelled `soundness-merge-digest`. A missing issue, a second issue with the label, or a body without the checkpoint marker fails the run, so a damaged checkpoint cannot silently skip commits. Record the first checkpoint by dispatching the workflow with `bootstrap` set; the run reports nothing and later runs report the commits after it. Restore a damaged checkpoint with `--since <sha> --apply`. A read that fails or comes back incomplete also fails the run and leaves the checkpoint where it was.
 
 Run it locally without changing anything: `uv run -- python _project/scripts/soundness_merge_digest.py --since <sha>`.

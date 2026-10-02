@@ -7,16 +7,24 @@ name: Soundness Merge Digest
 # merged without a review is found even when no push event fired for it.
 #
 # A failed or incomplete read fails the run and leaves the checkpoint where it
-# was, so the next run covers the same range again.
+# was, so the next run covers the same range again. A missing or damaged state
+# issue also fails the run. The first checkpoint is recorded only by dispatching
+# this workflow with `bootstrap` set.
 
 on:
   schedule:
     - cron: "23 5 * * *"
   workflow_dispatch:
+    inputs:
+      bootstrap:
+        description: Record the current develop head as the first checkpoint
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 concurrency:
   group: soundness-merge-digest
@@ -37,4 +45,12 @@ jobs:
       - name: Report and record the digest
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 _project/scripts/soundness_merge_digest.py --repo "${{ github.repository }}" --ref origin/develop --apply
+          REPOSITORY: ${{ github.repository }}
+          BOOTSTRAP: ${{ inputs.bootstrap }}
+        run: |
+          set -euo pipefail
+          args=(--repo "${REPOSITORY}" --ref origin/develop --apply)
+          if [[ "${BOOTSTRAP}" == "true" ]]; then
+            args+=(--bootstrap)
+          fi
+          python3 _project/scripts/soundness_merge_digest.py "${args[@]}"

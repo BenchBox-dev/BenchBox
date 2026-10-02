@@ -9,11 +9,18 @@ request had at its final head. A commit with no signal, with no pull request, or
 with a reviewer thread resolved and no later commit gets a tracking issue.
 
 A read that fails or comes back incomplete stops the run before the checkpoint
-moves, so a missed commit is reported on the next run and never skipped.
+moves, so a missed commit is reported on the next run and never skipped. A damaged
+or duplicated state issue stops the run the same way; only `--bootstrap` records a
+first checkpoint.
+
+A connector review counts when it names a commit that carries the final content.
+Reactions and posted reviews cannot name a commit, so they are compared with commit
+dates, which an author controls; the digest records that limit and does not hide it.
 
 Usage:
     uv run -- python _project/scripts/soundness_merge_digest.py --since <sha>
     uv run -- python _project/scripts/soundness_merge_digest.py --apply
+    uv run -- python _project/scripts/soundness_merge_digest.py --apply --bootstrap
 """
 
 from __future__ import annotations
@@ -35,6 +42,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from soundness_paths import any_soundness_path  # noqa: E402
 
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
+BASE_BRANCH = "develop"
 STATE_LABEL = "soundness-merge-digest"
 GAP_LABEL = "soundness-review-gap"
 CHECKPOINT_PATTERN = re.compile(r"<!-- soundness-digest-checkpoint: ([0-9a-f]{40}) -->")
@@ -53,7 +61,7 @@ class ReadError(RuntimeError):
 @dataclass(frozen=True)
 class Review:
     login: str
-    submitted_at: str
+    commit_sha: str
 
 
 @dataclass(frozen=True)
@@ -81,7 +89,7 @@ class Thread:
 class PullCommit:
     sha: str
     committed_at: str
-    is_merge: bool
+    is_refresh: bool
 
 
 @dataclass(frozen=True)
@@ -96,13 +104,13 @@ class PullEvidence:
 
     @property
     def content_cutoff(self) -> str:
-        """Commit time of the last non-merge commit; merge commits only refresh the base."""
-        return max((c.committed_at for c in self.commits if not c.is_merge), default="")
+        """Commit time of the last content commit; a clean merge of the base only refreshes it."""
+        return max((c.committed_at for c in self.commits if not c.is_refresh), default="")
 
     @property
     def content_shas(self) -> frozenset[str]:
-        """Commits at or after the last non-merge commit, which carry the final content."""
-        last = max((i for i, c in enumerate(self.commits) if not c.is_merge), default=0)
+        """Commits at or after the last content commit, which carry the final content."""
+        last = max((i for i, c in enumerate(self.commits) if not c.is_refresh), default=0)
         return frozenset(c.sha for c in self.commits[last:])
 
 
@@ -135,7 +143,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     """Return the completed-review signals that postdate the pull request's last content commit."""
     cutoff = evidence.content_cutoff
     signals: list[str] = []
-    if any(r.login in CONNECTOR_LOGINS and r.submitted_at >= cutoff for r in evidence.reviews):
+    if any(r.login in CONNECTOR_LOGINS and r.commit_sha in evidence.content_shas for r in evidence.reviews):
         signals.append("connector-review")
     if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and r.created_at >= cutoff for r in evidence.reactions):
         signals.append("connector-approval")
@@ -195,9 +203,9 @@ def gap_issue_body(entry: Entry) -> str:
     )
 
 
-def run(args: Sequence[str], *, input_text: str | None = None) -> str:
+def run(args: Sequence[str], *, input_text: str | None = None, cwd: Path | None = None) -> str:
     try:
-        result = subprocess.run(list(args), input=input_text, capture_output=True, text=True, check=False)
+        result = subprocess.run(list(args), input=input_text, capture_output=True, text=True, check=False, cwd=cwd)
     except OSError as exc:
         raise ReadError(f"{args[0]} could not run: {exc}") from exc
     if result.returncode != 0:
@@ -218,8 +226,28 @@ def merged_commits(ref: str, since: str) -> list[str]:
     return run(["git", "log", "--first-parent", "--reverse", "--format=%H", f"{since}..{ref}"]).split()
 
 
-def commit_files(sha: str) -> list[str]:
-    return run(["git", "diff", "--name-only", f"{sha}~1", sha]).splitlines()
+def commit_files(sha: str, *, cwd: Path | None = None) -> list[str]:
+    """Return every path the commit changes, counting both sides of a rename."""
+    return run(["git", "diff", "--name-only", "--no-renames", f"{sha}~1", sha], cwd=cwd).splitlines()
+
+
+def merge_adds_content(sha: str, *, cwd: Path | None = None) -> bool:
+    """Return whether a merge differs from what merging its two parents mechanically produces.
+
+    A merge that needs conflict resolution, has more than two parents, or carries any
+    change beyond the mechanical result may have altered reviewed content.
+    """
+    parents = run(["git", "rev-list", "--parents", "-n", "1", sha], cwd=cwd).split()[1:]
+    if len(parents) != 2:
+        return True
+    result = subprocess.run(
+        ["git", "merge-tree", "--write-tree", *parents], capture_output=True, text=True, check=False, cwd=cwd
+    )
+    if result.returncode == 1:
+        return True
+    if result.returncode != 0:
+        raise ReadError(f"git merge-tree failed for {sha[:9]}: {result.stderr.strip()[:200]}")
+    return result.stdout.split()[0] != run(["git", "rev-parse", f"{sha}^{{tree}}"], cwd=cwd).strip()
 
 
 def commit_subject(sha: str) -> str:
@@ -276,21 +304,50 @@ def collect_threads(repo: str, number: int) -> tuple[Thread, ...]:
     return tuple(parsed)
 
 
-def collect_pull(repo: str, sha: str) -> PullEvidence | None:
-    candidates = [pr for pr in gh_json("api", f"repos/{repo}/commits/{sha}/pulls") if pr.get("merge_commit_sha") == sha]
-    if not candidates:
-        return None
-    number = int(candidates[0]["number"])
-    pull = gh_json("api", f"repos/{repo}/pulls/{number}")
+def merged_pull_number(repo: str, sha: str) -> int | None:
+    """Return the pull request merged into the base branch as this commit, or None."""
+    candidates = [
+        pr
+        for pr in gh_pages(f"repos/{repo}/commits/{sha}/pulls")
+        if pr.get("merge_commit_sha") == sha
+        and pr.get("merged_at")
+        and (pr.get("base") or {}).get("ref") == BASE_BRANCH
+    ]
+    if len(candidates) > 1:
+        raise ReadError(f"{sha[:9]} is the merge commit of {len(candidates)} pull requests")
+    return int(candidates[0]["number"]) if candidates else None
+
+
+def collect_commits(repo: str, number: int, pull: dict[str, Any], *, cwd: Path | None = None) -> tuple[PullCommit, ...]:
+    """Read the pull request's commits, requiring the list to be complete and to end at its head."""
     commits = gh_pages(f"repos/{repo}/pulls/{number}/commits")
     if len(commits) >= MAX_PULL_COMMITS:
         raise ReadError(f"#{number} has {len(commits)} commits, the most the API lists")
+    if not commits or len(commits) != pull["commits"] or commits[-1]["sha"] != pull["head"]["sha"]:
+        raise ReadError(f"#{number} commit list does not match the pull request: {len(commits)} of {pull['commits']}")
+    if any(len(c["parents"]) > 1 for c in commits):
+        run(["git", "fetch", "--no-tags", "origin", f"refs/pull/{number}/head"], cwd=cwd)
+    return tuple(
+        PullCommit(
+            c["sha"],
+            c["commit"]["committer"]["date"],
+            len(c["parents"]) > 1 and not merge_adds_content(c["sha"], cwd=cwd),
+        )
+        for c in commits
+    )
+
+
+def collect_pull(repo: str, sha: str) -> PullEvidence | None:
+    number = merged_pull_number(repo, sha)
+    if number is None:
+        return None
+    pull = gh_json("api", f"repos/{repo}/pulls/{number}")
     return PullEvidence(
         number=number,
         author=pull["user"]["login"],
-        commits=tuple(PullCommit(c["sha"], c["commit"]["committer"]["date"], len(c["parents"]) > 1) for c in commits),
+        commits=collect_commits(repo, number, pull),
         reviews=tuple(
-            Review((r.get("user") or {}).get("login", ""), r.get("submitted_at") or "")
+            Review((r.get("user") or {}).get("login", ""), r.get("commit_id") or "")
             for r in gh_pages(f"repos/{repo}/pulls/{number}/reviews")
         ),
         reactions=tuple(
@@ -315,14 +372,21 @@ def collect_entries(repo: str, ref: str, since: str) -> list[Entry]:
 
 
 def find_state_issue(repo: str) -> dict[str, Any] | None:
-    issues = gh_json("issue", "list", "--repo", repo, "--label", STATE_LABEL, "--state", "all", "--json", "number,body")
+    issues = gh_pages(f"repos/{repo}/issues?labels={STATE_LABEL}&state=all&per_page=100")
+    if len(issues) > 1:
+        raise ReadError(f"{len(issues)} issues carry the {STATE_LABEL} label; keep exactly one")
     return issues[0] if issues else None
 
 
 def read_checkpoint(repo: str) -> str | None:
+    """Return the stored checkpoint, None when no state issue exists, and fail on a damaged one."""
     issue = find_state_issue(repo)
-    match = CHECKPOINT_PATTERN.search(issue["body"]) if issue else None
-    return match.group(1) if match else None
+    if issue is None:
+        return None
+    match = CHECKPOINT_PATTERN.search(issue.get("body") or "")
+    if match is None:
+        raise ReadError(f"state issue #{issue['number']} has no checkpoint marker; restore it by hand")
+    return match.group(1)
 
 
 def write_checkpoint(repo: str, sha: str, report: str) -> None:
@@ -351,10 +415,8 @@ def write_checkpoint(repo: str, sha: str, report: str) -> None:
 
 def open_gap_issues(repo: str, entries: Sequence[Entry]) -> list[str]:
     run(["gh", "label", "create", GAP_LABEL, "--repo", repo, "--force", "--color", "b60205"])
-    existing = gh_json(
-        "issue", "list", "--repo", repo, "--label", GAP_LABEL, "--state", "all", "--limit", "1000", "--json", "body"
-    )
-    known = "\n".join(issue["body"] or "" for issue in existing)
+    existing = gh_pages(f"repos/{repo}/issues?labels={GAP_LABEL}&state=all&per_page=100")
+    known = "\n".join(issue.get("body") or "" for issue in existing)
     opened: list[str] = []
     for entry in entries:
         if entry.needs_attention and f"<!-- soundness-gap:{entry.sha} -->" not in known:
@@ -384,6 +446,9 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument("--ref", default="origin/develop")
     parser.add_argument("--since", help="start after this commit; defaults to the stored checkpoint")
     parser.add_argument("--apply", action="store_true", help="open gap issues and advance the checkpoint")
+    parser.add_argument(
+        "--bootstrap", action="store_true", help="with --apply, record the current head as the first checkpoint"
+    )
     return parser.parse_args(argv)
 
 
@@ -391,17 +456,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
     try:
         until = run(["git", "rev-parse", args.ref]).strip()
-        since = args.since or read_checkpoint(args.repo)
-        if since is None:
+        if args.bootstrap:
             if not args.apply:
-                print(
-                    "No checkpoint stored; pass --since or run with --apply to record the current head.",
-                    file=sys.stderr,
-                )
+                print("--bootstrap needs --apply.", file=sys.stderr)
+                return 2
+            if read_checkpoint(args.repo) is not None:
+                print("A checkpoint is already stored; --bootstrap would skip the commits after it.", file=sys.stderr)
                 return 2
             write_checkpoint(args.repo, until, "Checkpoint recorded; the next run reports commits after it.")
             print(f"Recorded checkpoint {until[:9]}.")
             return 0
+        since = args.since or read_checkpoint(args.repo)
+        if since is None:
+            print("No checkpoint stored; pass --since, or run once with --apply --bootstrap.", file=sys.stderr)
+            return 2
         entries = collect_entries(args.repo, until, since)
         report = render(entries, since=since, until=until)
         print(report)
