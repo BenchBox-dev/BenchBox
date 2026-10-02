@@ -6269,18 +6269,13 @@
       "title": "Render TPC-DS gate SQL at the data's scale (gate builder only) and re-derive the empty list"
     },
     "dfparity-t04-adapter-prototype": {
-      "claim": {
-        "expires_at": "2026-10-03T16:53:43Z",
-        "generation": "2845b132dc9844b9a52a004ec49040ab",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:c8122ce9a44d70d81694d8ed"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t01-dsqgen-log-parser",
         "dfparity-t03-gate-scale-threading"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Prototype parameter adapters for Q39, Q44, Q49 and Q93 (Q41 as negative control)"
     },
     "dfparity-t05-adapter-batches": {
