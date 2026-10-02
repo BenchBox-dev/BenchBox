@@ -5400,7 +5400,7 @@ def q71_expression_impl(ctx: DataFrameContext) -> Any:
             channel("store_sales", "ss_sold_date_sk", "ss_ext_sales_price", "ss_item_sk", "ss_sold_time_sk"),
         ]
     )
-    return (
+    grouped = (
         combined.join(item.filter(col("i_manager_id") == 1), left_on="sold_item_sk", right_on="i_item_sk", how="inner")
         .join(
             time_dim.filter(col("t_meal_time").is_in(["breakfast", "dinner"])),
@@ -5409,9 +5409,14 @@ def q71_expression_impl(ctx: DataFrameContext) -> Any:
             how="inner",
         )
         .group_by(["i_brand_id", "i_brand", "t_hour", "t_minute"])
-        .agg(col("ext_price").sum().alias("ext_price"))
-        .sort(["ext_price", "i_brand_id"], descending=[True, False])
+        .agg(
+            ctx.when(col("ext_price").count() > ctx.lit(0))
+            .then(col("ext_price").sum())
+            .otherwise(ctx.lit(None))
+            .alias("ext_price")
+        )
     )
+    return _sort_null_largest_expression(ctx, grouped, ["ext_price", "i_brand_id"], [True, False])
 
 
 def q71_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5442,13 +5447,14 @@ def q71_pandas_impl(ctx: DataFrameContext) -> Any:
     item_filter = item[item["i_manager_id"] == 1]
     time_filter = time_dim[time_dim["t_meal_time"].isin(["breakfast", "dinner"])]
 
-    return (
+    grouped = (
         combined.merge(item_filter, left_on="sold_item_sk", right_on="i_item_sk", how="inner")
         .merge(time_filter, left_on="time_sk", right_on="t_time_sk", how="inner")
         .groupby(["i_brand_id", "i_brand", "t_hour", "t_minute"], as_index=False)
-        .agg(ext_price=("ext_price", "sum"))
-        .sort_values(["ext_price", "i_brand_id"], ascending=[False, True])
+        .agg(ext_price=("ext_price", lambda values: values.sum(min_count=1)))
     )
+    result = _sort_null_largest_pandas(grouped, ["ext_price", "i_brand_id"], [True, False])
+    return _none_for_null(result, ["ext_price"])
 
 
 # =============================================================================
@@ -5697,20 +5703,18 @@ def q76_expression_impl(ctx: DataFrameContext) -> Any:
         ]
     )
 
-    return (
-        combined.group_by(["channel", "col_name", "d_year", "d_qoy", "i_category"])
-        .agg(
-            [
-                ctx.count().alias("sales_cnt"),
-                ctx.when(col("ext_sales_price").count() > lit(0))
-                .then(col("ext_sales_price").sum())
-                .otherwise(lit(None))
-                .alias("sales_amt"),
-            ]
-        )
-        .sort(["channel", "col_name", "d_year", "d_qoy", "i_category"])
-        .head(100)
+    grouped = combined.group_by(["channel", "col_name", "d_year", "d_qoy", "i_category"]).agg(
+        [
+            ctx.count().alias("sales_cnt"),
+            ctx.when(col("ext_sales_price").count() > lit(0))
+            .then(col("ext_sales_price").sum())
+            .otherwise(lit(None))
+            .alias("sales_amt"),
+        ]
     )
+    return _sort_null_largest_expression(
+        ctx, grouped, ["channel", "col_name", "d_year", "d_qoy", "i_category"], [False] * 5
+    ).head(100)
 
 
 def q76_pandas_impl(ctx: DataFrameContext) -> Any:
@@ -5749,11 +5753,10 @@ def q76_pandas_impl(ctx: DataFrameContext) -> Any:
             sales_cnt=("ext_sales_price", "size"),
             sales_amt=("ext_sales_price", lambda values: values.sum(min_count=1)),
         )
-        .sort_values(["channel", "col_name", "d_year", "d_qoy", "i_category"])
+        .sort_values(["channel", "col_name", "d_year", "d_qoy", "i_category"], na_position="last")
         .head(100)
     )
-    result["sales_amt"] = result["sales_amt"].astype(object).where(result["sales_amt"].notna(), None)
-    return result
+    return _none_for_null(result, ["i_category", "sales_amt"])
 
 
 # =============================================================================
