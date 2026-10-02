@@ -3589,7 +3589,12 @@
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate",
-        "comment-cleanup-shared-infrastructure"
+        "comment-cleanup-examples",
+        "comment-cleanup-ssb",
+        "comment-cleanup-amplab",
+        "comment-cleanup-h2odb",
+        "comment-cleanup-clickbench",
+        "comment-cleanup-coffeeshop"
       ],
       "priority": "high",
       "status": "open",
