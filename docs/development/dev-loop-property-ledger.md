@@ -164,6 +164,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_comment_syntax_js.cjs` | tooling |
 | `test_ci_lint_environment_boundary.py` | tooling |
 | `test_comment_cleanup_scope.py` | tooling |
+| `test_comment_parity.py` | tooling |
 | `test_compile_all_platforms.py` | product-safety |
 | `test_compose_joinorder_hero.py` | product-safety |
 | `test_corpus_cohort_depth.py` | product-safety |
