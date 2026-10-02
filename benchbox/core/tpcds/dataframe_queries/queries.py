@@ -6231,19 +6231,25 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         date_key: str,
         return_null_col: str,
         group_cols: list[str],
-        agg_spec: dict[str, tuple[str, Any]],
+        value_cols: dict[str, str],
         aliases: dict[str, str],
     ) -> Any:
         joined = ctx.get_table(sales_table).merge(
             ctx.get_table(returns_table), left_on=left_on, right_on=right_on, how="left"
         )
         joined = joined.merge(date_dim, left_on=date_key, right_on="d_date_sk")
-        return (
-            joined[joined[return_null_col].isna()]
-            .groupby(group_cols, as_index=False, dropna=False)
-            .agg(**agg_spec)
-            .rename(columns=aliases)
+        # SQL SUM() over inputs that are all NULL is NULL. A groupby lambda with min_count=1 gives that
+        # but runs Python code per group; the built-in sum and count are vectorized and masked instead.
+        agg_spec = {}
+        for alias, source in value_cols.items():
+            agg_spec[alias] = (source, "sum")
+            agg_spec[f"{alias}_n"] = (source, "count")
+        grouped = (
+            joined[joined[return_null_col].isna()].groupby(group_cols, as_index=False, dropna=False).agg(**agg_spec)
         )
+        for alias in value_cols:
+            grouped[alias] = grouped[alias].where(grouped[f"{alias}_n"] > 0)
+        return grouped.drop(columns=[f"{alias}_n" for alias in value_cols]).rename(columns=aliases)
 
     ss_agg = channel(
         "store_sales",
@@ -6254,9 +6260,9 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         "sr_returned_date_sk",
         ["d_year", "ss_item_sk", "ss_customer_sk"],
         {
-            "ss_qty": ("ss_quantity", lambda values: values.sum(min_count=1)),
-            "ss_wc": ("ss_wholesale_cost", lambda values: values.sum(min_count=1)),
-            "ss_sp": ("ss_sales_price", lambda values: values.sum(min_count=1)),
+            "ss_qty": "ss_quantity",
+            "ss_wc": "ss_wholesale_cost",
+            "ss_sp": "ss_sales_price",
         },
         {"d_year": "ss_sold_year"},
     )
@@ -6269,9 +6275,9 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         "cr_returned_date_sk",
         ["d_year", "cs_item_sk", "cs_bill_customer_sk"],
         {
-            "cs_qty": ("cs_quantity", lambda values: values.sum(min_count=1)),
-            "cs_wc": ("cs_wholesale_cost", lambda values: values.sum(min_count=1)),
-            "cs_sp": ("cs_sales_price", lambda values: values.sum(min_count=1)),
+            "cs_qty": "cs_quantity",
+            "cs_wc": "cs_wholesale_cost",
+            "cs_sp": "cs_sales_price",
         },
         {"d_year": "cs_sold_year", "cs_bill_customer_sk": "cs_customer_sk"},
     )
@@ -6284,9 +6290,9 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         "wr_returned_date_sk",
         ["d_year", "ws_item_sk", "ws_bill_customer_sk"],
         {
-            "ws_qty": ("ws_quantity", lambda values: values.sum(min_count=1)),
-            "ws_wc": ("ws_wholesale_cost", lambda values: values.sum(min_count=1)),
-            "ws_sp": ("ws_sales_price", lambda values: values.sum(min_count=1)),
+            "ws_qty": "ws_quantity",
+            "ws_wc": "ws_wholesale_cost",
+            "ws_sp": "ws_sales_price",
         },
         {"d_year": "ws_sold_year", "ws_bill_customer_sk": "ws_customer_sk"},
     )
