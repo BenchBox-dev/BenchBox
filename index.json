@@ -6031,6 +6031,15 @@
       "status": "done",
       "title": "Add DataFrame execution support to Transaction Primitives benchmark"
     },
+    "dfparity-n01-q66-value-mismatch": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Diagnose the Q66 value mismatch at SF 0.03 to 0.1 on both families"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A stated cause with evidence for each family",
+    "Q66 matches at SF 0.1 on both families, or is reclassified with evidence",
+    "No comparator change"
+  ],
+  "description": "Q66 still diverges after the NULL warehouse fix in #2506 for a reason other than NULL names (the pandas .first() bug was fixed there). Reproduce at SF 0.03 and 0.1, state the cause with evidence, and fix at the cause or reclassify.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:33:15Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bfa92bd457ae4ee8bac910468ffcb30b",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
