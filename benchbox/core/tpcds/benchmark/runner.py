@@ -221,6 +221,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
     def get_queries(self, dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]:
         """Get all TPC-DS benchmark queries.
 
+        Parameters are rendered at the data's scale factor, as get_query() does: dsqgen derives some
+        values from the scale (for example row-count thresholds), so SQL rendered at a different scale
+        would not match the generated data.
+
         Args:
             dialect: Target SQL dialect for translation (e.g., 'duckdb', 'postgres')
 
@@ -231,8 +235,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
 
-        # Generate queries using dsqgen in the base dialect
-        int_queries = self.query_manager.get_all_queries(dialect=src)
+        # Generate queries using dsqgen in the base dialect, at the data's scale factor
+        int_queries = self.query_manager.get_all_queries(dialect=src, scale_factor=self.data_generator.scale_factor)
         base_queries = {str(k): v for k, v in int_queries.items()}
 
         # Always pass through SQLGlot from base to target for consistency

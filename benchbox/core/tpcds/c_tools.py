@@ -17,6 +17,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Optional, Union
 
+from benchbox.core.tpcds.parameter_log import TemplateParameters, parse_dsqgen_parameter_log
 from benchbox.utils.tpc_compilation import (
     CompilationStatus,
     ensure_tpc_binaries,
@@ -239,6 +240,69 @@ class DSQGenBinary:
         self._query_cache[cache_key] = result
         return result
 
+    def generate_parameter_log(
+        self,
+        query_id: Union[int, str],
+        *,
+        seed: Optional[int] = None,
+        scale_factor: float = 1.0,
+        stream_id: int = 0,
+        dialect: str = "netezza",
+    ) -> TemplateParameters:
+        """Return the parameters dsqgen substitutes for one template, via ``-LOG``.
+
+        The values are those of the requested stream for the given seed and
+        scale. A stream's values do not depend on how many streams are
+        generated, so stream ``n`` is produced by asking dsqgen for ``n + 1``.
+
+        ``stream_id`` is dsqgen's own ``-STREAMS`` stream. ``generate(..., stream_id=n)`` does not
+        select a stream (it renders stream 0), so for ``n > 0`` the values here do not match the
+        SQL ``generate`` returns; render the SQL for stream ``n`` from these values (or with
+        ``generate_dsqgen_streams``) when the two must agree.
+
+        Raises:
+            TPCDSError: If dsqgen fails or its log lacks the requested stream.
+            ValueError: If query_id or stream_id is invalid.
+        """
+        try:
+            base_query_id, variant = self._parse_query_id(query_id)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid query_id: {e}") from e
+        if not (1 <= base_query_id <= 99):
+            raise ValueError(f"Query ID must be 1-99, got {base_query_id}")
+        if stream_id < 0:
+            raise ValueError(f"Stream ID must be >= 0, got {stream_id}")
+
+        dialect = self._validate_dialect(dialect)
+        is_multi_part = base_query_id in (14, 23, 24, 39) and variant in ("a", "b")
+        cmd, opt = self._build_dsqgen_cmd(
+            base_query_id,
+            variant,
+            seed,
+            scale_factor,
+            dialect,
+            is_multi_part,
+            streams=stream_id + 1 if stream_id else None,
+        )
+        try:
+            _, log_text = self._run_dsqgen_with_log(cmd, opt, base_query_id, variant, capture_log=True)
+        except subprocess.TimeoutExpired:
+            raise TPCDSError(f"dsqgen timed out for query {base_query_id}{variant or ''}") from None
+        except FileNotFoundError:
+            raise TPCDSError(f"dsqgen binary not found at {self.dsqgen_path}") from None
+
+        try:
+            streams = parse_dsqgen_parameter_log(log_text or "")
+        except ValueError as e:
+            raise TPCDSError(f"Unreadable dsqgen parameter log for query {base_query_id}{variant or ''}: {e}") from e
+        templates = streams.get(stream_id, [])
+        if len(templates) != 1:
+            raise TPCDSError(
+                f"dsqgen parameter log for query {base_query_id}{variant or ''} has {len(templates)} templates "
+                f"in stream {stream_id}; expected 1"
+            )
+        return templates[0]
+
     def _resolve_template_arg(self, query_id: int, variant: Optional[str], is_multi_part: bool) -> str:
         """Pick the template path argument dsqgen should use."""
         template_name = f"query{query_id}.tpl" if is_multi_part else f"query{query_id}{variant or ''}.tpl"
@@ -264,6 +328,7 @@ class DSQGenBinary:
         scale_factor: float,
         dialect: str,
         is_multi_part: bool,
+        streams: Optional[int] = None,
     ) -> tuple[list[str], str]:
         """Build the dsqgen command and return (cmd, opt_prefix)."""
         _opt = "/" if sys.platform == "win32" else "-"
@@ -277,6 +342,8 @@ class DSQGenBinary:
             cmd.extend([f"{_opt}RNGSEED", str(seed)])
         cmd.extend([f"{_opt}FILTER", "Y"])
         cmd.extend([f"{_opt}VERBOSE", "N"])
+        if streams is not None:
+            cmd.extend([f"{_opt}STREAMS", str(streams)])
         return cmd, _opt
 
     def _stage_dsqgen_workdir(self, temp_path: Path) -> dict[str, str]:
@@ -306,14 +373,24 @@ class DSQGenBinary:
         self, cmd: list[str], opt: str, query_id: int, variant: Optional[str]
     ) -> subprocess.CompletedProcess:
         """Run dsqgen in a staged temporary workdir and return the completed process."""
+        return self._run_dsqgen_with_log(cmd, opt, query_id, variant, capture_log=False)[0]
+
+    def _run_dsqgen_with_log(
+        self, cmd: list[str], opt: str, query_id: int, variant: Optional[str], *, capture_log: bool
+    ) -> tuple[subprocess.CompletedProcess, Optional[str]]:
+        """Run dsqgen in a staged workdir; with ``capture_log`` also return its ``-LOG`` text."""
         import tempfile
 
+        log_text: Optional[str] = None
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             env = self._stage_dsqgen_workdir(temp_path)
 
             cmd.extend([f"{opt}INPUT", "q/templates.lst"])
             cmd.extend([f"{opt}DIRECTORY", "q"])
+            log_path = temp_path / "parameters.log"
+            if capture_log:
+                cmd.extend([f"{opt}LOG", str(log_path)])
 
             result = subprocess.run(
                 cmd,
@@ -323,6 +400,10 @@ class DSQGenBinary:
                 timeout=30,
                 env=env,
             )
+            if capture_log and result.returncode == 0:
+                if not log_path.exists():
+                    raise TPCDSError(f"dsqgen wrote no parameter log for query {query_id}{variant or ''}")
+                log_text = log_path.read_text(encoding="utf-8")
 
         if result.returncode != 0:
             error_output = result.stderr.strip() if result.stderr else "Unknown error"
@@ -334,7 +415,7 @@ class DSQGenBinary:
                 f"Stderr: {error_output}\n"
                 f"Stdout: {stdout_output}"
             )
-        return result
+        return result, log_text
 
     def _extract_sql_from_output(self, stdout: str, query_id: int, variant: Optional[str]) -> str:
         sql_output = stdout.strip()

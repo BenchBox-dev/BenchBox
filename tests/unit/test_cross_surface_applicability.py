@@ -69,21 +69,19 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # tpcds_obt was previously here; its id correspondence was then explicitly
 # abandoned, so it is `abandoned` instead. datavault was previously here too;
 # it is now an enforced cross-surface gate.)
-# tpch and tpcds are STAGED gates (registered but not CI-enforced): their
+# tpcds is a STAGED gate (registered but not CI-enforced): its
 # expression/pandas implementations are separately handwritten per query, but
-# the verbatim id overlap is still zero, so they stay candidate-unverified
+# the verbatim id overlap is still zero, so it stays candidate-unverified
 # until the mapping is verified.
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpch", "tpch_skew", "tpcds", "tsbs_devops"}
+_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpcds"}
 
 # Benchmarks that cannot land as a routine-PR gate because they reject the
 # bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
 # perform downloader-backed network fetches at the bounded scale.
 # joinorder accepts only SF=1.0 (IMDb 2013 manifest; joinorder_synthetic is the
-# already-enforced scaled stand-in); nyctaxi downloads the pinned TLC Parquet
-# months before sampling even at SF=0.01 (flightdata stays out: its downloader
-# always synthesizes below SF=0.1). tpcds_obt requires SF>=1.0 too, but its
+# already-enforced scaled stand-in). tpcds_obt requires SF>=1.0 too, but its
 # id correspondence was explicitly abandoned, so it is `abandoned` instead.
-_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder", "nyctaxi"}
+_NOT_CHEAPLY_GATEABLE_BENCHMARKS = {"joinorder"}
 
 # Benchmarks whose SQL<->DataFrame id correspondence was investigated and
 # explicitly abandoned: the verdict is recorded in the sweep classifier, so a
@@ -141,9 +139,6 @@ def test_bounded_scale_rejecting_benchmarks_are_not_cheaply_gateable(rows):
     assert "SF=0.01" in by_id["joinorder"].get("reason", "")
     assert "data_manifest.toml" in by_id["joinorder"].get("reason", "")
     assert "joinorder_synthetic" in by_id["joinorder"].get("reason", "")
-    assert by_id["nyctaxi"]["status"] == NOT_CHEAPLY_GATEABLE
-    assert by_id["nyctaxi"].get("data_source") == "network-fetch"
-    assert "network fetch" in by_id["nyctaxi"].get("reason", "")
     gateable = {r["benchmark"] for r in rows if r["status"] == GATEABLE}
     assert _NOT_CHEAPLY_GATEABLE_BENCHMARKS.isdisjoint(gateable)
 
@@ -183,13 +178,13 @@ def test_staged_gates_are_marked_not_unguarded(rows):
     """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
     # flightdata and datavault both graduated to enforced GATES, so neither is
-    # a candidate anymore. tpch and tpcds are the current staged pair:
-    # registered in STAGED_GATES but not CI-enforced, so they are drilled
-    # here and marked staged.
+    # a candidate anymore, and tpch, tpch_skew, nyctaxi, and tsbs_devops are
+    # enforced too. tpcds is the only staged gate: registered in
+    # STAGED_GATES but not CI-enforced, so it is drilled here and marked staged.
     assert "flightdata" not in by_id
     assert "datavault" not in by_id
     staged = {r["benchmark"] for r in rows if r.get("staged")}
-    assert staged == {"tpch", "tpcds", "nyctaxi", "tpch_skew", "tsbs_devops"}, f"staged set changed: {sorted(staged)}"
+    assert staged == {"tpcds"}, f"staged set changed: {sorted(staged)}"
     assert by_id["joinorder"].get("staged") is False
 
 

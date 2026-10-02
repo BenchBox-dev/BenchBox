@@ -142,9 +142,10 @@ capture remains local under `shared-review-protocol/SKILL.md`.
   linked worktree.
 - If a required push or PR is mechanically unavailable, keep the verified
   commit and report the blocker; do not describe the workflow as complete.
-- The workflow ends at a pushed branch and its created or updated draft PR.
-  The authority boundary that ends it there, and the actions it does not
-  authorize (merge, auto-merge, ready, deployment, activation, writes to an
+- The workflow ends at the terminal state the repository's agent instructions
+  name, or at a pushed branch and its created or updated draft PR when they
+  name none. The authority boundary that ends it there, and the actions it does
+  not authorize (deployment, activation, production publication, writes to an
   unnamed repository), is owned by `shared-review-protocol/SKILL.md` §1; do not
   restate it here. Repository policy may choose how an already-authorized step
   is performed, such as commit style, required checks, or PR template. Report
