@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Each listed query's implementation reads every value the SQL varies and has an adapter",
+    "The inventory test's HARD_CODED list is empty or each remaining query has a documented reason",
+    "With the adapter binding, each query matches the DuckDB reference on both families at SF 0.1, or the reason is documented",
+    "No other query's status changes in the SF 0.1 per-query probe"
+  ],
+  "description": "These eight implementations cannot take the dsqgen draw: they read one value or none (Q41 hard-codes colors and has no adapter by design; Q88 also has a literal fallback and an incomplete pandas run in the inventory). Each needs a rewrite so the implementation reads the values the SQL varies, then an adapter as in t04, removal from HARD_CODED in the inventory test, and deletion of dead YAML keys. Eight is within the inventory's budget of 15 hard-coded queries (test_hard_coded_queries_stay_within_the_adapter_budget). Q41 is the t04 negative control: its binding must be added deliberately and the control re-pointed. queries.py PRs queue one at a time. Effort about 3 to 4 days (judgement, not measured).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea",
+      "at": "2026-10-02T18:14:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "29a2e9d3b6034bfc9b788c4c268c20df",
+      "session_id": "9731d44c64f34c7d82551352fec356a5"
+    }
+  ]
+}
