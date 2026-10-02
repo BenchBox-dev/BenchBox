@@ -6166,10 +6166,15 @@
       "title": "Classify every gate divergence by cause using full detail strings"
     },
     "dfparity-t15-cross-platform-identity": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T02:22:24Z",
+        "generation": "5a572936ce994269b47f592768908c04",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Add a Linux vs macOS job comparing dsdgen data checksums and dsqgen -LOG output"
     },
     "dfparity-t16-qualification-renderer-spike": {
