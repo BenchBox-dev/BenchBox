@@ -445,6 +445,18 @@ def test_native_test_output_runs_between_stop_and_resume_tokens(
     assert after == ["child output", f"::{token}::"]
 
 
+def test_comment_policy_job_sets_up_every_tool_before_the_candidate_checkout() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["comment-policy"]["steps"]
+    uses = [str(step.get("uses", "")).split("@")[0] for step in steps]
+    checkout = uses.index("actions/checkout")
+    for tool in ("actions/setup-python", "astral-sh/setup-uv", "actions/setup-node"):
+        assert uses.index(tool) < checkout, f"{tool} must run before the candidate checkout"
+    assert checkout == max(index for index, name in enumerate(uses) if name) and steps[checkout + 1]["name"].startswith(
+        "Enforce"
+    )
+
+
 def test_comment_policy_job_does_not_let_setup_uv_scan_the_candidate_checkout() -> None:
     workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
     steps = workflow["jobs"]["comment-policy"]["steps"]

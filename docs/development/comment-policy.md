@@ -105,12 +105,14 @@ isolated from project configuration, import and installer overrides, candidate
 base that contains the rollout commit `ed5c263c513ba65499f4918d3a7de607f280c65b`
 and holds no trusted checker files, launcher or policy registry; on any other
 base, a missing checker fails. The job log is informational and the exit status is what decides the result. The
-checker escapes untrusted text it prints, the native JavaScript tests run inside
-a `stop-commands` fence with a random token, and the `setup-uv` step is pointed at
-an empty directory so it does not log candidate paths. The pull request's own
-code still runs in the job through those native tests, and its text can reach the
-log through other actions, so a log can be made to read differently from what
-the checker found. It cannot change the exit status. `.github/soundness-paths.txt` and
+checker escapes untrusted text it prints, and the native JavaScript tests run
+inside a `stop-commands` fence with a random token. Every tool the trusted
+launcher uses (Python, uv and Node) is set up before the pull request is checked
+out, so no candidate file or configuration, such as a `.yarnrc` that names a
+script, can run before the checker or change the interpreter it uses. The pull
+request's own code still runs in the job through those native tests, and its
+text can reach the log through other actions, so a log can be made to read
+differently from what the checker found. It cannot change the exit status. `.github/soundness-paths.txt` and
 `.github/CODEOWNERS` protect these files, and changes to this wiring need the
 repository's independent soundness review.
 
