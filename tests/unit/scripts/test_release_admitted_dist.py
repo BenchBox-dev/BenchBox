@@ -197,6 +197,8 @@ def test_refuses_duplicate_json_keys(admitted):
         (lambda value: value.update(artifact_id=True), "invalid artifact ID"),
         (lambda value: value.update(artifact_digest="b" * 64), "invalid artifact digest"),
         (lambda value: value.update(version="0.4.3"), "version differs from the tag"),
+        (lambda value: value["producer"].update(schema=True), "not for this repository"),
+        (lambda value: value["producer"].update(schema=1.0), "not for this repository"),
         (lambda value: value["producer"].update(repository="elsewhere/BenchBox"), "not for this repository"),
         (
             lambda value: value["producer"].update(workflow_path=".github/workflows/other.yml"),

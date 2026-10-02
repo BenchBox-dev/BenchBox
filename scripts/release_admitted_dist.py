@@ -124,7 +124,8 @@ def verify_admitted(directory: Path, tag: str, head_sha: str) -> tuple[dict[str,
     on_disk = json.loads(_read_regular(directory / _consumer.PRODUCER_RECEIPT, limit), object_pairs_hook=_object)
     _require(on_disk == producer, "producer receipt differs from the admission receipt")
     _require(
-        producer["schema"] == 1
+        type(producer["schema"]) is int
+        and producer["schema"] == 1
         and producer["repository"] == _consumer.REPOSITORY
         and producer["workflow_path"] == _consumer.WORKFLOW
         and producer["job_name"] == _consumer.JOB_NAME
