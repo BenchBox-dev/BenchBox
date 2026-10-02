@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "The first scheduled or dispatched run's Linux against macOS result is recorded",
+    "The trigger scope and the Windows decision are recorded"
+  ],
+  "description": "The workflow from #2523 runs on a schedule, on demand, and on pull requests that touch the bundled binaries or the code that runs them, on Linux and macOS. Decide whether that scope is right and whether to add Windows (streams.py carries a Windows-only retry for a transient Q46 cities distribution error). D3 depends on its first cross-platform result.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:34:50Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b5a43cc074d94d709cc7bf1218809102",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}

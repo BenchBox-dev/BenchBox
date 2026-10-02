@@ -6103,6 +6103,15 @@
       "status": "open",
       "title": "Note that standard TPC-DS runs at SF other than 1 now render at the data scale, and check results kept outside the repository"
     },
+    "dfparity-n09-identity-job-scope": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Decide the trigger scope of the cross-platform TPC-DS identity job, including Windows"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [
