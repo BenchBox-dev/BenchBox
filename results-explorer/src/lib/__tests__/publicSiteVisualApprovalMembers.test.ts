@@ -7,6 +7,7 @@ import {
   createGithubGet,
   isTransientGithubError,
   mergeGroupPullRequests,
+  rateLimitWaitMs,
   pullRequestFromCommitMessage,
   withRetries,
 } from "../../../scripts/public-site-visual-approval-members.mjs";
@@ -354,5 +355,101 @@ describe("rate limits that say how long to wait", () => {
       { sleep },
     );
     expect(sleep.mock.calls[0]![0]).toBeLessThanOrEqual(MAX_RETRY_WAIT_MS);
+  });
+});
+
+describe("rateLimitWaitMs", () => {
+  const now = 1_000_000_000_000;
+
+  it.each([
+    ["seconds in retry-after", { retryAfter: "30", reset: null, useReset: false }, 30000],
+    ["zero seconds in retry-after", { retryAfter: "0", reset: null, useReset: false }, 0],
+    ["an HTTP date in retry-after", { retryAfter: new Date(now + 45000).toUTCString(), reset: null, useReset: false }, 45000],
+    ["an HTTP date already past", { retryAfter: new Date(now - 5000).toUTCString(), reset: null, useReset: false }, 0],
+    ["a spent limit's reset time", { retryAfter: null, reset: String(Math.floor(now / 1000) + 20), useReset: true }, 20000],
+    ["a reset time already past", { retryAfter: null, reset: String(Math.floor(now / 1000) - 20), useReset: true }, 0],
+    ["retry-after over the reset time", { retryAfter: "5", reset: String(Math.floor(now / 1000) + 99), useReset: true }, 5000],
+  ])("reads %s", (_label, input, expected) => {
+    expect(rateLimitWaitMs({ ...input, now })).toBe(expected);
+  });
+
+  it.each([
+    ["no header at all", { retryAfter: null, reset: null, useReset: true }],
+    ["a missing reset header on a spent limit (Number(null) is 0, not a wait)", { retryAfter: null, reset: null, useReset: true }],
+    ["a blank retry-after", { retryAfter: "   ", reset: null, useReset: false }],
+    ["an unparseable retry-after", { retryAfter: "soon", reset: null, useReset: false }],
+    ["a reset time that is not a number", { retryAfter: null, reset: "later", useReset: true }],
+    ["a reset time when the limit is not spent", { retryAfter: null, reset: String(Math.floor(now / 1000) + 20), useReset: false }],
+  ])("says nothing for %s", (_label, input) => {
+    expect(rateLimitWaitMs({ ...input, now })).toBeUndefined();
+  });
+});
+
+describe("rate-limit waits that are not real instructions", () => {
+  const reply = (status: number, headers: Record<string, string>, text: () => Promise<string>) => ({
+    ok: false,
+    status,
+    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+    json: async () => ({}),
+    text,
+  });
+  const failure = async (response: ReturnType<typeof reply>) => {
+    const github = createGithubGet({ token: "t", fetchImpl: async () => response });
+    return (await github("/x").catch((caught) => caught)) as Error & { retryAfterMs?: number };
+  };
+
+  it("does not turn a spent limit with no reset header into an instant retry", async () => {
+    const error = await failure(reply(403, { "x-ratelimit-remaining": "0" }, async () => ""));
+    expect(error.message).toBe("GitHub API 429 for /x (rate limited)");
+    expect(error.retryAfterMs).toBeUndefined();
+    const sleep = vi.fn(async (_ms: number) => undefined);
+    let calls = 0;
+    await withRetries(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw error;
+        return "ok";
+      },
+      { sleep },
+    );
+    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([RETRY_BASE_DELAY_MS]);
+  });
+
+  it("backs off normally when the asked wait is zero or negative", async () => {
+    const sleep = vi.fn(async (_ms: number) => undefined);
+    let calls = 0;
+    await withRetries(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw Object.assign(new Error("GitHub API 429 for /x"), { retryAfterMs: 0 });
+        if (calls === 2) throw Object.assign(new Error("GitHub API 429 for /x"), { retryAfterMs: -50 });
+        return "ok";
+      },
+      { sleep },
+    );
+    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([RETRY_BASE_DELAY_MS, RETRY_BASE_DELAY_MS * 2]);
+  });
+
+  it("uses the reset time for a 429 even when the remaining count is not reported", async () => {
+    const reset = Math.floor(Date.now() / 1000) + 20;
+    const error = await failure(reply(429, { "x-ratelimit-reset": String(reset) }, async () => ""));
+    expect(error.retryAfterMs).toBeGreaterThan(15000);
+  });
+
+  it("fails at once for an HTTP-date retry-after beyond the cap", async () => {
+    const error = await failure(reply(429, { "retry-after": new Date(Date.now() + 600000).toUTCString() }, async () => ""));
+    expect(error.retryAfterMs).toBeGreaterThan(MAX_RETRY_WAIT_MS);
+    expect(isTransientGithubError(error)).toBe(false);
+  });
+
+  it("treats a body that cannot be read as an ordinary 403, not a crash", async () => {
+    const rejecting = await failure(reply(403, {}, async () => Promise.reject(new Error("stream closed"))));
+    expect(rejecting.message).toBe("GitHub API 403 for /x");
+    const throwing = await failure(
+      reply(403, {}, () => {
+        throw new Error("no body");
+      }),
+    );
+    expect(throwing.message).toBe("GitHub API 403 for /x");
   });
 });

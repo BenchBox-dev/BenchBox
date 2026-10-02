@@ -41,10 +41,33 @@ export async function withRetries(operation, { sleep = (ms) => new Promise((reso
       return await operation();
     } catch (error) {
       if (attempt >= MAX_ATTEMPTS || !isTransientGithubError(error)) throw error;
-      const asked = typeof error?.retryAfterMs === "number" ? error.retryAfterMs : RETRY_BASE_DELAY_MS * attempt;
+      // A wait of zero or less (a reset time already past, clock skew) is no real instruction: back off.
+      const asked =
+        typeof error?.retryAfterMs === "number" && error.retryAfterMs > 0 ? error.retryAfterMs : RETRY_BASE_DELAY_MS * attempt;
       await sleep(Math.min(Math.max(asked, 0), MAX_RETRY_WAIT_MS));
     }
   }
+}
+
+/**
+ * How long a rate-limited response asks to wait, in milliseconds, or undefined when it does not say. `retry-after`
+ * is either a number of seconds or an HTTP date; the reset header is an epoch time in seconds and counts only
+ * when `useReset` is set (a spent primary limit, or a 429). Missing, blank or unparseable values say nothing.
+ */
+export function rateLimitWaitMs({ retryAfter, reset, useReset, now = Date.now() }) {
+  const text = retryAfter === null || retryAfter === undefined ? "" : String(retryAfter).trim();
+  if (text !== "") {
+    const seconds = Number(text);
+    if (Number.isFinite(seconds)) return seconds * 1000;
+    const at = Date.parse(text);
+    if (Number.isFinite(at)) return Math.max(at - now, 0);
+  }
+  const resetText = reset === null || reset === undefined ? "" : String(reset).trim();
+  if (useReset && resetText !== "") {
+    const epochSeconds = Number(resetText);
+    if (Number.isFinite(epochSeconds)) return Math.max(epochSeconds * 1000 - now, 0);
+  }
+  return undefined;
 }
 
 /**
@@ -67,16 +90,21 @@ export function createGithubGet({ token, apiUrl = "https://api.github.com", fetc
       const exhausted = header("x-ratelimit-remaining") === "0";
       let secondary = false;
       if (response.status === 403) {
-        const body = await Promise.resolve(response.text?.()).catch(() => "");
-        secondary = /secondary rate limit/i.test(String(body ?? ""));
+        try {
+          secondary = /secondary rate limit/i.test(String((await response.text?.()) ?? ""));
+        } catch {
+          secondary = false;
+        }
       }
       const limited = response.status === 429 || (response.status === 403 && (exhausted || retryAfter !== null || secondary));
       const error = new Error(`GitHub API ${limited ? 429 : response.status} for ${path}${limited ? " (rate limited)" : ""}`);
       if (limited) {
-        const seconds = Number(retryAfter);
-        const reset = Number(header("x-ratelimit-reset"));
-        if (retryAfter !== null && Number.isFinite(seconds)) error.retryAfterMs = seconds * 1000;
-        else if (exhausted && Number.isFinite(reset)) error.retryAfterMs = Math.max(reset * 1000 - Date.now(), 0);
+        const waitMs = rateLimitWaitMs({
+          retryAfter,
+          reset: header("x-ratelimit-reset"),
+          useReset: exhausted || response.status === 429,
+        });
+        if (waitMs !== undefined) error.retryAfterMs = waitMs;
       }
       throw error;
     }

@@ -267,11 +267,15 @@ def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     # The gate's capture and compare steps call Playwright directly, not through the package script, so a
     # change to package.json (which is not a soundness path) cannot turn the check into a no-op. They resolve
     # the locally installed runner only (no registry fetch) and run from the explorer directory, where the spec is.
-    direct = "npx --no-install playwright test --project=chromium --workers=1 e2e/captures/public-site-pages.spec.ts"
+    direct = "npx --no playwright test --project=chromium --workers=1 e2e/captures/public-site-pages.spec.ts"
     for workflow_path in (DOCS_WORKFLOW, REPO_ROOT / ".github" / "workflows" / "ci.yml"):
         workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
-        steps = [step for job in workflow["jobs"].values() for step in job.get("steps", [])]
-        assert not any("npm run test:e2e:public-site" in str(step.get("run", "")) for step in steps), workflow_path.name
+        all_steps = [step for job in workflow["jobs"].values() for step in job.get("steps", [])]
+        assert not any("npm run test:e2e:public-site" in str(step.get("run", "")) for step in all_steps), (
+            workflow_path.name
+        )
+        # The steps must sit in the required visual job itself, not in some other job.
+        steps = workflow["jobs"]["public-site-visual-regression"]["steps"]
         gate_steps = [step for step in steps if step.get("run") == direct]
         assert len(gate_steps) == 2, workflow_path.name
         assert all(step.get("working-directory") == "results-explorer" for step in gate_steps), workflow_path.name

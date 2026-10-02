@@ -11,6 +11,13 @@ export function createGithubGet(options: {
   fetchImpl?: (url: string, init?: any) => Promise<any>;
 }): GithubGet;
 
+export function rateLimitWaitMs(input: {
+  retryAfter: string | null | undefined;
+  reset: string | null | undefined;
+  useReset: boolean;
+  now?: number;
+}): number | undefined;
+
 export function isTransientGithubError(error: unknown): boolean;
 
 export function withRetries<T>(
