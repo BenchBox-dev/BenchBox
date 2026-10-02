@@ -53,7 +53,7 @@ def test_medium_selection_and_receipts_gate_core() -> None:
     medium_text = "\n".join(step.get("run", "") for step in medium["steps"])
     assert selector in collect_text and selector in medium_text
     assert "--collect-only -q -n 0" in collect_text
-    assert "--tb=short --timeout=60 -n 5" in medium_text
+    assert "--tb=short --timeout=60 -o faulthandler_timeout=120 -n 5" in medium_text
     assert "-p scripts.pytest_shard_evidence" in medium_text
     assert "--collection-summary" in medium_text and "--checked-sha" in medium_text
     assert "test -s" in medium_text
@@ -63,6 +63,19 @@ def test_medium_selection_and_receipts_gate_core() -> None:
         assert job in jobs["core"]["needs"]
         assert f"--expect {job}=" in core_text
     assert "verify-medium" in core_text
+
+
+def test_the_medium_shard_records_memory_and_stalled_stacks() -> None:
+    medium = _jobs("ci.yml")["medium-test"]
+    run_step = next(step for step in medium["steps"] if step["name"] == "Run medium speed tier")
+    assert "sample_resources &" in run_step["run"]
+    assert 'trap \'kill "${sampler}"' in run_step["run"]
+    names = [step["name"] for step in medium["steps"]]
+    memory_step = next(
+        step for step in medium["steps"] if step["name"] == "Record kernel memory events for the medium shard"
+    )
+    assert memory_step["if"] == "always()"
+    assert names.index(memory_step["name"]) == names.index(run_step["name"]) + 1
 
 
 def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
