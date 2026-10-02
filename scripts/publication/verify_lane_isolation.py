@@ -142,6 +142,10 @@ NON_LANE_INPUTS: tuple[str, ...] = (
     # Cloud TPC template generator: invoked manually/by CI, never read by
     # lane artifact builds.
     "scripts/generate_cloud_tpc_templates.py",
+    "scripts/check_rerun_shard_retention.py",
+    # ClickHouse sketch storage smoke helper: on-demand sweep tool, never
+    # run in CI and never read by lane artifact builds.
+    "scripts/sketch_storage_smoke.sh",
     # SF=1 size measurement helper: invoked manually/by CI, never read by
     # lane artifact builds.
     "scripts/measure_sf1_sizes.py",

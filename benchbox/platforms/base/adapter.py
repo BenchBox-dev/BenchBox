@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.loaded_tables import require_loaded_tables
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.throughput.containment import await_quiescence
@@ -1590,6 +1591,7 @@ class PlatformAdapter(
 
         quiet_console.print("Loading benchmark data...")
         table_stats, loading_time, per_table_timings = self.load_data(benchmark, connection, data_dir)
+        require_loaded_tables(benchmark, table_stats)
         quiet_console.print(f"✅ Data loading completed in {loading_time:.2f}s")
         data_loading_phase = self._create_enhanced_data_loading_phase(table_stats, loading_time, per_table_timings)
         self._last_per_table_timings = per_table_timings

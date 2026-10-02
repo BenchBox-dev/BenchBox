@@ -36,6 +36,7 @@ def policy() -> dict:
             }
         ],
         "external_entries": [],
+        "format_classes": [],
         "payloads": [],
         "derived_rules": [],
         "consumer_edges": [],
@@ -395,6 +396,41 @@ def test_every_tracked_eula_and_notice_file_has_a_notice_entry() -> None:
     assert notice_files <= listed
 
 
+def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    tracked = set(scope.git(ROOT, "ls-files", "-z").decode().split("\0"))
+    edges = policy["consumer_edges"]
+    assert edges
+    for edge in edges:
+        assert edge["producer"] in tracked and edge["consumer"] in tracked
+    pairs = {(edge["producer"], edge["consumer"]) for edge in edges}
+    assert ("benchbox/mcp/tools/visualization.py", "tests/unit/mcp/test_surface_defect_regressions.py") in pairs
+    assert ("benchbox/core/tpch/dataframe_queries.py", "benchbox/core/query_catalog.py") in pairs
+    assert ("benchbox/core/benchmark_result_validation.py", "docs/reference/python-api/base.rst") in pairs
+
+
+def test_duration_policy_has_exactly_one_exact_path_rule_owned_by_shared_infrastructure() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rules = [rule for rule in policy["ownership_rules"] if {"path": "tests/duration_policy.py"} in rule["selectors"]]
+    assert [rule["owner"] for rule in rules] == ["comment-cleanup-shared-infrastructure"]
+
+
+def test_duration_policy_disposition_names_every_importer() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rule = next(rule for rule in policy["ownership_rules"] if rule["id"] == "root-test-tier-policy")
+    importers = {
+        line.split(":", 1)[0]
+        for line in scope.git(
+            ROOT, "grep", "-n", "-E", r"(from|import) +tests(\.| +import +)duration_policy", "--", "*.py"
+        )
+        .decode()
+        .splitlines()
+    } - {"tests/unit/scripts/test_comment_cleanup_scope.py"}
+    assert importers
+    missing = {path for path in importers if path not in rule["blocking_disposition"]}
+    assert not missing, f"the disposition omits importers: {sorted(missing)}"
+
+
 def _derived_rule(priority: int = 20) -> dict:
     return {
         "id": "test-import-owner",
@@ -704,12 +740,32 @@ y = 1  # noqa: E501
 z = 2  # type: ignore[attr-defined]  TODO later
 # FIXME remove
 """
-    assert scope.python_comment_markers(source) == (2, 2)
+    assert scope.python_comment_markers(source) == (2, 1)
     assert scope.python_comment_markers(b"def (:\n") == (0, 0)
     markers = [{"path": "a.py", "directives": 5, "todos": 3}]
-    policy["directives"] = [{"count": 2}]
-    policy["obligations"] = [{}]
+    policy["directives"] = [{"path": "a.py", "count": 2}, {"path": "ci.yml", "count": 4}]
+    policy["obligations"] = [{"path": "a.py"}, {"path": "nightly.yml"}]
     assert scope.unregistered_markers(markers, policy) == (3, 2)
+
+
+@pytest.mark.parametrize(
+    "comment,counted",
+    [
+        ("# TODO: link the issue", True),
+        ("# TODO(name): link the issue", True),
+        ("# FIXME remove", True),
+        ("#TODO later", True),
+        ("x = 1  # noqa: E501  TODO: later", True),
+        ("# see the renderer-consolidation TODO", False),
+        ("# TODO) only for a divergence", False),
+        ("# Confirmed (TODO w5): only the cells", False),
+        ("# see TODO/main/planning/item.yaml", False),
+        ("# the TODO's w4 stays pure", False),
+        ("# Per the tuning-keys TODO: do not add new aliases", False),
+    ],
+)
+def test_todo_counter_counts_marker_comments_and_not_prose_mentions(comment: str, counted: bool) -> None:
+    assert scope.python_comment_markers(f"{comment}\n".encode())[1] == int(counted)
 
 
 def test_facade_imports_are_ambiguous_but_submodule_imports_resolve() -> None:
@@ -741,3 +797,281 @@ def test_malformed_policy_exits_with_a_configuration_failure(
     code = scope.main(["--root", str(root), "--base", base, "--task-set", ".todo-batch/tasks.txt"])
     assert code == 2
     assert "malformed policy" in capsys.readouterr().err
+
+
+def _external(**overrides: object) -> dict:
+    entry = {
+        "selector": {"prefix": "vendor/"},
+        "owner": "comment-cleanup-external-ownership",
+        "provenance": "Vendor kit.",
+        "governing_requirement": "Owner decision.",
+        "blocking_disposition": "Excluded.",
+    }
+    entry.update(overrides)
+    return entry
+
+
+def test_external_entry_excludes_unowned_paths_only(policy: dict) -> None:
+    policy["external_entries"] = [_external()]
+    entries = scope.validate_external_entries(policy, {"vendor/a.c", "src/a.py"})
+    resolved = [
+        _resolved("vendor/a.c", None),
+        _resolved("vendor/b.c", "comment-cleanup-owned"),
+        _resolved("src/a.py", None),
+    ]
+    for record in resolved:
+        record["rule"] = None if record["owner"] is None else "r"
+    scope.apply_external_entries(resolved, entries)
+    assert (resolved[0]["owner"], resolved[0]["state"]) == ("comment-cleanup-external-ownership", "excluded")
+    assert resolved[0]["blocking_disposition"] == "Excluded."
+    assert resolved[1]["owner"] == "comment-cleanup-owned"
+    assert resolved[2]["owner"] is None
+
+
+def test_external_entry_must_match_a_tracked_path(policy: dict) -> None:
+    policy["external_entries"] = [_external(selector={"prefix": "missing/"})]
+    with pytest.raises(scope.PolicyError, match="matches no tracked path"):
+        scope.validate_external_entries(policy, {"src/a.py"})
+    policy["external_entries"] = [_external(selector={"glob": "*"})]
+    with pytest.raises(scope.PolicyError, match="invalid selector"):
+        scope.validate_external_entries(policy, {"src/a.py"})
+
+
+def _format_class(**overrides: object) -> dict:
+    entry = {
+        "id": "c",
+        "verifier": "strict-json",
+        "extensions": [".json"],
+        "selectors": [{"prefix": "a/"}],
+        "owner": "comment-cleanup-final-enforcement",
+        "blocking_disposition": "d",
+    }
+    entry.update(overrides)
+    return entry
+
+
+def test_blocked_format_class_needs_a_blocking_verifier_and_the_reverse(policy: dict) -> None:
+    policy["format_classes"] = [_format_class(state="blocked")]
+    with pytest.raises(scope.PolicyError, match="blocking verifier"):
+        scope.validate_format_classes(policy)
+    policy["format_classes"] = [_format_class(verifier="any-content")]
+    with pytest.raises(scope.PolicyError, match="blocking verifier"):
+        scope.validate_format_classes(policy)
+    policy["format_classes"] = [_format_class(verifier="any-content", state="blocked")]
+    assert scope.validate_format_classes(policy)
+    policy["format_classes"] = [_format_class(state="done")]
+    with pytest.raises(scope.PolicyError, match="unknown state"):
+        scope.validate_format_classes(policy)
+
+
+def test_blocked_classes_claim_only_what_the_clean_classes_left_unowned(tmp_path: Path, policy: dict) -> None:
+    root, base = _git_repo_with(
+        tmp_path,
+        {
+            "a/prose.md": "plain prose\n",
+            "a/sample.md": "text\n\n```sh\nls\n```\n",
+            "a/ref.md": "[todo]: target\n",
+            "a/.keep": "",
+            "a/tool.py": "x = 1\n",
+        },
+    )
+    policy["format_classes"] = [
+        _format_class(id="prose", verifier="markdown-prose", extensions=[".md"]),
+        _format_class(id="empty", verifier="empty-file", extensions=[".keep"]),
+        _format_class(
+            id="review",
+            verifier="markdown-needs-review",
+            extensions=[".md"],
+            owner="comment-cleanup-documentation-samples",
+            state="blocked",
+        ),
+        _format_class(
+            id="helpers",
+            verifier="any-content",
+            extensions=[".py"],
+            owner="comment-cleanup-project-tooling",
+            state="blocked",
+        ),
+    ]
+    resolved = [_resolved(path, None) for path in ("a/prose.md", "a/sample.md", "a/ref.md", "a/.keep", "a/tool.py")]
+    for record in resolved:
+        record["rule"] = None
+    scope.apply_format_classes(resolved, scope.validate_format_classes(policy), root, base)
+    states = {record["path"]: (record["owner"], record["state"]) for record in resolved}
+    assert states["a/prose.md"] == ("comment-cleanup-final-enforcement", "comment-free")
+    assert states["a/.keep"] == ("comment-cleanup-final-enforcement", "comment-free")
+    assert states["a/sample.md"] == ("comment-cleanup-documentation-samples", "blocked")
+    assert states["a/ref.md"] == ("comment-cleanup-documentation-samples", "blocked")
+    assert states["a/tool.py"] == ("comment-cleanup-project-tooling", "blocked")
+
+
+def test_empty_file_verifier_accepts_only_zero_bytes() -> None:
+    assert scope.verify_empty_file("a/.gitkeep", b"")
+    assert not scope.verify_empty_file("a/.gitkeep", b"\n")
+
+
+@pytest.mark.parametrize(
+    "path,blob,expected",
+    [
+        ("a.json", b'{"a": 1}', True),
+        ("a.json", b'{"a": 1} // note', False),
+        ("a.json", b"{\n  // note\n}", False),
+        ("a.jsonl", b'{"a": 1}\n\n{"b": 2}\n', True),
+        ("a.jsonl", b'{"a": 1}\nnot json\n', False),
+    ],
+)
+def test_strict_json_verifier(path: str, blob: bytes, expected: bool) -> None:
+    assert scope.verify_strict_json(path, blob) is expected
+
+
+def test_png_and_markdown_verifiers() -> None:
+    assert scope.verify_png_signature("a.png", b"\x89PNG\r\n\x1a\nrest")
+    assert not scope.verify_png_signature("a.png", b"GIF89a")
+    assert scope.verify_markdown_prose("a.md", b"# Title\n\nPlain prose.\n")
+    assert not scope.verify_markdown_prose("a.md", b"text\n\n```python\n# note\n```\n")
+    assert not scope.verify_markdown_prose("a.md", b"text <!-- hidden --> text\n")
+    assert scope.verify_markdown_prose("a.md", b"---\ntitle: x\n---\nbody\n")
+    assert not scope.verify_markdown_prose("a.md", b"---\n# comment\ntitle: x\n---\nbody\n")
+    assert not scope.verify_markdown_prose("a.md", b"\xff\xfe")
+
+
+def test_format_class_marks_only_verified_unowned_files(tmp_path: Path, policy: dict) -> None:
+    root, base = _git_repo_with(
+        tmp_path,
+        {
+            "data/ok.json": '{"a": 1}',
+            "data/bad.json": '{"a": 1} // c',
+            "data/code.py": "x = 1\n",
+            "other/ok.json": "{}",
+        },
+    )
+    policy["format_classes"] = [
+        {
+            "id": "json-data",
+            "verifier": "strict-json",
+            "extensions": [".json"],
+            "selectors": [{"prefix": "data/"}],
+            "owner": "comment-cleanup-final-enforcement",
+            "blocking_disposition": "Parses as strict JSON.",
+        }
+    ]
+    classes = scope.validate_format_classes(policy)
+    resolved = [_resolved(path, None) for path in ("data/ok.json", "data/bad.json", "data/code.py", "other/ok.json")]
+    for record in resolved:
+        record["rule"] = None
+    scope.apply_format_classes(resolved, classes, root, base)
+    states = {record["path"]: (record["owner"], record["state"]) for record in resolved}
+    assert states["data/ok.json"] == ("comment-cleanup-final-enforcement", "comment-free")
+    assert states["data/bad.json"][0] is None
+    assert states["data/code.py"][0] is None
+    assert states["other/ok.json"][0] is None
+
+
+def test_format_class_rejects_unknown_verifier_and_bad_extension(policy: dict) -> None:
+    entry = {
+        "id": "x",
+        "verifier": "guess",
+        "extensions": [".json"],
+        "selectors": [{"prefix": "a/"}],
+        "owner": "comment-cleanup-final-enforcement",
+        "blocking_disposition": "d",
+    }
+    policy["format_classes"] = [entry]
+    with pytest.raises(scope.PolicyError, match="unknown verifier"):
+        scope.validate_format_classes(policy)
+    entry.update(verifier="strict-json", extensions=["json"])
+    with pytest.raises(scope.PolicyError, match="start with a dot"):
+        scope.validate_format_classes(policy)
+
+
+@pytest.mark.parametrize(
+    "path,blob,expected",
+    [
+        ("a.json", b'{"_comment": ["note"], "a": 1}', False),
+        ("a.json", b'{"nested": {"$comment": "note"}}', False),
+        ("a.json", b'{"//": "note"}', False),
+        ("a.json", b'{"__comment": "note"}', False),
+        ("a.json", b'{"items": [{"comment": "note"}]}', False),
+        ("a.json", b'{"a": 1, "a": 2}', False),
+        ("a.json", b'{"a": NaN}', False),
+        ("a.json", b'\xef\xbb\xbf{"a": 1}', False),
+        ("a.json", b"", False),
+        ("a.jsonl", b"\n\n", False),
+    ],
+)
+def test_strict_json_verifier_rejects_comment_conventions_and_ambiguity(path: str, blob: bytes, expected: bool) -> None:
+    assert scope.verify_strict_json(path, blob) is expected
+
+
+@pytest.mark.parametrize(
+    "blob",
+    [
+        b"text\n\n    indented code\n",
+        b"text\n\n\tindented code\n",
+        b"---\ntitle: x # note\n---\nbody\n",
+        b"---\ntitle: x\n",
+        b"+++\ntitle = 'x'\n+++\nbody\n",
+        b"[//]: # (hidden)\n",
+        b"text {/* hidden */}\n",
+        b"% myst comment\n",
+        b"> ```\n> code\n> ```\n",
+        b"- item\n  ```\n  code\n  ```\n",
+        b"1. ```sh\n",
+        b"~~~\ncode\n~~~\n",
+        b"[//]: <> (hidden)\n",
+        b"[comment]: # (hidden)\n",
+        b"[//]:# (hidden)\n",
+        b"{% comment %}hidden{% endcomment %}\n",
+        b"{# hidden #}\n",
+        b"<pre>code</pre>\n",
+        b"<SCRIPT>x</SCRIPT>\n",
+        b"  % myst comment\n",
+        b"[todo]: ../planning/item.yaml\n",
+        b'[a]: <https://example.com> "hidden title"\n',
+        b"- [a]: target\n",
+        b"> [a]: target\n",
+    ],
+)
+def test_markdown_prose_verifier_rejects_every_comment_or_code_form(blob: bytes) -> None:
+    assert not scope.verify_markdown_prose("a.md", blob)
+
+
+def test_markdown_prose_verifier_keeps_visible_links_and_footnotes() -> None:
+    blob = b"See [the guide](guide.md) and the note[^1].\n\nRef: see [a]: b in running text.\n\n[^1]: A visible note.\n"
+    assert scope.verify_markdown_prose("a.md", blob)
+
+
+def test_sql_verifier_requires_the_absence_of_comment_markers() -> None:
+    assert scope.verify_sql_without_comment_markers("a.sql", b"SELECT 1 FROM t WHERE a = 'x';\n")
+    for blob in (b"SELECT 1; -- note\n", b"/* note */ SELECT 1;", b"SELECT 1; # note", b"\xff"):
+        assert not scope.verify_sql_without_comment_markers("a.sql", blob)
+
+
+def test_external_and_format_classes_leave_collisions_and_notices_alone(tmp_path: Path, policy: dict) -> None:
+    root, base = _git_repo_with(tmp_path, {"vendor/a.json": "{}", "vendor/b.json": "{}"})
+    policy["external_entries"] = [_external()]
+    policy["format_classes"] = [
+        {
+            "id": "json-data",
+            "verifier": "strict-json",
+            "extensions": [".json"],
+            "selectors": [{"prefix": "vendor/"}],
+            "owner": "comment-cleanup-final-enforcement",
+            "blocking_disposition": "Strict JSON.",
+        }
+    ]
+    notice = {"path": "vendor/a.json", "owner": "comment-cleanup-scope-policy", "blocking_disposition": "Retain."}
+    resolved = [_resolved("vendor/a.json", None), _resolved("vendor/b.json", None)]
+    resolved[0]["rule"] = None
+    resolved[1].update(rule=["rule-a", "rule-b"], competing_owners=["a", "b"])
+    scope.apply_notice_owners(resolved, [notice])
+    scope.apply_external_entries(resolved, scope.validate_external_entries(policy, {"vendor/a.json", "vendor/b.json"}))
+    scope.apply_format_classes(resolved, scope.validate_format_classes(policy), root, base)
+    assert (resolved[0]["owner"], resolved[0]["state"]) == ("comment-cleanup-scope-policy", "blocked")
+    assert resolved[1]["owner"] is None and resolved[1]["rule"] == ["rule-a", "rule-b"]
+
+
+def test_overlapping_external_prefixes_are_rejected(policy: dict) -> None:
+    policy["external_entries"] = [_external(), _external(selector={"prefix": "vendor/sub/"})]
+    with pytest.raises(scope.PolicyError, match="overlaps"):
+        scope.validate_external_entries(policy, {"vendor/sub/a.c"})
