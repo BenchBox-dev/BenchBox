@@ -15,6 +15,7 @@ import pytest
 
 from benchbox.core.results.query_normalizer import normalize_query_id
 from tests.unit.mcp.public_api import get_tool
+from tests.utilities.fixed_clock import set_mtimes
 
 pytestmark = [
     pytest.mark.unit,
@@ -655,9 +656,6 @@ class TestAnalyzeResultsRegressions:
 
     def test_detects_regression_between_runs(self, tmp_path):
         """Detects performance regression between two recent runs."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -666,15 +664,14 @@ class TestAnalyzeResultsRegressions:
             ]
         )
         older_file = _make_result_file(tmp_path, "older.json", older)
-        # Ensure different mtime
-        os.utime(older_file, (time.time() - 100, time.time() - 100))
 
         newer = _make_benchmark_result(
             queries=[
                 {"query_id": "Q1", "runtime_ms": 250, "status": "success"},  # 150% regression
             ]
         )
-        _make_result_file(tmp_path, "newer.json", newer)
+        newer_file = _make_result_file(tmp_path, "newer.json", newer)
+        set_mtimes([older_file, newer_file])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -688,9 +685,6 @@ class TestAnalyzeResultsRegressions:
 
     def test_detects_improvements(self, tmp_path):
         """Detects performance improvements between runs."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -699,14 +693,14 @@ class TestAnalyzeResultsRegressions:
             ]
         )
         older_file = _make_result_file(tmp_path, "older.json", older)
-        os.utime(older_file, (time.time() - 100, time.time() - 100))
 
         newer = _make_benchmark_result(
             queries=[
                 {"query_id": "Q1", "runtime_ms": 50, "status": "success"},  # -75% improvement
             ]
         )
-        _make_result_file(tmp_path, "newer.json", newer)
+        newer_file = _make_result_file(tmp_path, "newer.json", newer)
+        set_mtimes([older_file, newer_file])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -717,15 +711,12 @@ class TestAnalyzeResultsRegressions:
 
     def test_platform_filter(self, tmp_path):
         """Platform filter limits analysis to matching runs."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
-        _make_result_file(tmp_path, "sqlite1.json", _make_benchmark_result(platform="sqlite"))
-        duckdb_file = _make_result_file(tmp_path, "duckdb1.json", _make_benchmark_result(platform="duckdb"))
-        os.utime(duckdb_file, (time.time() - 50, time.time() - 50))
-        _make_result_file(tmp_path, "duckdb2.json", _make_benchmark_result(platform="duckdb"))
+        sqlite_file = _make_result_file(tmp_path, "sqlite1.json", _make_benchmark_result(platform="sqlite"))
+        duckdb_older = _make_result_file(tmp_path, "duckdb1.json", _make_benchmark_result(platform="duckdb"))
+        duckdb_newer = _make_result_file(tmp_path, "duckdb2.json", _make_benchmark_result(platform="duckdb"))
+        set_mtimes([sqlite_file, duckdb_older, duckdb_newer])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -737,9 +728,6 @@ class TestAnalyzeResultsRegressions:
 
     def test_recommendations_generated(self, tmp_path):
         """Recommendations are generated based on regression severity."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -748,14 +736,14 @@ class TestAnalyzeResultsRegressions:
             ]
         )
         older_file = _make_result_file(tmp_path, "older.json", older)
-        os.utime(older_file, (time.time() - 100, time.time() - 100))
 
         newer = _make_benchmark_result(
             queries=[
                 {"query_id": "Q1", "runtime_ms": 500, "status": "success"},  # 400% regression
             ]
         )
-        _make_result_file(tmp_path, "newer.json", newer)
+        newer_file = _make_result_file(tmp_path, "newer.json", newer)
+        set_mtimes([older_file, newer_file])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -771,9 +759,6 @@ class TestAnalyzeResultsRegressions:
 
     def test_threshold_parameter(self, tmp_path):
         """Custom threshold changes what counts as regression."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
         older = _make_benchmark_result(
@@ -782,14 +767,14 @@ class TestAnalyzeResultsRegressions:
             ]
         )
         older_file = _make_result_file(tmp_path, "older.json", older)
-        os.utime(older_file, (time.time() - 100, time.time() - 100))
 
         newer = _make_benchmark_result(
             queries=[
                 {"query_id": "Q1", "runtime_ms": 108, "status": "success"},  # 8% increase
             ]
         )
-        _make_result_file(tmp_path, "newer.json", newer)
+        newer_file = _make_result_file(tmp_path, "newer.json", newer)
+        set_mtimes([older_file, newer_file])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -831,18 +816,16 @@ class TestAnalyzeResultsTrends:
 
     def test_returns_chronological_data_points(self, tmp_path):
         """Returns data points in chronological order."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
+        files = []
         for i in range(3):
             data = _make_benchmark_result(
                 timestamp=f"2026-01-{15 + i}T10:00:00",
                 queries=[{"query_id": "Q1", "runtime_ms": 100 + i * 10, "status": "success"}],
             )
-            f = _make_result_file(tmp_path, f"run_{i}.json", data)
-            os.utime(f, (time.time() - (300 - i * 100), time.time() - (300 - i * 100)))
+            files.append(_make_result_file(tmp_path, f"run_{i}.json", data))
+        set_mtimes(files)
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -856,9 +839,6 @@ class TestAnalyzeResultsTrends:
 
     def test_geometric_mean_metric(self, tmp_path):
         """geometric_mean metric produces correct value."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(
@@ -867,8 +847,7 @@ class TestAnalyzeResultsTrends:
                 {"query_id": "Q2", "runtime_ms": 400, "status": "success"},
             ]
         )
-        f = _make_result_file(tmp_path, "run.json", data)
-        os.utime(f, (time.time() - 10, time.time() - 10))
+        first = _make_result_file(tmp_path, "run.json", data)
 
         # Add second run to get trend
         data2 = _make_benchmark_result(
@@ -877,7 +856,8 @@ class TestAnalyzeResultsTrends:
                 {"query_id": "Q2", "runtime_ms": 400, "status": "success"},
             ]
         )
-        _make_result_file(tmp_path, "run2.json", data2)
+        second = _make_result_file(tmp_path, "run2.json", data2)
+        set_mtimes([first, second])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -890,9 +870,6 @@ class TestAnalyzeResultsTrends:
 
     def test_total_time_metric(self, tmp_path):
         """total_time metric sums all query runtimes."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
         data = _make_benchmark_result(
@@ -901,9 +878,9 @@ class TestAnalyzeResultsTrends:
                 {"query_id": "Q2", "runtime_ms": 200, "status": "success"},
             ]
         )
-        f = _make_result_file(tmp_path, "run.json", data)
-        os.utime(f, (time.time() - 10, time.time() - 10))
-        _make_result_file(tmp_path, "run2.json", data)
+        first = _make_result_file(tmp_path, "run.json", data)
+        second = _make_result_file(tmp_path, "run2.json", data)
+        set_mtimes([first, second])
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -914,19 +891,17 @@ class TestAnalyzeResultsTrends:
 
     def test_trend_direction_degrading(self, tmp_path):
         """Identifies degrading trend when performance worsens."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
+        files = []
         for i in range(3):
             data = _make_benchmark_result(
                 queries=[
                     {"query_id": "Q1", "runtime_ms": 100 + i * 50, "status": "success"},
                 ]
             )
-            f = _make_result_file(tmp_path, f"run_{i}.json", data)
-            os.utime(f, (time.time() - (300 - i * 100), time.time() - (300 - i * 100)))
+            files.append(_make_result_file(tmp_path, f"run_{i}.json", data))
+        set_mtimes(files)
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -937,19 +912,17 @@ class TestAnalyzeResultsTrends:
 
     def test_trend_direction_improving(self, tmp_path):
         """Identifies improving trend when performance gets better."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
+        files = []
         for i in range(3):
             data = _make_benchmark_result(
                 queries=[
                     {"query_id": "Q1", "runtime_ms": 300 - i * 100, "status": "success"},
                 ]
             )
-            f = _make_result_file(tmp_path, f"run_{i}.json", data)
-            os.utime(f, (time.time() - (300 - i * 100), time.time() - (300 - i * 100)))
+            files.append(_make_result_file(tmp_path, f"run_{i}.json", data))
+        set_mtimes(files)
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn
@@ -960,19 +933,17 @@ class TestAnalyzeResultsTrends:
 
     def test_limit_parameter(self, tmp_path):
         """Limit parameter restricts data points returned."""
-        import os
-        import time
-
         from benchbox.mcp import create_server
 
+        files = []
         for i in range(5):
             data = _make_benchmark_result(
                 queries=[
                     {"query_id": "Q1", "runtime_ms": 100, "status": "success"},
                 ]
             )
-            f = _make_result_file(tmp_path, f"run_{i}.json", data)
-            os.utime(f, (time.time() - (500 - i * 100), time.time() - (500 - i * 100)))
+            files.append(_make_result_file(tmp_path, f"run_{i}.json", data))
+        set_mtimes(files)
 
         server = create_server(results_dir=tmp_path)
         fn = get_tool(server, "analyze_results").fn

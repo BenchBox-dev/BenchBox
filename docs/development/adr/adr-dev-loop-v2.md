@@ -73,6 +73,50 @@ two-layer safety contract:
 The repository's code-owner review setting remains configured but is not solely relied
 upon as the authorization mechanism.
 
+Amended 2026-10-02: the external review stays, but a PR-body attestation checked by CI
+will no longer bind it. The author of a change writes its own attestation, so the check
+can only test that the text is present; it never tests the review. The review is bound
+by three controls:
+
+1. Review findings. The external reviewer's Critical and High findings are posted as PR
+   review threads, and the ruleset requires every thread to be resolved before a merge
+   (`required_review_thread_resolution`). GitHub lets an author with write access resolve
+   a thread, so resolution shows that someone dispositioned the finding, not that it was
+   fixed. The digest below is the check on that.
+2. Review signal at arming. For changes on the narrowed soundness path list, `make
+   pr-arm` refuses until a completed review is visible on the current head: the Codex
+   connector's submitted review or thumbs-up reaction, or an external review posted as a
+   PR comment. An "eyes" reaction alone means the review has started, not finished. A
+   posted comment shows that a review was recorded, not what it examined.
+3. Post-merge digest. A scheduled report lists the commits that reached `develop` on the
+   narrowed paths and records which review signal each had at merge. It also flags each
+   review thread that was resolved with no later commit. It opens a tracker item for
+   each commit with no signal or with such a thread. An agent then runs the external
+   review and either records a clean result or opens a fix or revert PR.
+
+The first two controls can be bypassed by an author acting alone with the owner's
+rights, because every agent shares one account. They make a skipped review visible and
+slower to skip; the digest detects a bypass after the merge and is the backstop. A
+squash commit is one revert unit, but a revert on a busy trunk is not always clean, so
+the backstop does not replace the review before the merge.
+
+The arming refusal is a merge-blocking automated review signal. It supersedes item 3 of
+`_project/decisions/codeowner-approving-count-zero-constraint-2026-09-15.md` for paths on
+the soundness list only, and only that item. That decision kept such signals advisory
+because a batch of failing Codex reviews exhausted the usage limit and deadlocked the
+queue. To keep one provider's limit from blocking arming, any of the Codex connector,
+the `codex` CLI, `muse` and `agy` satisfies the signal, and each has its own quota. If
+none can complete a review, arming stays refused and the change waits: the gate fails
+closed, and relaxing it needs an owner decision.
+
+The soundness path list is narrowed to code that produces, normalizes, compares or
+validates results, every workflow, the release and binary paths, and `AGENTS.md`.
+Documentation, decision records, runbooks and threat models leave the list, because a
+review of prose gives no protection against a wrong result. The CI detection layer and
+the external review requirement are unchanged. The arming refusal, the digest and the
+narrowed list land in separate changes; until the attestation check is removed from
+`ci.yml`, a PR on a soundness path must still carry a valid `Soundness review:` section.
+
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
 Agent workspace safety tooling is retained:

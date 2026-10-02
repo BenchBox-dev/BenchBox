@@ -434,6 +434,8 @@
   dms: 1212
   year: 2000
 66:
+  catalog_net_col: cs_net_paid_inc_ship_tax
+  catalog_sales_col: cs_sales_price
   month_end: 4
   month_start: 1
   ship_carriers:
@@ -442,6 +444,8 @@
   time_start: 49530
   web_names:
   - pri
+  web_net_col: ws_net_paid_inc_tax
+  web_sales_col: ws_sales_price
   year: 2002
 67:
   dms: 1212
