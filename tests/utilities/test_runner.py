@@ -25,6 +25,8 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 
+from tests.utilities.paths import REPO_ROOT
+
 
 class BenchmarkCategory(Enum):
     """Test categories for selective execution."""
@@ -156,7 +158,7 @@ class BenchmarkRunner:
     """Enhanced test runner with optimization features."""
 
     def __init__(self, project_root: Path | None = None):
-        self.project_root = project_root or Path.cwd()
+        self.project_root = project_root or REPO_ROOT
         self.tests_dir = self.project_root / "tests"
         self.cache = ResultCache()
         self.results_history: list[BenchmarkTestResult] = []
