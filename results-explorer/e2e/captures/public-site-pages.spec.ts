@@ -6,7 +6,7 @@ import { type Browser, expect, test } from "@playwright/test";
 
 import {
   compareVisualManifests,
-  pullRequestNumbers,
+  approvalEntryHint,
   PUBLIC_SITE_CAPTURE_PROFILE,
   type VisualCapture,
   type VisualManifest,
@@ -175,13 +175,9 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   // The approval entry is what a maintainer records after reviewing the diagnostics, so print it
   // wherever a change is reported, approved or not. It is bound to a pull request's number: on a
   // pull request run that is the PR itself, and in a merge group any of the PRs it contains.
-  const pullRequests = pullRequestNumbers(process.env.VISUAL_APPROVAL_PULL_REQUESTS);
-  const approvalEntries = changeDigest ? pullRequests.map((pullRequest) => `${pullRequest}:${changeDigest}`) : [];
-  const approvalEntry = approvalEntries.join(" or ");
-  if (changeDigest) console.info("Visual change digest: %s; approval entry: %s", changeDigest, approvalEntry || "(no pull request)");
-  const digestHint = changeDigest
-    ? `; visual change digest: ${changeDigest}${approvalEntry ? `; approval entry: ${approvalEntry}` : ""}`
-    : "";
+  const approvalHint = approvalEntryHint(changeDigest, process.env.VISUAL_APPROVAL_PULL_REQUESTS);
+  if (changeDigest) console.info("Visual change digest: %s; %s", changeDigest, approvalHint || "no pull request resolved");
+  const digestHint = changeDigest ? `; visual change digest: ${changeDigest}${approvalHint ? `; ${approvalHint}` : ""}` : "";
   expect(
     { missing, unexpected },
     `visual baseline route/viewport matrix must match exactly${digestHint}`,

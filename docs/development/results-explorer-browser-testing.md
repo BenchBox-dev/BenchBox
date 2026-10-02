@@ -139,6 +139,26 @@ and enqueue it again after the other merges. If the list of PRs cannot be read i
 full (a commit without a PR number, a truncated or failed comparison), no PR is
 named and no digest approval applies, though the comparison itself still runs.
 
+The member list comes from the GitHub compare API and is retried a few times
+on a network failure, a rate limit or a server error (never on a client error
+such as 403 or 404), so one transient blip does not eject an approved group. It
+relies on the queue's merge method being `SQUASH`, which makes GitHub write each
+commit's trailing `(#<number>)` itself; `scripts/ruleset_drift_check.py` pins that
+method, and a rebase or merge-commit queue would let an author set the subject.
+
+A limit of the entry format: in a composed group, an entry for one member also
+covers an identical change introduced by another member of the same group, because
+the digest cannot say which PR produced the pixels. Withdraw an entry when the PR it
+names changes or drops its visual change, so a stale entry cannot cover another
+PR's change. The failure message prints every candidate entry for a group; record the
+one for the pull request that introduces the change.
+
+The code that decides whether a visual change passes (`publicSiteVisual.ts`,
+`public-site-pages.spec.ts` and the two approval-member scripts) is in
+`.github/soundness-paths.txt`, so a PR that edits it needs an external soundness
+review and a manual enqueue; a PR author can otherwise rewrite the check in the same
+PR that relies on it.
+
 Because the entry names the pull request, it cannot approve the same pixels in
 another PR, for example one that reapplies a reverted change. It does stay valid
 for its own PR: closing and reopening the PR, or force-pushing it, keeps the

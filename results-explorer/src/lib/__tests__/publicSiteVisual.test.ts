@@ -5,6 +5,7 @@ import {
   hasChangeDigestVisualApproval,
   hasExactHeadVisualApproval,
   PUBLIC_SITE_CAPTURE_PROFILE,
+  approvalEntryHint,
   pullRequestNumbers,
   VISUAL_CHANGE_DIGEST_VERSION,
   visualChangeDigest,
@@ -379,5 +380,28 @@ describe("pull request numbers", () => {
   ])("reads nothing from %j, so no approval can apply", (list) => {
     // One unreadable item voids the whole list: a partial list must not grant an approval.
     expect(pullRequestNumbers(list)).toEqual([]);
+  });
+});
+
+describe("approvalEntryHint", () => {
+  const digest = "a".repeat(64);
+
+  it("names the single entry for a pull request run", () => {
+    expect(approvalEntryHint(digest, "2385")).toBe(`approval entry: 2385:${digest}`);
+  });
+
+  it("lists every member of a merge group and says which to record", () => {
+    const hint = approvalEntryHint(digest, "2384 2385 2386");
+    expect(hint).toContain(`2384:${digest} | 2385:${digest} | 2386:${digest}`);
+    expect(hint).toContain("introduces this visual change");
+  });
+
+  it.each([
+    ["no change digest", "", "2385"],
+    ["no pull requests", "a".repeat(64), ""],
+    ["an unreadable pull request list", "a".repeat(64), "2385 pr-2386"],
+    ["an undefined list", "a".repeat(64), undefined],
+  ])("is empty with %s", (_label, changeDigest, pullRequests) => {
+    expect(approvalEntryHint(changeDigest, pullRequests)).toBe("");
   });
 });

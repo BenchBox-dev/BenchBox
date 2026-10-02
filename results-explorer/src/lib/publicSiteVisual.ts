@@ -96,6 +96,18 @@ export function pullRequestNumbers(list: string | undefined): string[] {
  * covers the whole change in the run, so a merge group in which several PRs change what renders
  * matches no single PR's entry and fails closed: those PRs must land one at a time.
  */
+/**
+ * The text a maintainer needs to record an approval: the entry for each covered pull request. In a merge
+ * group, record the entry for the PR that introduces the visual change, not for another member.
+ */
+export function approvalEntryHint(changeDigest: string, pullRequests: string | undefined): string {
+  const members = pullRequestNumbers(pullRequests);
+  if (changeDigest.length === 0 || members.length === 0) return "";
+  const entries = members.map((pullRequest) => `${pullRequest}:${changeDigest}`);
+  if (entries.length === 1) return `approval entry: ${entries[0]}`;
+  return `approval entry, one of: ${entries.join(" | ")} (record the entry for the pull request that introduces this visual change)`;
+}
+
 export function hasChangeDigestVisualApproval(approval: VisualApproval | undefined, changeDigest: string): boolean {
   if (!approval || changeDigest.length === 0) return false;
   const reason = approval.changeReason?.trim() ?? "";

@@ -5,12 +5,40 @@
  * The group's commits are the reliable list: each is a squash commit whose subject ends with the
  * `(#<number>)` that GitHub appends, so the PRs the group contains are read from the commits it adds on
  * top of its base.
+ *
+ * This relies on the queue's merge method being SQUASH: GitHub then writes each commit's subject itself, so
+ * the trailing number cannot be set by a PR author. The ruleset-drift check pins that method.
  */
 
 // The queue merges at most three entries per group; this bound only guards a malformed comparison.
 export const MAX_GROUP_COMMITS = 100;
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
+
+// A failed lookup names no pull request, and a merge group that needs a digest approval is then rejected
+// and ejected from the queue. Retry only failures a retry can cure, a few times, so one network blip or
+// rate limit does not eject a group that was approved correctly.
+export const MAX_ATTEMPTS = 3;
+export const RETRY_BASE_DELAY_MS = 2000;
+
+/** Whether an error from `github()` is worth retrying: a network failure, a rate limit or a server error. */
+export function isTransientGithubError(error) {
+  const status = /^GitHub API (\d{3})\b/.exec(String(error?.message ?? ""))?.[1];
+  if (!status) return true;
+  return status === "429" || status.startsWith("5");
+}
+
+/** Run `operation` up to MAX_ATTEMPTS times, waiting 2 s then 4 s, retrying only transient errors. */
+export async function withRetries(operation, { sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      if (attempt >= MAX_ATTEMPTS || !isTransientGithubError(error)) throw error;
+      await sleep(RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+}
 
 /** The pull request number GitHub appends to a squashed commit's subject, or "" when there is none. */
 export function pullRequestFromCommitMessage(message) {
@@ -25,10 +53,11 @@ export function pullRequestFromCommitMessage(message) {
  * Returns [] unless every commit the group adds can be traced to a pull request, so a list that is
  * partial, truncated or unreadable never grants an approval.
  */
-export async function mergeGroupPullRequests({ github, repository, baseSha, headSha }) {
+export async function mergeGroupPullRequests({ github, repository, baseSha, headSha, sleep }) {
   if (!FULL_SHA.test(baseSha ?? "") || !FULL_SHA.test(headSha ?? "")) return [];
-  const comparison = await github(
-    `/repos/${repository}/compare/${baseSha}...${headSha}?per_page=${MAX_GROUP_COMMITS}`,
+  const comparison = await withRetries(
+    () => github(`/repos/${repository}/compare/${baseSha}...${headSha}?per_page=${MAX_GROUP_COMMITS}`),
+    { sleep },
   );
   const commits = comparison?.commits;
   // `ahead` means the group's head descends from its base, so the commits are exactly what it adds.
