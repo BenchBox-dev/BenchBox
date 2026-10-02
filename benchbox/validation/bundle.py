@@ -1617,6 +1617,48 @@ def _validate_tables_block(data: dict, vr: ValidationResult) -> None:
             vr.error(f"'tables.{name}.load_ms' must be non-negative, got {load_ms!r}")
 
 
+#: Tables a benchmark's queries read, which must be loaded with rows. Kept as
+#: data rather than imported from the benchmark classes so the validator stays
+#: self-contained. Mirrors ``REQUIRED_LOADED_TABLES`` on the benchmark class.
+_REQUIRED_LOADED_TABLES: dict[str, tuple[str, ...]] = {
+    "tpcds_obt": ("tpcds_sales_returns_obt",),
+}
+
+
+def _validate_required_tables(data: dict, vr: ValidationResult) -> None:
+    """Reject a bundle that measured without the benchmark's query tables.
+
+    A run that loads the wrong dataset can still finish: the schema creates
+    the query table empty and every query succeeds with no or trivial rows.
+    A bundle with measured queries must therefore show these tables in its
+    ``tables`` block; omitting the block is not evidence that they loaded.
+    """
+    benchmark = data.get("benchmark")
+    benchmark_id = str(benchmark.get("id") or "").lower() if isinstance(benchmark, dict) else ""
+    required = _REQUIRED_LOADED_TABLES.get(benchmark_id)
+    if not required:
+        return
+    tables = data.get("tables")
+    if not isinstance(tables, dict):
+        if data.get("queries"):
+            vr.error(
+                f"benchmark '{benchmark_id}' bundle has measured queries but no 'tables' block, "
+                f"so it cannot show that {', '.join(required)} was loaded"
+            )
+        return
+    loaded = {str(name).lower(): entry for name, entry in tables.items()}
+    for table in required:
+        entry = loaded.get(table)
+        rows = entry.get("rows") if isinstance(entry, dict) else None
+        if entry is None:
+            vr.error(
+                f"benchmark '{benchmark_id}' queries table '{table}', which is not in 'tables' "
+                f"(loaded: {sorted(loaded)}); the run measured a different dataset"
+            )
+        elif isinstance(rows, (int, float)) and not isinstance(rows, bool) and rows <= 0:
+            vr.error(f"benchmark '{benchmark_id}' queries table '{table}', which was loaded with {rows} rows")
+
+
 def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> None:
     """Shape-check the optional ``platform.config`` clustering field when present.
 
@@ -2070,6 +2112,7 @@ def _validate_bundle(
     _validate_translation_section(data, vr)
     _validate_environment_client_link(data, vr)
     _validate_tables_block(data, vr)
+    _validate_required_tables(data, vr)
     _validate_platform_config_clustering(data, vr)
     _warn_pre_cutoff_clustering_claim(data, vr)
     _validate_public_cost_section(data, vr)

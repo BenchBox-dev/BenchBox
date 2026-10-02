@@ -1332,7 +1332,7 @@ class TestDatabricksSqlGenerationHelpers:
         assert cursor.execute.call_args_list[0].args[0] == (
             "COPY INTO ORDERS (o_orderkey, o_orderdate) FROM "
             "'dbfs:/Volumes/main/benchbox/data/orders.tbl.1' "
-            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false')"
+            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false') COPY_OPTIONS('force' = 'true')"
         )
         assert cursor.execute.call_args_list[1].args[0] == "SELECT COUNT(*) FROM ORDERS"
         assert cursor.execute.call_args_list[2].args[0] == "OPTIMIZE ORDERS"
@@ -1386,7 +1386,7 @@ class TestDatabricksSqlGenerationHelpers:
         assert cursor.execute.call_args_list[0].args[0] == (
             "COPY INTO HITS (WatchID) FROM "
             "'dbfs:/Volumes/main/benchbox/data/hits.csv.gz' "
-            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false', 'nullValue'='__NULL__')"
+            "FILEFORMAT = CSV FORMAT_OPTIONS('delimiter'='|', 'header'='false', 'nullValue'='__NULL__') COPY_OPTIONS('force' = 'true')"
         )
 
     def test_vacuum_table_executes_delta_maintenance(self):

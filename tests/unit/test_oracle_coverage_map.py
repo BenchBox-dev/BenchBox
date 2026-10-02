@@ -348,7 +348,7 @@ def test_staged_gate_scale_is_read_from_its_own_metadata(monkeypatch):
 
     # Stage a real gate object under a benchmark that has no oracle today, so the row
     # is classified purely through the STAGED path.
-    probe_id = "nyctaxi"
+    probe_id = "tpcdi"
     assert probe_id not in GATES, f"{probe_id} gained an enforced gate; pick another staged probe"
     template = GATES["coffeeshop"]
     staged = replace(
