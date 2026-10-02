@@ -6323,6 +6323,16 @@
       "status": "open",
       "title": "Parameter adapters, batch C: Q32, Q33, Q34, Q35, Q36, Q37, Q38, Q40, Q45"
     },
+    "dfparity-t05d-adapters-batch-d": {
+      "claim": null,
+      "needs": [
+        "dfparity-t04-adapter-prototype",
+        "dfparity-t02-parameter-inventory-test"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Parameter adapters, batch D: Q50, Q51, Q53, Q54, Q58, Q59, Q60, Q62, Q63"
+    },
     "dfparity-t06-literal-fallback-lint": {
       "claim": null,
       "needs": [
