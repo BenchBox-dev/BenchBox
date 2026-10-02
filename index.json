@@ -20373,6 +20373,18 @@
       "status": "done",
       "title": "Tuning docs/ADR drift refresh: stale DuckDB caveat, verifiable_total vocabulary, wider prefix sets, fold path, ADR-003 landed context"
     },
+    "tuning-docs-and-support-matrix-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-capability-single-source-validator-20261001",
+        "tuning-sort-evidence-attested-20261001",
+        "tuning-constraint-corroboration-20261001",
+        "tuning-gate-verification-reach-20261001"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Correct tuning docs and publish a registry-generated platform support matrix"
+    },
     "tuning-docs-env-contract-fixes-20260712": {
       "claim": null,
       "needs": [],
