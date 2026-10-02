@@ -1,6 +1,6 @@
 {
   "acceptance": [
-    "Constant-define rendering produces the expected qualification SQL for Q39, Q44, Q93 and Q8 and -LOG echoes the injected values",
+    "Rendering from explicit values (token substitution of [NAME.k] and [NAME]) produces the expected qualification SQL for Q39, Q44, Q93 and Q8 (400-zip list), and rendering a template from its own -LOG values reproduces dsqgen's SQL for all 99 queries",
     "generate_with_parameters is deleted or replaced by a working implementation with tests",
     "Findings and limits are recorded in this item"
   ],
@@ -48,6 +48,14 @@
       "generation": "0d2c174816b84e18b3e5fba681a61ea9",
       "op": "take",
       "op_id": "5c0fe04d554249f3bb069e9f427542f1",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:31:57Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a1c8c832539b49729c7a4896254472bd",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
