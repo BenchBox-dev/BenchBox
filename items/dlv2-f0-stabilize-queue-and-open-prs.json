@@ -127,6 +127,17 @@
       "op": "update",
       "op_id": "be271a48d5c74c1faa3003f9dd1536b6",
       "session_id": "61f7d250943b46ec8a6e05b38173c81b"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:303c674b74ec54e1807d1df3",
+      "at": "2026-10-02T15:29:03Z",
+      "client": "antigravity-client",
+      "displaced": "mcp:claude-code:joe@joe-mac-mini.local:88e67c6514508591d05f83d1",
+      "generation": "fe0a72e1d5bb419d8228b108d00ca1a0",
+      "op": "takeover",
+      "op_id": "181072d202a94501be1d78ce55abcbb3",
+      "reason": "Previous Claude session was stopped by the owner at 2026-10-02T15:20Z as documented in dlv2-adversarial-review-handoff.md section 11. Taking over to proceed with sequence.",
+      "session_id": "1d68f91b76e347fcb0369b5d31d8653a"
     }
   ]
 }
