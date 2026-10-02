@@ -299,3 +299,99 @@ def test_missing_or_malformed_queue_evidence_fails_closed(
         assert "cannot resolve head of anchor PR" in result.stderr
     if overrides.get("TEST_BASE") == "":
         assert "cannot resolve base of anchor PR" in result.stderr
+
+
+@pytest.fixture
+def stale_event_base(tmp_path: Path) -> dict[str, Any]:
+    """A pull request whose merge commit sits on a target that moved after the event."""
+    repo = tmp_path / "stale-repo"
+    repo.mkdir()
+    _git(repo, "init", "--initial-branch=trunk")
+    _git(repo, "config", "user.name", "Test Fixture")
+    _git(repo, "config", "user.email", "fixture@example.invalid")
+    (repo / "README.md").write_text("start\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-m", "Event base")
+    event_base = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-b", "pr")
+    (repo / "docs").mkdir()
+    (repo / "docs/x.md").write_text("the pull request's own change\n", encoding="utf-8")
+    _git(repo, "add", "docs/x.md")
+    _git(repo, "commit", "-m", "Pull request change")
+    pr_head = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "trunk")
+    workflow = repo / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: another pull request's soundness-path change\n", encoding="utf-8")
+    _git(repo, "add", ".github/workflows/ci.yml")
+    _git(repo, "commit", "-m", "Target moves after the event")
+    target_tip = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-b", "merge-ref")
+    _git(repo, "merge", "--no-ff", "-m", "Merge of the pull request", "pr")
+    _git(repo, "checkout", "--orphan", "unrelated")
+    _git(repo, "rm", "-rf", "--quiet", ".")
+    (repo / "other.txt").write_text("unrelated history\n", encoding="utf-8")
+    _git(repo, "add", "other.txt")
+    _git(repo, "commit", "-m", "Unrelated root")
+    unrelated = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "merge-ref")
+    runner = tmp_path / "stale-runner"
+    runner.mkdir()
+    return {
+        "repo": repo,
+        "event_base": event_base,
+        "pr_head": pr_head,
+        "target_tip": target_tip,
+        "unrelated": unrelated,
+        "runner": runner,
+    }
+
+
+def _collect_changed_paths(
+    history: dict[str, Any], event: str, base: str
+) -> tuple[subprocess.CompletedProcess[str], list[str]]:
+    skip_without_posix_shell()
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    step = next(
+        step for step in workflow["jobs"]["soundness-flag"]["steps"] if step.get("name") == "Collect changed paths"
+    )
+    script = step["run"].replace("${{ github.event_name }}", event)
+    env = {**os.environ, "RUNNER_TEMP": str(history["runner"]), "BASE_SHA": base}
+    result = run_posix_shell(script, cwd=history["repo"], env=env, capture_output=True, text=True, timeout=30)
+    listing = history["runner"] / "changed-paths.txt"
+    return result, listing.read_text(encoding="utf-8").split() if listing.exists() else []
+
+
+def test_pull_request_is_not_charged_for_files_the_target_changed_after_the_event(
+    stale_event_base: dict[str, Any],
+) -> None:
+    repo = stale_event_base["repo"]
+    stale = _git(repo, "diff", "--name-only", f"{stale_event_base['event_base']}...HEAD").split()
+    assert ".github/workflows/ci.yml" in stale, "the fixture must reproduce the stale-base charge"
+    result, paths = _collect_changed_paths(stale_event_base, "pull_request", stale_event_base["event_base"])
+    assert result.returncode == 0, result.stderr
+    assert paths == ["docs/x.md"]
+
+
+def test_event_base_that_is_not_an_ancestor_of_the_merge_target_fails_closed(
+    stale_event_base: dict[str, Any],
+) -> None:
+    result, paths = _collect_changed_paths(stale_event_base, "pull_request", stale_event_base["unrelated"])
+    assert result.returncode != 0
+    assert "not an ancestor" in result.stderr
+    assert paths == []
+
+
+def test_merge_group_event_keeps_the_event_base_comparison(stale_event_base: dict[str, Any]) -> None:
+    result, paths = _collect_changed_paths(stale_event_base, "merge_group", stale_event_base["event_base"])
+    assert result.returncode == 0, result.stderr
+    assert sorted(paths) == [".github/workflows/ci.yml", "docs/x.md"]
+
+
+def test_pull_request_head_without_a_merge_commit_keeps_the_event_base_comparison(
+    stale_event_base: dict[str, Any],
+) -> None:
+    _git(stale_event_base["repo"], "checkout", "--quiet", stale_event_base["pr_head"])
+    result, paths = _collect_changed_paths(stale_event_base, "pull_request", stale_event_base["event_base"])
+    assert result.returncode == 0, result.stderr
+    assert paths == ["docs/x.md"]
