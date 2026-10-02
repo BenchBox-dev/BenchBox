@@ -20281,6 +20281,15 @@
       "status": "done",
       "title": "Corroboration hardening nits: string-literal clause matching, empty-columns trivial corroboration, ORDER BY substring recording guard, bare-name table matching"
     },
+    "tuning-ctas-rewrite-safety-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-post-load-seam-20261001"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Make CTAS sort rewrites safe: Athena self-targeting CTAS, Synapse orphan copy, Redshift layout loss, Snowflake/Databricks guards"
+    },
     "tuning-df-ledger-parity-20260716": {
       "claim": null,
       "needs": [],
