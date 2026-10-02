@@ -3146,7 +3146,9 @@
     "comment-cleanup-cross-module-unit-tests": {
       "claim": null,
       "needs": [
-        "comment-cleanup-pilot-budget"
+        "comment-cleanup-unit-tests-core",
+        "comment-cleanup-unit-tests-platforms",
+        "comment-cleanup-unit-tests-cli-scripts-rest"
       ],
       "priority": "medium",
       "status": "open",
