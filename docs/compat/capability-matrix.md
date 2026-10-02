@@ -4,49 +4,49 @@
 
 Every rule registered in `benchbox.sql_compat` is listed below. The registry is the authoritative source of compatibility policy; this document is regenerated from it. See [adr-sql-compat-phase-aware-pipeline.md](../development/adr/adr-sql-compat-phase-aware-pipeline.md) for the design.
 
-**Total registered rules:** 556
+**Total registered rules:** 557
 
 **Platforms covered:** 35
 
 ## Phase coverage by platform
 
-| platform | benchmark_gate | query_source | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
-|---|---|---|---|---|---|---|---|
-| athena | - | - | - | - | 1 | - | 1 |
-| bigquery | - | 2 | 25 | 2 | 1 | 8 | 38 |
-| clickhouse | - | 19 | 3 | 4 | 1 | - | 27 |
-| clickhouse-cloud | - | - | 2 | - | - | 21 | 23 |
-| clickhouse-local | 1 | - | 2 | - | - | 21 | 24 |
-| clickhouse-server | - | - | 2 | - | - | 21 | 23 |
-| databend | - | - | - | - | 1 | - | 1 |
-| databricks | - | 1 | 11 | 2 | 2 | 8 | 24 |
-| datafusion | - | 3 | 6 | 2 | - | 12 | 23 |
-| doris | - | 7 | - | 2 | 1 | - | 10 |
-| duckdb | - | - | - | - | - | 26 | 26 |
-| ducklake | - | - | - | 2 | 1 | - | 3 |
-| fabric_dw | - | - | - | - | 1 | - | 1 |
-| firebolt | - | - | - | - | 1 | - | 1 |
-| lakesail | 5 | 6 | 11 | - | 1 | 69 | 92 |
-| mysql | - | 1 | - | - | - | - | 1 |
-| pg-duckdb | 3 | - | 10 | - | - | 11 | 24 |
-| pg-mooncake | 6 | - | 10 | - | - | 7 | 23 |
-| pg_mooncake | - | - | - | - | 1 | - | 1 |
-| postgres | - | - | - | 1 | - | 67 | 68 |
-| postgresql | - | 6 | - | 1 | 1 | - | 8 |
-| presto | - | - | - | 2 | 1 | - | 3 |
-| questdb | 1 | - | - | - | 1 | - | 2 |
-| redshift | - | - | - | 2 | 1 | - | 3 |
-| singlestore | - | - | - | - | 4 | - | 4 |
-| snowflake | - | 7 | 2 | 2 | 1 | 7 | 19 |
-| spark | - | 6 | 11 | 2 | 1 | - | 20 |
-| sqlite | - | 1 | - | - | - | - | 1 |
-| starrocks | - | 15 | 1 | 2 | 1 | - | 19 |
-| synapse | - | - | - | - | 1 | - | 1 |
-| timescale | - | - | - | 3 | - | - | 3 |
-| timescaledb | 3 | - | 10 | - | - | 9 | 22 |
-| trino | - | - | - | 2 | 1 | - | 3 |
-| tsql | - | - | - | 2 | - | - | 2 |
-| velox | - | - | 11 | - | 1 | - | 12 |
+| platform | benchmark_gate | query_source | query_compile | query_adapter | schema_emit | ddl_optimize | execution_filter | total |
+|---|---|---|---|---|---|---|---|---|
+| athena | - | - | - | - | - | 1 | - | 1 |
+| bigquery | - | 2 | - | 25 | 2 | 1 | 8 | 38 |
+| clickhouse | - | 19 | - | 3 | 4 | 1 | - | 27 |
+| clickhouse-cloud | - | - | - | 2 | - | - | 21 | 23 |
+| clickhouse-local | 1 | - | - | 2 | - | - | 21 | 24 |
+| clickhouse-server | - | - | - | 2 | - | - | 21 | 23 |
+| databend | - | - | - | - | - | 1 | - | 1 |
+| databricks | - | 1 | - | 11 | 2 | 2 | 8 | 24 |
+| datafusion | - | 3 | - | 6 | 2 | - | 12 | 23 |
+| doris | - | 7 | - | - | 2 | 1 | - | 10 |
+| duckdb | - | - | - | - | - | - | 26 | 26 |
+| ducklake | - | - | - | - | 2 | 1 | - | 3 |
+| fabric_dw | - | - | - | - | - | 1 | - | 1 |
+| firebolt | - | - | - | - | - | 1 | - | 1 |
+| lakesail | 5 | 6 | - | 11 | - | 1 | 69 | 92 |
+| mysql | - | 1 | - | - | - | - | - | 1 |
+| pg-duckdb | 3 | - | - | 10 | - | - | 11 | 24 |
+| pg-mooncake | 6 | - | - | 10 | - | - | 7 | 23 |
+| pg_mooncake | - | - | - | - | - | 1 | - | 1 |
+| postgres | - | - | - | - | 1 | - | 67 | 68 |
+| postgresql | - | 6 | - | - | 1 | 1 | - | 8 |
+| presto | - | - | - | - | 2 | 1 | - | 3 |
+| questdb | 1 | - | - | - | - | 1 | - | 2 |
+| redshift | - | - | - | - | 2 | 1 | - | 3 |
+| singlestore | - | - | - | - | - | 4 | - | 4 |
+| snowflake | - | 7 | - | 2 | 2 | 1 | 7 | 19 |
+| spark | - | 6 | - | 11 | 2 | 1 | - | 20 |
+| sqlite | - | 1 | 1 | - | - | - | - | 2 |
+| starrocks | - | 15 | - | 1 | 2 | 1 | - | 19 |
+| synapse | - | - | - | - | - | 1 | - | 1 |
+| timescale | - | - | - | - | 3 | - | - | 3 |
+| timescaledb | 3 | - | - | 10 | - | - | 9 | 22 |
+| trino | - | - | - | - | 2 | 1 | - | 3 |
+| tsql | - | - | - | - | 2 | - | - | 2 |
+| velox | - | - | - | 11 | - | 1 | - | 12 |
 
 ## Rules by platform
 
@@ -683,6 +683,7 @@ Every rule registered in `benchbox.sql_compat` is listed below. The registry is 
 | phase | scope | action | support | failure mode | rule_id |
 |---|---|---|---|---|---|
 | query_source | benchmark=h2odb, query=Q9 | select_variant | REWRITTEN | SYNTAX_ERROR | `query_source.sqlite.h2odb.q9_percentile_cont_variant` |
+| query_compile | benchmark=tpch, query=6 | rewrite_query | REWRITTEN | SILENT_CORRUPTION | `query_compile.sqlite.tpch.q6_exact_discount_bounds` |
 
 ### starrocks
 

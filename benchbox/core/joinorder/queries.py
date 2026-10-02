@@ -136,7 +136,11 @@ def _normalize_portable_aliases(query_id: str, query: str) -> str:
     """Avoid aliases that are reserved words on supported local engines."""
     if query_id not in _DUCKDB_RESERVED_ALIAS_QUERY_IDS:
         return query
+    # Table alias with or without AS (`aka_title AS at` and the legal
+    # `aka_title at`): normalize the declaration first so bare qualifiers
+    # below cannot orphan the alias.
     query = re.sub(r"\bAS\s+at\b", "AS at1", query)
+    query = re.sub(r"(?i)(\bFROM\s+aka_title|\bJOIN\s+aka_title)\s+at\b(?!\.)", r"\1 at1", query)
     return re.sub(r"\bat\.", "at1.", query)
 
 
@@ -170,7 +174,7 @@ class JoinOrderQueryManager:
                 try:
                     content = query_file.read_text(encoding="utf-8").strip()
                     if content:
-                        queries[query_id] = content
+                        queries[query_id] = _normalize_portable_aliases(query_id, content)
                 except Exception as e:
                     emit(f"Warning: Could not load query {query_id}: {e}")
 

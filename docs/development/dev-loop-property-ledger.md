@@ -153,6 +153,8 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_check_makefile_inventory.py` | tooling |
 | `test_check_project_references.py` | product-safety |
 | `test_check_release_curation.py` | product-safety |
+| `test_check_rerun_shard_retention.py` | tooling |
+| `test_check_sqlglot_repro_retirement.py` | tooling |
 | `test_check_submission_validator_sync.py` | product-safety |
 | `test_check_uv_lock_revision.py` | tooling |
 | `test_check_windows_antipatterns.py` | tooling |
@@ -185,12 +187,15 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_path_filter_decision.py` | tooling |
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
+| `test_pr_arm.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
 | `test_reference_usage_audit.py` | tooling |
+| `test_release_artifact_consumer.py` | product-safety | Producer receipt, provenance selection and archive admission fail closed |
+| `test_release_artifact_execution.py` | product-safety | Real tag objects, isolated verifier boundary, credential and Git configuration isolation, bounded download and no-replace publication |
 | `test_release_cut_start.py` | product-safety |
 | `test_release_finalize.py` | product-safety |
 | `test_release_flow.py` | product-safety |

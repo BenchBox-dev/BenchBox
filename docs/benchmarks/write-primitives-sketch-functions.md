@@ -420,17 +420,29 @@ Top-K only sweeps two values because `lg_max_map_size=6` (64 buckets)
 is too small for TPC-H lineitem's 7 distinct shipmodes — the merged
 sketch would saturate.
 
-Cloud-engine sweep variants are deferred. Each cloud engine has
+The sweep stays DuckDB-only. ClickHouse lacks parameterized accuracy
+knobs for its native sketches, so a ClickHouse "counterpart" would
+compare different algorithms (fixed-precision `uniqHLL12` versus
+`uniqExact`, `quantileBFloat16` versus `quantileExact`) rather than the
+swept parameter — results labeled as `lg_k`, `k`, or `lg_max_map_size`
+effects would actually measure algorithm changes. The sweep ops are
+therefore unsupported on ClickHouse (null platform override, the
+established skip). Remaining cloud engines stay deferred: each has
 different parameter knobs (Snowflake `APPROX_TOP_K` `counters` vs
-DataSketches `lg_max_map_size`, etc.); 6 families × 3 cloud engines is
-out of proportion with the analytical value. DuckDB-only sweep is
-enough to demonstrate the tradeoff; cloud users tune at their end with
+DataSketches `lg_max_map_size`, etc.); 6 families × remaining cloud
+engines is out of proportion with the analytical value. The DuckDB-only
+sweep demonstrates the tradeoff; cloud users tune at their end with
 vendor-specific knobs.
 
-KLL variants are end-to-end verified on the installed datasketches
-extension (k=100: ~2KB merged at SF=0.01, median=7395 vs true=7500;
-k=1000: ~18KB merged, median=7509). Theta and frequent-items variants
-share the parent ops' fate w.r.t. the recorded extension drift in
+Use the SF=0.01 TPC-H catalog validations to check the KLL median and
+storage bounds. Results from synthetic integer sequences do not establish
+those corpus bounds. Trino is unsupported for the headline sketch
+operations and parameter sweeps; its operation overrides skip execution
+before either the sketch SQL or validation SQL reaches the engine.
+Check the parameterized casts and merge calls separately from the
+headline functions: their availability alone does not establish sweep
+compatibility. Theta and frequent-items variants remain subject to the
+recorded extension drift in
 `_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
 
 ## Single-query scope: what this benchmark is **not**
