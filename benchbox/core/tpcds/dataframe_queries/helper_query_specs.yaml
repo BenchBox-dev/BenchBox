@@ -202,6 +202,7 @@ helper_queries:
     - i_item_id
     - i_item_desc
     - revenueratio
+  - null
 - query_id: 12
   title: Web Sales Item Analysis
   expression_helper: _item_category_sales_expression

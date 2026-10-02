@@ -175,7 +175,8 @@ class TPCDSQueryManager:
 
         Args:
             query_id: Query number (1-99)
-            parameters: Dictionary of parameter names to values
+            parameters: Values keyed by dsqgen's names as ``-LOG`` writes them (``YEAR.01``); see
+                ``DSQGenBinary.generate_with_parameters``
             scale_factor: Scale factor for calculations
             dialect: SQL dialect
 
