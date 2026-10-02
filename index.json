@@ -6040,6 +6040,15 @@
       "status": "open",
       "title": "Diagnose the Q66 value mismatch at SF 0.03 to 0.1 on both families"
     },
+    "dfparity-n02-q20-q78-mismatch": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Diagnose the Q20 mismatch at SF 0.03 and the Q78 mismatch"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [

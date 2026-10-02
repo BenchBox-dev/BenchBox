@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A stated cause with evidence for Q20 and for Q78",
+    "Each matches at SF 0.03 and 0.1, or is reclassified with evidence",
+    "No comparator change"
+  ],
+  "description": "Q20 diverges at SF 0.03 and is unclassified (split out of t09 and t12); Q78 still diverges on some cells after #2504. Reproduce, state the cause, then fix at the cause or reclassify.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:33:28Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "95f4545792b94aafbb437c8f5df07770",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
