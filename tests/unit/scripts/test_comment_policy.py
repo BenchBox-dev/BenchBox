@@ -250,7 +250,10 @@ def test_enforcement_value_is_validated_and_defaults_to_blocking() -> None:
     assert load_policy(json.dumps(policy(enforcement="advisory")).encode())["enforcement"] == "advisory"
     with pytest.raises(ValueError, match="advisory or blocking"):
         load_policy(json.dumps(policy(enforcement="warn")).encode())
-    assert load_policy((ROOT / "quality/comment-policy.json").read_bytes())["enforcement"] == "advisory"
+    assert load_policy((ROOT / "quality/comment-policy.json").read_bytes())["enforcement"] in {"advisory", "blocking"}
+    for malformed in ([], {}, 1, None):
+        with pytest.raises(ValueError, match="advisory or blocking"):
+            load_policy(json.dumps(policy(enforcement=malformed)).encode())
 
 
 def test_enforcement_can_be_tightened_but_never_relaxed() -> None:
@@ -309,6 +312,95 @@ def test_advisory_annotations_escape_path_and_text(monkeypatch: pytest.MonkeyPat
     annotation = next(line for line in printed if line.startswith("::warning"))
     assert annotation.startswith("::warning file=dir%2Cx%3A%3Ay%25z.py,line=7::")
     assert "\r" not in annotation and "set-output" not in annotation
+
+
+def commit_policy(tmp_path: Path, enforcement: str) -> str:
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(enforcement=enforcement)), encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            enforcement,
+            "--allow-empty",
+        ],
+        check=True,
+    )
+    return subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+
+
+def test_advisory_reports_unanalyzable_input_but_still_returns_zero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git_repo(tmp_path, "x = 1\n")
+    base = commit_policy(tmp_path, "advisory")
+    (tmp_path / "a.py").write_text("def broken(\n", encoding="utf-8")
+    capsys.readouterr()
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base]) == 0
+    out = capsys.readouterr().out
+    assert "CP coverage-error" in out
+    assert "(1 are inputs the checker could not analyze)" in out
+
+
+def test_flipping_to_blocking_does_not_block_itself_but_the_next_change_is(tmp_path: Path) -> None:
+    git_repo(tmp_path, "x = 1\n")
+    advisory_base = commit_policy(tmp_path, "advisory")
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(enforcement="blocking")), encoding="utf-8")
+    (tmp_path / "a.py").write_text("# new\nx = 1\n", encoding="utf-8")
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", advisory_base]) == 0
+    subprocess.run(["git", "-C", str(tmp_path), "add", "a.py", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "flip",
+        ],
+        check=True,
+    )
+    blocking_base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    (tmp_path / "a.py").write_text("# new\n# another\nx = 1\n", encoding="utf-8")
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", blocking_base]) == 1
+    assert main(["--root", str(tmp_path), "--mode", "report"]) == 0
+
+
+def test_hostile_paths_cannot_start_a_workflow_command_in_the_output(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    git_repo(tmp_path, "x = 1\n")
+    base = commit_policy(tmp_path, "advisory")
+    hostile = "::add-mask::secret.py"
+    (tmp_path / hostile).write_text("# new\n", encoding="utf-8")
+    newline_name = "one.py\n::stop-commands::token\ntwo.py"
+    try:
+        (tmp_path / newline_name).write_text("# new\n", encoding="utf-8")
+    except OSError:
+        newline_name = ""
+    capsys.readouterr()
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base]) == 0
+    lines = capsys.readouterr().out.splitlines()
+    assert not [line for line in lines if line.lstrip().startswith("::") and not line.startswith("::warning ")]
+    assert not any(line.lstrip().startswith(("::add-mask", "::stop-commands")) for line in lines)
+    if newline_name:
+        assert not any(line.strip() == "::stop-commands::token" for line in lines)
 
 
 def test_candidate_cannot_relax_blocking_enforcement_in_a_comparison(tmp_path: Path) -> None:

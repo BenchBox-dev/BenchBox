@@ -31,11 +31,16 @@ fail the command.
 
 `quality/comment-policy.json` sets `enforcement` to `advisory` or `blocking`. A
 comparison against a base (the check target, the hook and CI) reads the mode
-from the base policy. While it is `advisory`, the check prints every new
-violation, and in CI marks each as a warning on the changed line, but exits
-successfully, so a pull request is never blocked for a comment. Parser and
-configuration failures still fail in both modes, and `comment-policy-strict` and
-`comment-policy-report` ignore the mode.
+from the base policy. While it is `advisory`, the check prints new violations,
+up to 100 of them, and in CI marks each as a warning on the changed line, but
+exits successfully, so a pull request is never blocked for a comment. Findings
+about input the checker could not analyze are reported the same way and do not
+fail either, and the summary line counts them, so the gaps are visible before
+the switch to blocking. Parser and configuration failures, which stop the check
+before it has findings, still fail in both modes. `comment-policy-strict` and
+`comment-policy-report` ignore the mode. Paths and comment text in the output
+come from the pull request, so control characters are escaped and a line is
+never left starting with `::`.
 
 Moving from `advisory` to `blocking` is a one-line change to the policy. It is
 checked against the base policy, so that change is not blocked by itself, and

@@ -50,7 +50,8 @@ def load_policy(raw: bytes) -> dict:
     policy = json.loads(raw)
     if set(policy) - {"enforcement"} != {"version", "external", "completed", "exceptions"} or policy["version"] != 1:
         raise ValueError("invalid comment-policy schema")
-    if policy.get("enforcement", "blocking") not in ENFORCEMENT_MODES:
+    enforcement = policy.get("enforcement", "blocking")
+    if not isinstance(enforcement, str) or enforcement not in ENFORCEMENT_MODES:
         raise ValueError("enforcement must be advisory or blocking")
     for key in ("external", "completed", "exceptions"):
         if not isinstance(policy[key], list):
@@ -290,6 +291,11 @@ def validate_consumers(root: Path, policy: dict) -> None:
             raise ValueError(f"external provenance missing: {entry['provenance']}")
 
 
+def plain_text(value: str) -> str:
+    text = "".join(f"\\x{ord(char):02x}" if ord(char) < 32 or ord(char) == 127 else char for char in value)
+    return f"\\{text}" if text.lstrip().startswith("::") else text
+
+
 def annotation_text(value: str, *, property_value: bool = False) -> str:
     value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
     return value.replace(":", "%3A").replace(",", "%2C") if property_value else value
@@ -304,9 +310,10 @@ def exit_status(mode: str, baseline_policy: dict, failed: list[Finding]) -> int:
             excerpt = annotation_text(finding.text.splitlines()[0][:160] if finding.text else "")
             path = annotation_text(finding.path, property_value=True)
             print(f"::warning file={path},line={finding.line}::comment-policy {finding.kind}: {excerpt}")
+    gaps = sum(finding.kind in {"coverage-error", "payload-error"} for finding in failed)
     print(
-        f"comment-policy: enforcement is advisory, so these {len(failed)} findings do not fail the check; "
-        "they will once the policy sets enforcement to blocking"
+        f"comment-policy: enforcement is advisory, so these {len(failed)} findings do not fail the check "
+        f"({gaps} are inputs the checker could not analyze); they will once the policy sets enforcement to blocking"
     )
     return 0
 
@@ -399,13 +406,13 @@ def main(argv: list[str] | None = None) -> int:
             )
         for finding in failed[:100]:
             excerpt = finding.text.splitlines()[0][:160] if finding.text else ""
-            print(f"{finding.path}:{finding.line}: CP {finding.kind}: {excerpt}")
+            print(plain_text(f"{finding.path}:{finding.line}: CP {finding.kind}: {excerpt}"))
         print(
             f"comment-policy: {len(sources)} source files, {len(current)} violations, {len(failed)} enforced failures ({args.mode})"
         )
         return exit_status(args.mode, baseline_policy, failed)
     except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as exc:
-        print(f"comment-policy: configuration or parser failure: {exc}", file=sys.stderr)
+        print(plain_text(f"comment-policy: configuration or parser failure: {exc}"), file=sys.stderr)
         return 2
 
 
