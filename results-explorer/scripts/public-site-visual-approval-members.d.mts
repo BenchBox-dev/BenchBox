@@ -1,6 +1,7 @@
 export const MAX_GROUP_COMMITS: number;
 export const MAX_ATTEMPTS: number;
 export const RETRY_BASE_DELAY_MS: number;
+export const MAX_RETRY_WAIT_MS: number;
 
 export type GithubGet = (path: string) => Promise<any>;
 

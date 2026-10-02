@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   MAX_ATTEMPTS,
   MAX_GROUP_COMMITS,
+  MAX_RETRY_WAIT_MS,
   RETRY_BASE_DELAY_MS,
   createGithubGet,
   isTransientGithubError,
@@ -216,11 +217,12 @@ describe("mergeGroupPullRequests retries", () => {
 });
 
 describe("createGithubGet", () => {
-  const reply = (status: number, headers: Record<string, string> = {}, body: unknown = {}) => ({
+  const reply = (status: number, headers: Record<string, string> = {}, body: unknown = {}, text = "") => ({
     ok: status >= 200 && status < 300,
     status,
     headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
     json: async () => body,
+    text: async () => text,
   });
   const getWith = (response: ReturnType<typeof reply>) => {
     const fetchImpl = vi.fn(async (_url: string, _init?: any) => response);
@@ -264,5 +266,93 @@ describe("createGithubGet", () => {
     const error = await github("/x").catch((caught) => caught);
     expect(isTransientGithubError(error)).toBe(true);
     expect(error.message).not.toContain("secret-token");
+  });
+});
+
+describe("rate limits that say how long to wait", () => {
+  const reply = (status: number, headers: Record<string, string>, text = "") => ({
+    ok: false,
+    status,
+    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+    json: async () => ({}),
+    text: async () => text,
+  });
+  const failure = async (response: ReturnType<typeof reply>) => {
+    const github = createGithubGet({ token: "t", fetchImpl: async () => response });
+    return (await github("/x").catch((caught) => caught)) as Error & { retryAfterMs?: number };
+  };
+
+  it("recognizes a secondary rate limit from the message when no header says so", async () => {
+    const error = await failure(
+      reply(403, { "x-ratelimit-remaining": "4990" }, '{"message":"You have exceeded a secondary rate limit."}'),
+    );
+    expect(error.message).toBe("GitHub API 429 for /x (rate limited)");
+    expect(isTransientGithubError(error)).toBe(true);
+    expect(error.retryAfterMs).toBeUndefined();
+  });
+
+  it("keeps a 403 with an unrelated message a permanent error", async () => {
+    const error = await failure(reply(403, { "x-ratelimit-remaining": "4990" }, '{"message":"Resource not accessible"}'));
+    expect(error.message).toBe("GitHub API 403 for /x");
+    expect(isTransientGithubError(error)).toBe(false);
+  });
+
+  it("records the wait the server asked for in retry-after", async () => {
+    expect((await failure(reply(429, { "retry-after": "30" }))).retryAfterMs).toBe(30000);
+    expect((await failure(reply(403, { "retry-after": "7" }))).retryAfterMs).toBe(7000);
+  });
+
+  it("records the time until a spent primary limit resets", async () => {
+    const reset = Math.floor(Date.now() / 1000) + 20;
+    const error = await failure(reply(403, { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(reset) }));
+    expect(error.retryAfterMs).toBeGreaterThan(15000);
+    expect(error.retryAfterMs).toBeLessThanOrEqual(20000);
+  });
+
+  it("waits as long as the server asked, instead of the default backoff", async () => {
+    const sleep = vi.fn(async (_ms: number) => undefined);
+    let calls = 0;
+    const result = await withRetries(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw Object.assign(new Error("GitHub API 429 for /x"), { retryAfterMs: 30000 });
+        return "ok";
+      },
+      { sleep },
+    );
+    expect(result).toBe("ok");
+    expect(sleep.mock.calls.map(([ms]) => ms)).toEqual([30000]);
+  });
+
+  it("does not retry when the server asks for longer than the cap", async () => {
+    const sleep = vi.fn(async (_ms: number) => undefined);
+    let calls = 0;
+    const longWait = Object.assign(new Error("GitHub API 429 for /x"), { retryAfterMs: MAX_RETRY_WAIT_MS + 1 });
+    expect(isTransientGithubError(longWait)).toBe(false);
+    await expect(
+      withRetries(
+        async () => {
+          calls += 1;
+          throw longWait;
+        },
+        { sleep },
+      ),
+    ).rejects.toThrow("429");
+    expect(calls).toBe(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("never waits longer than the cap even for a transient error that asks for more", async () => {
+    const sleep = vi.fn(async (_ms: number) => undefined);
+    let calls = 0;
+    await withRetries(
+      async () => {
+        calls += 1;
+        if (calls === 1) throw Object.assign(new Error("GitHub API 429 for /x"), { retryAfterMs: MAX_RETRY_WAIT_MS });
+        return "ok";
+      },
+      { sleep },
+    );
+    expect(sleep.mock.calls[0]![0]).toBeLessThanOrEqual(MAX_RETRY_WAIT_MS);
   });
 });

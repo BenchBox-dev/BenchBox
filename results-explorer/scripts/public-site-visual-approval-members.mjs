@@ -20,29 +20,37 @@ const FULL_SHA = /^[0-9a-f]{40}$/;
 // rate limit does not eject a group that was approved correctly.
 export const MAX_ATTEMPTS = 3;
 export const RETRY_BASE_DELAY_MS = 2000;
+// A rate limit that asks for a longer wait than this is not worth holding a runner for: fail at once.
+export const MAX_RETRY_WAIT_MS = 60000;
 
-/** Whether an error from `github()` is worth retrying: a network failure, a rate limit or a server error. */
+/** Whether an error from `github()` is worth retrying: a network failure, a short rate limit or a server error. */
 export function isTransientGithubError(error) {
+  if (typeof error?.retryAfterMs === "number" && error.retryAfterMs > MAX_RETRY_WAIT_MS) return false;
   const status = /^GitHub API (\d{3})\b/.exec(String(error?.message ?? ""))?.[1];
   if (!status) return true;
   return status === "429" || status.startsWith("5");
 }
 
-/** Run `operation` up to MAX_ATTEMPTS times, waiting 2 s then 4 s, retrying only transient errors. */
+/**
+ * Run `operation` up to MAX_ATTEMPTS times, retrying only transient errors. Wait as long as the server asked
+ * (`retryAfterMs`, never more than MAX_RETRY_WAIT_MS) and otherwise 2 s then 4 s.
+ */
 export async function withRetries(operation, { sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await operation();
     } catch (error) {
       if (attempt >= MAX_ATTEMPTS || !isTransientGithubError(error)) throw error;
-      await sleep(RETRY_BASE_DELAY_MS * attempt);
+      const asked = typeof error?.retryAfterMs === "number" ? error.retryAfterMs : RETRY_BASE_DELAY_MS * attempt;
+      await sleep(Math.min(Math.max(asked, 0), MAX_RETRY_WAIT_MS));
     }
   }
 }
 
 /**
  * A `github(path)` function for the REST API. GitHub reports a spent rate limit as 429, or as 403 with
- * rate-limit headers, so both are raised as a 429 error a retry can cure; any other 403 stays a client error.
+ * rate-limit headers or a "secondary rate limit" message, so all of those are raised as a 429 error a retry
+ * can cure, carrying how long the server asked to wait; any other 403 stays a client error.
  */
 export function createGithubGet({ token, apiUrl = "https://api.github.com", fetchImpl = globalThis.fetch }) {
   return async function github(path) {
@@ -55,10 +63,22 @@ export function createGithubGet({ token, apiUrl = "https://api.github.com", fetc
     });
     if (!response.ok) {
       const header = (name) => response.headers?.get?.(name) ?? null;
-      const limited =
-        response.status === 429 ||
-        (response.status === 403 && (header("x-ratelimit-remaining") === "0" || header("retry-after") !== null));
-      throw new Error(`GitHub API ${limited ? 429 : response.status} for ${path}${limited ? " (rate limited)" : ""}`);
+      const retryAfter = header("retry-after");
+      const exhausted = header("x-ratelimit-remaining") === "0";
+      let secondary = false;
+      if (response.status === 403) {
+        const body = await Promise.resolve(response.text?.()).catch(() => "");
+        secondary = /secondary rate limit/i.test(String(body ?? ""));
+      }
+      const limited = response.status === 429 || (response.status === 403 && (exhausted || retryAfter !== null || secondary));
+      const error = new Error(`GitHub API ${limited ? 429 : response.status} for ${path}${limited ? " (rate limited)" : ""}`);
+      if (limited) {
+        const seconds = Number(retryAfter);
+        const reset = Number(header("x-ratelimit-reset"));
+        if (retryAfter !== null && Number.isFinite(seconds)) error.retryAfterMs = seconds * 1000;
+        else if (exhausted && Number.isFinite(reset)) error.retryAfterMs = Math.max(reset * 1000 - Date.now(), 0);
+      }
+      throw error;
     }
     return response.json();
   };
