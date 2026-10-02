@@ -5,12 +5,14 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import hashlib
+import math
 import re
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import asdict, dataclass
+from decimal import Context, Decimal, DecimalException, Inexact
 from typing import Callable
 
 #: Translation workload scopes. ``schema_ddl`` marks schema-creation DDL while
@@ -273,6 +275,83 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
     )
 
 
+def _fold_sqlite_discount_bounds(query: str) -> str:
+    """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic.
+
+    A bound is folded only when it is a ``+``/``-`` expression of at most four plain decimal
+    literals (``0.06 - 0.01``), each below 100 with at most six decimals. SQLite evaluates
+    those as REAL. At that size double rounding error is about 1e-14, so the exact decimal
+    result is computed in a trapped-inexact context and the bound is replaced only when the
+    double result is finite and within 1e-12 of it. Integer or mixed bounds, other operators,
+    larger or longer literals, scientific notation and negative results keep SQLite's
+    semantics and are left alone. The rewrite is scoped to queries that read a table named ``lineitem``, the TPC-H table
+    whose ``l_discount`` is ``DECIMAL(15,2)``, so a query over any other table is left alone;
+    the TPC-Havoc Q6 variants read ``lineitem`` and are folded.
+
+    The folded bound is the exact decimal endpoint, so the comparison follows exact decimal
+    semantics in both directions. SQLite's noisy endpoint can sit just below the exact value
+    (dropping an endpoint row, the Q6 defect) or just above it. A stored value inside that
+    noise band, about 1e-16 from the endpoint, is therefore decided by the exact endpoint.
+    TPC-H discounts are ``DECIMAL(15,2)``, so no stored value lies in that band.
+    """
+    # Most SQLite queries need no extra parse. The AST, not this hint, selects rewrites.
+    if not re.search(r"\bl_discount\b", query, re.IGNORECASE) or not re.search(r"\bBETWEEN\b", query, re.IGNORECASE):
+        return query
+
+    import sqlglot
+    from sqlglot import exp
+
+    context = Context(prec=60, traps=[Inexact])
+    max_leaves = 4
+    noise = 1e-12
+    leaves = 0
+
+    def evaluate(node: "exp.Expression") -> "tuple[Decimal, float] | None":
+        """Return the exact decimal value and the IEEE-double value of a decimal +/- tree."""
+        nonlocal leaves
+        node = node.unnest()
+        if isinstance(node, exp.Literal):
+            leaves += 1
+            if leaves > max_leaves or not node.is_number or not re.fullmatch(r"\d{1,2}\.\d{1,6}", node.name):
+                return None
+            return Decimal(node.name), float(node.name)
+        if isinstance(node, (exp.Add, exp.Sub)):
+            left, right = evaluate(node.this), evaluate(node.expression)
+            if left is None or right is None:
+                return None
+            try:
+                if isinstance(node, exp.Add):
+                    return context.add(left[0], right[0]), left[1] + right[1]
+                return context.subtract(left[0], right[0]), left[1] - right[1]
+            except DecimalException:
+                return None
+        return None
+
+    tree = sqlglot.parse_one(query, read="sqlite")
+    # A string or comment that merely mentions the table must not count: look at table references.
+    if not any(table.name.lower() == "lineitem" for table in tree.find_all(exp.Table)):
+        return query
+    changed = False
+    for between in tree.find_all(exp.Between):
+        if not isinstance(between.this, exp.Column) or between.this.name.lower() != "l_discount":
+            continue
+        folded: list[Decimal] = []
+        for bound in (between.args["low"], between.args["high"]):
+            leaves = 0
+            value = evaluate(bound) if isinstance(bound.unnest(), (exp.Add, exp.Sub)) else None
+            if value is None:
+                break
+            exact, real = value
+            if exact < 0 or not math.isfinite(real) or abs(real - float(exact)) > noise:
+                break
+            folded.append(exact)
+        else:
+            between.set("low", exp.Literal.number(format(folded[0], "f")))
+            between.set("high", exp.Literal.number(format(folded[1], "f")))
+            changed = True
+    return tree.sql(dialect="sqlite") if changed else query
+
+
 def _fix_sqlite_unsupported_syntax(query: str) -> str:
     """Rewrite SQLGlot output that SQLite cannot execute."""
 
@@ -327,13 +406,14 @@ def _fix_sqlite_unsupported_syntax(query: str) -> str:
         expression = match.group("expression").strip()
         return f"STRFTIME('{trunc_formats[unit]}', {expression})"
 
-    return re.sub(
+    query = re.sub(
         r"\bDATE_TRUNC\s*\(\s*['\"](?P<unit>YEAR|MONTH|DAY|HOUR|MINUTE|SECOND)['\"]\s*,\s*"
         r"(?P<expression>[^(),]+?)\s*\)",
         replace_date_trunc,
         query,
         flags=re.IGNORECASE,
     )
+    return _fold_sqlite_discount_bounds(query)
 
 
 def normalize_dialect_for_sqlglot(dialect: str) -> str:
