@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "ADR-001 addendum merged naming the chosen option, the verdict name (if any), its receipt JSON shape and the exact applied_verified rule.",
+    "The addendum states whether attested-only evidence can ever yield applied_verified (MotherDuck case)."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-1 / task P1.6.",
+  "description": "## Problem\nOn DuckDB, \"sorting\" is two things:\n- an ART index (`idx_<t>_sort`), visible in `duckdb_indexes()`;\n- a CTAS or FK-safe in-place rewrite that physically orders rows. It has no catalog footprint.\n\nThe ledger records the index. It never records a *successful* rewrite: `benchbox/platforms/base/sorted_ingestion.py:211-320` records only skips (as dropped intents) and failures. `corroborate()` can therefore only check the index, which is a proxy: an index can exist even when the data was never sorted. MotherDuck sorts without creating any index.\n\n## Options\n- **(A) Recommended.**\n  - Record a successful rewrite as an executed `post_load` statement with `mechanism=\"sorted_ingestion\"`.\n  - Classify it as a new non-blocking verdict class `attested`. It is shown in the receipt and never counted as corroboration.\n  - Index intents stay catalog-verified.\n  - A requested sort with no executed rewrite becomes a dropped intent through the post-load reconciliation, and it blocks.\n- **(B) Strict.** Sort intents stay unverifiable without catalog evidence, so DuckDB sorting can never reach `applied_verified`.\n- **(C) Rejected.** A bounded data probe of row order would violate the invariant that introspection never measurably slows a run.\n\n## Must decide\n- The verdict name and its receipt JSON shape, plus the Explorer label.\n- Exactly what `applied_verified` means once `attested` exists.\n- Whether a platform with *only* attested evidence (MotherDuck, which has no index) may ever reach `applied_verified`.\n\n## Guardrails\n- The decision must not widen what can corroborate. `attested` must never satisfy a catalog-verifiable intent.\n- `corroborate()` stays configuration-free (plan review F2). The \"requested but not executed\" rule lives in the reconciliation.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
+  "links": [
+    "docs/development/tuning-adr-001-trust-and-hash-semantics.md",
+    "benchbox/platforms/base/sorted_ingestion.py",
+    "benchbox/core/tuning/introspection.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:09:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "8b687b2f94d349c7bd029a0737d50ee5",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}

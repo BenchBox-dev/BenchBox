@@ -20307,6 +20307,13 @@
       "status": "done",
       "title": "Sweep all platform from_config implementations to forward tuning configuration"
     },
+    "tuning-gate-sort-evidence-model-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "DECISION GATE (D-1): evidence model for a physical sort order that has no catalog footprint"
+    },
     "tuning-generator-registry-completeness-20260712": {
       "claim": null,
       "needs": [],
