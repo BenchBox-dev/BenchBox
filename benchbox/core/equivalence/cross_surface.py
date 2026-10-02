@@ -935,6 +935,20 @@ _DATAVAULT_Q17_VACUOUS = (
 )
 _DATAVAULT_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q17",), _DATAVAULT_Q17_VACUOUS)
 
+_TPCH_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell (SF=0.01): Q17 is a scalar SUM(...) with "
+    "no GROUP BY whose default literals (Brand#23, MED BOX) match no qualifying part/lineitem "
+    "rows in the small cell, so the reference returns the single all-NULL row and neither "
+    "surface can discriminate anything. Verified 2026-10-01 by executing the reference SQL "
+    "over every brand/container combination present in the built cell (25 brands x 40 "
+    "containers = 1000 combos): 856 combinations return a non-NULL value and only the "
+    "combinations that match no qualifying rows, including the default pair, return the "
+    "all-NULL row. This is a literal artifact of the default parameters against the small "
+    "cell, not a load or logic bug, and the query is not vacuous in general. Tracked: gate "
+    "Q17 with a brand/container pair the cell satisfies (do NOT change the canonical Q17 "
+    "query)."
+)
+
 _TPCH_SKEW_Q17_VACUOUS = (
     "0 discriminating rows at the bounded gate cell (SF=0.01, seed 42): Q17 is a scalar "
     "SUM(...) with no GROUP BY whose default literals (Brand#23, MED BOX) match no "
@@ -1797,10 +1811,12 @@ GATES: dict[str, CrossSurfaceGate] = {
         scale_factor=_DATAVAULT_SCALE,
     ),
     # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q22"). SQL pinned to fixed stream 0.
+    # mechanical Q prefix ("Q1".."Q22"). SQL pinned to fixed stream 0. Q17 is
+    # legitimately empty at its default literals (see _TPCH_Q17_VACUOUS).
     "tpch": CrossSurfaceGate(
         name="tpch",
         build=build_tpch_duckdb,
+        legitimately_empty={"17": _TPCH_Q17_VACUOUS},
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
             "TPC-H expression and pandas DataFrame implementations are separately handwritten for each query."
