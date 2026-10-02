@@ -58,7 +58,9 @@ def _develop_expected():
     ]
 
 
-def _live_develop_ruleset(*, review_count: int = 0, code_owner_review: bool = True) -> dict:
+def _live_develop_ruleset(
+    *, review_count: int = 0, code_owner_review: bool = True, thread_resolution: bool = True
+) -> dict:
     return {
         "name": "develop-squash-only",
         "enforcement": "active",
@@ -70,6 +72,7 @@ def _live_develop_ruleset(*, review_count: int = 0, code_owner_review: bool = Tr
                 "parameters": {
                     "required_approving_review_count": review_count,
                     "require_code_owner_review": code_owner_review,
+                    "required_review_thread_resolution": thread_resolution,
                 },
             },
             {

@@ -87,6 +87,8 @@ class TestDataGeneration:
 
         def fake_process_month(self, writer, year, month, start_id):
             writer.writerow(_flight_row(start_id, year, month))
+            self._stats["downloaded_months"].append(f"{year}-{month:02d}")
+            self._stats["months_downloaded"] += 1
             return 1
 
         monkeypatch.setattr(FlightDataDownloader, "_process_month", fake_process_month)
@@ -187,6 +189,8 @@ class TestDataGeneration:
 
         def fake_process_month(self, writer, year, month, start_id):
             writer.writerow(_flight_row(start_id, year, month))
+            self._stats["downloaded_months"].append(f"{year}-{month:02d}")
+            self._stats["months_downloaded"] += 1
             return 1
 
         monkeypatch.setattr(FlightDataDownloader, "_process_month", fake_process_month)
