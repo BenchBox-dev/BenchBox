@@ -8,7 +8,7 @@ name: TPC-DS Platform Identity
 # another can be traced to the data or the parameters.
 #
 # Not a required check: it runs on a schedule, on demand, and on pull requests that touch the bundled
-# TPC-DS binaries or this check.
+# TPC-DS binaries, the code that selects and runs them, or this check.
 
 on:
   schedule:
@@ -19,6 +19,9 @@ on:
       - "benchbox/_binaries/tpc-ds/**"
       - "benchbox/core/tpcds/c_tools.py"
       - "benchbox/core/tpcds/parameter_log.py"
+      - "benchbox/core/tpcds/benchmark/**"
+      - "benchbox/core/tpcds/generator/**"
+      - "benchbox/utils/tpc_compilation.py"
       - "scripts/tpcds_platform_identity.py"
       - ".github/workflows/tpcds-platform-identity.yml"
 
