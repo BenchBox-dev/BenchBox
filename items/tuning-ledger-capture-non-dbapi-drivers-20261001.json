@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Fake-driver tests: Spark-family, BigQuery and DataFusion tuned schema DDL appears in the ledger as ddl; a SELECT through .sql is not recorded.",
+    "Local pyspark e2e: PARTITIONED BY / CLUSTER BY DDL recorded; status is not noop.",
+    "Constructed-ledger test: 'SET x=1; CREATE TABLE … ORDER BY (z)' no longer escapes the gate."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P2.1 (A1.2, N-4, latent A1; plan review F2). Unblocks spark-session-config-runtime ('with ledger evidence') and spark-tuned-template-measured.",
+  "description": "## Problem\n`RecordingConnection` intercepts only `execute`, `cursor().execute` and `executescript` (`benchbox/core/tuning/applied_ledger.py:382-431`). Other driver methods pass through `__getattr__` unrecorded:\n- Spark / PySpark / LakeSail / Velox use `.sql()`;\n- BigQuery uses `.query()`;\n- DataFusion uses `.sql()`.\n\nSpark's tuned `PARTITIONED BY` / `CLUSTER BY` DDL does execute (`spark.py:617-658` → `run_spark_schema_creation_loop` → `spark.sql`), yet the status is `noop`.\n\nEven once proxied, `is_schema_tuning_statement`'s footprint (`applied_ledger.py:119-123`, applied at `adapter.py:1555-1559`) lacks `partitioned by`, `clustered by`, `distkey`, `diststyle`, `duplicate key`, `primary index`, `distribution =`, `partitioning =`, `sorted_by` and `bucketed_by`. Statements with those clauses would still be filtered out (plan review F2).\n\n## Change\n- Adapters declare `ledger_execute_verbs`, e.g. `(\"sql\",)` or `(\"query\",)`, and the proxy wraps them.\n- For BigQuery, record the job SQL and its final state.\n- Extend the footprint with the keywords above, or better, renderer-tagged recording.\n- Split multi-statement strings with `_split_sql_script` before recording. This closes the latent transient-prefix laundering path (\"SET x; CREATE …\" classified transient).\n\n## Guardrails (must preserve)\n- Readbacks (SELECT/SHOW/DESCRIBE) through `.sql`/`.query` are not recorded.\n- Capture never breaks a run.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.\n- This item touches paths listed in the soundness manifest by `tuning-trust-paths-soundness-manifest-20261001`. The PR needs an external `Soundness review:` section (AGENTS.md) and must not auto-merge.",
+  "links": [
+    "benchbox/core/tuning/applied_ledger.py",
+    "benchbox/platforms/spark.py",
+    "benchbox/platforms/bigquery.py",
+    "benchbox/platforms/datafusion.py",
+    "benchbox/platforms/base/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:24:55Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "de7ea4b04df84f6bb532e45138d26d3d",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
