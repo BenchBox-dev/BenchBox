@@ -6076,6 +6076,15 @@
       "status": "open",
       "title": "Fold the duplicated dsqgen run in generate_with_parameters and the inline NULL-to-None loops into shared helpers"
     },
+    "dfparity-n06-replay-99-logs-test": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Commit a test that replays all 99 templates' complete logs through generate_with_parameters"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [

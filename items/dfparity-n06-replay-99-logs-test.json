@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "A test replays every query's complete log and compares the SQL with dsqgen's",
+    "It runs in a lane that fits the repository's test-count and time limits"
+  ],
+  "description": "The 99-of-99 round-trip is a script result today (scripts/rev2/full_replay.py) and nine pinned templates in tests/unit/tpcds/test_generate_with_parameters.py. Commit it as a test using parse_dsqgen_parameter_log, so it is reusable by t02 and t17.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:34:14Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e927f8bf29db4031868cdb09ab83c550",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
