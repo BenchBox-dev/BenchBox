@@ -6259,13 +6259,18 @@
       "title": "Add a data-free test inventorying parameter consumption for all 99 TPC-DS queries"
     },
     "dfparity-t03-gate-scale-threading": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T16:52:58Z",
+        "generation": "cd31a251bd26428c92d130f1e35e8161",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:c8122ce9a44d70d81694d8ed"
+      },
       "needs": [
         "dfparity-t00-owner-decisions",
         "dfparity-t01-dsqgen-log-parser"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Render TPC-DS gate SQL at the data's scale (gate builder only) and re-derive the empty list"
     },
     "dfparity-t04-adapter-prototype": {
