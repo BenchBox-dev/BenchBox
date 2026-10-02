@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "One dsqgen run path in c_tools.py",
+    "The inline NULL-to-None loops use _none_for_null",
+    "Existing tests pass and the per-query probe is unchanged"
+  ],
+  "description": "generate_with_parameters in c_tools.py duplicates about 15 lines of the log-capable dsqgen runner. Several implementations convert NULL to None with inline loops that _none_for_null already covers. Replace both with the shared helper without changing behaviour.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:34:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3319b316b84442c785948eac3a657f72",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
