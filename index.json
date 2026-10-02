@@ -6122,12 +6122,17 @@
       "title": "Classify the six all-NULL empty TPC-DS queries so the staged gate is green"
     },
     "dfparity-n11-q39-expression-columns": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T11:50:58Z",
+        "generation": "83cede7508a2429187c82ac16ba00193",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
+      },
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Fix Q39 on the expression family returning 8 columns where SQL returns 10"
     },
     "dfparity-t00-owner-decisions": {
