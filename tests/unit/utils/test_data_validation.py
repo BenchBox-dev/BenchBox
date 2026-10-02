@@ -4,11 +4,12 @@ Copyright 2026 Joe Harris / BenchBox Project
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone, tzinfo
 from pathlib import Path
 
 import pytest
 
+import benchbox.utils.data_validation as data_validation
 from benchbox.utils.data_validation import (
     BenchmarkDataValidator,
     DataValidationResult,
@@ -16,6 +17,20 @@ from benchbox.utils.data_validation import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+NOW = datetime(2026, 1, 15, 12, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def _validation_wallclock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Control this validator's event timestamps without stopping watchdogs."""
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz: tzinfo | None = None) -> datetime:
+            return NOW if tz is None else NOW.replace(tzinfo=timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr(data_validation, "datetime", FixedDatetime)
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +42,7 @@ class TestDataValidationResult:
     """Tests for the DataValidationResult dataclass."""
 
     def test_fields_are_stored(self):
-        now = datetime.now()
+        now = NOW
         result = DataValidationResult(
             valid=True,
             tables_validated={"orders": True, "lineitem": True},
@@ -52,7 +67,7 @@ class TestDataValidationResult:
             missing_tables=["lineitem"],
             row_count_mismatches={"orders": (1500000, 999)},
             file_size_info={},
-            validation_timestamp=datetime.now(),
+            validation_timestamp=NOW,
             issues=["Missing data files for table lineitem"],
         )
         assert result.valid is False
@@ -358,12 +373,10 @@ class TestShouldRegenerateData:
 class TestValidationTimestamp:
     """Tests that validation timestamps are populated."""
 
-    def test_timestamp_is_recent(self, tmp_path):
-        before = datetime.now()
+    def test_timestamp_uses_consumer_clock(self, tmp_path):
         v = BenchmarkDataValidator("tpch", scale_factor=0.01)
         result = v.validate_data_directory(tmp_path)
-        after = datetime.now()
-        assert before <= result.validation_timestamp <= after
+        assert result.validation_timestamp == NOW
 
 
 # ---------------------------------------------------------------------------
