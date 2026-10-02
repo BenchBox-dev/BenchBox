@@ -69,17 +69,6 @@ file	scripts/check_dependency_bounds.py
 file	_project/scripts/check_uv_lock_revision.py
 file	_project/decisions/single-repo-migration.md
 file	.github/workflows/release.yml
-file	_project/decisions/independent-publication-a0-freeze-2026-08-31.md
-file	docs/development/adr/adr-independent-publication-authorities.md
-file	docs/development/adr/adr-public-result-id-permanence.md
-file	docs/development/adr/adr-published-results-slim-corpus-branch.md
-file	docs/development/independent-publication-threat-model.md
-file	docs/operations/independent-publication-contract.md
-file	docs/operations/publication-deployer-soak-and-retirement.md
-file	docs/operations/results-phase-2-runbook.md
-file	docs/operations/results-phase-3-runbook.md
-file	docs/reference/hosted-results-contract.md
-file	docs/reference/threat-model.md
 file	scripts/check_decision_records.py
 prefix	benchbox/_binaries/
 file	benchbox/utils/binary_manifest.py

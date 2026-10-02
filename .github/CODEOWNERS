@@ -86,20 +86,8 @@ _project/scripts/check_uv_lock_revision.py @joeharris76
 _project/decisions/single-repo-migration.md @joeharris76
 _project/scripts/auto_merge_soundness_paths.py @joeharris76
 .github/workflows/release.yml @joeharris76
-# Independent-publication authority and trust-policy surfaces. These exact
-# paths mirror SOUNDNESS_FILES so policy changes route to manual maintainer
-# review and cannot retain auto-merge.
-_project/decisions/independent-publication-a0-freeze-2026-08-31.md @joeharris76
-docs/development/adr/adr-independent-publication-authorities.md @joeharris76
-docs/development/adr/adr-public-result-id-permanence.md @joeharris76
-docs/development/adr/adr-published-results-slim-corpus-branch.md @joeharris76
-docs/development/independent-publication-threat-model.md @joeharris76
-docs/operations/independent-publication-contract.md @joeharris76
-docs/operations/publication-deployer-soak-and-retirement.md @joeharris76
-docs/operations/results-phase-2-runbook.md @joeharris76
-docs/operations/results-phase-3-runbook.md @joeharris76
-docs/reference/hosted-results-contract.md @joeharris76
-docs/reference/threat-model.md @joeharris76
+# Independent-publication control scripts. These exact paths mirror
+# SOUNDNESS_FILES so changes route to manual maintainer review.
 scripts/check_decision_records.py @joeharris76
 publication/** @joeharris76
 scripts/publication/** @joeharris76
