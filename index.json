@@ -2624,6 +2624,15 @@
       "status": "open",
       "title": "Move ClickHouse OPTIMIZE to the post-load seam with the physical (lowercase) table name"
     },
+    "clickhouse-pk-prefix-sort-key-20261001": {
+      "claim": null,
+      "needs": [
+        "clickhouse-optimize-post-load-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "ClickHouse: never emit a PRIMARY KEY that is not a prefix of the tuned sort key; validator rejects it"
+    },
     "clickhouse-read-primitives-dialect-fixes": {
       "claim": null,
       "needs": [],

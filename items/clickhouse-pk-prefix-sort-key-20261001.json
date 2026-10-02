@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Generator unit tests for date-first sort keys with primary_keys enabled/disabled produce valid DDL.",
+    "e2e (chDB): ORDERS sorting (O_ORDERDATE, O_ORDERKEY) runs to completion.",
+    "Snapshot test: notuning ClickHouse DDL unchanged."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.4 (R-5). Serialized after the ClickHouse OPTIMIZE item (shared files).",
+  "description": "## Problem (reproduced)\nA custom ORDERS sort key `(O_ORDERDATE, O_ORDERKEY)` crashed schema creation with \"Primary key must be a prefix of the sorting key\". That happened even with `primary_keys.enabled: false`, after \"✅ Unified tuning configuration validated\". Date-first is the canonical ClickHouse layout.\n\n## Change\n- In `benchbox/core/tuning/generators/clickhouse.py` and `clickhouse/workload.py` `_optimize_table_definition`, when a tuned sort key exists: omit an explicit PRIMARY KEY (MergeTree defaults it to the sort key), or emit only the longest prefix.\n- Emit no PK clause when `primary_keys.enabled` is false.\n- The validator rejects explicit PK/sort combinations that violate the prefix rule. This is an explicit named unsafe combination, which ADR-003 Decision 1 already allows to block.\n\n## Guardrails (must preserve)\n- Untuned ClickHouse DDL is unchanged; a snapshot test proves it.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/core/tuning/generators/clickhouse.py",
+    "benchbox/platforms/clickhouse/workload.py",
+    "benchbox/core/tuning/interface.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:21:26Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "8729eaee43fb4f4bbfb62047011c47c3",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
