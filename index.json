@@ -20422,6 +20422,13 @@
       "status": "done",
       "title": "Applied-ledger capture for native Spark/Snowpark session tuning"
     },
+    "tuning-no-midrun-destructive-db-handling-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Stop mid-run destructive database handling (metadata temp connections drop/delete the run's own database)"
+    },
     "tuning-partition-order-rendered-contract": {
       "claim": null,
       "needs": [
