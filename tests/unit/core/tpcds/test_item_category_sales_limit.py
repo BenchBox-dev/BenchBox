@@ -118,3 +118,17 @@ def test_a_null_class_is_kept_sorts_last_and_stays_none(family, monkeypatch):
 
     assert [row[0] for row in rows] == ["ITEM0002", "ITEM0003", "ITEM0001"]
     assert rows[-1][3] is None  # NULL, not NaN
+
+
+def test_none_for_null_converts_lazily_on_dask():
+    """A lazy Dask frame cannot be tested for NULLs without computing, so named columns convert lazily."""
+    dd = pytest.importorskip("dask.dataframe")
+    import pandas as pd
+
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    frame = dd.from_pandas(pd.DataFrame({"k": ["a", None, "c"], "n": [1.0, None, 3.0], "i": [1, 2, 3]}), npartitions=2)
+
+    rows = queries._none_for_null(frame, ["k", "n"]).compute().to_dict("records")
+
+    assert rows == [{"k": "a", "n": 1.0, "i": 1}, {"k": None, "n": None, "i": 2}, {"k": "c", "n": 3.0, "i": 3}]

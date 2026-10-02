@@ -68,11 +68,14 @@ def _none_for_null(frame: Any, columns: list[str]) -> Any:
     """Report NULL as None rather than NaN in the named pandas columns, as the SQL surface does.
 
     Only a column that actually holds a NULL is converted, so a result without NULLs keeps its native
-    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame is
-    returned unchanged: finding out whether a column holds a NULL would compute it.
+    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame cannot
+    be asked whether a column holds a NULL without computing it, so every named column is converted
+    lazily (``notna`` is missing on a Dask Series, hence ``~isna()``).
     """
     if hasattr(frame, "npartitions"):
-        return frame
+        return frame.assign(
+            **{column: frame[column].astype(object).where(~frame[column].isna(), None) for column in columns}
+        )
     frame = frame.copy()
     for column in columns:
         nulls = frame[column].isna()
