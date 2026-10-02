@@ -268,6 +268,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `publication/test_transaction_executor.py` | product-safety |
 | `publication/test_verify_corpus_promotion.py` | product-safety |
 | `publication/test_verify_live.py` | product-safety |
+| `test_tpcds_divergence_report.py` | tooling |
 | `test_tpcds_platform_identity.py` | product-safety |
 
 ### `tests/unit/release/`
@@ -317,6 +318,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `bundled_binary_manifest.py` | product-safety | Deterministic hashes of the shipped generator tree |
 | `verify_distribution_binaries.py` | product-safety | Distribution membership, archive safety, and source-bound generator hashes |
 | Remaining scripts (ledger-catch-all: scripts/) | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
+| `tpcds_divergence_report.py` | product-safety | Cause labels for DataFrame-versus-SQL divergences (report only, no verdict) |
 | `tpcds_platform_identity.py` | product-safety | Cross-platform agreement of the bundled TPC-DS generators |
 
 ### `_project/scripts/`
