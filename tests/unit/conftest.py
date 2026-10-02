@@ -10,7 +10,9 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+import os
 import sys as _sys
+from functools import wraps
 from pathlib import Path
 from unittest.mock import patch
 
@@ -24,6 +26,53 @@ import pytest
 # versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
+
+
+@pytest.fixture(autouse=True)
+def _unit_home(_hermetic_state, tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """Give each unit test a fresh home outside its artifact directory."""
+    home = tmp_path_factory.mktemp("unit-home")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    return home
+
+
+@pytest.fixture(autouse=True)
+def _owned_cli_invocations(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Treat a CLI invocation as a process boundary for its runtime state.
+
+    CliRunner executes commands in this test process rather than exiting the
+    CLI process. Own its quiet/provider state and known command env outputs,
+    not unrelated test mutations, which remain visible to the leak detector.
+    """
+    from click.testing import CliRunner
+
+    import benchbox.utils.config_interface as config_interface
+    import benchbox.utils.printing as printing
+
+    invoke = CliRunner.invoke
+
+    @wraps(invoke)
+    def invoke_owned(*args, **kwargs):
+        quiet = printing._QUIET
+        provider = config_interface._config_provider
+        # These command outputs belong to the simulated CLI process, not the
+        # caller. Preserve only known writes, so unrelated env leaks still fail.
+        environment = {
+            key: os.environ.get(key) for key in ("BENCHBOX_NON_INTERACTIVE", "BENCHBOX_DATA_ORGANIZATION_CONFIG_JSON")
+        }
+        try:
+            return invoke(*args, **kwargs)
+        finally:
+            printing._QUIET = quiet
+            config_interface._config_provider = provider
+            for key, value in environment.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    monkeypatch.setattr(CliRunner, "invoke", invoke_owned)
 
 
 @pytest.fixture
