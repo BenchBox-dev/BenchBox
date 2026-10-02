@@ -340,18 +340,17 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
 
 # Approved native merge-queue parameters for refs/heads/develop, per
 # _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
-# amendment: ALLGREEN, 60-minute timeout; builds reduced to 2 and merges to 3
-# with the unit-check cutover, because 5 parallel groups saturated the
-# organization runner allowance and were ejected with checks_timed_out). One
-# expected-policy source; protected-setting changes are reported for
-# operator action, never silently repaired.
+# amendment: ALLGREEN, 60-minute timeout; 2026-10-02 amendment: 90-minute timeout
+# to prevent runner-starvation ejections during peak contention; builds reduced to 2
+# and merges to 3 with the unit-check cutover). One expected-policy source;
+# protected-setting changes are reported for operator action, never silently repaired.
 APPROVED_MERGE_QUEUE: dict[str, object] = {
     "merge_method": "SQUASH",
     "grouping_strategy": "ALLGREEN",
     "min_entries_to_merge": 1,
     "max_entries_to_build": 2,
     "max_entries_to_merge": 3,
-    "check_response_timeout_minutes": 60,
+    "check_response_timeout_minutes": 90,
     "min_entries_to_merge_wait_minutes": 0,
 }
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
@@ -362,6 +361,18 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "landing",
     "tooling",
 )
+
+
+def _approved_queue_summary() -> str:
+    return (
+        f"{APPROVED_MERGE_QUEUE['merge_method']}/"
+        f"{APPROVED_MERGE_QUEUE['grouping_strategy']}/"
+        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge']}/"
+        f"{APPROVED_MERGE_QUEUE['max_entries_to_build']}/"
+        f"{APPROVED_MERGE_QUEUE['max_entries_to_merge']}/"
+        f"{APPROVED_MERGE_QUEUE['check_response_timeout_minutes']}m/"
+        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge_wait_minutes']}"
+    )
 
 
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
@@ -376,15 +387,16 @@ def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
     findings: list[str] = []
     rule = _rule_by_type(live, "merge_queue")
     if rule is None:
+        summary = _approved_queue_summary()
         if live.get("rules"):
             return [
                 f"{name}: ruleset payload lists rules but no merge_queue rule; "
-                "queue-aware publication is unverified, verify queue parameters "
-                "(SQUASH/ALLGREEN/1/2/3/60m/0) in repository settings"
+                f"queue-aware publication is unverified, verify queue parameters "
+                f"({summary}) in repository settings"
             ]
         return [
             f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
-            "verify queue parameters (SQUASH/ALLGREEN/1/2/3/60m/0) in repository settings"
+            f"verify queue parameters ({summary}) in repository settings"
         ]
     raw_params = rule.get("parameters")
     if raw_params is None:
