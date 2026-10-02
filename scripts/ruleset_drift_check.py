@@ -340,18 +340,17 @@ def _fetch_environment(repo: str, token: str, name: str = PYPI_ENVIRONMENT) -> d
 
 # Approved native merge-queue parameters for refs/heads/develop, per
 # _project/decisions/native-merge-queue-activation-20260822.md (2026-08-31
-# amendment: ALLGREEN, 60-minute timeout; builds reduced to 2 and merges to 3
-# with the unit-check cutover, because 5 parallel groups saturated the
-# organization runner allowance and were ejected with checks_timed_out). One
-# expected-policy source; protected-setting changes are reported for
-# operator action, never silently repaired.
+# amendment: ALLGREEN, 60-minute timeout; 2026-10-02 amendment: 90-minute timeout
+# to prevent runner-starvation ejections during peak contention; builds reduced to 2
+# and merges to 3 with the unit-check cutover). One expected-policy source;
+# protected-setting changes are reported for operator action, never silently repaired.
 APPROVED_MERGE_QUEUE: dict[str, object] = {
     "merge_method": "SQUASH",
     "grouping_strategy": "ALLGREEN",
     "min_entries_to_merge": 1,
     "max_entries_to_build": 2,
     "max_entries_to_merge": 3,
-    "check_response_timeout_minutes": 60,
+    "check_response_timeout_minutes": 90,
     "min_entries_to_merge_wait_minutes": 0,
 }
 APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (

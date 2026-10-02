@@ -223,7 +223,7 @@ def test_merge_queue_approved_params_pass() -> None:
             "min_entries_to_merge": 1,
             "max_entries_to_build": 2,
             "max_entries_to_merge": 3,
-            "check_response_timeout_minutes": 60,
+            "check_response_timeout_minutes": 90,
             "min_entries_to_merge_wait_minutes": 0,
         }
     )
@@ -260,7 +260,10 @@ def _verified_develop_queue() -> dict:
     live["rules"].append(
         {
             "type": "pull_request",
-            "parameters": {"require_code_owner_review": True},
+            "parameters": {
+                "require_code_owner_review": True,
+                "required_review_thread_resolution": True,
+            },
         }
     )
     live["rules"].append({"type": "merge_queue", "parameters": dict(ruleset_drift_check.APPROVED_MERGE_QUEUE)})
