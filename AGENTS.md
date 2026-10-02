@@ -39,12 +39,16 @@ fix" within a named scope), report the findings first, then fix them in that tur
 Implementation requests authorize only the narrow implementation workflow, not
 unrelated cleanup or external actions.
 
-`[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a named branch, a
-commit, and `make pr-open`; auto-merge stays withheld until `make pr-ready`. These
-are required close-out steps of write authorization, not separate permissions.
-Within an authorized write workflow, do not stop before `make pr-open` unless the
-prompt explicitly forbids publication, authorizes only a local commit, or a gate
-fails (in which case keep the commit and report the blocker).
+`[WRITE-CLOSEOUT-001]` An authorized write workflow closes at a merged pull request:
+a named branch, a commit, `make pr-open`, `make pr-arm`,
+then monitor to merge. Close-out steps are part of write
+authorization, not separate permissions. Never hand a green, reviewed PR back:
+re-enqueue after a spurious ejection, fix and push after a real failure. Stop only for
+an owner-only action (settings, secrets), a denied permission,
+production publish or release, live-cloud spend, a HOLD or unresolved
+Critical/High review, or a real design choice. Do not stop before `make pr-open` unless
+the prompt explicitly forbids publication, authorizes only a local commit, or a gate
+fails (keep the commit and report the blocker).
 
 The active BenchBox bindings are in `docs/agent/review-protocol.md`, which supersedes the legacy `docs/agent/review-protocol-legacy.md` document.
 
@@ -86,7 +90,7 @@ Do not track batch ledgers.
 
 Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional per its rubric. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
-Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Manifest paths need external codex, muse, or agy review with a `Soundness review:` section (reviewer, link, all Critical/High findings resolved); excluded from auto-merge. A drift/pinning guard and required-CI wiring land in the same PR. Required checks are the six unit results from `ci.yml`, each passing when untouched. Stacked/feature-base PRs are unsupported: only `develop`-based PRs enter the queue — rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`).
+Dev PRs target `develop` (or `release` / `published-results`), use squash merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Manifest paths need external codex, muse, or agy review with a `Soundness review:` section (reviewer, link, all Critical/High findings resolved). A drift/pinning guard and required-CI wiring land in the same PR. Required checks are the six unit results from `ci.yml`, each passing when untouched. Stacked/feature-base PRs are unsupported: only `develop`-based PRs enter the queue — rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`).
 
 ## TODO tracker
 

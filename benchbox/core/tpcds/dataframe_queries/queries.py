@@ -4693,6 +4693,10 @@ def q70_expression_impl(ctx: DataFrameContext) -> Any:
     # ROLLUP on (s_state, s_county)
     agg_exprs = [col("ss_net_profit").sum().alias("total_sum")]
     rollup_result = expand_rollup_expression(base, ["s_state", "s_county"], agg_exprs, ctx)
+    # ss_net_profit is a two-decimal DECIMAL in the SQL surface. Round the
+    # float-backed aggregate back to that source scale so subtotal and
+    # grand-total rows keep the same equality and sort position as the SQL.
+    rollup_result = rollup_result.with_columns(col("total_sum").round(2).alias("total_sum"))
 
     # Add lochierarchy
     lochierarchy_expr = lochierarchy_expression("grouping_id", 2, ctx=ctx)

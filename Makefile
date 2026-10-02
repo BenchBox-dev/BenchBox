@@ -36,7 +36,7 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 	correctness-gate-digests-regen cross-surface-baseline-autodetect \
 	oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \
 	joinorder-verify-reference-results complexity-check complexity-report \
-	quality-governance-typecheck uv-lock-revision-check audit-deps audit-raw audit-raw-check \
+	quality-governance-typecheck uv-lock-revision-check sqlglot-repro-retirement-check audit-deps audit-raw audit-raw-check \
 	audit-sha-check lint-explorer-tokens lint-site-theme-tokens lint-explorer-stale-theme \
 	explorer-snapshot-check artifact-hygiene agent-instructions-check agent-identity-check security-audit \
 	agent-commit-range-check skill-integrity-check ci-lint pr-arm-auto-merge shrink-rollup \
@@ -301,6 +301,42 @@ flightdata-cross-surface-equivalence-report:
 datavault-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault
 
+# Enforced gate: NYC Taxi DataFrame surface vs its own SQL surface on a bounded
+# offline synthetic cell (SF=0.01, 12k trips; the builder forces synthesis and
+# fails on any network download). 25 SQL slugs map to DataFrame Q1..Q25;
+# airport-trips is classified legitimately empty (synthetic rate_code_id=1 vs
+# IN (2, 3) filter). Exits non-zero on any unclassified divergence.
+nyctaxi-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark nyctaxi
+
+# Enforced gate: TSBS DevOps DataFrame surface vs its own SQL surface on a
+# bounded offline cell (SF=0.01). 18 SQL slugs map to DataFrame Q1..Q18;
+# three threshold queries are classified legitimately empty (generator caps
+# usage_user at ~55, floors available_percent at ~17). Exits non-zero on any
+# unclassified divergence.
+tsbs-devops-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tsbs_devops
+
+# Enforced gate: TPC-H Skew DataFrame surface vs its own SQL surface on a
+# bounded deterministic cell (SF=0.01, seed 42). 22 SQL ids map to DataFrame
+# Q1..Q22; Q8 is classified legitimately empty (no ECONOMY ANODIZED STEEL
+# rows at any probed scale). Exits non-zero on any unclassified divergence.
+tpch-skew-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch_skew
+
+# Enforced gate: TPC-H DataFrame surface vs its own SQL surface on a bounded
+# cell (SF=0.01, unseeded-vs-unseeded). 22 SQL ids map to DataFrame Q1..Q22
+# with an empty baseline. Exits non-zero on any unclassified divergence.
+tpch-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch
+
+# Staged report (NOT a blocking gate): full-99 TPC-DS SQL<->DataFrame
+# equivalence at SF=0.01 (~13s wall). Only Q38/Q88 currently pass
+# discriminating, so no blocking subset exists yet; this target feeds the
+# weekly scheduled path that tracks DF surface maturation toward one.
+tpcds-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
+
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
 # the blocking gate run never prunes; only writes when the run is otherwise fully
@@ -468,6 +504,12 @@ lint:
 .PHONY: uv-lock-revision-check
 uv-lock-revision-check:
 	uv run -- python _project/scripts/check_uv_lock_revision.py $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
+
+# SQLGlot repro retirement: re-run upstream repros when the locked sqlglot
+# version changed vs base; fails with retirement guidance on newly-passing repros.
+.PHONY: sqlglot-repro-retirement-check
+sqlglot-repro-retirement-check:
+	uv run -- python scripts/check_sqlglot_repro_retirement.py $(if $(BASE_REF),--base-ref "$(BASE_REF)",) --check
 
 # Dependency audit - checks that every declared dep has an import site or is allowlisted.
 # Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
@@ -795,6 +837,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed quality-governance-typecheck"; \
 	$(MAKE) uv-lock-revision-check; \
 	[ $$? -eq 0 ] || failed="$$failed uv-lock-revision"; \
+	$(MAKE) sqlglot-repro-retirement-check; \
+	[ $$? -eq 0 ] || failed="$$failed sqlglot-repro-retirement"; \
 	$(MAKE) lint-markers; \
 	[ $$? -eq 0 ] || failed="$$failed lint-markers"; \
 	$(MAKE) lint-imports; \
@@ -853,6 +897,8 @@ ci-lint:
 	[ $$? -eq 0 ] || failed="$$failed complexity-check"; \
 	$(MAKE) spellcheck; \
 	[ $$? -eq 0 ] || failed="$$failed spellcheck"; \
+	uv run -- python scripts/check_rerun_shard_retention.py; \
+	[ $$? -eq 0 ] || failed="$$failed rerun-shard-retention"; \
 	uv run -- python _project/scripts/check_project_references.py; \
 	[ $$? -eq 0 ] || failed="$$failed project-references"; \
 	if [ -n "$$failed" ]; then \
@@ -1160,9 +1206,9 @@ release-cut: .release-cut-tree-required
 	git rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py
 	@# The v0.4.1 release PR exposed these tests for PR landing, worktree, queue, tracker,
 	@# publication, and submission-workflow tooling; they import or read curated-away paths.
-	git rm -f --ignore-unmatch tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py
+	git rm -f --ignore-unmatch tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py
 	@# Post-curation guard: every curated path must be gone from the index.
-	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
+	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
 		echo "$$LEFTOVER" | sed 's/^/  /' >&2; \
@@ -1279,7 +1325,7 @@ release-check:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-arm pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1649,6 +1695,32 @@ pr-arm-auto-merge:
 	if [ -z "$$EXPECTED_HEAD" ]; then EXPECTED_HEAD=$$(git rev-parse HEAD); fi; \
 	$(MAKE) -s pr-landing-ready REPO="$$REPOSITORY" PR="$$PR_NUMBER" HEAD="$$EXPECTED_HEAD" \
 		EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)" ARM=1
+
+# Arms a PR for its exact head after a live hold check and enqueues it into the merge queue.
+# `make pr-arm` (PR=<n> optional, HEAD=<sha> optional) refuses without merging when a hold label,
+# a requested change, a draft or closed state, or a head other than local HEAD applies.
+# The values reach the helper through the environment, never as words in a shell command, so a value
+# such as `PR='7 --pr 8'` cannot add arguments. `_SET` tells an omitted variable from an empty one and
+# is computed before `override`, which makes a variable look defined. Make expands a recursive
+# command-line value when it exports it, so a `$(shell ...)` typed on the command line runs for every
+# target in this Makefile; that is the invoker's own input and is not something a wrapper can prevent.
+# The target-specific overrides keep PR, HEAD and REPO literal in this target's environment. A global
+# override would also change how every other target's recipe sees them (an unexpanded `$(cmd)` would
+# reach their shell), which test_pr_arm.py pins.
+PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)
+PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)
+PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)
+pr-arm: override PR := $(value PR)
+pr-arm: override HEAD := $(value HEAD)
+pr-arm: override REPO := $(value REPO)
+pr-arm: export PR_ARM_PR := $(PR)
+pr-arm: export PR_ARM_PR_SET := $(PR_ARM_PR_SET)
+pr-arm: export PR_ARM_HEAD := $(HEAD)
+pr-arm: export PR_ARM_HEAD_SET := $(PR_ARM_HEAD_SET)
+pr-arm: export PR_ARM_REPO := $(REPO)
+pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
+pr-arm:
+	@uv run -- python scripts/pr_arm.py
 
 # Declares the branch final and arms auto-merge / queue enrollment.
 #
