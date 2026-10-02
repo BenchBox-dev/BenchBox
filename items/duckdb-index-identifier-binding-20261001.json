@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Test asserts that after the real create_schema + generated index DDL, duckdb_indexes().expressions are bare identifiers ([l_orderkey, l_linenumber]).",
+    "Test asserts a bound-form fact still yields verdict 'mismatch' with the explicit diff text.",
+    "e2e: a custom sort-only DuckDB config (sorting on LINEITEM(L_ORDERKEY,L_LINENUMBER) and ORDERS(O_ORDERDATE,O_ORDERKEY), all constraints disabled) run via `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --tuning <yaml> --phases generate,load,power --queries 1` produces zero 'mismatch' receipt entries.",
+    "docs/development/tuning-introspection-receipts.md DuckDB paragraph corrected."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.1 (CRIT-1a; plan review F5). Repro: duckdb.connect(); CREATE TABLE \"lineitem\" (\"l_orderkey\" INT, \"l_linenumber\" INT); CREATE INDEX i ON LINEITEM (L_ORDERKEY, L_LINENUMBER); SELECT expressions FROM duckdb_indexes() -> ['(LINEITEM.L_ORDERKEY)', '(LINEITEM.L_LINENUMBER)']. Full applied_verified also needs the constraint, partition and sort-evidence items.",
+  "description": "## Problem (reproduced; published)\n`_duckdb_sort_index_sql` (`benchbox/platforms/duckdb.py:147-156`) and the cluster-index builder (`duckdb.py:~1438`) emit `CREATE INDEX … ON LINEITEM (L_ORDERKEY, …)` against tables created as quoted lowercase. DuckDB 1.5.5 then stores `duckdb_indexes().expressions = ['(LINEITEM.L_ORDERKEY)', …]`. A case-exact reference stores `[l_orderkey]`.\n\nThe receipt reports a false `mismatch` for every index on every DuckDB tuned run. A sort-only, constraint-free custom config proved this is the sole blocker. All 5 published DuckDB tuned bundles carry these false mismatches.\n\nThe cited test (`tests/unit/platforms/test_duckdb_introspection.py:209-241`) passes only because it creates an **unquoted uppercase** table that production never creates. The doc claim at `docs/development/tuning-introspection-receipts.md:145-157` is false.\n\n## Change\n- Emit index DDL with the physical identifiers from `tuning-physical-identifier-resolution-20261001`, quoted, e.g. `\"lineitem\" (\"l_orderkey\", …)`.\n- Replace the unquoted fixture with one built by the real `DuckDBAdapter.create_schema`.\n- Make the receipt `diff` text explicit when the catalog shows a bound expression: \"catalog stored a bound expression; identifier case in the DDL differs from the catalog\".\n- Fix the doc paragraph.\n- **DuckLake:** check whether `CREATE INDEX` is supported. If not, record a drop rather than a failure, and detach the DuckDB introspector from DuckLake until it is.\n\n## Guardrails (must preserve)\n- **Do not change `normalize_columns`** (plan review F5). Unwrapping bound forms would relax the match rule, and it cannot be table-scoped there.\n- A bound-form fact must still produce `mismatch`.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/platforms/duckdb.py",
+    "benchbox/platforms/duckdb_introspection.py",
+    "tests/unit/platforms/test_duckdb_introspection.py",
+    "docs/development/tuning-introspection-receipts.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:19:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cf68e4a10ef640d589417193cdb61c2c",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}

@@ -7037,6 +7037,15 @@
       "status": "done",
       "title": "DuckDB from_config drops max_temp_directory_size and progress_bar"
     },
+    "duckdb-index-identifier-binding-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-physical-identifier-resolution-20261001"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Fix DuckDB sort/cluster index DDL identifier binding so indexes corroborate (false 'mismatch' on every run)"
+    },
     "duckdb-merge-token-gate-hardening": {
       "claim": null,
       "needs": [
