@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **TPC-DS queries now use parameters for the data's scale factor.** Standard
+  TPC-DS runs at a scale factor other than 1 used to take their query
+  parameters from scale factor 1. They now use values generated for the scale
+  you run, so up to 12 queries can differ: Q9, Q44, Q46 and Q68 at 0.01 and
+  0.1; ten queries at scale factor 10 (adds Q1, Q16, Q27, Q34, Q36, Q73);
+  and twelve at scale factor 100 and above (adds Q33, Q43).
+  Runs at scale factor 1, and power and throughput runs, are unchanged. Don't
+  compare these queries one-for-one with results recorded before this change
+  at other scale factors.
+
 ## [0.4.1] - 2026-09-24
 
 ### Before you upgrade
