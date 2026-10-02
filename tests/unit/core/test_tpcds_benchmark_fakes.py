@@ -13,9 +13,13 @@ pytestmark = [
 ]
 
 
+RENDERED_SCALE_FACTORS: list[float] = []
+
+
 @pytest.fixture
 def fake_tpcds_components(monkeypatch, tmp_path):
     """Provide lightweight test doubles for TPC-DS dependencies."""
+    RENDERED_SCALE_FACTORS.clear()
 
     class FakeTPCDSDataGenerator:
         def __init__(self, scale_factor, parallel, output_dir, **_):
@@ -44,7 +48,8 @@ def fake_tpcds_components(monkeypatch, tmp_path):
         def __init__(self):
             self.dsqgen = FakeDSQGen()
 
-        def get_all_queries(self, dialect="netezza"):
+        def get_all_queries(self, dialect="netezza", scale_factor=1.0):
+            RENDERED_SCALE_FACTORS.append(scale_factor)
             return {1: "SELECT 1", 2: "SELECT 2"}
 
         def get_query(self, query_id, **_):
@@ -94,3 +99,13 @@ def test_tpcds_benchmark_uses_fakes(fake_tpcds_components):
 
     schema = bench.get_schema()
     assert any(table["name"] == "customer" for table in schema.values())
+
+
+@pytest.mark.parametrize("scale_factor", [0.01, 1.0, 10.0])
+def test_get_queries_renders_at_the_data_scale_factor(fake_tpcds_components, scale_factor):
+    """dsqgen derives some values from the scale, so SQL must be rendered at the data's scale."""
+    bench = TPCDSBenchmark(scale_factor=scale_factor, output_dir=fake_tpcds_components)
+
+    bench.get_queries(dialect="duckdb")
+
+    assert [scale_factor] == RENDERED_SCALE_FACTORS

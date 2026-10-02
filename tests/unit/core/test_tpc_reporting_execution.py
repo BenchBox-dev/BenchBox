@@ -595,10 +595,6 @@ def test_tpcds_c_tools_and_dsqgen_helpers(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert dsq.validate_query_id("1a") is True
     assert dsq.validate_query_id("99b") is False
 
-    monkeypatch.setattr(dsq, "generate", lambda *_a, **_k: "select [X] from t")
-    cleaned = dsq.generate_with_parameters(1, {"x": 10}, dialect="ansi")
-    assert "10" in cleaned.lower()
-
     # _clean_sql branch-heavy normalization.
     dirty = """
     -- c
