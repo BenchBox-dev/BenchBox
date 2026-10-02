@@ -2613,6 +2613,17 @@
       "status": "done",
       "title": "Add ClickHouse dialect overrides for nyctaxi EXTRACT functions"
     },
+    "clickhouse-optimize-post-load-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-post-load-seam-20261001",
+        "tuning-physical-identifier-resolution-20261001",
+        "tuning-sort-realized-by-ddl-no-drop-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Move ClickHouse OPTIMIZE to the post-load seam with the physical (lowercase) table name"
+    },
     "clickhouse-read-primitives-dialect-fixes": {
       "claim": null,
       "needs": [],
