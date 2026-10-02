@@ -6236,17 +6236,12 @@
       "title": "Investigate the TPC-H seeded-run reference-seed path (owner-contested; verify before any change)"
     },
     "dfparity-t22-production-render-scale-decision": {
-      "claim": {
-        "expires_at": "2026-10-03T01:49:58Z",
-        "generation": "15aa2750817a4a4d9312d8678ca96184",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Render production TPC-DS get_queries at the data's scale (owner decision D1)"
     },
     "dfparity-t23-docs": {
