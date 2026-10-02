@@ -3238,6 +3238,16 @@
       "status": "open",
       "title": "Remove comments and docstrings from DuckDB family adapters"
     },
+    "comment-cleanup-enforcement-switch": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-final-enforcement",
+        "comment-cleanup-exception-register"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Switch the comment checker from advisory to blocking enforcement"
+    },
     "comment-cleanup-equivalence": {
       "claim": null,
       "needs": [

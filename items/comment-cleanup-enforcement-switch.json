@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The policy sets enforcement to blocking in a single reviewed change; the base policy at the time of the change is advisory, so the change itself is not blocked.",
+    "Immediately after the change, a probe pull request that adds one explanatory comment fails the comment-policy check, and one that changes no comments passes.",
+    "Strict, report, staged and CI behavior match the documentation under blocking enforcement; the whole-project strict check passes on develop.",
+    "Open pull requests that would now fail are listed and their authors told before the change lands.",
+    "The change passes an independent external soundness review with the receipt linked in the pull request body, and is merged by the repository owner."
+  ],
+  "context": "Created 2026-10-02 from delivery plan v2 (/tmp/benchbox-comment-cleanup-plan-v2.md, step R2), approved by the user. Until this item lands the checker stays advisory (decision D3).",
+  "description": "The last change of the program (R2 in the delivery plan): set `enforcement` to `blocking` in quality/comment-policy.json so the checker, which landed in advisory mode and has only reported violations, starts failing pull requests that add or reword comments and docstrings. It is a one-line policy change that the advisory base does not block; the ratchet in the checker forbids moving back.\n\nDo it only after the final whole-scope scan (comment-cleanup-final-enforcement) shows zero unapproved comments and docstrings, the exception register is merged, and no open pull request is likely to be surprised: list the open PRs that the checker would reject, tell their authors, and land the flip at a quiet time. Confirm that strict mode, report mode, the staged pre-commit hook, `make comment-policy-check` and the CI `comment-policy` job all behave as documented in docs/development/comment-policy.md under blocking enforcement. Make sure the required CI wiring for strict whole-project enforcement is in the same change.\n\nquality/comment-policy.json is a soundness-manifest path: an external review with a `Soundness review:` section and the repository owner's manual merge are required. This item authorizes no deployment, live cloud or stress test, historical-result rewriting or write to another repository.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-02T13:32:34Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7195ea277a624724bdf328bbe0ed3bad",
+      "session_id": "bec2d032574a4742968b229c90460810"
+    }
+  ]
+}
