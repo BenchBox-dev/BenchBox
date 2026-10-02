@@ -9,6 +9,14 @@ default_stages: [pre-commit]
 repos:
   - repo: local
     hooks:
+      - id: comment-policy
+        name: comment and docstring policy
+        entry: uv run -- python scripts/run_comment_policy.py --staged
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+
       - id: corpus-inventory
         name: corpus-inventory drift check
         entry: uv run -- python scripts/generate_corpus_inventory.py --check

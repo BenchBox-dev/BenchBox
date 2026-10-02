@@ -66,6 +66,7 @@ ALWAYS_ON_GUARDS = (
     "audit-deps",
     "spellcheck",
     "agent-commit-range",
+    "comment-policy",
 )
 
 
