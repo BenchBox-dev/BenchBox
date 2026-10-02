@@ -6112,6 +6112,15 @@
       "status": "open",
       "title": "Decide the trigger scope of the cross-platform TPC-DS identity job, including Windows"
     },
+    "dfparity-n10-classify-all-null-empties": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Classify the six all-NULL empty TPC-DS queries so the staged gate is green"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [

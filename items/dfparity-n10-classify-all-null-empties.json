@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The staged TPC-DS gate at SF 0.01 exits 0 with the six classified, each with a rationale",
+    "The PR has a passing Soundness review section",
+    "t19 notes that these entries are interim"
+  ],
+  "description": "Since #2396 stopped counting a scalar aggregate that collapses to one all-NULL row as coverage, the staged TPC-DS gate at SF 0.01 fails closed on Q13, Q23, Q32, Q61, Q90 and Q92, which are not in _TPCDS_LEGITIMATELY_EMPTY. Owner decision (2026-10-02): classify them now with a rationale each. This edits soundness paths, so it needs external review and a maintainer merge. t19 re-baselines the list later with scale-scoped criteria and answer-set evidence, so this is a deliberate interim exception.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:35:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "950c9169ff3b478394e6ce82911e50cc",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
