@@ -20450,6 +20450,24 @@
       "status": "open",
       "title": "Fold skipped layout ops as dropped intents (not failures) and enforce the ledger phase vocabulary"
     },
+    "tuning-liveness-e2e-gates-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-no-midrun-destructive-db-handling-20261001",
+        "tpcds-composite-primary-keys-20261001",
+        "tuning-notuning-db-reuse-gate-20261001",
+        "duckdb-index-identifier-binding-20261001",
+        "tuning-sort-realized-by-ddl-no-drop-20261001",
+        "clickhouse-optimize-post-load-20261001",
+        "clickhouse-pk-prefix-sort-key-20261001",
+        "tuning-duckdb-templates-drop-partitioning-20261001",
+        "tuning-sort-evidence-attested-20261001",
+        "tuning-constraint-corroboration-20261001"
+      ],
+      "priority": "critical",
+      "status": "open",
+      "title": "Positive liveness CI gate: real-CLI tuned runs must reach applied_verified on DuckDB and ClickHouse"
+    },
     "tuning-metadata-drift-gaps-20260801": {
       "claim": null,
       "needs": [],
