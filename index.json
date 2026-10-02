@@ -20650,6 +20650,16 @@
       "status": "open",
       "title": "Render requested layout tuning at execution on redshift (registry preview_only -> rendered)"
     },
+    "tuning-render-layout-synapse-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-capability-single-source-validator-20261001",
+        "tuning-requested-vs-rendered-reconciliation-20261001"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Render requested layout tuning at execution on synapse (registry preview_only -> rendered)"
+    },
     "tuning-render-layout-trino-iceberg-20261001": {
       "claim": null,
       "needs": [
