@@ -6293,6 +6293,16 @@
       "status": "active",
       "title": "Split the remaining parameter adapters into batch todos from the T2 inventory"
     },
+    "dfparity-t05a-adapters-batch-a": {
+      "claim": null,
+      "needs": [
+        "dfparity-t04-adapter-prototype",
+        "dfparity-t02-parameter-inventory-test"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Parameter adapters, batch A: Q1, Q3, Q7, Q8, Q10, Q12, Q13, Q14, Q17"
+    },
     "dfparity-t06-literal-fallback-lint": {
       "claim": null,
       "needs": [
