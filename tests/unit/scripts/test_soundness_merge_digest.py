@@ -363,7 +363,8 @@ SECOND_RUN = "2026-10-02T10:20:00Z"
 def runs_response(*runs):
     entries = []
     for event, at, *numbers in runs:
-        entries.append({"event": event, "created_at": at, "pull_requests": [{"number": n} for n in (numbers or [7])]})
+        entry = {"event": event, "created_at": at, "pull_requests": [{"number": n} for n in (numbers or [7])]}
+        entries.append(entry)
     return {"workflow_runs": entries}
 
 
@@ -389,7 +390,34 @@ def commit_list(monkeypatch, commits, *, fetch_head=HEAD, runs=()):
 
 
 def pull_of(head, commits):
-    return {"commits": commits, "head": {"sha": head}, "merged_at": MERGED_AT}
+    return {
+        "commits": commits,
+        "head": {"sha": head, "ref": "feature"},
+        "merged_at": MERGED_AT,
+        "created_at": "2026-10-02T08:00:00Z",
+    }
+
+
+def run_record(**overrides):
+    record = {"event": "pull_request", "created_at": PUSHED, "pull_requests": [], "head_branch": "feature"}
+    record.update(overrides)
+    return record
+
+
+@pytest.mark.parametrize(
+    ("override", "expected"),
+    [
+        ({"pull_requests": [{"number": 7}]}, True),
+        ({"pull_requests": [{"number": 3}]}, False),
+        ({"pull_requests": [], "head_branch": "feature"}, True),
+        ({"pull_requests": [], "head_branch": "elsewhere"}, False),
+        ({"pull_requests": [{"number": 7}], "created_at": "2026-10-01T00:00:00Z"}, False),
+        ({"event": "push", "pull_requests": [{"number": 7}]}, False),
+        ({"event": "pull_request_target"}, True),
+    ],
+)
+def test_a_run_counts_only_when_this_pull_request_started_it(override, expected):
+    assert digest.belongs_to_pull(run_record(**override), 7, pull_of(HEAD, 1)) is expected
 
 
 def test_commits_are_read_with_refresh_merges_marked(monkeypatch):

@@ -344,14 +344,20 @@ def merged_pull_number(repo: str, sha: str) -> int | None:
     return int(candidates[0]["number"]) if candidates else None
 
 
-def server_arrival(repo: str, sha: str, number: int) -> str | None:
+def belongs_to_pull(run_: dict[str, Any], number: int, pull: dict[str, Any]) -> bool:
+    """Return whether a workflow run was started by this pull request after it was opened."""
+    if run_.get("event") not in PULL_EVENTS or run_["created_at"] < pull["created_at"]:
+        return False
+    listed = run_.get("pull_requests") or []
+    if listed:
+        return any(p.get("number") == number for p in listed)
+    return run_.get("head_branch") == pull["head"]["ref"]
+
+
+def server_arrival(repo: str, sha: str, number: int, pull: dict[str, Any]) -> str | None:
     """Return when GitHub first ran this pull request's workflows for the commit, or None."""
     runs = gh_json("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
-    times = [
-        run_["created_at"]
-        for run_ in runs
-        if run_.get("event") in PULL_EVENTS and any(p.get("number") == number for p in run_.get("pull_requests") or [])
-    ]
+    times = [run_["created_at"] for run_ in runs if belongs_to_pull(run_, number, pull)]
     return min(times) if times else None
 
 
@@ -381,7 +387,7 @@ def collect_commits(
     if content:
         index = content[-1]
         arrival = next(
-            (t for c in built[index:] if (t := server_arrival(repo, c.sha, number))),
+            (t for c in built[index:] if (t := server_arrival(repo, c.sha, number, pull))),
             pull["merged_at"],
         )
         built[index] = replace(built[index], arrived_at=arrival)
