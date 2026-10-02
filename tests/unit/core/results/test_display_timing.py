@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from threading import Barrier, Thread
+from types import SimpleNamespace
 
 import pytest
 
+from benchbox.core.results import timing as timing_module
 from benchbox.core.results.display import (
     display_benchmark_list,
     display_configuration_summary,
@@ -24,6 +27,10 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _real_time_with(**overrides):
+    return SimpleNamespace(**{**vars(time), **overrides})
 
 
 def test_display_results_success_and_failure(capsys):
@@ -130,7 +137,7 @@ def test_query_timing_and_collector(monkeypatch):
     assert qt.bytes_per_second == 10.0
 
     sequence = iter([100.0, 101.0, 200.0, 202.0, 300.0, 301.0])
-    monkeypatch.setattr("benchbox.core.results.timing.time.perf_counter", lambda: next(sequence))
+    monkeypatch.setattr(timing_module, "time", _real_time_with(perf_counter=lambda: next(sequence)))
 
     collector = TimingCollector(enable_detailed_timing=True)
     with collector.time_query("Q2", "query-2"):
@@ -142,7 +149,8 @@ def test_query_timing_and_collector(monkeypatch):
     completed = collector.get_completed_timings()
     assert len(completed) == 1
     assert completed[0].query_id == "Q2"
-    assert completed[0].parse_time is not None
+    assert completed[0].execution_time == pytest.approx(202.0 - 100.0)
+    assert completed[0].parse_time == pytest.approx(200.0 - 101.0)
     assert completed[0].rows_returned == 42
 
     # detailed timing disabled/missing query paths

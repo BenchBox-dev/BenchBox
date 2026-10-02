@@ -222,7 +222,25 @@ jobs:
       - name: Collect changed paths
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/changed-paths.txt"
+        run: |
+          set -euo pipefail
+          # GitHub builds the merge ref of a pull request on the current target
+          # tip, while the event carries an older base. Diff against the merge
+          # commit's first parent so that files the target changed after the
+          # event are not charged to the pull request. The event base stays the
+          # trust root for the soundness files and must be an ancestor.
+          compare_base="$BASE_SHA"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            read -r -a commit_line <<< "$(git rev-list --parents -n 1 HEAD)"
+            if [ "${#commit_line[@]}" -eq 3 ]; then
+              if ! git merge-base --is-ancestor "$BASE_SHA" "${commit_line[1]}"; then
+                echo "soundness-flag: the event base is not an ancestor of the merge target; failing closed" >&2
+                exit 1
+              fi
+              compare_base="${commit_line[1]}"
+            fi
+          fi
+          git diff --name-only --no-renames "${compare_base}...HEAD" > "$RUNNER_TEMP/changed-paths.txt"
 
       - name: soundness-flag
         env:
