@@ -2473,6 +2473,13 @@
       "status": "done",
       "title": "✅ CLI Platform Adapter Management Feature"
     },
+    "cli-platform-mode-availability-check-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix --platform <name>:<mode> availability check (clickhouse:local reported as missing dependencies)"
+    },
     "cli-test-coverage-enhancement-to-80": {
       "claim": null,
       "needs": [],
