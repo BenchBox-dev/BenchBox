@@ -3964,6 +3964,15 @@
       "status": "open",
       "title": "Remove explanatory comments and docstrings from UAT harness code"
     },
+    "comment-cleanup-unit-tests-cli-scripts-rest": {
+      "claim": null,
+      "needs": [
+        "comment-cleanup-pilot-budget"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Remove comments from cross-module unit tests: CLI, MCP, scripts, workflows and the rest"
+    },
     "comment-cleanup-unit-tests-core": {
       "claim": null,
       "needs": [
