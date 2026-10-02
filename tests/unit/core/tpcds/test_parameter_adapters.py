@@ -118,13 +118,23 @@ def test_binding_follows_the_seed_and_the_scale(dsqgen):
     assert len(stores) == 3
 
 
+def _bound_keys(seen, binding):
+    """The parameters an execution saw, restricted to the keys the binding sets (the rest are defaults)."""
+    return {key: seen[key] for key in binding.parameters}
+
+
 class TestGateBuilderWiring:
+    """The binding travels with the query returned for execution, not with process-wide state."""
+
     @pytest.fixture
-    def builder(self, monkeypatch, tmp_path):
+    def gate(self, monkeypatch, tmp_path):
+        import dataclasses
+
         import benchbox.core.equivalence.builders.base as base
         import benchbox.tpcds as tpcds_module
         from benchbox.core.equivalence.builders.tpcds import build_tpcds_duckdb
-        from benchbox.core.tpcds.dataframe_queries import parameters
+        from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES, get_tpcds_query
+        from benchbox.core.tpcds.dataframe_queries.parameters import get_parameters
 
         class FakeBenchmark:
             def __init__(self, scale_factor, output_dir, **_):
@@ -136,27 +146,66 @@ class TestGateBuilderWiring:
             def get_queries(self, dialect=None, **_):
                 return {str(query_id): "select 1" for query_id in (39, 41, 44)}
 
+        def recording(query_id):
+            """An implementation that returns the parameters it sees, as a real one would read them."""
+
+            def run(ctx):
+                if ctx == "boom":
+                    raise RuntimeError("boom")
+                return dict(get_parameters(query_id).params)
+
+            return run
+
+        registry = {
+            query_id: dataclasses.replace(
+                get_tpcds_query(f"Q{query_id}"), pandas_impl=recording(query_id), expression_impl=recording(query_id)
+            )
+            for query_id in (39, 41, 44)
+        }
+        monkeypatch.setattr(TPCDS_DATAFRAME_QUERIES, "get_or_raise", lambda name: registry[int(name[1:])])
         monkeypatch.setattr(tpcds_module, "TPCDS", FakeBenchmark)
         monkeypatch.setattr(base, "_load_duckdb_cell", lambda *args, **kwargs: object())
-        yield build_tpcds_duckdb(0.01, tmp_path)
-        parameters.set_parameter_overrides(None)
+        data = build_tpcds_duckdb(0.01, tmp_path)
+        return SimpleNamespace(data=data, registry=registry, get_parameters=get_parameters)
 
-    def test_an_adapted_query_runs_on_the_values_dsqgen_put_in_the_sql(self, builder, dsqgen):
-        from benchbox.core.tpcds.dataframe_queries.parameters import get_parameters
+    def test_the_binding_applies_only_while_the_query_runs(self, gate, dsqgen):
+        from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
 
-        builder.dataframe_query("39")
+        query = gate.data.dataframe_query("39")
+        binding = gate.data.dataframe_query.bindings[39]
 
-        binding = builder.dataframe_query.bindings[39]
-        assert get_parameters(39).get("months") == binding.parameters["months"]
-        assert get_parameters(39).get("year") == binding.parameters["year"]
+        assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]  # looking the query up changes nothing
+        for implementation in (query.pandas_impl, query.expression_impl):
+            assert _bound_keys(implementation(None), binding) == dict(binding.parameters)
+        assert gate.get_parameters(39).params == TPCDS_DEFAULT_PARAMS[39]  # and nothing stays installed
         assert (binding.scale_factor, binding.seed, binding.stream_id) == (0.01, None, 0)
         assert re.fullmatch(r"[0-9a-f]{64}", binding.dsqgen_sha256)
 
-    def test_overrides_do_not_leak_from_one_query_to_the_next(self, builder, dsqgen):
-        from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS, get_parameters
+    def test_other_lookups_between_lookup_and_execution_do_not_lose_the_binding(self, gate, dsqgen):
+        q39 = gate.data.dataframe_query("39")
+        gate.data.dataframe_query("41")
+        q44 = gate.data.dataframe_query("44")
 
-        builder.dataframe_query("44")
-        builder.dataframe_query("41")  # no adapter: the defaults apply again
+        for query, number in ((q44, 44), (q39, 39)):
+            binding = gate.data.dataframe_query.bindings[number]
+            assert _bound_keys(query.pandas_impl(None), binding) == dict(binding.parameters)
 
-        assert get_parameters(44).get("store_sk") == TPCDS_DEFAULT_PARAMS[44]["store_sk"]
-        assert 41 not in builder.dataframe_query.bindings
+    def test_the_binding_is_removed_even_when_the_query_fails(self, gate, dsqgen):
+        from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
+
+        query = gate.data.dataframe_query("44")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            query.pandas_impl("boom")
+
+        assert gate.get_parameters(44).params == TPCDS_DEFAULT_PARAMS[44]
+
+    def test_the_shared_registry_object_is_not_modified_and_unadapted_queries_are_returned_as_is(self, gate, dsqgen):
+        original = gate.registry[39].pandas_impl
+
+        adapted = gate.data.dataframe_query("39")
+
+        assert adapted is not gate.registry[39]
+        assert gate.registry[39].pandas_impl is original
+        assert gate.data.dataframe_query("41") is gate.registry[41]
+        assert 41 not in gate.data.dataframe_query.bindings
