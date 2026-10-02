@@ -41,6 +41,14 @@ def _run(adapter, name: str = "tpch"):
     )
 
 
+@pytest.fixture(autouse=True)
+def _polars_environment(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Own thread settings written by tuned adapters in these export tests."""
+    from tests.utilities.session_isolation import own_environment
+
+    own_environment(monkeypatch, ["POLARS_MAX_THREADS"])
+
+
 def _tuned_polars() -> PolarsDataFrameAdapter:
     cfg = DataFrameTuningConfiguration()
     cfg.parallelism.thread_count = 4

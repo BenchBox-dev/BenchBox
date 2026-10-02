@@ -21,7 +21,8 @@ def test_fixture_restores_real_snowflake_cli_options_on_teardown() -> None:
     # Start with the real descriptor, rather than proving only stub-to-stub restoration.
     with patch.object(SnowflakeAdapter, "add_cli_arguments", staticmethod(real)):
         original = SnowflakeAdapter.__dict__["add_cli_arguments"]
-        generator = body()
+        # The fixture only orders itself after the state baseline; it does not read it.
+        generator = body(None)
         next(generator)
         try:
             assert SnowflakeAdapter.__dict__["add_cli_arguments"] is not original

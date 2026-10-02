@@ -67,6 +67,7 @@ keep this map in sync when adding or auditing deps.
 | Package | Top-level import(s) |
 | --- | --- |
 | `pyyaml` | `yaml` |
+| `markdown-it-py` | `markdown_it` |
 | `psycopg2-binary` | `psycopg2` |
 | `pillow` | `PIL` |
 | `beautifulsoup4` *(not declared)* | `bs4` |

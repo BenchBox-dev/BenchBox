@@ -7,7 +7,7 @@ import importlib
 import pytest
 from click.testing import CliRunner
 
-from benchbox.utils.printing import set_quiet
+import benchbox.utils.printing as printing
 
 pytestmark = [
     pytest.mark.unit,
@@ -19,11 +19,9 @@ visualize_module = importlib.import_module("benchbox.cli.commands.visualize")
 
 
 @pytest.fixture(autouse=True)
-def _ensure_quiet_off():
-    """Ensure quiet mode is off so console.print() output reaches CliRunner."""
-    set_quiet(False)
-    yield
-    set_quiet(False)
+def _ensure_quiet_off(_hermetic_state, monkeypatch):
+    """Inject visible output and restore the caller's actual quiet state."""
+    monkeypatch.setattr(printing, "_QUIET", False)
 
 
 # Helper to generate valid result JSON
