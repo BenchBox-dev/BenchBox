@@ -1722,8 +1722,9 @@ pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
 	@uv run -- python scripts/pr_arm.py
 
-# Evidence-gated arm path, kept for callers that already hold a readiness
-# evidence file; `make pr-arm` is the default and needs none.
+# Arms an open PR for an exact HEAD. Without EVIDENCE or BATCH this is
+# `make pr-arm` for the PR; with either one it runs the readiness evidence
+# transaction (`pr-arm-auto-merge`), which also validates a registered batch.
 #
 # Auto-merge is not armed when `pr-open` creates a PR, because arming at creation is only
 # correct if nothing more will be pushed - and the usual reason something more
@@ -1736,8 +1737,15 @@ pr-arm:
 pr-ready:
 	@[ -n "$(PR)" ] || [ -n "$(URL)" ] || { echo "PR or URL is required" >&2; exit 2; }
 	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }
-	@[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required" >&2; exit 2; }
-	@$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)" HEAD="$(HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"
+	@if [ -n "$(EVIDENCE)$(BATCH)" ]; then \
+		$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)" HEAD="$(HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
+	elif [ -n "$(URL)" ]; then \
+		[ -z "$(PR)" ] || { echo "PR and URL are mutually exclusive" >&2; exit 2; }; \
+		PR_NUMBER=$$(gh pr view --repo "$(or $(REPO),BenchBox-dev/BenchBox)" "$(URL)" --json number --jq '.number') || { echo "Could not resolve URL to a PR in $(or $(REPO),BenchBox-dev/BenchBox)" >&2; exit 1; }; \
+		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$(or $(REPO),BenchBox-dev/BenchBox)" HEAD="$(HEAD)"; \
+	else \
+		$(MAKE) -s pr-arm PR="$(PR)" REPO="$(or $(REPO),BenchBox-dev/BenchBox)" HEAD="$(HEAD)"; \
+	fi
 
 shrink-rollup:
 	@git fetch origin develop --quiet

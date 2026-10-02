@@ -122,7 +122,7 @@ help:
 	@echo "  make pr-preflight    Run classifier-selected product/skill integrity checks (coverage remains CI-only)"
 	@echo "  make pr-open [PR_BODY_FILE=path] [READY=1]  Push branch + open PR vs develop (READY=1 also arms it with pr-arm)"
 	@echo "  make pr-arm [PR=n] [HEAD=sha]  Enqueue the open PR for its exact head after a live hold check; the queue merges it"
-	@echo "  make pr-ready        Evidence-gated arm path (needs EVIDENCE); pr-arm needs none"
+	@echo "  make pr-ready PR=n|URL=u HEAD=sha  Arm an open PR for an exact head (pr-arm; EVIDENCE or BATCH runs the readiness evidence transaction)"
 	@echo "  make pr-fanout       Run pr-open across worktrees with bounded parallelism (PR_FANOUT_JOBS=$(PR_FANOUT_JOBS))"
 	@echo "  make shrink-rollup   Sum merged shrink ledger fragments from origin/develop"
 	@echo "  make pr-refresh      Merge origin/develop into current branch and re-run pr-open (arm afterwards with pr-arm)"

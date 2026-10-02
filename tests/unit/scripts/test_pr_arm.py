@@ -352,6 +352,77 @@ def test_the_make_wrapper_tells_an_omitted_variable_from_an_empty_one(tmp_path: 
     assert empty[f"PR_ARM_{name}"] == ""
 
 
+def _make_pr_ready(
+    tmp_path: Path, *assignments: str
+) -> tuple[subprocess.CompletedProcess[str], list[str], dict[str, str]]:
+    """Run the real `make pr-ready` with recording `uv` and `gh` shims (`gh pr view` prints PR number 7)."""
+    for name, body in (
+        ("uv", '#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD/argv"\nenv | grep "^PR_ARM_" | sort > "$RECORD/env"\n'),
+        ("gh", "#!/bin/sh\necho 7\n"),
+    ):
+        shim = tmp_path / name
+        shim.write_text(body)
+        shim.chmod(0o755)
+    env = {k: v for k, v in os.environ.items() if k not in {"PR", "HEAD", "REPO"} and not k.startswith("PR_ARM_")}
+    env.update({"PATH": f"{tmp_path}{os.pathsep}{env['PATH']}", "RECORD": str(tmp_path)})
+    result = subprocess.run(
+        ["make", "--no-print-directory", "pr-ready", *assignments],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        timeout=60,
+        check=False,
+    )
+    argv_file, env_file = tmp_path / "argv", tmp_path / "env"
+    argv = argv_file.read_text().splitlines() if argv_file.exists() else []
+    pairs = [line.split("=", 1) for line in env_file.read_text().splitlines()] if env_file.exists() else []
+    return result, argv, dict(pairs)
+
+
+def test_pr_ready_without_evidence_arms_through_pr_arm(tmp_path: Path) -> None:
+    result, argv, env = _make_pr_ready(tmp_path, "PR=7", f"HEAD={HEAD}")
+    assert result.returncode == 0, result.stderr
+    assert argv == ["run", "--", "python", "scripts/pr_arm.py"]
+    assert (env["PR_ARM_PR"], env["PR_ARM_HEAD"]) == ("7", HEAD)
+    assert env["PR_ARM_REPO"] == "BenchBox-dev/BenchBox"
+
+
+def test_pr_ready_resolves_a_url_to_the_pr_number_before_pr_arm(tmp_path: Path) -> None:
+    result, argv, env = _make_pr_ready(tmp_path, "URL=https://github.com/BenchBox-dev/BenchBox/pull/7", f"HEAD={HEAD}")
+    assert result.returncode == 0, result.stderr
+    assert argv == ["run", "--", "python", "scripts/pr_arm.py"]
+    assert env["PR_ARM_PR"] == "7"
+
+
+def test_pr_ready_hands_a_value_to_pr_arm_untouched(tmp_path: Path) -> None:
+    result, _, env = _make_pr_ready(tmp_path, "PR=7 --pr 8", f"HEAD={HEAD}")
+    assert result.returncode == 0, result.stderr
+    assert env["PR_ARM_PR"] == "7 --pr 8"
+
+
+@pytest.mark.parametrize("evidence", [("EVIDENCE=evidence.json",), ("EVIDENCE=evidence.json", "BATCH=1")])
+def test_pr_ready_with_evidence_keeps_the_readiness_transaction(tmp_path: Path, evidence: tuple[str, ...]) -> None:
+    result, argv, env = _make_pr_ready(tmp_path, "PR=7", f"HEAD={HEAD}", *evidence)
+    assert result.returncode == 0, result.stderr
+    assert "scripts/pr_landing.py" in argv and "scripts/pr_arm.py" not in argv
+    assert env == {}
+
+
+def test_pr_ready_with_batch_but_no_evidence_refuses_instead_of_arming(tmp_path: Path) -> None:
+    result, argv, env = _make_pr_ready(tmp_path, "PR=7", f"HEAD={HEAD}", "BATCH=1")
+    assert result.returncode != 0
+    assert "EVIDENCE is required" in result.stderr
+    assert argv == [] and env == {}
+
+
+def test_pr_ready_still_requires_a_pr_and_a_head(tmp_path: Path) -> None:
+    missing_pr, _, _ = _make_pr_ready(tmp_path, f"HEAD={HEAD}")
+    missing_head, _, _ = _make_pr_ready(tmp_path, "PR=7")
+    assert missing_pr.returncode == 2 and "PR or URL is required" in missing_pr.stderr
+    assert missing_head.returncode == 2 and "HEAD is required" in missing_head.stderr
+
+
 def test_main_passes_the_raw_environment_values_to_arm(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[tuple] = []
     monkeypatch.setattr(pr_arm, "arm", lambda pr, head, repo: seen.append((pr, head, repo)) or 0)
