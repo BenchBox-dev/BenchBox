@@ -1493,9 +1493,12 @@ jobs:
   dist-artifact:
     name: dist-artifact
     needs: ci-paths
+    permissions:
+      contents: read
+      actions: read
     # Merge-group only: builds the exact wheel+sdist the release workflow
     # publishes (docs/operations/release-artifacts.md). Runs on every merge
-    # group so the tag commit always has a dist-<sha> artifact; never gated
+    # group so the tag commit has an attempt-bound artifact; never gated
     # on packaging paths because release needs it for every merge.
     if: ${{ github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
@@ -1530,14 +1533,20 @@ jobs:
           (cd dist && sha256sum -- *.whl *.tar.gz > SHA256SUMS)
           cat dist/SHA256SUMS
 
+      - name: Bind distributions to the producer attempt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -I -S scripts/release_artifact_consumer.py producer --dist dist
+
       - name: Upload dist artifact
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: dist-${{ github.sha }}
+          name: dist-${{ github.sha }}-attempt-${{ github.run_attempt }}
           path: |
             dist/*.whl
             dist/*.tar.gz
             dist/SHA256SUMS
+            dist/producer-receipt.json
           if-no-files-found: error
           retention-days: 90
 
