@@ -165,8 +165,12 @@ def _run_session_probe(
         BENCHBOX_TEST_LOCK_WAIT_SECONDS="0",
         **(extra_env or {}),
     )
-    env.pop("BENCHBOX_TEST_SESSION_OWNER", None)
-    env.pop("BENCHBOX_SKIP_TEST_LOCK", None)
+    for inherited in (
+        "BENCHBOX_TEST_SESSION_OWNER",
+        "BENCHBOX_SKIP_TEST_LOCK",
+        *[k for k in env if k.startswith("PYTEST_XDIST_")],
+    ):
+        env.pop(inherited, None)  # the probe is a fresh controller, not a worker of this run
     env.update(extra_env or {})
     try:
         return subprocess.run(
@@ -242,3 +246,41 @@ def test_a_run_that_deselects_live_tests_is_isolated(tmp_path: Path) -> None:
     result = _run_session_probe(tmp_path, LIVE_PROBE, "-n", "0", "-m", "not live_integration")
     assert result.returncode == 0, result.stdout + result.stderr
     assert "1 passed" in result.stdout
+
+
+class _EarlyConfig:
+    def __init__(self) -> None:
+        self.cleanups: list[object] = []
+
+    def add_cleanup(self, func: object) -> None:
+        self.cleanups.append(func)
+
+
+@pytest.mark.parametrize(
+    ("worker", "args", "expected_lock"),
+    [
+        (None, ["-n", "2"], True),
+        (None, ["-n", "0"], False),
+        ("gw0", ["-n", "2"], False),
+    ],
+    ids=["parallel-controller", "serial", "xdist-worker"],
+)
+def test_only_a_parallel_controller_takes_the_lock(
+    monkeypatch: pytest.MonkeyPatch, worker: str | None, args: list[str], expected_lock: bool
+) -> None:
+    """A worker is covered by its controller's lock; on Windows it cannot verify that hold, so it must not try."""
+    import _benchbox_pytest_xdist_safety as plugin
+
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        plugin.session_isolation, "start", lambda acquire_lock=True: calls.append(acquire_lock) or False
+    )
+    monkeypatch.delenv("BENCHBOX_SKIP_TEST_LOCK", raising=False)
+    if worker is None:
+        monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
+    else:
+        monkeypatch.setenv("PYTEST_XDIST_WORKER", worker)
+    hook = plugin.pytest_load_initial_conftests(_EarlyConfig(), None, list(args))
+    next(hook)
+    hook.close()
+    assert calls == [expected_lock]

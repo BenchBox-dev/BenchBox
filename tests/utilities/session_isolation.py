@@ -87,7 +87,9 @@ def start(acquire_lock: bool = True) -> bool:
         fd = wait_for_lock(lock_path, wait)
         write_holder(fd, lock_path, phase="pytest-session", gate="hermetic")
     try:
-        home = tempfile.TemporaryDirectory(prefix="benchbox-pytest-home-", dir=os.environ.get("JCODE_SCRATCH_DIR"))
+        home = tempfile.TemporaryDirectory(
+            prefix="benchbox-pytest-home-", dir=os.environ.get("JCODE_SCRATCH_DIR"), ignore_cleanup_errors=True
+        )
     except BaseException:
         if fd is not None:
             _close_lock(fd)

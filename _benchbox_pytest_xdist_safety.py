@@ -99,8 +99,13 @@ def _last_option_value(args: list[str], long_name: str, short_name: str) -> str 
 
 
 def _wants_parallel_lock(args: list[str]) -> bool:
-    """Whether this run competes for the shared lock: parallel workers and no explicit bypass."""
-    if os.environ.get("BENCHBOX_SKIP_TEST_LOCK"):
+    """Whether this process competes for the shared lock: a parallel controller and no explicit bypass.
+
+    An xdist worker never does: its controller holds the lock for it. xdist sets this variable before it
+    prepares the worker's configuration, which loads this plugin. A worker cannot verify the controller's
+    hold on Windows, where the locked lock file is unreadable, so trying to would time out.
+    """
+    if os.environ.get("BENCHBOX_SKIP_TEST_LOCK") or os.environ.get("PYTEST_XDIST_WORKER"):
         return False
     value = _last_option_value(args, "--numprocesses", "-n")
     if value is None:
