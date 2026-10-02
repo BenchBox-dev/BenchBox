@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "enforcement": "advisory",
+  "external": [
+    {
+      "path": "_sources/tpc-h/dbgen/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_sources/tpc-ds/tools/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_sources/tpc-ds/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_sources/tpc-ds/query_variants/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "benchbox/_binaries/tpc-ds/templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "benchbox/_binaries/tpc-h/templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": ".claude/skills/",
+      "owner": "skill-sync catalog",
+      "provenance": "skill-sync.conf"
+    },
+    {
+      "path": "tools/skill-sync",
+      "owner": "skill-sync",
+      "provenance": "skill-sync.conf"
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-arm64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/darwin-x86_64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-arm64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/linux-x86_64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-arm64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_binaries/tpc-ds/windows-x86_64/query_templates/",
+      "owner": "TPC",
+      "provenance": "_sources/README.md"
+    },
+    {
+      "path": "_project/scripts/vendor/todo_db-0.8.1-py3-none-any.whl",
+      "owner": "todo-db",
+      "provenance": "_project/scripts/pyproject.toml"
+    }
+  ],
+  "completed": [
+    "scripts/check_comment_policy.py",
+    "scripts/comment_syntax.py",
+    "scripts/comment_syntax_js.cjs",
+    "scripts/run_comment_policy.py",
+    "tests/unit/scripts/test_comment_policy.py",
+    "scripts/comment_payloads.py",
+    "tests/unit/scripts/test_comment_syntax_js.cjs",
+    "quality/comment-policy-requirements.txt",
+    "scripts/comment_execution.py",
+    "scripts/comment_policy_entry.py"
+  ],
+  "exceptions": [
+    {
+      "path": "tests/unit/scripts/test_ci_lint_environment_boundary.py",
+      "symbol": "TestGateFailsClosed.test_ci_lint_environment_boundary_runs_the_guard_when_the_gate_is_broken",
+      "text": "unresolved executable source: f'{broken} echo RAN; else echo SKIPPED; fi'",
+      "payload": "sha256:d9de6a27a46433d6062e9d8855e24de88d975bb64e9e6fdcceb7a53842c74b60",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_ci_lint_environment_boundary.py",
+      "necessity": "The test executes conditions extracted from the checked Makefile against a deliberately broken gate to prove the guard still runs. Its executable argument is derived test input, bound to the complete consumer AST digest.",
+      "alternative": "Replacing execution with a text assertion would miss a condition that silently skips the guard. Literal duplication would stop testing the actual recipe.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the Make recipe extraction can be reconstructed by the executable-payload adapter without granting arbitrary input."
+    }
+  ]
+}
