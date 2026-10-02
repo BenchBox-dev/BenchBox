@@ -25,9 +25,12 @@ assignments. A help string or protocol record needs an actual reader.
   changed Python file it compares the syntax trees after leading docstrings are
   removed, so any other change is drift. A body left empty by a removed docstring
   may become `pass`. Comments or docstrings that the base did not have also
-  count as drift, so a removal cannot pay for an addition. Added or deleted
-  files, unparseable source, a changed shebang or encoding declaration, and
-  files in a language it cannot compare fail unless `--unverified-ok <suffix>`
+  count as drift, so a removal cannot pay for an addition. A retained comment
+  must keep its place: it is matched by its text, whether it trails code, and
+  the code tokens around it, so moving it to another statement is drift (moving
+  it across blank lines only is not). Added or deleted files, a changed file
+  mode or type, unparseable source, a changed shebang or encoding declaration,
+  and files in a language it cannot compare fail unless `--unverified-ok <suffix>`
   names that suffix. A directive such as `# noqa` is not syntax-tree content, so
   removing one counts as a removed comment here; the checker's comparison of
   registered directives protects those. It is an evidence tool, not a CI gate,

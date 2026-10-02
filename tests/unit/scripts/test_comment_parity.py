@@ -102,6 +102,30 @@ def test_a_removal_cannot_pay_for_an_addition_in_the_same_file() -> None:
     assert report.status == "drift" and report.comments_removed == 1
 
 
+@pytest.mark.parametrize(
+    "base,head",
+    [
+        ("# a\nx = 1\ny = 2\n", "x = 1\n# a\ny = 2\n"),
+        ("x = 1  # a\ny = 2\n", "x = 1\ny = 2  # a\n"),
+        ("x = 1  # a\ny = 2\n", "# a\nx = 1\ny = 2\n"),
+        (
+            "def f():\n    return 1\n\n\n# a\ndef g():\n    return 2\n",
+            "def f():\n    return 1\n\n\ndef g():\n    # a\n    return 2\n",
+        ),
+    ],
+)
+def test_a_comment_moved_to_another_position_is_drift(base: str, head: str) -> None:
+    report = compare(base, head)
+    assert report.status == "drift"
+    assert any("at that position" in problem for problem in report.problems)
+
+
+def test_a_retained_comment_stays_bound_when_neighbouring_text_is_removed() -> None:
+    base = '"""m"""\n# keep\n\n\ndef f():\n    """d"""  # drop\n\n\n# keep too\nx = 1  # drop\n'
+    report = compare(base, "# keep\n\n\ndef f():\n    pass\n\n\n# keep too\nx = 1\n")
+    assert report.status == "ok" and report.comments_removed == 2
+
+
 @pytest.mark.parametrize("source", ["def broken(:\n", "x = (\n", "\tx = 1\n  y = 2\n"])
 def test_unparseable_source_is_an_error_not_a_pass(source: str) -> None:
     assert compare("x = 1\n", source).status == "error"
@@ -198,6 +222,29 @@ def test_cli_rejects_added_and_deleted_files_and_unverified_languages(
     assert parity.main(["--root", str(repo), "--base", base]) == 1
     assert parity.main(["--root", str(repo), "--base", base, "--unverified-ok", "md"]) == 0
     assert "1 skipped" in capsys.readouterr().out
+
+
+def test_cli_rejects_a_file_mode_change_in_the_worktree_and_in_a_commit(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = git(repo, "rev-parse", "HEAD")
+    (repo / "pkg/b.py").chmod(0o755)
+    (repo / "notes.md").chmod(0o755)
+    assert parity.main(["--root", str(repo), "--base", base, "--unverified-ok", "md"]) == 1
+    out = capsys.readouterr().out
+    assert "pkg/b.py: drift: file mode or type changed from 100644 to 100755" in out
+    assert "notes.md: drift: file mode or type changed" in out
+    git(repo, "-c", "core.fileMode=true", "commit", "-aqm", "mode")
+    assert parity.main(["--root", str(repo), "--base", base, "--head", "HEAD", "--path", "pkg/b.py"]) == 1
+    assert "100644 to 100755" in capsys.readouterr().out
+
+
+def test_cli_rejects_a_file_replaced_by_a_symbolic_link(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    base = git(repo, "rev-parse", "HEAD")
+    (repo / "pkg/b.py").unlink()
+    (repo / "pkg/b.py").symlink_to("a.py")
+    assert parity.main(["--root", str(repo), "--base", base, "--path", "pkg/b.py"]) == 1
+    assert "100644 to 120000" in capsys.readouterr().out
 
 
 def test_cli_reports_a_git_failure_with_status_two(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:

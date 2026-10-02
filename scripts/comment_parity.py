@@ -5,6 +5,7 @@ import ast
 import io
 import json
 import re
+import stat
 import subprocess
 import sys
 import tokenize
@@ -15,6 +16,16 @@ from pathlib import Path
 PYTHON_SUFFIXES = {".py", ".pyi"}
 SCOPE_NODES = (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
 WORKTREE = "WORKTREE"
+IGNORED_TOKENS = {
+    tokenize.COMMENT,
+    tokenize.NL,
+    tokenize.NEWLINE,
+    tokenize.INDENT,
+    tokenize.DEDENT,
+    tokenize.ENCODING,
+    tokenize.ENDMARKER,
+}
+ANCHOR_WIDTH = 4
 
 
 @dataclass
@@ -53,9 +64,57 @@ def changed_paths(root: Path, base: str, head: str) -> list[str]:
     return sorted({name for name in names if name})
 
 
-def comment_texts(source: bytes) -> list[str]:
-    stream = io.BytesIO(source).readline
-    return [token.string for token in tokenize.tokenize(stream) if token.type == tokenize.COMMENT]
+def read_mode(root: Path, revision: str, path: str) -> str | None:
+    if revision == WORKTREE:
+        try:
+            info = (root / path).lstat()
+        except OSError:
+            return None
+        if stat.S_ISLNK(info.st_mode):
+            return "120000"
+        return "100755" if info.st_mode & stat.S_IXUSR else "100644"
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-tree", "-z", "--full-tree", revision, "--", path], capture_output=True
+    )
+    fields = result.stdout.split(b" ", 1)
+    return fields[0].decode() if result.returncode == 0 and len(fields) == 2 else None
+
+
+def docstring_spans(tree: ast.AST) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+    spans = []
+    for node in ast.walk(tree):
+        if isinstance(node, SCOPE_NODES):
+            docstring = leading_docstring(node)
+            if docstring is not None:
+                spans.append(
+                    ((docstring.lineno, docstring.col_offset), (docstring.end_lineno, docstring.end_col_offset))
+                )
+    return spans
+
+
+def comment_anchors(source: bytes, tree: ast.AST) -> list[tuple[str, bool, tuple[str, ...], tuple[str, ...]]]:
+    spans = docstring_spans(tree)
+    code: list[str] = []
+    seen: list[tuple[str, bool, int]] = []
+    last_row = 0
+    for token in tokenize.tokenize(io.BytesIO(source).readline):
+        if token.type == tokenize.COMMENT:
+            seen.append((token.string, bool(code) and last_row == token.start[0], len(code)))
+        elif (
+            token.type in IGNORED_TOKENS
+            or token.string == "pass"
+            or (
+                token.type in {tokenize.STRING, tokenize.OP} and any(start <= token.start < end for start, end in spans)
+            )
+        ):
+            continue
+        else:
+            code.append(token.string)
+            last_row = token.end[0]
+    return [
+        (text, inline, tuple(code[max(0, at - ANCHOR_WIDTH) : at]), tuple(code[at : at + ANCHOR_WIDTH]))
+        for text, inline, at in seen
+    ]
 
 
 ENCODING_COOKIE = re.compile(rb"^[ \t\f]*#.*?coding[:=][ \t]*[-\w.]+")
@@ -127,7 +186,10 @@ def compare_python(path: str, base: bytes, head: bytes) -> FileReport:
     report = FileReport(path, "ok")
     try:
         base_tree, head_tree = parse(base), parse(head)
-        base_comments, head_comments = Counter(comment_texts(base)), Counter(comment_texts(head))
+        base_comments, head_comments = (
+            Counter(comment_anchors(base, base_tree)),
+            Counter(comment_anchors(head, head_tree)),
+        )
         base_docs, head_docs = Counter(docstrings(base_tree)), Counter(docstrings(head_tree))
     except (SyntaxError, ValueError, tokenize.TokenError, MemoryError, RecursionError) as exc:
         report.status = "error"
@@ -145,7 +207,7 @@ def compare_python(path: str, base: bytes, head: bytes) -> FileReport:
     added_docstrings = head_docs - base_docs
     if added_comments:
         report.status = "drift"
-        report.problems.append(f"{sum(added_comments.values())} comment(s) not present in the base")
+        report.problems.append(f"{sum(added_comments.values())} comment(s) not present in the base at that position")
     if added_docstrings:
         report.status = "drift"
         report.problems.append(f"{sum(added_docstrings.values())} docstring(s) not present in the base")
@@ -163,10 +225,16 @@ def compare_file(root: Path, base: str, head: str, path: str, unverified_ok: set
     if after is None:
         return FileReport(path, "drift", problems=["file deleted; a deletion-only change cannot delete files"])
     if suffix in PYTHON_SUFFIXES:
-        return compare_python(path, before, after)
-    if suffix in unverified_ok:
-        return FileReport(path, "skipped")
-    return FileReport(path, "unverified", problems=[f"no comparator for {suffix or 'files without a suffix'}"])
+        report = compare_python(path, before, after)
+    elif suffix in unverified_ok:
+        report = FileReport(path, "skipped")
+    else:
+        report = FileReport(path, "unverified", problems=[f"no comparator for {suffix or 'files without a suffix'}"])
+    before_mode, after_mode = read_mode(root, base, path), read_mode(root, head, path)
+    if before_mode != after_mode:
+        report.status = "drift"
+        report.problems.append(f"file mode or type changed from {before_mode} to {after_mode}")
+    return report
 
 
 def compare(root: Path, base: str, head: str, prefixes: list[str], unverified_ok: set[str]) -> list[FileReport]:
