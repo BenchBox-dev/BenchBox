@@ -193,6 +193,27 @@ def test_project_write_closeout_exception_drift_fails(tmp_path: Path, phrase: st
     assert any("AGENTS.md WRITE-CLOSEOUT-001 semantics drifted" in error for error in errors)
 
 
+@pytest.mark.parametrize(
+    "phrase",
+    [
+        "docs/development/comment-policy.md",
+        "no explanatory comments or docstrings",
+        "make comment-policy-check",
+        "resolve every finding while enforcement is advisory",
+    ],
+)
+def test_project_comment_policy_drift_fails(tmp_path: Path, phrase: str) -> None:
+    project = _candidate(tmp_path)
+    agents = project / "AGENTS.md"
+    content = agents.read_text()
+    pattern = re.compile(r"\s+".join(re.escape(w) for w in phrase.split()), re.IGNORECASE)
+    new_content, count = pattern.subn("deleted constraint", content)
+    assert count > 0, f"Pattern {phrase} was not found in AGENTS.md"
+    agents.write_text(new_content)
+    _, errors = audit(project, CORPUS)
+    assert any("AGENTS.md COMMENT-POLICY-001 semantics drifted" in error for error in errors)
+
+
 def test_agent_facing_text_does_not_hand_a_finished_pr_back() -> None:
     """The repository's own instructions must not tell anyone to stop with a green PR."""
     assert agent_instruction_audit.audit_handback_wording(ROOT) == []

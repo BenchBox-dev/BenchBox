@@ -73,7 +73,7 @@ A disposable clone (remote session, CI runner) declares `BENCHBOX_EPHEMERAL_CLON
 
 - Prefer repository `make` targets and existing helpers.
 - Python tooling is `uv` only: `uv run -- ...`, `uv add`, `uv sync`, `uv lock`.
-- `[COMMENT-POLICY-001]` Follow the comment and docstring policy (`docs/development/comment-policy.md`). Maintained first-party code has no explanatory comments or docstrings: clarify intent with structure, names, and types. Put public contracts in API docs, not source prose. Permitted directives, notices, and fixtures must be registered in `quality/comment-policy.json`. Verify with `make comment-policy-check`.
+- `[COMMENT-POLICY-001]` Follow the comment and docstring policy (`docs/development/comment-policy.md`). Maintained first-party code has no explanatory comments or docstrings: clarify intent with structure, names, and types. Put public contracts in API docs, not source prose. Permitted directives, notices, and fixtures must be registered in `quality/comment-policy.json`. Verify with `make comment-policy-check`; resolve every finding while enforcement is advisory.
 - Research the affected path, make the narrowest coherent change, and preserve compatibility and critical-path performance. Before writing a new helper, search for an existing equivalent (`make duplicate-check-verbose` / `duplicate-check-delta`).
 - Use Python 3.11+, four spaces, 120 columns, Ruff, and public API type hints.
 - No credentials in Git; redact logs and use environment variables.
@@ -89,7 +89,7 @@ Before creating a batch ledger under `.todo-batch/`, add it to `.git/info/exclud
 
 Before publication, self-review with the `code` skill's review action and fix every Critical and Required finding; nits and considerations stay optional. Run `make pr-preflight` once, then `make pr-open`. Boilerplate gates may go to a low-effort subagent; you still choose the command and interpret failures. Check CI on a schedule (sleep/cron between reads), never in a loop. Pending means wait, not re-query.
 
-Dev PRs target `develop` (or `release` / `published-results`), squash-merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Manifest paths require external review (codex, muse, or agy) with a `Soundness review:` section (reviewer, link, all Critical/High findings resolved). A drift guard and required-CI wiring land in the same PR. Required checks are the six unit results from `ci.yml`. Stacked PRs are unsupported: only `develop`-based PRs enter the queue — rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`).
+Dev PRs target `develop` (or `release` / `published-results`), squash-merge, and never direct-push protected branches. Force-push only feature branches with `--force-with-lease`. Manifest paths require external review (codex, muse, or agy) with a `Soundness review:` section (reviewer, link, all Critical/High findings resolved). A drift/pinning guard and required-CI wiring land in the same PR. Required checks are the six unit results from `ci.yml`, each passing when untouched. Stacked PRs are unsupported: only `develop`-based PRs enter the queue — rebase onto `develop` after parent squash-merge (`docs/development/pr-base-branch-policy.md`).
 
 ## TODO tracker
 
@@ -103,14 +103,15 @@ implementation, verification, review, merge, and deployment boundaries.
 
 Feature delivery mode is opt-in for related items only after prerequisites
 are deployed and verified. It requires the active todo-db MCP server to
-advertise registered-batch support on a compatible schema; source PRs,
-catalog pins, or local mirrors do not qualify. The mode requires one shared
-integration branch, one integrator, an immutable base, an ordered member set,
-frozen scopes, member/base/head/final-tree evidence, and one final PR. It never
-creates a feature-base PR, skips CI, or bypasses review, merge, or authority controls.
+advertise registered-batch support on a compatible schema; a source PR,
+catalog pin, or local mirror is not an installation. The mode uses one shared
+integration branch and worktree, one integrator, an immutable base, an explicit
+ordered member set, frozen member scopes, explicit member/base/head/final-tree
+evidence, and one final PR. It never creates a feature-base PR, skips CI, or
+bypasses hosted/native review, merge, deployment, or authority controls.
 
 Feature delivery cannot certify or unlock the changes that make it possible.
-If the capability or schema is absent, retain serial mode, record the blocker,
+If the capability or schema is absent, retain serial mode, record the owned blocker,
 and state the next operator step.
 
 ## BenchBox invariants
