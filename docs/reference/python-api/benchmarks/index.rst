@@ -380,7 +380,7 @@ Benchmark Guides
 - :doc:`/benchmarks/tpc-h` - TPC-H guide
 - :doc:`/benchmarks/tpc-ds` - TPC-DS guide
 - :doc:`/benchmarks/clickbench` - ClickBench guide
-- :doc:`/benchmarks/README` - Benchmark catalog
+- :doc:`/benchmarks/index` - Benchmark catalog
 
 External Resources
 ~~~~~~~~~~~~~~~~~~

@@ -90,6 +90,7 @@ BenchBox is a comprehensive database benchmarking toolkit supporting TPC-H, TPC-
    development/getting-started
    development/architecture-design
    development/platform-development
+   development/comment-cleanup-scope
    design/architecture.md
    testing/index.md
 

@@ -89,7 +89,18 @@ def mock_platform_dependency_checks(_hermetic_state):
         try:
             from benchbox.platforms.snowflake import SnowflakeAdapter
 
-            SnowflakeAdapter.add_cli_arguments = staticmethod(lambda parser: None)
+            real_add_cli_arguments = SnowflakeAdapter.__dict__["add_cli_arguments"]
+
+            def _stub_add_cli_arguments(parser) -> None:
+                return None
+
+            # Expose the real implementation so CLI-option tests can prove it.
+            _stub_add_cli_arguments.real = getattr(
+                real_add_cli_arguments.__func__, "real", real_add_cli_arguments.__func__
+            )
+            stack.enter_context(
+                patch.object(SnowflakeAdapter, "add_cli_arguments", staticmethod(_stub_add_cli_arguments))
+            )
             # Don't stub from_config - we want to test the real implementation
         except ImportError:
             pass

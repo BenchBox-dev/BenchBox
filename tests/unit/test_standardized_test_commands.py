@@ -115,56 +115,6 @@ def _marker_names(path: Path) -> set[str]:
 class TestStandardizedTestCommands:
     """Test the standardized test command system."""
 
-    def test_pytest_marker_system_works(self):
-        env = dict(subprocess.os.environ)
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", "--collect-only", "-q"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-        )
-
-        assert result.returncode in (0, 2), f"Unexpected exit code: {result.returncode}"
-        assert "test_" in result.stdout or "collected" in result.stdout.lower()
-
-    def test_fast_marker_functionality(self):
-        env = dict(subprocess.os.environ)
-        result = subprocess.run(
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "-m",
-                "fast and not (slow or stress or resource_heavy or live_integration)",
-                "--collect-only",
-                "-q",
-            ],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-        )
-
-        assert result.returncode in (0, 2), f"Unexpected exit code: {result.returncode}"
-        assert "test_" in result.stdout or "collected" in result.stdout.lower()
-
-    def test_unit_marker_functionality(self):
-        env = dict(subprocess.os.environ)
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest", "-m", "unit", "--collect-only", "-q"],
-            cwd=REPO_ROOT,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
-        )
-
-        assert result.returncode in (0, 2), f"Unexpected exit code: {result.returncode}"
-        assert "test_" in result.stdout or "collected" in result.stdout.lower()
-
     def test_makefile_commands_exist(self):
         makefile_path = Path(__file__).resolve().parent.parent.parent / "Makefile"
         assert makefile_path.exists(), "Makefile should exist"

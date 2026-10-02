@@ -27,6 +27,8 @@ from benchbox.core.primitives_benchmark_utils import (
     failed_platform_error,
     fetch_count_probe,
     quote_identifier_for_dialect,
+    replace_table_sql,
+    replaces_tables_in_place,
     summarize_validation_failures,
     table_exists,
 )
@@ -202,6 +204,10 @@ def _resolve_validation_sql(
             "via null platform_overrides entry"
         )
     return override, None
+
+
+#: Setup dialects whose connection runs one SQL statement per ``execute`` call.
+_SINGLE_STATEMENT_SETUP_DIALECTS = frozenset({"sqlite", "databricks"})
 
 
 class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
@@ -619,7 +625,9 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
               changed row look unchanged (or vice versa); use a collision-
               resistant separator or length-prefixed encoding in that case.
         """
-        text_type = "STRING" if getattr(self, "_setup_dialect", "standard").lower() == "bigquery" else "VARCHAR"
+        # BigQuery has no VARCHAR, and Databricks rejects VARCHAR without a length.
+        dialect = getattr(self, "_setup_dialect", "standard").lower()
+        text_type = "STRING" if dialect in {"bigquery", "databricks"} else "VARCHAR"
         return f"c_name || '|' || c_address || '|' || CAST({acctbal_expr} AS {text_type}) || '|' || c_mktsegment"
 
     def _date_literal(self, value: str) -> str:
@@ -728,12 +736,14 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
     def _execute_population_sql(self, connection: DatabaseConnection, sql: str) -> None:
         """Execute staging population SQL using the active dialect's statement contract.
 
-        SQLite's DB-API ``execute`` accepts only one statement, while the SCD2
-        stage population is intentionally a three-statement batch. The other
-        adapters accept the batch as-is, so split only for SQLite and keep the
-        existing execution path unchanged elsewhere.
+        SQLite's DB-API ``execute`` and the Databricks SQL connector accept
+        only one statement per call (Databricks answers a batch with
+        ``PARSE_SYNTAX_ERROR``), while the SCD2 stage population is
+        intentionally a three-statement batch. The other adapters accept the
+        batch as-is, so split only for those dialects and keep the existing
+        execution path unchanged elsewhere.
         """
-        if self._setup_dialect.lower() == "sqlite":
+        if self._setup_dialect.lower() in _SINGLE_STATEMENT_SETUP_DIALECTS:
             for statement in sql.split(";"):
                 if statement.strip():
                     stmt_res = connection.execute(statement)
@@ -873,10 +883,13 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             rebuild = force or not self._staging_manifest_matches(connection, required_tables)
 
             # Drop existing staging tables when rebuilding (done once before loop)
+            replace_in_place = rebuild and replaces_tables_in_place(dialect)
             if rebuild:
                 reason = "force mode" if force else "stale/absent staging manifest"
                 self._drop_legacy_staging_manifests(connection)
-                for table_name in STAGING_TABLES:
+                if replace_in_place:
+                    self._invalidate_staging_manifest(connection)
+                for table_name in [] if replace_in_place else STAGING_TABLES:
                     try:
                         quoted = self._quote_identifier(table_name)
                         connection.execute(f"DROP TABLE IF EXISTS {quoted}")
@@ -888,7 +901,11 @@ class WritePrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult"]):
             created_tables = []
             for table_name in STAGING_TABLES:
                 table_existed = self._table_exists(connection, table_name)
-                create_sql = get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
+                create_sql = (
+                    replace_table_sql(get_create_table_sql(table_name, dialect=dialect))
+                    if replace_in_place
+                    else get_create_table_sql(table_name, dialect=dialect, if_not_exists=True)
+                )
                 try:
                     create_res = connection.execute(create_sql)
                     if (err := failed_platform_error(create_res)) is not None:

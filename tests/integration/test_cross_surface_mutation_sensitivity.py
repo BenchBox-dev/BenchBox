@@ -115,6 +115,22 @@ _TARGETS: dict[str, str] = {
     # ORDER BY supplier_cnt DESC with NO trailing LIMIT, so the strict
     # comparator path sees a discriminating order key.
     "datavault": "Q16",
+    # nyctaxi targets borough-summary (3 rows x 5 cols at SF=0.01): GROUP BY
+    # zone/borough + ORDER BY with NO trailing LIMIT, so the strict comparator
+    # path sees a discriminating order key.
+    "nyctaxi": "borough-summary",
+    # tsbs_devops targets double-groupby-1-hr (600 rows x 4 cols at SF=0.01):
+    # GROUP BY hostname/minute + ORDER BY with NO trailing LIMIT, so the
+    # strict comparator path sees a discriminating order key.
+    "tsbs_devops": "double-groupby-1-hr",
+    # tpch_skew targets 9 (89 rows x 3 cols at SF=0.01, seed 42): GROUP BY +
+    # ORDER BY with NO trailing LIMIT, so the strict comparator path sees a
+    # discriminating order key.
+    "tpch_skew": "9",
+    # tpch targets 9 (173 rows x 3 cols at SF=0.01 unseeded): GROUP BY +
+    # ORDER BY with NO trailing LIMIT, so the strict comparator path sees a
+    # discriminating order key.
+    "tpch": "9",
 }
 
 
