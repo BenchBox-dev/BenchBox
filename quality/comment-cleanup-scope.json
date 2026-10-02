@@ -1501,44 +1501,12 @@
       "blocking_disposition": "Edit only the private wrapper before the validation cleanup task owns the rest of the file."
     },
     {
-      "id": "interrogate-configuration",
-      "path": "pyproject.toml",
-      "carrier": "tool.interrogate",
-      "owner": "comment-cleanup-contracts-gate",
-      "state": "blocked",
-      "blocking_disposition": "Replace the hardcoded coverage threshold atomically with its Make and workflow consumers before the shared-infrastructure task owns the rest of the file."
-    },
-    {
-      "id": "interrogate-make-target",
-      "path": "Makefile",
-      "carrier": "docstring-coverage target",
-      "owner": "comment-cleanup-contracts-gate",
-      "state": "blocked",
-      "blocking_disposition": "Replace the docstring coverage target atomically with its configuration and workflow consumers."
-    },
-    {
-      "id": "interrogate-make-help",
-      "path": "make/help.mk",
-      "carrier": "docstring-coverage help text",
-      "owner": "comment-cleanup-contracts-gate",
-      "state": "blocked",
-      "blocking_disposition": "Update the help text together with the target it describes."
-    },
-    {
       "id": "make-inventory-receipt",
       "path": "make/inventory.json",
       "carrier": "generated Make inventory",
       "owner": "comment-cleanup-contracts-gate",
       "state": "blocked",
       "blocking_disposition": "Regenerate through the supported helper; preserve the historical monolith baseline."
-    },
-    {
-      "id": "interrogate-docs-workflow",
-      "path": ".github/workflows/docs.yml",
-      "carrier": "docstring coverage job and badge",
-      "owner": "comment-cleanup-contracts-gate",
-      "state": "blocked",
-      "blocking_disposition": "Replace the coverage job and badge generation atomically."
     },
     {
       "id": "joinorder-synthetic-generated-docstring-writer",

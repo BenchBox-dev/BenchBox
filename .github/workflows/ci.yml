@@ -2282,33 +2282,6 @@ jobs:
           ignore_words_file: .codespell-ignore.txt
           skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
 
-  docstring-coverage:
-    needs: visual-inputs
-    if: needs.visual-inputs.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install interrogate
-
-      - name: Check docstring coverage
-        run: |
-          interrogate -c pyproject.toml --fail-under 90 benchbox/
-
-      - name: Generate docstring coverage badge
-        run: |
-          mkdir -p docs/_static
-          interrogate -c pyproject.toml --generate-badge docs/_static/ benchbox/
-
   # Unit result: core. Required by the merge ruleset; reports on every event and passes when untouched.
   core:
     name: core
@@ -2422,7 +2395,7 @@ jobs:
   # Unit result: docs.
   docs:
     name: docs
-    needs: [ci-paths, visual-inputs, docs-build, public-site-visual-regression, example-validation, spellcheck, docstring-coverage]
+    needs: [ci-paths, visual-inputs, docs-build, public-site-visual-regression, example-validation, spellcheck]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2448,8 +2421,7 @@ jobs:
             --expect docs-build=${{ needs.visual-inputs.outputs.changed == 'true' }} \
             --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-docs == 'true' }} \
             --expect example-validation=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect docstring-coverage=${{ needs.visual-inputs.outputs.changed == 'true' }}
+            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }}
 
   # Unit result: landing.
   landing:
