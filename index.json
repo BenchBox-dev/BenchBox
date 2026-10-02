@@ -6366,6 +6366,7 @@
     "dfparity-t06-literal-fallback-lint": {
       "claim": null,
       "needs": [
+        "dfparity-t05-adapter-batches",
         "dfparity-t05a-adapters-batch-a",
         "dfparity-t05b-adapters-batch-b",
         "dfparity-t05c-adapters-batch-c",
