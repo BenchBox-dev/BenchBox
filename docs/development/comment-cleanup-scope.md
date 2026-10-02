@@ -185,11 +185,32 @@ gives each path exactly one owner. A branch lives about two working days, becaus
 `develop` merges about eighteen pull requests a day and a long-lived branch would
 always conflict with someone's open work. Foundation work, soundness-path files,
 payload changes, the exception register and the switch to blocking enforcement
-land as their own pull requests. The tracker's registered batch mode is not used.
+land as their own pull requests.
 
-The tracker stays in serial mode. A member task is taken, worked on the
-integration branch, released with a note naming the commit that carries its
-work, and finished only after the integration pull request has merged.
+### An exception to the delivery-mode rule
+
+This is a deliberate exception, approved by the repository owner on 2026-10-02,
+to the delivery-mode rule in `AGENTS.md`. That rule reserves a shared
+integration branch with one final pull request for the tracker's
+registered-batch capability, and says to stay in serial mode, with one pull
+request per task, while the capability is absent. The program cannot use the
+capability today: its first use is a one-way schema migration that every client
+of the tracker must be stopped or upgraded for, the final pull request head can
+be bound only once so a single review fix would abort a branch, and a batch
+cannot be refreshed from `develop`. Serial mode with a pull request per task
+would mean over a hundred queue entries and as many reviews, which is the cost
+this contract avoids.
+
+The exception keeps what the rule is for. The cut commit, an explicit ordered
+member list and frozen member scopes are recorded before work starts. One
+integrator alone writes the branch. Each member's check evidence is listed in
+the pull request. One final pull request goes through full CI, review and the
+merge queue; there is never a feature-base pull request, a skipped check, or a
+bypass of review, merge or authority controls. The tracker lifecycle stays
+serial: a member task is taken, worked on the integration branch, released with a
+note naming the commit that carries its work, and finished only after the
+integration pull request has merged. If the registered-batch capability is
+installed later, the program can move to it; nothing here depends on that.
 
 ### Cutting a branch
 
