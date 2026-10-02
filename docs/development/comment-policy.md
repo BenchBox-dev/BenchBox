@@ -20,6 +20,18 @@ assignments. A help string or protocol record needs an actual reader.
 - The pre-commit hook checks staged content, with the same advisory or blocking
   result as the check target.
 - `scripts/check_comment_policy.py --path` checks one file or directory prefix.
+- `scripts/comment_parity.py --base <revision> [--head <revision>] [--path <prefix>]`
+  shows that a change only removed comments and leading docstrings. For each
+  changed Python file it compares the syntax trees after leading docstrings are
+  removed, so any other change is drift. A body left empty by a removed docstring
+  may become `pass`. Comments or docstrings that the base did not have also
+  count as drift, so a removal cannot pay for an addition. Added or deleted
+  files, unparseable source, a changed shebang or encoding declaration, and
+  files in a language it cannot compare fail unless `--unverified-ok <suffix>`
+  names that suffix. A directive such as `# noqa` is not syntax-tree content, so
+  removing one counts as a removed comment here; the checker's comparison of
+  registered directives protects those. It is an evidence tool, not a CI gate,
+  and without `--head` it reads the working tree.
 
 The check target and hook need Python, `uv`, Node and npm. Without `BASE_REF`,
 if `origin/develop` is not an ancestor of `HEAD`, a local run uses their merge
