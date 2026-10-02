@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Test: a local result written per D-3 contains receipt statements/reasons; publish/export output stays redacted.",
+    "Console summary asserted in a CLI test for a DuckDB tuned run."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.3 (R-7).",
+  "description": "## Problem\nThe user's local result file redacts receipt statements and reasons (`exporter.py:105` defaults `anonymize=True`), and the console prints no verification summary.\n\n## Change (per gate D-3)\n- Apply the decided local-file anonymization default or flag.\n- After every run, print status, counts by verdict, the top 3 reasons, and the dropped intents.\n\n## Guardrails (must preserve)\n- Publish and public export stay fully anonymized.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/core/results/exporter.py",
+    "benchbox/cli/commands/run.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:32:55Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d842172f1e12466eb0a567ed522edf1f",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
