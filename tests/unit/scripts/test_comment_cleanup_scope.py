@@ -431,6 +431,40 @@ def test_duration_policy_disposition_names_every_importer() -> None:
     assert not missing, f"the disposition omits importers: {sorted(missing)}"
 
 
+def test_the_unit_test_umbrella_owns_nothing_and_its_three_children_split_the_tree() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    umbrella = "comment-cleanup-cross-module-unit-tests"
+    assert not [rule["id"] for rule in policy["ownership_rules"] if rule["owner"] == umbrella]
+    assert not [edge["consumer"] for edge in policy["consumer_edges"] if edge["owner"] == umbrella]
+    rules = {rule["id"]: rule for rule in policy["ownership_rules"]}
+    core, platforms, rest = (
+        rules[name] for name in ("unit-tests-core", "unit-tests-platforms", "unit-tests-cli-scripts-rest")
+    )
+    assert {rule["owner"] for rule in (core, platforms, rest)} == {
+        "comment-cleanup-unit-tests-core",
+        "comment-cleanup-unit-tests-platforms",
+        "comment-cleanup-unit-tests-cli-scripts-rest",
+    }
+    assert core["priority"] > platforms["priority"] > rest["priority"]
+    assert {"prefix": "tests/unit/"} in rest["selectors"] and {"prefix": "tests/unit/platforms/"} in platforms[
+        "selectors"
+    ]
+
+
+def test_the_checkers_own_files_and_the_autodoc_edges_have_named_owners() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rules = {rule["id"]: rule for rule in policy["ownership_rules"]}
+    tooling = rules["comment-policy-tooling"]
+    assert tooling["owner"] == "comment-cleanup-checker" and tooling["priority"] > 20
+    assert {"path": "scripts/check_comment_policy.py"} in tooling["selectors"]
+    assert {"path": "scripts/run_comment_policy.py"} in tooling["selectors"]
+    registry = rules["comment-policy-registry"]
+    assert registry["owner"] == "comment-cleanup-exception-register"
+    assert registry["selectors"] == [{"path": "quality/comment-policy.json"}]
+    docs_edges = [edge for edge in policy["consumer_edges"] if edge["consumer"].startswith("docs/")]
+    assert docs_edges and {edge["owner"] for edge in docs_edges} == {"comment-cleanup-contracts-gate"}
+
+
 def _derived_rule(priority: int = 20) -> dict:
     return {
         "id": "test-import-owner",

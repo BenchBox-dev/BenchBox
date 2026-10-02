@@ -174,3 +174,101 @@ Do not change TPC-DS stream ordering, RNG, timing, missing-count behavior, query
 algorithms, or payload identity under this policy. Do not rewrite historical
 results. Preserve useful nonempty query references, and record unsupported
 assurance as a blocker rather than adding inert replacement prose.
+
+## Delivery by integration branch
+
+Module cleanup lands through a small number of integration branches, not one
+pull request per task. An integration branch is cut from `develop`, has one
+integrator, carries a fixed set of module tasks (its members), and lands as one
+pull request into `develop`. Members own disjoint paths because the scope policy
+gives each path exactly one owner. A branch lives about two working days, because
+`develop` merges about eighteen pull requests a day and a long-lived branch would
+always conflict with someone's open work. Foundation work, soundness-path files,
+payload changes, the exception register and the switch to blocking enforcement
+land as their own pull requests. The tracker's registered batch mode is not used.
+
+The tracker stays in serial mode. A member task is taken, worked on the
+integration branch, released with a note naming the commit that carries its
+work, and finished only after the integration pull request has merged.
+
+### Cutting a branch
+
+1. Read live `develop`. List the files that every open pull request changes and
+   leave out of the branch any file another open pull request touches; those
+   files wait for the final sweep.
+2. Run the scope validator at the cut commit. It must report no findings; fix
+   ownership first, through the one writer of the scope policy.
+3. Create a linked worktree with `make worktree-create` and run
+   `make agent-write-preflight`. Record the member list, the cut commit and the
+   excluded files in the ignored ledger under `.todo-batch/`.
+
+### Members
+
+Each member is taken by one worker in its own worktree, branched from the
+integration head. A member makes only deletions and the reader migrations that
+its task requires, with the reader migrations committed first. Before handing the
+commits to the integrator, run, without the shared test lock:
+
+- the parity comparator over the changed files, which allows only removed
+  comments, removed leading docstrings and `pass` for a body left empty;
+- `scripts/check_comment_policy.py --mode strict --path <prefix>` for each owned
+  prefix, where only registered directives and notices may remain;
+- a check that the changed files are a subset of the member's owned paths;
+- a check that no deleted docstring has a reader that is not migrated in the same
+  member or an earlier one;
+- `ruff check`, `ruff format --check` and `compileall` on the changed files;
+- the member's own tests and the consumer tests its edges name, once, under the
+  shared lock and bounded to those tests.
+
+### Integrating and landing
+
+Only the integrator writes the integration branch, by cherry-picking member
+commits in dependency order. It reruns the parity and ownership checks over the
+whole branch and one full local preflight on the head; when the preflight cannot
+finish in the available time, hosted CI is the gate, and the pull request says so.
+The pull request is opened as a draft. Its body lists the areas cleaned, the
+parity totals, every change that is not a pure deletion with file and line, the
+contracts moved and where, the files left out because of open pull requests, and
+the checker's summary line.
+
+Before the pull request is marked ready, run one external read-only review over
+the non-deletion diff, a sample of the deleted hunks and every public API file,
+and fix what it finds. Then mark it ready and arm it. If the merge queue rejects
+the head for a reason that is not a defect, arm it again. If a review finding
+arrives after it was queued, dequeue it, fix it, push with an exact lease, wait
+for green and arm it again.
+
+The branch stays current by rebasing onto `develop`, never merging `develop` in,
+when the pull request conflicts and once more before it is marked ready. A branch
+never edits a file that an open pull request touches at cut time, and it does not
+push to or comment on other people's pull requests.
+
+### What stays out of an integration branch
+
+- **Soundness-manifest paths.** Files that the repository's soundness predicate
+  flags are carved out into their own pull requests. Each needs an external review
+  (codex, muse or agy) with a `Soundness review:` section and the owner's manual
+  merge, so keeping them out of the large branches keeps those branches
+  mergeable by the queue.
+- **Payload changes.** A change to SQL text, generated output or an identity needs
+  its own disclosed pull request with raw-hash, token, order, parameter and hint
+  evidence and the correctness, plan and timing evidence the task requires.
+- **The exception register and the switch to blocking.** The checker starts in
+  advisory mode and reports without failing pull requests. The register of
+  retained directives, notices and fixtures lands after the module work, and the
+  setting moves to blocking only after a final whole-scope scan is clean.
+
+### Sizing and failure handling
+
+The first branch is a pilot that measures authoring time, parity failures, missed
+readers, review findings and CI attempts, and sets the size limit for the rest.
+Until it does, plan for about four hundred files and twenty thousand deleted lines
+per branch, and at most about one thousand changed lines that are not deletions.
+
+| Event | Action |
+|---|---|
+| A member fails parity or its tests | Fix it on the member branch, or drop it and rebuild the integration branch from the cut commit with the other members. |
+| Branch CI fails because of one member | Fix or drop that member; do not hold the others. |
+| The pull request conflicts with `develop` | Rebase, rerun parity, push with an exact lease. |
+| A regression is found after merge | Revert the squash commit, or fix forward if one file is the cause. |
+| The branch is abandoned | Close the pull request. Members keep their notes and are taken again later; nothing in the tracker needs undoing, because tasks finish only after merge. |
