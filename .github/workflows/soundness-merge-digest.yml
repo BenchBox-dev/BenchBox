@@ -1,0 +1,40 @@
+name: Soundness Merge Digest
+
+# Backstop for the pre-merge soundness review. Lists the commits that reached
+# develop on `.github/soundness-paths.txt` since the stored checkpoint, records
+# which review signal each had, and opens an issue for each one with none or with
+# a reviewer thread resolved and no later commit. Scheduled so that a commit
+# merged without a review is found even when no push event fired for it.
+#
+# A failed or incomplete read fails the run and leaves the checkpoint where it
+# was, so the next run covers the same range again.
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: soundness-merge-digest
+  cancel-in-progress: false
+
+jobs:
+  digest:
+    name: Digest soundness-path merges
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Report and record the digest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 _project/scripts/soundness_merge_digest.py --repo "${{ github.repository }}" --ref origin/develop --apply

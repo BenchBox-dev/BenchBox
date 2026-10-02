@@ -116,3 +116,21 @@ gh api --method PUT repos/BenchBox-dev/BenchBox/rulesets/15611785 \
 ```
 
 Disabling the queue restores immediate single-PR squash merges under the `SHADOW_ONLY` strict-base policy.
+
+---
+
+## 5. Post-Merge Soundness Digest
+
+`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that touch `.github/soundness-paths.txt`. For each one it finds the merged pull request and records which review signal followed the pull request's last content commit:
+
+- the Codex connector's submitted review,
+- the connector's thumbs-up reaction, or
+- an external review posted as a PR comment that names its reviewer (`Reviewer: codex`, `muse` or `agy`).
+
+A merge of `develop` into the branch does not count as a content commit, so refreshing a branch keeps its signal. An "eyes" reaction is not a signal.
+
+A commit gets an issue labelled `soundness-review-gap` when it has no signal, no merged pull request, or a reviewer thread that was resolved with no commit after it. An agent runs the external review and either records a clean result on the issue or opens a fix or revert pull request.
+
+The checkpoint is stored in the body of the issue labelled `soundness-merge-digest`. The first run records the current head and reports nothing. A read that fails or comes back incomplete fails the run and leaves the checkpoint where it was.
+
+Run it locally without changing anything: `uv run -- python _project/scripts/soundness_merge_digest.py --since <sha>`.

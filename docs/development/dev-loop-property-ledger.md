@@ -86,6 +86,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `release.yml` | product-safety | Release publishing |
 | `release-canary.yml` | product-safety | Release canary protection |
 | `seed-corpus.yml` | product-safety | Corpus seeding |
+| `soundness-merge-digest.yml` | product-safety | Post-merge soundness review digest |
 | `submission-validator-drift-check.yml` | product-safety | Submission validator sync |
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
 | `test.yml` | product-safety | Test tiers; replaced by ci.yml units |
@@ -212,6 +213,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_scan_explorer_tokens.py` | product-safety |
 | `test_shrink_rollup.py` | pure-process |
 | `test_skill_sync_ci_policy.py` | tooling |
+| `test_soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |
 | `test_sqlglot_generator.py` | product-safety |
 | `test_sqlglot_generator_known_failures.py` | product-safety |
 | `test_sqlite_extract_repro.py` | product-safety |
@@ -332,6 +334,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `auto_merge_soundness_paths.py` | product-safety | Soundness path manifest |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
+| `soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |
 | `fast_lane_ratchet_check.py` | pure-process | Fast-lane mechanics; retires with the fast lane |
 | `reference_usage_audit.py` | tooling | Reference hygiene |
 | `agent_instruction_audit.py` | tooling | Agent instruction lockstep |
