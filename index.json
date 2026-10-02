@@ -6168,12 +6168,17 @@
       "title": "Support or document Dask mixed-direction NULL placement and cuDF numeric NULL handling"
     },
     "dfparity-n05-dedupe-null-and-dsqgen-run": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T20:54:34Z",
+        "generation": "60e17e9756a141fd834f097918a3c805",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea"
+      },
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Fold the duplicated dsqgen run in generate_with_parameters and the inline NULL-to-None loops into shared helpers"
     },
     "dfparity-n06-replay-99-logs-test": {
