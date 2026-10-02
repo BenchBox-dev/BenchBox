@@ -363,6 +363,18 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
 )
 
 
+def _approved_queue_summary() -> str:
+    return (
+        f"{APPROVED_MERGE_QUEUE['merge_method']}/"
+        f"{APPROVED_MERGE_QUEUE['grouping_strategy']}/"
+        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge']}/"
+        f"{APPROVED_MERGE_QUEUE['max_entries_to_build']}/"
+        f"{APPROVED_MERGE_QUEUE['max_entries_to_merge']}/"
+        f"{APPROVED_MERGE_QUEUE['check_response_timeout_minutes']}m/"
+        f"{APPROVED_MERGE_QUEUE['min_entries_to_merge_wait_minutes']}"
+    )
+
+
 def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
     """Validate the live merge_queue rule against the approved parameters.
 
@@ -375,15 +387,16 @@ def merge_queue_findings(live: dict[str, Any], name: str) -> list[str]:
     findings: list[str] = []
     rule = _rule_by_type(live, "merge_queue")
     if rule is None:
+        summary = _approved_queue_summary()
         if live.get("rules"):
             return [
                 f"{name}: ruleset payload lists rules but no merge_queue rule; "
-                "queue-aware publication is unverified, verify queue parameters "
-                "(SQUASH/ALLGREEN/1/2/3/60m/0) in repository settings"
+                f"queue-aware publication is unverified, verify queue parameters "
+                f"({summary}) in repository settings"
             ]
         return [
             f"{WARNING_PREFIX}{name}: no merge_queue rule in this ruleset payload; "
-            "verify queue parameters (SQUASH/ALLGREEN/1/2/3/60m/0) in repository settings"
+            f"verify queue parameters ({summary}) in repository settings"
         ]
     raw_params = rule.get("parameters")
     if raw_params is None:

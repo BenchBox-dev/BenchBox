@@ -242,12 +242,14 @@ def test_merge_queue_absent_is_blocking_when_rules_visible() -> None:
     findings = ruleset_drift_check.merge_queue_findings(_live_with_queue(None), "develop-squash-only")
     assert len(findings) == 1
     assert ruleset_drift_check.blocking_findings(findings) == findings
+    assert "90m" in findings[0]
 
 
 def test_merge_queue_absent_is_warning_only_when_payload_empty() -> None:
     findings = ruleset_drift_check.merge_queue_findings({"name": "x", "rules": []}, "develop-squash-only")
     assert len(findings) == 1
     assert ruleset_drift_check.blocking_findings(findings) == []
+    assert "90m" in findings[0]
 
 
 def _verified_develop_queue() -> dict:
