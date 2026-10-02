@@ -194,6 +194,8 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
 | `test_reference_usage_audit.py` | tooling |
+| `test_release_artifact_consumer.py` | product-safety | Producer receipt, provenance selection and archive admission fail closed |
+| `test_release_artifact_execution.py` | product-safety | Real tag objects, isolated verifier boundary, credential and Git configuration isolation, bounded download and no-replace publication |
 | `test_release_cut_start.py` | product-safety |
 | `test_release_finalize.py` | product-safety |
 | `test_release_flow.py` | product-safety |
