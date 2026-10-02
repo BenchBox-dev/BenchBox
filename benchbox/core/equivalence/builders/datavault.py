@@ -1,4 +1,4 @@
-"""Data Vault cross-surface gate builder (staged)."""
+"""Data Vault cross-surface gate builder."""
 
 from __future__ import annotations
 
