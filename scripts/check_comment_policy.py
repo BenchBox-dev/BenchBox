@@ -290,14 +290,20 @@ def validate_consumers(root: Path, policy: dict) -> None:
             raise ValueError(f"external provenance missing: {entry['provenance']}")
 
 
+def annotation_text(value: str, *, property_value: bool = False) -> str:
+    value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    return value.replace(":", "%3A").replace(",", "%2C") if property_value else value
+
+
 def exit_status(mode: str, baseline_policy: dict, failed: list[Finding]) -> int:
     rejects = bool(failed) and mode != "report"
     if not (rejects and mode == "transition" and baseline_policy.get("enforcement", "blocking") == "advisory"):
         return int(rejects)
     if os.environ.get("GITHUB_ACTIONS") == "true":
         for finding in failed[:100]:
-            excerpt = (finding.text.splitlines()[0][:160] if finding.text else "").replace("%", "%25")
-            print(f"::warning file={finding.path},line={finding.line}::comment-policy {finding.kind}: {excerpt}")
+            excerpt = annotation_text(finding.text.splitlines()[0][:160] if finding.text else "")
+            path = annotation_text(finding.path, property_value=True)
+            print(f"::warning file={path},line={finding.line}::comment-policy {finding.kind}: {excerpt}")
     print(
         f"comment-policy: enforcement is advisory, so these {len(failed)} findings do not fail the check; "
         "they will once the policy sets enforcement to blocking"

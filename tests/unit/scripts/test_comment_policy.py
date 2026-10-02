@@ -300,6 +300,17 @@ def test_advisory_enforcement_reports_findings_without_failing_the_comparison(
     assert main(["--root", str(tmp_path), "--mode", "transition", "--base", "f" * 40]) == 2
 
 
+def test_advisory_annotations_escape_path_and_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    printed: list[str] = []
+    monkeypatch.setattr("builtins.print", lambda *args, **_: printed.append(" ".join(map(str, args))))
+    finding = Finding("dir,x::y%z.py", 7, "comment", "# 100%\r::set-output name=a::b")
+    assert check_comment_policy.exit_status("transition", policy(enforcement="advisory"), [finding]) == 0
+    annotation = next(line for line in printed if line.startswith("::warning"))
+    assert annotation.startswith("::warning file=dir%2Cx%3A%3Ay%25z.py,line=7::")
+    assert "\r" not in annotation and "set-output" not in annotation
+
+
 def test_candidate_cannot_relax_blocking_enforcement_in_a_comparison(tmp_path: Path) -> None:
     (tmp_path / "quality").mkdir()
     (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(enforcement="blocking")), encoding="utf-8")
