@@ -97,7 +97,8 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
    being mistaken for a queue failure; remove a hold deliberately to release it. Before editing an armed PR,
    withdraw it with the revision transaction (`make pr-landing-withdraw`, see `docs/agent/review-protocol.md`),
    push the correction, and arm the new head: a later `--match-head-commit` cannot undo a merge of the old head.
-   `make pr-ready` remains only for delivering a prepared batch, where its evidence file must declare
+   `make pr-ready PR=<n> HEAD=<sha>` arms an open PR through `make pr-arm`. With `EVIDENCE` or `BATCH` it runs the
+   readiness evidence transaction used to deliver a prepared batch, where the evidence file must declare
    `delivery_mode` and the complete prepared-batch binding; a single PR does not need it.
    `auto-merge-on-open.yml` only revokes and never arms (see `docs/operations/repo-admin-settings.md`).
 

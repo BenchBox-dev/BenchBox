@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "4411ad3b25f7045759699f031d0a19e7a3fd0457da8a7412338f72fdfb675bf8",
+  "contract_sha256": "200a77194a1340390839c196e63399becb42c1c2d91e686e328cb965488ae53c",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1309,8 +1309,8 @@
     "pr-ready": [
       {
         "header": "pr-ready:",
-        "recipe": "\t@[ -n \"$(PR)\" ] || [ -n \"$(URL)\" ] || { echo \"PR or URL is required\" >&2; exit 2; }\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }\n\t@if [ -n \"$(EVIDENCE)$(BATCH)\" ]; then \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\" HEAD=\"$(HEAD)\" EVIDENCE=\"$(EVIDENCE)\" BATCH=\"$(BATCH)\"; \\\n\telif [ -n \"$(URL)\" ]; then \\\n\t\t[ -z \"$(PR)\" ] || { echo \"PR and URL are mutually exclusive\" >&2; exit 2; }; \\\n\t\tPR_NUMBER=$$(gh pr view --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \"$(URL)\" --json number --jq '.number') || { echo \"Could not resolve URL to a PR in $(or $(REPO),BenchBox-dev/BenchBox)\" >&2; exit 1; }; \\\n\t\t$(MAKE) -s pr-arm PR=\"$$PR_NUMBER\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm PR=\"$(PR)\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\tfi",
-        "recipe_sha256": "0f5407a48e33996ccde97bc83a65bed965eb079170aaeaaac908c36f66dff21f"
+        "recipe": "\t@[ -n \"$(PR)\" ] || [ -n \"$(URL)\" ] || { echo \"PR or URL is required\" >&2; exit 2; }\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }\n\t@if [ -n \"$(EVIDENCE)$(BATCH)\" ]; then \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\" HEAD=\"$(HEAD)\" EVIDENCE=\"$(EVIDENCE)\" BATCH=\"$(BATCH)\"; \\\n\telif [ -n \"$(URL)\" ]; then \\\n\t\t[ -z \"$(PR)\" ] || { echo \"PR and URL are mutually exclusive\" >&2; exit 2; }; \\\n\t\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\t\tPR_INFO=$$(gh pr view --repo \"$$REPOSITORY\" \"$(URL)\" --json number,url --jq '\"\\(.number) \\(.url)\"') || { echo \"Could not resolve URL to a PR in $$REPOSITORY\" >&2; exit 1; }; \\\n\t\tPR_NUMBER=\"$${PR_INFO%% *}\"; PR_URL=$$(printf '%s' \"$${PR_INFO#* }\" | tr 'A-Z' 'a-z'); \\\n\t\tWANT=$$(printf '%s' \"$$REPOSITORY\" | tr 'A-Z' 'a-z'); \\\n\t\tcase \"$$PR_URL\" in \"https://github.com/$$WANT/pull/\"*) ;; *) echo \"URL names a PR outside $$REPOSITORY; refusing to arm it\" >&2; exit 2 ;; esac; \\\n\t\t$(MAKE) -s pr-arm PR=\"$$PR_NUMBER\" REPO=\"$$REPOSITORY\" HEAD=\"$(HEAD)\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm PR=\"$(PR)\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\tfi",
+        "recipe_sha256": "018b0c1a9fb231bc7146249e8c5337ecd3afff0ee569eabcfccb1bd6b9a15eb9"
       }
     ],
     "pr-refresh": [
@@ -2265,7 +2265,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "8172280eaf074a480f02c0bc4efe493a8f7409eb0199d16b4bb8eced0b9d11bd",
+  "semantic_sha256": "28dfcf0d8811c769445b891a5bd192da00d2924ba1f404a8637043f932e5bbde",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -4253,9 +4253,9 @@
       ]
     },
     {
-      "body": "pr-ready:\n\t@[ -n \"$(PR)\" ] || [ -n \"$(URL)\" ] || { echo \"PR or URL is required\" >&2; exit 2; }\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }\n\t@if [ -n \"$(EVIDENCE)$(BATCH)\" ]; then \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\" HEAD=\"$(HEAD)\" EVIDENCE=\"$(EVIDENCE)\" BATCH=\"$(BATCH)\"; \\\n\telif [ -n \"$(URL)\" ]; then \\\n\t\t[ -z \"$(PR)\" ] || { echo \"PR and URL are mutually exclusive\" >&2; exit 2; }; \\\n\t\tPR_NUMBER=$$(gh pr view --repo \"$(or $(REPO),BenchBox-dev/BenchBox)\" \"$(URL)\" --json number --jq '.number') || { echo \"Could not resolve URL to a PR in $(or $(REPO),BenchBox-dev/BenchBox)\" >&2; exit 1; }; \\\n\t\t$(MAKE) -s pr-arm PR=\"$$PR_NUMBER\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm PR=\"$(PR)\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\tfi",
+      "body": "pr-ready:\n\t@[ -n \"$(PR)\" ] || [ -n \"$(URL)\" ] || { echo \"PR or URL is required\" >&2; exit 2; }\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }\n\t@if [ -n \"$(EVIDENCE)$(BATCH)\" ]; then \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\" HEAD=\"$(HEAD)\" EVIDENCE=\"$(EVIDENCE)\" BATCH=\"$(BATCH)\"; \\\n\telif [ -n \"$(URL)\" ]; then \\\n\t\t[ -z \"$(PR)\" ] || { echo \"PR and URL are mutually exclusive\" >&2; exit 2; }; \\\n\t\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\t\tPR_INFO=$$(gh pr view --repo \"$$REPOSITORY\" \"$(URL)\" --json number,url --jq '\"\\(.number) \\(.url)\"') || { echo \"Could not resolve URL to a PR in $$REPOSITORY\" >&2; exit 1; }; \\\n\t\tPR_NUMBER=\"$${PR_INFO%% *}\"; PR_URL=$$(printf '%s' \"$${PR_INFO#* }\" | tr 'A-Z' 'a-z'); \\\n\t\tWANT=$$(printf '%s' \"$$REPOSITORY\" | tr 'A-Z' 'a-z'); \\\n\t\tcase \"$$PR_URL\" in \"https://github.com/$$WANT/pull/\"*) ;; *) echo \"URL names a PR outside $$REPOSITORY; refusing to arm it\" >&2; exit 2 ;; esac; \\\n\t\t$(MAKE) -s pr-arm PR=\"$$PR_NUMBER\" REPO=\"$$REPOSITORY\" HEAD=\"$(HEAD)\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm PR=\"$(PR)\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\tfi",
       "kind": "rule",
-      "sha256": "3d389011fa8e3fe56d680516e599d983795a888e610a9f98b800ee46240b5952",
+      "sha256": "a45b4485c4afff45b24592e84e59ca00d9001e0144c03f8180e1f1197f5d4830",
       "targets": [
         "pr-ready"
       ]

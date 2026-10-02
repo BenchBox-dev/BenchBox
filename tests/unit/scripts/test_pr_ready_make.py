@@ -17,12 +17,12 @@ HEAD = "a" * 40
 
 
 def _make_pr_ready(
-    tmp_path: Path, *assignments: str
+    tmp_path: Path, *assignments: str, gh_output: str = "7 https://github.com/BenchBox-dev/BenchBox/pull/7"
 ) -> tuple[subprocess.CompletedProcess[str], list[str], dict[str, str]]:
-    """Run the real `make pr-ready` with recording `uv` and `gh` shims (`gh pr view` prints PR number 7)."""
+    """Run the real `make pr-ready` with recording `uv` and `gh` shims (`gh pr view` prints `gh_output`)."""
     for name, body in (
         ("uv", '#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD/argv"\nenv | grep "^PR_ARM_" | sort > "$RECORD/env"\n'),
-        ("gh", "#!/bin/sh\necho 7\n"),
+        ("gh", f"#!/bin/sh\necho '{gh_output}'\n"),
     ):
         shim = tmp_path / name
         shim.write_text(body)
@@ -57,6 +57,17 @@ def test_pr_ready_without_evidence_arms_through_pr_arm(tmp_path: Path) -> None:
         assert result.returncode == 0, (name, result.stderr)
         assert argv == ["run", "--", "python", "scripts/pr_arm.py"], name
         assert (env["PR_ARM_PR"], env["PR_ARM_HEAD"], env["PR_ARM_REPO"]) == (expected, HEAD, "BenchBox-dev/BenchBox")
+
+
+def test_pr_ready_refuses_a_url_that_names_a_pr_in_another_repository(tmp_path: Path) -> None:
+    result, argv, env = _make_pr_ready(
+        tmp_path,
+        "URL=https://github.com/other-org/other-repo/pull/7",
+        f"HEAD={HEAD}",
+        gh_output="7 https://github.com/other-org/other-repo/pull/7",
+    )
+    assert result.returncode == 2 and "outside BenchBox-dev/BenchBox" in result.stderr
+    assert argv == [] and env == {}
 
 
 def test_pr_ready_with_evidence_or_batch_keeps_the_readiness_transaction(tmp_path: Path) -> None:

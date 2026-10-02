@@ -1741,8 +1741,12 @@ pr-ready:
 		$(MAKE) -s pr-arm-auto-merge REPO="$(or $(REPO),BenchBox-dev/BenchBox)" PR="$(PR)" URL="$(URL)" HEAD="$(HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
 	elif [ -n "$(URL)" ]; then \
 		[ -z "$(PR)" ] || { echo "PR and URL are mutually exclusive" >&2; exit 2; }; \
-		PR_NUMBER=$$(gh pr view --repo "$(or $(REPO),BenchBox-dev/BenchBox)" "$(URL)" --json number --jq '.number') || { echo "Could not resolve URL to a PR in $(or $(REPO),BenchBox-dev/BenchBox)" >&2; exit 1; }; \
-		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$(or $(REPO),BenchBox-dev/BenchBox)" HEAD="$(HEAD)"; \
+		REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
+		PR_INFO=$$(gh pr view --repo "$$REPOSITORY" "$(URL)" --json number,url --jq '"\(.number) \(.url)"') || { echo "Could not resolve URL to a PR in $$REPOSITORY" >&2; exit 1; }; \
+		PR_NUMBER="$${PR_INFO%% *}"; PR_URL=$$(printf '%s' "$${PR_INFO#* }" | tr 'A-Z' 'a-z'); \
+		WANT=$$(printf '%s' "$$REPOSITORY" | tr 'A-Z' 'a-z'); \
+		case "$$PR_URL" in "https://github.com/$$WANT/pull/"*) ;; *) echo "URL names a PR outside $$REPOSITORY; refusing to arm it" >&2; exit 2 ;; esac; \
+		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$(HEAD)"; \
 	else \
 		$(MAKE) -s pr-arm PR="$(PR)" REPO="$(or $(REPO),BenchBox-dev/BenchBox)" HEAD="$(HEAD)"; \
 	fi
