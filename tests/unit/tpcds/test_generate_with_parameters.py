@@ -14,7 +14,7 @@ import pytest
 
 pytestmark = [
     pytest.mark.unit,
-    pytest.mark.fast,
+    pytest.mark.medium,
     pytest.mark.tpcds,
 ]
 
