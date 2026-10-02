@@ -20321,6 +20321,13 @@
       "status": "open",
       "title": "DECISION GATE (D-2): which constraint kinds become catalog-verifiable, and from which structured sources"
     },
+    "tuning-gate-ledger-outcome-vocabulary-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "DECISION GATE (D-6): ledger outcome and phase vocabulary (dropped for skips, satisfied_by, closed phase set)"
+    },
     "tuning-gate-load-only-semantics-20261001": {
       "claim": null,
       "needs": [],
