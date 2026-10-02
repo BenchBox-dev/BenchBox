@@ -946,7 +946,7 @@ _TPCH_Q17_VACUOUS = (
     "1000 combos): 856 combinations return a non-NULL value and the other 144, including "
     "the default pair, return the all-NULL row. The all-NULL result is a literal artifact "
     "of the default parameters against the small cell, not a load or logic bug, and the "
-    "query is not vacuous in general. Follow-up, not yet filed: gate Q17 with a "
+    "query is not vacuous in general. Remediation: gate Q17 with a "
     "brand/container pair the cell satisfies on both surfaces (do NOT change the canonical "
     "Q17 query)."
 )
@@ -963,7 +963,7 @@ _TPCH_SKEW_Q17_VACUOUS = (
     "the other 504, including the default pair, return the all-NULL row. The all-NULL "
     "result is a literal artifact of the default parameters against the skewed "
     "distribution, not a load or logic bug, and the query is not vacuous in general. "
-    "Follow-up, not yet filed: gate Q17 with a brand/container pair the cell satisfies on "
+    "Remediation: gate Q17 with a brand/container pair the cell satisfies on "
     "both surfaces (do NOT change the canonical Q17 query)."
 )
 
