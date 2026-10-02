@@ -283,6 +283,29 @@ query_stream = tpcds.get_query(42,
                                stream_id=0)
 ```
 
+### Scale factor and query parameters
+
+dsqgen derives some query parameters from the scale factor, so the SQL for a
+few queries depends on it. Standard runs now generate every query with the scale
+factor of the data you loaded. Earlier versions used the scale factor 1 values
+at every scale, which made a few queries test different values than the data
+called for.
+
+This can change the SQL of these queries when the scale factor is not 1:
+
+| Scale factor | Queries whose SQL can differ |
+|--------------|------------------------------|
+| 0.01 and 0.1 | Q9, Q44, Q46, Q68 |
+| 10 and above | Q9, Q44, Q46, Q68, plus Q1, Q16, Q27, Q33, Q34, Q36, Q43, Q73 |
+
+For a given seed some of these queries can come out the same at both scales,
+because the random values they draw can coincide.
+
+Runs at scale factor 1 are unchanged. Power and throughput runs already
+generated their queries for the data's scale factor and are unchanged. Results
+recorded before this change at other scale factors used the old SQL for the
+queries above, so don't compare those queries one for one with newer results.
+
 ## Query Characteristics
 
 ### Query Complexity Categories
