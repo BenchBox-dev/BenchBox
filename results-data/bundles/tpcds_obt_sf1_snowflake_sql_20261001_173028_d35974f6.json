@@ -17,7 +17,7 @@
     "platform_option_sources": {
       "account": "account_a1fffaa9cc9a",
       "database": "database_f3ba6a7c0af9",
-      "default_output_location": "path_d969e086da79",
+      "default_output_location": "saved_config",
       "force_recreate": "saved_config",
       "force_upload": "saved_config",
       "last_updated": "saved_config",

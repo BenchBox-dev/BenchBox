@@ -1541,3 +1541,29 @@ class TestCloudWarehouseAndOutputLocation:
         assert config["uc_volume"].startswith("volume_")
         # Plain `catalog` carries an engine catalog type in local bundles; it stays readable.
         assert config["catalog"] == "duckdb"
+
+    def test_option_source_labels_stay_readable(self):
+        payload = {
+            "config": {
+                "platform_options": {"default_output_location": "gs://bucket/", "database": "prod"},
+                "platform_option_sources": {
+                    "default_output_location": "saved_config",
+                    "database": "cli_option",
+                    "warehouse": "not-a-label",
+                },
+            }
+        }
+        config = AnonymizationManager().anonymize_result_payload(payload)["config"]
+        assert config["platform_option_sources"]["default_output_location"] == "saved_config"
+        assert config["platform_option_sources"]["database"] == "cli_option"
+        # Anything outside the label vocabulary is still treated as a value.
+        assert config["platform_option_sources"]["warehouse"].startswith("warehouse_")
+        assert "bucket" not in json.dumps(config["platform_options"])
+
+    def test_option_source_labels_match_metadata_source_vocabulary(self):
+        from typing import get_args
+
+        from benchbox.core.results import anonymization
+        from benchbox.core.results.environment import MetadataSource
+
+        assert frozenset(get_args(MetadataSource)) == anonymization._OPTION_SOURCE_LABELS

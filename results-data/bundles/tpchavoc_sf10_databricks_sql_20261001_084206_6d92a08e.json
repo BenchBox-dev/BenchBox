@@ -30,9 +30,9 @@
       "staging_root": "path_d969e086da79",
       "status": "saved_config",
       "tuning_source": "saved_config",
-      "uc_catalog": "catalog_a15321a9260b",
-      "uc_schema": "schema_ea670f1f4924",
-      "uc_volume": "volume_312df09bc4f2"
+      "uc_catalog": "saved_config",
+      "uc_schema": "saved_config",
+      "uc_volume": "saved_config"
     },
     "platform_options": {
       "access_token": "<redacted>",

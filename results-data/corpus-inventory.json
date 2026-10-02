@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-10-02T02:01:52.226344+00:00",
+  "generated_at": "2026-10-02T12:49:49.206723+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -663,7 +663,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "7e795a557d98c01bab10b2e277181e0b447e54fbd69f04ed871662a1076f6a03"
+      "bundle_sha256": "9643735477b2870e14599212fb5eaa85e91aea6ce21745310d827a403eee072f"
     },
     {
       "file": "datavault_sf1_bigquery_sql_20261001_091125_26fe04bf.json",
@@ -676,7 +676,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8d72d47db0d081c48df5985c417c1474d0dedd64db617109d8edf3de6a1ad676"
+      "bundle_sha256": "79d8c861395b18d2f8f2c783d069fdde9b9a9cb328f09da2a0f041fbba19f20c"
     },
     {
       "file": "datavault_sf10_bigquery_sql_20261001_110327_d1328d05.json",
@@ -689,7 +689,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8589fe677933a22a6b34c42f476b1293347dcba9ae22a7a9982eb3a36f95684e"
+      "bundle_sha256": "3eeebe24bad274bb218b009375a36038d30150d541284f3060fae685f78d06dd"
     },
     {
       "file": "datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
@@ -754,7 +754,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "137646799ee998d0c7168aa2410d55cc9566a53a934cf4776e0b68e1f0ba703d"
+      "bundle_sha256": "af519c10ce882d402141e14b035c86c011ba003f142f60481ff3db78accbcace"
     },
     {
       "file": "datavault_sf1_databricks_sql_20260930_180331_e7b23724.json",
@@ -767,7 +767,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d5ee529acf127fdbeb0bac3607c5e566fb234c3c144ddb86beb7092765eb4a67"
+      "bundle_sha256": "f830fa9abf22561ebcc9ba5bc64976aa7adee15e3dcf6cf19343d77cc164a211"
     },
     {
       "file": "datavault_sf10_databricks_sql_20261001_195104_c9a232ef.json",
@@ -780,7 +780,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "eb30fda848923a6e19f8e5f2681e6d7dfd230576218ee3687d6155e149f9d459"
+      "bundle_sha256": "f5efe937271235b6235fc1177b92bbae2dc09aa8fb02166d3bdf321d66e41e1d"
     },
     {
       "file": "datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
@@ -819,7 +819,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c7d16cac4f26dcc7d44a1cce0fc4b63f5bb27e638ce7b6bc238a208d3c590cb3"
+      "bundle_sha256": "e7eb6da617adc220522f895a1565b44749f17744d20b0da9460a1d99d731a3e2"
     },
     {
       "file": "datavault_sf1_snowflake_sql_20260925_224900_77db76a8.json",
@@ -832,7 +832,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8633461cdc97b3e3e8aee93e298f9af27992ab4172013b4a6fca9311c7b513fc"
+      "bundle_sha256": "472f9f847df348bf31d0f1dd9f80fe2af0811e844b3c943f196388a710cb8acf"
     },
     {
       "file": "datavault_sf10_snowflake_sql_20260930_180120_db643832.json",
@@ -845,7 +845,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "473ee72e52b8e9157186f3f315d6d0de78bd74fd8f2660c507e688902bb959d6"
+      "bundle_sha256": "d4918143d89697aa28ef2121557d4d2b247198abf88122ffb62f74e509b53cf4"
     },
     {
       "file": "flightdata_sf01_bigquery_sql_20260920_115330_5dd56bc3.json",
@@ -858,7 +858,7 @@
       "query_count": 40,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f206db63053ba8a5a5f3e720826d27e416c03faec26251d0b4a6e269df650077"
+      "bundle_sha256": "ef199e55c94d4b962ab93f01924382ebbfafd60a90473dd68f4bf757d10a52d6"
     },
     {
       "file": "flightdata_sf1_bigquery_sql_20260927_123112_15864c7e.json",
@@ -871,7 +871,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "13a39e26f592a74020fd7257bfa354228506ad40b1ab0b83b1c5d8aa7209a50a"
+      "bundle_sha256": "632e6bd2503d8735c44f89bb6f7d02a3bc6dfcb7268afa96abfe68b191e7aaff"
     },
     {
       "file": "flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json",
@@ -884,7 +884,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ff95180d9aacbd9872110721bd3bab98a918db5c13a51f45e8f537d69519c4aa"
+      "bundle_sha256": "04ab3d974f90ef046d9de13d9f61af87ab6961f73a655086348e156e82fa0602"
     },
     {
       "file": "flightdata_sf001_clickhouse_local_sql_20260826_172222_5f3f4c89.json",
@@ -975,7 +975,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e9053142803310b605a45ced95b3937d91bc5c7c96300f29ca35e41d84fae29b"
+      "bundle_sha256": "e90649c3655c424463db29edd2145dbd73f89e8f9b752e172acfcbe33f19b664"
     },
     {
       "file": "flightdata_sf1_databricks_sql_20261001_143909_6326e239.json",
@@ -988,7 +988,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b8ebe71b8aa13c032647cfd5d6fe0732e366ae272d6c64b97bb99ea6228d6627"
+      "bundle_sha256": "8c3912550b56b6794c083625afee27490664f4fbb7931042d3a3cf536ae16ebe"
     },
     {
       "file": "flightdata_sf10_databricks_sql_20261001_151316_6644c94b.json",
@@ -1001,7 +1001,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b419d0f96ffa1cfd30e86920e46c3a930fbb08f8a664f8d28e5b806b895c5c2a"
+      "bundle_sha256": "1cfe475c3a3fa58e6636849d9fe041512725e7528e0359a83249fdb4685d08d0"
     },
     {
       "file": "flightdata_sf001_duckdb_sql_20260826_163352_55f0b3f1.json",
@@ -1053,7 +1053,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "99a15ee442860fbea1c4cac07e0ae987e724315ca7ce4bef976d37ec48515ad0"
+      "bundle_sha256": "462cc74227d010ebfb66e34c7a5cc2211f883fb89f188393e2c9a474eb25e327"
     },
     {
       "file": "flightdata_sf1_snowflake_sql_20261001_111501_3a83168a.json",
@@ -1066,7 +1066,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "76714ea72955bc35a15166fa4ee7fea6621c337601b00b28e1682e68ee9b3032"
+      "bundle_sha256": "6bc382ba24ddc1a169d0a853f22175a3c79e0434bd74f953cb18ca77fdd19f8d"
     },
     {
       "file": "flightdata_sf10_snowflake_sql_20261001_113621_e22fa5a3.json",
@@ -1079,7 +1079,7 @@
       "query_count": 60,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3de3e9f75bcdd695a16d4b3626389a968dd4578016148d43862b616603b976e5"
+      "bundle_sha256": "2cc3449aedf77ce4a204254902333fe3500f682eea2a6d7d029a272cda30e0fb"
     },
     {
       "file": "h2odb_sf001_clickhouse_local_sql_20260826_113044_c45bba08.json",
@@ -1404,7 +1404,7 @@
       "query_count": 135,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "55e4f2f67cae0d891cd6359958c238a1bce365cb87cd8e23cca338b7147cf5dd"
+      "bundle_sha256": "0724827e372caf1af4257f53ecd009bb71315a3ff480f1daacd7c8e83c6969fc"
     },
     {
       "file": "metadata_primitives_sf1_databricks_sql_20261001_191204_8daddf3b.json",
@@ -1417,7 +1417,7 @@
       "query_count": 177,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3227843c817fdf004111418ce7af39b40bf1925b4004a7d3d64767262504241e"
+      "bundle_sha256": "08d392e75fa40625a23c913b4f259e4504f9cb551c9e79415308535f4fe774cd"
     },
     {
       "file": "metadata_primitives_sf1_snowflake_sql_20261001_111119_1ee8b07d.json",
@@ -1430,7 +1430,7 @@
       "query_count": 180,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "df099d3c1a6d39e2c69b7e278be738dd943030b22a9b6de188260abc03829f88"
+      "bundle_sha256": "8c19e0c98fb3653f53e055a887c456b9395e29117583558c40d4c6c637b25dc4"
     },
     {
       "file": "nyctaxi_sf01_bigquery_sql_20260925_221622_67c2e5e9.json",
@@ -1443,7 +1443,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "beda026328c4f60108a3267437e4f4d327e4bdb008daed04e0a2f1a0ed733250"
+      "bundle_sha256": "408bdababac42ef4c57223cd7fd60afc381068e5e4b87f754001c3a0e15e44b1"
     },
     {
       "file": "nyctaxi_sf1_bigquery_sql_20260923_091616_1f78ef99.json",
@@ -1456,7 +1456,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d0f78f0af031dc844f4adde6889e9f38ef88f6863a8f3123c941aa29756bd441"
+      "bundle_sha256": "19ed922401b9c292bbfe0385ab57045be882d13605037852f326d61fca06e8fc"
     },
     {
       "file": "nyctaxi_sf10_bigquery_sql_20260927_120407_fec02550.json",
@@ -1469,7 +1469,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "75ecc60967fee7e2b6006ab282e9747a98bebab3c3d377b18b7f836f9d10ee74"
+      "bundle_sha256": "a35aab13831f75eb93f455ec7c5d161eb85a2de4382d8c2d50833f103af81e76"
     },
     {
       "file": "nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
@@ -1560,7 +1560,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "452f05270302ced78b82be7aa6b9b9b9629dc66080ac1649cb0d63b14452e25f"
+      "bundle_sha256": "9c975de1c7bd815cce7b1103a4f903d7647f8850b7d10aa23fe8706f247abd58"
     },
     {
       "file": "nyctaxi_sf1_databricks_sql_20261001_101715_c8b8cad2.json",
@@ -1573,7 +1573,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "484565e6e65fbcbd6a64fb467f49026156b2dea4a2c0030a0081063504fd90ad"
+      "bundle_sha256": "9d9ebc92ea53fea876407b80bec704847d2af1f5f870ba2ad436ce72c4c218c4"
     },
     {
       "file": "nyctaxi_sf10_databricks_sql_20261001_102629_e82aa7d2.json",
@@ -1586,7 +1586,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9edf53bde3e3993e02b1b2c17b1e80fa9ad9fa70f42d386a938e874e8ea35592"
+      "bundle_sha256": "92776915a182c1a00384bac85d3e0d06ae8f7744def35ccd1b3c1b5ef8b23400"
     },
     {
       "file": "nyctaxi_sf001_duckdb_sql_20260826_163341_b51bee79.json",
@@ -1638,7 +1638,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f30809d470483fe269c0425925fac9ec88245a56ffa8ec7c17e483b3949a5d88"
+      "bundle_sha256": "1114ab7d410d47418d34c38eb998659b221dd4418f1102659e1e4c8294c31c70"
     },
     {
       "file": "nyctaxi_sf1_snowflake_sql_20260925_092203_0cd1a463.json",
@@ -1651,7 +1651,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b65cd7583eee7d6b16963b33e47bbcb06cf85edeb6a5ce5f3d885fd6bcc7c669"
+      "bundle_sha256": "f9b3d2c11adda623e5a12e4d2ca0e4b4884570260205a6fe71b42ec36d8444aa"
     },
     {
       "file": "nyctaxi_sf10_snowflake_sql_20261001_102124_4c662b94.json",
@@ -1664,7 +1664,7 @@
       "query_count": 75,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c35061db5c2c57a6982178fb0419f385f922263c8bcb3c3b0cd01d9618c7ab6b"
+      "bundle_sha256": "6a44b05019663363e3960a8f5f61ca9f195a5f76e9256d4d4269bc6a1d997143"
     },
     {
       "file": "read_primitives_sf001_bigquery_sql_20260930_081905_1a102885.json",
@@ -1677,7 +1677,7 @@
       "query_count": 426,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "bd72f02f9afe0da4ac77869f4805b30f1fcd3e4056abd4be907919e2f37acf3a"
+      "bundle_sha256": "f4820de0b8f0a3180aa6cbe0f327ca2046ee5ec17fd4fb3fb3831e57bd5fb6e0"
     },
     {
       "file": "read_primitives_sf01_bigquery_sql_20260929_184751_5bfa3d9b.json",
@@ -1690,7 +1690,7 @@
       "query_count": 426,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c685912b0829ea1003fad45edee282fa814f11903dcc0046995e68cb416c107b"
+      "bundle_sha256": "ccbc7e792beb8f846f49ae8a70380b00e9b6f7b8c0dc630330a5296ade4ca63f"
     },
     {
       "file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
@@ -1755,7 +1755,7 @@
       "query_count": 444,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3efcbb6debc09599c8585bb0430ace835c243e93aa4fea4e2d476075ec88f51c"
+      "bundle_sha256": "83ba93f47da0b841fe1db4152ae1adac807e0a541d820d9a9396c3f0d352cb60"
     },
     {
       "file": "read_primitives_sf01_databricks_sql_20261001_143234_f068492b.json",
@@ -1768,7 +1768,7 @@
       "query_count": 444,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f6139db3cdaa1a068e21dcdef8c7a346e1da686337c4196d91e721870951bb79"
+      "bundle_sha256": "ec6c7dbf1ac19db03d6af9b03755efce380ea1bc28cefa9b88b8804304364d81"
     },
     {
       "file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.json",
@@ -1885,7 +1885,7 @@
       "query_count": 444,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a4269a99dd0bf772a299e178dd95eca9d0bef8d52df06b9d39af72b243f07429"
+      "bundle_sha256": "aa2194b5036763273d63b29e352780add83eb30bacc2943b340f5581be1cb350"
     },
     {
       "file": "read_primitives_sf01_snowflake_sql_20261001_105057_79bd90a5.json",
@@ -1898,7 +1898,7 @@
       "query_count": 444,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "27f18decc18b0f581d8dc8516c0429aa084c6f9f32e507cce724e3a8ed804e6c"
+      "bundle_sha256": "3512a43789ee8952c50d633e0afc17d671a0fce93e729f2714b360aee5f00d10"
     },
     {
       "file": "ssb_sf001_clickhouse_local_sql_20260825_175415_374cef00.json",
@@ -2730,7 +2730,7 @@
       "query_count": 267,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "dc75a6d91e3896a3b237a662bca6e597f7758134920994a54d834eee82086e75"
+      "bundle_sha256": "8d767d1ac4ba6cd4d3f6ab6dc8050ebe0f71adb95654a5e3ba941bfc7d5387ec"
     },
     {
       "file": "tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json",
@@ -2769,7 +2769,7 @@
       "query_count": 267,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "0113630fa60baf6c7f6233bcc3f2222e875e364c19623080c0f42ba8a7ca260c"
+      "bundle_sha256": "6a5eb592e6e491a720bdad6ab9c0daa117fc76f5db2624de0131856b60256ebc"
     },
     {
       "file": "tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
@@ -2795,7 +2795,7 @@
       "query_count": 267,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c8d50f488c6404f3681fa0572fed26ffa8ceddf60cb77f381232b322bd59a4f9"
+      "bundle_sha256": "1fd9a95b990a5f2369317bfb2704aeb6ef7055d00d8acc68d9c3554a9d7361c5"
     },
     {
       "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
@@ -3380,7 +3380,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "26fe3749cd436fdcb1d33e2b4c9c4aad911b566fb851fb1599596f2ce4b0b3a3"
+      "bundle_sha256": "819de8622ab5aca0fb51bf9366c44bf8c95020662d1a61f3c4b385a4d9ef260b"
     },
     {
       "file": "tpch_skew_sf1_bigquery_sql_20260925_225451_d1e9d2fd.json",
@@ -3393,7 +3393,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "bccc76f8d363187521e3a448a4a57683a24b7708502f0dd02e192e818bb634c7"
+      "bundle_sha256": "0ea8db8cec4e25efb71d70e41fa3fb23be1c191396a98cd48d00ddf753f7302a"
     },
     {
       "file": "tpch_skew_sf10_bigquery_sql_20260927_104923_b3fc1da6.json",
@@ -3406,7 +3406,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "06b061fc9e9e7d8f39f73a75ca7ebc5aeac434f8609e58d296b928499006f5bd"
+      "bundle_sha256": "12488739cca47da9d95e2bab27aca16c7a09a0860fbee2fcee6e4456757145c5"
     },
     {
       "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
@@ -3497,7 +3497,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "1006fc7a4aecc93758ae31a51679d6da999809d67851c158c9ff2fd7051ac8cc"
+      "bundle_sha256": "97662b89526034ef19757ab84010a4a86279a54af0000e1d3354658c0e5ac58c"
     },
     {
       "file": "tpch_skew_sf1_databricks_sql_20261001_103719_61f8cbae.json",
@@ -3510,7 +3510,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "454d198d78b6d2f5d22039b3d06f57e15d463af38989e4398f5d03a68374c8b0"
+      "bundle_sha256": "bdb26f4135f216a86fa913015d891f4d11a6bd848333962612319760c032f2d4"
     },
     {
       "file": "tpch_skew_sf10_databricks_sql_20261001_104602_9f1d9a8b.json",
@@ -3523,7 +3523,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "cb8a94de4b8027c2b6cadc2dd3492573e5553db9165cffed86834aa9049d92d4"
+      "bundle_sha256": "b8579144c8286c8ce54ac9a4c0ea1d65194c647bb21e68d5b6e2d64c65314105"
     },
     {
       "file": "tpch_skew_sf001_duckdb_sql_20260824_082549_fea46d50.json",
@@ -3653,7 +3653,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "3d9c048809519359123d40d8528f60be6322de193be2ed6f105859622c1874ab"
+      "bundle_sha256": "09cc0b677ebfd5edb3792542c2c4e75e72003ddcf3357edef29c579993c17183"
     },
     {
       "file": "tpch_skew_sf1_snowflake_sql_20260925_221217_97d77ab8.json",
@@ -3666,7 +3666,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c8fd83da00c6ef03b93faca602779413bc8c809b31ddeb0047d647dcc349248d"
+      "bundle_sha256": "60bc23cba50824c2f68fe086b73d0da1f5d450864e7a2639dbe3393fbeb6c065"
     },
     {
       "file": "tpch_skew_sf10_snowflake_sql_20260929_124322_e9d6506c.json",
@@ -3679,7 +3679,7 @@
       "query_count": 66,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e7e54a8ee861d7bebcdde448c3ccb761c930a82267fd7cd1c99085323fed695f"
+      "bundle_sha256": "9d6269b898213625e690b7cd08fd95be40dab2d058acdd4790e52b6a806143c6"
     },
     {
       "file": "tpchavoc_sf01_bigquery_sql_20260929_141245_143d6f5e.json",
@@ -3692,7 +3692,7 @@
       "query_count": 654,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b623131c909c78b633c842d52499404fead60b51e219afb3bec5acc9bb79a956"
+      "bundle_sha256": "013e70550f571129d7bcb90ae87a6351d3b0026602dfe7f7075f24cb783346b1"
     },
     {
       "file": "tpchavoc_sf1_bigquery_sql_20261001_113358_53fc08cb.json",
@@ -3705,7 +3705,7 @@
       "query_count": 654,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b470ebf62e0695d6c214e38511c0e9c0f726db8ad2ad5ef89a4e5d32bacd6c18"
+      "bundle_sha256": "3fe79bebac0477a2a4fec6108dd9575b05fcf7cc488719eedc9688107dd6d570"
     },
     {
       "file": "tpchavoc_sf10_bigquery_sql_20261001_190554_ad5f29c8.json",
@@ -3718,7 +3718,7 @@
       "query_count": 654,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2576660e286d2b5300cbc4f80ea3d09ddd36b339f20516d2082bab1f3fa686dc"
+      "bundle_sha256": "55993d797642f303c1f6d44332f7677ea2f8d38be30a48773d9f93440e18d40d"
     },
     {
       "file": "tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json",
@@ -3809,7 +3809,7 @@
       "query_count": 657,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "da9c9191cf874f4d2073c160d4b9af26053528ee558c1c26378df493b0185c87"
+      "bundle_sha256": "9b756b43f9714debff635b1ecc2f95851c10929463a5c5c2ba522d3d8f35cb44"
     },
     {
       "file": "tpchavoc_sf1_databricks_sql_20261001_075954_ffaa37ca.json",
@@ -3822,7 +3822,7 @@
       "query_count": 657,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "0101276bfce786abdbe219702fc3acf6ca56a5b7688333af6fde6937becfb422"
+      "bundle_sha256": "fb47946351a6a1f9bb82f0563ff3b8ce103c84149f5b249bcf4a7c11f005ee59"
     },
     {
       "file": "tpchavoc_sf10_databricks_sql_20261001_084206_6d92a08e.json",
@@ -3835,7 +3835,7 @@
       "query_count": 657,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "e0e5cbe0ffc601cb1bd1dc6d4091ed26fd42b7fa9f372df59fdb0b533ca37d33"
+      "bundle_sha256": "94419bc6ba0164de24b62277b66445c6722de962f8765f3eeed18a09d1a8a4ea"
     },
     {
       "file": "tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json",
@@ -3887,7 +3887,7 @@
       "query_count": 654,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "c94a09276c80f1132225d3a42ae3bd7bd7c3e98ca671094054e5c997007322ea"
+      "bundle_sha256": "42e1be186f55a297552b69e6f82a5c47c341a87d9dd5e6d597ca1f9d8bafbc82"
     },
     {
       "file": "tpchavoc_sf1_snowflake_sql_20260930_200344_2761bdbc.json",
@@ -3900,7 +3900,7 @@
       "query_count": 654,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "888b478d0fcf81136922ce26414459ad5074db8119792eaee5ceceabf4341738"
+      "bundle_sha256": "60bec6fed54c01bb216de24f4035e52aa13a56dca2d5263449863fbb7bac1762"
     },
     {
       "file": "tpchavoc_sf10_snowflake_sql_20260930_193124_48bb07c7.json",
@@ -3913,7 +3913,7 @@
       "query_count": 654,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a28b2de9e2f9fbadc148ced09b6613fa4018d6d7f7064e4483817dd78f815f03"
+      "bundle_sha256": "b4ed07e5a9419a3c2269a8d2a831fbeb68111fae7b0fadc34df1edf1670d63a9"
     },
     {
       "file": "transaction_primitives_sf001_bigquery_sql_20261001_205304_209908db.json",
@@ -3926,7 +3926,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "8f11aba3fea6a57f3f83bbee945663656cccf5765c73eb079b903102bb63875e"
+      "bundle_sha256": "53dd2783fc80a3090fedb0c2881a2b9ec30ed70c8afe6be1f06af4364b224e7e"
     },
     {
       "file": "transaction_primitives_sf01_bigquery_sql_20261001_151409_dc7eeac0.json",
@@ -3939,7 +3939,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "072a05d5a53b06b170f4d69f84ca003b75caa054ae27e90b56358074880d8175"
+      "bundle_sha256": "a6dc5a469ba4ca4d651fcdd13e3c7d8336797f4f571137682b8b93aec69b711a"
     },
     {
       "file": "transaction_primitives_sf1_bigquery_sql_20261001_154316_52129540.json",
@@ -3952,7 +3952,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6aa352460e22dff341aee2d3a5e50daa05f2f559832ec07ccfdd9101be6efff2"
+      "bundle_sha256": "43e0f5753e8f2581fbca580040e387061d75724dbf43a2c5af436dbb3995ee55"
     },
     {
       "file": "transaction_primitives_sf001_databricks_sql_20261001_165710_25cbf2c1.json",
@@ -3965,7 +3965,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b0eecb8b496a1e3629fb386df8b53f6b3beb72217284c5cb4ecda6e21b283300"
+      "bundle_sha256": "5f80e54518ea2566c89c9ff3b3b895d0923df3138dea47b232c78c3faa7ba56c"
     },
     {
       "file": "transaction_primitives_sf01_databricks_sql_20261001_175853_773a7d29.json",
@@ -3978,7 +3978,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "59cbfa3fe731b0f69979ea7f8c2f5a3ba65bbfc69815187811b09e991e7a0763"
+      "bundle_sha256": "7771856754bff526fa37e62a606f1d0623963a9b2c7d53a4db37529a4bb31071"
     },
     {
       "file": "transaction_primitives_sf1_databricks_sql_20261001_190409_576d4969.json",
@@ -3991,7 +3991,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "fc9f83d53b7a212fad4346780cec1d1d1e317220a7dfe09e72c18f4abdb52f15"
+      "bundle_sha256": "98c910bd128f0d7c7c0ac302d360436a28b6c93bd105b6085ef972218e985e55"
     },
     {
       "file": "transaction_primitives_sf001_snowflake_sql_20261001_084848_c3e017eb.json",
@@ -4004,7 +4004,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "888acafa83ce3f96458819c86019d8c9e7edc6fd6036f18acf6f28cc8e80e902"
+      "bundle_sha256": "acc10702b195fa4016b961cb58825c031bf6631f0008a2338d83cfb532f6feb2"
     },
     {
       "file": "transaction_primitives_sf01_snowflake_sql_20261001_090534_90566a67.json",
@@ -4017,7 +4017,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "7a99b732a915f058d90c8031710185faa97da736d54ec895523f74278a9fe2ef"
+      "bundle_sha256": "e2ea21fcaf0baf3e6df6da9372e089a22b6b0f24ac84925a306144ec7122cecd"
     },
     {
       "file": "transaction_primitives_sf1_snowflake_sql_20261001_092311_b4c0d6da.json",
@@ -4030,7 +4030,7 @@
       "query_count": 69,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d9ff7edf5b5bcbdcbb1aa68e631860f878784a3185c63f182293e466c7afacca"
+      "bundle_sha256": "f17a2c358bfeaecfb67e5abbbd4ca383341da4693f631c08ee0f8da166de9361"
     },
     {
       "file": "tsbs_devops_sf01_bigquery_sql_20260929_192405_78305c52.json",
@@ -4043,7 +4043,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a941207eb5071db6406b551f6d7a54cfaa0b77db463f8a885efe95191ed8447c"
+      "bundle_sha256": "603530ec76feb51e947cc9179b8cba91f2234a02ae10bba6ac73b6904d232329"
     },
     {
       "file": "tsbs_devops_sf1_bigquery_sql_20260929_194803_b2f76dae.json",
@@ -4056,7 +4056,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "f0d9aab6ed5c862f865288c8530b124f81d9c1db4be16e67f98c15944c0152e0"
+      "bundle_sha256": "79d0287247c6f044992a03facf161a279f2f2597cc61947b271641a3531f5e85"
     },
     {
       "file": "tsbs_devops_sf10_bigquery_sql_20261001_085654_76754d66.json",
@@ -4069,7 +4069,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5ed4109730b56fc239e2e46511b9ef5bd319b0c3bb899d6ebed5a4081f2ba7cb"
+      "bundle_sha256": "24ae1e276158b4007b04d86a8dbcd88c693e40490b42ad2776e00a3ac9612d3d"
     },
     {
       "file": "tsbs_devops_sf01_databricks_sql_20260930_173454_741f616c.json",
@@ -4082,7 +4082,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "03524711e3cc22b71ea0801656f390675d0382f9b3fb867f798834bdb389bc6b"
+      "bundle_sha256": "3b9eba6e4186e648c7d657d46e58ea16b63488fea6d0af1331c118b1b1577cd6"
     },
     {
       "file": "tsbs_devops_sf1_databricks_sql_20260930_173958_176e523b.json",
@@ -4095,7 +4095,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "b0d3e6ea849eefd1ed54c9ec919bdbab0739041f56879a3aed77862df16ffa6a"
+      "bundle_sha256": "5605a923874eaa3b159b110cd4f94001c4f6dcee55c2ddd7ff7b12e70ad7144c"
     },
     {
       "file": "tsbs_devops_sf10_databricks_sql_20260930_174638_397e236a.json",
@@ -4108,7 +4108,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "0312297241bbd701fe0b16dd7fa3f7bc2688fe13848c83a02a7d3a622ad4eccd"
+      "bundle_sha256": "2505704c1227c6f27c6f6023434961c967eff9fc514ddbbead12c64bf4250559"
     },
     {
       "file": "tsbs_devops_sf01_snowflake_sql_20260929_192425_ba04d0d6.json",
@@ -4121,7 +4121,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "2de5b5088af58cd4612f23343e53085def641477b0904b71f17f94c707f37ef8"
+      "bundle_sha256": "93cea4edec566fd66bc3eb7285d5713755c1e84ce66dc2db42d7b8db2c17c8d5"
     },
     {
       "file": "tsbs_devops_sf1_snowflake_sql_20260929_192925_18bb194f.json",
@@ -4134,7 +4134,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "d91edd77853adb533ba3bd06901782956ca1ebd552736c1c543803d53206f98f"
+      "bundle_sha256": "60f4d13e6231dac9b1d321b475cb214721dadf6050ad595bd9021268adc0df46"
     },
     {
       "file": "tsbs_devops_sf10_snowflake_sql_20260929_224733_a340c633.json",
@@ -4147,7 +4147,7 @@
       "query_count": 54,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "ad8e39cfb806fac5ae5a8bfab5c7f082a5e1528bf3c08fdd9c054af0612047b1"
+      "bundle_sha256": "aa90aa054b21ae9bf7f1db54c4e7f846a668d6975767eb7170ba7d9e6b455636"
     },
     {
       "file": "write_primitives_sf001_bigquery_sql_20261001_202950_88736ac2.json",
@@ -4160,7 +4160,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5cee0b7d68231809c2d4b85694bf2144f68901ac7f1b2ebb3bc4ea899893e3a5"
+      "bundle_sha256": "9b56ac5abbbe778d8699b7574a1ba370dbe486d9aa2b1452a0a25b6611c30593"
     },
     {
       "file": "write_primitives_sf01_bigquery_sql_20261001_131148_b2d946ee.json",
@@ -4173,7 +4173,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "27bcd7bb6d67ac7686e7da39eeb6ac11593f07407fe17e047d3478dea923609e"
+      "bundle_sha256": "7659f7358f87386c1b664bcd66d7a3ffe9791a2cdb105430ead5543d8243bda8"
     },
     {
       "file": "write_primitives_sf1_bigquery_sql_20261001_144917_922446ec.json",
@@ -4186,7 +4186,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "995a1d06e881a15807e723b6d3c5f28c367f22fc553240ba5cf45b0d27e10a10"
+      "bundle_sha256": "761e4ef014410d8b28db80ef919cb8b98d21cb149004294a78c88b5b0c07fcf9"
     },
     {
       "file": "write_primitives_sf001_databricks_sql_20261001_164226_94cc487b.json",
@@ -4199,7 +4199,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "beae02352a9dee87018b899a7f1e23e7f4e16bee0cd50846c010650a095bae8c"
+      "bundle_sha256": "b79ac4affc6272c8a5d7c00886b4c7c819042215b6b29f0f8fa68f6fcf07a317"
     },
     {
       "file": "write_primitives_sf01_databricks_sql_20261001_174439_9055e7de.json",
@@ -4212,7 +4212,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "a314a43ff8665a1f1be261ccf72409f4e8171a0dcba8a005522d66fd6aff7b0b"
+      "bundle_sha256": "d391f4e8b2c01896ab56d0c6a523a054bb828e2bc080ff06075d6ca2c95b931c"
     },
     {
       "file": "write_primitives_sf1_databricks_sql_20261001_184834_88ba12ba.json",
@@ -4225,7 +4225,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "6b46bb52c1617b872a8c1a9e528e7476737e039044bb86eeba0ba54949d69f81"
+      "bundle_sha256": "8880ffca0b8f7eb4871c811047e7d12c6923fe800c4b7cbe8c5dc57eedeeecc4"
     },
     {
       "file": "write_primitives_sf001_snowflake_sql_20260930_212005_0fab9883.json",
@@ -4238,7 +4238,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "56191c71766fffd36a0dc6d9d158a7d524dbcd4769cb9f0e90730237ee02f811"
+      "bundle_sha256": "1e61b5de9cb402b0a5699df54bb3fa237ade3c1c9662cc99a24f69739b2e5f63"
     },
     {
       "file": "write_primitives_sf01_snowflake_sql_20260930_222159_5d085279.json",
@@ -4251,7 +4251,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "5196b420087817644256d3c485cd61c924e425b298b5b24e28e077f75b57ad6c"
+      "bundle_sha256": "f397a57ee7c560854cc90fc3d1dd8af0d67df6c3cb9a67277defe12387c3c1fd"
     },
     {
       "file": "write_primitives_sf1_snowflake_sql_20261001_083039_3c313d6f.json",
@@ -4264,7 +4264,7 @@
       "query_count": 336,
       "trust_label": "maintainer-run",
       "funding": "unspecified",
-      "bundle_sha256": "9ba2ff706d6de84bb9742029aff8721e14b1e318944a9fa65a9db19405c72cf3"
+      "bundle_sha256": "405e56dc4da5053f78daeb54e11b196ba0a6edb6cd95a84e6b665debf0cff914"
     }
   ],
   "cohorts": {
