@@ -421,10 +421,14 @@ def test_native_test_output_runs_between_stop_and_resume_tokens(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], fails: bool, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
-    events: list[str] = []
+    seen: list[str] = []
 
     def native_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
-        events.append("native")
+        before = capsys.readouterr().out.splitlines()
+        assert len(before) == 1 and before[0].startswith("::stop-commands::")
+        seen.append(before[0])
+        assert kwargs["stderr"] is subprocess.STDOUT
+        print("child output")
         if fails:
             raise subprocess.CalledProcessError(1, command)
         return subprocess.CompletedProcess(command, 0)
@@ -435,11 +439,21 @@ def test_native_test_output_runs_between_stop_and_resume_tokens(
             policy_runner.run_native_tests(tmp_path, tmp_path, {})
     else:
         policy_runner.run_native_tests(tmp_path, tmp_path, {})
-    lines = capsys.readouterr().out.splitlines()
-    assert events == ["native"]
-    stop = next(line for line in lines if line.startswith("::stop-commands::"))
-    token = stop.removeprefix("::stop-commands::")
-    assert len(token) == 32 and lines == [stop, f"::{token}::"]
+    after = capsys.readouterr().out.splitlines()
+    token = seen[0].removeprefix("::stop-commands::")
+    assert len(token) == 32
+    assert after == ["child output", f"::{token}::"]
+
+
+def test_comment_policy_job_does_not_let_setup_uv_scan_the_candidate_checkout() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["comment-policy"]["steps"]
+    uv = next(step for step in steps if str(step.get("uses", "")).startswith("astral-sh/setup-uv@"))
+    assert uv["with"] == {
+        "enable-cache": False,
+        "working-directory": "${{ runner.temp }}",
+        "ignore-empty-workdir": True,
+    }
 
 
 def test_native_test_output_is_not_wrapped_outside_github_actions(

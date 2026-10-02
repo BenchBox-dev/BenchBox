@@ -176,6 +176,7 @@ def run_native_tests(root: Path, trusted: Path, env: dict[str, str]) -> None:
             cwd=trusted,
             env=env,
             check=True,
+            stderr=subprocess.STDOUT,
         )
     finally:
         if token:
