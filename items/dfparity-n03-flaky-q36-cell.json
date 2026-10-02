@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The cause of the flip is stated with evidence",
+    "Q36 is stable over 40 repeats or classified with the reason",
+    "The classifier and the promotion gate fail or flag a cell that differs between repeated runs"
+  ],
+  "description": "Q36 on the expression family at SF 0.03 diverges in some runs of identical code (40 repeats in one process: 2 divergent without the #2502 changes, 1 with them; detail: Value mismatch at row 4, column 3. Original: 0, Variant: 1). Q36 uses none of the changed code. Find the cause (likely a tie or an unstable aggregation order). A cell that flips between runs cannot be a stable gate, so the classifier (t14) and the promotion gate (t20) need repeat-run detection.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:33:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c245261a21b74ceda935b08542add4b7",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
