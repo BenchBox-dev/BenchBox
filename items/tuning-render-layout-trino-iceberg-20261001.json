@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Snapshot test (adapter == generator) and fake-driver execution test pass; registry entry flipped; registry parity test green.",
+    "With a tuning file requesting the layout, the reconciliation records no drop for it on this platform."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.4 (A1.4; closes registry preview_only gap).",
+  "description": "## Problem\nOn trino-iceberg, the capability registry marks layout tuning `:preview_only`: the generator renders it for `--dry-run`, but execution applies nothing (`capability_registry.py:174` and the platform entries). A user's tuning file therefore silently does nothing. Until the reconciliation item lands it isn't even recorded as dropped.\n\n## Change\nRender at execution: WITH (partitioning=..., sorted_by=...) for Trino/Starburst/Presto (Iceberg/Hive).\n\nFollow ADR-003's per-platform cutover:\n1. a before/after DDL snapshot test proving adapter output equals generator output;\n2. flip the registry entry from `:preview_only` to a rendered mechanism;\n3. a fake-driver execution test showing the statements are executed and recorded.\n\n## Guardrails (must preserve)\n- Untuned DDL is unchanged (snapshot).\n- Live confirmation only with explicit approval.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/platforms/trino.py",
+    "benchbox/platforms/presto_trino_adapter_base.py",
+    "benchbox/core/tuning/generators/trino.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:29:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "38209714ea0d4dabb530ae5a80288dda",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
