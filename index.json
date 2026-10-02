@@ -6366,7 +6366,13 @@
     "dfparity-t06-literal-fallback-lint": {
       "claim": null,
       "needs": [
-        "dfparity-t05-adapter-batches"
+        "dfparity-t05a-adapters-batch-a",
+        "dfparity-t05b-adapters-batch-b",
+        "dfparity-t05c-adapters-batch-c",
+        "dfparity-t05d-adapters-batch-d",
+        "dfparity-t05e-adapters-batch-e",
+        "dfparity-t05f-adapters-batch-f",
+        "dfparity-t05g-adapters-hard-coded"
       ],
       "priority": "medium-high",
       "status": "open",
