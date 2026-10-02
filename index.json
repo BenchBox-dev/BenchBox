@@ -20615,6 +20615,16 @@
       "status": "done",
       "title": "Correct capability-registry entries resting on the dead generate_tuning_clause adapter mixin (postgresql, snowflake, redshift, bigquery, mysql)"
     },
+    "tuning-render-layout-bigquery-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-capability-single-source-validator-20261001",
+        "tuning-requested-vs-rendered-reconciliation-20261001"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Render requested layout tuning at execution on bigquery (registry preview_only -> rendered)"
+    },
     "tuning-render-layout-redshift-20261001": {
       "claim": null,
       "needs": [
