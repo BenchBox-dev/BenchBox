@@ -109,15 +109,16 @@ a PR's mergeability — both only alert.
   - `make pr-arm` on a finished branch (enqueues the exact local head after a
     live check of the PR)
   - `make pr-open READY=1` to open or reuse the PR and arm it in one step
-  - `make pr-ready PR=<n> HEAD=<sha> EVIDENCE=<path>`, the evidence-gated
-    path; the evidence file declares `delivery_mode` (`batch` evidence must
+  - `make pr-ready PR=<n> HEAD=<sha>`, which arms through `make pr-arm`; with
+    `EVIDENCE=<path>` or `BATCH=1` it runs the evidence transaction instead,
+    and the evidence file declares `delivery_mode` (`batch` evidence must
     include the complete batch binding)
 
   `auto-merge-on-open.yml` is revoke-only
   and never arms (its draft→ready arm point never fired once and was deleted
   — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
   D2). The Makefile paths refuse while the PR carries the `no-auto-merge`
-  label; `make pr-ready` also refuses for soundness paths, and
+  label; the evidence transaction also refuses for soundness paths, and
   `auto-merge-on-open.yml` disarms a soundness-path PR on each push, so arm
   such a PR with `make pr-arm` after its last push.
 
@@ -134,7 +135,7 @@ a PR's mergeability — both only alert.
 
   Do **not** remediate a green-unmerged alert by re-pushing "to re-trigger
   synchronize." That path no longer enables auto-merge. When the branch is
-  final, arm via `make pr-ready` / `READY=1` with exact readiness evidence; if work continues, leave
+  final, arm via `make pr-arm` (or `READY=1`); if work continues, leave
   auto-merge off (or apply a durable hold — see below).
 
   A green revocation-workflow run is also not proof of the PR's `auto_merge`
