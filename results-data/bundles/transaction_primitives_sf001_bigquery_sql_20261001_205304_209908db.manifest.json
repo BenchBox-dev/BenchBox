@@ -1,0 +1,8 @@
+{
+  "bundle_file": "transaction_primitives_sf001_bigquery_sql_20261001_205304_209908db.json",
+  "bundle_hash": "a1e47a1e8eee5320bfa026e5dce54da4e9f46d4f3e9e139afdef38911ee6c0f9",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

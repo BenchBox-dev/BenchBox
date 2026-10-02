@@ -1,0 +1,8 @@
+{
+  "bundle_file": "nyctaxi_sf1_bigquery_sql_20260923_091616_1f78ef99.json",
+  "bundle_hash": "07d367a711478e13edfcfcb99fc3be989cd713b0af496a27819469dc16292f2c",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

@@ -1,0 +1,1096 @@
+{
+  "benchmark": {
+    "id": "flightdata",
+    "name": "Flight Data OLAP",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "account": "account_a1fffaa9cc9a",
+      "database": "database_f3ba6a7c0af9",
+      "default_output_location": "path_d969e086da79",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "last_updated": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "password": "<redacted>",
+      "role": "role_b316fb92dc3e",
+      "schema": "schema_ea670f1f4924",
+      "show_query_plans": "saved_config",
+      "status": "saved_config",
+      "tuning_source": "saved_config",
+      "username": "user_4af2b511cbe3",
+      "warehouse": "warehouse_1dea189db0ff"
+    },
+    "platform_options": {
+      "account": "account_0357e1819187",
+      "database": "database_f7fe55623feb",
+      "default_output_location": "path_542e3a574624",
+      "force_recreate": false,
+      "force_upload": false,
+      "last_updated": "2025-10-24T10:18:18.584043",
+      "normalize_plan_literals": false,
+      "password": "<redacted>",
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "show_query_plans": false,
+      "status": "valid",
+      "tuning_source": "baseline",
+      "username": "user_dbea85fd2491",
+      "warehouse": "warehouse_a86522e42ed1"
+    }
+  },
+  "cost": {
+    "model": "actual"
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 113.005,
+        "min": 103.228,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "managed_cloud",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "snowflake-connector-python",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "4.7.3",
+    "driver_version_resolved": "4.7.3",
+    "entry_point": "cli",
+    "mode": "sql",
+    "timestamp": "2026-10-01T11:12:26.844523",
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-10-01T11:15:01.353988",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "credit",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "unavailable",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": "aws",
+      "cloud_region": "AWS_US_EAST_2",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": "X-Small"
+    },
+    "normalized_cost_usd": null,
+    "pricing_region": "AWS_US_EAST_2"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 47618,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 97019,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 1754,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 2146,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "4.7.3",
+    "cloud": {
+      "account": "account_34e3849c269e",
+      "collection_status": "partial",
+      "organization": "organization_e5079cbf172a",
+      "provider": "aws",
+      "region": "AWS_US_EAST_2",
+      "source": "observed"
+    },
+    "compute": {
+      "auto_resume": "true",
+      "auto_suspend": 300,
+      "cache_control": {
+        "cache_disabled": true,
+        "settings": {
+          "USE_CACHED_RESULT": "FALSE"
+        },
+        "validated": true
+      },
+      "collection_status": "available",
+      "max_cluster_count": 1,
+      "min_cluster_count": 1,
+      "multi_cluster_warehouse": false,
+      "query_acceleration_max_scale_factor": "true",
+      "result_cache_enabled": false,
+      "scaling_policy": 0,
+      "source": "observed",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "X-Small",
+      "warehouse_state": "STARTED",
+      "warehouse_type": "STANDARD"
+    },
+    "config": {
+      "account": "account_0357e1819187",
+      "account_name": "account_34e3849c269e",
+      "auto_resume": true,
+      "auto_suspend": 300,
+      "cloud_provider": "AWS",
+      "cloud_region": "AWS_US_EAST_2",
+      "compression": "AUTO",
+      "connection_mode": "remote",
+      "database": "database_f3412a0efb36",
+      "driver_package": "snowflake-connector-python",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "4.7.3",
+      "driver_version_resolved": "4.7.3",
+      "engine_version": "10.35.101",
+      "engine_version_source": "sql_query",
+      "execution_mode": "sql",
+      "file_format": "CSV",
+      "multi_cluster_warehouse": false,
+      "organization_name": "organization_e5079cbf172a",
+      "result_cache_enabled": false,
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "staging_root": "path_542e3a574624",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "MEDIUM"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "remote",
+      "database": "database_f3412a0efb36",
+      "deployment_type": "managed_cloud",
+      "endpoint_class": "cloud_endpoint",
+      "metadata_source": "observed",
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1"
+    },
+    "driver_actual_version": "4.7.3",
+    "driver_package": "snowflake-connector-python",
+    "driver_resolved_version": "4.7.3",
+    "driver_runtime_strategy": "current-process",
+    "name": "Snowflake",
+    "raw_config": {
+      "account": "account_0357e1819187",
+      "account_name": "account_34e3849c269e",
+      "auto_resume": true,
+      "auto_suspend": 300,
+      "compression": "AUTO",
+      "database": "database_f3412a0efb36",
+      "file_format": "CSV",
+      "multi_cluster_warehouse": false,
+      "organization_name": "organization_e5079cbf172a",
+      "password": "<redacted>",
+      "private_key_passphrase": "<redacted>",
+      "private_key_path": "<redacted>",
+      "result_cache_enabled": false,
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "staging_root": "path_542e3a574624",
+      "tuning_source": "baseline",
+      "type": "snowflake",
+      "username": "user_d16817d72f81",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "MEDIUM"
+    },
+    "raw_metadata": {
+      "cloud_provider": "AWS",
+      "cloud_region": "AWS_US_EAST_2",
+      "compute_configuration": {
+        "auto_resume": "true",
+        "auto_suspend": 300,
+        "enable_query_acceleration": "",
+        "max_cluster_count": 1,
+        "min_cluster_count": 1,
+        "query_acceleration_max_scale_factor": "true",
+        "scaling_policy": 0,
+        "warehouse_name": "warehouse_a86522e42ed1",
+        "warehouse_size": "X-Small",
+        "warehouse_state": "STARTED",
+        "warehouse_type": "STANDARD"
+      }
+    },
+    "storage": {
+      "collection_status": "partial",
+      "compression": "AUTO",
+      "source": "requested",
+      "staging_location": "path_542e3a574624",
+      "table_format": "CSV"
+    },
+    "tuning": {
+      "applied": {
+        "dropped": [],
+        "statements": [
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "failed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          }
+        ],
+        "status": "not_applicable"
+      },
+      "applied_ledger_hash": "e8c5bfd447d862128ad9b9362a344819bbe56a30b48fc8f1f316e409639bf768"
+    },
+    "version": "10.35.101"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "ontime-by-carrier",
+      "iter": 0,
+      "ms": 799.3,
+      "rows": 17,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "delay-by-airport",
+      "iter": 0,
+      "ms": 1275.6,
+      "rows": 50,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "delay-by-hour",
+      "iter": 0,
+      "ms": 522.5,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "best-routes",
+      "iter": 0,
+      "ms": 991.4,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "improvement-trend",
+      "iter": 0,
+      "ms": 535.7,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "delay-causes",
+      "iter": 0,
+      "ms": 537.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "cascade-delays",
+      "iter": 0,
+      "ms": 687.1,
+      "rows": 17,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "weather-impact",
+      "iter": 0,
+      "ms": 494.2,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "recovery-time",
+      "iter": 0,
+      "ms": 653.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "busiest-routes",
+      "iter": 0,
+      "ms": 812.8,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "route-reliability",
+      "iter": 0,
+      "ms": 778.7,
+      "rows": 30,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "distance-delay",
+      "iter": 0,
+      "ms": 560.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "hub-connectivity",
+      "iter": 0,
+      "ms": 2010.3,
+      "rows": 30,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "day-of-week",
+      "iter": 0,
+      "ms": 470.6,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "seasonal-trends",
+      "iter": 0,
+      "ms": 515.2,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "holiday-impact",
+      "iter": 0,
+      "ms": 989.2,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "time-of-day",
+      "iter": 0,
+      "ms": 621.6,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "carrier-ranking",
+      "iter": 0,
+      "ms": 801.3,
+      "rows": 17,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "cancellation-rate",
+      "iter": 0,
+      "ms": 654.4,
+      "rows": 17,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "market-share",
+      "iter": 0,
+      "ms": 1155.3,
+      "rows": 17,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ontime-by-carrier",
+      "iter": 1,
+      "ms": 846.4,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "delay-by-airport",
+      "iter": 1,
+      "ms": 848.2,
+      "rows": 50,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "delay-by-hour",
+      "iter": 1,
+      "ms": 498.5,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "best-routes",
+      "iter": 1,
+      "ms": 859.8,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "improvement-trend",
+      "iter": 1,
+      "ms": 427.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "delay-causes",
+      "iter": 1,
+      "ms": 402.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "cascade-delays",
+      "iter": 1,
+      "ms": 673.9,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "weather-impact",
+      "iter": 1,
+      "ms": 394.3,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "recovery-time",
+      "iter": 1,
+      "ms": 572.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "busiest-routes",
+      "iter": 1,
+      "ms": 871.0,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "route-reliability",
+      "iter": 1,
+      "ms": 936.4,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "distance-delay",
+      "iter": 1,
+      "ms": 544.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "hub-connectivity",
+      "iter": 1,
+      "ms": 1561.3,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "day-of-week",
+      "iter": 1,
+      "ms": 475.0,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "seasonal-trends",
+      "iter": 1,
+      "ms": 490.8,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "holiday-impact",
+      "iter": 1,
+      "ms": 653.3,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "time-of-day",
+      "iter": 1,
+      "ms": 584.4,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "carrier-ranking",
+      "iter": 1,
+      "ms": 782.2,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "cancellation-rate",
+      "iter": 1,
+      "ms": 634.6,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "market-share",
+      "iter": 1,
+      "ms": 1198.4,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ontime-by-carrier",
+      "iter": 2,
+      "ms": 663.7,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "delay-by-airport",
+      "iter": 2,
+      "ms": 791.3,
+      "rows": 50,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "delay-by-hour",
+      "iter": 2,
+      "ms": 534.1,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "best-routes",
+      "iter": 2,
+      "ms": 891.3,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "improvement-trend",
+      "iter": 2,
+      "ms": 458.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "delay-causes",
+      "iter": 2,
+      "ms": 429.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "cascade-delays",
+      "iter": 2,
+      "ms": 622.0,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "weather-impact",
+      "iter": 2,
+      "ms": 404.7,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "recovery-time",
+      "iter": 2,
+      "ms": 575.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "busiest-routes",
+      "iter": 2,
+      "ms": 643.3,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "route-reliability",
+      "iter": 2,
+      "ms": 784.0,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "distance-delay",
+      "iter": 2,
+      "ms": 573.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "hub-connectivity",
+      "iter": 2,
+      "ms": 1323.0,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "day-of-week",
+      "iter": 2,
+      "ms": 535.8,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "seasonal-trends",
+      "iter": 2,
+      "ms": 439.5,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "holiday-impact",
+      "iter": 2,
+      "ms": 510.1,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "time-of-day",
+      "iter": 2,
+      "ms": 498.6,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "carrier-ranking",
+      "iter": 2,
+      "ms": 870.0,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "cancellation-rate",
+      "iter": 2,
+      "ms": 671.7,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "market-share",
+      "iter": 2,
+      "ms": 1053.0,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ontime-by-carrier",
+      "iter": 3,
+      "ms": 624.6,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "delay-by-airport",
+      "iter": 3,
+      "ms": 779.5,
+      "rows": 50,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "delay-by-hour",
+      "iter": 3,
+      "ms": 489.9,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "best-routes",
+      "iter": 3,
+      "ms": 964.3,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "improvement-trend",
+      "iter": 3,
+      "ms": 492.0,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "delay-causes",
+      "iter": 3,
+      "ms": 401.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "cascade-delays",
+      "iter": 3,
+      "ms": 628.9,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "weather-impact",
+      "iter": 3,
+      "ms": 413.2,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "recovery-time",
+      "iter": 3,
+      "ms": 610.9,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "busiest-routes",
+      "iter": 3,
+      "ms": 790.8,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "route-reliability",
+      "iter": 3,
+      "ms": 823.9,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "distance-delay",
+      "iter": 3,
+      "ms": 555.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "hub-connectivity",
+      "iter": 3,
+      "ms": 1745.3,
+      "rows": 30,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "day-of-week",
+      "iter": 3,
+      "ms": 480.3,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "seasonal-trends",
+      "iter": 3,
+      "ms": 422.5,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "holiday-impact",
+      "iter": 3,
+      "ms": 516.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "time-of-day",
+      "iter": 3,
+      "ms": 533.8,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "carrier-ranking",
+      "iter": 3,
+      "ms": 850.1,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "cancellation-rate",
+      "iter": 3,
+      "ms": 661.4,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "market-share",
+      "iter": 3,
+      "ms": 1075.6,
+      "rows": 17,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "3a83168a",
+    "iterations": 3,
+    "query_time_ms": 41389,
+    "streams": 4,
+    "timestamp": "2026-10-01T11:15:01.155381",
+    "total_duration_ms": 152076
+  },
+  "summary": {
+    "cost": {
+      "total_bytes_scanned": 2794984448
+    },
+    "data": {
+      "load_time_ms": 47618.3,
+      "rows_loaded": 23437622
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 60,
+      "total": 60
+    },
+    "timing": {
+      "avg_ms": 689.8,
+      "geometric_mean_ms": 647.2,
+      "max_ms": 1745.3,
+      "min_ms": 394.3,
+      "p90_ms": 964.3,
+      "p95_ms": 1198.4,
+      "p99_ms": 1745.3,
+      "stdev_ms": 276.0,
+      "total_ms": 41388.8
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "AIRLINES": {
+      "load_ms": 2494,
+      "rows": 25
+    },
+    "AIRPORTS": {
+      "load_ms": 2748,
+      "rows": 50
+    },
+    "FLIGHTS": {
+      "load_ms": 41876,
+      "rows": 23437547
+    }
+  },
+  "version": "2.2"
+}

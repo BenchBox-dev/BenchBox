@@ -1,0 +1,8 @@
+{
+  "bundle_file": "nyctaxi_sf01_databricks_sql_20261001_101301_84fd0b4c.json",
+  "bundle_hash": "4321111ec46a2e37959473654cd66adb54f97c905fb9a0d0564a2f5ee6f04d71",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

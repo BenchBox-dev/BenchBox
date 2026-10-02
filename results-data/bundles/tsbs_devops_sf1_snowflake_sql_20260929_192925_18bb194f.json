@@ -1,0 +1,1068 @@
+{
+  "benchmark": {
+    "id": "tsbs_devops",
+    "name": "TSBS DevOps",
+    "scale_factor": 1.0,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "account": "account_a1fffaa9cc9a",
+      "database": "database_f3ba6a7c0af9",
+      "default_output_location": "path_d969e086da79",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "last_updated": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "password": "<redacted>",
+      "role": "role_b316fb92dc3e",
+      "schema": "schema_ea670f1f4924",
+      "show_query_plans": "saved_config",
+      "status": "saved_config",
+      "tuning_source": "saved_config",
+      "username": "user_4af2b511cbe3",
+      "warehouse": "warehouse_1dea189db0ff"
+    },
+    "platform_options": {
+      "account": "account_0357e1819187",
+      "database": "database_f7fe55623feb",
+      "default_output_location": "path_542e3a574624",
+      "force_recreate": false,
+      "force_upload": false,
+      "last_updated": "2025-10-24T10:18:18.584043",
+      "normalize_plan_literals": false,
+      "password": "<redacted>",
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "show_query_plans": false,
+      "status": "valid",
+      "tuning_source": "baseline",
+      "username": "user_dbea85fd2491",
+      "warehouse": "warehouse_a86522e42ed1"
+    }
+  },
+  "cost": {
+    "model": "actual"
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 85.017,
+        "min": 75.641,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "managed_cloud",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "snowflake-connector-python",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "4.7.3",
+    "driver_version_resolved": "4.7.3",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "timestamp": "2026-09-29T19:27:40.284506",
+    "translation": {
+      "attempt_count": 90,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 90,
+          "count": 90,
+          "normalized_source_dialect": "duckdb",
+          "normalized_target_dialect": "snowflake",
+          "parser_grammar": "duckdb",
+          "scope": "workload_query",
+          "source_dialect": "duckdb",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "snowflake",
+          "translator": "sqlglot",
+          "unique_queries": 88
+        }
+      ],
+      "source_dialects": [
+        "duckdb"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 90,
+      "target_dialects": [
+        "snowflake"
+      ],
+      "total_transpilation_calls": 90,
+      "translators": [
+        "sqlglot"
+      ],
+      "unique_queries_translated": 88
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-09-29T19:29:25.847819",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "credit",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "unavailable",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": "aws",
+      "cloud_region": "AWS_US_EAST_2",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": "X-Small"
+    },
+    "normalized_cost_usd": null,
+    "pricing_region": "AWS_US_EAST_2"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 37781,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 26242,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 2862,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 1891,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "4.7.3",
+    "cloud": {
+      "account": "account_34e3849c269e",
+      "collection_status": "partial",
+      "organization": "organization_e5079cbf172a",
+      "provider": "aws",
+      "region": "AWS_US_EAST_2",
+      "source": "observed"
+    },
+    "compute": {
+      "auto_resume": "true",
+      "auto_suspend": 300,
+      "cache_control": {
+        "cache_disabled": true,
+        "settings": {
+          "USE_CACHED_RESULT": "FALSE"
+        },
+        "validated": true
+      },
+      "collection_status": "available",
+      "max_cluster_count": 1,
+      "min_cluster_count": 1,
+      "multi_cluster_warehouse": false,
+      "query_acceleration_max_scale_factor": "true",
+      "result_cache_enabled": false,
+      "scaling_policy": 0,
+      "source": "observed",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "X-Small",
+      "warehouse_state": "STARTED",
+      "warehouse_type": "STANDARD"
+    },
+    "config": {
+      "account": "account_0357e1819187",
+      "account_name": "account_34e3849c269e",
+      "auto_resume": true,
+      "auto_suspend": 300,
+      "cloud_provider": "AWS",
+      "cloud_region": "AWS_US_EAST_2",
+      "compression": "AUTO",
+      "connection_mode": "remote",
+      "database": "database_37969be229d4",
+      "driver_package": "snowflake-connector-python",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "4.7.3",
+      "driver_version_resolved": "4.7.3",
+      "engine_version": "10.35.101",
+      "engine_version_source": "sql_query",
+      "execution_mode": "sql",
+      "file_format": "CSV",
+      "multi_cluster_warehouse": false,
+      "organization_name": "organization_e5079cbf172a",
+      "result_cache_enabled": false,
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "staging_root": "path_542e3a574624",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "MEDIUM"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "remote",
+      "database": "database_37969be229d4",
+      "deployment_type": "managed_cloud",
+      "endpoint_class": "cloud_endpoint",
+      "metadata_source": "observed",
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1"
+    },
+    "driver_actual_version": "4.7.3",
+    "driver_package": "snowflake-connector-python",
+    "driver_resolved_version": "4.7.3",
+    "driver_runtime_strategy": "current-process",
+    "name": "Snowflake",
+    "raw_config": {
+      "account": "account_0357e1819187",
+      "account_name": "account_34e3849c269e",
+      "auto_resume": true,
+      "auto_suspend": 300,
+      "compression": "AUTO",
+      "database": "database_37969be229d4",
+      "file_format": "CSV",
+      "multi_cluster_warehouse": false,
+      "organization_name": "organization_e5079cbf172a",
+      "password": "<redacted>",
+      "private_key_passphrase": "<redacted>",
+      "private_key_path": "<redacted>",
+      "result_cache_enabled": false,
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "staging_root": "path_542e3a574624",
+      "tuning_source": "baseline",
+      "type": "snowflake",
+      "username": "user_d16817d72f81",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "MEDIUM"
+    },
+    "raw_metadata": {
+      "cloud_provider": "AWS",
+      "cloud_region": "AWS_US_EAST_2",
+      "compute_configuration": {
+        "auto_resume": "true",
+        "auto_suspend": 300,
+        "enable_query_acceleration": "",
+        "max_cluster_count": 1,
+        "min_cluster_count": 1,
+        "query_acceleration_max_scale_factor": "true",
+        "scaling_policy": 0,
+        "warehouse_name": "warehouse_a86522e42ed1",
+        "warehouse_size": "X-Small",
+        "warehouse_state": "STARTED",
+        "warehouse_type": "STANDARD"
+      }
+    },
+    "storage": {
+      "collection_status": "partial",
+      "compression": "AUTO",
+      "source": "requested",
+      "staging_location": "path_542e3a574624",
+      "table_format": "CSV"
+    },
+    "tuning": {
+      "applied": {
+        "dropped": [],
+        "statements": [
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "failed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          }
+        ],
+        "status": "not_applicable"
+      },
+      "applied_ledger_hash": "e8c5bfd447d862128ad9b9362a344819bbe56a30b48fc8f1f316e409639bf768"
+    },
+    "version": "10.35.101"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "single-host-12-hr",
+      "iter": 0,
+      "ms": 736.9,
+      "rows": 4320,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "single-host-1-hr",
+      "iter": 0,
+      "ms": 294.3,
+      "rows": 360,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "iter": 0,
+      "ms": 256.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "iter": 0,
+      "ms": 305.4,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "iter": 0,
+      "ms": 733.8,
+      "rows": 6000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "double-groupby-5-min",
+      "iter": 0,
+      "ms": 401.0,
+      "rows": 3000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "iter": 0,
+      "ms": 223.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "iter": 0,
+      "ms": 256.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "iter": 0,
+      "ms": 268.8,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "low-memory-hosts",
+      "iter": 0,
+      "ms": 375.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "iter": 0,
+      "ms": 301.1,
+      "rows": 200,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "disk-latency",
+      "iter": 0,
+      "ms": 959.7,
+      "rows": 200,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "iter": 0,
+      "ms": 601.9,
+      "rows": 200,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "net-errors",
+      "iter": 0,
+      "ms": 330.4,
+      "rows": 175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "resource-utilization",
+      "iter": 0,
+      "ms": 408.9,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "lastpoint",
+      "iter": 0,
+      "ms": 374.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "by-region",
+      "iter": 0,
+      "ms": 354.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "by-service",
+      "iter": 0,
+      "ms": 570.6,
+      "rows": 6,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "single-host-12-hr",
+      "iter": 1,
+      "ms": 405.5,
+      "rows": 4320,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "single-host-1-hr",
+      "iter": 1,
+      "ms": 215.0,
+      "rows": 360,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "iter": 1,
+      "ms": 317.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "iter": 1,
+      "ms": 304.0,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "iter": 1,
+      "ms": 465.8,
+      "rows": 6000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "double-groupby-5-min",
+      "iter": 1,
+      "ms": 458.5,
+      "rows": 3000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "iter": 1,
+      "ms": 189.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "iter": 1,
+      "ms": 198.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "iter": 1,
+      "ms": 498.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "low-memory-hosts",
+      "iter": 1,
+      "ms": 214.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "iter": 1,
+      "ms": 224.9,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "disk-latency",
+      "iter": 1,
+      "ms": 404.1,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "iter": 1,
+      "ms": 237.9,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "net-errors",
+      "iter": 1,
+      "ms": 398.0,
+      "rows": 183,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "resource-utilization",
+      "iter": 1,
+      "ms": 328.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "lastpoint",
+      "iter": 1,
+      "ms": 374.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "by-region",
+      "iter": 1,
+      "ms": 311.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "by-service",
+      "iter": 1,
+      "ms": 333.0,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "single-host-12-hr",
+      "iter": 2,
+      "ms": 500.0,
+      "rows": 4320,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "single-host-1-hr",
+      "iter": 2,
+      "ms": 224.3,
+      "rows": 360,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "iter": 2,
+      "ms": 420.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "iter": 2,
+      "ms": 341.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "iter": 2,
+      "ms": 485.8,
+      "rows": 6000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "double-groupby-5-min",
+      "iter": 2,
+      "ms": 402.9,
+      "rows": 3000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "iter": 2,
+      "ms": 202.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "iter": 2,
+      "ms": 214.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "iter": 2,
+      "ms": 263.8,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "low-memory-hosts",
+      "iter": 2,
+      "ms": 462.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "iter": 2,
+      "ms": 221.4,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "disk-latency",
+      "iter": 2,
+      "ms": 262.5,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "iter": 2,
+      "ms": 467.8,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "net-errors",
+      "iter": 2,
+      "ms": 343.9,
+      "rows": 176,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "resource-utilization",
+      "iter": 2,
+      "ms": 471.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "lastpoint",
+      "iter": 2,
+      "ms": 338.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "by-region",
+      "iter": 2,
+      "ms": 445.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "by-service",
+      "iter": 2,
+      "ms": 443.0,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "single-host-12-hr",
+      "iter": 3,
+      "ms": 393.4,
+      "rows": 4320,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "single-host-1-hr",
+      "iter": 3,
+      "ms": 257.1,
+      "rows": 360,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "cpu-max-all-1-hr",
+      "iter": 3,
+      "ms": 241.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "cpu-max-all-8-hr",
+      "iter": 3,
+      "ms": 245.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "double-groupby-1-hr",
+      "iter": 3,
+      "ms": 445.7,
+      "rows": 6000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "double-groupby-5-min",
+      "iter": 3,
+      "ms": 436.8,
+      "rows": 3000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "high-cpu-1-hr",
+      "iter": 3,
+      "ms": 187.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "high-cpu-12-hr",
+      "iter": 3,
+      "ms": 323.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "mem-by-host-1-hr",
+      "iter": 3,
+      "ms": 278.0,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "low-memory-hosts",
+      "iter": 3,
+      "ms": 225.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "disk-iops-1-hr",
+      "iter": 3,
+      "ms": 234.0,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "disk-latency",
+      "iter": 3,
+      "ms": 421.8,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "net-throughput-1-hr",
+      "iter": 3,
+      "ms": 275.2,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "net-errors",
+      "iter": 3,
+      "ms": 412.4,
+      "rows": 184,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "resource-utilization",
+      "iter": 3,
+      "ms": 325.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "lastpoint",
+      "iter": 3,
+      "ms": 378.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "by-region",
+      "iter": 3,
+      "ms": 654.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "by-service",
+      "iter": 3,
+      "ms": 361.7,
+      "rows": 6,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "18bb194f",
+    "iterations": 3,
+    "query_time_ms": 18488,
+    "streams": 4,
+    "timestamp": "2026-09-29T19:29:25.681418",
+    "total_duration_ms": 102908
+  },
+  "summary": {
+    "cost": {
+      "total_bytes_scanned": 619471557
+    },
+    "data": {
+      "load_time_ms": 37782.0,
+      "rows_loaded": 10368100
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 54,
+      "total": 54
+    },
+    "timing": {
+      "avg_ms": 342.4,
+      "geometric_mean_ms": 326.5,
+      "max_ms": 654.4,
+      "min_ms": 187.0,
+      "p90_ms": 467.8,
+      "p95_ms": 498.5,
+      "p99_ms": 654.4,
+      "stdev_ms": 105.3,
+      "total_ms": 18487.8
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "CPU": {
+      "load_ms": 7881,
+      "rows": 1728000
+    },
+    "DISK": {
+      "load_ms": 11243,
+      "rows": 3456000
+    },
+    "MEM": {
+      "load_ms": 6782,
+      "rows": 1728000
+    },
+    "NET": {
+      "load_ms": 9165,
+      "rows": 3456000
+    },
+    "TAGS": {
+      "load_ms": 2271,
+      "rows": 100
+    }
+  },
+  "version": "2.2"
+}

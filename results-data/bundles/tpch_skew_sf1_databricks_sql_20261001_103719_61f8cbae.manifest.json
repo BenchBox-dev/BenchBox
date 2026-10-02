@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_skew_sf1_databricks_sql_20261001_103719_61f8cbae.json",
+  "bundle_hash": "ce4c3f4dfbe68a3269faf405aad184be7f2607416424bbb85853e8df69115fec",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

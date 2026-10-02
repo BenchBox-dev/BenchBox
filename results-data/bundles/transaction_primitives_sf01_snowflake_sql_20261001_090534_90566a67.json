@@ -1,0 +1,1257 @@
+{
+  "benchmark": {
+    "id": "transaction_primitives",
+    "name": "Transaction Primitives",
+    "scale_factor": 0.1,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "zstd"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "account": "account_a1fffaa9cc9a",
+      "database": "database_f3ba6a7c0af9",
+      "default_output_location": "path_d969e086da79",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "last_updated": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "password": "<redacted>",
+      "role": "role_b316fb92dc3e",
+      "schema": "schema_ea670f1f4924",
+      "show_query_plans": "saved_config",
+      "status": "saved_config",
+      "tuning_source": "saved_config",
+      "username": "user_4af2b511cbe3",
+      "warehouse": "warehouse_1dea189db0ff"
+    },
+    "platform_options": {
+      "account": "account_0357e1819187",
+      "database": "database_f7fe55623feb",
+      "default_output_location": "path_542e3a574624",
+      "force_recreate": false,
+      "force_upload": false,
+      "last_updated": "2025-10-24T10:18:18.584043",
+      "normalize_plan_literals": false,
+      "password": "<redacted>",
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "show_query_plans": false,
+      "status": "valid",
+      "tuning_source": "baseline",
+      "username": "user_dbea85fd2491",
+      "warehouse": "warehouse_a86522e42ed1"
+    }
+  },
+  "cost": {
+    "model": "actual"
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 108.013,
+        "min": 96.557,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "managed_cloud",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "zstd"
+    },
+    "driver_package": "snowflake-connector-python",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "4.7.3",
+    "driver_version_resolved": "4.7.3",
+    "entry_point": "cli",
+    "mode": "sql",
+    "timestamp": "2026-10-01T08:49:10.269864",
+    "translation": {
+      "attempt_count": 1,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 1,
+          "count": 1,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "snowflake",
+          "parser_grammar": "postgres",
+          "scope": "schema_ddl",
+          "source_dialect": "standard",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "snowflake",
+          "translator": "sqlglot",
+          "unique_queries": 1
+        }
+      ],
+      "schema_statements_translated": 1,
+      "source_dialects": [
+        "standard"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 1,
+      "target_dialects": [
+        "snowflake"
+      ],
+      "total_transpilation_calls": 1,
+      "translators": [
+        "sqlglot"
+      ]
+    },
+    "tuning_mode": "notuning"
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-10-01T09:05:34.140198",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "credit",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "unavailable",
+    "cost_usd": null,
+    "deployment": {
+      "cloud_provider": "aws",
+      "cloud_region": "AWS_US_EAST_2",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": "X-Small"
+    },
+    "normalized_cost_usd": null,
+    "pricing_region": "AWS_US_EAST_2"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 39882,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 920924,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 6979,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 3725,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "4.7.3",
+    "cloud": {
+      "account": "account_34e3849c269e",
+      "collection_status": "partial",
+      "organization": "organization_e5079cbf172a",
+      "provider": "aws",
+      "region": "AWS_US_EAST_2",
+      "source": "observed"
+    },
+    "compute": {
+      "auto_resume": "true",
+      "auto_suspend": 300,
+      "cache_control": {
+        "cache_disabled": true,
+        "settings": {
+          "USE_CACHED_RESULT": "FALSE"
+        },
+        "validated": true
+      },
+      "collection_status": "available",
+      "max_cluster_count": 1,
+      "min_cluster_count": 1,
+      "multi_cluster_warehouse": false,
+      "query_acceleration_max_scale_factor": "true",
+      "result_cache_enabled": false,
+      "scaling_policy": 0,
+      "source": "observed",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "X-Small",
+      "warehouse_state": "STARTED",
+      "warehouse_type": "STANDARD"
+    },
+    "config": {
+      "account": "account_0357e1819187",
+      "account_name": "account_34e3849c269e",
+      "auto_resume": true,
+      "auto_suspend": 300,
+      "cloud_provider": "AWS",
+      "cloud_region": "AWS_US_EAST_2",
+      "compression": "AUTO",
+      "connection_mode": "remote",
+      "database": "database_852f2bfe1fab",
+      "driver_package": "snowflake-connector-python",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "4.7.3",
+      "driver_version_resolved": "4.7.3",
+      "engine_version": "10.35.101",
+      "engine_version_source": "sql_query",
+      "execution_mode": "sql",
+      "file_format": "CSV",
+      "multi_cluster_warehouse": false,
+      "organization_name": "organization_e5079cbf172a",
+      "result_cache_enabled": false,
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "staging_root": "path_542e3a574624",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "MEDIUM"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "remote",
+      "database": "database_852f2bfe1fab",
+      "deployment_type": "managed_cloud",
+      "endpoint_class": "cloud_endpoint",
+      "metadata_source": "observed",
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1"
+    },
+    "driver_actual_version": "4.7.3",
+    "driver_package": "snowflake-connector-python",
+    "driver_resolved_version": "4.7.3",
+    "driver_runtime_strategy": "current-process",
+    "name": "Snowflake",
+    "raw_config": {
+      "account": "account_0357e1819187",
+      "account_name": "account_34e3849c269e",
+      "auto_resume": true,
+      "auto_suspend": 300,
+      "compression": "AUTO",
+      "database": "database_852f2bfe1fab",
+      "file_format": "CSV",
+      "multi_cluster_warehouse": false,
+      "organization_name": "organization_e5079cbf172a",
+      "password": "<redacted>",
+      "private_key_passphrase": "<redacted>",
+      "private_key_path": "<redacted>",
+      "result_cache_enabled": false,
+      "role": "role_2e205d3e01ba",
+      "schema": "schema_ebca565228a1",
+      "staging_root": "path_542e3a574624",
+      "tuning_source": "baseline",
+      "type": "snowflake",
+      "username": "user_d16817d72f81",
+      "warehouse": "warehouse_a86522e42ed1",
+      "warehouse_size": "MEDIUM"
+    },
+    "raw_metadata": {
+      "cloud_provider": "AWS",
+      "cloud_region": "AWS_US_EAST_2",
+      "compute_configuration": {
+        "auto_resume": "true",
+        "auto_suspend": 300,
+        "enable_query_acceleration": "",
+        "max_cluster_count": 1,
+        "min_cluster_count": 1,
+        "query_acceleration_max_scale_factor": "true",
+        "scaling_policy": 0,
+        "warehouse_name": "warehouse_a86522e42ed1",
+        "warehouse_size": "X-Small",
+        "warehouse_state": "STARTED",
+        "warehouse_type": "STANDARD"
+      }
+    },
+    "storage": {
+      "collection_status": "partial",
+      "compression": "AUTO",
+      "source": "requested",
+      "staging_location": "path_542e3a574624",
+      "table_format": "CSV"
+    },
+    "tuning": {
+      "applied": {
+        "dropped": [],
+        "statements": [
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "failed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          },
+          {
+            "phase": "session",
+            "statement_redacted": true,
+            "status": "executed"
+          }
+        ],
+        "status": "not_applicable"
+      },
+      "applied_ledger_hash": "e8c5bfd447d862128ad9b9362a344819bbe56a30b48fc8f1f316e409639bf768"
+    },
+    "version": "10.35.101"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "transaction_commit_small",
+      "iter": 0,
+      "ms": 9203.3,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_commit_medium",
+      "iter": 0,
+      "ms": 2228.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_commit_large",
+      "iter": 0,
+      "ms": 2342.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_rollback_small",
+      "iter": 0,
+      "ms": 2707.4,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_rollback_medium",
+      "iter": 0,
+      "ms": 1351.1,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_savepoint_nested",
+      "iter": 0,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SKIPPED",
+      "stream": 0
+    },
+    {
+      "id": "transaction_savepoint_deep_nesting",
+      "iter": 0,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SKIPPED",
+      "stream": 0
+    },
+    {
+      "id": "transaction_isolation_read_committed",
+      "iter": 0,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SKIPPED",
+      "stream": 0
+    },
+    {
+      "id": "transaction_isolation_repeatable_read",
+      "iter": 0,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SKIPPED",
+      "stream": 0
+    },
+    {
+      "id": "transaction_isolation_serializable",
+      "iter": 0,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SKIPPED",
+      "stream": 0
+    },
+    {
+      "id": "transaction_mixed_dml_small",
+      "iter": 0,
+      "ms": 3871.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_mixed_dml_medium",
+      "iter": 0,
+      "ms": 2602.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_insert_update_chain",
+      "iter": 0,
+      "ms": 3050.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_delete_insert_same_key",
+      "iter": 0,
+      "ms": 2903.3,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_read_your_writes",
+      "iter": 0,
+      "ms": 2563.5,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_insert_with_subquery",
+      "iter": 0,
+      "ms": 2160.8,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_multi_table_writes",
+      "iter": 0,
+      "ms": 2503.0,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_long_running_mixed",
+      "iter": 0,
+      "ms": 3288.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_truncate_in_transaction",
+      "iter": 0,
+      "ms": 2715.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_create_temp_table",
+      "iter": 0,
+      "ms": 2786.9,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_with_cte",
+      "iter": 0,
+      "ms": 1988.5,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_nested_subquery_updates",
+      "iter": 0,
+      "ms": 1995.8,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_rollback_after_error",
+      "iter": 0,
+      "ms": 1970.7,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "transaction_commit_small",
+      "iter": 1,
+      "ms": 6478.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_commit_medium",
+      "iter": 1,
+      "ms": 1884.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_commit_large",
+      "iter": 1,
+      "ms": 1746.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_rollback_small",
+      "iter": 1,
+      "ms": 3072.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_rollback_medium",
+      "iter": 1,
+      "ms": 1191.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_savepoint_nested",
+      "iter": 1,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 1
+    },
+    {
+      "id": "transaction_savepoint_deep_nesting",
+      "iter": 1,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 1
+    },
+    {
+      "id": "transaction_isolation_read_committed",
+      "iter": 1,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 1
+    },
+    {
+      "id": "transaction_isolation_repeatable_read",
+      "iter": 1,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 1
+    },
+    {
+      "id": "transaction_isolation_serializable",
+      "iter": 1,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 1
+    },
+    {
+      "id": "transaction_mixed_dml_small",
+      "iter": 1,
+      "ms": 3552.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_mixed_dml_medium",
+      "iter": 1,
+      "ms": 2833.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_insert_update_chain",
+      "iter": 1,
+      "ms": 3199.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_delete_insert_same_key",
+      "iter": 1,
+      "ms": 2553.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_read_your_writes",
+      "iter": 1,
+      "ms": 2272.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_insert_with_subquery",
+      "iter": 1,
+      "ms": 1859.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_multi_table_writes",
+      "iter": 1,
+      "ms": 2732.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_long_running_mixed",
+      "iter": 1,
+      "ms": 3050.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_truncate_in_transaction",
+      "iter": 1,
+      "ms": 3401.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_create_temp_table",
+      "iter": 1,
+      "ms": 2517.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_with_cte",
+      "iter": 1,
+      "ms": 2415.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_nested_subquery_updates",
+      "iter": 1,
+      "ms": 2261.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_rollback_after_error",
+      "iter": 1,
+      "ms": 1443.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "transaction_commit_small",
+      "iter": 2,
+      "ms": 6342.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_commit_medium",
+      "iter": 2,
+      "ms": 1484.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_commit_large",
+      "iter": 2,
+      "ms": 1823.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_rollback_small",
+      "iter": 2,
+      "ms": 2876.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_rollback_medium",
+      "iter": 2,
+      "ms": 1497.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_savepoint_nested",
+      "iter": 2,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 2
+    },
+    {
+      "id": "transaction_savepoint_deep_nesting",
+      "iter": 2,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 2
+    },
+    {
+      "id": "transaction_isolation_read_committed",
+      "iter": 2,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 2
+    },
+    {
+      "id": "transaction_isolation_repeatable_read",
+      "iter": 2,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 2
+    },
+    {
+      "id": "transaction_isolation_serializable",
+      "iter": 2,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 2
+    },
+    {
+      "id": "transaction_mixed_dml_small",
+      "iter": 2,
+      "ms": 4055.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_mixed_dml_medium",
+      "iter": 2,
+      "ms": 3041.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_insert_update_chain",
+      "iter": 2,
+      "ms": 3009.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_delete_insert_same_key",
+      "iter": 2,
+      "ms": 2490.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_read_your_writes",
+      "iter": 2,
+      "ms": 2304.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_insert_with_subquery",
+      "iter": 2,
+      "ms": 1870.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_multi_table_writes",
+      "iter": 2,
+      "ms": 2366.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_long_running_mixed",
+      "iter": 2,
+      "ms": 3161.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_truncate_in_transaction",
+      "iter": 2,
+      "ms": 3257.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_create_temp_table",
+      "iter": 2,
+      "ms": 2972.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_with_cte",
+      "iter": 2,
+      "ms": 3603.5,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_nested_subquery_updates",
+      "iter": 2,
+      "ms": 2814.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_rollback_after_error",
+      "iter": 2,
+      "ms": 1668.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "transaction_commit_small",
+      "iter": 3,
+      "ms": 8202.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_commit_medium",
+      "iter": 3,
+      "ms": 2593.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_commit_large",
+      "iter": 3,
+      "ms": 2423.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_rollback_small",
+      "iter": 3,
+      "ms": 3723.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_rollback_medium",
+      "iter": 3,
+      "ms": 1550.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_savepoint_nested",
+      "iter": 3,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 3
+    },
+    {
+      "id": "transaction_savepoint_deep_nesting",
+      "iter": 3,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 3
+    },
+    {
+      "id": "transaction_isolation_read_committed",
+      "iter": 3,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 3
+    },
+    {
+      "id": "transaction_isolation_repeatable_read",
+      "iter": 3,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 3
+    },
+    {
+      "id": "transaction_isolation_serializable",
+      "iter": 3,
+      "ms": 0.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SKIPPED",
+      "stream": 3
+    },
+    {
+      "id": "transaction_mixed_dml_small",
+      "iter": 3,
+      "ms": 6139.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_mixed_dml_medium",
+      "iter": 3,
+      "ms": 4500.7,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_insert_update_chain",
+      "iter": 3,
+      "ms": 4012.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_delete_insert_same_key",
+      "iter": 3,
+      "ms": 3362.9,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_read_your_writes",
+      "iter": 3,
+      "ms": 2174.0,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_insert_with_subquery",
+      "iter": 3,
+      "ms": 2598.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_multi_table_writes",
+      "iter": 3,
+      "ms": 3279.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_long_running_mixed",
+      "iter": 3,
+      "ms": 3885.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_truncate_in_transaction",
+      "iter": 3,
+      "ms": 2602.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_create_temp_table",
+      "iter": 3,
+      "ms": 3757.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_with_cte",
+      "iter": 3,
+      "ms": 2708.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_nested_subquery_updates",
+      "iter": 3,
+      "ms": 3034.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "transaction_rollback_after_error",
+      "iter": 3,
+      "ms": 2270.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "90566a67",
+    "iterations": 3,
+    "query_time_ms": 161923,
+    "streams": 4,
+    "timestamp": "2026-10-01T09:05:33.928681",
+    "total_duration_ms": 975204
+  },
+  "summary": {
+    "data": {
+      "load_time_ms": 39882.8,
+      "rows_loaded": 866602
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 54,
+      "skipped": 15,
+      "total": 69
+    },
+    "timing": {
+      "avg_ms": 2998.6,
+      "geometric_mean_ms": 2771.3,
+      "max_ms": 8202.3,
+      "min_ms": 1191.5,
+      "p90_ms": 4055.0,
+      "p95_ms": 6342.6,
+      "p99_ms": 8202.3,
+      "stdev_ms": 1330.4,
+      "total_ms": 161923.1
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "CUSTOMER": {
+      "load_ms": 5580,
+      "rows": 15000
+    },
+    "LINEITEM": {
+      "load_ms": 7164,
+      "rows": 600572
+    },
+    "NATION": {
+      "load_ms": 2049,
+      "rows": 25
+    },
+    "ORDERS": {
+      "load_ms": 5095,
+      "rows": 150000
+    },
+    "PART": {
+      "load_ms": 4768,
+      "rows": 20000
+    },
+    "PARTSUPP": {
+      "load_ms": 5853,
+      "rows": 80000
+    },
+    "REGION": {
+      "load_ms": 2785,
+      "rows": 5
+    },
+    "SUPPLIER": {
+      "load_ms": 5631,
+      "rows": 1000
+    }
+  },
+  "version": "2.2"
+}

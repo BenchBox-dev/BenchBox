@@ -1,0 +1,8 @@
+{
+  "bundle_file": "transaction_primitives_sf1_snowflake_sql_20261001_092311_b4c0d6da.json",
+  "bundle_hash": "d9ff7edf5b5bcbdcbb1aa68e631860f878784a3185c63f182293e466c7afacca",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

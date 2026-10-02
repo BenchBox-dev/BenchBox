@@ -1,0 +1,6247 @@
+{
+  "benchmark": {
+    "id": "read_primitives",
+    "name": "Read Primitives",
+    "scale_factor": 0.01,
+    "test_type": "power"
+  },
+  "config": {
+    "compression": {
+      "level": null,
+      "type": "gzip"
+    },
+    "mode": "sql",
+    "phases": [
+      "power"
+    ],
+    "platform_option_sources": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "saved_config",
+      "default_output_location": "path_d969e086da79",
+      "force_recreate": "saved_config",
+      "force_upload": "saved_config",
+      "last_updated": "saved_config",
+      "location": "saved_config",
+      "normalize_plan_literals": "saved_config",
+      "project_id": "project_6ab0d019ccae",
+      "show_query_plans": "saved_config",
+      "staging_root": "path_d969e086da79",
+      "status": "saved_config",
+      "storage_bucket": "bucket_aa4b9df65128",
+      "storage_prefix": "prefix_5c53d7013283",
+      "tuning_source": "saved_config"
+    },
+    "platform_options": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "benchbox",
+      "default_output_location": "path_399fe063fc9e",
+      "force_recreate": false,
+      "force_upload": false,
+      "last_updated": "2025-10-24T18:56:25.263788",
+      "location": "US",
+      "normalize_plan_literals": false,
+      "project_id": "project_9d60772868dd",
+      "show_query_plans": false,
+      "staging_root": "path_399fe063fc9e",
+      "status": "valid",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "",
+      "tuning_source": "baseline"
+    }
+  },
+  "cost": {
+    "model": "actual",
+    "total_usd": 0.04639625549316406
+  },
+  "environment": {
+    "arch": "arm64",
+    "client_host": {
+      "arch": "arm64",
+      "cpu_count": 10,
+      "cpu_identity_provenance": "measured",
+      "cpu_model": "Apple M4",
+      "cpu_vendor": "Apple",
+      "memory_gb": 16.0,
+      "os": "Darwin 27.0.0",
+      "python": "3.12.13"
+    },
+    "client_link": {
+      "collection_status": "partial",
+      "source": "unavailable",
+      "statement_overhead_ms": {
+        "median": 364.724,
+        "min": 322.179,
+        "samples": 5
+      }
+    },
+    "cpu_count": 10,
+    "cpu_identity_provenance": "measured",
+    "cpu_model": "Apple M4",
+    "cpu_vendor": "Apple",
+    "memory_gb": 16.0,
+    "os": "Darwin 27.0.0",
+    "platform_runtime": {
+      "collection_status": "partial",
+      "runtime_type": "serverless",
+      "source": "inferred"
+    },
+    "python": "3.12.13"
+  },
+  "execution": {
+    "compression": {
+      "type": "gzip"
+    },
+    "driver_package": "google-cloud-bigquery",
+    "driver_runtime_strategy": "current-process",
+    "driver_version_actual": "3.45.1",
+    "driver_version_resolved": "3.45.1",
+    "entry_point": "cli",
+    "mode": "sql",
+    "non_interactive": true,
+    "timestamp": "2026-09-30T08:06:12.025378",
+    "translation": {
+      "attempt_count": 651,
+      "failed_count": 0,
+      "fallback_count": 0,
+      "outcomes": [
+        {
+          "calls": 650,
+          "count": 650,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "bigquery",
+          "parser_grammar": "postgres",
+          "scope": "workload_query",
+          "source_dialect": "netezza",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "bigquery",
+          "translator": "sqlglot",
+          "unique_queries": 129
+        },
+        {
+          "calls": 1,
+          "count": 1,
+          "normalized_source_dialect": "postgres",
+          "normalized_target_dialect": "bigquery",
+          "parser_grammar": "postgres",
+          "scope": "schema_ddl",
+          "source_dialect": "standard",
+          "status": "success",
+          "strict_mode": false,
+          "target_dialect": "bigquery",
+          "translator": "sqlglot",
+          "unique_queries": 1
+        }
+      ],
+      "schema_statements_translated": 1,
+      "source_dialects": [
+        "netezza",
+        "standard"
+      ],
+      "status": "success",
+      "strict_mode": false,
+      "success_count": 651,
+      "target_dialects": [
+        "bigquery"
+      ],
+      "total_transpilation_calls": 651,
+      "translators": [
+        "sqlglot"
+      ],
+      "unique_queries_translated": 129
+    },
+    "tuning_mode": "notuning",
+    "variant_comparability": {
+      "comparable": true,
+      "issue_count": 0,
+      "per_query": {
+        "aggregation_distinct": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_distinct_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_groupby_large": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_groupby_small": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_materialize": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_materialize_subquery": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_partition": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "aggregation_simple": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "any_value_simple": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "any_value_with_filter": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "approx_count_distinct_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "approx_count_distinct_simple": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "approx_quantile_groupby": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse",
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "approx_quantiles_array": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse",
+            "snowflake"
+          ]
+        },
+        "approx_top_k_lineitem": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "array_agg_distinct": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "array_agg_simple": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "array_contains": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "array_distinct": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "array_length": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse",
+            "duckdb",
+            "snowflake"
+          ]
+        },
+        "array_min_max": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "array_of_struct": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "array_slice": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "array_sort": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "array_unnest": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse"
+          ]
+        },
+        "asof_join_basic": {
+          "has_variants": true,
+          "variant_dialects": [
+            "snowflake"
+          ]
+        },
+        "broadcast_join_four_tables": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "broadcast_join_three_tables": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "broadcast_join_two_tables": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "count_star": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "decimal_arithmetic": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "empty_build_join": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "exchange_broadcast": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "exchange_merge": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "exchange_shuffle": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_bigint_in_list_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_bigint_non_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_bigint_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_decimal_in_list_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_decimal_non_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_decimal_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_in_predicate_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_non_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_string_like": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_string_non_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "filter_string_selective": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "fulltext_boolean_search": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "fulltext_phrase_search": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "fulltext_simple_search": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "groupby_all_complex": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion"
+          ]
+        },
+        "groupby_all_simple": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "groupby_bigint_highndv": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "groupby_bigint_lowndv": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "groupby_bigint_pk": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "groupby_decimal_highndv": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "groupby_decimal_lowndv": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "intrinsic_to_date": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion"
+          ]
+        },
+        "json_aggregates": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse",
+            "duckdb",
+            "snowflake"
+          ]
+        },
+        "json_extract_nested": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "json_extract_simple": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "limit": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "limit_ordered": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "list_filter": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "list_reduce": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "list_transform": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "long_predicate": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "map_access": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "datafusion"
+          ]
+        },
+        "map_construction": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "datafusion",
+            "duckdb"
+          ]
+        },
+        "map_keys_values": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "datafusion"
+          ]
+        },
+        "max_by_complex": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "max_by_simple": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "max_by_with_ties": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "min_by_complex": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "min_by_simple": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "min_by_with_ties": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "min_max_runtime_filter": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "olap_cube_analysis": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "olap_rollup_analysis": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_aggregate_pushdown": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_column_pruning": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_common_subexpression": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_constant_folding": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_distinct_elimination": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_exists_to_semijoin": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_groupjoin": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_in_to_exists": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_join_reordering": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_limit_pushdown": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_predicate_pushdown": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_runtime_filter": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_scalar_subquery_flattening": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "optimizer_union_optimization": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_all": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_all_desc": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "orderby_all_simple": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "orderby_bigint": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_bigint_expression": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_decimal16": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_desc": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_multi": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_multicol": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_shortstrings": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "orderby_simple": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "pivot_basic": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "predicate_ordering_aggregation": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "predicate_ordering_aggregation_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "predicate_ordering_costs": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "predicate_ordering_subquery": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "qualify_cume_dist": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "qualify_dense_rank": {
+          "has_variants": true,
+          "variant_dialects": [
+            "redshift"
+          ]
+        },
+        "qualify_lag_lead": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "qualify_ntile": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "qualify_percentile": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "qualify_row_number": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "shuffle_1mb_rows": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "shuffle_full_join_one_to_many_string_with_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "shuffle_inner_join_one_to_many_string_with_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "shuffle_inner_join_union_all_with_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "shuffle_join": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "shuffle_left_join_one_to_many_string_with_groupby": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "statistical_correlation": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse"
+          ]
+        },
+        "statistical_percentiles": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "redshift"
+          ]
+        },
+        "statistical_variance_stddev": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_concat": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_ends_with": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_equal_predicate": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_equal_predicate_lower": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_ilike_predicate_end": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_ilike_predicate_multi": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_ilike_predicate_start": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_in_predicate": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_like": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_like_predicate_center": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_like_predicate_center_insensitive": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_like_predicate_end": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_like_predicate_multi": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_like_predicate_start": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_starts_with": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "string_substring": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "struct_access": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "snowflake"
+          ]
+        },
+        "struct_construction": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse",
+            "duckdb"
+          ]
+        },
+        "timeseries_trend_analysis": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery",
+            "clickhouse",
+            "datafusion",
+            "duckdb"
+          ]
+        },
+        "topn": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "topn_aggregate_2columns": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "topn_ordered_allcols": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "unpivot_basic": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion"
+          ]
+        },
+        "window_growing_frame": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "window_lead_lag_same_frame": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "window_moving_frame": {
+          "has_variants": true,
+          "variant_dialects": [
+            "bigquery"
+          ]
+        },
+        "window_multiple_orderings": {
+          "has_variants": true,
+          "variant_dialects": [
+            "clickhouse"
+          ]
+        },
+        "window_rank": {
+          "has_variants": true,
+          "variant_dialects": [
+            "datafusion",
+            "redshift"
+          ]
+        },
+        "window_row_number": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "window_running_sum": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "window_sum": {
+          "has_variants": false,
+          "variant_dialects": []
+        },
+        "window_unbounded_frame": {
+          "has_variants": false,
+          "variant_dialects": []
+        }
+      },
+      "queries_with_variants": 46,
+      "total_queries": 157
+    }
+  },
+  "export": {
+    "anonymized": true,
+    "benchbox_version": "0.4.1",
+    "timestamp": "2026-09-30T08:19:05.560259",
+    "tool": "benchbox-exporter"
+  },
+  "normalized_cost": {
+    "billing_unit": "tib_scanned",
+    "cost_model_source": "benchbox.core.cost.pricing",
+    "cost_model_version": "2026.09",
+    "cost_scope": "compute_only",
+    "cost_status": "normalized",
+    "cost_usd": "0.04639625549316406",
+    "deployment": {
+      "cloud_provider": "gcp",
+      "cloud_region": "US",
+      "cluster_size": null,
+      "instance_type": null,
+      "node_count": null,
+      "storage_format": null,
+      "storage_tier": null,
+      "warehouse_size": null
+    },
+    "normalized_cost_usd": "0.04639625549316406",
+    "pricing_region": "US"
+  },
+  "phases": {
+    "data_generation": {
+      "duration_ms": 0,
+      "status": "SUCCESS"
+    },
+    "data_loading": {
+      "duration_ms": 57669,
+      "status": "SUCCESS"
+    },
+    "power_test": {
+      "duration_ms": 657982,
+      "status": "COMPLETED"
+    },
+    "schema_creation": {
+      "duration_ms": 9375,
+      "status": "SUCCESS"
+    },
+    "throughput_test": {
+      "status": "NOT_RUN"
+    },
+    "validation": {
+      "duration_ms": 13406,
+      "status": "PASSED"
+    }
+  },
+  "platform": {
+    "client_version": "3.45.1",
+    "cloud": {
+      "collection_status": "partial",
+      "location": "US",
+      "project": "project_9d60772868dd",
+      "provider": "gcp",
+      "source": "observed"
+    },
+    "compute": {
+      "cache_enabled": false,
+      "collection_status": "available",
+      "dataset_metadata_collection_status": "available",
+      "edition": "ON_DEMAND",
+      "job_priority": "INTERACTIVE",
+      "pricing_model": "on-demand",
+      "source": "observed"
+    },
+    "config": {
+      "cloud_provider": "GCP",
+      "connection_mode": "remote",
+      "dataset_id": "tpch_sf001_notuning_noconstraints",
+      "driver_package": "google-cloud-bigquery",
+      "driver_runtime_strategy": "current-process",
+      "driver_version_actual": "3.45.1",
+      "driver_version_resolved": "3.45.1",
+      "execution_mode": "sql",
+      "job_priority": "INTERACTIVE",
+      "location": "US",
+      "project_id": "project_9d60772868dd",
+      "query_cache_enabled": false,
+      "staging_root": "path_399fe063fc9e",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "prefix_60098b0cc37e"
+    },
+    "deployment": {
+      "collection_status": "partial",
+      "connection_mode": "remote",
+      "dataset": "tpch_sf001_notuning_noconstraints",
+      "deployment_type": "serverless",
+      "endpoint_class": "cloud_endpoint",
+      "metadata_source": "requested"
+    },
+    "driver_actual_version": "3.45.1",
+    "driver_package": "google-cloud-bigquery",
+    "driver_resolved_version": "3.45.1",
+    "driver_runtime_strategy": "current-process",
+    "name": "BigQuery",
+    "raw_config": {
+      "credentials_path": "<redacted>",
+      "dataset_id": "tpch_sf001_notuning_noconstraints",
+      "job_priority": "INTERACTIVE",
+      "location": "US",
+      "project_id": "project_9d60772868dd",
+      "query_cache_enabled": false,
+      "staging_root": "path_399fe063fc9e",
+      "storage_bucket": "bucket_71a5e582935b",
+      "storage_prefix": "prefix_60098b0cc37e",
+      "tuning_source": "baseline",
+      "type": "bigquery"
+    },
+    "raw_metadata": {
+      "cloud_provider": "GCP",
+      "compute_configuration": {
+        "dataset_created": "2026-09-30T12:06:29.770000+00:00",
+        "dataset_location": "US",
+        "dataset_metadata_collection_status": "available",
+        "dataset_modified": "2026-09-30T12:06:29.770000+00:00",
+        "edition": "ON_DEMAND",
+        "pricing_model": "on-demand"
+      }
+    },
+    "storage": {
+      "bucket": "bucket_71a5e582935b",
+      "collection_status": "partial",
+      "prefix": "prefix_60098b0cc37e",
+      "source": "requested",
+      "staging_location": "path_399fe063fc9e"
+    },
+    "version": "unknown"
+  },
+  "provenance": {
+    "source": "internal"
+  },
+  "queries": [
+    {
+      "id": "aggregation_distinct",
+      "iter": 0,
+      "ms": 893.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "iter": 0,
+      "ms": 914.0,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "approx_count_distinct_simple",
+      "iter": 0,
+      "ms": 949.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "approx_count_distinct_groupby",
+      "iter": 0,
+      "ms": 864.4,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "iter": 0,
+      "ms": 4316.2,
+      "rows": 60162,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "iter": 0,
+      "ms": 954.1,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_materialize",
+      "iter": 0,
+      "ms": 825.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "iter": 0,
+      "ms": 1233.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_partition",
+      "iter": 0,
+      "ms": 859.4,
+      "rows": 2482,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_selective",
+      "iter": 0,
+      "ms": 923.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_simple",
+      "iter": 0,
+      "ms": 757.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "iter": 0,
+      "ms": 955.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "iter": 0,
+      "ms": 1024.1,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "iter": 0,
+      "ms": 1038.7,
+      "rows": 67,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "iter": 0,
+      "ms": 955.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "iter": 0,
+      "ms": 756.5,
+      "rows": 3,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "iter": 0,
+      "ms": 995.9,
+      "rows": 88,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "iter": 0,
+      "ms": 910.4,
+      "rows": 74,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "count_star",
+      "iter": 0,
+      "ms": 1249.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "decimal_arithmetic",
+      "iter": 0,
+      "ms": 866.3,
+      "rows": 1000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "empty_build_join",
+      "iter": 0,
+      "ms": 10327.0,
+      "rows": 60175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "exchange_broadcast",
+      "iter": 0,
+      "ms": 1312.7,
+      "rows": 1449,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "exchange_merge",
+      "iter": 0,
+      "ms": 2960.2,
+      "rows": 60175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "exchange_shuffle",
+      "iter": 0,
+      "ms": 1104.4,
+      "rows": 10840,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "iter": 0,
+      "ms": 877.0,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "iter": 0,
+      "ms": 928.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_bigint_selective",
+      "iter": 0,
+      "ms": 779.6,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "iter": 0,
+      "ms": 848.1,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "iter": 0,
+      "ms": 954.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_decimal_selective",
+      "iter": 0,
+      "ms": 705.2,
+      "rows": 0,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "iter": 0,
+      "ms": 1234.8,
+      "rows": 1900,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_string_like",
+      "iter": 0,
+      "ms": 1350.4,
+      "rows": 107,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_string_non_selective",
+      "iter": 0,
+      "ms": 777.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_string_selective",
+      "iter": 0,
+      "ms": 767.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "iter": 0,
+      "ms": 2785.3,
+      "rows": 15000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "iter": 0,
+      "ms": 812.5,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "iter": 0,
+      "ms": 805.5,
+      "rows": 1500,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "iter": 0,
+      "ms": 2322.8,
+      "rows": 35921,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "iter": 0,
+      "ms": 748.6,
+      "rows": 11,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "iter": 0,
+      "ms": 923.1,
+      "rows": 7,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "intrinsic_to_date",
+      "iter": 0,
+      "ms": 746.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "limit",
+      "iter": 0,
+      "ms": 1034.3,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "long_predicate",
+      "iter": 0,
+      "ms": 1065.3,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "iter": 0,
+      "ms": 1032.1,
+      "rows": 2027,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_all",
+      "iter": 0,
+      "ms": 880.2,
+      "rows": 1500,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_bigint",
+      "iter": 0,
+      "ms": 1048.9,
+      "rows": 15000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "iter": 0,
+      "ms": 963.5,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_decimal16",
+      "iter": 0,
+      "ms": 732.9,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_multicol",
+      "iter": 0,
+      "ms": 878.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_shortstrings",
+      "iter": 0,
+      "ms": 753.9,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "iter": 0,
+      "ms": 724.2,
+      "rows": 700,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "iter": 0,
+      "ms": 802.6,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "iter": 0,
+      "ms": 1023.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "iter": 0,
+      "ms": 732.5,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "iter": 0,
+      "ms": 831.9,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_equal_predicate",
+      "iter": 0,
+      "ms": 836.5,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "iter": 0,
+      "ms": 751.0,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_in_predicate",
+      "iter": 0,
+      "ms": 683.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_like_predicate_center",
+      "iter": 0,
+      "ms": 846.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "iter": 0,
+      "ms": 1142.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "iter": 0,
+      "ms": 729.9,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "iter": 0,
+      "ms": 823.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_like_predicate_end",
+      "iter": 0,
+      "ms": 1599.8,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "iter": 0,
+      "ms": 722.1,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_like_predicate_start",
+      "iter": 0,
+      "ms": 1004.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "iter": 0,
+      "ms": 909.7,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "iter": 0,
+      "ms": 924.2,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "iter": 0,
+      "ms": 873.2,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "approx_top_k_lineitem",
+      "iter": 0,
+      "ms": 752.4,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_growing_frame",
+      "iter": 0,
+      "ms": 773.3,
+      "rows": 1004,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "iter": 0,
+      "ms": 923.9,
+      "rows": 2204,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_row_number",
+      "iter": 0,
+      "ms": 1635.7,
+      "rows": 2204,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_multiple_orderings",
+      "iter": 0,
+      "ms": 1921.0,
+      "rows": 9965,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_moving_frame",
+      "iter": 0,
+      "ms": 1792.1,
+      "rows": 2204,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_unbounded_frame",
+      "iter": 0,
+      "ms": 1098.3,
+      "rows": 5066,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "json_aggregates",
+      "iter": 0,
+      "ms": 872.7,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "statistical_percentiles",
+      "iter": 0,
+      "ms": 822.6,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "approx_quantiles_array",
+      "iter": 0,
+      "ms": 1173.9,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "iter": 0,
+      "ms": 1200.1,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "statistical_correlation",
+      "iter": 0,
+      "ms": 787.6,
+      "rows": 1,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "olap_cube_analysis",
+      "iter": 0,
+      "ms": 1708.0,
+      "rows": 840,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "iter": 0,
+      "ms": 873.1,
+      "rows": 156,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "iter": 0,
+      "ms": 2308.0,
+      "rows": 24,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "max_by_simple",
+      "iter": 0,
+      "ms": 974.6,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "min_by_simple",
+      "iter": 0,
+      "ms": 1086.3,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "max_by_complex",
+      "iter": 0,
+      "ms": 1077.9,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "min_by_complex",
+      "iter": 0,
+      "ms": 954.3,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "max_by_with_ties",
+      "iter": 0,
+      "ms": 2300.4,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "min_by_with_ties",
+      "iter": 0,
+      "ms": 1104.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ualify_row_number",
+      "iter": 0,
+      "ms": 6144.6,
+      "rows": 2953,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ualify_dense_rank",
+      "iter": 0,
+      "ms": 757.3,
+      "rows": 301,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ualify_percentile",
+      "iter": 0,
+      "ms": 700.2,
+      "rows": 816,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ualify_ntile",
+      "iter": 0,
+      "ms": 746.0,
+      "rows": 2032,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ualify_cume_dist",
+      "iter": 0,
+      "ms": 2410.5,
+      "rows": 763,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "ualify_lag_lead",
+      "iter": 0,
+      "ms": 902.7,
+      "rows": 3510,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_exists_to_semijoin",
+      "iter": 0,
+      "ms": 1062.0,
+      "rows": 722,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "iter": 0,
+      "ms": 878.9,
+      "rows": 1872,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "iter": 0,
+      "ms": 1125.1,
+      "rows": 5000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "iter": 0,
+      "ms": 695.9,
+      "rows": 27,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "iter": 0,
+      "ms": 1104.3,
+      "rows": 12,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "iter": 0,
+      "ms": 820.2,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "iter": 0,
+      "ms": 862.2,
+      "rows": 13,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_scalar_subquery_flattening",
+      "iter": 0,
+      "ms": 965.3,
+      "rows": 41,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "iter": 0,
+      "ms": 808.6,
+      "rows": 1000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "iter": 0,
+      "ms": 801.0,
+      "rows": 89,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_in_to_exists",
+      "iter": 0,
+      "ms": 1366.2,
+      "rows": 163,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "iter": 0,
+      "ms": 928.4,
+      "rows": 155,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "iter": 0,
+      "ms": 988.5,
+      "rows": 254,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "iter": 0,
+      "ms": 827.7,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "any_value_simple",
+      "iter": 0,
+      "ms": 1257.2,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "any_value_with_filter",
+      "iter": 0,
+      "ms": 767.1,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_all_simple",
+      "iter": 0,
+      "ms": 916.7,
+      "rows": 4,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "groupby_all_complex",
+      "iter": 0,
+      "ms": 740.3,
+      "rows": 219,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_all_simple",
+      "iter": 0,
+      "ms": 907.2,
+      "rows": 25,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_all_desc",
+      "iter": 0,
+      "ms": 817.4,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_agg_simple",
+      "iter": 0,
+      "ms": 884.4,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_agg_distinct",
+      "iter": 0,
+      "ms": 1104.7,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_unnest",
+      "iter": 0,
+      "ms": 785.6,
+      "rows": 800,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_contains",
+      "iter": 0,
+      "ms": 1118.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_length",
+      "iter": 0,
+      "ms": 1111.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_slice",
+      "iter": 0,
+      "ms": 708.1,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "struct_construction",
+      "iter": 0,
+      "ms": 700.5,
+      "rows": 59,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "struct_access",
+      "iter": 0,
+      "ms": 754.1,
+      "rows": 26,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "array_of_struct",
+      "iter": 0,
+      "ms": 1220.9,
+      "rows": 5,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "pivot_basic",
+      "iter": 0,
+      "ms": 794.6,
+      "rows": 2,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "unpivot_basic",
+      "iter": 0,
+      "ms": 1034.6,
+      "rows": 200,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_selective",
+      "iter": 0,
+      "ms": 891.3,
+      "rows": 2369,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "filter_non_selective",
+      "iter": 0,
+      "ms": 3632.2,
+      "rows": 58968,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_simple",
+      "iter": 0,
+      "ms": 752.6,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_multi",
+      "iter": 0,
+      "ms": 826.0,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "orderby_desc",
+      "iter": 0,
+      "ms": 1254.1,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_like",
+      "iter": 0,
+      "ms": 724.7,
+      "rows": 99,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_starts_with",
+      "iter": 0,
+      "ms": 779.1,
+      "rows": 361,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_ends_with",
+      "iter": 0,
+      "ms": 907.3,
+      "rows": 376,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_concat",
+      "iter": 0,
+      "ms": 869.3,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "string_substring",
+      "iter": 0,
+      "ms": 728.3,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "shuffle_join",
+      "iter": 0,
+      "ms": 1218.7,
+      "rows": 15000,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "topn",
+      "iter": 0,
+      "ms": 709.6,
+      "rows": 10,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_rank",
+      "iter": 0,
+      "ms": 683.5,
+      "rows": 1192,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_sum",
+      "iter": 0,
+      "ms": 3928.3,
+      "rows": 60175,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "window_running_sum",
+      "iter": 0,
+      "ms": 839.8,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "limit_ordered",
+      "iter": 0,
+      "ms": 779.9,
+      "rows": 100,
+      "run_type": "warmup",
+      "status": "SUCCESS",
+      "stream": 0
+    },
+    {
+      "id": "aggregation_distinct",
+      "iter": 1,
+      "ms": 886.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "iter": 1,
+      "ms": 695.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "approx_count_distinct_simple",
+      "iter": 1,
+      "ms": 818.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "approx_count_distinct_groupby",
+      "iter": 1,
+      "ms": 805.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "iter": 1,
+      "ms": 4674.0,
+      "rows": 60162,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "iter": 1,
+      "ms": 780.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_materialize",
+      "iter": 1,
+      "ms": 700.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "iter": 1,
+      "ms": 929.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_partition",
+      "iter": 1,
+      "ms": 878.9,
+      "rows": 2482,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_selective",
+      "iter": 1,
+      "ms": 929.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_simple",
+      "iter": 1,
+      "ms": 847.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "iter": 1,
+      "ms": 765.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "iter": 1,
+      "ms": 795.7,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "iter": 1,
+      "ms": 1161.7,
+      "rows": 67,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "iter": 1,
+      "ms": 756.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "iter": 1,
+      "ms": 717.0,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "iter": 1,
+      "ms": 750.0,
+      "rows": 88,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "iter": 1,
+      "ms": 1148.0,
+      "rows": 74,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "count_star",
+      "iter": 1,
+      "ms": 607.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "decimal_arithmetic",
+      "iter": 1,
+      "ms": 802.7,
+      "rows": 1000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "empty_build_join",
+      "iter": 1,
+      "ms": 10855.7,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "exchange_broadcast",
+      "iter": 1,
+      "ms": 869.7,
+      "rows": 1449,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "exchange_merge",
+      "iter": 1,
+      "ms": 2835.3,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "exchange_shuffle",
+      "iter": 1,
+      "ms": 924.7,
+      "rows": 10840,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "iter": 1,
+      "ms": 615.2,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "iter": 1,
+      "ms": 1163.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_bigint_selective",
+      "iter": 1,
+      "ms": 658.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "iter": 1,
+      "ms": 677.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "iter": 1,
+      "ms": 1883.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_decimal_selective",
+      "iter": 1,
+      "ms": 1803.1,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "iter": 1,
+      "ms": 997.3,
+      "rows": 1900,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_string_like",
+      "iter": 1,
+      "ms": 921.9,
+      "rows": 107,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_string_non_selective",
+      "iter": 1,
+      "ms": 788.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_string_selective",
+      "iter": 1,
+      "ms": 773.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "iter": 1,
+      "ms": 2080.4,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "iter": 1,
+      "ms": 720.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "iter": 1,
+      "ms": 807.9,
+      "rows": 1500,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "iter": 1,
+      "ms": 2203.0,
+      "rows": 35921,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "iter": 1,
+      "ms": 725.2,
+      "rows": 11,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "iter": 1,
+      "ms": 757.5,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "intrinsic_to_date",
+      "iter": 1,
+      "ms": 772.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "limit",
+      "iter": 1,
+      "ms": 715.0,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "long_predicate",
+      "iter": 1,
+      "ms": 1111.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "iter": 1,
+      "ms": 3075.3,
+      "rows": 2027,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_all",
+      "iter": 1,
+      "ms": 2307.0,
+      "rows": 1500,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_bigint",
+      "iter": 1,
+      "ms": 3498.1,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "iter": 1,
+      "ms": 4194.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_decimal16",
+      "iter": 1,
+      "ms": 2753.1,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_multicol",
+      "iter": 1,
+      "ms": 2585.1,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_shortstrings",
+      "iter": 1,
+      "ms": 1941.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "iter": 1,
+      "ms": 1512.4,
+      "rows": 700,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "iter": 1,
+      "ms": 2955.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "iter": 1,
+      "ms": 1124.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "iter": 1,
+      "ms": 2528.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "iter": 1,
+      "ms": 1377.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_equal_predicate",
+      "iter": 1,
+      "ms": 825.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "iter": 1,
+      "ms": 2276.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_in_predicate",
+      "iter": 1,
+      "ms": 1179.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_like_predicate_center",
+      "iter": 1,
+      "ms": 2009.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "iter": 1,
+      "ms": 1090.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "iter": 1,
+      "ms": 838.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "iter": 1,
+      "ms": 943.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_like_predicate_end",
+      "iter": 1,
+      "ms": 1417.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "iter": 1,
+      "ms": 1073.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_like_predicate_start",
+      "iter": 1,
+      "ms": 817.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "iter": 1,
+      "ms": 1490.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "iter": 1,
+      "ms": 1209.5,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "iter": 1,
+      "ms": 974.6,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "approx_top_k_lineitem",
+      "iter": 1,
+      "ms": 1373.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_growing_frame",
+      "iter": 1,
+      "ms": 817.9,
+      "rows": 1004,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "iter": 1,
+      "ms": 804.8,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_row_number",
+      "iter": 1,
+      "ms": 880.8,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_multiple_orderings",
+      "iter": 1,
+      "ms": 1826.8,
+      "rows": 9965,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_moving_frame",
+      "iter": 1,
+      "ms": 995.7,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_unbounded_frame",
+      "iter": 1,
+      "ms": 1346.8,
+      "rows": 5066,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "json_aggregates",
+      "iter": 1,
+      "ms": 969.4,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "statistical_percentiles",
+      "iter": 1,
+      "ms": 900.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "approx_quantiles_array",
+      "iter": 1,
+      "ms": 723.9,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "iter": 1,
+      "ms": 672.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "statistical_correlation",
+      "iter": 1,
+      "ms": 789.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "olap_cube_analysis",
+      "iter": 1,
+      "ms": 829.9,
+      "rows": 840,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "iter": 1,
+      "ms": 880.8,
+      "rows": 156,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "iter": 1,
+      "ms": 729.0,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "max_by_simple",
+      "iter": 1,
+      "ms": 883.2,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "min_by_simple",
+      "iter": 1,
+      "ms": 935.8,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "max_by_complex",
+      "iter": 1,
+      "ms": 842.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "min_by_complex",
+      "iter": 1,
+      "ms": 749.2,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "max_by_with_ties",
+      "iter": 1,
+      "ms": 994.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "min_by_with_ties",
+      "iter": 1,
+      "ms": 823.8,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ualify_row_number",
+      "iter": 1,
+      "ms": 926.3,
+      "rows": 2953,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ualify_dense_rank",
+      "iter": 1,
+      "ms": 686.4,
+      "rows": 301,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ualify_percentile",
+      "iter": 1,
+      "ms": 1394.9,
+      "rows": 816,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ualify_ntile",
+      "iter": 1,
+      "ms": 815.9,
+      "rows": 2032,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ualify_cume_dist",
+      "iter": 1,
+      "ms": 830.5,
+      "rows": 763,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "ualify_lag_lead",
+      "iter": 1,
+      "ms": 898.9,
+      "rows": 3510,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_exists_to_semijoin",
+      "iter": 1,
+      "ms": 812.1,
+      "rows": 722,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "iter": 1,
+      "ms": 858.1,
+      "rows": 1872,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "iter": 1,
+      "ms": 921.0,
+      "rows": 5000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "iter": 1,
+      "ms": 847.9,
+      "rows": 27,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "iter": 1,
+      "ms": 707.9,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "iter": 1,
+      "ms": 836.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "iter": 1,
+      "ms": 729.2,
+      "rows": 13,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_scalar_subquery_flattening",
+      "iter": 1,
+      "ms": 897.4,
+      "rows": 41,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "iter": 1,
+      "ms": 752.6,
+      "rows": 1000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "iter": 1,
+      "ms": 780.4,
+      "rows": 89,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_in_to_exists",
+      "iter": 1,
+      "ms": 1059.1,
+      "rows": 163,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "iter": 1,
+      "ms": 756.5,
+      "rows": 155,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "iter": 1,
+      "ms": 816.6,
+      "rows": 254,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "iter": 1,
+      "ms": 780.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "any_value_simple",
+      "iter": 1,
+      "ms": 669.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "any_value_with_filter",
+      "iter": 1,
+      "ms": 701.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_all_simple",
+      "iter": 1,
+      "ms": 791.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "groupby_all_complex",
+      "iter": 1,
+      "ms": 733.5,
+      "rows": 219,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_all_simple",
+      "iter": 1,
+      "ms": 682.8,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_all_desc",
+      "iter": 1,
+      "ms": 603.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_agg_simple",
+      "iter": 1,
+      "ms": 828.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_agg_distinct",
+      "iter": 1,
+      "ms": 1077.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_unnest",
+      "iter": 1,
+      "ms": 809.6,
+      "rows": 800,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_contains",
+      "iter": 1,
+      "ms": 815.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_length",
+      "iter": 1,
+      "ms": 703.8,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_slice",
+      "iter": 1,
+      "ms": 1024.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "struct_construction",
+      "iter": 1,
+      "ms": 813.2,
+      "rows": 59,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "struct_access",
+      "iter": 1,
+      "ms": 731.8,
+      "rows": 26,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "array_of_struct",
+      "iter": 1,
+      "ms": 1308.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "pivot_basic",
+      "iter": 1,
+      "ms": 935.0,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "unpivot_basic",
+      "iter": 1,
+      "ms": 766.9,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_selective",
+      "iter": 1,
+      "ms": 857.7,
+      "rows": 2369,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "filter_non_selective",
+      "iter": 1,
+      "ms": 3142.8,
+      "rows": 58968,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_simple",
+      "iter": 1,
+      "ms": 792.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_multi",
+      "iter": 1,
+      "ms": 846.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "orderby_desc",
+      "iter": 1,
+      "ms": 1010.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_like",
+      "iter": 1,
+      "ms": 748.1,
+      "rows": 99,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_starts_with",
+      "iter": 1,
+      "ms": 748.1,
+      "rows": 361,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_ends_with",
+      "iter": 1,
+      "ms": 779.9,
+      "rows": 376,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_concat",
+      "iter": 1,
+      "ms": 641.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "string_substring",
+      "iter": 1,
+      "ms": 1064.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "shuffle_join",
+      "iter": 1,
+      "ms": 968.6,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "topn",
+      "iter": 1,
+      "ms": 1003.8,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_rank",
+      "iter": 1,
+      "ms": 866.1,
+      "rows": 1192,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_sum",
+      "iter": 1,
+      "ms": 3289.5,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "window_running_sum",
+      "iter": 1,
+      "ms": 716.9,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "limit_ordered",
+      "iter": 1,
+      "ms": 696.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 1
+    },
+    {
+      "id": "aggregation_distinct",
+      "iter": 2,
+      "ms": 1219.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "iter": 2,
+      "ms": 746.6,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "approx_count_distinct_simple",
+      "iter": 2,
+      "ms": 627.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "approx_count_distinct_groupby",
+      "iter": 2,
+      "ms": 670.8,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "iter": 2,
+      "ms": 3683.8,
+      "rows": 60162,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "iter": 2,
+      "ms": 985.7,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_materialize",
+      "iter": 2,
+      "ms": 760.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "iter": 2,
+      "ms": 983.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_partition",
+      "iter": 2,
+      "ms": 882.0,
+      "rows": 2482,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_selective",
+      "iter": 2,
+      "ms": 722.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_simple",
+      "iter": 2,
+      "ms": 637.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "iter": 2,
+      "ms": 656.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "iter": 2,
+      "ms": 634.6,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "iter": 2,
+      "ms": 749.2,
+      "rows": 67,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "iter": 2,
+      "ms": 671.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "iter": 2,
+      "ms": 646.3,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "iter": 2,
+      "ms": 656.7,
+      "rows": 88,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "iter": 2,
+      "ms": 802.8,
+      "rows": 74,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "count_star",
+      "iter": 2,
+      "ms": 681.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "decimal_arithmetic",
+      "iter": 2,
+      "ms": 648.2,
+      "rows": 1000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "empty_build_join",
+      "iter": 2,
+      "ms": 8964.3,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "exchange_broadcast",
+      "iter": 2,
+      "ms": 812.0,
+      "rows": 1449,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "exchange_merge",
+      "iter": 2,
+      "ms": 2545.3,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "exchange_shuffle",
+      "iter": 2,
+      "ms": 998.0,
+      "rows": 10840,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "iter": 2,
+      "ms": 618.5,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "iter": 2,
+      "ms": 865.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_bigint_selective",
+      "iter": 2,
+      "ms": 705.6,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "iter": 2,
+      "ms": 663.2,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "iter": 2,
+      "ms": 682.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_decimal_selective",
+      "iter": 2,
+      "ms": 1368.8,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "iter": 2,
+      "ms": 955.2,
+      "rows": 1900,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_string_like",
+      "iter": 2,
+      "ms": 737.5,
+      "rows": 107,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_string_non_selective",
+      "iter": 2,
+      "ms": 728.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_string_selective",
+      "iter": 2,
+      "ms": 745.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "iter": 2,
+      "ms": 815.0,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "iter": 2,
+      "ms": 1048.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "iter": 2,
+      "ms": 836.2,
+      "rows": 1500,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "iter": 2,
+      "ms": 2318.3,
+      "rows": 35921,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "iter": 2,
+      "ms": 713.1,
+      "rows": 11,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "iter": 2,
+      "ms": 692.6,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "intrinsic_to_date",
+      "iter": 2,
+      "ms": 692.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "limit",
+      "iter": 2,
+      "ms": 887.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "long_predicate",
+      "iter": 2,
+      "ms": 812.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "iter": 2,
+      "ms": 957.8,
+      "rows": 2027,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_all",
+      "iter": 2,
+      "ms": 914.7,
+      "rows": 1500,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_bigint",
+      "iter": 2,
+      "ms": 877.3,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "iter": 2,
+      "ms": 665.0,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_decimal16",
+      "iter": 2,
+      "ms": 717.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_multicol",
+      "iter": 2,
+      "ms": 748.9,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_shortstrings",
+      "iter": 2,
+      "ms": 734.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "iter": 2,
+      "ms": 1115.1,
+      "rows": 700,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "iter": 2,
+      "ms": 1242.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "iter": 2,
+      "ms": 894.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "iter": 2,
+      "ms": 1090.1,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "iter": 2,
+      "ms": 1592.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_equal_predicate",
+      "iter": 2,
+      "ms": 715.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "iter": 2,
+      "ms": 707.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_in_predicate",
+      "iter": 2,
+      "ms": 644.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_like_predicate_center",
+      "iter": 2,
+      "ms": 1133.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "iter": 2,
+      "ms": 676.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "iter": 2,
+      "ms": 672.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "iter": 2,
+      "ms": 742.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_like_predicate_end",
+      "iter": 2,
+      "ms": 762.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "iter": 2,
+      "ms": 686.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_like_predicate_start",
+      "iter": 2,
+      "ms": 761.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "iter": 2,
+      "ms": 802.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "iter": 2,
+      "ms": 697.6,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "iter": 2,
+      "ms": 641.3,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "approx_top_k_lineitem",
+      "iter": 2,
+      "ms": 820.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_growing_frame",
+      "iter": 2,
+      "ms": 716.1,
+      "rows": 1004,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "iter": 2,
+      "ms": 950.8,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_row_number",
+      "iter": 2,
+      "ms": 889.2,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_multiple_orderings",
+      "iter": 2,
+      "ms": 1971.2,
+      "rows": 9965,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_moving_frame",
+      "iter": 2,
+      "ms": 809.8,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_unbounded_frame",
+      "iter": 2,
+      "ms": 810.2,
+      "rows": 5066,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "json_aggregates",
+      "iter": 2,
+      "ms": 838.3,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "statistical_percentiles",
+      "iter": 2,
+      "ms": 784.5,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "approx_quantiles_array",
+      "iter": 2,
+      "ms": 992.8,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "iter": 2,
+      "ms": 628.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "statistical_correlation",
+      "iter": 2,
+      "ms": 748.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "olap_cube_analysis",
+      "iter": 2,
+      "ms": 754.0,
+      "rows": 840,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "iter": 2,
+      "ms": 799.2,
+      "rows": 156,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "iter": 2,
+      "ms": 899.5,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "max_by_simple",
+      "iter": 2,
+      "ms": 930.5,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "min_by_simple",
+      "iter": 2,
+      "ms": 817.4,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "max_by_complex",
+      "iter": 2,
+      "ms": 991.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "min_by_complex",
+      "iter": 2,
+      "ms": 962.1,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "max_by_with_ties",
+      "iter": 2,
+      "ms": 852.9,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "min_by_with_ties",
+      "iter": 2,
+      "ms": 1200.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ualify_row_number",
+      "iter": 2,
+      "ms": 842.6,
+      "rows": 2953,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ualify_dense_rank",
+      "iter": 2,
+      "ms": 825.3,
+      "rows": 301,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ualify_percentile",
+      "iter": 2,
+      "ms": 911.7,
+      "rows": 816,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ualify_ntile",
+      "iter": 2,
+      "ms": 842.2,
+      "rows": 2032,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ualify_cume_dist",
+      "iter": 2,
+      "ms": 709.4,
+      "rows": 763,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "ualify_lag_lead",
+      "iter": 2,
+      "ms": 844.6,
+      "rows": 3510,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_exists_to_semijoin",
+      "iter": 2,
+      "ms": 841.5,
+      "rows": 722,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "iter": 2,
+      "ms": 724.7,
+      "rows": 1872,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "iter": 2,
+      "ms": 913.4,
+      "rows": 5000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "iter": 2,
+      "ms": 1099.8,
+      "rows": 27,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "iter": 2,
+      "ms": 653.4,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "iter": 2,
+      "ms": 902.9,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "iter": 2,
+      "ms": 774.2,
+      "rows": 13,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_scalar_subquery_flattening",
+      "iter": 2,
+      "ms": 855.0,
+      "rows": 41,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "iter": 2,
+      "ms": 1614.4,
+      "rows": 1000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "iter": 2,
+      "ms": 992.9,
+      "rows": 89,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_in_to_exists",
+      "iter": 2,
+      "ms": 685.1,
+      "rows": 163,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "iter": 2,
+      "ms": 770.8,
+      "rows": 155,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "iter": 2,
+      "ms": 729.7,
+      "rows": 254,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "iter": 2,
+      "ms": 820.9,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "any_value_simple",
+      "iter": 2,
+      "ms": 803.8,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "any_value_with_filter",
+      "iter": 2,
+      "ms": 742.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_all_simple",
+      "iter": 2,
+      "ms": 680.9,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "groupby_all_complex",
+      "iter": 2,
+      "ms": 714.9,
+      "rows": 219,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_all_simple",
+      "iter": 2,
+      "ms": 823.0,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_all_desc",
+      "iter": 2,
+      "ms": 1175.0,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_agg_simple",
+      "iter": 2,
+      "ms": 1368.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_agg_distinct",
+      "iter": 2,
+      "ms": 914.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_unnest",
+      "iter": 2,
+      "ms": 740.1,
+      "rows": 800,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_contains",
+      "iter": 2,
+      "ms": 965.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_length",
+      "iter": 2,
+      "ms": 842.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_slice",
+      "iter": 2,
+      "ms": 898.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "struct_construction",
+      "iter": 2,
+      "ms": 668.4,
+      "rows": 59,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "struct_access",
+      "iter": 2,
+      "ms": 2052.8,
+      "rows": 26,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "array_of_struct",
+      "iter": 2,
+      "ms": 952.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "pivot_basic",
+      "iter": 2,
+      "ms": 919.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "unpivot_basic",
+      "iter": 2,
+      "ms": 857.4,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_selective",
+      "iter": 2,
+      "ms": 1065.3,
+      "rows": 2369,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "filter_non_selective",
+      "iter": 2,
+      "ms": 3179.2,
+      "rows": 58968,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_simple",
+      "iter": 2,
+      "ms": 1015.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_multi",
+      "iter": 2,
+      "ms": 746.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "orderby_desc",
+      "iter": 2,
+      "ms": 1318.8,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_like",
+      "iter": 2,
+      "ms": 688.2,
+      "rows": 99,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_starts_with",
+      "iter": 2,
+      "ms": 1835.3,
+      "rows": 361,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_ends_with",
+      "iter": 2,
+      "ms": 767.5,
+      "rows": 376,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_concat",
+      "iter": 2,
+      "ms": 784.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "string_substring",
+      "iter": 2,
+      "ms": 1595.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "shuffle_join",
+      "iter": 2,
+      "ms": 902.6,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "topn",
+      "iter": 2,
+      "ms": 633.6,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_rank",
+      "iter": 2,
+      "ms": 1210.3,
+      "rows": 1192,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_sum",
+      "iter": 2,
+      "ms": 3047.7,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "window_running_sum",
+      "iter": 2,
+      "ms": 702.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "limit_ordered",
+      "iter": 2,
+      "ms": 892.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 2
+    },
+    {
+      "id": "aggregation_distinct",
+      "iter": 3,
+      "ms": 977.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_distinct_groupby",
+      "iter": 3,
+      "ms": 1076.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "approx_count_distinct_simple",
+      "iter": 3,
+      "ms": 697.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "approx_count_distinct_groupby",
+      "iter": 3,
+      "ms": 875.7,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_groupby_large",
+      "iter": 3,
+      "ms": 3693.4,
+      "rows": 60162,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_groupby_small",
+      "iter": 3,
+      "ms": 716.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_materialize",
+      "iter": 3,
+      "ms": 858.2,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_materialize_subquery",
+      "iter": 3,
+      "ms": 839.3,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_partition",
+      "iter": 3,
+      "ms": 750.8,
+      "rows": 2482,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_selective",
+      "iter": 3,
+      "ms": 2133.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "aggregation_simple",
+      "iter": 3,
+      "ms": 725.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "broadcast_join_two_tables",
+      "iter": 3,
+      "ms": 719.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "broadcast_join_three_tables",
+      "iter": 3,
+      "ms": 826.9,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "broadcast_join_four_tables",
+      "iter": 3,
+      "ms": 814.8,
+      "rows": 67,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "predicate_ordering_aggregation",
+      "iter": 3,
+      "ms": 735.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "predicate_ordering_aggregation_groupby",
+      "iter": 3,
+      "ms": 698.7,
+      "rows": 3,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "predicate_ordering_costs",
+      "iter": 3,
+      "ms": 763.2,
+      "rows": 88,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "predicate_ordering_subquery",
+      "iter": 3,
+      "ms": 680.2,
+      "rows": 74,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "count_star",
+      "iter": 3,
+      "ms": 626.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "decimal_arithmetic",
+      "iter": 3,
+      "ms": 763.7,
+      "rows": 1000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "empty_build_join",
+      "iter": 3,
+      "ms": 8239.8,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "exchange_broadcast",
+      "iter": 3,
+      "ms": 1189.1,
+      "rows": 1449,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "exchange_merge",
+      "iter": 3,
+      "ms": 2636.8,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "exchange_shuffle",
+      "iter": 3,
+      "ms": 823.6,
+      "rows": 10840,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_bigint_in_list_selective",
+      "iter": 3,
+      "ms": 753.6,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_bigint_non_selective",
+      "iter": 3,
+      "ms": 799.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_bigint_selective",
+      "iter": 3,
+      "ms": 861.3,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_decimal_in_list_selective",
+      "iter": 3,
+      "ms": 680.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_decimal_non_selective",
+      "iter": 3,
+      "ms": 652.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_decimal_selective",
+      "iter": 3,
+      "ms": 841.4,
+      "rows": 0,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_in_predicate_selective",
+      "iter": 3,
+      "ms": 749.4,
+      "rows": 1900,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_string_like",
+      "iter": 3,
+      "ms": 946.9,
+      "rows": 107,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_string_non_selective",
+      "iter": 3,
+      "ms": 704.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_string_selective",
+      "iter": 3,
+      "ms": 680.9,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_bigint_highndv",
+      "iter": 3,
+      "ms": 1188.7,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_bigint_lowndv",
+      "iter": 3,
+      "ms": 724.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_bigint_pk",
+      "iter": 3,
+      "ms": 669.9,
+      "rows": 1500,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_decimal_highndv",
+      "iter": 3,
+      "ms": 2132.5,
+      "rows": 35921,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_decimal_lowndv",
+      "iter": 3,
+      "ms": 768.4,
+      "rows": 11,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "approx_quantile_groupby",
+      "iter": 3,
+      "ms": 1956.9,
+      "rows": 7,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "intrinsic_to_date",
+      "iter": 3,
+      "ms": 790.5,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "limit",
+      "iter": 3,
+      "ms": 778.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "long_predicate",
+      "iter": 3,
+      "ms": 995.1,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "min_max_runtime_filter",
+      "iter": 3,
+      "ms": 962.7,
+      "rows": 2027,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_all",
+      "iter": 3,
+      "ms": 1229.5,
+      "rows": 1500,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_bigint",
+      "iter": 3,
+      "ms": 969.6,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_bigint_expression",
+      "iter": 3,
+      "ms": 796.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_decimal16",
+      "iter": 3,
+      "ms": 811.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_multicol",
+      "iter": 3,
+      "ms": 709.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_shortstrings",
+      "iter": 3,
+      "ms": 861.9,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "shuffle_1mb_rows",
+      "iter": 3,
+      "ms": 1062.2,
+      "rows": 700,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "shuffle_full_join_one_to_many_string_with_groupby",
+      "iter": 3,
+      "ms": 767.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "shuffle_inner_join_one_to_many_string_with_groupby",
+      "iter": 3,
+      "ms": 933.0,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "shuffle_inner_join_union_all_with_groupby",
+      "iter": 3,
+      "ms": 840.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "shuffle_left_join_one_to_many_string_with_groupby",
+      "iter": 3,
+      "ms": 782.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_equal_predicate",
+      "iter": 3,
+      "ms": 952.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_equal_predicate_lower",
+      "iter": 3,
+      "ms": 916.7,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_in_predicate",
+      "iter": 3,
+      "ms": 680.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_like_predicate_center",
+      "iter": 3,
+      "ms": 1684.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_like_predicate_center_insensitive",
+      "iter": 3,
+      "ms": 705.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_like_predicate_multi",
+      "iter": 3,
+      "ms": 7371.0,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_ilike_predicate_multi",
+      "iter": 3,
+      "ms": 860.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_like_predicate_end",
+      "iter": 3,
+      "ms": 621.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_ilike_predicate_end",
+      "iter": 3,
+      "ms": 717.4,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_like_predicate_start",
+      "iter": 3,
+      "ms": 688.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_ilike_predicate_start",
+      "iter": 3,
+      "ms": 970.6,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "topn_ordered_allcols",
+      "iter": 3,
+      "ms": 747.1,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "topn_aggregate_2columns",
+      "iter": 3,
+      "ms": 1433.0,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "approx_top_k_lineitem",
+      "iter": 3,
+      "ms": 755.3,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_growing_frame",
+      "iter": 3,
+      "ms": 670.2,
+      "rows": 1004,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_lead_lag_same_frame",
+      "iter": 3,
+      "ms": 826.9,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_row_number",
+      "iter": 3,
+      "ms": 1352.2,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_multiple_orderings",
+      "iter": 3,
+      "ms": 1849.6,
+      "rows": 9965,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_moving_frame",
+      "iter": 3,
+      "ms": 929.1,
+      "rows": 2204,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_unbounded_frame",
+      "iter": 3,
+      "ms": 1289.2,
+      "rows": 5066,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "json_aggregates",
+      "iter": 3,
+      "ms": 707.3,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "statistical_percentiles",
+      "iter": 3,
+      "ms": 1090.1,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "approx_quantiles_array",
+      "iter": 3,
+      "ms": 778.2,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "statistical_variance_stddev",
+      "iter": 3,
+      "ms": 755.2,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "statistical_correlation",
+      "iter": 3,
+      "ms": 722.8,
+      "rows": 1,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "olap_cube_analysis",
+      "iter": 3,
+      "ms": 903.9,
+      "rows": 840,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "olap_rollup_analysis",
+      "iter": 3,
+      "ms": 890.5,
+      "rows": 156,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "timeseries_trend_analysis",
+      "iter": 3,
+      "ms": 624.8,
+      "rows": 24,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "max_by_simple",
+      "iter": 3,
+      "ms": 1891.5,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "min_by_simple",
+      "iter": 3,
+      "ms": 923.4,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "max_by_complex",
+      "iter": 3,
+      "ms": 1031.1,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "min_by_complex",
+      "iter": 3,
+      "ms": 1528.2,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "max_by_with_ties",
+      "iter": 3,
+      "ms": 901.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "min_by_with_ties",
+      "iter": 3,
+      "ms": 1063.3,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "ualify_row_number",
+      "iter": 3,
+      "ms": 1770.7,
+      "rows": 2953,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "ualify_dense_rank",
+      "iter": 3,
+      "ms": 1425.9,
+      "rows": 301,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "ualify_percentile",
+      "iter": 3,
+      "ms": 758.8,
+      "rows": 816,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "ualify_ntile",
+      "iter": 3,
+      "ms": 783.1,
+      "rows": 2032,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "ualify_cume_dist",
+      "iter": 3,
+      "ms": 722.4,
+      "rows": 763,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "ualify_lag_lead",
+      "iter": 3,
+      "ms": 913.3,
+      "rows": 3510,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_exists_to_semijoin",
+      "iter": 3,
+      "ms": 708.9,
+      "rows": 722,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_distinct_elimination",
+      "iter": 3,
+      "ms": 812.5,
+      "rows": 1872,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_common_subexpression",
+      "iter": 3,
+      "ms": 1089.8,
+      "rows": 5000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_predicate_pushdown",
+      "iter": 3,
+      "ms": 690.1,
+      "rows": 27,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_join_reordering",
+      "iter": 3,
+      "ms": 774.3,
+      "rows": 12,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_limit_pushdown",
+      "iter": 3,
+      "ms": 711.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_aggregate_pushdown",
+      "iter": 3,
+      "ms": 755.0,
+      "rows": 13,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_scalar_subquery_flattening",
+      "iter": 3,
+      "ms": 739.5,
+      "rows": 41,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_constant_folding",
+      "iter": 3,
+      "ms": 753.5,
+      "rows": 1000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_column_pruning",
+      "iter": 3,
+      "ms": 783.4,
+      "rows": 89,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_in_to_exists",
+      "iter": 3,
+      "ms": 786.6,
+      "rows": 163,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_union_optimization",
+      "iter": 3,
+      "ms": 690.1,
+      "rows": 155,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_runtime_filter",
+      "iter": 3,
+      "ms": 966.0,
+      "rows": 254,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "optimizer_groupjoin",
+      "iter": 3,
+      "ms": 764.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "any_value_simple",
+      "iter": 3,
+      "ms": 791.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "any_value_with_filter",
+      "iter": 3,
+      "ms": 841.5,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_all_simple",
+      "iter": 3,
+      "ms": 1114.3,
+      "rows": 4,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "groupby_all_complex",
+      "iter": 3,
+      "ms": 713.6,
+      "rows": 219,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_all_simple",
+      "iter": 3,
+      "ms": 699.2,
+      "rows": 25,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_all_desc",
+      "iter": 3,
+      "ms": 751.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_agg_simple",
+      "iter": 3,
+      "ms": 935.5,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_agg_distinct",
+      "iter": 3,
+      "ms": 813.6,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_unnest",
+      "iter": 3,
+      "ms": 864.9,
+      "rows": 800,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_contains",
+      "iter": 3,
+      "ms": 750.1,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_length",
+      "iter": 3,
+      "ms": 1637.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_slice",
+      "iter": 3,
+      "ms": 715.7,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "struct_construction",
+      "iter": 3,
+      "ms": 785.1,
+      "rows": 59,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "struct_access",
+      "iter": 3,
+      "ms": 894.0,
+      "rows": 26,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "array_of_struct",
+      "iter": 3,
+      "ms": 900.4,
+      "rows": 5,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "pivot_basic",
+      "iter": 3,
+      "ms": 3562.8,
+      "rows": 2,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "unpivot_basic",
+      "iter": 3,
+      "ms": 1245.7,
+      "rows": 200,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_selective",
+      "iter": 3,
+      "ms": 805.0,
+      "rows": 2369,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "filter_non_selective",
+      "iter": 3,
+      "ms": 3236.9,
+      "rows": 58968,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_simple",
+      "iter": 3,
+      "ms": 680.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_multi",
+      "iter": 3,
+      "ms": 1227.9,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "orderby_desc",
+      "iter": 3,
+      "ms": 727.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_like",
+      "iter": 3,
+      "ms": 985.5,
+      "rows": 99,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_starts_with",
+      "iter": 3,
+      "ms": 738.0,
+      "rows": 361,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_ends_with",
+      "iter": 3,
+      "ms": 713.0,
+      "rows": 376,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_concat",
+      "iter": 3,
+      "ms": 895.2,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "string_substring",
+      "iter": 3,
+      "ms": 1326.6,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "shuffle_join",
+      "iter": 3,
+      "ms": 1499.9,
+      "rows": 15000,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "topn",
+      "iter": 3,
+      "ms": 1349.4,
+      "rows": 10,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_rank",
+      "iter": 3,
+      "ms": 1761.2,
+      "rows": 1192,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_sum",
+      "iter": 3,
+      "ms": 23570.9,
+      "rows": 60175,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "window_running_sum",
+      "iter": 3,
+      "ms": 715.8,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    },
+    {
+      "id": "limit_ordered",
+      "iter": 3,
+      "ms": 733.4,
+      "rows": 100,
+      "run_type": "measurement",
+      "status": "SUCCESS",
+      "stream": 3
+    }
+  ],
+  "result_schema_version": "2.2",
+  "run": {
+    "id": "1a102885",
+    "iterations": 3,
+    "query_time_ms": 491132,
+    "streams": 4,
+    "timestamp": "2026-09-30T08:19:05.518400",
+    "total_duration_ms": 766418
+  },
+  "summary": {
+    "cost": {
+      "total_bytes_billed": 8162115584,
+      "total_bytes_scanned": 912119308
+    },
+    "data": {
+      "load_time_ms": 57669.7,
+      "rows_loaded": 86805
+    },
+    "queries": {
+      "failed": 0,
+      "passed": 426,
+      "total": 426
+    },
+    "timing": {
+      "avg_ms": 1152.9,
+      "geometric_mean_ms": 963.0,
+      "max_ms": 23570.9,
+      "min_ms": 603.5,
+      "p90_ms": 1770.7,
+      "p95_ms": 2585.1,
+      "p99_ms": 7371.0,
+      "stdev_ms": 1451.5,
+      "total_ms": 491131.8
+    },
+    "validation": "passed"
+  },
+  "tables": {
+    "CUSTOMER": {
+      "load_ms": 7570,
+      "rows": 1500
+    },
+    "LINEITEM": {
+      "load_ms": 9728,
+      "rows": 60175
+    },
+    "NATION": {
+      "load_ms": 5274,
+      "rows": 25
+    },
+    "ORDERS": {
+      "load_ms": 10118,
+      "rows": 15000
+    },
+    "PART": {
+      "load_ms": 6853,
+      "rows": 2000
+    },
+    "PARTSUPP": {
+      "load_ms": 6084,
+      "rows": 8000
+    },
+    "REGION": {
+      "load_ms": 4377,
+      "rows": 5
+    },
+    "SUPPLIER": {
+      "load_ms": 7427,
+      "rows": 100
+    }
+  },
+  "version": "2.2"
+}
