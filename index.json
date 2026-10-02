@@ -20314,6 +20314,13 @@
       "status": "open",
       "title": "DECISION GATE (D-2): which constraint kinds become catalog-verifiable, and from which structured sources"
     },
+    "tuning-gate-load-only-semantics-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "DECISION GATE (D-4): what --tuning means for load-only runs (--phases generate,load)"
+    },
     "tuning-gate-local-result-anonymization-20261001": {
       "claim": null,
       "needs": [],

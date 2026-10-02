@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Decision recorded (ADR-002 or ADR-003 addendum) selecting parity or refusal."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-4 / task P3.3 (re-review R-3, revised after probe).",
+  "description": "## Problem\n`_execute_load_only_mode` (`benchbox/core/runner/runner.py:528-585`) calls `create_schema` and `load_data` directly and never calls `apply_unified_tuning`. Observed on DuckDB with a sort-only custom config:\n- the DataLoader CTAS sort and index re-create still ran (`idx_lineitem_sort` and `idx_orders_sort` present);\n- constraints, pre-load DDL, dropped-intent accounting and platform optimizations were skipped;\n- no metadata was saved;\n- the bundle had `tuning_mode: custom` with `platform.tuning: null`.\n\n## Options\n- **(A) Recommended.** Full lifecycle parity with a full run: apply, reconcile, metadata, ledger, receipt and `platform.tuning` export.\n- **(B)** Refuse any `--tuning` other than `notuning` combined with load-only phases, with an actionable error.\n\n## Guardrails\n- A load-only bundle must never carry a tuned `tuning_mode` without a `platform.tuning` section.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
+  "links": [
+    "benchbox/core/runner/runner.py",
+    "benchbox/platforms/base/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:11:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "fb0488189001412f8884cf26dd491c8e",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
