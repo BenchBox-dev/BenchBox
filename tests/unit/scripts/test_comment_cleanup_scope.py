@@ -409,6 +409,12 @@ def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers()
     assert ("benchbox/core/benchmark_result_validation.py", "docs/reference/python-api/base.rst") in pairs
 
 
+def test_duration_policy_has_exactly_one_exact_path_rule_owned_by_shared_infrastructure() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rules = [rule for rule in policy["ownership_rules"] if {"path": "tests/duration_policy.py"} in rule["selectors"]]
+    assert [rule["owner"] for rule in rules] == ["comment-cleanup-shared-infrastructure"]
+
+
 def _derived_rule(priority: int = 20) -> dict:
     return {
         "id": "test-import-owner",
