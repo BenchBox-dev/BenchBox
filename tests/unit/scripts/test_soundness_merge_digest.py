@@ -30,15 +30,26 @@ MERGED = "e" * 40
 PUSHED = "2026-10-02T10:00:00Z"
 BEFORE = "2026-10-02T09:00:00Z"
 AFTER = "2026-10-02T11:00:00Z"
+MERGED_AT = "2026-10-02T12:00:00Z"
+LATER = "2026-10-02T13:00:00Z"
 CONNECTOR = "chatgpt-codex-connector[bot]"
 
 
-def commit(sha, committed_at, refresh=False):
-    return digest.PullCommit(sha, committed_at, refresh)
+def commit(sha, arrived_at, refresh=False):
+    return digest.PullCommit(sha, arrived_at, refresh)
+
+
+def review(login, sha, submitted_at=AFTER, state="COMMENTED"):
+    return digest.Review(login, sha, submitted_at, state)
 
 
 def evidence(**overrides):
-    fields = {"number": 7, "author": "dev", "commits": (commit(OLD, BEFORE), commit(HEAD, PUSHED))}
+    fields = {
+        "number": 7,
+        "author": "dev",
+        "merged_at": MERGED_AT,
+        "commits": (commit(OLD, BEFORE), commit(HEAD, PUSHED)),
+    }
     fields.update(overrides)
     return digest.PullEvidence(**fields)
 
@@ -49,22 +60,36 @@ def refreshed(**overrides):
 
 
 def test_connector_review_of_the_last_content_commit_is_a_signal():
-    pull = evidence(reviews=(digest.Review(CONNECTOR, HEAD),))
+    pull = evidence(reviews=(review(CONNECTOR, HEAD),))
     assert digest.review_signals(pull) == ("connector-review",)
 
 
 def test_connector_review_of_an_earlier_commit_is_not_a_signal():
-    pull = evidence(reviews=(digest.Review(CONNECTOR, OLD),))
+    pull = evidence(reviews=(review(CONNECTOR, OLD),))
     assert digest.review_signals(pull) == ()
 
 
 def test_a_connector_review_stays_valid_after_a_refresh_merge():
-    pull = refreshed(reviews=(digest.Review(CONNECTOR, HEAD),))
+    pull = refreshed(reviews=(review(CONNECTOR, HEAD),))
     assert digest.review_signals(pull) == ("connector-review",)
 
 
+def test_a_pending_connector_review_is_not_a_signal():
+    pull = evidence(reviews=(review(CONNECTOR, HEAD, state="PENDING"),))
+    assert digest.review_signals(pull) == ()
+
+
+def test_signals_that_arrive_after_the_merge_are_not_counted():
+    pull = evidence(
+        reviews=(review(CONNECTOR, HEAD, submitted_at=LATER),),
+        reactions=(digest.Reaction(CONNECTOR, "+1", LATER),),
+        comments=(digest.Comment("dev", "Reviewer: codex", LATER),),
+    )
+    assert digest.review_signals(pull) == ()
+
+
 def test_a_connector_review_from_another_account_is_not_a_signal():
-    pull = evidence(reviews=(digest.Review("dev", HEAD),))
+    pull = evidence(reviews=(review("dev", HEAD),))
     assert digest.review_signals(pull) == ()
 
 
@@ -83,7 +108,7 @@ def test_a_refresh_merge_after_the_approval_keeps_the_signal():
 def test_a_content_commit_after_the_signals_drops_them():
     pull = evidence(
         commits=(commit(OLD, BEFORE), commit(HEAD, AFTER)),
-        reviews=(digest.Review(CONNECTOR, OLD),),
+        reviews=(review(CONNECTOR, OLD),),
         reactions=(digest.Reaction(CONNECTOR, "+1", PUSHED),),
         comments=(digest.Comment("dev", "Reviewer: codex", PUSHED),),
     )
@@ -151,7 +176,7 @@ def test_a_commit_with_no_pull_request_needs_attention():
 
 
 def test_a_reviewed_commit_with_no_flagged_thread_needs_none():
-    pull = evidence(reviews=(digest.Review(CONNECTOR, HEAD),))
+    pull = evidence(reviews=(review(CONNECTOR, HEAD),))
     entry = digest.classify("c" * 40, "change", ["AGENTS.md"], pull)
     assert not entry.needs_attention
     assert entry.reasons == ()
@@ -159,7 +184,7 @@ def test_a_reviewed_commit_with_no_flagged_thread_needs_none():
 
 def test_a_reviewed_commit_with_a_flagged_thread_needs_attention():
     pull = evidence(
-        reviews=(digest.Review(CONNECTOR, HEAD),),
+        reviews=(review(CONNECTOR, HEAD),),
         threads=(digest.Thread(resolved=True, started_by=CONNECTOR, first_comment_sha=HEAD),),
     )
     entry = digest.classify("c" * 40, "change", ["AGENTS.md"], pull)
@@ -168,7 +193,7 @@ def test_a_reviewed_commit_with_a_flagged_thread_needs_attention():
 
 
 def test_render_lists_each_commit_with_its_signal():
-    pull = evidence(reviews=(digest.Review(CONNECTOR, HEAD),))
+    pull = evidence(reviews=(review(CONNECTOR, HEAD),))
     entries = [
         digest.classify("c" * 40, "reviewed", ["AGENTS.md"], pull),
         digest.classify("d" * 40, "unreviewed", ["AGENTS.md"], evidence(number=8)),
@@ -227,7 +252,17 @@ def test_a_mechanical_merge_of_the_base_adds_no_content(repo):
     make_branches(repo)
     git(repo, "checkout", "-q", "feat")
     git(repo, "merge", "-q", "--no-edit", "main")
-    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), cwd=repo) is False
+    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), "main", cwd=repo) is False
+
+
+def test_a_mechanical_merge_of_two_branches_off_the_base_adds_content(repo):
+    for name in ("one", "two"):
+        git(repo, "checkout", "-qb", name, "main")
+        write(repo, name, name)
+        git(repo, "add", name)
+        git(repo, "commit", "-qm", name)
+    git(repo, "merge", "-q", "--no-edit", "one")
+    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), "main", cwd=repo) is True
 
 
 def test_a_merge_with_an_extra_edit_adds_content(repo):
@@ -236,7 +271,7 @@ def test_a_merge_with_an_extra_edit_adds_content(repo):
     git(repo, "merge", "-q", "--no-commit", "--no-ff", "main")
     write(repo, "f", "top\na\nb\nc\nfeat\nsneaked in\n")
     git(repo, "commit", "-qam", "merge main")
-    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), cwd=repo) is True
+    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), "main", cwd=repo) is True
 
 
 def test_a_merge_resolved_by_hand_adds_content(repo):
@@ -250,7 +285,7 @@ def test_a_merge_resolved_by_hand_adds_content(repo):
     git(repo, "merge", "--no-edit", "main", check=False)
     write(repo, "g", "resolved\n")
     git(repo, "commit", "-qam", "resolve")
-    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), cwd=repo) is True
+    assert digest.merge_adds_content(git(repo, "rev-parse", "HEAD"), "main", cwd=repo) is True
 
 
 def test_an_octopus_merge_adds_content(repo):
@@ -265,7 +300,20 @@ def test_an_octopus_merge_adds_content(repo):
     git(repo, "merge", "-q", "--no-ff", "--no-edit", "one", "two")
     head = git(repo, "rev-parse", "HEAD")
     assert len(git(repo, "rev-list", "--parents", "-n1", head).split()) == 4
-    assert digest.merge_adds_content(head, cwd=repo) is True
+    assert digest.merge_adds_content(head, "main", cwd=repo) is True
+
+
+def test_an_unknown_commit_is_an_error_not_a_non_ancestor(repo):
+    with pytest.raises(digest.ReadError):
+        digest.is_ancestor("f" * 40, "main", cwd=repo)
+
+
+def test_ancestry_is_reported_in_both_directions(repo):
+    base = git(repo, "rev-parse", "main")
+    write(repo, "f", "changed\n")
+    git(repo, "commit", "-qam", "next")
+    assert digest.is_ancestor(base, "main", cwd=repo) is True
+    assert digest.is_ancestor("main", base, cwd=repo) is False
 
 
 def test_a_rename_reports_both_the_old_and_the_new_path(repo):
@@ -308,27 +356,75 @@ def api_commit(sha, committed_at, parents=1):
     return {"sha": sha, "commit": {"committer": {"date": committed_at}}, "parents": [{"sha": "p"}] * parents}
 
 
-def commit_list(monkeypatch, commits):
+FIRST_RUN = "2026-10-02T10:05:00Z"
+SECOND_RUN = "2026-10-02T10:20:00Z"
+
+
+def runs_response(*runs):
+    return {"workflow_runs": [{"event": event, "created_at": at} for event, at in runs]}
+
+
+def commit_list(monkeypatch, commits, *, fetch_head=HEAD, runs=()):
     monkeypatch.setattr(digest, "gh_pages", lambda endpoint: commits)
-    monkeypatch.setattr(digest, "merge_adds_content", lambda sha, cwd=None: sha == OLD)
-    fetched = []
-    monkeypatch.setattr(digest, "run", lambda args, **_: fetched.append(list(args)) or "")
-    return fetched
+    monkeypatch.setattr(digest, "gh_json", lambda *args: runs_response(*runs))
+    monkeypatch.setattr(digest, "merge_adds_content", lambda sha, base, cwd=None: sha == OLD)
+    calls = []
+
+    def fake_run(args, **_):
+        calls.append(list(args))
+        return fetch_head + "\n" if args[:3] == ["git", "rev-parse", "FETCH_HEAD"] else ""
+
+    monkeypatch.setattr(digest, "run", fake_run)
+    return calls
 
 
 def test_commits_are_read_with_refresh_merges_marked(monkeypatch):
     commits = [api_commit(OLD, BEFORE, 2), api_commit(REFRESH, PUSHED, 2), api_commit(HEAD, AFTER)]
-    fetched = commit_list(monkeypatch, commits)
+    calls = commit_list(monkeypatch, commits)
     pull = {"commits": 3, "head": {"sha": HEAD}}
-    result = digest.collect_commits("o/r", 7, pull)
+    result = digest.collect_commits("o/r", 7, pull, "base")
     assert [c.is_refresh for c in result] == [False, True, False]
-    assert fetched == [["git", "fetch", "--no-tags", "origin", "refs/pull/7/head"]]
+    assert ["git", "fetch", "--no-tags", "origin", "refs/pull/7/head"] in calls
 
 
 def test_a_commit_list_without_merges_fetches_nothing(monkeypatch):
-    fetched = commit_list(monkeypatch, [api_commit(HEAD, AFTER)])
-    digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}})
-    assert fetched == []
+    calls = commit_list(monkeypatch, [api_commit(HEAD, AFTER)])
+    digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}}, "base")
+    assert calls == []
+
+
+def test_a_pull_head_that_moved_during_the_read_is_refused(monkeypatch):
+    commits = [api_commit(OLD, BEFORE, 2), api_commit(HEAD, AFTER)]
+    commit_list(monkeypatch, commits, fetch_head="f" * 40)
+    with pytest.raises(digest.ReadError):
+        digest.collect_commits("o/r", 7, {"commits": 2, "head": {"sha": HEAD}}, "base")
+
+
+def test_the_last_content_commit_is_dated_by_the_first_pull_request_run(monkeypatch):
+    commit_list(
+        monkeypatch,
+        [api_commit(OLD, BEFORE), api_commit(HEAD, "2000-01-01T00:00:00Z")],
+        runs=[("pull_request", SECOND_RUN), ("push", "2026-10-02T08:00:00Z"), ("pull_request", FIRST_RUN)],
+    )
+    result = digest.collect_commits("o/r", 7, {"commits": 2, "head": {"sha": HEAD}}, "base")
+    assert [c.arrived_at for c in result] == [BEFORE, FIRST_RUN]
+
+
+def test_a_backdated_commit_cannot_make_an_old_reaction_current(monkeypatch):
+    commit_list(
+        monkeypatch,
+        [api_commit(HEAD, "2000-01-01T00:00:00Z")],
+        runs=[("pull_request", "2026-10-02T11:30:00Z")],
+    )
+    commits = digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}}, "base")
+    pull = evidence(commits=commits, reactions=(digest.Reaction(CONNECTOR, "+1", AFTER),))
+    assert digest.review_signals(pull) == ()
+
+
+def test_a_commit_with_no_pull_request_run_keeps_its_commit_date(monkeypatch):
+    commit_list(monkeypatch, [api_commit(HEAD, AFTER)], runs=[("push", BEFORE)])
+    result = digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}}, "base")
+    assert [c.arrived_at for c in result] == [AFTER]
 
 
 @pytest.mark.parametrize(
@@ -342,14 +438,53 @@ def test_a_commit_list_without_merges_fetches_nothing(monkeypatch):
 def test_an_empty_short_or_mismatched_commit_list_is_refused(monkeypatch, commits, pull):
     commit_list(monkeypatch, commits)
     with pytest.raises(digest.ReadError):
-        digest.collect_commits("o/r", 7, pull)
+        digest.collect_commits("o/r", 7, pull, "base")
 
 
 def test_a_commit_list_at_the_api_limit_is_refused(monkeypatch):
     commits = [api_commit(f"{i:040x}", BEFORE) for i in range(digest.MAX_PULL_COMMITS)]
     commit_list(monkeypatch, commits)
     with pytest.raises(digest.ReadError):
-        digest.collect_commits("o/r", 7, {"commits": len(commits), "head": {"sha": commits[-1]["sha"]}})
+        digest.collect_commits("o/r", 7, {"commits": len(commits), "head": {"sha": commits[-1]["sha"]}}, "base")
+
+
+def test_pages_of_a_paginated_read_are_flattened(monkeypatch):
+    pages = '[[{"n": 1}, {"n": 2}], [{"n": 3}]]'
+    monkeypatch.setattr(digest, "run", lambda args, **_: pages)
+    assert digest.gh_pages("repos/o/r/issues") == [{"n": 1}, {"n": 2}, {"n": 3}]
+
+
+def graphql_threads(nodes, *, more=False):
+    return {
+        "data": {"repository": {"pullRequest": {"reviewThreads": {"pageInfo": {"hasNextPage": more}, "nodes": nodes}}}}
+    }
+
+
+def thread_node(resolved, login, sha):
+    comment = {"author": {"login": login}, "originalCommit": {"oid": sha}}
+    return {"isResolved": resolved, "comments": {"nodes": [comment]}}
+
+
+def test_review_threads_are_parsed_from_the_graphql_response(monkeypatch):
+    nodes = [
+        thread_node(True, "reviewer", HEAD),
+        {"isResolved": False, "comments": {"nodes": [{"author": None, "originalCommit": None}]}},
+    ]
+    monkeypatch.setattr(digest, "gh_json", lambda *args: graphql_threads(nodes))
+    threads = digest.collect_threads("o/r", 7)
+    assert threads == (digest.Thread(True, "reviewer", HEAD), digest.Thread(False, "", ""))
+
+
+def test_more_threads_than_one_page_stops_the_read(monkeypatch):
+    monkeypatch.setattr(digest, "gh_json", lambda *args: graphql_threads([], more=True))
+    with pytest.raises(digest.ReadError):
+        digest.collect_threads("o/r", 7)
+
+
+def test_a_malformed_thread_response_stops_the_read(monkeypatch):
+    monkeypatch.setattr(digest, "gh_json", lambda *args: {"data": None})
+    with pytest.raises(digest.ReadError):
+        digest.collect_threads("o/r", 7)
 
 
 def test_a_damaged_state_issue_is_refused(monkeypatch):
@@ -387,16 +522,40 @@ def test_gap_issues_are_not_repeated_across_pages_of_existing_issues(monkeypatch
     assert sum(1 for args in created if args[:3] == ["gh", "issue", "create"]) == 1
 
 
+ON_HISTORY = "1" * 40
+OFF_HISTORY = "9" * 40
+
+
+def fake_git(args, **_):
+    if args[:2] == ["git", "rev-list"]:
+        return f"{HEAD}\n{ON_HISTORY}\n"
+    if args[:3] == ["git", "rev-parse", "--verify"]:
+        return args[3].removesuffix("^{commit}") + "\n"
+    return HEAD + "\n"
+
+
 @pytest.fixture
 def stubbed(monkeypatch):
     calls = {"issues": [], "checkpoint": []}
     unreviewed = digest.classify("d" * 40, "unreviewed", ["AGENTS.md"], evidence(number=8))
-    monkeypatch.setattr(digest, "run", lambda args, **_: HEAD + "\n")
-    monkeypatch.setattr(digest, "read_checkpoint", lambda repo: "1" * 40)
+    monkeypatch.setattr(digest, "run", fake_git)
+    monkeypatch.setattr(digest, "read_checkpoint", lambda repo: ON_HISTORY)
     monkeypatch.setattr(digest, "collect_entries", lambda repo, ref, since: [unreviewed])
     monkeypatch.setattr(digest, "open_gap_issues", lambda repo, entries: calls["issues"].append(entries) or ["d" * 40])
     monkeypatch.setattr(digest, "write_checkpoint", lambda repo, sha, report: calls["checkpoint"].append(sha))
     return calls
+
+
+def test_a_checkpoint_off_the_first_parent_history_is_refused(stubbed, monkeypatch):
+    monkeypatch.setattr(digest, "read_checkpoint", lambda repo: OFF_HISTORY)
+    assert digest.main(["--apply"]) == 2
+    assert stubbed["issues"] == []
+    assert stubbed["checkpoint"] == []
+
+
+def test_an_explicit_since_off_the_first_parent_history_is_refused(stubbed):
+    assert digest.main(["--apply", "--since", OFF_HISTORY]) == 2
+    assert stubbed["checkpoint"] == []
 
 
 def test_apply_opens_issues_and_then_advances_the_checkpoint(stubbed):
@@ -470,7 +629,7 @@ def test_an_explicit_since_repairs_a_damaged_state_issue(stubbed, monkeypatch):
         raise AssertionError("the stored checkpoint must not be read")
 
     monkeypatch.setattr(digest, "read_checkpoint", damaged)
-    assert digest.main(["--apply", "--since", "2" * 40]) == 0
+    assert digest.main(["--apply", "--since", ON_HISTORY]) == 0
     assert stubbed["checkpoint"] == [HEAD]
 
 

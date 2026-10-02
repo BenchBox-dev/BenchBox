@@ -31,7 +31,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +52,7 @@ EXTERNAL_REVIEW_PATTERN = re.compile(
 CONNECTOR_LOGINS = frozenset({"chatgpt-codex-connector", "chatgpt-codex-connector[bot]"})
 THREAD_PAGE = 100
 MAX_PULL_COMMITS = 250
+PULL_EVENTS = frozenset({"pull_request", "pull_request_target"})
 
 
 class ReadError(RuntimeError):
@@ -62,6 +63,8 @@ class ReadError(RuntimeError):
 class Review:
     login: str
     commit_sha: str
+    submitted_at: str
+    state: str
 
 
 @dataclass(frozen=True)
@@ -88,7 +91,7 @@ class Thread:
 @dataclass(frozen=True)
 class PullCommit:
     sha: str
-    committed_at: str
+    arrived_at: str
     is_refresh: bool
 
 
@@ -96,6 +99,7 @@ class PullCommit:
 class PullEvidence:
     number: int
     author: str
+    merged_at: str
     commits: tuple[PullCommit, ...]
     reviews: tuple[Review, ...] = ()
     reactions: tuple[Reaction, ...] = ()
@@ -104,8 +108,8 @@ class PullEvidence:
 
     @property
     def content_cutoff(self) -> str:
-        """Commit time of the last content commit; a clean merge of the base only refreshes it."""
-        return max((c.committed_at for c in self.commits if not c.is_refresh), default="")
+        """Arrival time of the last content commit; a clean merge of the base only refreshes it."""
+        return max((c.arrived_at for c in self.commits if not c.is_refresh), default="")
 
     @property
     def content_shas(self) -> frozenset[str]:
@@ -140,16 +144,26 @@ class Entry:
 
 
 def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
-    """Return the completed-review signals that postdate the pull request's last content commit."""
+    """Return the review signals that were visible at merge for the pull request's final content."""
     cutoff = evidence.content_cutoff
+
+    def in_window(at: str) -> bool:
+        return cutoff <= at <= evidence.merged_at
+
     signals: list[str] = []
-    if any(r.login in CONNECTOR_LOGINS and r.commit_sha in evidence.content_shas for r in evidence.reviews):
+    if any(
+        r.login in CONNECTOR_LOGINS
+        and r.commit_sha in evidence.content_shas
+        and r.state != "PENDING"
+        and r.submitted_at <= evidence.merged_at
+        for r in evidence.reviews
+    ):
         signals.append("connector-review")
-    if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and r.created_at >= cutoff for r in evidence.reactions):
+    if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions):
         signals.append("connector-approval")
     for comment in evidence.comments:
         match = EXTERNAL_REVIEW_PATTERN.search(comment.body)
-        if match and comment.created_at >= cutoff:
+        if match and in_window(comment.created_at):
             signals.append(f"external-review:{match.group(1).lower()}")
     return tuple(dict.fromkeys(signals))
 
@@ -231,14 +245,23 @@ def commit_files(sha: str, *, cwd: Path | None = None) -> list[str]:
     return run(["git", "diff", "--name-only", "--no-renames", f"{sha}~1", sha], cwd=cwd).splitlines()
 
 
-def merge_adds_content(sha: str, *, cwd: Path | None = None) -> bool:
-    """Return whether a merge differs from what merging its two parents mechanically produces.
+def is_ancestor(commit: str, descendant: str, *, cwd: Path | None = None) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, descendant], capture_output=True, text=True, check=False, cwd=cwd
+    )
+    if result.returncode not in (0, 1):
+        raise ReadError(f"git merge-base failed for {commit[:9]}: {result.stderr.strip()[:200]}")
+    return result.returncode == 0
 
-    A merge that needs conflict resolution, has more than two parents, or carries any
-    change beyond the mechanical result may have altered reviewed content.
+
+def merge_adds_content(sha: str, base: str, *, cwd: Path | None = None) -> bool:
+    """Return whether a merge is anything other than a mechanical merge of the base branch.
+
+    A refresh has exactly two parents, one of them already on the base branch, and a tree
+    equal to merging the parents mechanically. Anything else may have altered reviewed content.
     """
     parents = run(["git", "rev-list", "--parents", "-n", "1", sha], cwd=cwd).split()[1:]
-    if len(parents) != 2:
+    if len(parents) != 2 or not any(is_ancestor(parent, base, cwd=cwd) for parent in parents):
         return True
     result = subprocess.run(
         ["git", "merge-tree", "--write-tree", *parents], capture_output=True, text=True, check=False, cwd=cwd
@@ -318,23 +341,40 @@ def merged_pull_number(repo: str, sha: str) -> int | None:
     return int(candidates[0]["number"]) if candidates else None
 
 
-def collect_commits(repo: str, number: int, pull: dict[str, Any], *, cwd: Path | None = None) -> tuple[PullCommit, ...]:
+def server_arrival(repo: str, sha: str, fallback: str) -> str:
+    """Return when GitHub first ran pull request workflows for the commit, else the commit date."""
+    runs = gh_json("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
+    times = [r["created_at"] for r in runs if r.get("event") in PULL_EVENTS]
+    return min(times) if times else fallback
+
+
+def collect_commits(
+    repo: str, number: int, pull: dict[str, Any], base: str, *, cwd: Path | None = None
+) -> tuple[PullCommit, ...]:
     """Read the pull request's commits, requiring the list to be complete and to end at its head."""
     commits = gh_pages(f"repos/{repo}/pulls/{number}/commits")
     if len(commits) >= MAX_PULL_COMMITS:
         raise ReadError(f"#{number} has {len(commits)} commits, the most the API lists")
-    if not commits or len(commits) != pull["commits"] or commits[-1]["sha"] != pull["head"]["sha"]:
+    head = pull["head"]["sha"]
+    if not commits or len(commits) != pull["commits"] or commits[-1]["sha"] != head:
         raise ReadError(f"#{number} commit list does not match the pull request: {len(commits)} of {pull['commits']}")
     if any(len(c["parents"]) > 1 for c in commits):
         run(["git", "fetch", "--no-tags", "origin", f"refs/pull/{number}/head"], cwd=cwd)
-    return tuple(
+        if run(["git", "rev-parse", "FETCH_HEAD"], cwd=cwd).strip() != head:
+            raise ReadError(f"#{number} head moved while its commits were being read")
+    built = [
         PullCommit(
             c["sha"],
             c["commit"]["committer"]["date"],
-            len(c["parents"]) > 1 and not merge_adds_content(c["sha"], cwd=cwd),
+            len(c["parents"]) > 1 and not merge_adds_content(c["sha"], base, cwd=cwd),
         )
         for c in commits
-    )
+    ]
+    content = [i for i, c in enumerate(built) if not c.is_refresh]
+    if content:
+        last = built[content[-1]]
+        built[content[-1]] = replace(last, arrived_at=server_arrival(repo, last.sha, last.arrived_at))
+    return tuple(built)
 
 
 def collect_pull(repo: str, sha: str) -> PullEvidence | None:
@@ -345,9 +385,15 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
     return PullEvidence(
         number=number,
         author=pull["user"]["login"],
-        commits=collect_commits(repo, number, pull),
+        merged_at=pull["merged_at"],
+        commits=collect_commits(repo, number, pull, f"{sha}~1"),
         reviews=tuple(
-            Review((r.get("user") or {}).get("login", ""), r.get("commit_id") or "")
+            Review(
+                (r.get("user") or {}).get("login", ""),
+                r.get("commit_id") or "",
+                r.get("submitted_at") or "",
+                r.get("state") or "",
+            )
             for r in gh_pages(f"repos/{repo}/pulls/{number}/reviews")
         ),
         reactions=tuple(
@@ -470,6 +516,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if since is None:
             print("No checkpoint stored; pass --since, or run once with --apply --bootstrap.", file=sys.stderr)
             return 2
+        since = run(["git", "rev-parse", "--verify", f"{since}^{{commit}}"]).strip()
+        if since not in run(["git", "rev-list", "--first-parent", until]).split():
+            raise ReadError(f"checkpoint {since[:9]} is not on the first-parent history of {args.ref}")
         entries = collect_entries(args.repo, until, since)
         report = render(entries, since=since, until=until)
         print(report)
