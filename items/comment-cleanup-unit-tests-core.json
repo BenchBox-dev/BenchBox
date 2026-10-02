@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The frozen file list for this scope is revision-bound, individually assigned by the scope policy, and has no overlap with another task.",
+    "Every file in scope reaches zero discretionary comments and explanatory docstrings, with directives and notices kept only where registered with their consumer and necessity; no skips, xfails, weakened assertions, lowered thresholds or broadened ignores.",
+    "Prose-source assertions are replaced by behavior or metadata cases before the text they read is deleted; rejected cases and nonempty coverage are preserved.",
+    "Source-only slices pass the parity comparator; any change beyond comment and docstring removal is a separate disclosed slice.",
+    "The wave pull request records exact base and head, the paths changed, the checks run and their results, and any soundness-path files carved out into their own pull requests."
+  ],
+  "context": "Created 2026-10-02 from delivery plan v2 (/tmp/benchbox-comment-cleanup-plan-v2.md, decision D4): split from comment-cleanup-cross-module-unit-tests, which alone held 854 files and about 25,800 items. Sibling items: comment-cleanup-unit-tests-platforms and comment-cleanup-unit-tests-cli-scripts-rest. Counts come from the ownership manifest at develop 2026-10-02; refresh at dispatch.",
+  "description": "Exclusive candidate scope (one third of the former comment-cleanup-cross-module-unit-tests, about 9,100 comments and docstrings in about 380 files at the 2026-10-02 base): tests/unit/core, tests/unit/benchmarks, tests/unit/generators, tests/unit/utils, tests/unit/visualization, tests/unit/tpch, tests/unit/tpcdi, tests/unit/tpchavoc, tests/unit/tpcds, tests/unit/query_plans, tests/unit/sql_compat, tests/unit/examples, and the platform root test files whose names start with test_a, test_b or test_c under tests/unit/platforms/. The exact path assignment is made by the scope policy rules (quality/comment-cleanup-scope.json) in the delivery plan's scope-completion step; freeze the file list individually before dispatch and exclude every other task's manifest.\n\nTarget: zero discretionary explanatory comments and authored explanatory docstrings in maintained first-party code. Only proven minimum machine directives and unavoidable provenance-bound required notices remain. Useful product strings must have an actual consumer; no inert constants, unused strings, fake metadata or dynamic __doc__ replacements. Never broaden lint/type/coverage ignores, weaken assertions, or turn unknown ownership/parser coverage into an exclusion.\n\nRequired work and decisions: Replace prose-source assertions (tests that read docstring or source text of production code) with meaningful behavior or advertised-metadata cases, and preserve rejected cases and nonempty coverage. Three tests in the wider suite require production docstring text to stay; where they fall in this scope, migrate the contract and change the assertion in the same wave as the producer or earlier. Unknown source readers block deletion. Source-only Python slices prove parity with the comparator delivered by the checker item. Delete filler and false claims; move necessary contracts to owning references before deleting source text. Executable simplification, typing or behavior changes need a separate approved and reviewed slice, with no new abstraction solely to house prose.\n\nModule work lands through an integration branch with one PR into develop, as defined in the dispatch contract in docs/development/comment-cleanup-scope.md; serialize shared test-lock checks and integration, not module edits. Execution guard: creation of this TODO is planning, not approval to execute the reviewed cleanup. Use a separate linked worktree and agent-write-preflight; preserve unrelated work. Required native or external soundness review remains mandatory for any soundness-manifest path, with no auto-merge bypass. No live cloud or stress test, deployment, publication, historical-result rewriting or unapproved external-repository write.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-02T13:39:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d5c9b642d89a4d4d84c47ef7f4b74a1b",
+      "session_id": "bec2d032574a4742968b229c90460810"
+    }
+  ]
+}
