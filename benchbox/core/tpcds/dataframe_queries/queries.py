@@ -68,8 +68,11 @@ def _none_for_null(frame: Any, columns: list[str]) -> Any:
     """Report NULL as None rather than NaN in the named pandas columns, as the SQL surface does.
 
     Only a column that actually holds a NULL is converted, so a result without NULLs keeps its native
-    dtypes (object columns are not supported by every pandas-family backend).
+    dtypes (object columns are not supported by every pandas-family backend). A lazy Dask frame is
+    returned unchanged: finding out whether a column holds a NULL would compute it.
     """
+    if hasattr(frame, "npartitions"):
+        return frame
     frame = frame.copy()
     for column in columns:
         nulls = frame[column].isna()
@@ -5451,8 +5454,11 @@ def q71_pandas_impl(ctx: DataFrameContext) -> Any:
         combined.merge(item_filter, left_on="sold_item_sk", right_on="i_item_sk", how="inner")
         .merge(time_filter, left_on="time_sk", right_on="t_time_sk", how="inner")
         .groupby(["i_brand_id", "i_brand", "t_hour", "t_minute"], as_index=False)
-        .agg(ext_price=("ext_price", lambda values: values.sum(min_count=1)))
+        .agg(ext_price=("ext_price", "sum"), priced=("ext_price", "count"))
     )
+    # SQL SUM of only NULLs is NULL; pandas sums them to 0. Dask has no lambda aggregation, so count the non-NULLs.
+    grouped["ext_price"] = grouped["ext_price"].where(grouped["priced"] > 0)
+    grouped = grouped.drop(columns=["priced"])
     result = _sort_null_largest_pandas(grouped, ["ext_price", "i_brand_id"], [True, False])
     return _none_for_null(result, ["ext_price"])
 
@@ -5728,8 +5734,9 @@ def q76_pandas_impl(ctx: DataFrameContext) -> Any:
     date_dim, item = _tables(ctx, "date_dim", "item")
 
     def channel(name: str, table: str, null_col: str, date_key: str, item_key: str, value_col: str) -> Any:
+        sales = ctx.get_table(table)
         result = (
-            ctx.get_table(table)[lambda frame: frame[null_col].isna()]
+            sales[sales[null_col].isna()]
             .merge(date_dim, left_on=date_key, right_on="d_date_sk", how="inner")
             .merge(item, left_on=item_key, right_on="i_item_sk", how="inner")
         )
@@ -5751,12 +5758,15 @@ def q76_pandas_impl(ctx: DataFrameContext) -> Any:
         combined.groupby(["channel", "col_name", "d_year", "d_qoy", "i_category"], as_index=False, dropna=False)
         .agg(
             sales_cnt=("ext_sales_price", "size"),
-            sales_amt=("ext_sales_price", lambda values: values.sum(min_count=1)),
+            sales_amt=("ext_sales_price", "sum"),
+            priced=("ext_sales_price", "count"),
         )
         .sort_values(["channel", "col_name", "d_year", "d_qoy", "i_category"], na_position="last")
         .head(100)
     )
-    return _none_for_null(result, ["i_category", "sales_amt"])
+    # SQL SUM of only NULLs is NULL; pandas sums them to 0. Dask has no lambda aggregation, so count the non-NULLs.
+    result["sales_amt"] = result["sales_amt"].where(result["priced"] > 0)
+    return _none_for_null(result.drop(columns=["priced"]), ["i_category", "sales_amt"])
 
 
 # =============================================================================

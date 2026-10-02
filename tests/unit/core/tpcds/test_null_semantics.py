@@ -196,13 +196,8 @@ def test_q34_orders_a_null_preferred_flag_first_because_the_key_is_descending(fa
     assert [row[3] for row in _rows(impl(_context(family, tables)))] == [None, "Y", "N"]
 
 
-@pytest.mark.parametrize("family", FAMILIES)
-def test_q71_sums_only_nulls_to_null_and_sorts_it_first_because_the_key_is_descending(family, monkeypatch):
-    """SQL SUM of only NULLs is NULL, and ``ext_price DESC`` puts it first; ``i_brand_id`` ascends."""
-    from benchbox.core.tpcds.dataframe_queries import queries
-
-    monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"year": 2000, "month": 12})
-    tables = {
+def _q71_tables():
+    return {
         "date_dim": {"d_date_sk": [1], "d_year": [2000], "d_moy": [12]},
         "item": {
             "i_item_sk": [1, 2, 3],
@@ -230,6 +225,33 @@ def test_q71_sums_only_nulls_to_null_and_sorts_it_first_because_the_key_is_desce
             "cs_ext_sales_price": [None, 1.0],
         },
     }
+
+
+def _q76_tables():
+    def channel(prefix, prices, customer_key):
+        return {
+            f"{prefix}_sold_date_sk": [1, 1],
+            f"{prefix}_item_sk": [1, 2],
+            customer_key: [None, None],
+            f"{prefix}_ext_sales_price": prices,
+        }
+
+    return {
+        "date_dim": {"d_date_sk": [1], "d_year": [2001], "d_qoy": [3]},
+        "item": {"i_item_sk": [1, 2], "i_category": [None, "Books"]},
+        "store_sales": channel("ss", [None, 2.0], "ss_customer_sk"),
+        "web_sales": channel("ws", [3.0, 4.0], "ws_bill_customer_sk"),
+        "catalog_sales": channel("cs", [5.0, 6.0], "cs_bill_customer_sk"),
+    }
+
+
+@pytest.mark.parametrize("family", FAMILIES)
+def test_q71_sums_only_nulls_to_null_and_sorts_it_first_because_the_key_is_descending(family, monkeypatch):
+    """SQL SUM of only NULLs is NULL, and ``ext_price DESC`` puts it first; ``i_brand_id`` ascends."""
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"year": 2000, "month": 12})
+    tables = _q71_tables()
     impl = queries.q71_expression_impl if family == "expression" else queries.q71_pandas_impl
 
     assert _rows(impl(_context(family, tables))) == [
@@ -245,21 +267,7 @@ def test_q76_sorts_a_null_category_last_and_reports_it_as_none(family, monkeypat
 
     monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {})
 
-    def channel(prefix, prices, customer_key):
-        return {
-            f"{prefix}_sold_date_sk": [1, 1],
-            f"{prefix}_item_sk": [1, 2],
-            customer_key: [None, None],
-            f"{prefix}_ext_sales_price": prices,
-        }
-
-    tables = {
-        "date_dim": {"d_date_sk": [1], "d_year": [2001], "d_qoy": [3]},
-        "item": {"i_item_sk": [1, 2], "i_category": [None, "Books"]},
-        "store_sales": channel("ss", [None, 2.0], "ss_customer_sk"),
-        "web_sales": channel("ws", [3.0, 4.0], "ws_bill_customer_sk"),
-        "catalog_sales": channel("cs", [5.0, 6.0], "cs_bill_customer_sk"),
-    }
+    tables = _q76_tables()
     impl = queries.q76_expression_impl if family == "expression" else queries.q76_pandas_impl
 
     assert _rows(impl(_context(family, tables))) == [
@@ -270,6 +278,32 @@ def test_q76_sorts_a_null_category_last_and_reports_it_as_none(family, monkeypat
         ("web", "ws_bill_customer_sk", 2001, 3, "Books", 1, 4.0),
         ("web", "ws_bill_customer_sk", 2001, 3, None, 1, 3.0),
     ]
+
+
+def test_q71_and_q76_run_on_dask_and_keep_a_null_total():
+    """Dask has no lambda aggregation, prunes columns an opaque filter needs, and cannot test a lazy frame for NULLs."""
+    dd = pytest.importorskip("dask.dataframe")
+    import pandas as pd
+
+    from benchbox.core.tpcds.dataframe_queries import queries
+    from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
+
+    def run(impl, tables):
+        ctx = DaskDataFrameAdapter(use_distributed=False).create_context()
+        for name, data in tables.items():
+            ctx.register_table(name, dd.from_pandas(pd.DataFrame(data), npartitions=2))
+        return impl(ctx).compute().astype(object).where(lambda frame: frame.notna(), None)
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(queries, "get_parameters", lambda query_id: {"year": 2000, "month": 12} if query_id == 71 else {})
+        q71 = run(queries.q71_pandas_impl, _q71_tables())
+        q76 = run(queries.q76_pandas_impl, _q76_tables())
+
+    # A mixed-direction sort keeps NULLs last on Dask, so only the values are compared for Q71.
+    assert sorted(q71.itertuples(index=False, name=None), key=str) == sorted(
+        [(1, "a", 18, 26, None), (3, "c", 18, 26, 20.0), (2, "b", 18, 26, 8.0)], key=str
+    )
+    assert list(q76.itertuples(index=False, name=None))[3] == ("store", "ss_customer_sk", 2001, 3, None, 1, None)
 
 
 def test_joined_aggregate_runs_on_dask_and_keeps_a_null_group_last():
