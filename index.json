@@ -20370,6 +20370,15 @@
       "status": "done",
       "title": "Route rerun drift-validation results into the published bundle"
     },
+    "tuning-dry-run-fidelity-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-capability-single-source-validator-20261001"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Make --dry-run tuning previews execution-faithful or explicitly flagged"
+    },
     "tuning-duckdb-templates-drop-partitioning-20261001": {
       "claim": null,
       "needs": [

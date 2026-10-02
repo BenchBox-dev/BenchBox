@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "`benchbox run --dry-run <dir> --platform snowflake --benchmark tpch --tuning tuned` without credentials produces a non-null ddl_preview (or an explicit warning), with the preview-only banner where applicable.",
+    "DuckDB dry-run preview lists CREATE INDEX and the sort statements; Athena preview contains no '-- Note:' placeholder."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.2 (R-8).",
+  "description": "## Problem\n- Cloud dry-runs without credentials fall back to `database_config: data_only`. The generator lookup then throws and the error is swallowed (`benchbox/core/dryrun.py:1053-1056`), so the Snowflake and Databricks tuned previews are `null`.\n- Generators drive execution only for DuckDB (CTAS SQL), ClickHouse and StarRocks. Elsewhere the preview is generator output that execution does not run, with no disclaimer.\n- The DuckDB preview omits the index DDL that execution runs.\n- The Athena generator emits a SQL comment (\"-- Note: PARTITIONED BY…\") instead of partitioning.\n\n## Change\n- Use the requested platform type for generator lookup and surface a warning on failure.\n- Add a banner for `:preview_only` / non-migrated platforms that cites the registry notes.\n- Include the DuckDB index and atomic-sort statements.\n- Replace the Athena comment with real `PARTITIONED BY` or an explicit \"unsupported\" marker.\n\n## Guardrails (must preserve)\n- Dry-run never executes or records statements.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/core/dryrun.py",
+    "benchbox/core/tuning/generators/trino.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:32:22Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ebaf737de72345deb91ce73c5cc2c58f",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
