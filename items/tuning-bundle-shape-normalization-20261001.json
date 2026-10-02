@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Exporter test: notuning DuckDB and SQLite bundles both carry platform.tuning.validation_status == 'not_applicable'.",
+    "result-formats.md no longer references the .applied.json companion; Explorer vitest for the untuned shape passes."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.4 (N-1, R-10).",
+  "description": "## Problem\nUntuned runs produce three bundle shapes:\n- no `platform.tuning` at all (DuckDB);\n- a tuning block whose only status is the nested `applied.status` (SQLite, ClickHouse);\n- the full block.\n\n`docs/reference/result-formats.md:178` describes a `.applied.json` companion that is no longer written, and says `validation_status` is omitted only for pre-ledger bundles.\n\n## Change\n- Always emit `platform.tuning.validation_status`, with `not_applicable` for untuned runs, consistent with `applied.status`.\n- Confirm Explorer ingest handles it.\n- Correct the docs.\n\n## Guardrails (must preserve)\n- Additive only; existing field names and shapes are unchanged (Explorer ingests verbatim).\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/core/results/exporter.py",
+    "docs/reference/result-formats.md",
+    "results-explorer/src"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:33:31Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "80ee30d156c843ad8a5be7b7da4ca593",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}

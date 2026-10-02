@@ -20247,6 +20247,13 @@
       "status": "done",
       "title": "Export tuning provenance, requested config, and requested-config hash into bundles"
     },
+    "tuning-bundle-shape-normalization-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Always emit platform.tuning.validation_status (including not_applicable) and fix result-format docs"
+    },
     "tuning-capability-registry-coverage-20260716": {
       "claim": null,
       "needs": [
