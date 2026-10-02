@@ -4,7 +4,7 @@
     "Per-query status before and after at SF=0.01 and 0.1 is recorded; Q44 and Q93 emptiness at SF=0.1 is recorded (non-empty, or kept as classification evidence)",
     "No SF=1 DataFrame run (SQL-only at SF=1 if needed, with approval)"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T4). Prior art to extend: benchbox/core/tpcds/parameter_extractor.py (orphaned since #2126), the per-benchmark set_parameter_overrides seams; the NYC Taxi builders scrape SQL (_extract_sql_windows) and are not the model. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T4). Prior art to extend: benchbox/core/tpcds/parameter_extractor.py (orphaned since #2126), the per-benchmark set_parameter_overrides seams; the NYC Taxi builders scrape SQL (_extract_sql_windows) and are not the model. Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nProgress 2026-10-02: implemented as PR #2526 (branch feat/tpcds-parameter-adapters, worktree ../BenchBox.wt-tpcds-param-adapters, head 88f92ec2a); make pr-preflight exit 0; the PR edits soundness paths (benchbox/core/equivalence/builders/tpcds.py and cross_surface.py), so it carries a Soundness review section (Codex, one P2 finding fixed) and needs a maintainer merge. DESIGN: benchbox/core/tpcds/dataframe_queries/parameter_adapters.py maps dsqgen -LOG values to the DataFrame keys (Q39: year and months [MONTH, MONTH+1]; Q44: store_sk, null_col; Q49: year, month; Q93: reason), a ParameterBinding records the dsqgen binary sha256, seed, scale and stream (decision D2), Q41 (negative control) has no adapter and asking for it raises. The gate builder returns, for an adapted query, a copy whose implementations install the binding only while they run (parameter_overrides context manager in parameters.py), at the gate's scale and dsqgen's default seed, so nothing is process-wide between lookup and execution (an automated review caught the first design, which replaced the overrides at lookup). MEASURED (TESTED, both families, evidence/rev2/t04_*): SF 0.01: Q44 divergent to match; Q39, Q49, Q93 return no rows so they match either way. SF 0.1: Q44 and Q49 divergent to match on both families; Q39 pandas divergent to match; Q93 returns no rows with the right parameters (so Q93 stays classification evidence); Q41 unchanged. Q39 on the EXPRESSION family still diverges at 0.1 for a different reason: it returns 8 columns where the SQL returns 10 (the Polars self-join drops the second month's key columns), an implementation defect not a binding problem, so the approach is not falsified for Q39 (new todo N11). Staged SF 0.01 gate: 8 divergent cells to 6 (Q9, Q46 and Q68 have no adapter yet); it still exits 1 for the six all-NULL-row queries and these three (see dfparity-t03 context). Also drops the stale Q44 entry from _TPCDS_LEGITIMATELY_EMPTY (the entry claimed an empty result mirrored by both families; with scale-aware rendering and bound parameters Q44 returns ten rows). Not run: SF=1. Remaining: CI, a maintainer merge, then finish; then t05 (adapter batches for the remaining queries from the t02 inventory).",
   "description": "Write per-query adapter functions mapping the dsqgen -LOG parameters to the DataFrame parameter keys, wire them into the gate builder (benchbox/core/equivalence/builders/tpcds.py) at the gate's scale, and measure. A flat name map is insufficient: Q39's SQL uses [MONTH] and [MONTH]+1 while -LOG records only MONTH.01 and the DataFrame expects months: [1, 2]. Verified drift between the gate's SQL and the DataFrame defaults: Q39 SQL year 1998 months 4-5 vs default 2001 [1,2]; Q49 SQL 2000/month 12 vs default 2001; Q41 SQL BETWEEN 742 AND 742+40 vs default [738,129,830,540]. Q44 and Q93 are SQL-empty at SF 0.01-0.1 and diverge only at SF=1 (verified from probe data). Hypothesis (unproven): with parameters rendered at the data's scale they become non-empty and match at SF=0.1. Q41 is the negative control because its implementation hard-codes colors and reads manufact_start with a literal fallback; do not prototype on it. Falsified if Q39, Q44, Q49 or Q93 still diverge under identical bindings, or an adapter cannot be written without ambiguity.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "bbd80e5c0f5445aeabb2901348110570",
       "session_id": "22dc715f760446e49a2ea1b25d8e90a8"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T06:37:02Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d36931982053457ab4c1e5d183a0d212",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
 }
