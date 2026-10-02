@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def test_q78_pandas_keeps_all_null_sums_null(monkeypatch):
