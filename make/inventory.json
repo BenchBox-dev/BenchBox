@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "83f225fbc9602ab71e03a51431a41375ed1252a8825a623e2f54bbf5d172d06b",
+  "contract_sha256": "ef4f0cd1c2a268805fb966e6ca9d48711fce5329db7eba6973386b252b296f88",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -183,7 +183,7 @@
     "worktree-list",
     "worktree-remove"
   ],
-  "public_target_count": 213,
+  "public_target_count": 218,
   "public_targets": [
     "agent-commit-range-check",
     "agent-identity-check",
@@ -261,6 +261,7 @@
     "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
+    "nyctaxi-cross-surface-equivalence-report",
     "oracle-coverage-map",
     "oracle-coverage-map-check",
     "parity-check",
@@ -368,11 +369,15 @@
     "test-unlock",
     "test-verbose",
     "test-window",
+    "tpcds-cross-surface-equivalence-report",
+    "tpch-cross-surface-equivalence-report",
+    "tpch-skew-cross-surface-equivalence-report",
     "tpchavoc-dataframe-equivalence-report",
     "tpchavoc-equivalence-report",
     "tpchavoc-equivalence-report-clickhouse",
     "tpchavoc-equivalence-report-datafusion",
     "tpchavoc-equivalence-report-postgres",
+    "tsbs-devops-cross-surface-equivalence-report",
     "typecheck",
     "typecheck-uv",
     "uat-artifact-hygiene",
@@ -1061,6 +1066,13 @@
         "header": "mutation-test:",
         "recipe": "\t@echo \"Running mutation tests on critical modules...\"\n\tuv run -- mutmut run\n\t@echo \"--- Mutation test results ---\"\n\tuv run -- mutmut results",
         "recipe_sha256": "34594bb961fe9784e110dac4c3a9bd7fb223a2057baf3624830c56a2ca61212d"
+      }
+    ],
+    "nyctaxi-cross-surface-equivalence-report": [
+      {
+        "header": "nyctaxi-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark nyctaxi",
+        "recipe_sha256": "6ced6f4c122d5cc9101e0777add357f0be3ebc6ffb7514f4f1c8d7062a8e166d"
       }
     ],
     "oracle-coverage-map": [
@@ -1953,6 +1965,27 @@
         "recipe_sha256": "b698d3e61b6e5d3c2168d890b14c86c460d57da34e9aaa5dbcf0f8dd886a5342"
       }
     ],
+    "tpcds-cross-surface-equivalence-report": [
+      {
+        "header": "tpcds-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds",
+        "recipe_sha256": "782513cdfdae01d690d62749b3650a35c050b190100426134d8336eafa08011b"
+      }
+    ],
+    "tpch-cross-surface-equivalence-report": [
+      {
+        "header": "tpch-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch",
+        "recipe_sha256": "0ca8cc2defe413fed807d6070b014ef13f48e1ee5490333856cfb65b6b1be022"
+      }
+    ],
+    "tpch-skew-cross-surface-equivalence-report": [
+      {
+        "header": "tpch-skew-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch_skew",
+        "recipe_sha256": "1ec7dfb3c4b0c6e3f79e46808bcd2896147b860d2f547eb34f658117fd404df6"
+      }
+    ],
     "tpchavoc-dataframe-equivalence-report": [
       {
         "header": "tpchavoc-dataframe-equivalence-report:",
@@ -1986,6 +2019,13 @@
         "header": "tpchavoc-equivalence-report-postgres:",
         "recipe": "\tuv run -- python -m benchbox.core.tpchavoc.equivalence --engine postgres",
         "recipe_sha256": "dc9fd9e0d03c97bf801e4e944864575ed6d811aba5b16f828660a6138285bcc5"
+      }
+    ],
+    "tsbs-devops-cross-surface-equivalence-report": [
+      {
+        "header": "tsbs-devops-cross-surface-equivalence-report:",
+        "recipe": "\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tsbs_devops",
+        "recipe_sha256": "443abada8e32bd579348c99c4e305811c45bf09d28e69b6500fb8d317886f36c"
       }
     ],
     "typecheck": [
@@ -2225,7 +2265,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "edd9305b8d3ff2baf1f272d02f21ac0eaf90ee24f77a611a4846e9e1cb411476",
+  "semantic_sha256": "68af0563f5cb29ebe7c10fa98edd65e0fb9b2de13ea8a37c4da4168185fd64b1",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2714,6 +2754,46 @@
       "sha256": "4222552c9343569c0989b2c78955e5448c10cce7d4a8074efb4ad51df16d9aa1",
       "targets": [
         "datavault-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "nyctaxi-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark nyctaxi",
+      "kind": "rule",
+      "sha256": "de599b88e0dcf9d3f2eb3ce5c158d50d02be41f6f545cb68609e4b65ad5048de",
+      "targets": [
+        "nyctaxi-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "tsbs-devops-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tsbs_devops",
+      "kind": "rule",
+      "sha256": "94e61dca2fadba0022bcb93385d68228deb41c4249c2e76e4a5484563cc4885b",
+      "targets": [
+        "tsbs-devops-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "tpch-skew-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch_skew",
+      "kind": "rule",
+      "sha256": "651c6dde591acb6f5efd0de43f795f6acce91bb265761345d6ddd39391f3aab5",
+      "targets": [
+        "tpch-skew-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "tpch-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch",
+      "kind": "rule",
+      "sha256": "509e692642590180585e77e450c7e69ac41c28fe0abd2078e7a4d8ffb44603e5",
+      "targets": [
+        "tpch-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": "tpcds-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds",
+      "kind": "rule",
+      "sha256": "1f342e2e0b2d2174265df5bf41e6f3b631cd06aab4fd7329e2b30468364d52c4",
+      "targets": [
+        "tpcds-cross-surface-equivalence-report"
       ]
     },
     {
@@ -4591,7 +4671,7 @@
       ]
     }
   ],
-  "target_count": 219,
+  "target_count": 224,
   "targets": [
     ".development-tree-required",
     ".pr-preflight-route",
@@ -4672,6 +4752,7 @@
     "local-validation-show",
     "makefile-inventory-check",
     "mutation-test",
+    "nyctaxi-cross-surface-equivalence-report",
     "oracle-coverage-map",
     "oracle-coverage-map-check",
     "parity-check",
@@ -4782,11 +4863,15 @@
     "test-unlock",
     "test-verbose",
     "test-window",
+    "tpcds-cross-surface-equivalence-report",
+    "tpch-cross-surface-equivalence-report",
+    "tpch-skew-cross-surface-equivalence-report",
     "tpchavoc-dataframe-equivalence-report",
     "tpchavoc-equivalence-report",
     "tpchavoc-equivalence-report-clickhouse",
     "tpchavoc-equivalence-report-datafusion",
     "tpchavoc-equivalence-report-postgres",
+    "tsbs-devops-cross-surface-equivalence-report",
     "typecheck",
     "typecheck-uv",
     "uat-artifact-hygiene",

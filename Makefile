@@ -301,6 +301,42 @@ flightdata-cross-surface-equivalence-report:
 datavault-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault
 
+# Enforced gate: NYC Taxi DataFrame surface vs its own SQL surface on a bounded
+# offline synthetic cell (SF=0.01, 12k trips; the builder forces synthesis and
+# fails on any network download). 25 SQL slugs map to DataFrame Q1..Q25;
+# airport-trips is classified legitimately empty (synthetic rate_code_id=1 vs
+# IN (2, 3) filter). Exits non-zero on any unclassified divergence.
+nyctaxi-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark nyctaxi
+
+# Enforced gate: TSBS DevOps DataFrame surface vs its own SQL surface on a
+# bounded offline cell (SF=0.01). 18 SQL slugs map to DataFrame Q1..Q18;
+# three threshold queries are classified legitimately empty (generator caps
+# usage_user at ~55, floors available_percent at ~17). Exits non-zero on any
+# unclassified divergence.
+tsbs-devops-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tsbs_devops
+
+# Enforced gate: TPC-H Skew DataFrame surface vs its own SQL surface on a
+# bounded deterministic cell (SF=0.01, seed 42). 22 SQL ids map to DataFrame
+# Q1..Q22; Q8 is classified legitimately empty (no ECONOMY ANODIZED STEEL
+# rows at any probed scale). Exits non-zero on any unclassified divergence.
+tpch-skew-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch_skew
+
+# Enforced gate: TPC-H DataFrame surface vs its own SQL surface on a bounded
+# cell (SF=0.01, unseeded-vs-unseeded). 22 SQL ids map to DataFrame Q1..Q22
+# with an empty baseline. Exits non-zero on any unclassified divergence.
+tpch-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch
+
+# Staged report (NOT a blocking gate): full-99 TPC-DS SQL<->DataFrame
+# equivalence at SF=0.01 (~13s wall). Only Q38/Q88 currently pass
+# discriminating, so no blocking subset exists yet; this target feeds the
+# weekly scheduled path that tracks DF surface maturation toward one.
+tpcds-cross-surface-equivalence-report:
+	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
+
 # Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
 # no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
 # the blocking gate run never prunes; only writes when the run is otherwise fully

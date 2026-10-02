@@ -247,6 +247,7 @@ def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) ->
         # A hand-back that the first guard missed.
         "When CI passes, ask the user to enable auto-merge.",
         "Then ask the owner to merge it.",
+        "Then ask the maintainer to enable the auto merge.",
         "Wait for the human to merge the green PR.",
         "Then waiting for the maintainer to merge it, stop.",
         # Variants a first version missed.
@@ -270,6 +271,8 @@ def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: s
         "When the branch is final, arm the exact head and monitor until merged.",
         "Never ask the owner to merge a finished PR.",
         "Do not ask the user to enable auto-merge; arm it yourself.",
+        # Asking for an unrelated setting is not a PR hand-back.
+        "If the tool is missing, ask the user to enable the plugin in settings.",
         "Never wait for the owner to merge a finished PR.",
         # Release and publication authorization is an explicit exception, not a PR hand-back.
         "Wait for the owner to approve the production release before publishing.",

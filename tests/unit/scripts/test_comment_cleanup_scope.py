@@ -409,6 +409,28 @@ def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers()
     assert ("benchbox/core/benchmark_result_validation.py", "docs/reference/python-api/base.rst") in pairs
 
 
+def test_duration_policy_has_exactly_one_exact_path_rule_owned_by_shared_infrastructure() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rules = [rule for rule in policy["ownership_rules"] if {"path": "tests/duration_policy.py"} in rule["selectors"]]
+    assert [rule["owner"] for rule in rules] == ["comment-cleanup-shared-infrastructure"]
+
+
+def test_duration_policy_disposition_names_every_importer() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rule = next(rule for rule in policy["ownership_rules"] if rule["id"] == "root-test-tier-policy")
+    importers = {
+        line.split(":", 1)[0]
+        for line in scope.git(
+            ROOT, "grep", "-n", "-E", r"(from|import) +tests(\.| +import +)duration_policy", "--", "*.py"
+        )
+        .decode()
+        .splitlines()
+    } - {"tests/unit/scripts/test_comment_cleanup_scope.py"}
+    assert importers
+    missing = {path for path in importers if path not in rule["blocking_disposition"]}
+    assert not missing, f"the disposition omits importers: {sorted(missing)}"
+
+
 def _derived_rule(priority: int = 20) -> dict:
     return {
         "id": "test-import-owner",
