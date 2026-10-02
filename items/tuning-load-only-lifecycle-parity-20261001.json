@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "e2e: load-only tuned DuckDB run → the bundle carries platform.tuning whose ddl/post_load statements equal those of the corresponding full run (or the run is refused with the decided message)."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.3 (R-3).",
+  "description": "## Problem\n`--phases generate,load` goes through `_execute_load_only_mode` (`benchbox/core/runner/runner.py:528-585`). It applies a different subset of tuning from a full run (the CTAS sort runs, `apply_unified_tuning` does not), saves no metadata, and exports `platform.tuning: null` under a tuned `tuning_mode`.\n\n## Change (per gate D-4)\n- **Parity (expected):** route through the same apply → load → post-load → reconcile → metadata → ledger/receipt → export path as `_setup_fresh_database_phases`.\n- **Or refusal:** an actionable error for tuned load-only runs.\n\n## Guardrails (must preserve)\n- A load-only bundle never carries a tuned mode without `platform.tuning`.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/core/runner/runner.py",
+    "benchbox/platforms/base/adapter.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:27:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "045354a84c9a4f739cfbedd2445ee773",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
