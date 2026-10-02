@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Each limit is either fixed with a test or documented where users read about backend differences",
+    "No change to the Polars or pandas families"
+  ],
+  "description": "On Dask a mixed ascending and descending sort keeps NULLs last for every key (its optimizer drops helper flag columns), so Q34 and Q71 order NULLs differently from the reference there. The cuDF family may need dtype care for numeric NULL handling. Either support these or document them as limits.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:33:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "24e4997f55b74038bf29ceae81144ca8",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
