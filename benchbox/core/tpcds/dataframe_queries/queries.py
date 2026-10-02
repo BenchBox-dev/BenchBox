@@ -1454,6 +1454,39 @@ def _joined_agg_pandas_condition(frame: Any, params: Any, condition: _JoinedAggC
     raise ValueError(f"Unsupported joined aggregate condition: {op}")
 
 
+def _sort_null_largest_expression(ctx: DataFrameContext, frame: Any, columns: list[str], descending: list[bool]) -> Any:
+    """ORDER BY with the NULL placement of the rendered reference SQL: NULL sorts as the largest value.
+
+    That is last for an ascending key (the engine's default) and first for a descending key (the
+    translated SQL says NULLS FIRST). A single ``nulls_last`` flag cannot express a mix of both, so
+    sort on an ``is_null`` flag ahead of each key, in the key's own direction.
+    """
+    flags = [f"_null_{index}" for index in range(len(columns))]
+    original = frame.columns
+    keyed = frame.with_columns(*(ctx.col(name).is_null().alias(flag) for name, flag in zip(columns, flags)))
+    by = [name for pair in zip(flags, columns) for name in pair]
+    flag_descending = [value for value in descending for _ in range(2)]
+    return keyed.sort(by, descending=flag_descending).select(original)
+
+
+def _sort_null_largest_pandas(frame: Any, columns: list[str], descending: list[bool]) -> Any:
+    """pandas counterpart of ``_sort_null_largest_expression`` (``na_position`` is global to the sort).
+
+    When every key points the same way one ``na_position`` is enough (last when ascending, first when
+    descending). A mix needs the ``is_null`` flag columns, which Dask cannot sort on (its optimizer
+    drops them), so on Dask a mixed sort keeps NULLs last for every key.
+    """
+    if all(descending):
+        return frame.sort_values(columns, ascending=[False] * len(columns), na_position="first")
+    if not any(descending) or hasattr(frame, "npartitions"):
+        return frame.sort_values(columns, ascending=[not value for value in descending], na_position="last")
+    flags = [f"_null_{index}" for index in range(len(columns))]
+    keyed = frame.assign(**{flag: frame[name].isna() for name, flag in zip(columns, flags)})
+    by = [name for pair in zip(flags, columns) for name in pair]
+    ascending = [not value for value in descending for _ in range(2)]
+    return keyed.sort_values(by, ascending=ascending, na_position="last").drop(columns=flags)
+
+
 def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     params = get_parameters(spec["query_id"])
     frame = ctx.get_table(spec["base"])
@@ -1470,8 +1503,11 @@ def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> 
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result.filter(_joined_agg_expr_condition(ctx, params, post_filter))
-    result = result.sort(
-        list(spec["sort_by"]), descending=list(spec.get("descending", (False,) * len(spec["sort_by"])))
+    result = _sort_null_largest_expression(
+        ctx,
+        result,
+        list(spec["sort_by"]),
+        list(spec.get("descending", (False,) * len(spec["sort_by"]))),
     )
     limit = spec.get("limit", 100)
     return result if limit is None else result.limit(limit)
@@ -1487,14 +1523,17 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     predicate = _joined_agg_pandas_condition(frame, params, ("and", *spec.get("filters", ())))
     if predicate is not None:
         frame = frame[predicate]
-    result = frame.groupby(list(spec["group_by"]), as_index=False).agg(
+    # SQL GROUP BY keeps a NULL key as its own group; pandas drops it unless told otherwise.
+    result = frame.groupby(list(spec["group_by"]), as_index=False, dropna=False).agg(
         **{alias: (source, func) for alias, source, func in spec["aggs"]}
     )
+    for column in spec["group_by"]:
+        result[column] = result[column].astype(object).where(~result[column].isna(), None)
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result[_joined_agg_pandas_condition(result, params, post_filter)]
     descending = spec.get("descending", (False,) * len(spec["sort_by"]))
-    result = result.sort_values(list(spec["sort_by"]), ascending=[not value for value in descending])
+    result = _sort_null_largest_pandas(result, list(spec["sort_by"]), list(descending))
     limit = spec.get("limit", 100)
     return result if limit is None else result.head(limit)
 
@@ -3386,20 +3425,19 @@ def q34_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
     # Join with customer
-    return (
-        ticket_agg.join(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-        .select(
-            col("c_last_name"),
-            col("c_first_name"),
-            col("c_salutation"),
-            col("c_preferred_cust_flag"),
-            col("ss_ticket_number"),
-            col("cnt"),
-        )
-        .sort(
-            ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
-            descending=[False, False, False, True, False],
-        )
+    result = ticket_agg.join(customer, left_on="ss_customer_sk", right_on="c_customer_sk").select(
+        col("c_last_name"),
+        col("c_first_name"),
+        col("c_salutation"),
+        col("c_preferred_cust_flag"),
+        col("ss_ticket_number"),
+        col("cnt"),
+    )
+    return _sort_null_largest_expression(
+        ctx,
+        result,
+        ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
+        [False, False, False, True, False],
     )
 
 
@@ -3449,14 +3487,15 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join with customer
     result = ticket_filtered.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-    result["c_last_name"] = result["c_last_name"].astype(object).where(result["c_last_name"].notna(), None)
+    for column in ("c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"):
+        result[column] = result[column].astype(object).where(~result[column].isna(), None)
 
     # Select and sort
-    return result[
-        ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]
-    ].sort_values(
+    result = result[["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]]
+    return _sort_null_largest_pandas(
+        result,
         ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number"],
-        ascending=[True, True, True, False, True],
+        [False, False, False, True, False],
     )
 
 
@@ -6783,7 +6822,21 @@ def _three_channel_customer_count_expression(ctx: DataFrameContext, query_id: in
         (col("d_month_seq") >= lit(dms)) & (col("d_month_seq") <= lit(dms + 11))
     )
     store_customers, catalog_customers, web_customers = _customer_date_sets_expression(ctx, date_filtered)
-    keys = ["c_last_name", "c_first_name", "d_date"]
+
+    # SQL INTERSECT and EXCEPT treat NULLs as equal, but a join does not match NULL keys. Key the
+    # names on a NULL indicator plus a filled value so NULL names compare equal to each other only.
+    def null_safe(frame: Any) -> Any:
+        return frame.with_columns(
+            col("c_last_name").is_null().alias("c_last_name_is_null"),
+            col("c_first_name").is_null().alias("c_first_name_is_null"),
+            col("c_last_name").fill_null(lit("")).alias("c_last_name"),
+            col("c_first_name").fill_null(lit("")).alias("c_first_name"),
+        )
+
+    keys = ["c_last_name", "c_first_name", "c_last_name_is_null", "c_first_name_is_null", "d_date"]
+    store_customers, catalog_customers, web_customers = (
+        null_safe(frame) for frame in (store_customers, catalog_customers, web_customers)
+    )
     if mode == "intersect":
         result = store_customers.join(catalog_customers, on=keys).join(web_customers, on=keys)
     else:
