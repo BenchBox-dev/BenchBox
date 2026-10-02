@@ -51,23 +51,28 @@ def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | No
 
 
 def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
-    """Return reasons the develop ruleset lacks a code-owner review rule."""
+    """Return reasons the develop ruleset lacks required review enforcement."""
     params = _pull_request_parameters(rules)
     if params is None:
         return [
             "develop ruleset has no pull_request rule: a soundness-path PR "
             f"({', '.join(SOUNDNESS_PATH_GLOBS)}) can squash-auto-merge with zero reviews"
         ]
+    findings: list[str] = []
     if not params.get("require_code_owner_review", False):
-        return [
+        findings.append(
             f"require_code_owner_review={params.get('require_code_owner_review', False)} (need true) "
             f"for CODEOWNERS-owned soundness paths: {', '.join(SOUNDNESS_PATH_GLOBS)}"
-        ]
-    return []
+        )
+    if not params.get("required_review_thread_resolution", False):
+        findings.append(
+            f"required_review_thread_resolution={params.get('required_review_thread_resolution', False)} (need true)"
+        )
+    return findings
 
 
 def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
-    """True when the ruleset requires a code-owner review."""
+    """True when the ruleset requires a code-owner review and review thread resolution."""
     return not review_enforcement_findings(rules)
 
 
@@ -356,6 +361,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(f"# Ruleset review enforcement ({args.branch}) - OK")
     print(f"- code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
+    print("- review thread resolution required")
     return 0
 
 
