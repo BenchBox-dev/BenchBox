@@ -20321,6 +20321,13 @@
       "status": "open",
       "title": "DECISION GATE (D-2): which constraint kinds become catalog-verifiable, and from which structured sources"
     },
+    "tuning-gate-duckdb-partitioning-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "DECISION GATE (D-7): remove partitioning from DuckDB tuned templates or implement it"
+    },
     "tuning-gate-ledger-outcome-vocabulary-20261001": {
       "claim": null,
       "needs": [],

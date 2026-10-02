@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Decision recorded (template README or ADR-003 addendum) selecting (A) or (B)."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-7 / task P1.5 (re-review R-1b).",
+  "description": "## Problem\nEvery shipped DuckDB tuned template requests partitioning: TPC-H (LINEITEM, ORDERS), SSB (LINEORDER) and TPC-DS (6 fact tables). DuckDB always drops it (`benchbox/platforms/duckdb.py:1453-1472`), and dropped intents veto the upgrade (`benchbox/core/tuning/introspection.py:678`). The curated templates defeat their own verification.\n\n## Options\n- **(A) Recommended.** Remove partitioning from `examples/tunings/duckdb/*_tuned.yaml` and the packaged mirrors under `benchbox/core/tuning/templates/duckdb/`, and mark DuckDB partitioning `rendered_via=\"none\"`.\n- **(B)** Hive-partitioned Parquet in external-table mode only.\n\n## Guardrails\n- Keep the `TestPackagedTemplatesParity` test green.\n- The requested-config hash changes; record that in release notes.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
+  "links": [
+    "examples/tunings/duckdb",
+    "benchbox/core/tuning/templates/duckdb",
+    "benchbox/platforms/duckdb.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:13:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5fd5d89f44d048f3b9a036fe15ae9bd9",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
