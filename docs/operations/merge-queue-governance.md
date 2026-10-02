@@ -8,7 +8,7 @@ This document defines the operational architecture, required status check contra
 
 1. **Squash Integration Only:** All pull requests targeting `develop` must be integrated via squash merge. Merge commits and rebase-and-merge remain forbidden.
 2. **Zero Bypass Actors:** The `develop-squash-only` ruleset enforces `bypass_actors: []`. No user, bot, or organization admin may bypass status checks, linear history, or code owner review.
-3. **Soundness Review Boundary:** Any pull request touching files within `SOUNDNESS_PREFIXES` (or matching `_VALIDATION_RE` in `_project/scripts/auto_merge_soundness_paths.py`) cannot be automatically enqueued. It requires explicit maintainer review and manual enqueueing.
+3. **Soundness Review Boundary:** A pull request touching a path in `.github/soundness-paths.txt` needs a completed external adversarial review before it is armed. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. `make pr-arm` will refuse until the review is visible on the current head. A scheduled digest will list the soundness-path commits that merged and the review signal each had, and open a tracker item for any with none. The review is not an attestation in the PR body: the author of a change can write that text, so it cannot bind. The arming refusal and the digest are added in later changes, and the attestation check in `ci.yml` stays in force until they exist.
 4. **Fail-Closed Execution:** If an Actions workflow encounter an unknown or malformed `merge_group` event payload, it must fail closed and withhold reporting green.
 
 ---
