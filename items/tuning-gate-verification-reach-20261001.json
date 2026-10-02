@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "ADR-001 addendum recording facts-only vs introspectors and the demand criterion that admits a platform."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-9, added after plan review F10.",
+  "description": "## Problem\nOnly DuckDB, ClickHouse and Snowflake have introspectors. Candidate introspectors from structured catalogs:\n- Databricks `DESCRIBE DETAIL`;\n- BigQuery `INFORMATION_SCHEMA.COLUMNS`;\n- Redshift `SVV_TABLE_INFO` / `PG_TABLE_DEF`;\n- PostgreSQL `pg_index` / `pg_partitioned_table`;\n- StarRocks `information_schema.tables_config`;\n- Trino / Iceberg `$properties` / `$partitions`;\n- Firebolt `information_schema.indexes`;\n- Synapse `sys.pdw_*`;\n- MotherDuck `duckdb_indexes()`.\n\nThe published corpus has zero tuned bundles on any of these (244 bundles; 5 tuned, all DuckDB), and several render no layout at execution today. The re-review recommended scoping the binary verified gate to DuckDB and ClickHouse and presenting raw catalog facts elsewhere.\n\n## Options\n- **(A) Recommended.** Facts-only by default; add a full introspector per platform only on recorded demand.\n- **(B)** An introspector per platform as each execution renderer lands.\n\n## Guardrails\n- No new introspector before this gate is done.\n- Introspectors must be bounded (filter inside the SQL `WHERE`, truncation measured on the raw result), non-raising and structured-catalog only.\n- An introspector lands only after that platform renders the layout at execution.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
+  "links": [
+    "benchbox/core/tuning/introspection.py",
+    "docs/development/tuning-adr-001-trust-and-hash-semantics.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:14:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "57f3a01be65a42298f8a41c5c7716768",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
