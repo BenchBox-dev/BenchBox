@@ -72,6 +72,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.slow,
     pytest.mark.duckdb,
+    pytest.mark.timeout(600),
 ]
 
 
