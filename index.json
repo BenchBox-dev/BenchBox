@@ -6141,17 +6141,12 @@
       "title": "Check w_warehouse_name coming back None on the expression family (Q21, Q62, Q66, Q99)"
     },
     "dfparity-t12-q71-q76-null-order": {
-      "claim": {
-        "expires_at": "2026-10-03T08:30:25Z",
-        "generation": "12d21482e6174465af2b21768ec5691e",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Fix NULL ordering in Q71 and Q76 DataFrame implementations against the explicit ORDER BY"
     },
     "dfparity-t13-pandas-q78-perf": {
