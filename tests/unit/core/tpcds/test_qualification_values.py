@@ -44,6 +44,7 @@ SPEC_SAMPLE = [
     (44, "STORE.01", "4"),
     (44, "NULLCOLSS.01", "ss_addr_sk"),
     (47, "ORDERBY.01", "s_store_name"),
+    (72, "YEAR.01", "1999"),
     (88, "STORE.01", "Unknown"),
     (93, "REASON.01", "reason 28"),
 ]
@@ -64,6 +65,17 @@ def test_every_query_has_values(document):
 @pytest.mark.parametrize(("query_id", "name", "expected"), SPEC_SAMPLE)
 def test_sampled_values_match_the_specification_text(document, query_id, name, expected):
     assert document["values"][str(query_id)][name] == expected
+
+
+def test_no_value_swallowed_a_comment_that_follows_it_in_the_specification(document):
+    """Appendix B puts prose comments after some parameter lists (Q72's note on the 5-day offset)."""
+    offenders = {
+        (query_id, name): value
+        for query_id, values in document["values"].items()
+        for name, value in values.items()
+        if "Comment" in value or len(value) > 80
+    }
+    assert offenders == {}
 
 
 def test_q8_carries_all_four_hundred_zip_codes(document):

@@ -881,7 +881,7 @@
   "72": {
    "BP.01": ">10000",
    "MS.01": "D",
-   "YEAR.01": "1999 Comment: The adding of the scalar number 5 to d1.d_date in the predicate \u201cd3.d_date > d1.d_date + 5\u201d means that 5 days are added to d1.d_date."
+   "YEAR.01": "1999"
   },
   "73": {
    "BPONE.01": ">10000",
