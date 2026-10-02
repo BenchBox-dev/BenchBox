@@ -99,6 +99,8 @@ class _DatabricksCursor:
             self._results = [("13.3",)]
         elif normalized.startswith("select current_catalog"):
             self._results = [(self._state.catalog, self._state.schema)]
+        elif normalized == "set use_cached_result":
+            self._results = [("use_cached_result", "false")]
         elif normalized.startswith("set "):
             self._results = []
         elif normalized.startswith("copy into"):

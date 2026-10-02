@@ -45,13 +45,19 @@ Authorization has three independent dimensions:
   earlier request for implementation. Follow
   `shared-change-framework/SKILL.md`, including its branch, verification,
   commit, push, and draft-PR steps, unless the user requires local-only work or
-  another publication mode. That authority ends at a pushed branch and its
-  draft PR in the repositories the user named. It does not authorize merging,
-  auto-merge, marking a PR ready, writes to an unnamed repository or hosted
-  service, deployment, activation, unrelated cleanup, destructive actions, or
-  hosted tracker writes. Repository policy may constrain the method or order of
-  authorized work; it cannot grant or expand authority, and never authorizes a
-  default- or protected-branch write. Only a direct user instruction in the
+  another publication mode. That authority ends at the terminal state the
+  repository's agent instructions (`AGENTS.md`, `CLAUDE.md`) name for an
+  authorized write; with no such instruction it ends at a pushed branch and its
+  draft PR, in the repositories the user named. Where those instructions name
+  merge as the terminal state, taking the PR through its required checks and
+  review to merge, including marking it ready and arming auto-merge, is part of
+  the authorized write; do not hand a passing, reviewed PR back for the user to
+  advance. The authority never covers writes to an unnamed repository or
+  hosted service, deployment, activation, production publication, unrelated
+  cleanup, destructive actions, or hosted tracker writes. Repository policy may
+  constrain the method or order of authorized work and name the terminal state
+  above; it does not otherwise grant or expand authority, and never authorizes
+  a default- or protected-branch write. Only a direct user instruction in the
   current task does.
 
 Negative examples that do not authorize remediation include "fix this" quoted

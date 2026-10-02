@@ -965,7 +965,7 @@ class TestCacheControlGate:
     def test_absent_receipt_with_declared_enabled_cache_refused(self):
         # A receipt-capable platform declaring result_cache_enabled without a
         # receipt advertises cached timings with no disabling evidence.
-        for platform_name in ("Snowflake", "Redshift"):
+        for platform_name in ("Snowflake", "Redshift", "Databricks"):
             vr = ValidationResult("test")
             data = _bundle_with_cache_control(None, platform_name=platform_name, result_cache_enabled=True)
             _validate_bundle(data, vr)
@@ -979,10 +979,10 @@ class TestCacheControlGate:
         assert vr.ok, vr.errors
 
     def test_absent_receipt_with_enabled_cache_grandfathered_without_receipt_machinery(self):
-        # Platforms that never record a receipt (e.g. Databricks) keep the
+        # Platforms that never record a receipt (e.g. DuckDB) keep the
         # legacy exemption even when they declare an enabled cache.
         vr = ValidationResult("test")
-        data = _bundle_with_cache_control(None, platform_name="Databricks", result_cache_enabled=True)
+        data = _bundle_with_cache_control(None, platform_name="DuckDB", result_cache_enabled=True)
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors
 

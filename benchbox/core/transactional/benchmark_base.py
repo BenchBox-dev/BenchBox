@@ -567,6 +567,21 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         if (err := failed_platform_error(res3)) is not None:
             raise RuntimeError(f"Failed to insert staging manifest entry: {err}")
 
+    def _invalidate_staging_manifest(self, connection: DatabaseConnection) -> None:
+        """Remove this benchmark's manifest row before rebuilding staging in place.
+
+        A rebuild that replaces tables in place leaves earlier tables populated
+        if it fails part-way. Without this, the old manifest row would still
+        match and a later setup() would reuse the half-rebuilt staging set.
+        """
+        benchmark_id, _scale, _spec = self._staging_provenance_key()
+        quoted_table = self._quote_identifier(self._STAGING_MANIFEST_TABLE)
+        try:
+            connection.execute(f"DELETE FROM {quoted_table} WHERE benchmark = '{_sql_escape(benchmark_id)}'")
+        except Exception as e:
+            # A missing manifest table already means "no reusable staging".
+            self.log_verbose(f"Staging manifest not cleared ({e})")
+
     def _staging_manifest_matches(self, connection: DatabaseConnection, source_tables: list[str]) -> bool:
         """Return True iff a manifest row exists whose benchmark/scale/spec/digest match this run.
 

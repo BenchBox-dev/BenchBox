@@ -1106,6 +1106,54 @@ class ResultCaptureMixin:
         if plan_capture_time_ms is not None:
             result["plan_capture_time_ms"] = plan_capture_time_ms
 
+    def execute_query_with_plan_capture(
+        self,
+        execute: Callable[..., dict[str, Any]],
+        connection: Any,
+        query: str,
+        query_id: str,
+        benchmark_type: str | None = None,
+        scale_factor: float | None = None,
+        validate_row_count: bool = True,
+        stream_id: int | None = None,
+    ) -> dict[str, Any]:
+        """Run one query through the shared executor, then merge plan capture.
+
+        Firebolt, Presto/Trino, PostgreSQL, SingleStore, and Doris each wrapped
+        the shared cursor execution with the same two lines: delegate to the
+        parent executor, then merge SUCCESS-guarded plan fields into the
+        result. This method owns that idiom so the copies cannot drift; each
+        adapter keeps its thin ``execute_query`` override (and its platform
+        docstring) and forwards its own ``super().execute_query`` as
+        ``execute``. Adapters with genuinely different semantics — Redshift's
+        FAILED guard and display logic, pg_mooncake's transaction retry,
+        QuestDB's rewriter path — keep their bespoke overrides.
+
+        Args:
+            execute: Bound parent ``execute_query`` to delegate to.
+            connection: Database connection.
+            query: SQL query text.
+            query_id: Query identifier.
+            benchmark_type: Benchmark family for validation.
+            scale_factor: Scale factor for validation.
+            validate_row_count: Whether to validate row counts.
+            stream_id: Throughput stream identifier.
+
+        Returns:
+            Query result dict with plan fields merged when captured.
+        """
+        result = execute(
+            connection=connection,
+            query=query,
+            query_id=query_id,
+            benchmark_type=benchmark_type,
+            scale_factor=scale_factor,
+            validate_row_count=validate_row_count,
+            stream_id=stream_id,
+        )
+        self._merge_plan_capture_into_result(result, connection, query, query_id)
+        return result
+
     def validate_loaded_data(self, connection: Any, benchmark_type: str, scale_factor: float) -> ValidationResult:
         """Validate database state after data loading using platform-specific methods.
 
@@ -1861,7 +1909,15 @@ class ResultCaptureMixin:
         log_fn = self.logger.warning if capture_failures else self.logger.info
         log_fn(summary_message)
 
-    def _build_execution_phases(self, query_results, query_executions, run_config, setup_phase) -> tuple:
+    def _build_execution_phases(
+        self,
+        query_results,
+        query_executions,
+        run_config,
+        setup_phase,
+        *,
+        power_workload_timing: tuple[str, str, int] | None = None,
+    ) -> tuple:
         """Build power/throughput test phases and return execution phases with metrics.
 
         Returns:
@@ -1888,10 +1944,20 @@ class ResultCaptureMixin:
 
         power_test_phase = None
         if execution_type not in {"throughput"}:
+            # Only a standalone executed power workload supplies wall boundaries.
+            # Keep query aggregates independent for latency and cost consumers;
+            # combined/maintenance callers retain their existing phase accounting.
+            # Wall-based effective cost per hour uses this phase duration, while
+            # query-based spend inputs remain unchanged.
+            start_time, end_time, duration_ms = power_workload_timing or (
+                _datetime.now().isoformat(),
+                _datetime.now().isoformat(),
+                int(total_exec_time * 1000),
+            )
             power_test_phase = PowerTestPhase(
-                start_time=_datetime.now().isoformat(),
-                end_time=_datetime.now().isoformat(),
-                duration_ms=int(total_exec_time * 1000),
+                start_time=start_time,
+                end_time=end_time,
+                duration_ms=duration_ms,
                 query_executions=query_executions,
                 geometric_mean_time=avg_time,
                 power_at_size=power_at_size_value,

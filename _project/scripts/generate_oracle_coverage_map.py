@@ -295,20 +295,16 @@ def oracle_surface_provenance(primary: str, benchmark_id: str) -> tuple[str, str
 
     Read live from the per-gate ``CrossSurfaceGate.surface_independence`` metadata, so
     re-registering a gate with different provenance reclassifies the row on the next
-    regeneration. The axis applies only to cross-surface gates; every other oracle --
-    and every UNGUARDED row -- reports ``—``.
+    regeneration. The axis applies to any benchmark with a registered cross-surface
+    gate (enforced or staged), even when a higher-priority oracle is primary: the
+    gate exists and its authorship distance is disclosable. Benchmarks with no
+    registered gate report ``—``.
     """
-    if primary != ORACLE_CROSS_SURFACE:
-        return PROVENANCE_NONE, PROVENANCE_NONE
-
     from benchbox.core.equivalence.cross_surface import GATES, STAGED_GATES
 
     gate = GATES.get(benchmark_id) or STAGED_GATES.get(benchmark_id)
-    if gate is None:  # pragma: no cover - a cross-surface primary implies a registered gate
-        return (
-            PROVENANCE_NONE,
-            "Cross-surface gate metadata is unavailable; provenance is undisclosed until the gate is registered.",
-        )
+    if gate is None:
+        return PROVENANCE_NONE, PROVENANCE_NONE
     if gate.surface_independence not in _KNOWN_PROVENANCE_LABELS:
         raise ValueError(
             f"{benchmark_id}: unknown surface-provenance label {gate.surface_independence!r}. "

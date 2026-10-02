@@ -469,3 +469,31 @@ def test_transaction_workflow_reconciliation_wiring() -> None:
     rec_step = next((s for s in verify_steps if s.get("name") == "Record verification success in journal CAS"), None)
     assert rec_step is not None
     assert "--github-token" in rec_step.get("run", "")
+
+
+def test_transaction_validates_candidate_against_bounded_develop_ancestry() -> None:
+    """Both validations accept a candidate built from the tip or a recent ancestor.
+
+    The pre-approval check pins the resolved tip with an explicit commit
+    bound; the post-approval check re-resolves the tip after the approval
+    wait instead of reusing the permit value, so queued approvals survive
+    merge-queue landings without accepting unreachable or stale bundles.
+    """
+    text = TX_WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert text.count("--develop-max-behind-commits 50") >= 2
+
+    wf = _load_yaml(TX_WORKFLOW_PATH)
+    pre_steps = wf["jobs"]["prepare"]["steps"]
+    pre_step = next(
+        (s for s in pre_steps if s.get("name") == "Resolve and validate selected candidate before approval"),
+        None,
+    )
+    assert pre_step is not None
+    assert '--expected-develop-sha "$EXPECTED_DEVELOP_SHA"' in pre_step.get("run", "")
+
+    deploy_steps = wf["jobs"]["deploy"]["steps"]
+    mat_step = next((s for s in deploy_steps if s.get("name") == "Materialize site bytes"), None)
+    assert mat_step is not None
+    mat_run = mat_step.get("run", "")
+    assert "git fetch --no-tags origin develop:refs/remotes/origin/develop" in mat_run
+    assert '--expected-develop-sha "$CURRENT_DEVELOP_SHA"' in mat_run

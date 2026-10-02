@@ -20,13 +20,13 @@ helper_queries:
   args:
   - - - i_manufact_id
       - manufact_id
-      - 128
+      - 436
     - - d_moy
       - month
-      - 11
+      - 12
   - - d_year
-    - i_brand
     - i_brand_id
+    - i_brand
   - ss_ext_sales_price
   - sum_agg
   - - d_year
@@ -45,10 +45,10 @@ helper_queries:
       - 1
     - - d_moy
       - month
-      - 11
+      - 12
     - - d_year
       - year
-      - 2000
+      - 1998
   - - d_year
     - i_category_id
     - i_category
@@ -72,13 +72,13 @@ helper_queries:
       - 1
     - - d_moy
       - month
-      - 11
+      - 12
     - - d_year
       - year
-      - 2000
+      - 1998
   - - d_year
-    - i_brand
     - i_brand_id
+    - i_brand
   - ss_ext_sales_price
   - ext_price
   - - d_year
@@ -94,13 +94,13 @@ helper_queries:
   args:
   - - - i_manager_id
       - manager_id
-      - 28
+      - 36
     - - d_moy
       - month
-      - 11
+      - 12
     - - d_year
       - year
-      - 1999
+      - 2001
   - - i_brand_id
     - i_brand
   - ss_ext_sales_price
@@ -116,13 +116,71 @@ helper_queries:
   args:
   - ss_sales_price
   - sum_sales
+  - i_manufact_id
+  - d_qoy
+  - avg_quarterly_sales
+  - - Books
+    - Children
+    - Electronics
+  - - personal
+    - portable
+    - reference
+    - self-help
+  - - scholaramalgamalg #14
+    - scholaramalgamalg #7
+    - exportiunivamalg #9
+    - scholaramalgamalg #9
+  - - Women
+    - Music
+    - Men
+  - - accessories
+    - classical
+    - fragrances
+    - pants
+  - - amalgimporto #1
+    - edu packscholar #1
+    - exportiimporto #1
+    - importoamalg #1
+  - - avg_quarterly_sales
+    - sum_sales
+    - i_manufact_id
+  - 1212
 - query_id: 63
   title: Store Manufacturer Profit
   expression_helper: _manufacturer_month_expression
   pandas_helper: _manufacturer_month_pandas
   args:
-  - ss_net_profit
-  - sum_profit
+  - ss_sales_price
+  - sum_sales
+  - i_manager_id
+  - d_moy
+  - avg_monthly_sales
+  - - Books
+    - Children
+    - Electronics
+  - - personal
+    - portable
+    - reference
+    - self-help
+  - - scholaramalgamalg #14
+    - scholaramalgamalg #7
+    - exportiunivamalg #9
+    - scholaramalgamalg #9
+  - - Women
+    - Music
+    - Men
+  - - accessories
+    - classical
+    - fragrances
+    - pants
+  - - amalgimporto #1
+    - edu packscholar #1
+    - exportiimporto #1
+    - importoamalg #1
+  - - i_manager_id
+    - avg_monthly_sales
+    - sum_sales
+  - 1212
 - query_id: 98
   title: Store Sales Item Band
   expression_helper: _item_category_sales_expression
@@ -133,15 +191,18 @@ helper_queries:
   - ss_sold_date_sk
   - ss_ext_sales_price
   - categories
-  - 1
-  - - i_item_desc
+  - '2001-01-12'
+  - - i_item_id
+    - i_item_desc
     - i_category
     - i_class
     - i_current_price
   - - i_category
     - i_class
-    - itemrevenue
+    - i_item_id
     - i_item_desc
+    - revenueratio
+  - null
 - query_id: 12
   title: Web Sales Item Analysis
   expression_helper: _item_category_sales_expression
@@ -152,7 +213,7 @@ helper_queries:
   - ws_sold_date_sk
   - ws_ext_sales_price
   - item_categories
-  - 2
+  - '2001-01-12'
   - - i_item_id
     - i_item_desc
     - i_category
@@ -160,8 +221,9 @@ helper_queries:
     - i_current_price
   - - i_category
     - i_class
-    - itemrevenue
     - i_item_id
+    - i_item_desc
+    - revenueratio
 - query_id: 20
   title: Catalog Sales Item Analysis
   expression_helper: _item_category_sales_expression
@@ -172,7 +234,7 @@ helper_queries:
   - cs_sold_date_sk
   - cs_ext_sales_price
   - item_categories
-  - 2
+  - '2001-01-12'
   - - i_item_id
     - i_item_desc
     - i_category
@@ -180,8 +242,9 @@ helper_queries:
     - i_current_price
   - - i_category
     - i_class
-    - itemrevenue
     - i_item_id
+    - i_item_desc
+    - revenueratio
 - query_id: 26
   title: Catalog Sales Promo Analysis
   expression_helper: _promotion_sales_expression
@@ -205,7 +268,7 @@ helper_queries:
   - cs_item_sk
   - cs_sold_date_sk
   - cs_ext_discount_amt
-  - 977
+  - 269
 - query_id: 37
   title: Item Inventory Analysis
   expression_helper: _inventory_item_expression
@@ -215,9 +278,15 @@ helper_queries:
   - cs_item_sk
   - - current_price_min
     - current_price_max
-  - - 68
-    - 98
+  - - 22
+    - 52
   - true
+  - manufact_ids
+  - - 678
+    - 964
+    - 918
+    - 849
+  - '2001-06-02'
 - query_id: 82
   title: Store Sales Inventory
   expression_helper: _inventory_item_expression
@@ -227,9 +296,15 @@ helper_queries:
   - ss_item_sk
   - - price_min
     - price_max
-  - - 62
-    - 92
+  - - 30
+    - 60
   - false
+  - manufact_ids
+  - - 437
+    - 129
+    - 727
+    - 663
+  - '2002-05-30'
 - query_id: 92
   title: Web Sales Excess Discount
   expression_helper: _excess_discount_expression
@@ -239,7 +314,7 @@ helper_queries:
   - ws_item_sk
   - ws_sold_date_sk
   - ws_ext_discount_amt
-  - 350
+  - 269
 - query_id: 94
   title: Web Orders from Multiple Warehouses Not Returned
   expression_helper: _web_multi_warehouse_expression
@@ -261,9 +336,9 @@ helper_queries:
   args:
   - i_color
   - colors
-  - - pale
+  - - orchid
     - chiffon
-    - thistle
+    - lace
   - 1
   - - total_sales
     - i_item_id
@@ -275,6 +350,6 @@ helper_queries:
   - i_category
   - category
   - Children
-  - 8
+  - 9
   - - i_item_id
     - total_sales

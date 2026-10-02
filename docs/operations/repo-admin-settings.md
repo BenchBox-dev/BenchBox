@@ -195,10 +195,11 @@ The soundness gate, as operated:
   rule-dispatch core), and the gate machinery itself (the predicate,
   `.github/workflows/auto-merge-on-open.yml`, and the PyPI-publishing
   `.github/workflows/release.yml`).
-- `make pr-open` no longer arms auto-merge at all; `make pr-ready` (or
-  `make pr-open READY=1`) runs the exact readiness transaction and then does,
-  so a PR cannot merge while a follow-up commit is still being written. Arming at creation stranded three commits in one
-  session, two of them the fixes for their own review findings.
+- `make pr-open` does not arm auto-merge when it creates a PR; `make pr-arm`
+  (or `make pr-open READY=1`) arms it after a live check of the PR, so a PR
+  cannot merge while a follow-up commit is still being written. Arming at
+  creation stranded three commits in one session, two of them the fixes for
+  their own review findings.
 - `make pr-open` checks a non-ancestor branch with `git merge-tree` and the
   live `scripts/ruleset_drift_check.py --queue-policy` verdict. A verified,
   conflict-free native queue permits publication without an author-side
