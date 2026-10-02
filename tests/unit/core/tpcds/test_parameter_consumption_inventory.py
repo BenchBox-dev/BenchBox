@@ -8,10 +8,13 @@ together with the template text that says which of them reach the SQL.
 
 Categories, in priority order:
 
-* ``c`` hard-coded: a multi-valued dsqgen draw that reaches the SQL (Q8 draws 400 zips, Q41 sixteen
-  colors) has fewer values in the matching defaults than the SQL uses, or no matching key at all.
+* ``c`` hard-coded: the implementation cannot take what dsqgen draws. A multi-valued draw that reaches the
+  SQL (Q41 draws sixteen colors) has no matching key, or only a scalar one (Q24 reads a single color), so
+  the code itself has to change.
 * ``b`` binding gap: an implementation reads a key the defaults file does not have (a silent literal
-  fallback), or the defaults file has a key no implementation reads (a dead key).
+  fallback), the defaults file has a key no implementation reads (a dead key), or a list-valued default is
+  shorter than the draw (Q8 draws 400 zips and the default has five, but the implementation passes the whole
+  list through, so only the binding data is short).
 * ``a`` no gap detected.
 
 The derived flag marks templates that do arithmetic on a drawn value (Q39 uses ``[MONTH]+1``), which an
@@ -55,14 +58,14 @@ LITERAL_FALLBACK = frozenset({8, 10, 21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88,
 # Implementations that do not run to completion against the stand-in context.
 INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
 
-# Category (c): the dsqgen draw is larger than what the implementation can take.
-HARD_CODED = frozenset({8, 16, 24, 27, 36, 41, 73, 74, 85, 88, 89})
+# Category (c): the implementation cannot take the draw (it reads one value, or none).
+HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
 
 # Category (b): everything else the inventory finds a gap in. This may only shrink.
 BINDING_GAP = frozenset(
     {
-        1, 3, 7, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 31, 32, 33, 34, 35, 37, 38, 40, 44, 45, 49, 50, 51,
-        53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
+        1, 3, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 44, 45,
+        49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
     }
 )  # fmt: skip
 
@@ -136,11 +139,12 @@ class QueryInventory:
     query_id: int
     category: str = "a"
     derived: bool = False
-    complete: bool = True
+    incomplete: set[str] = field(default_factory=set)  # family names whose run did not finish
     consumed: set[str] = field(default_factory=set)
     fallback: set[str] = field(default_factory=set)
     dead: set[str] = field(default_factory=set)
-    shortfall: list[str] = field(default_factory=list)
+    shortfall: list[str] = field(default_factory=list)  # the implementation cannot take the draw
+    data_shortfall: list[str] = field(default_factory=list)  # the defaults are shorter than the draw
     unmatched_names: list[str] = field(default_factory=list)
 
 
@@ -242,7 +246,8 @@ def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) 
     for family in ("expression", "pandas"):
         keys, complete = _read_keys(query_id, family, defaults)
         result.consumed |= keys
-        result.complete = result.complete and complete
+        if not complete:
+            result.incomplete.add(family)
     yaml_keys = set(defaults.get(query_id, {}))
     result.fallback = result.consumed - yaml_keys
     result.dead = yaml_keys - result.consumed
@@ -271,15 +276,22 @@ def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) 
         multi_valued = logged[name] >= 2 and len(used[name]) >= 2
         if not multi_valued or any(key not in defaults.get(query_id, {}) for key in keys):
             continue
+        takes_a_list = any(isinstance(defaults[query_id][key], (list, tuple)) for key in keys)
         capacity = sum(
             len(defaults[query_id][key]) if isinstance(defaults[query_id][key], (list, tuple)) else 1 for key in keys
         )
-        if len(used[name]) > capacity:
-            result.shortfall.append(f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults")
+        if len(used[name]) <= capacity:
+            continue
+        if takes_a_list:
+            # The implementation passes a list through (for example to is_in), so it can take every value the
+            # SQL uses; only the binding data is short, which is adapter work, not a code change.
+            result.data_shortfall.append(f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults")
+        else:
+            result.shortfall.append(f"{name}: {len(used[name])} values reach the SQL, the implementation reads one")
 
     if result.shortfall:
         result.category = "c"
-    elif result.fallback or (result.dead and result.complete):
+    elif result.fallback or result.data_shortfall or (result.dead and not result.incomplete):
         result.category = "b"
     return result
 
@@ -306,9 +318,12 @@ def test_every_query_is_classified(inventory):
 
 
 def test_incomplete_runs_are_the_known_ones(inventory):
-    """Dead-key results are lower bounds only for implementations that do not run to completion."""
-    incomplete = {f"{entry.query_id}" for entry in inventory.values() if not entry.complete}
-    assert incomplete <= {key.split(":")[0] for key in INCOMPLETE_RUNS}
+    """Dead-key results are lower bounds only for implementations that do not run to completion.
+
+    Tracked per (query, family): a new failure in the other family of a known query must not pass.
+    """
+    incomplete = {f"{entry.query_id}:{family}" for entry in inventory.values() for family in entry.incomplete}
+    assert incomplete <= INCOMPLETE_RUNS
 
 
 def test_literal_fallback_queries_are_the_known_fifteen(inventory):
