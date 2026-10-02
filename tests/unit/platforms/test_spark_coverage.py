@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.fast, pytest.mark.usefixtures("spark_runtime_environment")]
 
 
 # ---------------------------------------------------------------------------

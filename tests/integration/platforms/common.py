@@ -844,6 +844,9 @@ def install_athena_stubs(
     monkeypatch.setitem(sys.modules, "pyathena", pyathena_module)
     monkeypatch.setitem(sys.modules, "pyathena.cursor", cursor_module)
     monkeypatch.setitem(sys.modules, "boto3", boto3_module)
+    # The adapter's credential check reads the environment and ~/.aws; the stubs own both.
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "athena-stub-access-key")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "athena-stub-secret-key")
 
     # Patch the adapter module to use our stubs
     try:

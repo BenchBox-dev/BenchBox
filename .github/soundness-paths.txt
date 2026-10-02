@@ -85,3 +85,14 @@ prefix	benchbox/_binaries/
 file	benchbox/utils/binary_manifest.py
 file	scripts/bundled_binary_manifest.py
 file	scripts/verify_distribution_binaries.py
+file	quality/comment-policy.json
+file	quality/comment-policy-requirements.txt
+file	quality/comment-policy-package.json
+file	quality/comment-policy-package-lock.json
+file	scripts/check_comment_policy.py
+file	scripts/comment_syntax.py
+file	scripts/comment_syntax_js.cjs
+file	scripts/run_comment_policy.py
+file	scripts/comment_payloads.py
+file	scripts/comment_execution.py
+file	scripts/comment_policy_entry.py

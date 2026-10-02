@@ -46,6 +46,22 @@ Many are isolated and fast, but the directory does not itself guarantee a
 runtime or absence of external dependencies. Select the `fast` marker for the
 curated fast lane.
 
+Unit tests derive checkout paths from `tests.utilities.paths.REPO_ROOT`, not
+the caller's working directory. The early pytest plugin acquires the shared
+test lock before creating a disposable HOME, so conftest imports and collection
+cannot read the caller's BenchBox configuration. Each unit test then receives
+a fresh HOME. Child pytest processes share only a verified ancestor's live
+lock, including collection-only subprocesses.
+
+The required state detector checks cwd, every environment key, and registered
+raw quiet/config-provider globals after fixture teardown. It restores leaked
+state and reports a teardown error without printing environment values. Use
+`monkeypatch` or an owned context for intentional changes. Existing reset safety
+nets defer to that final check rather than hiding leaks. Unit CLI invocations
+own their quiet/provider state because CliRunner does not exit a real CLI
+process. Patch wall clocks at the consuming module, not globally, so timeout
+and watchdog clocks keep running.
+
 ### E2E Tests (`e2e/`)
 End-to-end tests that validate complete CLI workflows:
 - CLI option validation
