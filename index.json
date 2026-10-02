@@ -6196,9 +6196,9 @@
     },
     "dfparity-n08-render-scale-user-note": {
       "claim": {
-        "expires_at": "2026-10-03T22:55:32Z",
-        "generation": "5aadba88d6534c35bfa10c0a9a34269d",
-        "renewals": 0,
+        "expires_at": "2026-10-03T22:55:45Z",
+        "generation": "98f462ed195c4ca98364038bc3f02ae6",
+        "renewals": 1,
         "worker": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea"
       },
       "needs": [
