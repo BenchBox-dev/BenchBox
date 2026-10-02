@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Every retained directive, required notice and genuine parsed fixture in maintained first-party code is registered with exact identity, consumer, necessity and removal trigger; shared necessity text is used only where the justification is identical.",
+    "The scope policy and the checker policy agree: a test or check fails when one lists a retained item the other does not.",
+    "An expired suppression date produces a reported finding and never a configuration failure; the checker exits successfully in advisory mode with such a finding.",
+    "No broadened ignore, blanket exemption or weakened assertion is introduced; the 41 suppressions outside the directive grammar are either brought into the grammar or removed.",
+    "The change passes an independent external soundness review with the receipt linked in the pull request body, and is merged by the repository owner."
+  ],
+  "context": "Created 2026-10-02 from delivery plan v2 (/tmp/benchbox-comment-cleanup-plan-v2.md, step R1), approved by the user. Lands after the module waves and before comment-cleanup-enforcement-switch.",
+  "description": "Own the checker policy's `exceptions` list in quality/comment-policy.json (R1 in the delivery plan). It is the register that lets the checker, once enforcement is blocking, accept the machine directives and required notices that must stay in source. Today the scope policy (quality/comment-cleanup-scope.json) and the checker policy hold two registers with different schemas and no cross-check; reconcile them so there is one source of truth for each retained item and a check that the two agree.\n\nWork: register the retained directive comments (about 1,100 `# noqa`, `# type: ignore` and similar Python comments, plus the 41 suppressions that do not match the directive grammar) with their consumer, necessity and removal trigger, using shared necessity text per directive class where the justification is identical (decision D7); resolve the expiry handling so that an expired suppression date is a reported finding and never a configuration failure that exits 2 for every pull request; register the required notices and genuine parsed fixtures. Trimming a directive under blocking enforcement needs its prior registration, so this lands after the module waves that remove explanatory text from directive comments and before the enforcement switch.\n\nquality/comment-policy.json is a soundness-manifest path: an external review (codex, muse or agy) with a `Soundness review:` section and the repository owner's manual merge are required. This item authorizes no deployment, live cloud or stress test, historical-result rewriting or write to another repository.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-02T13:31:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "17a6d864a5ff4fc5a17f71493cac91f7",
+      "session_id": "bec2d032574a4742968b229c90460810"
+    }
+  ]
+}
