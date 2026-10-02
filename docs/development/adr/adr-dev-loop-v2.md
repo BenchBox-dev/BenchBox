@@ -121,10 +121,14 @@ three days under the fail-closed rule alone.
 The soundness path list is narrowed to code that produces, normalizes, compares or
 validates results, every workflow, the release and binary paths, and `AGENTS.md`.
 Documentation, decision records, runbooks and threat models leave the list, because a
-review of prose gives no protection against a wrong result. The CI detection layer and
-the external review requirement are unchanged. The arming refusal, the digest and the
-narrowed list land in separate changes; until the attestation check is removed from
-`ci.yml`, a PR on a soundness path must still carry a valid `Soundness review:` section.
+review of prose gives no protection against a wrong result. The CI detection layer is
+unchanged, and the external review requirement is unchanged except for the quota
+fallback above. `AGENTS.md` still states the requirement without the fallback; the change
+that removes the attestation check from `ci.yml` rewrites that sentence, because
+`AGENTS.md` is itself a soundness path and must carry the attestation until then. The
+arming refusal, the digest and the narrowed list land in separate changes; until the
+attestation check is removed from `ci.yml`, a PR on a soundness path must still carry a
+valid `Soundness review:` section.
 
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
