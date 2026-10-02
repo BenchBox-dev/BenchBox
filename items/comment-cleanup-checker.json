@@ -1,7 +1,7 @@
 {
   "acceptance": [
     "Checker and parity design includes a prior-art decision for every added helper/dependency, using existing tooling where sufficient.",
-    "Fixture corpus includes valid directives/notices and invalid attached explanation, #/--/URL strings, sole-docstring bodies, dynamic __doc__, genuine parsed fixtures, embedded SQL, YAML blocks, JSX/heredocs/templates, unknown syntax and stale/missing-consumer exceptions.",
+    "Fixture corpus includes valid directives/notices and invalid attached explanation, #/--/URL strings, sole-docstring bodies, dynamic __doc__, genuine parsed fixtures, embedded SQL, YAML blocks, JSX/heredocs/templates, unknown syntax and stale/missing-consumer exceptions. It must also cover the two adapter gaps Codex found on PR 2469 (2026-10-02): SQL passed as a keyword argument, such as `pd.read_sql(sql=\"SELECT 1 -- note\", con=conn)` (benchbox scripts/comment_syntax.py, the string's parent is an ast.keyword), and a heredoc whose interpreter takes an option operand, such as `python -W ignore <<'PY'` (scripts/comment_payloads.py, the operand is mistaken for a script file). Both are fixed, with fixtures, before the policy moves to blocking.",
     "Python comparison rejects all executable drift except exactly specified removal and empty-body repair; unrelated strings and controls are never normalized away. A parity comparator exists and reports, per file, comments removed, docstrings removed, pass statements added and any other drift (which fails).",
     "Other declared languages/config classes have context-aware coverage, including CSS/HTML and notebook code; unsupported classes are visible failures rather than silently excluded.",
     "Reporting, new-content blocking, completed-module ratchets and final strict mode all work against an immutable ownership/scope manifest. The checker lands in advisory mode first; moving the policy to blocking enforcement is a separate, later change.",
@@ -25,6 +25,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "470c68e204f7420996aaa7f29f4f3386",
+      "session_id": "bec2d032574a4742968b229c90460810"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-02T13:35:51Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ffd613eadaac474e8e7288b74f084f1f",
       "session_id": "bec2d032574a4742968b229c90460810"
     }
   ]
