@@ -127,7 +127,7 @@ Disabling the queue restores immediate single-PR squash merges under the `SHADOW
 - the connector's thumbs-up reaction, or
 - an external review posted as a PR comment that names its reviewer (`Reviewer: codex`, `muse` or `agy`).
 
-The reaction and the comment must come after the last content commit and before the merge. The digest dates that commit by when GitHub first ran pull request workflows for it, because commit dates are set by the author. When GitHub has no such run (runs expire), it uses the commit date. A review submitted after the merge, or still pending, does not count.
+The reaction and the comment must come after the last content commit and before the merge. The digest dates that commit by when GitHub first ran this pull request's workflows for it, because commit dates are set by the author. When that commit has no run (for example it was pushed with `[skip ci]`, or its runs expired), the digest uses the first run of a later commit, and when there is none, the merge time. Each fallback makes the date later, so it can report a gap that was not one and cannot hide a real gap. A review submitted after the merge, or still pending, does not count.
 
 A merge of `develop` into the branch is a refresh, not content, when it has two parents, one of them already on `develop`, and its tree equals what merging the parents mechanically produces. A merge that needed conflict resolution, carries any other change, merges two branches that are not on `develop`, or has more than two parents counts as content. An "eyes" reaction is not a signal.
 

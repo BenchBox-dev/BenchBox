@@ -361,12 +361,22 @@ SECOND_RUN = "2026-10-02T10:20:00Z"
 
 
 def runs_response(*runs):
-    return {"workflow_runs": [{"event": event, "created_at": at} for event, at in runs]}
+    entries = []
+    for event, at, *numbers in runs:
+        entries.append({"event": event, "created_at": at, "pull_requests": [{"number": n} for n in (numbers or [7])]})
+    return {"workflow_runs": entries}
 
 
 def commit_list(monkeypatch, commits, *, fetch_head=HEAD, runs=()):
     monkeypatch.setattr(digest, "gh_pages", lambda endpoint: commits)
-    monkeypatch.setattr(digest, "gh_json", lambda *args: runs_response(*runs))
+
+    def fake_json(*args):
+        endpoint = args[1]
+        if isinstance(runs, dict):
+            return runs_response(*runs.get(endpoint.split("head_sha=")[1].split("&")[0], ()))
+        return runs_response(*runs)
+
+    monkeypatch.setattr(digest, "gh_json", fake_json)
     monkeypatch.setattr(digest, "merge_adds_content", lambda sha, base, cwd=None: sha == OLD)
     calls = []
 
@@ -378,10 +388,14 @@ def commit_list(monkeypatch, commits, *, fetch_head=HEAD, runs=()):
     return calls
 
 
+def pull_of(head, commits):
+    return {"commits": commits, "head": {"sha": head}, "merged_at": MERGED_AT}
+
+
 def test_commits_are_read_with_refresh_merges_marked(monkeypatch):
     commits = [api_commit(OLD, BEFORE, 2), api_commit(REFRESH, PUSHED, 2), api_commit(HEAD, AFTER)]
     calls = commit_list(monkeypatch, commits)
-    pull = {"commits": 3, "head": {"sha": HEAD}}
+    pull = pull_of(HEAD, 3)
     result = digest.collect_commits("o/r", 7, pull, "base")
     assert [c.is_refresh for c in result] == [False, True, False]
     assert ["git", "fetch", "--no-tags", "origin", "refs/pull/7/head"] in calls
@@ -389,7 +403,7 @@ def test_commits_are_read_with_refresh_merges_marked(monkeypatch):
 
 def test_a_commit_list_without_merges_fetches_nothing(monkeypatch):
     calls = commit_list(monkeypatch, [api_commit(HEAD, AFTER)])
-    digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}}, "base")
+    digest.collect_commits("o/r", 7, pull_of(HEAD, 1), "base")
     assert calls == []
 
 
@@ -397,7 +411,7 @@ def test_a_pull_head_that_moved_during_the_read_is_refused(monkeypatch):
     commits = [api_commit(OLD, BEFORE, 2), api_commit(HEAD, AFTER)]
     commit_list(monkeypatch, commits, fetch_head="f" * 40)
     with pytest.raises(digest.ReadError):
-        digest.collect_commits("o/r", 7, {"commits": 2, "head": {"sha": HEAD}}, "base")
+        digest.collect_commits("o/r", 7, pull_of(HEAD, 2), "base")
 
 
 def test_the_last_content_commit_is_dated_by_the_first_pull_request_run(monkeypatch):
@@ -406,7 +420,7 @@ def test_the_last_content_commit_is_dated_by_the_first_pull_request_run(monkeypa
         [api_commit(OLD, BEFORE), api_commit(HEAD, "2000-01-01T00:00:00Z")],
         runs=[("pull_request", SECOND_RUN), ("push", "2026-10-02T08:00:00Z"), ("pull_request", FIRST_RUN)],
     )
-    result = digest.collect_commits("o/r", 7, {"commits": 2, "head": {"sha": HEAD}}, "base")
+    result = digest.collect_commits("o/r", 7, pull_of(HEAD, 2), "base")
     assert [c.arrived_at for c in result] == [BEFORE, FIRST_RUN]
 
 
@@ -416,23 +430,51 @@ def test_a_backdated_commit_cannot_make_an_old_reaction_current(monkeypatch):
         [api_commit(HEAD, "2000-01-01T00:00:00Z")],
         runs=[("pull_request", "2026-10-02T11:30:00Z")],
     )
-    commits = digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}}, "base")
+    commits = digest.collect_commits("o/r", 7, pull_of(HEAD, 1), "base")
     pull = evidence(commits=commits, reactions=(digest.Reaction(CONNECTOR, "+1", AFTER),))
     assert digest.review_signals(pull) == ()
 
 
-def test_a_commit_with_no_pull_request_run_keeps_its_commit_date(monkeypatch):
+def test_a_run_for_another_pull_request_does_not_date_the_commit(monkeypatch):
+    commit_list(monkeypatch, [api_commit(HEAD, "2000-01-01T00:00:00Z")], runs=[("pull_request", BEFORE, 3)])
+    result = digest.collect_commits("o/r", 7, pull_of(HEAD, 1), "base")
+    assert [c.arrived_at for c in result] == [MERGED_AT]
+
+
+def test_a_content_commit_with_no_run_takes_the_first_run_of_a_later_commit(monkeypatch):
+    commits = [api_commit(HEAD, "2000-01-01T00:00:00Z"), api_commit(REFRESH, "2000-01-01T00:00:00Z", 2)]
+    commit_list(monkeypatch, commits, fetch_head=REFRESH, runs={REFRESH: [("pull_request", SECOND_RUN)]})
+    result = digest.collect_commits("o/r", 7, pull_of(REFRESH, 2), "base")
+    assert [(c.sha, c.is_refresh) for c in result] == [(HEAD, False), (REFRESH, True)]
+    assert result[0].arrived_at == SECOND_RUN
+
+
+def test_a_skipped_run_on_the_last_content_commit_cannot_make_an_old_review_current(monkeypatch):
+    commits = [api_commit(HEAD, "2000-01-01T00:00:00Z"), api_commit(REFRESH, "2000-01-01T00:00:00Z", 2)]
+    commit_list(monkeypatch, commits, fetch_head=REFRESH, runs={REFRESH: [("pull_request", MERGED_AT)]})
+    result = digest.collect_commits("o/r", 7, pull_of(REFRESH, 2), "base")
+    pull = evidence(commits=result, reactions=(digest.Reaction(CONNECTOR, "+1", AFTER),))
+    assert result[0].arrived_at == MERGED_AT
+    assert digest.review_signals(pull) == ()
+
+
+def test_a_commit_with_no_pull_request_run_at_all_is_dated_by_the_merge(monkeypatch):
     commit_list(monkeypatch, [api_commit(HEAD, AFTER)], runs=[("push", BEFORE)])
-    result = digest.collect_commits("o/r", 7, {"commits": 1, "head": {"sha": HEAD}}, "base")
-    assert [c.arrived_at for c in result] == [AFTER]
+    result = digest.collect_commits("o/r", 7, pull_of(HEAD, 1), "base")
+    assert [c.arrived_at for c in result] == [MERGED_AT]
+
+
+def test_the_cutoff_is_the_last_content_commit_alone():
+    pull = evidence(commits=(commit(OLD, LATER), commit(HEAD, BEFORE)))
+    assert pull.content_cutoff == BEFORE
 
 
 @pytest.mark.parametrize(
     ("commits", "pull"),
     [
-        ([], {"commits": 0, "head": {"sha": HEAD}}),
-        ([api_commit(HEAD, AFTER)], {"commits": 2, "head": {"sha": HEAD}}),
-        ([api_commit(OLD, AFTER)], {"commits": 1, "head": {"sha": HEAD}}),
+        ([], pull_of(HEAD, 0)),
+        ([api_commit(HEAD, AFTER)], pull_of(HEAD, 2)),
+        ([api_commit(OLD, AFTER)], pull_of(HEAD, 1)),
     ],
 )
 def test_an_empty_short_or_mismatched_commit_list_is_refused(monkeypatch, commits, pull):
@@ -445,7 +487,7 @@ def test_a_commit_list_at_the_api_limit_is_refused(monkeypatch):
     commits = [api_commit(f"{i:040x}", BEFORE) for i in range(digest.MAX_PULL_COMMITS)]
     commit_list(monkeypatch, commits)
     with pytest.raises(digest.ReadError):
-        digest.collect_commits("o/r", 7, {"commits": len(commits), "head": {"sha": commits[-1]["sha"]}}, "base")
+        digest.collect_commits("o/r", 7, pull_of(commits[-1]["sha"], len(commits)), "base")
 
 
 def test_pages_of_a_paginated_read_are_flattened(monkeypatch):
@@ -473,6 +515,12 @@ def test_review_threads_are_parsed_from_the_graphql_response(monkeypatch):
     monkeypatch.setattr(digest, "gh_json", lambda *args: graphql_threads(nodes))
     threads = digest.collect_threads("o/r", 7)
     assert threads == (digest.Thread(True, "reviewer", HEAD), digest.Thread(False, "", ""))
+
+
+def test_a_thread_with_no_comments_is_skipped(monkeypatch):
+    nodes = [{"isResolved": True, "comments": {"nodes": []}}, thread_node(True, "reviewer", HEAD)]
+    monkeypatch.setattr(digest, "gh_json", lambda *args: graphql_threads(nodes))
+    assert digest.collect_threads("o/r", 7) == (digest.Thread(True, "reviewer", HEAD),)
 
 
 def test_more_threads_than_one_page_stops_the_read(monkeypatch):

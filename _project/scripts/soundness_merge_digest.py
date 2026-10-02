@@ -109,7 +109,8 @@ class PullEvidence:
     @property
     def content_cutoff(self) -> str:
         """Arrival time of the last content commit; a clean merge of the base only refreshes it."""
-        return max((c.arrived_at for c in self.commits if not c.is_refresh), default="")
+        content = [c for c in self.commits if not c.is_refresh]
+        return content[-1].arrived_at if content else ""
 
     @property
     def content_shas(self) -> frozenset[str]:
@@ -314,6 +315,8 @@ def collect_threads(repo: str, number: int) -> tuple[Thread, ...]:
             raise ReadError(f"#{number} has more than {THREAD_PAGE} review threads")
         parsed: list[Thread] = []
         for node in threads["nodes"]:
+            if not node["comments"]["nodes"]:
+                continue
             first = node["comments"]["nodes"][0]
             parsed.append(
                 Thread(
@@ -341,11 +344,15 @@ def merged_pull_number(repo: str, sha: str) -> int | None:
     return int(candidates[0]["number"]) if candidates else None
 
 
-def server_arrival(repo: str, sha: str, fallback: str) -> str:
-    """Return when GitHub first ran pull request workflows for the commit, else the commit date."""
+def server_arrival(repo: str, sha: str, number: int) -> str | None:
+    """Return when GitHub first ran this pull request's workflows for the commit, or None."""
     runs = gh_json("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
-    times = [r["created_at"] for r in runs if r.get("event") in PULL_EVENTS]
-    return min(times) if times else fallback
+    times = [
+        run_["created_at"]
+        for run_ in runs
+        if run_.get("event") in PULL_EVENTS and any(p.get("number") == number for p in run_.get("pull_requests") or [])
+    ]
+    return min(times) if times else None
 
 
 def collect_commits(
@@ -372,8 +379,12 @@ def collect_commits(
     ]
     content = [i for i, c in enumerate(built) if not c.is_refresh]
     if content:
-        last = built[content[-1]]
-        built[content[-1]] = replace(last, arrived_at=server_arrival(repo, last.sha, last.arrived_at))
+        index = content[-1]
+        arrival = next(
+            (t for c in built[index:] if (t := server_arrival(repo, c.sha, number))),
+            pull["merged_at"],
+        )
+        built[index] = replace(built[index], arrived_at=arrival)
     return tuple(built)
 
 
