@@ -100,6 +100,7 @@ MERGE_GATE_WORKFLOWS = {
     "test.yml": RELEASE_TEST_WORKFLOW,
 }
 MERGE_GATE_SETUP_NAMES = {
+    "Install Python dependencies",
     "Checkout code",
     "Checkout repository",
     "Install dependencies",
@@ -143,6 +144,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "dist-artifact", "Verify source bundled binary manifest"): "scripts/bundled_binary_manifest.py",
     ("ci.yml", "dist-artifact", "Build wheel and sdist"): "scripts/verify_distribution_binaries.py",
     ("ci.yml", "ci-paths", "Check release content"): "release-check",
+    ("ci.yml", "comment-policy", "Enforce comment and docstring policy"): "comment-policy-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",

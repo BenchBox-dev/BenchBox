@@ -111,3 +111,14 @@ benchbox/_binaries/** @joeharris76
 benchbox/utils/binary_manifest.py @joeharris76
 scripts/bundled_binary_manifest.py @joeharris76
 scripts/verify_distribution_binaries.py @joeharris76
+quality/comment-policy.json @joeharris76
+quality/comment-policy-requirements.txt @joeharris76
+quality/comment-policy-package.json @joeharris76
+quality/comment-policy-package-lock.json @joeharris76
+scripts/check_comment_policy.py @joeharris76
+scripts/comment_syntax.py @joeharris76
+scripts/comment_syntax_js.cjs @joeharris76
+scripts/run_comment_policy.py @joeharris76
+scripts/comment_payloads.py @joeharris76
+scripts/comment_execution.py @joeharris76
+scripts/comment_policy_entry.py @joeharris76
