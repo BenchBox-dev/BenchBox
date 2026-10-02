@@ -16,7 +16,7 @@
     ],
     "platform_option_sources": {
       "credentials_path": "<redacted>",
-      "dataset_id": "saved_config",
+      "dataset_id": "dataset_a22167112980",
       "default_output_location": "path_d969e086da79",
       "force_recreate": "saved_config",
       "force_upload": "saved_config",
@@ -33,7 +33,7 @@
     },
     "platform_options": {
       "credentials_path": "<redacted>",
-      "dataset_id": "benchbox",
+      "dataset_id": "dataset_85fd478089fd",
       "default_output_location": "path_399fe063fc9e",
       "force_recreate": false,
       "force_upload": false,
@@ -996,7 +996,7 @@
     "config": {
       "cloud_provider": "GCP",
       "connection_mode": "remote",
-      "dataset_id": "tpch_sf01_notuning_noconstraints",
+      "dataset_id": "dataset_26d8ebf523ff",
       "driver_package": "google-cloud-bigquery",
       "driver_runtime_strategy": "current-process",
       "driver_version_actual": "3.45.1",
@@ -1013,7 +1013,7 @@
     "deployment": {
       "collection_status": "partial",
       "connection_mode": "remote",
-      "dataset": "tpch_sf01_notuning_noconstraints",
+      "dataset": "dataset_26d8ebf523ff",
       "deployment_type": "serverless",
       "endpoint_class": "cloud_endpoint",
       "metadata_source": "requested"
@@ -1025,7 +1025,7 @@
     "name": "BigQuery",
     "raw_config": {
       "credentials_path": "<redacted>",
-      "dataset_id": "tpch_sf01_notuning_noconstraints",
+      "dataset_id": "dataset_26d8ebf523ff",
       "job_priority": "INTERACTIVE",
       "location": "US",
       "project_id": "project_9d60772868dd",

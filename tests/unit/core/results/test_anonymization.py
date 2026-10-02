@@ -1521,3 +1521,23 @@ class TestCloudWarehouseAndOutputLocation:
         payload = {"platform": {"config": {"warehouse_id": "04851bf1f1d8ff51"}}}
         once = manager.anonymize_result_payload(payload)
         assert manager.anonymize_result_payload(once) == once
+
+    def test_cloud_namespace_fields_are_pseudonymised(self):
+        payload = {
+            "platform": {
+                "config": {
+                    "dataset_id": "tpch_sf1_notuning_noconstraints",
+                    "uc_catalog": "workspace",
+                    "uc_schema": "benchbox",
+                    "uc_volume": "data",
+                    "catalog": "duckdb",
+                }
+            }
+        }
+        config = AnonymizationManager().anonymize_result_payload(payload)["platform"]["config"]
+        assert config["dataset_id"].startswith("dataset_")
+        assert config["uc_catalog"].startswith("catalog_")
+        assert config["uc_schema"].startswith("schema_")
+        assert config["uc_volume"].startswith("volume_")
+        # Plain `catalog` carries an engine catalog type in local bundles; it stays readable.
+        assert config["catalog"] == "duckdb"

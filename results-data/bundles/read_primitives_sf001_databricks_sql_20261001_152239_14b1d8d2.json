@@ -30,9 +30,9 @@
       "staging_root": "path_d969e086da79",
       "status": "saved_config",
       "tuning_source": "saved_config",
-      "uc_catalog": "saved_config",
-      "uc_schema": "saved_config",
-      "uc_volume": "saved_config"
+      "uc_catalog": "catalog_a15321a9260b",
+      "uc_schema": "schema_ea670f1f4924",
+      "uc_volume": "volume_312df09bc4f2"
     },
     "platform_options": {
       "access_token": "<redacted>",
@@ -50,9 +50,9 @@
       "staging_root": "path_4c2bf9a41230",
       "status": "valid",
       "tuning_source": "baseline",
-      "uc_catalog": "workspace",
-      "uc_schema": "benchbox",
-      "uc_volume": "data"
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc"
     }
   },
   "cost": {
@@ -1046,9 +1046,9 @@
       "staging_root": "path_4c2bf9a41230",
       "table_format": "delta",
       "u_build_hash": "9dea94816c243d7b1977f03d2e6092ddedf725b6",
-      "uc_catalog": "workspace",
-      "uc_schema": "benchbox",
-      "uc_volume": "data",
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc",
       "warehouse_id": "warehouse_bc5f5094a483"
     },
     "deployment": {
@@ -1149,9 +1149,9 @@
       "table_format": "delta",
       "tuning_source": "baseline",
       "type": "databricks",
-      "uc_catalog": "workspace",
-      "uc_schema": "benchbox",
-      "uc_volume": "data",
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc",
       "warehouse_id": "warehouse_bc5f5094a483"
     },
     "raw_metadata": {
@@ -1181,9 +1181,9 @@
       "source": "requested",
       "staging_location": "path_4c2bf9a41230",
       "table_format": "delta",
-      "uc_catalog": "workspace",
-      "uc_schema": "benchbox",
-      "uc_volume": "data"
+      "uc_catalog": "catalog_f6e94f88499f",
+      "uc_schema": "schema_d4060c7297f6",
+      "uc_volume": "volume_bbf8fcf9dbbc"
     },
     "tuning": {
       "applied": {

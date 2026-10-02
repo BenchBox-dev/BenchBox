@@ -73,6 +73,13 @@ identifier_keys:
   clustername: cluster
   database: database
   databasename: database
+  # BigQuery datasets and Databricks Unity Catalog namespaces. Plain `catalog`
+  # is deliberately absent: local bundles use it for an engine catalog type.
+  dataset: dataset
+  datasetid: dataset
+  uccatalog: catalog
+  ucschema: schema
+  ucvolume: volume
   db: database
   dbname: database
   schema: schema
