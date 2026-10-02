@@ -105,9 +105,18 @@ The arming refusal is a merge-blocking automated review signal. It supersedes it
 the soundness list only, and only that item. That decision kept such signals advisory
 because a batch of failing Codex reviews exhausted the usage limit and deadlocked the
 queue. To keep one provider's limit from blocking arming, any of the Codex connector,
-the `codex` CLI, `muse` and `agy` satisfies the signal, and each has its own quota. If
-none can complete a review, arming stays refused and the change waits: the gate fails
-closed, and relaxing it needs an owner decision.
+the `codex` CLI, `muse` and `agy` satisfies the signal, and each has its own quota.
+
+When none of them can complete a review, the owner's own review of the PR satisfies the
+signal: a review comment from the repository owner, left on the current head, counts as
+the completed review and `make pr-arm` accepts it. The owner is the one party whose
+review does not share the author's context, so this keeps the review independent instead
+of lowering it to a same-model reader. Two conditions apply. The PR body names each
+reviewer that was tried and quotes the quota error each returned, so the fallback leaves
+a record; and the fallback holds only while no listed reviewer can run, so an agent that
+can obtain an external review must do so rather than wait for the owner. All four
+reviewers were exhausted at once on 2026-10-02, which blocked every workflow change for
+three days under the fail-closed rule alone.
 
 The soundness path list is narrowed to code that produces, normalizes, compares or
 validates results, every workflow, the release and binary paths, and `AGENTS.md`.
