@@ -20314,6 +20314,13 @@
       "status": "open",
       "title": "DECISION GATE (D-2): which constraint kinds become catalog-verifiable, and from which structured sources"
     },
+    "tuning-gate-local-result-anonymization-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "DECISION GATE (D-3): should the CLI's local result file be anonymized by default?"
+    },
     "tuning-gate-sort-evidence-model-20261001": {
       "claim": null,
       "needs": [],

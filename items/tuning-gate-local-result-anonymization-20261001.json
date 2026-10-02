@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Decision recorded naming the default and flag surface, confirming publish/export anonymization is unchanged."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan gate D-3 / task P5.3 (re-review R-7).",
+  "description": "## Problem\n`ResultExporter(anonymize=True)` is the default (`benchbox/core/results/exporter.py:105`). The CLI exports the user's *local* result anonymized, so receipt statements and reasons are redacted in the user's own file and there is no flag to disable it. The user cannot diagnose why tuning did not verify.\n\n## Options\n- **(A) Recommended.** Unanonymized local file; anonymize on publish / public export.\n- **(B)** Add `--no-anonymize`.\n- **(C)** Keep the default and print an unredacted console verification summary.\n\n## Guardrails\n- Publish and public export must keep full anonymization, including receipt statement/reason/error scrubbing.\n- Decide together with the public-anonymizer owners; AGENTS.md makes the anonymizer owner-reviewed.\n\n## Gate protocol\n- This is a decision record, not an implementation.\n- Implementation items that list this gate in `needs` must not start until it is done.\n- The decision owner is the maintainer.\n- Record the outcome as a dated ADR addendum (addenda only; do not rewrite recorded decisions) and paste the decision into this item's context before finishing.",
+  "links": [
+    "benchbox/core/results/exporter.py",
+    "benchbox/cli/commands/run.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:10:50Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f7d477844c724b3aabff070761e9a0b1",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
