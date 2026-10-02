@@ -296,7 +296,8 @@ This can change the SQL of these queries when the scale factor is not 1:
 | Scale factor | Queries whose SQL can differ |
 |--------------|------------------------------|
 | 0.01 and 0.1 | Q9, Q44, Q46, Q68 |
-| 10 and above | Q9, Q44, Q46, Q68, plus Q1, Q16, Q27, Q33, Q34, Q36, Q43, Q73 |
+| 10 | Q9, Q44, Q46, Q68, plus Q1, Q16, Q27, Q34, Q36, Q73 |
+| 100 and above | Q9, Q44, Q46, Q68, plus Q1, Q16, Q27, Q33, Q34, Q36, Q43, Q73 |
 
 For a given seed some of these queries can come out the same at both scales,
 because the random values they draw can coincide.
