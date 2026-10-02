@@ -3692,9 +3692,9 @@
     },
     "comment-cleanup-scope-policy": {
       "claim": {
-        "expires_at": "2026-10-02T18:30:47Z",
+        "expires_at": "2026-10-03T13:24:34Z",
         "generation": "156fcbc83256472cbfd96228b4b4df13",
-        "renewals": 0,
+        "renewals": 1,
         "worker": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b"
       },
       "needs": [],

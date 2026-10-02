@@ -96,6 +96,15 @@
       "op_id": "6a60cd2e2d6344359af77ed46f7d7b9b",
       "reason": "Holder a10c9ef4 is this Claude session's earlier MCP identity (took over 2026-10-01T00:04Z). Its generation now fails renew (E_CLAIM_STALE) and take (E_CONFLICT). User asked to renew and said proceed. No other agent works this item.",
       "session_id": "bec2d032574a4742968b229c90460810"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-02T13:24:34Z",
+      "client": "claude-code",
+      "generation": "156fcbc83256472cbfd96228b4b4df13",
+      "op": "renew",
+      "op_id": "7043ba6b0757488c8b019063d460a95c",
+      "session_id": "bec2d032574a4742968b229c90460810"
     }
   ]
 }
