@@ -20542,6 +20542,15 @@
       "status": "done",
       "title": "Applied-ledger capture for Snowpark session tuning"
     },
+    "tuning-sort-realized-by-ddl-no-drop-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-gate-ledger-outcome-vocabulary-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Stop recording 'sort not applied' when the platform realizes the sort through DDL (ClickHouse, StarRocks)"
+    },
     "tuning-soundness-test-coverage-20260712": {
       "claim": null,
       "needs": [

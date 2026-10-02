@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Unit tests: ClickHouse/StarRocks sort with registry ddl → no dropped intent; platform with neither → dropped; mode off → reason 'sorted_ingestion_mode=off'.",
+    "e2e (chDB): custom ClickHouse config with LINEITEM sort (L_ORDERKEY,L_LINENUMBER) + partition L_SHIPDATE and ORDERS sort (O_ORDERKEY,O_ORDERDATE), constraints disabled, produces zero dropped intents."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.2 (CRIT-1b(i), A1.7). Evidence: same chDB run had 3 corroborated catalog facts (orders/lineitem sort_key, lineitem partition_key toyyyymm(l_shipdate)) vetoed by 2 spurious drops.",
+  "description": "## Problem (reproduced on chDB)\nClickHouse (local, server, cloud) and StarRocks pass `tuning_config` to `DataLoader` (`clickhouse/workload.py:709-715`, `starrocks/workload.py:475-481`). After each load, the shared `SortedIngestionMixin.apply_ctas_sort` calls `_build_ctas_sort_sql`, gets `None` (default at `sorted_ingestion.py:429`), and records the dropped intent `sorted_ingestion <t> ORDER BY …` / \"ClickHouse Local does not support CTAS sort\" (`sorted_ingestion.py:144-152`). The sort was already realized by `ORDER BY` DDL and corroborated in the catalog, but any dropped intent vetoes `applied_verified`. ClickHouse can never verify.\n\nAlso, with the opt-in `sorted_ingestion_mode` off, Athena, Synapse, Snowflake and Databricks report the misleading reason \"does not support CTAS sort\".\n\n## Change\n- Make the capability registry state sorting `rendered_via=\"ddl\"` for ClickHouse and StarRocks.\n- When `_build_ctas_sort_sql` returns `None` and the registry says sorting renders via DDL, record nothing, or the D-6 non-blocking `satisfied_by`.\n- When the mode is off, the reason is `sorted_ingestion_mode=off`.\n\n## Guardrails (must preserve)\n- A sort requested on a platform that neither renders it via DDL nor CTAS still records a drop.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/platforms/base/sorted_ingestion.py",
+    "benchbox/core/tuning/capability_registry.py",
+    "benchbox/platforms/clickhouse/workload.py",
+    "benchbox/platforms/starrocks/workload.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:20:14Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d17a59f7a1a240039adf91c8671fdde9",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
