@@ -10664,14 +10664,34 @@ def q39_expression_impl(ctx: DataFrameContext) -> Any:
             col("d_moy").alias("inv2_moy"),
             col("mean").alias("inv2_mean"),
             col("cov").alias("inv2_cov"),
+            # A join drops the right-hand key columns; the SQL selects them, so join on copies.
+            col("inv_warehouse_sk").alias("_join_w_sk"),
+            col("inv_item_sk").alias("_join_i_sk"),
         ]
     )
 
-    return inv1.join(
-        inv2,
-        left_on=["inv1_w_sk", "inv1_i_sk"],
-        right_on=["inv2_w_sk", "inv2_i_sk"],
-    ).sort(["inv1_w_sk", "inv1_i_sk", "inv1_moy", "inv1_mean", "inv1_cov"])
+    return (
+        inv1.join(
+            inv2,
+            left_on=["inv1_w_sk", "inv1_i_sk"],
+            right_on=["_join_w_sk", "_join_i_sk"],
+        )
+        .select(
+            [
+                "inv1_w_sk",
+                "inv1_i_sk",
+                "inv1_moy",
+                "inv1_mean",
+                "inv1_cov",
+                "inv2_w_sk",
+                "inv2_i_sk",
+                "inv2_moy",
+                "inv2_mean",
+                "inv2_cov",
+            ]
+        )
+        .sort(["inv1_w_sk", "inv1_i_sk", "inv1_moy", "inv1_mean", "inv1_cov"])
+    )
 
 
 def q39_pandas_impl(ctx: DataFrameContext) -> Any:
