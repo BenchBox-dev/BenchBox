@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "benchbox/platforms/base/tuning_trust.py exists; adapter.py delegates to it; `uv run -- python -m pytest tests/unit/core/tuning tests/unit/platforms tests/integration/test_clickhouse_applied_ledger_live.py -q` passes unchanged.",
+    "`uv run -- python -c \"import sys; sys.path.insert(0,'_project/scripts'); from soundness_paths import is_soundness_path as s; assert all(s(p) for p in ['benchbox/core/tuning/introspection.py','benchbox/core/tuning/applied_ledger.py','benchbox/core/tuning/capability_registry.py','benchbox/core/tuning/metadata.py','benchbox/platforms/duckdb_introspection.py','benchbox/platforms/snowflake_introspection.py','benchbox/platforms/clickhouse/introspection.py','benchbox/platforms/base/tuning_trust.py'])\"` exits 0.",
+    "PR body contains a `Soundness review:` section from codex, muse or agy, with all Critical/Required findings resolved."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P0.4 (finding A1.14; plan review F8). Every later item that touches these paths carries the soundness guardrail.",
+  "description": "## Problem\nThe trust-critical tuning files are **not** listed in `.github/soundness-paths.txt` (kinds `file|glob|prefix|regex`, read by `_project/scripts/soundness_paths.py`). Only `benchbox/platforms/base/result_capture.py` is. Unlisted files:\n- `benchbox/core/tuning/introspection.py`;\n- `applied_ledger.py`;\n- `capability_registry.py`;\n- `metadata.py`;\n- `platforms/*_introspection.py`;\n- `platforms/clickhouse/introspection.py`;\n- the corroboration code in `platforms/base/adapter.py`.\n\nChanges to verification logic can therefore auto-merge without the external soundness review AGENTS.md requires.\n\n## Change\n1. **Preparatory refactor, no behavior change:** move `_corroborate_applied_ledger`, `_fold_layout_operations_into_ledger`, `_attach_applied_ledger_payload`, `_build_drift_check_payload` and the ledger read-back from `platforms/base/adapter.py` into a new module `benchbox/platforms/base/tuning_trust.py`. A manifest \"region\" is not expressible (plan review F8), and listing all of `adapter.py` would put most adapter PRs under soundness review.\n2. Add manifest entries for:\n   - `benchbox/core/tuning/introspection.py`, `applied_ledger.py`, `capability_registry.py` and `metadata.py`;\n   - glob `benchbox/platforms/*_introspection.py`;\n   - `benchbox/platforms/clickhouse/introspection.py`;\n   - `benchbox/platforms/base/tuning_trust.py`.\n\n## Guardrails (must preserve)\n- The refactor is behavior-identical. The existing tuning unit and integration suites pass unchanged.\n- This PR edits a manifest path itself, so it needs its own external `Soundness review:`.\n\n## Do not\n- Do not list all of `adapter.py`. That makes nearly every adapter PR soundness-gated; extract instead.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    ".github/soundness-paths.txt",
+    "_project/scripts/soundness_paths.py",
+    "benchbox/platforms/base/adapter.py",
+    "AGENTS.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:14:42Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c88c178933584b24b287596b1307d81a",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}

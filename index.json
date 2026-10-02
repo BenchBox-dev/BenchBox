@@ -20510,6 +20510,13 @@
       "status": "done",
       "title": "Ship discoverable tuning templates with the installed package"
     },
+    "tuning-trust-paths-soundness-manifest-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the tuning trust-path files soundness-manifest paths (extract corroboration out of adapter.py first)"
+    },
     "tuning-verification-footprint-duckdb-clickhouse-20260722": {
       "claim": null,
       "needs": [],
