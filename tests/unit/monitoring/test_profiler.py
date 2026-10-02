@@ -27,8 +27,7 @@ pytestmark = [
 ]
 
 
-def _time_with(**overrides):
-    """Stand-in for one module's `time` name: the named functions are replaced, the rest is the real module."""
+def _real_time_with(**overrides):
     return SimpleNamespace(**{**vars(time), **overrides})
 
 
@@ -462,7 +461,7 @@ class TestEnhancedResourceProfiler:
         profiler._prev_net_recv = 2_000_000
 
         with (
-            patch("benchbox.monitoring.profiler.time", _time_with(time=lambda: 1000.0)),
+            patch("benchbox.monitoring.profiler.time", _real_time_with(time=lambda: 1000.0)),
             patch("benchbox.monitoring.profiler.mono_time", return_value=12.0),
         ):
             sample = profiler._collect_sample()

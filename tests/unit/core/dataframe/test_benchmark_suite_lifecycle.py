@@ -53,8 +53,7 @@ pytestmark = [
 ]
 
 
-def _time_with(**overrides):
-    """Stand-in for one module's `time` name: the named functions are replaced, the rest is the real module."""
+def _real_time_with(**overrides):
     return SimpleNamespace(**{**vars(time), **overrides})
 
 
@@ -1258,7 +1257,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
             def fetchall(self):
                 return [(1,), (2,)]
 
-        with patch(SUITE_TIME, _time_with(perf_counter=iter([1.0, 1.1, 2.0, 2.4]).__next__)):
+        with patch(SUITE_TIME, _real_time_with(perf_counter=iter([1.0, 1.1, 2.0, 2.4]).__next__)):
             avg_ms, row_count = bm._warmup_and_benchmark(FakeConnection(), "SELECT 1")
 
         assert avg_ms == pytest.approx(250.0)
@@ -1283,7 +1282,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
 
         with (
             patch("benchbox.platforms.get_dataframe_adapter", return_value=fake_adapter),
-            patch(SUITE_TIME, _time_with(perf_counter=iter([1.0, 1.2, 2.0, 2.3]).__next__)),
+            patch(SUITE_TIME, _real_time_with(perf_counter=iter([1.0, 1.2, 2.0, 2.3]).__next__)),
         ):
             avg_ms, row_count = bm._run_df_query("Q1", "polars-df", tmp_path)
 

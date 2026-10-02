@@ -80,7 +80,6 @@ class TestAccessTokenCaching:
             _token("tok-A", expires_at=1000),
             _token("tok-B", expires_at=9999999999),
         ]
-        # Replace the module's own `time` name, not the process-wide time module.
         now = {"value": 500}
         monkeypatch.setattr(credentials_module, "time", SimpleNamespace(time=lambda: now["value"]))
         assert provider.access_token() == "tok-A"
