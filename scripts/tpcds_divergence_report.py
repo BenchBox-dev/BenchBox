@@ -74,10 +74,12 @@ _ORDER_KEY = re.compile(
     r"ORDER BY key mismatch at position (\d+)\. Original key: (.*?), Variant key: (.*?) \(order-key", re.S
 )
 _VALUE = re.compile(
-    r"Value mismatch at row (\d+), column (\d+)\. Original: (.*?), Variant: (.*?)(?:, Tolerance:|$)", re.S
+    r"Value mismatch at row (\d+), column (\d+)\. Original: (.*?), Variant: (.*?)(?:, Tolerance:|; also columns|$)",
+    re.S,
 )
 _ROW_COUNT = re.compile(r"Row count mismatch\. Original: (\d+), Variant: (\d+)")
 _COLUMN_COUNT = re.compile(r"Column count mismatch")
+_HARNESS_FAILURES = ("error:", "reference query failed:")
 _NUMBER = re.compile(r"^-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?$")
 
 
@@ -197,7 +199,11 @@ def _run_cell(
     except Exception as exc:  # noqa: BLE001 - a comparison that raises is a result, not a crash
         return "error", f"{type(exc).__name__}: {exc}"
     if divergences:
-        return "divergent", divergences[0].detail
+        detail = divergences[0].detail
+        # The harness catches execution failures itself and reports them as divergences with these prefixes.
+        if detail.startswith(_HARNESS_FAILURES):
+            return "error", detail
+        return "divergent", detail
     return "match", ""
 
 
@@ -266,9 +272,9 @@ def collect(scale: float, *, queries: Sequence[str] | None = None, repeat: int =
     return cells
 
 
-def render_markdown(cells: Sequence[Cell]) -> str:
+def render_markdown(cells: Sequence[Cell], scales: Sequence[float] = ()) -> str:
     lines = ["# TPC-DS divergence report", ""]
-    for scale in sorted({cell.scale for cell in cells}):
+    for scale in sorted({cell.scale for cell in cells} | set(scales)):
         subset = [cell for cell in cells if cell.scale == scale]
         counts = Counter(cell.cause for cell in subset)
         lines += [
@@ -295,10 +301,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--json", type=Path, help="write the JSON report here")
     args = parser.parse_args(argv)
 
+    scales = args.scale or [0.03, 0.1]
     cells: list[Cell] = []
-    for scale in args.scale or [0.03, 0.1]:
+    for scale in scales:
         cells.extend(collect(scale, queries=args.query, repeat=args.repeat))
-    markdown = render_markdown(cells)
+    markdown = render_markdown(cells, scales)
     if args.out:
         args.out.write_text(markdown + "\n", encoding="utf-8")
     else:

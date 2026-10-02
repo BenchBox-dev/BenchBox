@@ -13,6 +13,7 @@ from tpcds_divergence_report import (
     UNBOUND,
     UNCLASSIFIED,
     Cell,
+    _run_cell,
     classify_cell,
     label_detail,
     render_markdown,
@@ -106,3 +107,54 @@ def test_the_report_lists_each_cell_with_its_full_evidence():
     assert "## Scale factor 0.1" in report
     assert "| Q11 | pandas | divergent | row count/logic | 88 rows against 0 |" in report
     assert "Original: 88, Variant: 0 \\| pipe" in report
+
+
+def test_a_value_mismatch_followed_by_extra_columns_is_still_read():
+    detail = "Q66.0: Value mismatch at row 0, column 8. Original: 8288141.53, Variant: 238632.13; also columns [9, 10]"
+
+    assert label_detail(detail)[0] == ROW_COUNT_LOGIC
+    near = "Q9.0: Value mismatch at row 0, column 1. Original: 5.0000000001, Variant: 5.0000000002, Tolerance: 1e-10; also columns [2]"
+    assert label_detail(near)[0] == DECIMAL_FLOAT
+
+
+def test_a_scale_with_no_divergences_is_still_in_the_report():
+    report = render_markdown([], [0.03])
+
+    assert "## Scale factor 0.03" in report
+    assert "no divergent cells" in report
+
+
+class _Divergence:
+    def __init__(self, detail):
+        self.detail = detail
+
+
+class _Harness:
+    def __init__(self, detail):
+        self._detail = detail
+
+    def find_cross_surface_divergences(self, *_args, **_kwargs):
+        return [_Divergence(self._detail)] if self._detail else []
+
+
+class _Data:
+    connection = None
+    reference_sql = None
+
+
+class _Gate:
+    def build_validator(self):
+        return None
+
+
+@pytest.mark.parametrize("detail", ["error: boom", "reference query failed: no such table"])
+def test_failures_the_harness_captured_are_errors_not_divergences(detail):
+    status, text = _run_cell(_Harness(detail), _Gate(), _Data(), None, "1", "pandas", None)
+
+    assert (status, text) == ("error", detail)
+
+
+def test_a_real_divergence_is_still_divergent():
+    status, _ = _run_cell(_Harness(ORDER_KEY_NULL), _Gate(), _Data(), None, "71", "pandas", None)
+
+    assert status == "divergent"
