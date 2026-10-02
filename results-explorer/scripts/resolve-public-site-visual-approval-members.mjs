@@ -3,22 +3,12 @@
 
 import { appendFile } from "node:fs/promises";
 
-import { mergeGroupPullRequests } from "./public-site-visual-approval-members.mjs";
+import { createGithubGet, mergeGroupPullRequests } from "./public-site-visual-approval-members.mjs";
 
 const event = process.env.APPROVAL_EVENT ?? "";
 const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
 
-async function github(path) {
-  const response = await fetch(`${apiUrl}${path}`, {
-    headers: {
-      Accept: "application/vnd.github+json",
-      Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-  if (!response.ok) throw new Error(`GitHub API ${response.status} for ${path}`);
-  return response.json();
-}
+const github = createGithubGet({ token: process.env.GITHUB_TOKEN, apiUrl });
 
 let pullRequests = [];
 try {

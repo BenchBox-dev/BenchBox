@@ -140,8 +140,9 @@ full (a commit without a PR number, a truncated or failed comparison), no PR is
 named and no digest approval applies, though the comparison itself still runs.
 
 The member list comes from the GitHub compare API and is retried a few times
-on a network failure, a rate limit or a server error (never on a client error
-such as 403 or 404), so one transient blip does not eject an approved group. It
+on a network failure, a rate limit (an HTTP 429, or a 403 carrying rate-limit
+headers) or a 5xx server error, but never on another client error such as a plain
+403 or 404, so one transient blip does not eject an approved group. It
 relies on the queue's merge method being `SQUASH`, which makes GitHub write each
 commit's trailing `(#<number>)` itself; `scripts/ruleset_drift_check.py` pins that
 method, and a rebase or merge-commit queue would let an author set the subject.

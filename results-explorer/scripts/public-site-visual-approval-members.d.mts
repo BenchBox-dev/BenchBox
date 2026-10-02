@@ -4,6 +4,12 @@ export const RETRY_BASE_DELAY_MS: number;
 
 export type GithubGet = (path: string) => Promise<any>;
 
+export function createGithubGet(options: {
+  token: string | undefined;
+  apiUrl?: string;
+  fetchImpl?: (url: string, init?: any) => Promise<any>;
+}): GithubGet;
+
 export function isTransientGithubError(error: unknown): boolean;
 
 export function withRetries<T>(

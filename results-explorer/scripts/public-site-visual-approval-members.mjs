@@ -40,6 +40,30 @@ export async function withRetries(operation, { sleep = (ms) => new Promise((reso
   }
 }
 
+/**
+ * A `github(path)` function for the REST API. GitHub reports a spent rate limit as 429, or as 403 with
+ * rate-limit headers, so both are raised as a 429 error a retry can cure; any other 403 stays a client error.
+ */
+export function createGithubGet({ token, apiUrl = "https://api.github.com", fetchImpl = globalThis.fetch }) {
+  return async function github(path) {
+    const response = await fetchImpl(`${apiUrl}${path}`, {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
+    if (!response.ok) {
+      const header = (name) => response.headers?.get?.(name) ?? null;
+      const limited =
+        response.status === 429 ||
+        (response.status === 403 && (header("x-ratelimit-remaining") === "0" || header("retry-after") !== null));
+      throw new Error(`GitHub API ${limited ? 429 : response.status} for ${path}${limited ? " (rate limited)" : ""}`);
+    }
+    return response.json();
+  };
+}
+
 /** The pull request number GitHub appends to a squashed commit's subject, or "" when there is none. */
 export function pullRequestFromCommitMessage(message) {
   const subject = String(message ?? "").split("\n", 1)[0].trimEnd();

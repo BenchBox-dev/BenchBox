@@ -264,6 +264,14 @@ def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
     assert "test:e2e:public-site" in package["scripts"]
     assert "e2e/captures/public-site-pages.spec.ts" in package["scripts"]["test:e2e:public-site"]
 
+    # The gate's capture and compare steps call Playwright directly, not through the package script, so a
+    # change to package.json (which is not a soundness path) cannot turn the check into a no-op.
+    direct = "npx playwright test --project=chromium --workers=1 e2e/captures/public-site-pages.spec.ts"
+    for workflow_path in (DOCS_WORKFLOW, REPO_ROOT / ".github" / "workflows" / "ci.yml"):
+        text = workflow_path.read_text(encoding="utf-8")
+        assert "npm run test:e2e:public-site" not in text, workflow_path.name
+        assert text.count(f"run: {direct}") == 2, workflow_path.name
+
 
 def test_public_results_capture_waits_for_data_before_digesting() -> None:
     source = CAPTURE_SPEC.read_text(encoding="utf-8")

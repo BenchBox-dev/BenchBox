@@ -92,11 +92,6 @@ export function pullRequestNumbers(list: string | undefined): string[] {
 }
 
 /**
- * Whether one of the covered pull requests has a recorded entry for exactly this change. The digest
- * covers the whole change in the run, so a merge group in which several PRs change what renders
- * matches no single PR's entry and fails closed: those PRs must land one at a time.
- */
-/**
  * The text a maintainer needs to record an approval: the entry for each covered pull request. In a merge
  * group, record the entry for the PR that introduces the visual change, not for another member.
  */
@@ -108,6 +103,11 @@ export function approvalEntryHint(changeDigest: string, pullRequests: string | u
   return `approval entry, one of: ${entries.join(" | ")} (record the entry for the pull request that introduces this visual change)`;
 }
 
+/**
+ * Whether one of the covered pull requests has a recorded entry for exactly this change. The digest
+ * covers the whole change in the run, so a merge group in which several PRs change what renders
+ * matches no single PR's entry and fails closed: those PRs must land one at a time.
+ */
 export function hasChangeDigestVisualApproval(approval: VisualApproval | undefined, changeDigest: string): boolean {
   if (!approval || changeDigest.length === 0) return false;
   const reason = approval.changeReason?.trim() ?? "";

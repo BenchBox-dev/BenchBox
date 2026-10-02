@@ -3,6 +3,7 @@ import {
   MAX_ATTEMPTS,
   MAX_GROUP_COMMITS,
   RETRY_BASE_DELAY_MS,
+  createGithubGet,
   isTransientGithubError,
   mergeGroupPullRequests,
   pullRequestFromCommitMessage,
@@ -203,7 +204,7 @@ describe("mergeGroupPullRequests retries", () => {
     expect(github).toHaveBeenCalledTimes(2);
   });
 
-  it("still names nothing when the lookup keeps failing", async () => {
+  it("surfaces the last transient error to the caller after exhausting retries", async () => {
     const github = vi.fn(async () => {
       throw new Error("GitHub API 503 for /compare");
     });
@@ -211,5 +212,57 @@ describe("mergeGroupPullRequests retries", () => {
       "503",
     );
     expect(github).toHaveBeenCalledTimes(MAX_ATTEMPTS);
+  });
+});
+
+describe("createGithubGet", () => {
+  const reply = (status: number, headers: Record<string, string> = {}, body: unknown = {}) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (name: string) => headers[name.toLowerCase()] ?? null },
+    json: async () => body,
+  });
+  const getWith = (response: ReturnType<typeof reply>) => {
+    const fetchImpl = vi.fn(async (_url: string, _init?: any) => response);
+    return { fetchImpl, github: createGithubGet({ token: "secret-token", apiUrl: "https://api.example", fetchImpl }) };
+  };
+
+  it("returns the JSON body and sends the token and API version", async () => {
+    const { github, fetchImpl } = getWith(reply(200, {}, { status: "ahead" }));
+    expect(await github("/repos/o/r/compare/a...b")).toEqual({ status: "ahead" });
+    const [url, init] = fetchImpl.mock.calls[0]!;
+    expect(url).toBe("https://api.example/repos/o/r/compare/a...b");
+    expect(init.headers.Authorization).toBe("Bearer secret-token");
+    expect(init.headers["X-GitHub-Api-Version"]).toBe("2022-11-28");
+  });
+
+  it.each([
+    ["a 429", 429, {}],
+    ["a 403 whose rate limit is spent", 403, { "x-ratelimit-remaining": "0" }],
+    ["a 403 with a retry-after", 403, { "retry-after": "30" }],
+  ])("raises %s as a retryable rate-limit error", async (_label, status, headers) => {
+    const { github } = getWith(reply(status, headers));
+    const error = await github("/x").catch((caught) => caught);
+    expect(error.message).toBe("GitHub API 429 for /x (rate limited)");
+    expect(isTransientGithubError(error)).toBe(true);
+  });
+
+  it.each([
+    ["a 403 with calls remaining", 403, { "x-ratelimit-remaining": "4999" }],
+    ["a bare 403", 403, {}],
+    ["a 404", 404, {}],
+    ["a 422", 422, {}],
+  ])("keeps %s a permanent client error", async (_label, status, headers) => {
+    const { github } = getWith(reply(status, headers));
+    const error = await github("/x").catch((caught) => caught);
+    expect(error.message).toBe(`GitHub API ${status} for /x`);
+    expect(isTransientGithubError(error)).toBe(false);
+  });
+
+  it("raises a 5xx as a retryable error and never puts the token in an error message", async () => {
+    const { github } = getWith(reply(503));
+    const error = await github("/x").catch((caught) => caught);
+    expect(isTransientGithubError(error)).toBe(true);
+    expect(error.message).not.toContain("secret-token");
   });
 });

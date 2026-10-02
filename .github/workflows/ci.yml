@@ -2079,7 +2079,7 @@ jobs:
           PUBLIC_SITE_VISUAL_PHASE: capture
           PUBLIC_SITE_VISUAL_OUTPUT: ${{ runner.temp }}/public-site-visual-current
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
-        run: npm run test:e2e:public-site
+        run: npx playwright test --project=chromium --workers=1 e2e/captures/public-site-pages.spec.ts
         working-directory: results-explorer
 
       # A merge-queue follower's base is the head of the group ahead of it. That
@@ -2137,7 +2137,7 @@ jobs:
           # The approval is bound to pull request numbers: the PR's own, or every PR with a commit in the merge
           # group, because a group can compose several PRs while its branch name carries only the last one.
           VISUAL_APPROVAL_PULL_REQUESTS: ${{ steps.approval_members.outputs.pull_requests }}
-        run: npm run test:e2e:public-site
+        run: npx playwright test --project=chromium --workers=1 e2e/captures/public-site-pages.spec.ts
         working-directory: results-explorer
 
       - name: Upload protected-develop visual baseline
