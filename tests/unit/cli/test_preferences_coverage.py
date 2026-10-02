@@ -15,6 +15,20 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
+NOW = datetime(2026, 1, 15, 12, 0, 0)
+
+
+@pytest.fixture(autouse=True)
+def _preferences_wallclock(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Freeze only this consumer's audit/age clock, never pytest watchdogs."""
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return NOW if tz is None else NOW.replace(tzinfo=tz)
+
+    monkeypatch.setattr(prefs, "datetime", FixedDatetime)
+
 
 def test_safe_yaml_load_valid_and_invalid_types(tmp_path: Path) -> None:
     p = tmp_path / "ok.yaml"
@@ -114,7 +128,7 @@ def test_format_last_run_summary_paths_and_age(monkeypatch: pytest.MonkeyPatch, 
         "table_mode": "external",
         "concurrency": 4,
         "iterations": 5,
-        "timestamp": (datetime.now() - timedelta(minutes=2)).isoformat(),
+        "timestamp": (NOW - timedelta(minutes=2)).isoformat(),
     }
     out = prefs.format_last_run_summary(config)
     assert "TPCH on DUCKDB" in out

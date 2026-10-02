@@ -98,8 +98,9 @@ def test_prose_only_omits_cname_and_404(tmp_path: Path) -> None:
     assert (site_dir / "404.html").is_file()
 
 
-@pytest.mark.parametrize("destination", [Path("/"), Path.home()])
-def test_refuses_broad_output_directories(tmp_path: Path, destination: Path) -> None:
+@pytest.mark.parametrize("destination", [Path("/"), None])
+def test_refuses_broad_output_directories(tmp_path: Path, destination: Path | None) -> None:
+    destination = Path.home() if destination is None else destination
     _pages_inputs(tmp_path)
 
     with pytest.raises(ValueError, match="refusing unsafe site output directory"):
