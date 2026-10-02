@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A release or docs note states the change",
+    "Baseline records mention it where relevant",
+    "Results outside the repository are checked and the outcome is recorded"
+  ],
+  "description": "After #2509, get_all_queries renders SQL at the data's scale factor, so runs at SF other than 1 use different dsqgen values than before. Add a user-facing note and a note in the baseline records, and check whether stored results outside the repository depend on the old behaviour.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:34:39Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2d9a74e241c54e2dbd69a6d84b2737d9",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}

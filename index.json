@@ -6094,6 +6094,15 @@
       "status": "open",
       "title": "Fix CI fragility found during the parity work"
     },
+    "dfparity-n08-render-scale-user-note": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Note that standard TPC-DS runs at SF other than 1 now render at the data scale, and check results kept outside the repository"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [
