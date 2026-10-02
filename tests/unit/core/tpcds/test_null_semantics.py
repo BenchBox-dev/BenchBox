@@ -11,7 +11,7 @@ from datetime import date
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 FAMILIES = ["expression", "pandas"]
 
