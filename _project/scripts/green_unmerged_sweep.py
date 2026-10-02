@@ -375,7 +375,7 @@ def build_digest(
     lines.append("")
     lines.append(
         "This sweep never enables auto-merge itself (and must not re-arm a hold it did not set). "
-        "When the branch is final, arm via `make pr-ready` (or `make pr-open READY=1`, or draft → "
+        "When the branch is final, arm via `make pr-arm` (or `make pr-open READY=1`, or draft → "
         "ready). Do **not** re-push expecting `synchronize` to re-arm -- that path no longer "
         "enables auto-merge. To hold a non-draft intentionally, apply "
         f"the `{AUTO_MERGE_HOLD_LABEL}` label (or convert to draft). See docs/operations/pr-triage.md."
