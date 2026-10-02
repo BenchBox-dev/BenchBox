@@ -1,7 +1,7 @@
 """Tests for ``DSQGenBinary.generate_with_parameters``: rendering a query with explicit values.
 
 Values are keyed by the names dsqgen's ``-LOG`` writes (``YEAR.01``). The round-trip test renders
-a seed for every one of the 99 queries, reads its ``-LOG`` values, renders again from those values
+a seed for every one of the 99 queries and every variant template, reads its ``-LOG`` values, renders again from those values
 with a different seed, and requires the same SQL, so it pins that the explicit values fully determine
 the substitutions.
 """
@@ -63,7 +63,10 @@ def test_multi_part_variant_selects_its_part(dsqgen):
     assert sql != dsqgen.generate_with_parameters("39b", {"YEAR.01": 2001, "MONTH.01": 1})
 
 
-@pytest.mark.parametrize("query_id", range(1, 100))
+VARIANT_QUERY_IDS = ["5a", "10a", "14a", "18a", "22a", "27a", "35a", "36a", "51a", "67a", "70a", "77a", "80a", "86a"]
+
+
+@pytest.mark.parametrize("query_id", [*range(1, 100), *VARIANT_QUERY_IDS])
 def test_values_from_a_seed_reproduce_that_seed(dsqgen, query_id):
     values = dsqgen.generate_parameter_log(query_id, seed=7, scale_factor=1.0).substitutions
     reference = dsqgen.generate(query_id, seed=7)
