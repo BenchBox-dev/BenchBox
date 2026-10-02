@@ -2233,6 +2233,13 @@
       "status": "done",
       "title": "CI savings reviews must account for same-event workflow fan-out"
     },
+    "ci-soundness-flag-stale-base": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Compare soundness-flag against the merge commit's first parent, not the stale event base"
+    },
     "ci-visual-baseline-queue-follower-gap": {
       "claim": null,
       "needs": [],

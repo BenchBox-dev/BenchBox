@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "For a pull_request event whose target branch has moved since the event, soundness-flag charges only the pull request's own changes: a test with a stale event base and a newer first parent passes for a pull request that touches no soundness path and still fails for one that does.",
+    "The event base remains the trust root for the soundness predicate files, and a base that is not an ancestor of the merge commit's first parent fails closed.",
+    "Merge-group behavior is unchanged and covered by its existing tests.",
+    "The change passes an independent external soundness review with the receipt linked in the pull request body, and is merged by the repository owner."
+  ],
+  "context": "Created 2026-10-02 from delivery plan v2 (foundation step F2). It is outside the comment-cleanup program; the same fix was made for the comment-policy job in PR 2469.",
+  "description": "The repository's `soundness-flag` job in .github/workflows/ci.yml diffs `${BASE_SHA}...HEAD`, where BASE_SHA is the base commit from the pull request event and HEAD is the merge ref that GitHub builds on the current target tip. When the target branch has moved since the event, files other pull requests changed in between are charged to this one, so a pull request that touches no soundness path fails with \"PR body must contain a 'Soundness review:' section\" until it is rebased. This happened twice on 2026-10-01 and 2026-10-02 (two comment-cleanup pull requests) and recurs whenever develop moves during a pull request's CI; develop merges about 18 pull requests a day.\n\nFix: for `pull_request` events, compare against the first parent of the merge commit the job checks out, and require the event base to be an ancestor of it, as the `comment-policy` job's launcher does (scripts/run_comment_policy.py `comparison_base`); keep the event base as the trust root for the soundness files and predicates, keep merge-group behavior unchanged, and add a regression test with a stale event base (a real two-parent merge commit whose first parent is newer than the event base).\n\n.github/workflows/ci.yml and the soundness predicate are soundness-manifest paths: an external review (codex, muse or agy) with a `Soundness review:` section and the repository owner's manual merge are required.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:10a393f7979d1bf94a9c7e8b",
+      "at": "2026-10-02T13:33:23Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4f2dc3b5270b45429e464b49447eb861",
+      "session_id": "bec2d032574a4742968b229c90460810"
+    }
+  ]
+}
