@@ -73,6 +73,31 @@ two-layer safety contract:
 The repository's code-owner review setting remains configured but is not solely relied
 upon as the authorization mechanism.
 
+Amended 2026-10-02: the external review stays, but a PR-body attestation checked by CI
+will no longer bind it. The author of a change writes its own attestation, so the check
+can only test that the text is present; it never tests the review. The review binds
+through three controls that the author cannot relax:
+
+1. Review findings. The external reviewer's Critical and High findings are posted as PR
+   review threads, and the ruleset requires every thread to be resolved before a merge
+   (`required_review_thread_resolution`).
+2. Review signal at arming. For changes on the narrowed soundness path list, `make
+   pr-arm` refuses until a completed review is visible on the current head: the Codex
+   connector's submitted review or thumbs-up reaction, or a posted external review. An
+   "eyes" reaction alone means the review has started, not finished.
+3. Post-merge digest. A scheduled report lists the commits that reached `develop` on the
+   narrowed paths, records which review signal each had at merge, and opens a tracker
+   item for each one with none. An agent then runs the external review and either
+   records a clean result or opens a fix or revert PR.
+
+The soundness path list is narrowed to code that produces, normalizes, compares or
+validates results, every workflow, the release and binary paths, and `AGENTS.md`.
+Documentation, decision records, runbooks and threat models leave the list, because a
+review of prose gives no protection against a wrong result. The CI detection layer and
+the external review requirement are unchanged. The arming refusal, the digest and the
+narrowed list land in separate changes; until the attestation check is removed from
+`ci.yml`, a PR on a soundness path must still carry a valid `Soundness review:` section.
+
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
 Agent workspace safety tooling is retained:
