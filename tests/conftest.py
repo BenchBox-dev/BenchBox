@@ -30,8 +30,9 @@ from typing import Any
 
 import pytest
 
-from benchbox.utils.config_interface import set_config_provider
-from benchbox.utils.printing import set_quiet
+pytest.register_assert_rewrite("tests.utilities.leak_detector")
+from tests.utilities.leak_detector import restore_global
+from tests.utilities.session_isolation import active as isolated_session_active
 
 # Sphinx 11 deprecations in third-party extensions (sphinx_tags, myst_parser, ablog, napoleon).
 # Guarded because older Sphinx versions (e.g. on Python 3.10) lack this class,
@@ -51,6 +52,7 @@ pytest_plugins = [
     "tests.fixtures.result_dict_fixtures",
     "tests.fixtures.platform_fixtures",
     "tests.fixtures.utility_fixtures",
+    "tests.utilities.leak_detector",
 ]
 
 
@@ -121,6 +123,8 @@ def _should_acquire_test_lock(config: pytest.Config) -> bool:
     process locks), when parallelism is disabled (-n 0 / no numprocesses), or
     when BENCHBOX_SKIP_TEST_LOCK is set in the environment.
     """
+    if isolated_session_active():
+        return False  # early plugin acquired or verified the real shared lock
     if hasattr(config, "workerinput"):
         return False  # xdist worker - the controller holds the lock on our behalf
     if os.environ.get("BENCHBOX_SKIP_TEST_LOCK"):
@@ -403,59 +407,26 @@ def pytest_collection_finish(session) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_quiet_state():
-    """Never let benchbox's global quiet flag leak across tests.
+def _reset_global_quiet_state(request, _hermetic_state):
+    """Retain the quiet-state safety net without erasing leak evidence.
 
-    benchbox.utils.printing keeps module-global output state (_QUIET) that
-    tests toggle via set_quiet(True). A test that fails, times out, or forgets
-    its reset between set_quiet(True) and its cleanup poisons every later
-    test in the same xdist worker: emit() routes to the sink console and
-    capsys sees ''. Observed live on develop-post-merge run 28706929881,
-    where test_display_results failed with CaptureResult(out='') under -n 5
-    while passing in isolation (medium-tier-red-disposition-and-promotion).
-    Resetting AFTER each test (post-yield) contains the blast radius to the
-    leaking test itself.
-
-    ``set_quiet`` is imported at module scope (not lazily here in the
-    teardown body): this fixture is autouse, so its teardown runs after
-    EVERY test, including one that monkeypatches ``builtins.__import__``
-    for the duration of its own test body (e.g. the vortex-converter
-    "missing module" test). A lazy import here would route through that
-    patched ``__import__`` and raise the OTHER test's synthetic
-    ImportError, misattributed to this fixture's teardown, whenever pytest's
-    fixture-teardown ordering runs this after monkeypatch's own finalizer
-    (order is topology-dependent, hence intermittent). Importing once at
-    module load time, before any test's monkeypatch is active, avoids the
-    race entirely.
+    Checked unit tests defer restoration to the outer teardown hook, after
+    every fixture has cleaned up. Raw module access avoids imports while a
+    test still owns a patched import function.
     """
     yield
-    set_quiet(False)
+    restore_global(request.node, "benchbox.utils.printing", "_QUIET", False)
 
 
 @pytest.fixture(autouse=True)
-def _reset_global_config_provider():
-    """Never let the CLI's config provider leak across tests.
+def _reset_global_config_provider(request, _hermetic_state):
+    """Retain provider isolation using its raw identity, never a default getter.
 
-    benchbox.utils.config_interface keeps a process-global provider that the
-    CLI installs from its group callback (install_cli_config_provider, added
-    with the utils -> cli dependency inversion in #1556). Any test that invokes
-    a CLI subcommand therefore makes CLIConfigProvider -- backed by a real
-    ConfigManager reading ~/.benchbox/config.yaml -- the provider for every
-    LATER test in the same xdist worker. A test that then builds an
-    ExecutionConfigHelper() or an execution manager without passing
-    config_manager silently reads the developer's real config instead of
-    SimpleConfigProvider's documented defaults, and does so only when it
-    happens to be scheduled after a CLI test on that worker.
-
-    Resetting AFTER each test (post-yield) mirrors _reset_global_quiet_state
-    and contains the blast radius to the leaking test itself.
-
-    ``set_config_provider`` is imported at module scope for the same reason
-    that fixture documents: this teardown runs after EVERY test, including
-    tests that monkeypatch ``builtins.__import__`` for their own duration.
+    The outer teardown hook checks before restoring the provider for unit
+    tests. Other test tiers keep the existing unconditional reset.
     """
     yield
-    set_config_provider(None)
+    restore_global(request.node, "benchbox.utils.config_interface", "_config_provider", None)
 
 
 def pytest_sessionfinish(session, exitstatus) -> None:

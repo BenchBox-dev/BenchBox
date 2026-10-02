@@ -196,7 +196,7 @@ class TestPandasFamilyFactory:
             adapter = get_dataframe_adapter("cudf-df")
             assert adapter is not None
 
-    def test_dask_df_in_factory_mapping(self):
+    def test_dask_df_in_factory_mapping(self, monkeypatch):
         """Test that dask-df is in the factory mapping."""
         from benchbox.platforms import get_dataframe_adapter
 
@@ -204,8 +204,14 @@ class TestPandasFamilyFactory:
             with pytest.raises(ImportError, match="[Dd]ask"):
                 get_dataframe_adapter("dask-df")
         else:
+            from tests.utilities.session_isolation import own_environment
+
+            own_environment(monkeypatch, ["MALLOC_TRIM_THRESHOLD_", "PYTHONHASHSEED", "__DASK_PARENT_PID"])
             adapter = get_dataframe_adapter("dask-df")
-            assert adapter is not None
+            try:
+                assert adapter is not None
+            finally:
+                adapter.close()
 
 
 # =============================================================================
