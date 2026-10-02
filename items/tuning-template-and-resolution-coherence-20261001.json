@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "clickhouse-local tuned runs for tpch/ssb/tpcds resolve the curated template and reach applied_verified (added to the liveness gate).",
+    "Fallback message per platform asserted in tests; `benchbox tuning validate <sql.yaml> --platform duckdb` works."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P5.1 (R-9).",
+  "description": "## Problem\n- ClickHouse ships no curated template, so `--tuning tuned` falls back to session SETs only. ClickHouse is the platform where catalog verification works.\n- The fallback message \"using basic constraints\" (`benchbox/cli/tuning_resolver.py:454,459`) is wrong for Polars (streaming runtime) and ClickHouse (OLAP session pack).\n- `tuning validate` and `tuning defaults` are DataFrame-only (`docs/reference/cli/tuning.md:68,135`), so SQL users cannot validate custom files.\n- DataFrame `tuned` resolution waits on the D-8 decision.\n\n## Change\n- Add `examples/tunings/clickhouse/{tpch,ssb,tpcds}_tuned.yaml` plus packaged mirrors, with PK-prefix-consistent sort keys and partitions.\n- Derive the fallback text from the registry per platform.\n- Support SQL YAML in `tuning validate` via `validate_for_platform_detailed` and the registry.\n- Implement the D-8 rule.\n\n## Guardrails (must preserve)\n- A fallback never facet-matches a curated run (ADR-002).\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "examples/tunings/clickhouse",
+    "benchbox/core/tuning/templates",
+    "benchbox/cli/tuning_resolver.py",
+    "docs/reference/cli/tuning.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:31:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "988cf14de0c14945b7d5a2bd446c021e",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
