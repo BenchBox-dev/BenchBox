@@ -30,8 +30,10 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from benchbox.core.tpcds.streams import _DSQGEN_BEGIN_STREAM_RE, _DSQGEN_TEMPLATE_RE
+from benchbox.core.tpcds.streams import _DSQGEN_BEGIN_STREAM_RE
 
+# dsqgen names a variant template by its path (``../query_variants/query5a.tpl``) and a base template by its file name.
+_TEMPLATE_RE = re.compile(r"^Template:\s*(?:\S*[/\\])?query(\d+)([ab]?)\.tpl\s*$", re.IGNORECASE)
 _END_STREAM_RE = re.compile(r"^END STREAM\s+(\d+)\s*$", re.IGNORECASE)
 _PARAMETER_RE = re.compile(r"^(\S+)\s*=\s*(.*)$")
 
@@ -93,7 +95,7 @@ def parse_dsqgen_parameter_log(log_text: str) -> dict[int, list[TemplateParamete
             current = None
             continue
 
-        template = _DSQGEN_TEMPLATE_RE.match(line)
+        template = _TEMPLATE_RE.match(line)
         if template:
             if current_stream is None:
                 raise ValueError(f"dsqgen log line {line_number}: template outside a stream: {line!r}")
