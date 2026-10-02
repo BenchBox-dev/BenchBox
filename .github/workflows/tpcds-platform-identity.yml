@@ -1,0 +1,89 @@
+name: TPC-DS Platform Identity
+
+# Each platform ships its own dsdgen and dsqgen binary. scripts/bundled_binary_manifest.py pins the
+# bytes of those binaries; this workflow checks what they produce. Each runner generates TPC-DS data
+# at scale factor 0.01 and records per-table row counts and checksums, the dsqgen -LOG values for
+# every query at a pinned seed, and a hash of the rendered SQL. A final job compares the manifests and
+# fails on any difference, so a DataFrame-versus-SQL divergence that appears on one platform and not
+# another can be traced to the data or the parameters.
+#
+# Not a required check: it runs on a schedule, on demand, and on pull requests that touch the bundled
+# TPC-DS binaries or this check.
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "benchbox/_binaries/tpc-ds/**"
+      - "benchbox/core/tpcds/c_tools.py"
+      - "benchbox/core/tpcds/parameter_log.py"
+      - "scripts/tpcds_platform_identity.py"
+      - ".github/workflows/tpcds-platform-identity.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tpcds-platform-identity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifest:
+    name: TPC-DS manifest (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Build the manifest
+        run: uv run -- python scripts/tpcds_platform_identity.py manifest --out "manifest-${{ runner.os }}-${{ runner.arch }}.json"
+
+      - name: Upload the manifest
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: tpcds-manifest-${{ runner.os }}-${{ runner.arch }}
+          path: manifest-*.json
+          if-no-files-found: error
+          retention-days: 30
+
+  compare:
+    name: Compare TPC-DS manifests
+    needs: manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Download the manifests
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          pattern: tpcds-manifest-*
+          path: manifests
+          merge-multiple: true
+
+      - name: Compare
+        run: python scripts/tpcds_platform_identity.py compare manifests/manifest-*.json
