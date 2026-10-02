@@ -20307,6 +20307,13 @@
       "status": "done",
       "title": "Sweep all platform from_config implementations to forward tuning configuration"
     },
+    "tuning-gate-constraint-corroboration-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "DECISION GATE (D-2): which constraint kinds become catalog-verifiable, and from which structured sources"
+    },
     "tuning-gate-sort-evidence-model-20261001": {
       "claim": null,
       "needs": [],
