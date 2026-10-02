@@ -3011,7 +3011,8 @@
     "comment-cleanup-clickbench": {
       "claim": null,
       "needs": [
-        "comment-cleanup-pilot-budget"
+        "comment-cleanup-checker",
+        "comment-cleanup-contracts-gate"
       ],
       "priority": "medium",
       "status": "open",
