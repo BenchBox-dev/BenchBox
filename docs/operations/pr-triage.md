@@ -104,18 +104,22 @@ a PR's mergeability — both only alert.
   After the auto-merge hold, **an intentional non-armed green PR is normal**,
   not a stuck state, and the sweep **excludes** it. Auto-merge is **not**
   armed by `opened`, `reopened`, or `synchronize` (a re-push will not flip it
-  on). The only intentional arm signals are:
+  on). The intentional arm paths are:
 
-  - `make pr-ready PR=<n> HEAD=<sha> EVIDENCE=<path>` on a finished branch
-  - `make pr-open READY=1 EVIDENCE=<path>` to open and arm in one step
+  - `make pr-arm` on a finished branch (enqueues the exact local head after a
+    live check of the PR)
+  - `make pr-open READY=1` to open or reuse the PR and arm it in one step
+  - `make pr-ready PR=<n> HEAD=<sha> EVIDENCE=<path>`, the evidence-gated
+    path; the evidence file declares `delivery_mode` (`batch` evidence must
+    include the complete batch binding)
 
-  Those are the **only** arm paths, and both require an evidence file declaring
-  `delivery_mode` (`batch` evidence must include the complete batch binding):
   `auto-merge-on-open.yml` is revoke-only
   and never arms (its draft→ready arm point never fired once and was deleted
   — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
-  D2). Both Makefile paths refuse while the PR carries the `no-auto-merge`
-  label or touches soundness paths.
+  D2). The Makefile paths refuse while the PR carries the `no-auto-merge`
+  label; `make pr-ready` also refuses for soundness paths, and
+  `auto-merge-on-open.yml` disarms a soundness-path PR on each push, so arm
+  such a PR with `make pr-arm` after its last push.
 
   **Classifier (arm intent):** a PR is stranded only when auto-merge is off
   *and* the issue/PR timeline includes at least one of

@@ -10,6 +10,11 @@ from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark
 class TPCDSOBT(BaseBenchmark):
     """Public API wrapper for the TPC-DS OBT benchmark."""
 
+    # Mirror the implementation's run-time contract so orchestration and the
+    # load guard see it on the wrapper too.
+    GENERATES_OWN_OUTPUT = TPCDSOBTBenchmark.GENERATES_OWN_OUTPUT
+    REQUIRED_LOADED_TABLES = TPCDSOBTBenchmark.REQUIRED_LOADED_TABLES
+
     def __init__(
         self,
         scale_factor: float = 1.0,

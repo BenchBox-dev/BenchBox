@@ -248,7 +248,9 @@ def _item_category_sales_expression(
     sales_date_default: str,
     group_by: tuple[str, ...],
     sort_by: tuple[str, ...],
+    limit: int | None = 100,
 ) -> Any:
+    """``limit`` is the SQL ``LIMIT``; ``None`` for a template with none (Q98)."""
     params = get_parameters(query_id)
     categories = params.get(category_param, ["Sports", "Books", "Home"])
     start_date, end_date = _sales_date_window(query_id, sales_date_default)
@@ -262,15 +264,18 @@ def _item_category_sales_expression(
             col("i_category").is_in(categories) & (col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date))
         )
         .group_by(*group_by)
-        .agg(col(value_col).sum().alias("itemrevenue"))
-    )
-    return (
-        grouped.with_columns(
-            (col("itemrevenue") * 100 / ctx.window_sum("itemrevenue", partition_by=["i_class"])).alias("revenueratio")
+        # SQL SUM() over all-NULL inputs is NULL (not 0.0), and so is the ratio built on it.
+        .agg(
+            ctx.when(col(value_col).count() > lit(0))
+            .then(col(value_col).sum())
+            .otherwise(lit(None))
+            .alias("itemrevenue")
         )
-        .sort(list(sort_by))
-        .limit(100)
     )
+    ranked = grouped.with_columns(
+        (col("itemrevenue") * 100 / ctx.window_sum("itemrevenue", partition_by=["i_class"])).alias("revenueratio")
+    ).sort(list(sort_by))
+    return ranked if limit is None else ranked.limit(limit)
 
 
 def _item_category_sales_pandas(
@@ -284,7 +289,9 @@ def _item_category_sales_pandas(
     sales_date_default: str,
     group_by: tuple[str, ...],
     sort_by: tuple[str, ...],
+    limit: int | None = 100,
 ) -> Any:
+    """``limit`` is the SQL ``LIMIT``; ``None`` for a template with none (Q98)."""
     params = get_parameters(query_id)
     categories = params.get(category_param, ["Sports", "Books", "Home"])
     start_date, end_date = _sales_date_window(query_id, sales_date_default)
@@ -293,9 +300,18 @@ def _item_category_sales_pandas(
     filtered = merged[
         (merged["i_category"].isin(categories)) & (merged["d_date"] >= start_date) & (merged["d_date"] <= end_date)
     ]
-    grouped = filtered.groupby(list(group_by), as_index=False).agg(itemrevenue=(value_col, "sum"))
+    # SQL SUM() over all-NULL inputs is NULL (not 0.0), and so is the ratio built on it.
+    grouped = filtered.groupby(list(group_by), as_index=False).agg(
+        itemrevenue=(value_col, lambda values: values.sum(min_count=1))
+    )
     grouped["revenueratio"] = grouped["itemrevenue"] * 100 / grouped.groupby("i_class")["itemrevenue"].transform("sum")
-    return grouped.sort_values(list(sort_by)).head(100)
+    ordered = grouped.sort_values(list(sort_by))
+    result = ordered if limit is None else ordered.head(limit)
+    # Only a group with no non-NULL input is NULL; a zero-total class gives NaN (0/0) in SQL too.
+    null_groups = result["itemrevenue"].isna()
+    for column in ("itemrevenue", "revenueratio"):
+        result[column] = result[column].astype(object).where(~null_groups, None)
+    return result
 
 
 def _excess_discount_expression(
@@ -4693,6 +4709,10 @@ def q70_expression_impl(ctx: DataFrameContext) -> Any:
     # ROLLUP on (s_state, s_county)
     agg_exprs = [col("ss_net_profit").sum().alias("total_sum")]
     rollup_result = expand_rollup_expression(base, ["s_state", "s_county"], agg_exprs, ctx)
+    # ss_net_profit is a two-decimal DECIMAL in the SQL surface. Round the
+    # float-backed aggregate back to that source scale so subtotal and
+    # grand-total rows keep the same equality and sort position as the SQL.
+    rollup_result = rollup_result.with_columns(col("total_sum").round(2).alias("total_sum"))
 
     # Add lochierarchy
     lochierarchy_expr = lochierarchy_expression("grouping_id", 2, ctx=ctx)
@@ -6227,19 +6247,25 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         date_key: str,
         return_null_col: str,
         group_cols: list[str],
-        agg_spec: dict[str, tuple[str, Any]],
+        value_cols: dict[str, str],
         aliases: dict[str, str],
     ) -> Any:
         joined = ctx.get_table(sales_table).merge(
             ctx.get_table(returns_table), left_on=left_on, right_on=right_on, how="left"
         )
         joined = joined.merge(date_dim, left_on=date_key, right_on="d_date_sk")
-        return (
-            joined[joined[return_null_col].isna()]
-            .groupby(group_cols, as_index=False, dropna=False)
-            .agg(**agg_spec)
-            .rename(columns=aliases)
+        # SQL SUM() over inputs that are all NULL is NULL. A groupby lambda with min_count=1 gives that
+        # but runs Python code per group; the built-in sum and count are vectorized and masked instead.
+        agg_spec = {}
+        for alias, source in value_cols.items():
+            agg_spec[alias] = (source, "sum")
+            agg_spec[f"{alias}_n"] = (source, "count")
+        grouped = (
+            joined[joined[return_null_col].isna()].groupby(group_cols, as_index=False, dropna=False).agg(**agg_spec)
         )
+        for alias in value_cols:
+            grouped[alias] = grouped[alias].where(grouped[f"{alias}_n"] > 0)
+        return grouped.drop(columns=[f"{alias}_n" for alias in value_cols]).rename(columns=aliases)
 
     ss_agg = channel(
         "store_sales",
@@ -6250,9 +6276,9 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         "sr_returned_date_sk",
         ["d_year", "ss_item_sk", "ss_customer_sk"],
         {
-            "ss_qty": ("ss_quantity", lambda values: values.sum(min_count=1)),
-            "ss_wc": ("ss_wholesale_cost", lambda values: values.sum(min_count=1)),
-            "ss_sp": ("ss_sales_price", lambda values: values.sum(min_count=1)),
+            "ss_qty": "ss_quantity",
+            "ss_wc": "ss_wholesale_cost",
+            "ss_sp": "ss_sales_price",
         },
         {"d_year": "ss_sold_year"},
     )
@@ -6265,9 +6291,9 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         "cr_returned_date_sk",
         ["d_year", "cs_item_sk", "cs_bill_customer_sk"],
         {
-            "cs_qty": ("cs_quantity", lambda values: values.sum(min_count=1)),
-            "cs_wc": ("cs_wholesale_cost", lambda values: values.sum(min_count=1)),
-            "cs_sp": ("cs_sales_price", lambda values: values.sum(min_count=1)),
+            "cs_qty": "cs_quantity",
+            "cs_wc": "cs_wholesale_cost",
+            "cs_sp": "cs_sales_price",
         },
         {"d_year": "cs_sold_year", "cs_bill_customer_sk": "cs_customer_sk"},
     )
@@ -6280,9 +6306,9 @@ def q78_pandas_impl(ctx: DataFrameContext) -> Any:
         "wr_returned_date_sk",
         ["d_year", "ws_item_sk", "ws_bill_customer_sk"],
         {
-            "ws_qty": ("ws_quantity", lambda values: values.sum(min_count=1)),
-            "ws_wc": ("ws_wholesale_cost", lambda values: values.sum(min_count=1)),
-            "ws_sp": ("ws_sales_price", lambda values: values.sum(min_count=1)),
+            "ws_qty": "ws_quantity",
+            "ws_wc": "ws_wholesale_cost",
+            "ws_sp": "ws_sales_price",
         },
         {"d_year": "ws_sold_year", "ws_bill_customer_sk": "ws_customer_sk"},
     )

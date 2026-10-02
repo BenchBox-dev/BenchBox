@@ -81,6 +81,21 @@ def _build_failure_result(config: BenchmarkConfig, exc: Exception) -> BenchmarkR
     )
 
 
+def _local_datagen_name(benchmark: Any, benchmark_name: str) -> str:
+    """Return the datagen folder name a benchmark reads its local data from.
+
+    Benchmarks that share another benchmark's data (``get_data_source_benchmark``)
+    read the source's folder, except those that generate their own output
+    (``GENERATES_OWN_OUTPUT``, e.g. tpcds_obt, which transforms TPC-DS data into
+    its own OBT table). Pointing those at the source folder makes the runner
+    reuse the source manifest and load the source tables instead of their own.
+    """
+    if getattr(benchmark, "GENERATES_OWN_OUTPUT", False):
+        return benchmark_name.lower()
+    data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
+    return (data_source or benchmark_name).lower()
+
+
 class BenchmarkOrchestrator:
     """Orchestrates benchmark execution using platform adapters."""
 
@@ -156,10 +171,9 @@ class BenchmarkOrchestrator:
         # a separate OBT table) must keep their own output_dir: redirecting
         # would hide their generated files from the loader.
         if getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None) is None:
-            data_source = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
-            generates_own_output = getattr(benchmark_instance, "GENERATES_OWN_OUTPUT", False)
-            if data_source and self.custom_output_dir is None and not generates_own_output:
-                shared_path = self.directory_manager.get_datagen_path(data_source.lower(), config.scale_factor)
+            source_name = _local_datagen_name(benchmark_instance, config.name)
+            if source_name != config.name.lower() and self.custom_output_dir is None:
+                shared_path = self.directory_manager.get_datagen_path(source_name, config.scale_factor)
                 benchmark_instance.output_dir = shared_path
 
         return benchmark_instance
@@ -391,8 +405,7 @@ class BenchmarkOrchestrator:
         if not is_cloud_path(self.custom_output_dir):
             return self.custom_output_dir
 
-        data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
-        source_name = (data_source or config.name).lower()
+        source_name = _local_datagen_name(benchmark, config.name)
         local_cache_path = self.directory_manager.get_datagen_path(source_name, config.scale_factor)
 
         if is_databricks_path(self.custom_output_dir):
