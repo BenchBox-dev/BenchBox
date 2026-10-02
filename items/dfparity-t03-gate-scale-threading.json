@@ -4,7 +4,7 @@
     "Report-mode gate at SF=0.01 and SF=0.1 runs; every classified-empty entry still returns 0 rows or is removed, with the new empty set recorded",
     "A test asserts the gate renders at the gate scale"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T3). Owner decision D1 (see dfparity-t00-owner-decisions) also fixes production; that is the separate item dfparity-t22, so this item stays gate-builder only. Owner decision D2: the dsqgen stream is configurable, so thread a stream number (default 0) through the gate render and record it with seed, scale and binary identity. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T3). If owner decision D1 chooses production scope, that is a separate item (dfparity-t22). Project owner does NOT accept earlier reviewers' TPC-H claims.\n\nFindings 2026-10-02 (TESTED by bisecting develop; nothing implemented in this item yet). (1) The gate-side change is ALREADY LIVE: benchbox/core/equivalence/builders/tpcds.py renders the reference SQL with benchmark.get_queries(dialect=\"duckdb\"), and PR #2509 (t22, merged) makes get_queries render at the data's scale, so the gate now renders at SF 0.01 (the 'runner.get_queries is unchanged' clause of the acceptance is superseded by owner decision D1). What remains for this item: a builder-level test pinning that the gate renders at its scale, the D2 stream (default 0) threaded into the gate render, and the recorded empty set at SF 0.01 and 0.1. D2 note: generate(stream_id=) does not select a stream, so the stream-n SQL must come from DSQGenBinary.generate_with_parameters (PR #2510) fed with generate_parameter_log values. (2) EFFECT OF #2509 ON THE GATE (tests/evidence: evidence/rev2/gate_tpcds_sf001_at_4e6e1bec5_8divergent.log): at SF 0.01 the SQL for Q9, Q44, Q46 and Q68 now carries SF=0.01 dsqgen values while the DataFrame defaults are SF>=1 values, so those queries now diverge on both families (8 divergent cells). That is parameter drift being exposed, which t04/t05 adapters are meant to fix; they are not DataFrame logic bugs. (3) THE GATE ALREADY FAILED BEFORE #2509: the staged TPC-DS gate went from exit 0 (146 of 198 cells compared, 52 empty, 0 divergent at 9fcf78335, d39166ea6) to exit 1 (134 compared, 64 vacuous, 0 divergent at d33ef35e5) at commit 68ce40abc (#2396, joinorder, which also edited benchbox/core/equivalence/cross_surface.py): it now treats a scalar aggregate that collapses to one all-NULL row as 0-row vacuous, which is right (None == None must not count as coverage), but six TPC-DS queries are exactly that (13, 23, 32, 61, 90, 92) and are not in _TPCDS_LEGITIMATELY_EMPTY, so the gate fails closed: 'vacuous empty-vs-empty queries not classified'. The only consumer is the weekly report workflow tpcds-staged-maturation.yml (make tpcds-cross-surface-equivalence-report), which is not a required check, so no merge is blocked. Not fixed here because t19's own rule forbids classifying an empty query before parameters match and the answer-set evidence exists; an owner decision is needed on whether to add these six with rationale as an interim step (the file is a soundness path: external review plus a maintainer merge).",
   "description": "Pass the gate's scale into the TPC-DS SQL render inside benchbox/core/equivalence/builders/tpcds.py only. Do NOT change runner.get_queries or any production path (see owner decision D1): production SQL runs at SF!=1 currently use SF=1 parameters and changing that alters baselines. About 10 templates use rowcount(...) so their dsqgen values depend on scale (Q44's differ at every other scale; tested). After rendering at the data's scale, _TPCDS_LEGITIMATELY_EMPTY (benchbox/core/equivalence/cross_surface.py ~1410, 26 entries, described as the bounded SF=0.01 cell) must be re-derived because emptiness is not monotonic in scale (23 queries are empty at some scales and not others).",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "28fde2844ff4450d9aadaad122fc7f97",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T03:42:39Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "931ccb014be14867920c0c6cf551a232",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
     }
   ]
