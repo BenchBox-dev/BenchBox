@@ -287,15 +287,19 @@ def _make_pr_arm(tmp_path: Path, *assignments: str) -> tuple[list[str], dict[str
         "https://github.com/other-org/other-repo/pull/7",
     ],
 )
-def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(tmp_path: Path, value: str) -> None:
-    argv, env = _make_pr_arm(tmp_path, f"PR={value}")
+@pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
+def test_the_make_wrapper_hands_a_value_over_as_one_untouched_environment_value(
+    tmp_path: Path, name: str, value: str
+) -> None:
+    argv, env = _make_pr_arm(tmp_path, f"{name}={value}")
     # The helper gets no extra command-line words, so a value cannot add `--pr 8` or `--repo x/y`.
     assert argv == ["run", "--", "python", "scripts/pr_arm.py"]
-    assert env["PR_ARM_PR"] == value
-    assert env["PR_ARM_PR_SET"] == "1"
+    assert env[f"PR_ARM_{name}"] == value
+    assert env[f"PR_ARM_{name}_SET"] == "1"
 
 
-def test_the_make_wrapper_does_not_run_shell_metacharacters_in_a_value(tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
+def test_the_make_wrapper_does_not_run_shell_metacharacters_in_a_value(tmp_path: Path, name: str) -> None:
     """The recipe has no shell word for the value, so `;` and backticks stay text.
 
     A `$(shell ...)` typed on the make command line is expanded by make itself for every target in this
@@ -303,8 +307,8 @@ def test_the_make_wrapper_does_not_run_shell_metacharacters_in_a_value(tmp_path:
     """
     marker = tmp_path / "ran"
     for value in (f"7; touch {marker}", f"7`touch {marker}`", f"7 && touch {marker}", f"7 | touch {marker}"):
-        _, env = _make_pr_arm(tmp_path, f"PR={value}")
-        assert env["PR_ARM_PR"] == value
+        _, env = _make_pr_arm(tmp_path, f"{name}={value}")
+        assert env[f"PR_ARM_{name}"] == value
     assert not marker.exists()
 
 
@@ -339,12 +343,13 @@ def test_making_pr_arm_literal_does_not_change_how_other_targets_see_a_value(
     assert result.returncode != 0  # each refuses for a missing PR, head or evidence, as before
 
 
-def test_the_make_wrapper_tells_an_omitted_variable_from_an_empty_one(tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", ["PR", "HEAD", "REPO"])
+def test_the_make_wrapper_tells_an_omitted_variable_from_an_empty_one(tmp_path: Path, name: str) -> None:
     _, omitted = _make_pr_arm(tmp_path)
-    assert omitted.get("PR_ARM_PR_SET", "") == ""
-    _, empty = _make_pr_arm(tmp_path, "PR=")
-    assert empty["PR_ARM_PR_SET"] == "1"
-    assert empty["PR_ARM_PR"] == ""
+    assert omitted.get(f"PR_ARM_{name}_SET", "") == ""
+    _, empty = _make_pr_arm(tmp_path, f"{name}=")
+    assert empty[f"PR_ARM_{name}_SET"] == "1"
+    assert empty[f"PR_ARM_{name}"] == ""
 
 
 def test_main_passes_the_raw_environment_values_to_arm(monkeypatch: pytest.MonkeyPatch) -> None:
