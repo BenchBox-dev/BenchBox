@@ -1324,13 +1324,29 @@ jobs:
           set -euo pipefail
           test -s "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
           mapfile -t node_ids < "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          sample_resources() {
+            while sleep 30; do
+              echo "[resources $(date -u +%H:%M:%S)] $(free -m | awk '/Mem:/ {print "used_mb=" $3 " available_mb=" $7}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              ps -eo pid,rss,etimes,args --sort=-rss | awk 'NR <= 4 {print "  " substr($0, 1, 160)}'
+            done
+          }
+          sample_resources &
+          sampler=$!
+          trap 'kill "${sampler}" 2>/dev/null || true' EXIT
           BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest \
             -m "medium and not (slow or stress or resource_heavy or live_integration)" \
-            --tb=short --timeout=60 -n 5 \
+            --tb=short --timeout=60 -o faulthandler_timeout=120 -n 5 \
             -p scripts.pytest_shard_evidence \
             --assigned-nodeids "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
             --shard-evidence "t2-artifacts/shard-${SHARD_INDEX}-execution.json" \
             --checked-sha "${{ github.sha }}" "${node_ids[@]}"
+
+      - name: Record kernel memory events for the medium shard
+        if: always()
+        shell: bash
+        run: |
+          free -m
+          sudo dmesg -T 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -20 || true
 
       - name: Upload medium shard evidence
         if: always()
