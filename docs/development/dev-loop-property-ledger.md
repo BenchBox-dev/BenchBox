@@ -193,6 +193,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_pr_ready_make.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
+| `test_required_case_evidence.py` | product-safety | A required local-engine case that skips, is deselected, fails or is expected to fail fails the required-case check |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
