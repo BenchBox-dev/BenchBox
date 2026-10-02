@@ -19710,6 +19710,13 @@
       "status": "done",
       "title": "No TPC-DS result can ever be submitted: --official never reaches the compliance classifier"
     },
+    "tpcds-composite-primary-keys-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Correct TPC-DS composite primary keys and pin every benchmark's PK sets with a conformance test"
+    },
     "tpcds-obt-benchmark-implementation": {
       "claim": null,
       "needs": [],
