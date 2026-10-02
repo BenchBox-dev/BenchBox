@@ -1551,20 +1551,19 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
-# Push current branch and open a PR against develop. Auto-merge is WITHHELD by
-# default so a follow-up commit cannot race a merge. Arm only when the branch
-# is final: `make pr-ready`, or `make pr-open READY=1` when reusing an already
-# open, reviewed PR. A newly created PR always remains held so it can receive
-# review before readiness is evaluated. When a merge queue is enabled on
-# develop, arming auto-merge enqueues the PR for speculative integration once
-# checks pass. Soundness-path diffs are never armed or auto-enqueued (see
-# pr-arm-auto-merge).
+# Push current branch and open a PR against develop. This does not arm
+# auto-merge by itself, so a follow-up commit pushed for review feedback cannot
+# race a merge. Arm with `make pr-arm` once the branch carries the review
+# fixes, or run `make pr-open READY=1` to open (or reuse) the PR and arm it in
+# one step. Arming enqueues the PR in the merge queue, which merges it when the
+# required checks pass.
 # Refuses to run from develop/release.
 #
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
-# Without READY=1 this does not re-enable auto-merge — run `make pr-ready`
-# when the branch is final. READY=1 arms only after reusing an already-open
-# PR; a newly created PR prints the exact pr-ready action and stays held.
+# READY=1 arms through `make pr-arm`, which checks the live PR (hold label,
+# requested changes, unresolved review threads, draft state, head) before it
+# enqueues the exact local HEAD. READY=1 with EVIDENCE or BATCH keeps its
+# earlier meaning: the evidence transaction (`pr-ready`) for a reused PR.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
@@ -1585,10 +1584,6 @@ pr-open:
 	if [ -n "$(PR_BODY_FILE)" ] && [ ! -f "$(PR_BODY_FILE)" ]; then \
 		echo "PR_BODY_FILE does not exist: $(PR_BODY_FILE)" >&2; \
 		exit 1; \
-	fi; \
-	if [ "$(READY)" = "1" ] && [ -z "$(EVIDENCE)" ]; then \
-		echo "EVIDENCE is required when READY=1; use make pr-open without READY=1 to publish a held PR." >&2; \
-		exit 2; \
 	fi; \
 	REPOSITORY="$(or $(REPO),BenchBox-dev/BenchBox)"; \
 	case "$$REPOSITORY" in \
@@ -1663,12 +1658,17 @@ pr-open:
 	fi && \
 	echo "$$URL" && \
 	if [ "$(READY)" != "1" ]; then \
-		echo "Auto-merge withheld. Run 'make pr-ready' when the branch is final, or rerun 'make pr-open READY=1' to arm a reused reviewed PR."; \
-	elif [ "$$REUSED_PR" != "1" ]; then \
-		echo "PR created and held; READY=1 does not arm a newly created PR."; \
-		echo "Next action after review: make pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"<readiness-evidence.json>\""; \
+		echo "Next: make pr-arm once the review fixes are pushed; the merge queue merges it when the required checks pass."; \
+	elif [ -n "$(EVIDENCE)$(BATCH)" ]; then \
+		if [ "$$REUSED_PR" != "1" ]; then \
+			echo "READY=1 with EVIDENCE or BATCH applies to a reused PR, so this new PR is not armed."; \
+			echo "Arm it after review with make pr-arm, or with the evidence transaction: make pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"<readiness-evidence.json>\""; \
+		else \
+			$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
+		fi; \
 	else \
-		$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
+		PR_NUMBER=$$(gh pr view --repo "$$REPOSITORY" "$$URL" --json number --jq '.number') || { echo "Could not resolve $$URL to a PR in $$REPOSITORY" >&2; exit 1; }; \
+		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"; \
 	fi
 
 # Runs the readiness transaction for an already-open PR. This compatibility
@@ -1722,9 +1722,10 @@ pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
 	@uv run -- python scripts/pr_arm.py
 
-# Declares the branch final and arms auto-merge / queue enrollment.
+# Evidence-gated arm path, kept for callers that already hold a readiness
+# evidence file; `make pr-arm` is the default and needs none.
 #
-# Auto-merge is NOT armed by `pr-open`, because arming at creation is only
+# Auto-merge is not armed when `pr-open` creates a PR, because arming at creation is only
 # correct if nothing more will be pushed - and the usual reason something more
 # is pushed is review feedback, which arrives after the PR exists. A PR armed
 # at creation can satisfy its checks and merge while the follow-up commit is
@@ -1765,9 +1766,8 @@ pr-fanout:
 # Refresh the current PR branch onto origin/develop, then run pr-open.
 # This is the stale-PR escape hatch when required checks must be current with
 # develop: GitHub can show a PR as CLEAN even though merge is waiting for a
-# branch update. pr-refresh does NOT re-enable auto-merge on its own (pr-open
-# withholds unless READY=1 reuses an already-open reviewed PR); run
-# `make pr-ready` when the branch is final.
+# branch update. pr-refresh does not arm on its own (pr-open arms only with
+# READY=1); run `make pr-arm` once the refreshed branch is pushed.
 # Run this one stale PR at a time; updating several branches at once can let
 # the first merge stale the others again under strict checks.
 pr-refresh:
