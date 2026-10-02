@@ -389,6 +389,7 @@ def test_hostile_paths_cannot_start_a_workflow_command_in_the_output(
     base = commit_policy(tmp_path, "advisory")
     hostile = "::add-mask::secret.py"
     (tmp_path / hostile).write_text("# new\n", encoding="utf-8")
+    (tmp_path / "##[stop-commands]hidden.py").write_text("# ##[add-mask]comment-policy\n", encoding="utf-8")
     newline_name = "one.py\n::stop-commands::token\ntwo.py"
     try:
         (tmp_path / newline_name).write_text("# new\n", encoding="utf-8")
@@ -396,11 +397,60 @@ def test_hostile_paths_cannot_start_a_workflow_command_in_the_output(
         newline_name = ""
     capsys.readouterr()
     assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base]) == 0
-    lines = capsys.readouterr().out.splitlines()
+    output = capsys.readouterr().out
+    lines = output.splitlines()
+    assert "##[" not in output
     assert not [line for line in lines if line.lstrip().startswith("::") and not line.startswith("::warning ")]
     assert not any(line.lstrip().startswith(("::add-mask", "::stop-commands")) for line in lines)
     if newline_name:
         assert not any(line.strip() == "::stop-commands::token" for line in lines)
+
+
+def test_legacy_command_markers_are_neutralized_in_text_and_annotations() -> None:
+    for value in ("# ##[add-mask]comment-policy", "scripts/##[stop-commands]hidden.py"):
+        assert "##[" not in check_comment_policy.plain_text(value)
+        assert "##[" not in policy_runner.plain_text(value)
+        assert "##[" not in check_comment_policy.annotation_text(value)
+        assert "##[" not in check_comment_policy.annotation_text(value, property_value=True)
+    assert policy_runner.plain_text("::stop-commands::x").startswith("\\::")
+    assert policy_runner.plain_text("line one\n::add-mask::x") == "line one\\x0a::add-mask::x"
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_native_test_output_runs_between_stop_and_resume_tokens(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], fails: bool, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    events: list[str] = []
+
+    def native_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        events.append("native")
+        if fails:
+            raise subprocess.CalledProcessError(1, command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(policy_runner.subprocess, "run", native_run)
+    if fails:
+        with pytest.raises(subprocess.CalledProcessError):
+            policy_runner.run_native_tests(tmp_path, tmp_path, {})
+    else:
+        policy_runner.run_native_tests(tmp_path, tmp_path, {})
+    lines = capsys.readouterr().out.splitlines()
+    assert events == ["native"]
+    stop = next(line for line in lines if line.startswith("::stop-commands::"))
+    token = stop.removeprefix("::stop-commands::")
+    assert len(token) == 32 and lines == [stop, f"::{token}::"]
+
+
+def test_native_test_output_is_not_wrapped_outside_github_actions(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(
+        policy_runner.subprocess, "run", lambda command, **kwargs: subprocess.CompletedProcess(command, 0)
+    )
+    policy_runner.run_native_tests(tmp_path, tmp_path, {})
+    assert capsys.readouterr().out == ""
 
 
 def test_candidate_cannot_relax_blocking_enforcement_in_a_comparison(tmp_path: Path) -> None:

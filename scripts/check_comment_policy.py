@@ -293,11 +293,12 @@ def validate_consumers(root: Path, policy: dict) -> None:
 
 def plain_text(value: str) -> str:
     text = "".join(f"\\x{ord(char):02x}" if ord(char) < 32 or ord(char) == 127 else char for char in value)
+    text = text.replace("##[", "\\x23#[")
     return f"\\{text}" if text.lstrip().startswith("::") else text
 
 
 def annotation_text(value: str, *, property_value: bool = False) -> str:
-    value = value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    value = value.replace("##[", "%23#[").replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
     return value.replace(":", "%3A").replace(",", "%2C") if property_value else value
 
 

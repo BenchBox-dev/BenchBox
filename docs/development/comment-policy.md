@@ -114,8 +114,10 @@ Python is read with its AST and tokenizer, including standalone strings and
 runtime docstring assignments; JavaScript and TypeScript with the isolated
 TypeScript parser; SQL-valued strings and execution-sink arguments as SQL; other
 formats with Pygments lexers; embedded code with its own language check.
-Unknown input is a coverage error, never a pass, and changed files and
-completed scopes always reject it. Parsers are used because text search would
+Unknown input is a coverage error, never a pass, and under blocking enforcement
+or in strict mode changed files and completed scopes always reject it. While
+enforcement is advisory a coverage error is reported and counted but does not
+fail the comparison. Parsers are used because text search would
 confuse strings with comments, and Ruff has no cross-language ban.
 
 This syntax rule cannot prove a string has a reader or that code is simple.

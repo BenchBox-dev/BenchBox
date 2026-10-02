@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -159,6 +160,28 @@ def checker_command(
     return command
 
 
+def plain_text(value: str) -> str:
+    text = "".join(f"\\x{ord(char):02x}" if ord(char) < 32 or ord(char) == 127 else char for char in value)
+    text = text.replace("##[", "\\x23#[")
+    return f"\\{text}" if text.lstrip().startswith("::") else text
+
+
+def run_native_tests(root: Path, trusted: Path, env: dict[str, str]) -> None:
+    token = secrets.token_hex(16) if os.environ.get("GITHUB_ACTIONS") == "true" else ""
+    if token:
+        print(f"::stop-commands::{token}", flush=True)
+    try:
+        subprocess.run(
+            ["node", "--test", str(root / "tests/unit/scripts/test_comment_syntax_js.cjs")],
+            cwd=trusted,
+            env=env,
+            check=True,
+        )
+    finally:
+        if token:
+            print(f"::{token}::", flush=True)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the comment policy with immutable base parsers.")
     parser.add_argument("--base", default=os.environ.get("BASE_REF"))
@@ -193,15 +216,10 @@ def main(argv: list[str] | None = None) -> int:
             if result:
                 return result
             if args.native_tests:
-                subprocess.run(
-                    ["node", "--test", str(root / "tests/unit/scripts/test_comment_syntax_js.cjs")],
-                    cwd=trusted,
-                    env=env,
-                    check=True,
-                )
+                run_native_tests(root, trusted, env)
             return 0
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as exc:
-        print(f"comment-policy: trusted invocation failed: {exc}", file=sys.stderr)
+        print(plain_text(f"comment-policy: trusted invocation failed: {exc}"), file=sys.stderr)
         return 2
 
 
