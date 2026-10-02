@@ -26,6 +26,18 @@ from benchbox.core.tpch.benchmark import get_reference_seed
 from benchbox.core.validation.query_validation import QueryValidator
 from tests.e2e.utils import is_dataframe_available, is_gpu_available, is_platform_available
 from tests.integration._cli_e2e_utils import run_cli_command
+from tests.required_local_cases import (
+    SQLITE_CASE_ITERATIONS,
+    SQLITE_CASE_QUERY_IDS,
+    SQLITE_CASE_SCALE_FACTOR,
+    SQLITE_CASE_SEED,
+    TPCH_TABLE_NAMES,
+    RequiredCaseError,
+    check_measurement_multiset,
+    check_rows_match,
+    check_tables_populated,
+    expected_measurement_multiset,
+)
 from tests.uat.matrix import LOCAL_SQL_PLATFORMS
 
 pytestmark = [
@@ -510,6 +522,130 @@ def test_local_platform_benchmark_matrix(
         scale_factor,
         expected_query_ids=set(query_subset) or None,
     )
+
+
+def _load_duckdb_from_generated_files(datagen_dir: Path):
+    """Load the generated TPC-H ``.tbl`` files (the files SQLite loaded) into an in-memory DuckDB."""
+    import duckdb
+    import zstandard
+
+    from benchbox.core.tpch.schema import TABLES
+    from benchbox.platforms.base.data_loading import escape_sql_string_literal
+
+    con = duckdb.connect(":memory:")
+    scratch = datagen_dir.parent / "duckdb_reference_input"
+    scratch.mkdir(exist_ok=True)
+    for table in TABLES:
+        con.execute(table.get_create_table_sql(enable_primary_keys=False, enable_foreign_keys=False))
+        chunks = sorted(datagen_dir.glob(f"{table.name}.tbl*"))
+        assert chunks, f"no generated data files for {table.name} in {datagen_dir}"
+        for index, chunk in enumerate(chunks):
+            raw = chunk.read_bytes()
+            if chunk.suffix == ".zst":
+                raw = zstandard.ZstdDecompressor().stream_reader(__import__("io").BytesIO(raw)).read()
+            # dbgen rows end with a trailing delimiter; drop it so columns line up.
+            lines = [line[:-1] if line.endswith(b"|") else line for line in raw.splitlines() if line]
+            staged = scratch / f"{table.name}.{index}.csv"
+            staged.write_bytes(b"\n".join(lines) + b"\n")
+            escaped_path = escape_sql_string_literal(str(staged))
+            con.execute(f"COPY {table.name} FROM '{escaped_path}' (DELIMITER '|', HEADER false)")
+    return con
+
+
+@pytest.mark.integration
+@pytest.mark.stress
+def test_sqlite_tpch_fixed_seed_value_parity(tmp_path: Path) -> None:
+    """SQLite SF=0.01 Q1/Q6/Q14 at a fixed seed: exact measurements and row values match DuckDB."""
+    import sqlite3
+
+    from benchbox.core.tpch.benchmark import TPCHBenchmark
+    from benchbox.platforms.sqlite import SQLiteAdapter
+
+    if not is_platform_available("sqlite"):
+        pytest.fail("sqlite is required for this case and must not be skipped")
+
+    checkout = Path(__file__).resolve().parents[2]
+    assert not tmp_path.resolve().is_relative_to(checkout), (
+        "SQLite case outputs must be outside the checkout; use an external --basetemp"
+    )
+    case_dir = tmp_path / "sqlite_tpch_value_parity"
+    case_dir.mkdir()
+    output_dir = case_dir / "benchmark_runs"
+    # Case-owned output under pytest tmp guarantees a fresh database.
+    db_path = output_dir / "databases" / "tpch_sf001" / "tpch_sf001_notuning_noconstraints.sqlite"
+    assert not output_dir.exists(), "case requires fresh output"
+
+    result = run_cli_command(
+        [
+            "run",
+            "--platform",
+            "sqlite",
+            "--benchmark",
+            "tpch",
+            "--scale",
+            str(SQLITE_CASE_SCALE_FACTOR),
+            "--phases",
+            "generate,load,power",
+            "--queries",
+            ",".join(SQLITE_CASE_QUERY_IDS),
+            "--seed",
+            str(SQLITE_CASE_SEED),
+            "--iterations",
+            str(SQLITE_CASE_ITERATIONS),
+            "--non-interactive",
+        ],
+        cwd=case_dir,
+        # Keep results and generated data inside this case, not an inherited output directory.
+        env={"BENCHBOX_OUTPUT_DIR": str(output_dir)},
+        timeout=MATRIX_CASE_TIMEOUT,
+    )
+    assert result.returncode == 0, f"CLI failed\nstdout:\n{result.stdout}\n\nstderr:\n{result.stderr}"
+
+    _, payload = _load_result_payload(case_dir, "tpch")
+    _validate_phase_coverage(payload, ["generate", "load", "power"])
+    check_measurement_multiset(payload.get("queries", []), expected_measurement_multiset())
+
+    # Reopen the generated database and prove every table was populated.
+    assert db_path.is_file(), "SQLite database was not created at the fresh path"
+    raw = sqlite3.connect(str(db_path))
+    try:
+        row_counts = {name: raw.execute(f"SELECT COUNT(*) FROM {name}").fetchone()[0] for name in TPCH_TABLE_NAMES}
+    finally:
+        raw.close()
+    check_tables_populated(row_counts)
+
+    datagen_dir = output_dir / "datagen" / "tpch_sf001"
+    reference = _load_duckdb_from_generated_files(datagen_dir)
+    adapter = SQLiteAdapter(database_path=str(db_path))
+    benchmark = TPCHBenchmark(scale_factor=SQLITE_CASE_SCALE_FACTOR)
+    connection = adapter.create_connection()
+    try:
+        for query_id in SQLITE_CASE_QUERY_IDS:
+            sqlite_sql = benchmark.get_query(
+                int(query_id), seed=SQLITE_CASE_SEED, scale_factor=SQLITE_CASE_SCALE_FACTOR, dialect="sqlite"
+            )
+            duckdb_sql = benchmark.get_query(
+                int(query_id), seed=SQLITE_CASE_SEED, scale_factor=SQLITE_CASE_SCALE_FACTOR, dialect="duckdb"
+            )
+            executed = adapter.execute_query(connection, sqlite_sql, query_id, validate_row_count=False)
+            assert executed["status"] == "SUCCESS", f"Q{query_id} failed on SQLite: {executed}"
+            sqlite_rows = [tuple(row) for row in executed["results"]]
+            duckdb_rows = [tuple(row) for row in reference.execute(duckdb_sql).fetchall()]
+
+            check_rows_match(duckdb_rows, sqlite_rows, query_id)
+
+            # Same cardinality, wrong value: the comparison must reject it.
+            corrupted = [tuple(row) for row in sqlite_rows]
+            first = list(corrupted[0])
+            column = next(i for i, v in enumerate(first) if isinstance(v, (int, float)) and not isinstance(v, bool))
+            first[column] = first[column] * 1.001 + 1
+            corrupted[0] = tuple(first)
+            assert len(corrupted) == len(duckdb_rows)
+            with pytest.raises(RequiredCaseError):
+                check_rows_match(duckdb_rows, corrupted, query_id)
+    finally:
+        adapter.close_connection(connection) if hasattr(adapter, "close_connection") else connection.close()
+        reference.close()
 
 
 @pytest.mark.integration

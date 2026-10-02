@@ -139,6 +139,10 @@ HANDBACK_TEXT = (
     ".claude/commands/*.md",
     "docs/agent/*.md",
     "docs/development/development.md",
+    "docs/operations/pr-triage.md",
+    "docs/operations/repo-admin-settings.md",
+    "Makefile",
+    "make/help.mk",
 )
 HANDBACK_PATTERNS = {
     "auto-merge withheld": r"\bauto[- ]merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
@@ -156,7 +160,8 @@ HANDBACK_PATTERNS = {
         r"(?:merge|arm|mark)\b"
     ),
     "ask the user to arm or merge": (
-        r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+(?:enable|arm|merge|mark)\b"
+        r"(?<!not )(?<!never )\bask\s+(?:the\s+)?(?:user|owner|maintainer|human)\s+to\s+"
+        r"(?:enable\s+(?:the\s+)?auto[- ]?merge|arm|merge|mark)\b"
     ),
 }
 _MARKDOWN_EMPHASIS = re.compile(r"[*_`]")

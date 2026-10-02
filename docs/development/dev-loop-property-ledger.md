@@ -90,10 +90,12 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
 | `test.yml` | product-safety | Test tiers; replaced by ci.yml units |
 | `todo-state-validate.yml` | tooling | Tracker state validation |
+| `tpcds-staged-maturation.yml` | tooling | Weekly TPC-DS cross-surface maturation report |
 | `upload-answers.yml` | product-safety | Answer file publication |
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
 | `validate-submission-comment.yml` | product-safety | Submission validation comment |
+| `tpcds-platform-identity.yml` | product-safety | Bundled TPC-DS generators agree across platforms (data checksums and dsqgen parameters) |
 
 ### `tests/unit/workflows/`
 
@@ -188,6 +190,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
 | `test_pr_arm.py` | pure-process |
+| `test_pr_ready_make.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
@@ -263,6 +266,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `publication/test_transaction_executor.py` | product-safety |
 | `publication/test_verify_corpus_promotion.py` | product-safety |
 | `publication/test_verify_live.py` | product-safety |
+| `test_tpcds_platform_identity.py` | product-safety |
 
 ### `tests/unit/release/`
 
@@ -311,6 +315,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `bundled_binary_manifest.py` | product-safety | Deterministic hashes of the shipped generator tree |
 | `verify_distribution_binaries.py` | product-safety | Distribution membership, archive safety, and source-bound generator hashes |
 | Remaining scripts (ledger-catch-all: scripts/) | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
+| `tpcds_platform_identity.py` | product-safety | Cross-platform agreement of the bundled TPC-DS generators |
 
 ### `_project/scripts/`
 

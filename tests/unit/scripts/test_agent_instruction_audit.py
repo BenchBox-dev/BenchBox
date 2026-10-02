@@ -247,6 +247,7 @@ def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) ->
         # A hand-back that the first guard missed.
         "When CI passes, ask the user to enable auto-merge.",
         "Then ask the owner to merge it.",
+        "Then ask the maintainer to enable the auto merge.",
         "Wait for the human to merge the green PR.",
         "Then waiting for the maintainer to merge it, stop.",
         # Variants a first version missed.
@@ -270,6 +271,8 @@ def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: s
         "When the branch is final, arm the exact head and monitor until merged.",
         "Never ask the owner to merge a finished PR.",
         "Do not ask the user to enable auto-merge; arm it yourself.",
+        # Asking for an unrelated setting is not a PR hand-back.
+        "If the tool is missing, ask the user to enable the plugin in settings.",
         "Never wait for the owner to merge a finished PR.",
         # Release and publication authorization is an explicit exception, not a PR hand-back.
         "Wait for the owner to approve the production release before publishing.",
@@ -284,6 +287,19 @@ def test_handback_guard_allows_safety_wording_and_separate_list_items(tmp_path: 
     command = project / ".claude/commands/pr.md"
     command.write_text(command.read_text() + "\n\n" + text + "\n")
     assert agent_instruction_audit.audit_handback_wording(project) == []
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["Makefile", "make/help.mk", "docs/operations/pr-triage.md", "docs/operations/repo-admin-settings.md"],
+)
+def test_handback_guard_covers_the_scripts_and_docs_that_print_guidance(tmp_path: Path, relative: str) -> None:
+    project = _candidate(tmp_path)
+    assert agent_instruction_audit.audit_handback_wording(project) == []
+    target = _with_repo_file(project, relative)
+    target.write_text(target.read_text() + "\n\nAuto-merge withheld. Run make pr-ready when the branch is final.\n")
+    errors = agent_instruction_audit.audit_handback_wording(project)
+    assert any(error.startswith(f"{relative}:") for error in errors), errors
 
 
 def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
