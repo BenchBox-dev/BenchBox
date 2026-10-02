@@ -1592,10 +1592,6 @@ _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
         "The bounded item dimension contains no product satisfying the manufacturer range and correlated attribute "
         "conditions; the empty SQL result is mirrored by both DataFrame families."
     ),
-    "44": (
-        "The bounded cell has no store and household-demographic combination satisfying the configured rank "
-        "conditions; the empty SQL result is mirrored by both DataFrame families."
-    ),
     "49": (
         "The bounded cell has no web, catalog, and store return combination satisfying the December 2000 and "
         "profit thresholds; the empty SQL result is mirrored by both DataFrame families."
