@@ -9270,6 +9270,44 @@ def q85_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+# The Q66 template draws the sales and net columns of each channel at random (SALESONE, SALESTWO,
+# NETONE, NETTWO), so the DataFrame implementations take them as parameters.
+_Q66_SALES_COLUMNS = {
+    "web": ("ws_sales_price", "ws_ext_sales_price", "ws_ext_list_price"),
+    "catalog": ("cs_sales_price", "cs_ext_sales_price", "cs_ext_list_price"),
+}
+_Q66_NET_COLUMNS = {
+    "web": ("ws_net_paid", "ws_net_paid_inc_tax", "ws_net_paid_inc_ship", "ws_net_paid_inc_ship_tax", "ws_net_profit"),
+    "catalog": (
+        "cs_net_paid",
+        "cs_net_paid_inc_tax",
+        "cs_net_paid_inc_ship",
+        "cs_net_paid_inc_ship_tax",
+        "cs_net_profit",
+    ),
+}
+
+
+def _q66_value_columns(params: Any) -> dict[str, tuple[str, str]]:
+    """The (sales, net) column of each channel, checked against the columns the template can choose."""
+    chosen = {
+        "web": (
+            params.get("web_sales_col", "ws_sales_price"),
+            params.get("web_net_col", "ws_net_paid_inc_tax"),
+        ),
+        "catalog": (
+            params.get("catalog_sales_col", "cs_sales_price"),
+            params.get("catalog_net_col", "cs_net_paid_inc_ship_tax"),
+        ),
+    }
+    for channel, (sales_col, net_col) in chosen.items():
+        if sales_col not in _Q66_SALES_COLUMNS[channel]:
+            raise ValueError(f"Q66 {channel} sales column {sales_col!r} is not one of {_Q66_SALES_COLUMNS[channel]}")
+        if net_col not in _Q66_NET_COLUMNS[channel]:
+            raise ValueError(f"Q66 {channel} net column {net_col!r} is not one of {_Q66_NET_COLUMNS[channel]}")
+    return chosen
+
+
 def q66_expression_impl(ctx: DataFrameContext) -> Any:
     """Q66: Web/catalog sales monthly warehouse analysis (Polars).
 
@@ -9282,6 +9320,7 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
     year = params.get("year", 2002)
     ship_carriers = params.get("ship_carriers", ["DIAMOND", "AIRBORNE"])
     time_start = params.get("time_start", 49530)
+    value_columns = _q66_value_columns(params)
 
     col = ctx.col
     lit = ctx.lit
@@ -9319,7 +9358,7 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
             )
         return aggs
 
-    # Web sales aggregation (net uses the paid-inc-tax column from the SQL template)
+    # Web sales aggregation
     ws = (
         web_sales.join(warehouse, left_on="ws_warehouse_sk", right_on="w_warehouse_sk")
         .join(date_filtered, left_on="ws_sold_date_sk", right_on="d_date_sk")
@@ -9329,9 +9368,8 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
 
     ws_agg = (
         ws.group_by(["w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "d_year"])
-        # SQL multiplies the unit sales_price by quantity (ext_sales_price is
-        # already extended and must not be multiplied again).
-        .agg(build_monthly_aggs("ws_sales_price", "ws_net_paid_inc_tax", "ws_quantity"))
+        # SQL multiplies the chosen sales column by quantity, whichever column the template drew.
+        .agg(build_monthly_aggs(*value_columns["web"], "ws_quantity"))
         .with_columns(
             [
                 lit(carriers_str).alias("ship_carriers"),
@@ -9340,7 +9378,7 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    # Catalog sales aggregation (net uses the paid-inc-ship-tax column from the SQL template)
+    # Catalog sales aggregation
     cs = (
         catalog_sales.join(warehouse, left_on="cs_warehouse_sk", right_on="w_warehouse_sk")
         .join(date_filtered, left_on="cs_sold_date_sk", right_on="d_date_sk")
@@ -9350,8 +9388,7 @@ def q66_expression_impl(ctx: DataFrameContext) -> Any:
 
     cs_agg = (
         cs.group_by(["w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "d_year"])
-        # SQL multiplies the unit sales_price by quantity (see the web leg above).
-        .agg(build_monthly_aggs("cs_sales_price", "cs_net_paid_inc_ship_tax", "cs_quantity"))
+        .agg(build_monthly_aggs(*value_columns["catalog"], "cs_quantity"))
         .with_columns(
             [
                 lit(carriers_str).alias("ship_carriers"),
@@ -9404,6 +9441,7 @@ def q66_pandas_impl(ctx: DataFrameContext) -> Any:
     year = params.get("year", 2002)
     ship_carriers = params.get("ship_carriers", ["DIAMOND", "AIRBORNE"])
     time_start = params.get("time_start", 49530)
+    value_columns = _q66_value_columns(params)
 
     web_sales, catalog_sales, warehouse, date_dim, time_dim, ship_mode = _tables(
         ctx, "web_sales", "catalog_sales", "warehouse", "date_dim", "time_dim", "ship_mode"
@@ -9442,28 +9480,25 @@ def q66_pandas_impl(ctx: DataFrameContext) -> Any:
         result["year"] = result["d_year"]
         return result
 
-    # Process web sales (net uses the paid-inc-tax column from the SQL template;
-    # monthly sales multiply the unit price by quantity)
+    # Process web sales (the chosen sales and net columns are each multiplied by quantity)
     ws_agg = process_channel(
         web_sales,
         "ws_warehouse_sk",
         "ws_sold_date_sk",
         "ws_sold_time_sk",
         "ws_ship_mode_sk",
-        "ws_sales_price",
-        "ws_net_paid_inc_tax",
+        *value_columns["web"],
         "ws_quantity",
     )
 
-    # Process catalog sales (net uses the paid-inc-ship-tax column from the SQL template)
+    # Process catalog sales
     cs_agg = process_channel(
         catalog_sales,
         "cs_warehouse_sk",
         "cs_sold_date_sk",
         "cs_sold_time_sk",
         "cs_ship_mode_sk",
-        "cs_sales_price",
-        "cs_net_paid_inc_ship_tax",
+        *value_columns["catalog"],
         "cs_quantity",
     )
 
