@@ -55,3 +55,21 @@ def test_the_value_digest_still_sorts_on_the_exact_float():
     rows = [(high, 1), (low, 0)]
 
     assert calculate_checksum(rows) == calculate_checksum([(low, 0), (high, 1)])
+
+
+def test_pairing_respects_configured_tolerance():
+    """Pairing aligns with self.tolerance rather than a fixed decimal bucket."""
+    original = [(100.0, 0), (100.0, 1)]
+    variant = [(100.00005, 0), (100.0, 1)]
+
+    assert ResultValidator(tolerance=1e-3).validate_results_exact(original, variant, query_id=1, variant_id=1)
+
+
+def test_pairing_handles_values_straddling_decimal_rounding_boundary():
+    """Values differing by float noise across a decimal boundary still pair correctly."""
+    val1 = 1.0000000049999999
+    val2 = 1.0000000050000001
+    original = [(val1, 0), (val1, 1)]
+    variant = [(val2, 0), (val1, 1)]
+
+    assert ResultValidator().validate_results_exact(original, variant, query_id=1, variant_id=1)
