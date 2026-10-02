@@ -49,6 +49,14 @@ pytestmark = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def _polars_environment(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Own environment outputs installed by the tuned Polars adapters."""
+    from tests.utilities.session_isolation import own_environment
+
+    own_environment(monkeypatch, ["POLARS_MAX_THREADS", "POLARS_STREAMING_CHUNK_SIZE"])
+
+
 def _polars_thread_config(threads: int = 6, chunk_size: int = 100_000) -> DataFrameTuningConfiguration:
     cfg = DataFrameTuningConfiguration()
     cfg.parallelism.thread_count = threads

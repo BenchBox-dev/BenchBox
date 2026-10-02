@@ -12,6 +12,7 @@ from tests.unit.platforms.pyspark.conftest import PYSPARK_SQL_SKIP_REASON, PYSPA
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
+    pytest.mark.usefixtures("spark_runtime_environment"),
     pytest.mark.xdist_group("pyspark"),
     pytest.mark.skipif(PYSPARK_SQL_TESTS_SKIPPED, reason=PYSPARK_SQL_SKIP_REASON),
 ]

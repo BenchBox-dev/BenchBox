@@ -101,6 +101,9 @@ def test_setup_prompt_token_is_validated_but_not_persisted(
     mock_validate,
     monkeypatch,
 ):
+    from tests.utilities.session_isolation import own_environment
+
+    own_environment(monkeypatch, [MOTHERDUCK_TOKEN_ENV])
     monkeypatch.delenv(MOTHERDUCK_TOKEN_ENV, raising=False)
     manager = _cred_manager(None)
     console = MagicMock()
