@@ -20796,6 +20796,15 @@
       "status": "done",
       "title": "Make DuckDB sorting + ClickHouse keys verification-eligible for applied_verified"
     },
+    "tuning-verification-reach-per-platform-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-gate-verification-reach-20261001"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Execute the D-9 verification-reach decision per admitted platform (facts-only reader or introspector)"
+    },
     "tutorial-benchmark-verification": {
       "claim": null,
       "needs": [],

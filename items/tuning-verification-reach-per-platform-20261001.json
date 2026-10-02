@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Item context lists the platforms admitted by D-9; each admitted platform has a bounded, non-raising reader with recorded-fixture tests; ClickHouse truncation measured on raw rows."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P4.2 (gated after plan review F10). Split into per-platform follow-up items when D-9 admits platforms.",
+  "description": "## Problem\nVerification reach beyond DuckDB, ClickHouse and Snowflake is undecided. The corpus shows zero tuned runs on other platforms.\n\n## Change\nImplement exactly what gate D-9 decides. If facts-only is chosen, build a generic per-platform catalog-facts reader with no verdicts. Otherwise, build introspectors only for the platforms the gate admits, each only after that platform's render-at-execution item lands.\n\nPer-platform structured sources:\n- Databricks `DESCRIBE DETAIL` (`clusteringColumns`, `partitionColumns`);\n- BigQuery `INFORMATION_SCHEMA.COLUMNS`;\n- Redshift `SVV_TABLE_INFO` / `PG_TABLE_DEF`;\n- PostgreSQL `pg_index` / `pg_partitioned_table`;\n- StarRocks `information_schema.tables_config`;\n- Trino / Iceberg `$properties` / `$partitions`;\n- Firebolt `information_schema.indexes`;\n- Synapse `sys.pdw_*`;\n- MotherDuck `duckdb_indexes()`.\n\n## Guardrails (must preserve)\n- Bounded: the ledger-table filter goes inside the SQL `WHERE` and truncation is measured on the raw result. Fix the ClickHouse introspector, which computes `truncated` after filtering (`clickhouse/introspection.py:73,81`).\n- Non-raising, structured catalogs only (never DDL text).\n- Recorded-fixture unit tests, plus a separately approved live confirmation per platform.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "links": [
+    "benchbox/core/tuning/introspection.py",
+    "benchbox/platforms/clickhouse/introspection.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:31:07Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7359be0d4f7d491998e44bec53f42470",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
