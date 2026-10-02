@@ -74,6 +74,10 @@ _project/scripts/soundness_paths.py @joeharris76
 _project/scripts/check_soundness_review.py @joeharris76
 .github/workflows/ci.yml @joeharris76
 .github/ci-units.yml @joeharris76
+results-explorer/src/lib/publicSiteVisual.ts @joeharris76
+results-explorer/e2e/captures/public-site-pages.spec.ts @joeharris76
+results-explorer/scripts/public-site-visual-approval-members.mjs @joeharris76
+results-explorer/scripts/resolve-public-site-visual-approval-members.mjs @joeharris76
 scripts/ci_units.py @joeharris76
 scripts/ci_unit_result.py @joeharris76
 scripts/release_flow.py @joeharris76

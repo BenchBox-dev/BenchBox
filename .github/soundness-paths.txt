@@ -58,6 +58,12 @@ file	.github/CODEOWNERS
 file	AGENTS.md
 file	.github/workflows/ci.yml
 file	.github/ci-units.yml
+# The public-site visual gate's approval decision: a PR author can edit this code
+# in the same PR it approves, so changes to it need the same external review.
+file	results-explorer/src/lib/publicSiteVisual.ts
+file	results-explorer/e2e/captures/public-site-pages.spec.ts
+file	results-explorer/scripts/public-site-visual-approval-members.mjs
+file	results-explorer/scripts/resolve-public-site-visual-approval-members.mjs
 file	scripts/ci_units.py
 file	scripts/ci_unit_result.py
 file	scripts/release_flow.py
