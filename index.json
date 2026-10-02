@@ -20452,6 +20452,13 @@
       "status": "done",
       "title": "Extend rendered-SQL clause contract to partition_by/order_by previews"
     },
+    "tuning-physical-identifier-resolution-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Add a physical identifier resolution helper and use it in every tuning statement builder"
+    },
     "tuning-platform-identity-canonical-keys-20260712": {
       "claim": null,
       "needs": [],
