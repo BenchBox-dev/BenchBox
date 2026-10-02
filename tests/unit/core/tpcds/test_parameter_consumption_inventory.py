@@ -53,7 +53,7 @@ pytestmark = [
 ]
 
 # Queries whose implementations read a key missing from the defaults file (literal fallback).
-LITERAL_FALLBACK = frozenset({8, 10, 21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88, 90, 91})
+LITERAL_FALLBACK = frozenset({21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88, 90, 91})
 
 # Implementations that do not run to completion against the stand-in context.
 INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
@@ -64,7 +64,7 @@ HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
 # Category (b): everything else the inventory finds a gap in. This may only shrink.
 BINDING_GAP = frozenset(
     {
-        1, 3, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 44, 45,
+        18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 44, 45,
         49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
     }
 )  # fmt: skip
@@ -242,6 +242,8 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
 
 
 def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) -> QueryInventory:
+    from benchbox.core.tpcds.dataframe_queries.parameter_adapters import ADAPTERS
+
     result = QueryInventory(query_id)
     for family in ("expression", "pandas"):
         keys, complete = _read_keys(query_id, family, defaults)
@@ -284,8 +286,12 @@ def _inventory(query_id: int, dsqgen: Any, defaults: dict[int, dict[str, Any]]) 
             continue
         if takes_a_list:
             # The implementation passes a list through (for example to is_in), so it can take every value the
-            # SQL uses; only the binding data is short, which is adapter work, not a code change.
-            result.data_shortfall.append(f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults")
+            # SQL uses; only the binding data is short, which is adapter work, not a code change. A query
+            # with an adapter takes its list from dsqgen, so the defaults file being short no longer matters.
+            if query_id not in ADAPTERS:
+                result.data_shortfall.append(
+                    f"{name}: {len(used[name])} values reach the SQL, {capacity} in the defaults"
+                )
         else:
             result.shortfall.append(f"{name}: {len(used[name])} values reach the SQL, the implementation reads one")
 
@@ -326,7 +332,7 @@ def test_incomplete_runs_are_the_known_ones(inventory):
     assert incomplete <= INCOMPLETE_RUNS
 
 
-def test_literal_fallback_queries_are_the_known_fifteen(inventory):
+def test_literal_fallback_queries_are_the_known_ones(inventory):
     assert {entry.query_id for entry in inventory.values() if entry.fallback} == LITERAL_FALLBACK
 
 

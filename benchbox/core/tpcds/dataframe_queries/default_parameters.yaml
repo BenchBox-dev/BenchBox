@@ -1,5 +1,5 @@
 1:
-  agg_field: sr_return_amt
+  agg_field: sr_fee
   state: TN
   year: 2000
 2:
@@ -17,12 +17,12 @@
   month: 2
   year: 2000
 7:
-  channel_promo: channel_demo
   education: Primary
   gender: F
   marital_status: W
   year: 1998
 8:
+  qoy: 2
   year: 1998
   zip_codes:
   - '24128'
@@ -49,7 +49,12 @@
   - 10098
   - 18213
 10:
-  gender: F
+  counties:
+  - Walker County
+  - Richland County
+  - Gaines County
+  - Douglas County
+  - Dona Ana County
   month: 2
   year: 2002
 11:
@@ -59,9 +64,7 @@
   - Jewelry
   - Sports
   - Books
-  month: 2
   sales_date: '2001-01-12'
-  year: 1999
 13:
   demo1_education: 2 yr Degree
   demo1_marital: D
@@ -69,8 +72,6 @@
   demo2_marital: S
   demo3_education: Advanced Degree
   demo3_marital: W
-  education: Advanced Degree
-  marital_status: M
   states1:
   - CO
   - IL
@@ -85,7 +86,6 @@
   - MI
   year: 2001
 14:
-  day: 11
   year: 1998
 15:
   min_price: 500
@@ -114,7 +114,6 @@
   year: 1999
 17:
   quarter: 1
-  state: OK
   year: 1998
 18:
   birth_months:

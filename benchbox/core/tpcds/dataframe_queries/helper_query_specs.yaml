@@ -35,6 +35,7 @@ helper_queries:
   - - false
     - true
     - false
+  - agg_column
 - query_id: 42
   title: Date/Item Category Sales
   expression_helper: _date_item_sales_expression

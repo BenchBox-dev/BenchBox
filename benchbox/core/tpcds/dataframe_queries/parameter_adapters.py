@@ -53,6 +53,80 @@ def _year_and_month(values: Mapping[str, str]) -> tuple[int, int]:
     return int(values["YEAR.01"]), int(values["MONTH.01"])
 
 
+def _listed(values: Mapping[str, str], name: str, first: int = 1, last: int | None = None) -> list[str]:
+    """The values logged as ``NAME.nn`` for ``first`` through ``last`` (every one when ``last`` is omitted)."""
+    prefix = f"{name}."
+    numbered = sorted((int(key[len(prefix) :]), value) for key, value in values.items() if key.startswith(prefix))
+    return [value for number, value in numbered if number >= first and (last is None or number <= last)]
+
+
+def _q1(values: Mapping[str, str]) -> dict[str, Any]:
+    # STATE is derived from COUNTY inside the template; only the state reaches the SQL.
+    return {
+        "year": int(values["YEAR.01"]),
+        "state": values["STATE.01"],
+        "agg_field": values["AGG_FIELD.01"].lower(),
+    }
+
+
+def _q3(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "manufact_id": int(values["MANUFACT.01"]),
+        "month": int(values["MONTH.01"]),
+        "agg_column": values["AGGC.01"].lower(),
+    }
+
+
+def _q7(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "education": values["ES.01"],
+        "gender": values["GEN.01"],
+        "marital_status": values["MS.01"],
+    }
+
+
+def _q8(values: Mapping[str, str]) -> dict[str, Any]:
+    # The template draws 400 zip codes; every one reaches the SQL.
+    return {"year": int(values["YEAR.01"]), "qoy": int(values["QOY.01"]), "zip_codes": _listed(values, "ZIP")}
+
+
+def _q10(values: Mapping[str, str]) -> dict[str, Any]:
+    # The template draws ten counties and its SQL uses the first five.
+    return {
+        "year": int(values["YEAR.01"]),
+        "month": int(values["MONTH.01"]),
+        "counties": _listed(values, "COUNTY", last=5),
+    }
+
+
+def _q12(values: Mapping[str, str]) -> dict[str, Any]:
+    # YEAR only picks the date the template draws SDATE from; the SQL filters on the dates and categories.
+    return {"item_categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
+
+
+def _q13(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL has three demographic groups, each a marital status, an education status and three states.
+    marital, education, states = _listed(values, "MS"), _listed(values, "ES"), _listed(values, "STATE")
+    parameters: dict[str, Any] = {}
+    for group in range(3):
+        parameters[f"demo{group + 1}_marital"] = marital[group]
+        parameters[f"demo{group + 1}_education"] = education[group]
+        parameters[f"states{group + 1}"] = states[group * 3 : group * 3 + 3]
+    return parameters
+
+
+def _q14(values: Mapping[str, str]) -> dict[str, Any]:
+    # DAY.01 only reaches the template's second statement (this year against last year); the DataFrame
+    # implementation reproduces the first, which depends on YEAR alone.
+    return {"year": int(values["YEAR.01"])}
+
+
+def _q17(values: Mapping[str, str]) -> dict[str, Any]:
+    # The quarters are fixed in the template (Q1 to Q3); only the year is drawn.
+    return {"year": int(values["YEAR.01"])}
+
+
 def _q39(values: Mapping[str, str]) -> dict[str, Any]:
     # The SQL compares month MONTH with month MONTH+1; the log has only MONTH.
     year, month = _year_and_month(values)
@@ -72,7 +146,21 @@ def _q93(values: Mapping[str, str]) -> dict[str, Any]:
     return {"reason": values["REASON.01"]}
 
 
-ADAPTERS: dict[int, Adapter] = {39: _q39, 44: _q44, 49: _q49, 93: _q93}
+ADAPTERS: dict[int, Adapter] = {
+    1: _q1,
+    3: _q3,
+    7: _q7,
+    8: _q8,
+    10: _q10,
+    12: _q12,
+    13: _q13,
+    14: _q14,
+    17: _q17,
+    39: _q39,
+    44: _q44,
+    49: _q49,
+    93: _q93,
+}
 
 
 def adapter_query_ids() -> tuple[int, ...]:
