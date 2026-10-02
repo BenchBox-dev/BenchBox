@@ -206,7 +206,7 @@
     {
       "benchmark": "nyctaxi",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
@@ -329,7 +329,7 @@
     {
       "benchmark": "tpch",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
@@ -351,7 +351,7 @@
     {
       "benchmark": "tpch_skew",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
@@ -413,7 +413,7 @@
     {
       "benchmark": "tsbs_devops",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "independence": "self-referential",
