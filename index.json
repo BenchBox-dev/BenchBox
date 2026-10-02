@@ -6279,13 +6279,18 @@
       "title": "Prototype parameter adapters for Q39, Q44, Q49 and Q93 (Q41 as negative control)"
     },
     "dfparity-t05-adapter-batches": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T18:13:02Z",
+        "generation": "bb16bc23f6c34a6fba71fb20dd1f10c5",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea"
+      },
       "needs": [
         "dfparity-t04-adapter-prototype",
         "dfparity-t02-parameter-inventory-test"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Split the remaining parameter adapters into batch todos from the T2 inventory"
     },
     "dfparity-t06-literal-fallback-lint": {
