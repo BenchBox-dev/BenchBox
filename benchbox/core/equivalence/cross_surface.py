@@ -935,6 +935,20 @@ _DATAVAULT_Q17_VACUOUS = (
 )
 _DATAVAULT_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q17",), _DATAVAULT_Q17_VACUOUS)
 
+_TPCH_SKEW_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell (SF=0.01, seed 42): Q17 is a scalar "
+    "SUM(...) with no GROUP BY whose default literals (Brand#23, MED BOX) match no "
+    "qualifying part/lineitem rows in the skewed data, so the reference returns the single "
+    "all-NULL row and neither surface can discriminate anything. Verified 2026-10-01 by "
+    "executing the reference SQL over every brand/container combination present in the "
+    "built cell (25 brands x 40 containers = 1000 combos): 496 combinations return a "
+    "non-NULL value and only the combinations that match no qualifying rows, including the "
+    "default pair, return the all-NULL row. This is a literal artifact of the default "
+    "parameters against the skewed distribution, not a load or logic bug, and the query is "
+    "not vacuous in general. Tracked: gate Q17 with a brand/container pair the cell "
+    "satisfies (do NOT change the canonical Q17 query)."
+)
+
 _JOINORDER_SYNTHETIC_VACUOUS = (
     "Synthetic selectivity, not a bug: the query's multi-table conjunction needs coordinated "
     "real-world literals (specific keywords, notes, countries, ratings, link types) that the "
@@ -1833,15 +1847,18 @@ GATES: dict[str, CrossSurfaceGate] = {
     ),
     # TPC-H Skew: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
     # mechanical Q prefix ("Q1".."Q22"), the same convention as amplab and
-    # datavault. Bounded cell at the shared small scale. Q8 is legitimately
-    # empty: the skewed generator emits no part rows with p_type
-    # 'ECONOMY ANODIZED STEEL' at any probed scale (0.01/0.05/0.1), so the
-    # reference itself returns 0 rows independent of either surface.
+    # datavault. Bounded cell at the shared small scale. Q8 and Q17 are
+    # legitimately empty: Q8 because the skewed generator emits no part rows
+    # with p_type 'ECONOMY ANODIZED STEEL' at any probed scale (0.01/0.05/0.1),
+    # Q17 because its default literals match nothing in the skewed cell (see
+    # _TPCH_SKEW_Q17_VACUOUS). Either way the reference itself returns no
+    # discriminating rows independent of either surface.
     "tpch_skew": CrossSurfaceGate(
         name="tpch_skew",
         build=build_tpch_skew_duckdb,
         legitimately_empty={
             "8": "Skewed generator emits zero 'ECONOMY ANODIZED STEEL' part rows at SF 0.01-0.1; reference returns 0 rows.",
+            "17": _TPCH_SKEW_Q17_VACUOUS,
         },
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
