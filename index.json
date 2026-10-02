@@ -6046,12 +6046,17 @@
       "title": "Add dsqgen -LOG support and a structured parameter-log parser"
     },
     "dfparity-t02-parameter-inventory-test": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-03T01:51:06Z",
+        "generation": "60b56ecaf9cb4a8d8bab37c1ffc45b76",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65"
+      },
       "needs": [
         "dfparity-t01-dsqgen-log-parser"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Add a data-free test inventorying parameter consumption for all 99 TPC-DS queries"
     },
     "dfparity-t03-gate-scale-threading": {
