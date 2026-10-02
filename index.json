@@ -20583,6 +20583,16 @@
       "status": "done",
       "title": "Applied-ledger capture for Snowpark session tuning"
     },
+    "tuning-sort-evidence-attested-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-gate-sort-evidence-model-20261001",
+        "tuning-requested-vs-rendered-reconciliation-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Implement the decided sort-evidence model (record successful sort rewrites; requested-but-unexecuted sorts block)"
+    },
     "tuning-sort-realized-by-ddl-no-drop-20261001": {
       "claim": null,
       "needs": [

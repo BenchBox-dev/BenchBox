@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "Test: requested sort + index present + no executed rewrite → dropped intent → not applied_verified.",
+    "Test: requested sort + index corroborated + executed rewrite → applied_verified, and the receipt shows the attested entry.",
+    "Explorer drill-down renders the new verdict class (vitest)."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.6 (finding A3; plan review F2).",
+  "description": "## Problem\nThe DuckDB verified evidence is the ART index, not the physical order. A successful CTAS or atomic sort rewrite is never recorded (`benchbox/platforms/base/sorted_ingestion.py:211-320`).\n\n## Change (per gate D-1; option A expected)\n- Record a successful rewrite in `_execute_ctas_sort` as an executed `post_load` statement with `mechanism=\"sorted_ingestion\"`.\n- Classify it per the decision (e.g. a non-blocking `attested` verdict), surfaced in the receipt and the Explorer drill-down.\n- \"Sort requested but no executed rewrite\" is enforced by the reconciliation item as a dropped intent. `corroborate()` stays configuration-free (plan review F2).\n- MotherDuck: wire `DuckDBTuningIntrospector` only if D-1 permits attested-only verification. MotherDuck creates no index.\n\n## Guardrails (must preserve)\n- `attested` never counts as corroboration of a catalog-verifiable intent.\n- Skipped or failed sorts still block.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.\n- This item touches paths listed in the soundness manifest by `tuning-trust-paths-soundness-manifest-20261001`. The PR needs an external `Soundness review:` section (AGENTS.md) and must not auto-merge.",
+  "links": [
+    "benchbox/platforms/base/sorted_ingestion.py",
+    "benchbox/core/tuning/introspection.py",
+    "results-explorer/src/components/RunReceipt.tsx"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:23:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ebabe24f8e6d4a6dbbd485a28c3cde73",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
