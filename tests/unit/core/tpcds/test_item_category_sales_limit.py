@@ -10,7 +10,7 @@ from datetime import date
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 ITEM_COUNT = 150  # more than the SQL LIMIT of 100
 
