@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import math
 import statistics
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -50,6 +51,14 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+
+
+def _time_with(**overrides):
+    """Stand-in for one module's `time` name: the named functions are replaced, the rest is the real module."""
+    return SimpleNamespace(**{**vars(time), **overrides})
+
+
+SUITE_TIME = "benchbox.core.dataframe.benchmark_suite.time"
 
 
 # ---------------------------------------------------------------------------
@@ -1249,7 +1258,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
             def fetchall(self):
                 return [(1,), (2,)]
 
-        with patch("time.perf_counter", side_effect=[1.0, 1.1, 2.0, 2.4]):
+        with patch(SUITE_TIME, _time_with(perf_counter=iter([1.0, 1.1, 2.0, 2.4]).__next__)):
             avg_ms, row_count = bm._warmup_and_benchmark(FakeConnection(), "SELECT 1")
 
         assert avg_ms == pytest.approx(250.0)
@@ -1274,7 +1283,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
 
         with (
             patch("benchbox.platforms.get_dataframe_adapter", return_value=fake_adapter),
-            patch("time.perf_counter", side_effect=[1.0, 1.2, 2.0, 2.3]),
+            patch(SUITE_TIME, _time_with(perf_counter=iter([1.0, 1.2, 2.0, 2.3]).__next__)),
         ):
             avg_ms, row_count = bm._run_df_query("Q1", "polars-df", tmp_path)
 

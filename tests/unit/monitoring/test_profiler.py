@@ -27,6 +27,11 @@ pytestmark = [
 ]
 
 
+def _time_with(**overrides):
+    """Stand-in for one module's `time` name: the named functions are replaced, the rest is the real module."""
+    return SimpleNamespace(**{**vars(time), **overrides})
+
+
 class TestResourceType:
     """Tests for ResourceType enum."""
 
@@ -457,11 +462,12 @@ class TestEnhancedResourceProfiler:
         profiler._prev_net_recv = 2_000_000
 
         with (
-            patch("benchbox.monitoring.profiler.time.time", return_value=1000.0),
+            patch("benchbox.monitoring.profiler.time", _time_with(time=lambda: 1000.0)),
             patch("benchbox.monitoring.profiler.mono_time", return_value=12.0),
         ):
             sample = profiler._collect_sample()
 
+        assert sample.timestamp == 1000.0
         # Disk IOPS: deltas over 2-second monotonic interval.
         assert sample.disk_read_iops == 6.0
         assert sample.disk_write_iops == 4.0
