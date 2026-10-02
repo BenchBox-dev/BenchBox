@@ -289,6 +289,19 @@ def test_handback_guard_allows_safety_wording_and_separate_list_items(tmp_path: 
     assert agent_instruction_audit.audit_handback_wording(project) == []
 
 
+@pytest.mark.parametrize(
+    "relative",
+    ["Makefile", "make/help.mk", "docs/operations/pr-triage.md", "docs/operations/repo-admin-settings.md"],
+)
+def test_handback_guard_covers_the_scripts_and_docs_that_print_guidance(tmp_path: Path, relative: str) -> None:
+    project = _candidate(tmp_path)
+    assert agent_instruction_audit.audit_handback_wording(project) == []
+    target = _with_repo_file(project, relative)
+    target.write_text(target.read_text() + "\n\nAuto-merge withheld. Run make pr-ready when the branch is final.\n")
+    errors = agent_instruction_audit.audit_handback_wording(project)
+    assert any(error.startswith(f"{relative}:") for error in errors), errors
+
+
 def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"

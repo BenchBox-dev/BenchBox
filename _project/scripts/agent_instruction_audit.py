@@ -139,6 +139,10 @@ HANDBACK_TEXT = (
     ".claude/commands/*.md",
     "docs/agent/*.md",
     "docs/development/development.md",
+    "docs/operations/pr-triage.md",
+    "docs/operations/repo-admin-settings.md",
+    "Makefile",
+    "make/help.mk",
 )
 HANDBACK_PATTERNS = {
     "auto-merge withheld": r"\bauto[- ]merge\s+(?:is\s+|stays\s+|remains\s+)?withheld\b",
