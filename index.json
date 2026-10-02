@@ -20517,6 +20517,13 @@
       "status": "done",
       "title": "StarRocks DDL generator: render tuned PARTITION BY / DISTRIBUTED BY / ORDER BY via the single renderer"
     },
+    "tuning-stop-false-console-and-explorer-claims-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Stop false tuning claims in the console and the Results Explorer"
+    },
     "tuning-template-packaging-20260716": {
       "claim": null,
       "needs": [],
