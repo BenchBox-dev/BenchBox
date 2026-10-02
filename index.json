@@ -20237,6 +20237,17 @@
       "status": "done",
       "title": "Anonymize nested tuning companion shapes (successor) (successor)"
     },
+    "tuning-constraint-corroboration-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-gate-constraint-corroboration-20261001",
+        "duckdb-index-identifier-binding-20261001",
+        "tuning-trust-paths-soundness-manifest-20261001"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Corroborate declared constraints against structured catalogs (DuckDB first), with FK target matching"
+    },
     "tuning-corpus-drop-pre-provenance-tuned-bundles-20260716": {
       "claim": null,
       "needs": [],

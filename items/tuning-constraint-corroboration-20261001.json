@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Unit tests per constraint kind (positive) and negatives: PK on different columns → mismatch; FK with same child columns but a different referenced table → mismatch.",
+    "e2e: the shipped DuckDB TPC-H template (after partitioning removal) produces no constraint 'unverifiable' entries."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P1.7 (R-1a; plan review F6).",
+  "description": "## Problem\nConstraint-bearing `CREATE TABLE` statements are always `unverifiable` (`introspection.py:492-496`), so constraint-enabled runs, including every shipped DuckDB template, can never verify.\n\n## Change (per gate D-2)\n- Add constraint kinds to `introspection.py`. `_classify` extracts `PRIMARY KEY (…)`, `UNIQUE (…)` and `FOREIGN KEY (…) REFERENCES t(…)` after literal stripping.\n- Extend `_Intent` and `IntrospectedObject` with `referenced_table` and `referenced_columns`. For FKs, `_match_object` requires equal child columns, referenced table and referenced columns.\n- The DuckDB introspector adds `duckdb_constraints()` facts, bounded and filtered.\n- Platforms without a rule stay `unverifiable`.\n\n## Guardrails (must preserve)\n- Fail-closed: anything unparsed or without a source blocks.\n- No widening for existing kinds.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.\n- This item touches paths listed in the soundness manifest by `tuning-trust-paths-soundness-manifest-20261001`. The PR needs an external `Soundness review:` section (AGENTS.md) and must not auto-merge.",
+  "links": [
+    "benchbox/core/tuning/introspection.py",
+    "benchbox/platforms/duckdb_introspection.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:23:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ff921f13885e460a88aae303082481c6",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
