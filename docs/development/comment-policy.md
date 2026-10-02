@@ -9,14 +9,16 @@ assignments. A help string or protocol record needs an actual reader.
 
 ## Commands
 
-- `make comment-policy-check` rejects new violations against `origin/develop`,
-  then runs the native parser regressions. Set `BASE_REF` to an immutable
+- `make comment-policy-check` compares against `origin/develop`, then runs the
+  native parser regressions. While enforcement is advisory it lists new
+  violations without failing; once enforcement is blocking it rejects them. Set `BASE_REF` to an immutable
   commit SHA to reproduce a CI comparison.
 - `make comment-policy-strict` checks the whole inventory. It fails until
   cleanup is complete.
 - `make comment-policy-report` lists remaining violations without rejecting
   legacy debt. Configuration and parser setup failures still fail.
-- The pre-commit hook checks staged content.
+- The pre-commit hook checks staged content, with the same advisory or blocking
+  result as the check target.
 - `scripts/check_comment_policy.py --path` checks one file or directory prefix.
 
 The check target and hook need Python, `uv`, Node and npm. Without `BASE_REF`,
@@ -24,6 +26,23 @@ if `origin/develop` is not an ancestor of `HEAD`, a local run uses their merge
 base; an explicit or CI base must be an ancestor. Native tests run only after
 the source check passes, so they cannot replace the checker, but they can still
 fail the command.
+
+## Enforcement
+
+`quality/comment-policy.json` sets `enforcement` to `advisory` or `blocking`. A
+comparison against a base (the check target, the hook and CI) reads the mode
+from the base policy. While it is `advisory`, the check prints every new
+violation, and in CI marks each as a warning on the changed line, but exits
+successfully, so a pull request is never blocked for a comment. Parser and
+configuration failures still fail in both modes, and `comment-policy-strict` and
+`comment-policy-report` ignore the mode.
+
+Moving from `advisory` to `blocking` is a one-line change to the policy. It is
+checked against the base policy, so that change is not blocked by itself, and
+the next pull request is. A policy cannot be moved back from `blocking` to
+`advisory`. Flip it after the open pull requests have merged or been cleaned,
+so that no one meets the new rule on a branch that was started before it
+existed.
 
 ## Exceptions
 
@@ -69,7 +88,8 @@ scopes; report and strict modes inspect everything.
 ## CI trust model
 
 The `comment-policy` job runs on every pull request and merge group and feeds
-the required tooling result. Its base SHA comes from the platform event and
+the required tooling result. While enforcement is advisory its only failures
+are parser and configuration failures. Its base SHA comes from the platform event and
 cannot be overridden. The launcher, checker, adapters and hash-pinned parser
 dependency specifications come from that immutable base. For a pull request,
 the comparison is against the first parent of the merge commit CI checks out,

@@ -18,6 +18,7 @@ from pathlib import Path, PurePosixPath
 from comment_syntax import Finding, javascript_requests, language, scan, source_language
 
 POLICY_PATH = "quality/comment-policy.json"
+ENFORCEMENT_MODES = {"advisory", "blocking"}
 BOOTSTRAP_BASE = "ed5c263c513ba65499f4918d3a7de607f280c65b"
 DIRECTIVES = (
     r"# noqa: [A-Z]+[0-9]+(?:, ?[A-Z]+[0-9]+)*",
@@ -47,8 +48,10 @@ def validate_path(path: str) -> None:
 
 def load_policy(raw: bytes) -> dict:
     policy = json.loads(raw)
-    if set(policy) != {"version", "external", "completed", "exceptions"} or policy["version"] != 1:
+    if set(policy) - {"enforcement"} != {"version", "external", "completed", "exceptions"} or policy["version"] != 1:
         raise ValueError("invalid comment-policy schema")
+    if policy.get("enforcement", "blocking") not in ENFORCEMENT_MODES:
+        raise ValueError("enforcement must be advisory or blocking")
     for key in ("external", "completed", "exceptions"):
         if not isinstance(policy[key], list):
             raise ValueError(f"{key} must be a list")
@@ -110,6 +113,8 @@ def load_policy(raw: bytes) -> dict:
 
 
 def check_ratchet(policy: dict, baseline: dict) -> None:
+    if baseline.get("enforcement", "blocking") == "blocking" and policy.get("enforcement", "blocking") == "advisory":
+        raise ValueError("enforcement cannot be relaxed from blocking to advisory")
     if not set(baseline["completed"]).issubset(policy["completed"]):
         raise ValueError("completed scopes cannot be removed")
     if any(entry not in baseline["external"] for entry in policy["external"]):
@@ -285,6 +290,21 @@ def validate_consumers(root: Path, policy: dict) -> None:
             raise ValueError(f"external provenance missing: {entry['provenance']}")
 
 
+def exit_status(mode: str, baseline_policy: dict, failed: list[Finding]) -> int:
+    rejects = bool(failed) and mode != "report"
+    if not (rejects and mode == "transition" and baseline_policy.get("enforcement", "blocking") == "advisory"):
+        return int(rejects)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        for finding in failed[:100]:
+            excerpt = (finding.text.splitlines()[0][:160] if finding.text else "").replace("%", "%25")
+            print(f"::warning file={finding.path},line={finding.line}::comment-policy {finding.kind}: {excerpt}")
+    print(
+        f"comment-policy: enforcement is advisory, so these {len(failed)} findings do not fail the check; "
+        "they will once the policy sets enforcement to blocking"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Reject discretionary comments and docstrings in maintained source.")
     parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -377,7 +397,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"comment-policy: {len(sources)} source files, {len(current)} violations, {len(failed)} enforced failures ({args.mode})"
         )
-        return int(bool(failed) and args.mode != "report")
+        return exit_status(args.mode, baseline_policy, failed)
     except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as exc:
         print(f"comment-policy: configuration or parser failure: {exc}", file=sys.stderr)
         return 2

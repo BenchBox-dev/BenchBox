@@ -245,6 +245,90 @@ def test_transition_worktree_and_staged_content(tmp_path: Path) -> None:
     assert main([*args, "--staged"]) == 1
 
 
+def test_enforcement_value_is_validated_and_defaults_to_blocking() -> None:
+    assert load_policy(json.dumps(policy()).encode()).get("enforcement", "blocking") == "blocking"
+    assert load_policy(json.dumps(policy(enforcement="advisory")).encode())["enforcement"] == "advisory"
+    with pytest.raises(ValueError, match="advisory or blocking"):
+        load_policy(json.dumps(policy(enforcement="warn")).encode())
+    assert load_policy((ROOT / "quality/comment-policy.json").read_bytes())["enforcement"] == "advisory"
+
+
+def test_enforcement_can_be_tightened_but_never_relaxed() -> None:
+    check_ratchet(policy(enforcement="blocking"), policy(enforcement="advisory"))
+    check_ratchet(policy(enforcement="advisory"), policy(enforcement="advisory"))
+    check_ratchet(policy(enforcement="blocking"), policy())
+    with pytest.raises(ValueError, match="relaxed"):
+        check_ratchet(policy(enforcement="advisory"), policy(enforcement="blocking"))
+    with pytest.raises(ValueError, match="relaxed"):
+        check_ratchet(policy(enforcement="advisory"), policy())
+
+
+def test_advisory_enforcement_reports_findings_without_failing_the_comparison(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = git_repo(tmp_path, "x = 1\n")
+    args = ["--root", str(tmp_path), "--mode", "transition", "--base", base]
+    (tmp_path / "a.py").write_text("# new\nx = 1\n", encoding="utf-8")
+    assert main(args) == 1
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(enforcement="advisory")), encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "advisory",
+        ],
+        check=True,
+    )
+    advisory_base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    capsys.readouterr()
+    advisory = ["--root", str(tmp_path), "--mode", "transition", "--base", advisory_base]
+    assert main(advisory) == 0
+    out = capsys.readouterr().out
+    assert "a.py:1: CP comment" in out
+    assert "enforcement is advisory" in out
+    assert main(["--root", str(tmp_path), "--mode", "strict"]) == 1
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", "f" * 40]) == 2
+
+
+def test_candidate_cannot_relax_blocking_enforcement_in_a_comparison(tmp_path: Path) -> None:
+    (tmp_path / "quality").mkdir()
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(enforcement="blocking")), encoding="utf-8")
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "a.py", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "blocking",
+        ],
+        check=True,
+    )
+    base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(enforcement="advisory")), encoding="utf-8")
+    (tmp_path / "a.py").write_text("# new\nx = 1\n", encoding="utf-8")
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base]) == 2
+
+
 def test_new_exception_cannot_self_authorize_source(tmp_path: Path) -> None:
     base = git_repo(tmp_path, "x = 1\n")
     (tmp_path / "pyproject.toml").write_text("", encoding="utf-8")
