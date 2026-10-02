@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Q39 expression returns the same columns as the SQL and matches it at SF 0.1 with the Q39 adapter binding",
+    "pandas Q39 and every other query's status are unchanged",
+    "A unit case with a hand-built two-month input fails without the fix"
+  ],
+  "description": "The Polars self-join in the Q39 expression implementation drops the second month's key columns, so the result has 8 columns against the SQL's 10 (TESTED in the t04 measurement: Q39 pandas matches at SF 0.1, expression still diverges). Fix the expression implementation so the output columns match the SQL. Do not change the comparator.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:32:39Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "446b996acd45402396de952826a82a94",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}

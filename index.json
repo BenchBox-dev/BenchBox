@@ -6031,6 +6031,15 @@
       "status": "done",
       "title": "Add DataFrame execution support to Transaction Primitives benchmark"
     },
+    "dfparity-n11-q39-expression-columns": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Fix Q39 on the expression family returning 8 columns where SQL returns 10"
+    },
     "dfparity-t00-owner-decisions": {
       "claim": null,
       "needs": [],
