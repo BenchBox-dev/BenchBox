@@ -6168,17 +6168,12 @@
       "title": "Support or document Dask mixed-direction NULL placement and cuDF numeric NULL handling"
     },
     "dfparity-n05-dedupe-null-and-dsqgen-run": {
-      "claim": {
-        "expires_at": "2026-10-03T20:54:34Z",
-        "generation": "60e17e9756a141fd834f097918a3c805",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:59c85330a0f891e4bc7606ea"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "open",
       "title": "Replace the inline NULL-to-None loops in queries.py with the shared _none_for_null helper"
     },
     "dfparity-n06-replay-99-logs-test": {
