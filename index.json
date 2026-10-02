@@ -6085,6 +6085,15 @@
       "status": "open",
       "title": "Commit a test that replays all 99 templates' complete logs through generate_with_parameters"
     },
+    "dfparity-n07-ci-fragility": {
+      "claim": null,
+      "needs": [
+        "dfparity-t00-owner-decisions"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Fix CI fragility found during the parity work"
+    },
     "dfparity-n11-q39-expression-columns": {
       "claim": null,
       "needs": [

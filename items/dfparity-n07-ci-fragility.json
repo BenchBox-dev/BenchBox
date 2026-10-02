@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Each of the three is fixed or closed with a reason",
+    "Any soundness-path change has the required review and a maintainer merge"
+  ],
+  "description": "(1) The soundness-flag job diffs from the PR's recorded base to a merge ref on current develop, so a stale base gives a false 'PR body must contain a Soundness review' failure (a soundness path, so it needs the owner). (2) The test_unit_marker_functionality test is a 60 s flake. (3) The 600 s baseline wait in the PR workflow. Each is independent.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c434447bf9b2d2bb57095d65",
+      "at": "2026-10-02T11:34:26Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d7bcee0e24af49f3b979be721c228870",
+      "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    }
+  ]
+}
