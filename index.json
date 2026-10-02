@@ -6303,6 +6303,16 @@
       "status": "open",
       "title": "Parameter adapters, batch A: Q1, Q3, Q7, Q8, Q10, Q12, Q13, Q14, Q17"
     },
+    "dfparity-t05b-adapters-batch-b": {
+      "claim": null,
+      "needs": [
+        "dfparity-t04-adapter-prototype",
+        "dfparity-t02-parameter-inventory-test"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Parameter adapters, batch B: Q18, Q20, Q21, Q22, Q23, Q25, Q26, Q27, Q31"
+    },
     "dfparity-t06-literal-fallback-lint": {
       "claim": null,
       "needs": [
