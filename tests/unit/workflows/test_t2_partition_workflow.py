@@ -69,7 +69,10 @@ def test_the_medium_shard_records_memory_and_stalled_stacks() -> None:
     medium = _jobs("ci.yml")["medium-test"]
     run_step = next(step for step in medium["steps"] if step["name"] == "Run medium speed tier")
     assert "sample_resources &" in run_step["run"]
-    assert 'trap \'kill "${sampler}"' in run_step["run"]
+    assert 'pkill -P "${sampler}"' in run_step["run"]
+    assert 'kill "${sampler}"' in run_step["run"]
+    sampler_body = run_step["run"].split("sample_resources()")[1].split("sample_resources &")[0]
+    assert "comm" in sampler_body and "args" not in sampler_body
     names = [step["name"] for step in medium["steps"]]
     memory_step = next(
         step for step in medium["steps"] if step["name"] == "Record kernel memory events for the medium shard"

@@ -1132,12 +1132,12 @@ jobs:
           sample_resources() {
             while sleep 30; do
               echo "[resources $(date -u +%H:%M:%S)] $(free -m | awk '/Mem:/ {print "used_mb=" $3 " available_mb=" $7}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
-              ps -eo pid,rss,etimes,args --sort=-rss | awk 'NR <= 4 {print "  " substr($0, 1, 160)}'
+              ps -eo pid,rss,etimes,comm --sort=-rss | awk 'NR <= 4 {print "  " $0}'
             done
           }
           sample_resources &
           sampler=$!
-          trap 'kill "${sampler}" 2>/dev/null || true' EXIT
+          trap 'pkill -P "${sampler}" 2>/dev/null || true; kill "${sampler}" 2>/dev/null || true' EXIT
           BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest \
             -m "medium and not (slow or stress or resource_heavy or live_integration)" \
             --tb=short --timeout=60 -o faulthandler_timeout=120 -n 5 --durations=25 \
