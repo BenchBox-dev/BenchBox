@@ -64,8 +64,12 @@ def _ancestor_holds_lock(lock_path: Path) -> bool:
     return False
 
 
-def start() -> bool:
-    """Acquire or verify the shared lock before changing any HOME setting."""
+def start(acquire_lock: bool = True) -> bool:
+    """Acquire or verify the shared lock before changing any HOME setting.
+
+    ``acquire_lock=False`` isolates HOME without the lock, for a run that does not compete for
+    one: a serial run, or one that sets ``BENCHBOX_SKIP_TEST_LOCK``.
+    """
     global _state
     if _state is not None:
         return False
@@ -74,8 +78,8 @@ def start() -> bool:
     lock_dir = Path(configured).expanduser().resolve() if configured else Path.home() / ".benchbox"
     lock_path = lock_dir / "test.lock"
     fd: int | None = None
-    inherited = _ancestor_holds_lock(lock_path)
-    if not inherited:
+    inherited = _ancestor_holds_lock(lock_path) if acquire_lock else False
+    if acquire_lock and not inherited:
         try:
             wait = max(0.0, float(os.environ.get("BENCHBOX_TEST_LOCK_WAIT_SECONDS", "3600") or "3600"))
         except ValueError:
@@ -91,7 +95,7 @@ def start() -> bool:
     os.environ["HOME"] = home.name
     os.environ["USERPROFILE"] = home.name
     os.environ["BENCHBOX_TEST_LOCK_DIR"] = str(lock_dir)
-    if not inherited:
+    if acquire_lock and not inherited:
         os.environ[_OWNER] = str(os.getpid())
     _state = {"previous": previous, "home": home, "fd": fd}
     return True

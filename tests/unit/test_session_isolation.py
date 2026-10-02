@@ -137,3 +137,108 @@ def test_session_finish_restores_caller_environment(tmp_path: Path) -> None:
         [sys.executable, "-c", script], cwd=tmp_path, env=env, capture_output=True, text=True, timeout=30
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _run_session_probe(
+    tmp_path: Path,
+    test_source: str,
+    *pytest_args: str,
+    extra_env: dict[str, str] | None = None,
+    lock_held: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    """Run a probe module under the early plugin, optionally while this process holds the shared lock."""
+    caller_home = tmp_path / "caller-home"
+    caller_home.mkdir()
+    (tmp_path / "pytest.ini").write_text("[pytest]\nmarkers =\n    live_integration: live\n", encoding="utf-8")
+    (tmp_path / "test_probe.py").write_text(test_source, encoding="utf-8")
+    lock_path = tmp_path / "lock" / "test.lock"
+    fd = wait_for_lock(lock_path, 0) if lock_held else None
+    if fd is not None:
+        write_holder(fd, lock_path, phase="test", gate="isolation-negative")
+    env = dict(
+        os.environ,
+        HOME=str(caller_home),
+        USERPROFILE=str(caller_home),
+        PROBE_CALLER_HOME=str(caller_home),
+        PYTHONPATH=str(REPO_ROOT),
+        BENCHBOX_TEST_LOCK_DIR=str(lock_path.parent),
+        BENCHBOX_TEST_LOCK_WAIT_SECONDS="0",
+        **(extra_env or {}),
+    )
+    env.pop("BENCHBOX_TEST_SESSION_OWNER", None)
+    env.pop("BENCHBOX_SKIP_TEST_LOCK", None)
+    env.update(extra_env or {})
+    try:
+        return subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-c",
+                str(tmp_path / "pytest.ini"),
+                "--confcutdir",
+                str(tmp_path),
+                "-p",
+                "_benchbox_pytest_xdist_safety",
+                "-p",
+                "no:cacheprovider",
+                "-q",
+                *pytest_args,
+                "test_probe.py",
+            ],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    finally:
+        if fd is not None:
+            _close_lock(fd)
+
+
+HOME_PROBE = (
+    "import os\nfrom pathlib import Path\n"
+    "def test_home():\n"
+    '    assert str(Path.home()) != os.environ["PROBE_CALLER_HOME"]\n'
+)
+
+
+def test_a_serial_run_does_not_wait_for_the_shared_lock(tmp_path: Path) -> None:
+    result = _run_session_probe(tmp_path, HOME_PROBE, "-n", "0", lock_held=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_a_parallel_run_still_waits_for_the_shared_lock(tmp_path: Path) -> None:
+    result = _run_session_probe(tmp_path, HOME_PROBE, "-n", "1", lock_held=True)
+    assert result.returncode != 0, result.stdout + result.stderr
+    assert "TimeoutError" in result.stdout + result.stderr or "lock" in (result.stdout + result.stderr).lower()
+
+
+def test_the_documented_lock_bypass_is_honored_by_a_parallel_run(tmp_path: Path) -> None:
+    result = _run_session_probe(
+        tmp_path, HOME_PROBE, "-n", "1", extra_env={"BENCHBOX_SKIP_TEST_LOCK": "1"}, lock_held=True
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+LIVE_PROBE = (
+    "import os\nimport pytest\nfrom pathlib import Path\n"
+    "@pytest.mark.live_integration\n"
+    "def test_live_keeps_the_caller_home():\n"
+    '    assert str(Path.home()) == os.environ["PROBE_CALLER_HOME"]\n'
+    "def test_other_is_isolated():\n"
+    '    assert str(Path.home()) != os.environ["PROBE_CALLER_HOME"]\n'
+)
+
+
+def test_a_run_that_selects_live_tests_keeps_the_callers_home(tmp_path: Path) -> None:
+    result = _run_session_probe(tmp_path, LIVE_PROBE, "-n", "0", "-m", "live_integration")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed" in result.stdout
+
+
+def test_a_run_that_deselects_live_tests_is_isolated(tmp_path: Path) -> None:
+    result = _run_session_probe(tmp_path, LIVE_PROBE, "-n", "0", "-m", "not live_integration")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "1 passed" in result.stdout
