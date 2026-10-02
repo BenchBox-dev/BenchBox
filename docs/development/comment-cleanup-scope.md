@@ -57,9 +57,14 @@ The directive and TODO/FIXME registers are incomplete. A directive or TODO/FIXME
 that is not registered keeps its text: no task may delete it until it is
 registered with its consumer, necessity and owner, or an existing tracker item.
 The validator counts the Python comments that are not yet registered and prints
-the totals; the base has 1,093 directive comments and 35 TODO/FIXME comments in
-Python sources. Other languages need the grammar-aware checker before they can
-be counted.
+the totals; the base has about 1,100 directive comments, and every TODO/FIXME
+marker is registered. A TODO/FIXME marker is a comment that starts with the
+word, or has it after `#`, `;` or two spaces followed by a colon, such as
+`# TODO: link the issue` or `# noqa: E501  TODO: later`. A comment that only
+mentions the word in prose, such as "see the renderer TODO", is an ordinary
+comment that its owner removes with the rest, and the same goes for a mention
+that is part of a sentence. Other languages need the grammar-aware checker
+before they can be counted.
 
 The policy does not create a permanent path ledger. Before dispatch, run the
 validator against the immutable source commit and write the resolved manifest to
@@ -107,13 +112,27 @@ unowned, and ambiguity counts as failure.
 - `png-signature`: the file starts with the PNG signature. It does not validate
   the image or its metadata chunks.
 - `markdown-prose`: no code fence (also inside quotes and lists), indented line,
-  `<pre>`, `<code>`, `<script>` or `<style>` tag, HTML, link-reference, MDX,
-  MyST, Liquid or Jinja comment marker, or commented front matter.
+  `<pre>`, `<code>`, `<script>` or `<style>` tag, HTML, MDX, MyST, Liquid or
+  Jinja comment marker, link reference definition (any label, because its title
+  can hold hidden text), or commented front matter. Footnote definitions and
+  inline links are allowed.
 - `sql-without-comment-markers`: no `--`, `/*` or `#` anywhere in the file.
+- `empty-file`: the file has zero bytes, such as a `.gitkeep` placeholder.
 
 A class applies only to unclaimed paths under its selectors with a listed
-extension. The final-enforcement task owns these files and confirms that none
+extension. A file with no suffix, such as `.gitkeep`, matches by its whole name.
+The final-enforcement task owns the comment-free files and confirms that none
 gained comments.
+
+A class with `"state": "blocked"` does the opposite: it hands a file that no
+verifier can clear to a named owner, with a specific disposition, instead of
+leaving it unowned. It must use `markdown-needs-review` (the Markdown file fails
+`markdown-prose`) or `any-content` (every file with a listed extension under the
+selectors). A comment-free class must use a verifier that proves cleanliness, and
+a blocked class must not, so a blocked class can never mark a file clean. List
+the clean classes first, because a class claims only paths that earlier classes
+left unowned. Owners of a blocked class decide by provenance whether each file is
+maintained, frozen evidence or an external source before any edit.
 
 A directive records its exact token, the number of occurrences in the file, its
 actual consumer, necessity, smaller alternative considered, owner, and removal
@@ -132,7 +151,21 @@ assurance.
 ## Dispatch boundaries
 
 Consumer migration precedes deletion of its producer. An edge with a blocked
-consumer blocks the producer. Scope validation is limited to ownership, evidence,
+consumer blocks the producer.
+
+The committed edges cover two kinds of reader, each traced to its source. Three
+production readers (`benchbox/core/query_catalog.py`, `benchbox/core/dryrun.py`
+and `benchbox/mcp/tools/benchmark.py`) return `inspect.getsource` of the
+registered DataFrame implementations, so each of the 38 files that define them
+(resolved from the live registry) is a producer for all three. Three tests
+assert that specific docstring text is present. Sphinx autodoc renders the
+docstring of every object named by an `auto*` directive in `docs/`, so each
+defining file, found by importing the object and calling `inspect.getsourcefile`,
+is a producer for the page that names it. A test that only asserts absence or a
+code token cannot be broken by deleting a comment, so it is not an edge. The
+list is not exhaustive: Click and FastMCP help read a docstring in the same
+file, which an edge cannot express, and readers reached through dynamic names
+are still the owners' to inventory. Scope validation is limited to ownership, evidence,
 and dependency data. The checker owns deletion comparison, syntax and parser
 coverage, directive grammar, and strict/report enforcement. Shared tooling owns
 public command and CI wiring.
