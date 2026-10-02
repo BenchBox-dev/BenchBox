@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Each listed item updated (needs edge or explicit restriction note) and each closure annotated, with links to evidence."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan Phase 6 (A1.13). The live-cloud restriction is the urgent part; do it in Wave 0.",
+  "description": "## Problem\n- Open live-cloud items will run on Snowflake, BigQuery and Databricks. A tuned or `auto` run there risks dropping its own database mid-run until `tuning-no-midrun-destructive-db-handling-20261001` lands. Affected items:\n  - `live-cloud-benchmark-industry-suites`\n  - `live-cloud-benchmark-academic-suites`\n  - `live-cloud-benchmark-real-world-suites`\n  - `live-cloud-benchmark-tpc-variants-experimental`\n  - `live-cloud-benchmark-primitives-timeseries-ai`\n  - `databricks-liquid-clustering-tuning-review-20260526`, step w4\n- Two items are marked done without delivering:\n  - `tuning-verification-footprint-duckdb-clickhouse-20260722`: neither platform verifies end to end;\n  - `snowflake-clustering-key-live-verification-20260730`: the description says it was deferred for lack of credentials, and no live evidence is recorded.\n- Open Spark/Snowpark items depend on ledger capture.\n\n## Change (tracker writes; maintainer approves each)\n- **Add `needs` edges:**\n  - the five `live-cloud-benchmark-*` items → the mid-run-safety and metadata-portability items, **or** a description note restricting them to `--tuning notuning` until those land;\n  - `databricks-liquid-clustering-tuning-review-20260526` → the mid-run-safety, skip-vs-fail and post-load-seam items;\n  - `spark-session-config-runtime` and `spark-tuned-template-measured` → the non-DB-API capture item;\n  - `snowpark-tuning-surface-warehouse-and-session-params` → the reconciliation item.\n- **Annotate or reopen** the two prematurely closed items, with evidence.\n- **Supersede** `simplify-tuning-ledger-writer-dispatch-20260811` if the capture item rewrites that dispatch.\n\n## Guardrails (must preserve)\n- Only the maintainer decides drops and reopenings. Record the evidence in each item's context.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:35:41Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "83b4c60dade34951a67b83dc059f9c83",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
