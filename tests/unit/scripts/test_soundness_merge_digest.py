@@ -392,14 +392,20 @@ def commit_list(monkeypatch, commits, *, fetch_head=HEAD, runs=()):
 def pull_of(head, commits):
     return {
         "commits": commits,
-        "head": {"sha": head, "ref": "feature"},
+        "head": {"sha": head, "ref": "feature", "repo": {"full_name": "o/r"}},
         "merged_at": MERGED_AT,
         "created_at": "2026-10-02T08:00:00Z",
     }
 
 
 def run_record(**overrides):
-    record = {"event": "pull_request", "created_at": PUSHED, "pull_requests": [], "head_branch": "feature"}
+    record = {
+        "event": "pull_request",
+        "created_at": PUSHED,
+        "pull_requests": [],
+        "head_branch": "feature",
+        "head_repository": {"full_name": "o/r"},
+    }
     record.update(overrides)
     return record
 
@@ -411,6 +417,8 @@ def run_record(**overrides):
         ({"pull_requests": [{"number": 3}]}, False),
         ({"pull_requests": [], "head_branch": "feature"}, True),
         ({"pull_requests": [], "head_branch": "elsewhere"}, False),
+        ({"pull_requests": [], "head_repository": {"full_name": "fork/r"}}, False),
+        ({"pull_requests": [], "head_repository": None}, False),
         ({"pull_requests": [{"number": 7}], "created_at": "2026-10-01T00:00:00Z"}, False),
         ({"event": "push", "pull_requests": [{"number": 7}]}, False),
         ({"event": "pull_request_target"}, True),
@@ -418,6 +426,12 @@ def run_record(**overrides):
 )
 def test_a_run_counts_only_when_this_pull_request_started_it(override, expected):
     assert digest.belongs_to_pull(run_record(**override), 7, pull_of(HEAD, 1)) is expected
+
+
+def test_a_pull_request_whose_head_repository_is_gone_matches_no_unlisted_run():
+    pull = pull_of(HEAD, 1)
+    pull["head"]["repo"] = None
+    assert digest.belongs_to_pull(run_record(), 7, pull) is False
 
 
 def test_commits_are_read_with_refresh_merges_marked(monkeypatch):

@@ -345,13 +345,19 @@ def merged_pull_number(repo: str, sha: str) -> int | None:
 
 
 def belongs_to_pull(run_: dict[str, Any], number: int, pull: dict[str, Any]) -> bool:
-    """Return whether a workflow run was started by this pull request after it was opened."""
+    """Return whether a workflow run was started by this pull request after it was opened.
+
+    A run that lists no pull request is matched by head repository and branch name, which a
+    reused branch name can still confuse; the digest documents that residual limit.
+    """
     if run_.get("event") not in PULL_EVENTS or run_["created_at"] < pull["created_at"]:
         return False
     listed = run_.get("pull_requests") or []
     if listed:
         return any(p.get("number") == number for p in listed)
-    return run_.get("head_branch") == pull["head"]["ref"]
+    head_repo = (pull["head"].get("repo") or {}).get("full_name")
+    run_repo = (run_.get("head_repository") or {}).get("full_name")
+    return bool(head_repo) and run_repo == head_repo and run_.get("head_branch") == pull["head"]["ref"]
 
 
 def server_arrival(repo: str, sha: str, number: int, pull: dict[str, Any]) -> str | None:

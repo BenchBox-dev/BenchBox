@@ -131,7 +131,7 @@ The reaction and the comment must come after the last content commit and before 
 
 A merge of `develop` into the branch is a refresh, not content, when it has two parents, one of them already on `develop`, and its tree equals what merging the parents mechanically produces. A merge that needed conflict resolution, carries any other change, merges two branches that are not on `develop`, or has more than two parents counts as content. An "eyes" reaction is not a signal.
 
-The connector review names a commit, so it cannot be backdated. A posted review is text the author can write, so it shows that a review was recorded, not what it examined.
+The connector review names a commit, so it cannot be backdated. A posted review is text the author can write, so it shows that a review was recorded, not what it examined. A run that lists no pull request is matched to one by repository and branch name, so an author who reuses a branch name across pull requests, shares a commit between them and pushes the final content with `[skip ci]` can make the date earlier than it was. That needs deliberate set-up of the same kind as posting a review comment that was never written, and the digest does not defend against it.
 
 A commit gets an issue labelled `soundness-review-gap` when it has no signal, no merged pull request, or a reviewer thread that was resolved with no commit after it. An agent runs the external review and either records a clean result on the issue or opens a fix or revert pull request.
 
