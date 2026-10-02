@@ -132,6 +132,26 @@ def _row_sort_key(row: tuple[Any, ...]) -> tuple[Any, ...]:
     return tuple(_cell_sort_key(value) for value in row)
 
 
+_SORT_SIGNIFICANT_DIGITS = 9
+_SORT_ZERO_BELOW = 1e-10
+
+
+def _float_sort_bucket(value: float) -> float:
+    """Collapse float noise so rows the comparator treats as equal also sort as equal.
+
+    Two engines can sum the same values in a different order and differ in the last
+    digit. ``_numeric_values_equal`` accepts that, but sorting on the exact float can
+    still put two otherwise-tied rows in opposite orders on the two sides, which pairs
+    the wrong rows. Rounding to nine significant digits (and treating anything below
+    the comparator's absolute tolerance as zero) puts such rows in the same bucket.
+    """
+    if math.isnan(value) or math.isinf(value):
+        return value
+    if abs(value) < _SORT_ZERO_BELOW:
+        return 0.0
+    return float(f"{value:.{_SORT_SIGNIFICANT_DIGITS - 1}e}")
+
+
 class ValidationError(Exception):
     """Exception raised when query variant validation fails."""
 
@@ -267,8 +287,8 @@ class ResultValidator:
         # sort on a None-safe surrogate rather than the raw row (a bare ``sorted``
         # would raise TypeError, which a caller would then mislabel as an execution
         # "error:" instead of a clean MISMATCH/match - see _row_sort_key).
-        original_sorted = sorted(original_results, key=self._row_sort_key)
-        variant_sorted = sorted(variant_results, key=self._row_sort_key)
+        original_sorted = sorted(original_results, key=self._pairing_sort_key)
+        variant_sorted = sorted(variant_results, key=self._pairing_sort_key)
 
         detail = self._first_positional_mismatch(original_sorted, variant_sorted, query_id, variant_id)
         if detail is None:
@@ -399,8 +419,8 @@ class ResultValidator:
             if i == last_index and tie_aware and final_key_tied_beyond_limit:
                 continue
             detail = self._first_positional_mismatch(
-                sorted(orig_rows, key=self._row_sort_key),
-                sorted(var_rows, key=self._row_sort_key),
+                sorted(orig_rows, key=self._pairing_sort_key),
+                sorted(var_rows, key=self._pairing_sort_key),
                 query_id,
                 variant_id,
             )
@@ -445,8 +465,8 @@ class ResultValidator:
         """
         if len(left) != len(right):
             return False
-        left_sorted = sorted(left, key=self._row_sort_key)
-        right_sorted = sorted(right, key=self._row_sort_key)
+        left_sorted = sorted(left, key=self._pairing_sort_key)
+        right_sorted = sorted(right, key=self._pairing_sort_key)
         return all(self._order_keys_equal(lhs, rhs) for lhs, rhs in zip(left_sorted, right_sorted))
 
     def _row_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
@@ -475,6 +495,23 @@ class ResultValidator:
         if self.treat_nan_as_null:
             return tuple(self._cell_sort_key(value) for value in row)
         return _row_sort_key(row)
+
+    def _pairing_sort_key(self, row: tuple[Any, ...]) -> tuple[Any, ...]:
+        """Sort key for pairing two result sets row by row.
+
+        Float cells are bucketed (see :func:`_float_sort_bucket`) ahead of the exact key, so
+        rows that differ only by float noise sort alike on both sides. The exact key stays
+        as the tie-break, so rows with no float cells order as before. The value digest
+        (:func:`calculate_checksum`) keeps using the exact :func:`_row_sort_key`.
+        """
+        exact = self._row_sort_key(row)
+        bucketed = tuple(
+            (cell[0], cell[1], _float_sort_bucket(value))
+            if isinstance(value, float) and not isinstance(value, bool) and cell[1] == "num"
+            else cell
+            for value, cell in zip(row, exact)
+        )
+        return (bucketed, exact)
 
     def _cell_sort_key(self, value: Any) -> tuple[Any, ...]:
         """A None-safe, type-safe sort surrogate for one cell (see _row_sort_key).
@@ -762,8 +799,8 @@ class ResultValidator:
 
         # Sort both result sets on the None-safe surrogate so a NULL-bearing or
         # mixed-type column never raises TypeError (see _row_sort_key).
-        original_sorted = sorted(original_results, key=self._row_sort_key)
-        variant_sorted = sorted(variant_results, key=self._row_sort_key)
+        original_sorted = sorted(original_results, key=self._pairing_sort_key)
+        variant_sorted = sorted(variant_results, key=self._pairing_sort_key)
 
         agg_columns = set(aggregation_columns or ())
         for i, (orig_row, var_row) in enumerate(zip(original_sorted, variant_sorted)):
