@@ -20580,6 +20580,15 @@
       "status": "done",
       "title": "Record tuning-policy generation in bundles; explorer warns when comparing across the ADR-003 seam"
     },
+    "tuning-portable-metadata-store-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-no-midrun-destructive-db-handling-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the tuning metadata store portable (no unsupported CREATE INDEX; per-dialect DDL)"
+    },
     "tuning-post-load-seam-20261001": {
       "claim": null,
       "needs": [

@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Test renders the metadata DDL for every registered platform and parses it with sqlglot for the target dialect.",
+    "Fake-driver save/load round-trip per adapter passes.",
+    "DataFusion tuned run logs no 'Failed to save tuning metadata'."
+  ],
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P3.1 (A1.3, N-5).",
+  "description": "## Problem\n`metadata.py:551-566` issues `CREATE INDEX IF NOT EXISTS …` on every platform except ClickHouse and BigQuery. It is unsupported on Snowflake standard tables, Databricks/Delta, Redshift, Trino/Presto/Athena, Spark SQL and DataFusion (observed: \"Unsupported logical plan: CreateIndex\"). T-SQL has no `IF NOT EXISTS` index form.\n\nOther gaps:\n- `clickhouse-cloud` is missing from the ClickHouse DDL branch (`metadata.py:540`).\n- BigQuery keeps `VARCHAR(255)`.\n- Table and index creation share one try (`:495-510`), so an index failure marks creation failed. The failure is swallowed into \"⚠️ Failed to save tuning metadata\", and reuse and drift detection silently never work.\n\n## Change\n- Move metadata DDL per dialect into the registry or a per-adapter `metadata_store_ddl()`.\n- No index where secondary indexes are unsupported.\n- T-SQL uses `IF NOT EXISTS (SELECT … sys.indexes) CREATE INDEX`.\n- Add `clickhouse-cloud` to the ClickHouse branch.\n- BigQuery uses `STRING`/`INT64`/`TIMESTAMP`.\n- Athena uses Iceberg with an explicit location, or declares metadata unsupported with a clear message.\n- Separate table creation from index creation.\n\n## Guardrails (must preserve)\n- A metadata failure stays non-fatal, but is loud and accurate.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.\n- This item touches paths listed in the soundness manifest by `tuning-trust-paths-soundness-manifest-20261001`. The PR needs an external `Soundness review:` section (AGENTS.md) and must not auto-merge.",
+  "links": [
+    "benchbox/core/tuning/metadata.py",
+    "benchbox/core/tuning/capability_registry.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:446eb7a9096372c4461afc0c",
+      "at": "2026-10-02T13:26:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3b2dd8028e0e49b1b4ac620c700469d8",
+      "session_id": "953b286e7ca64e218aede0ba11665923"
+    }
+  ]
+}
