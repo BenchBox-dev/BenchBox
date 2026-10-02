@@ -14,6 +14,7 @@ import pytest
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
+    pytest.mark.usefixtures("spark_runtime_environment"),
 ]
 
 
