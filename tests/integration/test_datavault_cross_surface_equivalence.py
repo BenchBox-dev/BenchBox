@@ -81,10 +81,13 @@ def test_datavault_dataframe_surface_equivalent_to_sql(tmp_path):
 
     # The production gate fails an unclassified vacuous (empty-reference) query;
     # without the row counts this test could pass on empty-vs-empty cells the
-    # gate rejects. Data Vault configures no legitimately-empty queries, so
-    # every reference must return rows.
+    # gate rejects. Only the gate's classified legitimately_empty set (Q17: scalar
+    # SUM over a conjunction the bounded cell never satisfies, verified across all
+    # 1000 in-cell brand/container combos) may be vacuous; any other zero-row
+    # reference is an unclassified regression.
     vacuous = sorted(qid for qid, count in reference_row_counts.items() if count == 0)
-    assert not vacuous, f"Data Vault reference queries returned zero rows: {vacuous}"
+    unclassified = [qid for qid in vacuous if qid not in gate.legitimately_empty]
+    assert not unclassified, f"Data Vault reference queries returned zero rows: {unclassified}"
 
     # The baseline is empty: every divergence is an unclassified regression.
     assert not divergences, "Data Vault DataFrame surface diverges from SQL: " + ", ".join(

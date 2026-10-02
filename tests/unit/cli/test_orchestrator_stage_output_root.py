@@ -132,3 +132,39 @@ class TestStageOutputRootRouting:
         resolved = self.orchestrator._resolve_construction_output_dir(self.config, Mock(DATA_SOURCE_BENCHMARK=None))
 
         assert resolved == local_dir
+
+
+class TestCloudStagingDataSourceCache:
+    """The cloud-staging path picks the same local cache as the construction path."""
+
+    def setup_method(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.orchestrator = BenchmarkOrchestrator(base_dir=self.temp_dir)
+        self.orchestrator.custom_output_dir = "@~/benchbox"
+
+    def teardown_method(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _cache_name(self, name, benchmark):
+        config = BenchmarkConfig(name=name, display_name=name, scale_factor=1.0)
+        root = self.orchestrator._resolve_custom_output_root(config, benchmark, {})
+        return Path(str(root)).name
+
+    def test_benchmark_that_generates_its_own_output_keeps_its_cache(self):
+        """tpcds_obt on Snowflake/BigQuery must not read the TPC-DS source cache.
+
+        Reading it made the runner reuse the TPC-DS manifest and load the 25
+        source tables instead of the OBT table, so every query ran against an
+        empty table.
+        """
+        benchmark = Mock(spec=["get_data_source_benchmark", "GENERATES_OWN_OUTPUT"])
+        benchmark.get_data_source_benchmark = Mock(return_value="tpcds")
+        benchmark.GENERATES_OWN_OUTPUT = True
+
+        assert self._cache_name("tpcds_obt", benchmark) == "tpcds_obt_sf1"
+
+    def test_data_sharing_benchmark_still_reads_the_source_cache(self):
+        benchmark = Mock(spec=["get_data_source_benchmark"])
+        benchmark.get_data_source_benchmark = Mock(return_value="tpch")
+
+        assert self._cache_name("read_primitives", benchmark) == "tpch_sf1"

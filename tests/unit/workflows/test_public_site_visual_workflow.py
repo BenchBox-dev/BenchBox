@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -174,6 +175,51 @@ def test_merge_groups_publish_a_candidate_baseline_only_after_comparison() -> No
     assert names.index("Compare public site with exact base") < names.index(
         "Upload merge-queue candidate visual baseline"
     )
+
+
+def _candidate_producers() -> list[tuple[Path, str]]:
+    """Workflows that run on merge_group and upload a candidate baseline, with that job's name."""
+    producers = []
+    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        triggers = workflow.get(True, workflow.get("on", {})) or {}
+        if "merge_group" not in triggers:
+            continue
+        for job in workflow["jobs"].values():
+            steps = job.get("steps", [])
+            if any(step.get("name") == "Upload merge-queue candidate visual baseline" for step in steps):
+                producers.append((path, job.get("name", "")))
+    return producers
+
+
+def _lookup_constants_and_trusted_paths() -> tuple[dict[str, str], set[str]]:
+    """The lookup's string constants and the workflow paths in its merge-queue trusted list.
+
+    Membership is read from the exported list itself, so a path that is only declared as a constant,
+    or appears in a comment, does not count as trusted.
+    """
+    lookup = (REPO_ROOT / "results-explorer" / "scripts" / "public-site-visual-baseline-lookup.mjs").read_text(
+        encoding="utf-8"
+    )
+    constants = dict(re.findall(r'^export const (\w+) = "([^"]*)";', lookup, flags=re.MULTILINE))
+    listed = re.search(r"^export const MERGE_QUEUE_WORKFLOW_PATHS = \[([^\]]*)\];", lookup, flags=re.MULTILINE)
+    assert listed, "the lookup no longer exports MERGE_QUEUE_WORKFLOW_PATHS as a list of constants"
+    names = [name.strip() for name in listed.group(1).split(",") if name.strip()]
+    return constants, {constants[name] for name in names}
+
+
+def test_the_lookup_trusts_every_workflow_that_publishes_a_merge_queue_candidate() -> None:
+    # The lookup only trusts candidates from named workflow paths. When validation moved into CI
+    # the list was not updated, so every follower ignored a candidate that already existed and
+    # waited out its deadline. A workflow that runs on merge_group and uploads a candidate must be
+    # trusted, and the job the lookup reads for an unfinished leader must be the job that uploads.
+    constants, trusted = _lookup_constants_and_trusted_paths()
+    producers = _candidate_producers()
+    assert producers, "no merge_group workflow uploads a candidate baseline"
+    for path, job_name in producers:
+        relative = path.relative_to(REPO_ROOT).as_posix()
+        assert relative in trusted, f"{relative} uploads candidates but the lookup's trusted list is {sorted(trusted)}"
+        assert constants["VISUAL_JOB_NAME"] == job_name, f"{relative} job {job_name!r} differs from the lookup"
 
 
 def test_visual_baseline_script_and_capture_command_are_tracked() -> None:
