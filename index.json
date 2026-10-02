@@ -20436,6 +20436,13 @@
       "status": "open",
       "title": "Stop mid-run destructive database handling (metadata temp connections drop/delete the run's own database)"
     },
+    "tuning-notuning-db-reuse-gate-20261001": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Allow notuning database reuse (one-line gate in _validate_database_tunings)"
+    },
     "tuning-partition-order-rendered-contract": {
       "claim": null,
       "needs": [
