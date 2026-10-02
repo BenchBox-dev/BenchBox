@@ -1511,10 +1511,18 @@ def test_make_entrypoints_forward_explicit_landing_bindings() -> None:
     assert "gh pr edit --repo" in open_body
     assert "git remote get-url --push origin" in open_body
     assert "HEAD_SPEC" in open_body and '--head "$$HEAD_SPEC"' in open_body
-    assert 'pr-arm REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"' in open_body
-    assert "EVIDENCE" not in open_body and "pr-ready" not in open_body
     assert "Next: make pr-arm once the review fixes are pushed" in open_body
     assert "withheld" not in open_body and "held" not in open_body
+    # READY=1 with no evidence arms through pr-arm for the PR number resolved from the URL, so a fork
+    # checkout never lets pr-arm search by a bare branch name.
+    evidence_route = open_body.index('elif [ -n "$(EVIDENCE)$(BATCH)" ]')
+    plain_route = open_body.index("PR_NUMBER=$$(gh pr view --repo", evidence_route)
+    assert 'pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"' in open_body[plain_route:]
+    # Any EVIDENCE or BATCH keeps the evidence transaction (batch validation), never a silent pr-arm.
+    evidence_branch = open_body[evidence_route:plain_route]
+    assert 'pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)"' in evidence_branch
+    assert 'EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"' in evidence_branch
+    assert "pr-arm" not in evidence_branch.split("else", 1)[1].split("fi", 1)[0]
     executable = "\n".join(line for line in makefile.splitlines() if not line.lstrip().startswith(("#", "@#")))
     assert "gh pr merge --auto --squash" not in executable
     for target in ("pr-landing-ready", "pr-open", "pr-arm-auto-merge"):

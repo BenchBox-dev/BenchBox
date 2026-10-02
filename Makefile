@@ -1562,7 +1562,8 @@ pr-content-guard:
 # Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
 # READY=1 arms through `make pr-arm`, which checks the live PR (hold label,
 # requested changes, unresolved review threads, draft state, head) before it
-# enqueues the exact local HEAD.
+# enqueues the exact local HEAD. READY=1 with EVIDENCE or BATCH keeps its
+# earlier meaning: the evidence transaction (`pr-ready`) for a reused PR.
 #
 # Pre-push warning: runs `git merge-tree` against every other open PR head
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
@@ -1637,6 +1638,7 @@ pr-open:
 	fi; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
+	REUSED_PR=0; \
 	URL=$$(gh pr list --repo "$$REPOSITORY" --base develop --state open \
 		--json url,headRepositoryOwner,headRefName \
 		--jq '.[] | select((.headRepositoryOwner.login | ascii_downcase) == (env.PR_HEAD_OWNER | ascii_downcase) and .headRefName == env.PR_HEAD_NAME) | .url' \
@@ -1648,16 +1650,25 @@ pr-open:
 			URL=$$(gh pr create --repo "$$REPOSITORY" --base develop --fill --head "$$HEAD_SPEC"); \
 		fi; \
 	else \
+		REUSED_PR=1; \
 		echo "Reusing existing PR: $$URL"; \
 		if [ -n "$(PR_BODY_FILE)" ]; then \
 			gh pr edit --repo "$$REPOSITORY" "$$URL" --body-file "$(PR_BODY_FILE)"; \
 		fi; \
 	fi && \
 	echo "$$URL" && \
-	if [ "$(READY)" = "1" ]; then \
-		$(MAKE) -s pr-arm REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"; \
-	else \
+	if [ "$(READY)" != "1" ]; then \
 		echo "Next: make pr-arm once the review fixes are pushed; the merge queue merges it when the required checks pass."; \
+	elif [ -n "$(EVIDENCE)$(BATCH)" ]; then \
+		if [ "$$REUSED_PR" != "1" ]; then \
+			echo "READY=1 with EVIDENCE or BATCH applies to a reused PR, so this new PR is not armed."; \
+			echo "Arm it after review with make pr-arm, or with the evidence transaction: make pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"<readiness-evidence.json>\""; \
+		else \
+			$(MAKE) -s pr-ready REPO="$$REPOSITORY" URL="$$URL" HEAD="$$(git rev-parse HEAD)" EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)"; \
+		fi; \
+	else \
+		PR_NUMBER=$$(gh pr view --repo "$$REPOSITORY" "$$URL" --json number --jq '.number') || { echo "Could not resolve $$URL to a PR in $$REPOSITORY" >&2; exit 1; }; \
+		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"; \
 	fi
 
 # Runs the readiness transaction for an already-open PR. This compatibility
