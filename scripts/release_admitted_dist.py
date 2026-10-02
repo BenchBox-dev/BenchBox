@@ -1,15 +1,3 @@
-"""Re-verify an admitted release directory in the job that publishes it.
-
-`release_artifact_consumer.py admit` proves that a wheel and sdist came from one successful
-merge-queue attempt. Its output directory then crosses a job boundary (artifact upload and
-download) before a publisher uses it. This gate runs in the publishing job, offline, and confirms
-that the directory still matches its admission receipt and the tag being released. It then writes
-only the wheel and sdist, from the bytes it verified, to a new directory for the upload step.
-
-It never builds, downloads, calls a network API, or publishes. It does not repeat the GitHub
-provenance checks that `admit` made; it binds the bytes to that receipt.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -57,7 +45,6 @@ _PRODUCER_KEYS = {
 
 
 def _load_consumer():
-    """Load the sibling consumer for its constants, as the consumer loads `release_flow.py`."""
     spec = importlib.util.spec_from_file_location(
         "_release_artifact_consumer", Path(__file__).with_name("release_artifact_consumer.py")
     )
@@ -89,7 +76,6 @@ def _object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 
 def _read_regular(path: Path, limit: int) -> bytes:
-    """Read one regular, non-link file, refusing anything larger than `limit` bytes."""
     status = path.lstat()
     _require(stat.S_ISREG(status.st_mode), f"{path.name} is not a regular file")
     _require(status.st_size <= limit, f"{path.name} exceeds the size limit")
@@ -112,11 +98,6 @@ def _sums(data: bytes) -> dict[str, str]:
 
 
 def verify_admitted(directory: Path, tag: str, head_sha: str) -> tuple[dict[str, Any], dict[str, bytes]]:
-    """Return the admission receipt and the verified distribution bytes, or raise ValueError.
-
-    `tag` and `head_sha` come from the publishing run (`github.ref_name` and `github.sha`), never
-    from the directory under test.
-    """
     from packaging.utils import parse_sdist_filename, parse_wheel_filename
     from packaging.version import Version
 
@@ -196,7 +177,6 @@ def verify_admitted(directory: Path, tag: str, head_sha: str) -> tuple[dict[str,
 
 
 def stage_distributions(payloads: dict[str, bytes], destination: Path) -> None:
-    """Write only the verified distributions to a new directory; never replace an existing one."""
     destination.mkdir(mode=0o700)
     for name, data in payloads.items():
         with open(destination / name, "xb") as stream:
@@ -206,7 +186,9 @@ def stage_distributions(payloads: dict[str, bytes], destination: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description="Verify an admitted release directory against its admission receipt before publication."
+    )
     parser.add_argument(
         "--admitted", type=Path, required=True, help="output directory of release_artifact_consumer admit"
     )

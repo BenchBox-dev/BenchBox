@@ -1,5 +1,3 @@
-"""Refuse an admitted release directory that no longer matches its admission receipt."""
-
 from __future__ import annotations
 
 import ast
@@ -21,7 +19,6 @@ from tests.unit.scripts.test_release_artifact_consumer import (
     metadata as metadata,
 )
 
-# Medium tier, like the consumer tests it builds on: the fast lane is at its ceiling.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 TAG = "v0.4.2"
 SECOND_WHEEL = "benchbox-0.4.2-py3-none-manylinux_2_17_x86_64.whl"
@@ -29,7 +26,6 @@ SECOND_WHEEL = "benchbox-0.4.2-py3-none-manylinux_2_17_x86_64.whl"
 
 @pytest.fixture
 def admitted(distributions):
-    """The directory `release_artifact_consumer.py admit` publishes, rebuilt from the fixtures."""
     producer = json.loads((distributions / consumer.PRODUCER_RECEIPT).read_text())
     receipt = {
         "tag": TAG,
@@ -120,7 +116,7 @@ def test_refuses_an_extra_member(admitted):
 def _symlink(link: Path, target: Path, *, directory: bool = False) -> None:
     try:
         link.symlink_to(target, target_is_directory=directory)
-    except (OSError, NotImplementedError):  # Windows without the symlink privilege
+    except (OSError, NotImplementedError):
         pytest.skip("symlinks are unavailable here")
 
 
@@ -155,7 +151,6 @@ def test_refuses_a_member_larger_than_the_size_limit(admitted, monkeypatch):
 
 @pytest.mark.parametrize("renamed", ["../escape.whl", "sub/dir.whl", "/absolute.whl", "..\\escape.whl"])
 def test_refuses_a_receipt_file_name_that_leaves_the_directory(admitted, renamed):
-    """The names a receipt lists must be exactly the directory's own entries; none may name another path."""
 
     def rename(value):
         value["files"][renamed] = value["files"].pop(WHEEL)
@@ -223,7 +218,6 @@ def test_refuses_a_receipt_that_does_not_bind_this_release(admitted, change, mes
 
 
 def reseal(directory: Path, sums: bytes | None = None) -> None:
-    """Make SHA256SUMS and both receipts agree with the producer's file list, so one other check can fail alone."""
     producer = json.loads((directory / gate.ADMISSION_RECEIPT).read_text())["producer"]
     if sums is None:
         sums = "".join(f"{record['sha256']}  {name}\n" for name, record in producer["files"].items()).encode("ascii")
@@ -248,7 +242,6 @@ def test_refuses_distribution_names_for_another_version_or_package(admitted, ren
 
 
 def test_refuses_a_checksum_file_whose_bytes_differ_from_the_receipt(admitted):
-    """Same records, different bytes: only the receipt's digest of SHA256SUMS can tell."""
     path = admitted / gate.SHA256SUMS
     path.write_bytes(path.read_bytes() + b"\n")
     with pytest.raises(ValueError, match="SHA256SUMS differs from receipt"):
@@ -300,11 +293,10 @@ def test_refuses_a_producer_receipt_with_an_extra_field(admitted):
     ids=["third-file", "two-wheels", "record-extra-key", "size-not-int", "digest-not-lowercase", "size-wrong"],
 )
 def test_refuses_an_invalid_file_record_in_the_receipt(admitted, change, message, extra_member):
-    """Each case keeps the directory listing consistent with the receipt, so only the named check can fire."""
     if extra_member is not None:
         (admitted / extra_member).write_bytes((admitted / WHEEL).read_bytes())
     if extra_member == SECOND_WHEEL:
-        (admitted / SDIST).unlink()  # two wheels and no sdist: the file count is still two
+        (admitted / SDIST).unlink()
     edit_producer(admitted, lambda value: change(value["files"]))
     with pytest.raises(ValueError, match=message):
         gate.verify_admitted(admitted, TAG, SHA)

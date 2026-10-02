@@ -124,6 +124,29 @@ Limits inside that boundary:
   proxy settings, CA bundles, includes, and URL rewrites to another HTTPS host,
   is still honored.
 
+## Publish-side gate
+
+An admitted directory crosses a job boundary, an artifact upload and download,
+before a publisher uses it. `scripts/release_admitted_dist.py` runs in the job
+that publishes and confirms the directory is still the admitted one. It is
+offline: it builds, downloads, and publishes nothing, and no workflow calls it
+yet.
+
+The tag and commit come from the publishing run (`github.ref_name` and
+`github.sha`), never from the directory. The directory must match its admission
+receipt exactly: the five members `admit` writes, the producer receipt, the
+receipt's digest of `SHA256SUMS`, and the name, size, hash, package, and version
+of the wheel and sdist against the tag. Links, files that are not regular files,
+files over the size limit, and receipt names that point outside the directory
+are refused.
+
+`--stage` writes only the wheel and sdist, from the bytes it verified, into a
+new directory that must not exist, and the upload step publishes that directory
+instead of the admitted one. The gate binds bytes to the admission receipt. It
+does not repeat the GitHub provenance checks that admission made, and it keeps
+the admission threat model above: it reads each file once and compares what it
+read, but it does not defend against a hostile writer on the same filesystem.
+
 ## Release requirements
 
 The publishing workflow still requires the live `v-tag-restricted` rule,
