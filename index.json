@@ -20475,6 +20475,15 @@
       "status": "done",
       "title": "Record tuning-policy generation in bundles; explorer warns when comparing across the ADR-003 seam"
     },
+    "tuning-post-load-seam-20261001": {
+      "claim": null,
+      "needs": [
+        "tuning-physical-identifier-resolution-20261001"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Add one post-load tuning seam and move maintenance ops (OPTIMIZE/ANALYZE/VACUUM/ZORDER/RESUME RECLUSTER) into it"
+    },
     "tuning-registry-mixin-honesty-20260717": {
       "claim": null,
       "needs": [],
