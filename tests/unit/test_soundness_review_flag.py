@@ -301,9 +301,8 @@ def test_missing_or_malformed_queue_evidence_fails_closed(
         assert "cannot resolve base of anchor PR" in result.stderr
 
 
-@pytest.fixture
-def stale_event_base(tmp_path: Path) -> dict[str, Any]:
-    """A pull request whose merge commit sits on a target that moved after the event."""
+def _stale_event_base_history(tmp_path: Path, pr_files: dict[str, str]) -> dict[str, Any]:
+    """A pull request, one commit per file, merged on a target that moved after the event."""
     repo = tmp_path / "stale-repo"
     repo.mkdir()
     _git(repo, "init", "--initial-branch=trunk")
@@ -314,10 +313,11 @@ def stale_event_base(tmp_path: Path) -> dict[str, Any]:
     _git(repo, "commit", "-m", "Event base")
     event_base = _git(repo, "rev-parse", "HEAD")
     _git(repo, "checkout", "-b", "pr")
-    (repo / "docs").mkdir()
-    (repo / "docs/x.md").write_text("the pull request's own change\n", encoding="utf-8")
-    _git(repo, "add", "docs/x.md")
-    _git(repo, "commit", "-m", "Pull request change")
+    for relative, text in pr_files.items():
+        (repo / relative).parent.mkdir(parents=True, exist_ok=True)
+        (repo / relative).write_text(text, encoding="utf-8")
+        _git(repo, "add", relative)
+        _git(repo, "commit", "-m", f"Pull request change to {relative}")
     pr_head = _git(repo, "rev-parse", "HEAD")
     _git(repo, "checkout", "trunk")
     workflow = repo / ".github/workflows/ci.yml"
@@ -347,6 +347,16 @@ def stale_event_base(tmp_path: Path) -> dict[str, Any]:
     }
 
 
+@pytest.fixture
+def stale_event_base(tmp_path: Path) -> dict[str, Any]:
+    return _stale_event_base_history(tmp_path, {"docs/x.md": "first change\n", "docs/y.md": "second change\n"})
+
+
+@pytest.fixture
+def stale_event_base_with_protected_change(tmp_path: Path) -> dict[str, Any]:
+    return _stale_event_base_history(tmp_path, {"docs/x.md": "first change\n", "AGENTS.md": "protected change\n"})
+
+
 def _collect_changed_paths(
     history: dict[str, Any], event: str, base: str
 ) -> tuple[subprocess.CompletedProcess[str], list[str]]:
@@ -359,7 +369,7 @@ def _collect_changed_paths(
     env = {**os.environ, "RUNNER_TEMP": str(history["runner"]), "BASE_SHA": base}
     result = run_posix_shell(script, cwd=history["repo"], env=env, capture_output=True, text=True, timeout=30)
     listing = history["runner"] / "changed-paths.txt"
-    return result, listing.read_text(encoding="utf-8").split() if listing.exists() else []
+    return result, sorted(listing.read_text(encoding="utf-8").split()) if listing.exists() else []
 
 
 def test_pull_request_is_not_charged_for_files_the_target_changed_after_the_event(
@@ -370,7 +380,20 @@ def test_pull_request_is_not_charged_for_files_the_target_changed_after_the_even
     assert ".github/workflows/ci.yml" in stale, "the fixture must reproduce the stale-base charge"
     result, paths = _collect_changed_paths(stale_event_base, "pull_request", stale_event_base["event_base"])
     assert result.returncode == 0, result.stderr
-    assert paths == ["docs/x.md"]
+    assert paths == ["docs/x.md", "docs/y.md"]
+    assert CHECKER.check_soundness_review(paths, "") == []
+
+
+def test_a_protected_path_the_pull_request_itself_changes_is_still_collected_and_needs_a_review(
+    stale_event_base_with_protected_change: dict[str, Any],
+) -> None:
+    history = stale_event_base_with_protected_change
+    result, paths = _collect_changed_paths(history, "pull_request", history["event_base"])
+    assert result.returncode == 0, result.stderr
+    assert paths == ["AGENTS.md", "docs/x.md"]
+    errors = CHECKER.check_soundness_review(paths, "")
+    assert errors and "Soundness review:" in errors[0]
+    assert CHECKER.check_soundness_review(paths, VALID_REVIEW) == []
 
 
 def test_event_base_that_is_not_an_ancestor_of_the_merge_target_fails_closed(
@@ -385,7 +408,7 @@ def test_event_base_that_is_not_an_ancestor_of_the_merge_target_fails_closed(
 def test_merge_group_event_keeps_the_event_base_comparison(stale_event_base: dict[str, Any]) -> None:
     result, paths = _collect_changed_paths(stale_event_base, "merge_group", stale_event_base["event_base"])
     assert result.returncode == 0, result.stderr
-    assert sorted(paths) == [".github/workflows/ci.yml", "docs/x.md"]
+    assert paths == [".github/workflows/ci.yml", "docs/x.md", "docs/y.md"]
 
 
 def test_pull_request_head_without_a_merge_commit_keeps_the_event_base_comparison(
@@ -394,4 +417,4 @@ def test_pull_request_head_without_a_merge_commit_keeps_the_event_base_compariso
     _git(stale_event_base["repo"], "checkout", "--quiet", stale_event_base["pr_head"])
     result, paths = _collect_changed_paths(stale_event_base, "pull_request", stale_event_base["event_base"])
     assert result.returncode == 0, result.stderr
-    assert paths == ["docs/x.md"]
+    assert paths == ["docs/x.md", "docs/y.md"], "a single-parent head must not be compared with HEAD^"
