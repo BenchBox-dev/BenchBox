@@ -216,3 +216,64 @@ def test_restored_monkeypatch_and_generator_teardown_pass(tmp_path: Path) -> Non
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "2 passed" in result.stdout
+
+
+def _run_module_fixture_probe(tmp_path: Path, last_test_body: str) -> subprocess.CompletedProcess[str]:
+    """Run a module whose scoped fixture sets and restores one variable around its tests."""
+    (tmp_path / "pytest.ini").write_text("[pytest]\nmarkers = unit\n", encoding="utf-8")
+    (tmp_path / "test_probe.py").write_text(
+        "import os, pytest\npytestmark = pytest.mark.unit\n"
+        '@pytest.fixture(scope="module")\ndef module_env():\n'
+        '    previous = os.environ.get("MODULE_PROBE")\n'
+        '    os.environ["MODULE_PROBE"] = "module-value"\n'
+        "    yield\n"
+        "    if previous is None:\n"
+        '        os.environ.pop("MODULE_PROBE", None)\n'
+        "    else:\n"
+        '        os.environ["MODULE_PROBE"] = previous\n'
+        "def test_first(module_env):\n    pass\n"
+        f"def test_last(module_env):\n    {last_test_body}\n",
+        encoding="utf-8",
+    )
+    env = dict(os.environ, PYTHONPATH=str(REPO_ROOT))
+    env.pop("PYTEST_CURRENT_TEST", None)
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-c",
+            str(tmp_path / "pytest.ini"),
+            "--confcutdir",
+            str(tmp_path),
+            "-p",
+            "tests.utilities.leak_detector",
+            "-p",
+            "no:cacheprovider",
+            "-n",
+            "0",
+            "-q",
+            "test_probe.py",
+        ],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+def test_a_module_fixture_restoring_state_is_not_blamed_on_the_last_test(tmp_path: Path) -> None:
+    """The module fixture's teardown runs inside the last test's teardown; it is not a leak of that test."""
+    result = _run_module_fixture_probe(tmp_path, "pass")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "2 passed" in result.stdout
+    assert "leaked" not in result.stdout
+
+
+def test_a_leak_by_the_last_test_is_still_detected_next_to_a_module_fixture(tmp_path: Path) -> None:
+    result = _run_module_fixture_probe(tmp_path, 'os.environ["LEAKY_PROBE"] = "secret-value"')
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "env[LEAKY_PROBE]" in result.stdout
+    assert "env[MODULE_PROBE]" not in result.stdout
+    assert "secret-value" not in result.stdout

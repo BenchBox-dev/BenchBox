@@ -84,48 +84,40 @@ def detect_and_restore(baseline: dict[str, Any]) -> list[str]:
     return problems
 
 
+def _check_item(item: pytest.Item) -> None:
+    """Fail the teardown of ``item`` if its function-level teardown left process state changed."""
+    baseline = item.stash.get(_BASELINE_KEY, None)
+    if baseline is None:
+        return
+    # pytest changes this value at each phase, outside fixture ownership.
+    # Accept only its exact expected transition, not arbitrary test writes.
+    expected = f"{item.nodeid} (teardown)"
+    if os.environ.get("PYTEST_CURRENT_TEST") == expected:
+        baseline["env"]["PYTEST_CURRENT_TEST"] = expected
+    elif "PYTEST_CURRENT_TEST" not in os.environ:
+        baseline["env"].pop("PYTEST_CURRENT_TEST", None)
+    problems = detect_and_restore(baseline)
+    if problems:
+        item.stash[_LEAK_KEY] = problems
+        pytest.fail("test leaked process state past teardown (restored): " + ", ".join(problems), pytrace=False)
+
+
 @pytest.fixture(autouse=True)
 def _hermetic_state(request: pytest.FixtureRequest) -> Iterator[None]:
-    """Capture function-fixture state after broader-scoped fixtures are ready."""
+    """Capture function-fixture state after broader-scoped fixtures are ready.
+
+    The check is a finalizer on the test item, registered here, before any other function-scoped
+    fixture is set up. Finalizers run last-in first-out, so it runs after every function-level
+    finalizer (including ones that fail) and before broader-scoped fixtures are torn down. A
+    module- or session-scoped fixture that legitimately restores state when the last test of its
+    scope finishes is therefore never blamed on that test.
+    """
     item = request.node
     unit_dir = request.config.rootpath / "tests" / "unit"
     if item.path.is_relative_to(unit_dir) or item.get_closest_marker("unit") is not None:
         item.stash[_BASELINE_KEY] = snapshot()
+        item.addfinalizer(lambda: _check_item(item))
     yield
-
-
-@pytest.hookimpl(wrapper=True, tryfirst=True)
-def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> Generator[None, Any, Any]:
-    result = None
-    teardown_error: BaseException | None = None
-    try:
-        result = yield
-    except BaseException as exc:
-        teardown_error = exc
-    finally:
-        baseline = item.stash.get(_BASELINE_KEY, None)
-        problems: list[str] = []
-        if baseline is not None:
-            # pytest changes this value at each phase, outside fixture ownership.
-            # Accept only its exact expected transition, not arbitrary test writes.
-            expected = f"{item.nodeid} (teardown)"
-            if os.environ.get("PYTEST_CURRENT_TEST") == expected:
-                baseline["env"]["PYTEST_CURRENT_TEST"] = expected
-            elif "PYTEST_CURRENT_TEST" not in os.environ:
-                baseline["env"].pop("PYTEST_CURRENT_TEST", None)
-            problems = detect_and_restore(baseline)
-    if problems:
-        item.stash[_LEAK_KEY] = problems
-        message = "test leaked process state past teardown (restored): " + ", ".join(problems)
-        if teardown_error is not None:
-            raise BaseExceptionGroup(
-                "fixture teardown failed and process state leaked",
-                [teardown_error, pytest.fail.Exception(message, pytrace=False)],
-            )
-        pytest.fail(message, pytrace=False)
-    if teardown_error is not None:
-        raise teardown_error
-    return result
 
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
