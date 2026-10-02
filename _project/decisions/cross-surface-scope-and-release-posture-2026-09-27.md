@@ -10,9 +10,10 @@ Cross-surface gates (`benchbox/core/equivalence/cross_surface.py`, `GATES`)
 cover benchmarks that ship both a SQL surface and a static `QueryRegistry`
 DataFrame surface. That is transcription and regression verification against
 DuckDB SQL references at a bounded equivalence scale: the two surfaces are
-authored from the same understanding by the same person, so the gate catches
-transcription drift, not shared conceptual errors, and its signal holds only
-at the gated scale (see the module docstring and
+authored from the same understanding by the same person (how separately they
+were handwritten varies by benchmark, as each gate's `surface_independence`
+records), so the gate catches transcription drift, not shared conceptual
+errors, and its signal holds only at the gated scale (see the module docstring and
 `_project/analysis/cross-surface-oracle-independence.md` for per-benchmark
 provenance).
 
@@ -34,7 +35,10 @@ authority. Out of scope for the cross-surface gate, by construction:
   JoinOrder family in the meantime. A divergence that appears only on the
   canonical IMDb distributions is not caught by any cross-surface gate.
 - `tpcds_obt` has an abandoned correspondence (OBT-native Q1..Q17 versus
-  TPC-DS numbered SQL IDs), ruled out without renumbering one side.
+  TPC-DS numbered SQL IDs), ruled out without renumbering one side. The
+  comment above `STAGED_GATES` in `cross_surface.py` still lists `tpcds_obt`
+  among the next gateable benchmarks; it predates this decision and is
+  stale.
 - `ai_primitives` and `vector_search` stay `supports_dataframe: false` in
   `benchmark_registry.yaml` and are single-surface benchmarks that need the
   same non-cross-surface oracle.
@@ -50,9 +54,9 @@ against `release` triggers the same workflow as one against `develop`, but the
 `validate-base` and `release-required-result`
 (`docs/operations/repo-admin-settings.md`). `release-required-result`
 aggregates `test.yml`, which runs the bounded `test-correctness-gate`
-(`make test-correctness-gate`, a strict expected-results run of the local
-platform benchmark matrix) and does not include `ci.yml`'s `core` unit or its
-`GATES` cross-surface reports. Those reports can run on a release pull request,
+(`make test-correctness-gate`, a strict expected-results run of TPC-H on
+DuckDB over the gated query ids in `CORRECTNESS_GATE_QUERY_IDS`) and does not
+include `ci.yml`'s `core` unit or its `GATES` cross-surface reports. Those reports can run on a release pull request,
 but nothing makes them merge-blocking there.
 
 The `release` ruleset rejects direct pushes, so every change reaches it through
