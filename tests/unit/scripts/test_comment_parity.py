@@ -137,6 +137,51 @@ def test_comparison_does_not_depend_on_line_numbers_or_blank_lines() -> None:
     assert report.status == "ok" and report.docstrings_removed == 2
 
 
+@pytest.mark.parametrize("directive", ["# type: ignore", "# type: ignore[override]"])
+def test_preserved_type_ignore_may_shift_after_docstring_removal(directive: str) -> None:
+    base = f'"""module"""\n\ndef f(x):  {directive}\n    return x\n'
+    head = f"def f(x):  {directive}\n    return x\n"
+    assert compare(base, head).status == "ok"
+
+
+@pytest.mark.parametrize(
+    "directive",
+    [
+        "# type: ignore",
+        "# type: ignore[assignment]",
+        "# ruff: noqa",
+        "# ruff: noqa: E501",
+        "# flake8: noqa",
+        "# flake8: noqa: E501",
+        "# noqa",
+        "# noqa: E501",
+        "# pragma: no cover",
+        "# fmt: off",
+    ],
+)
+def test_registered_directive_removal_is_drift(directive: str) -> None:
+    assert compare(f"x = 1  {directive}\n", "x = 1\n").status == "drift"
+
+
+def test_type_ignore_tag_change_and_reorder_are_drift() -> None:
+    assert compare("x = 1  # type: ignore[assignment]\n", "x = 1  # type: ignore[arg-type]\n").status == "drift"
+    base = "x = 1  # type: ignore[assignment]\ny = 2  # type: ignore[arg-type]\n"
+    head = "x = 1  # type: ignore[arg-type]\ny = 2  # type: ignore[assignment]\n"
+    assert compare(base, head).status == "drift"
+
+
+def test_directive_moves_in_repeated_code_are_drift() -> None:
+    rows = ["x = 1"] * 10
+    for directive, inline in [("# type: ignore", True), ("# type: ignore[assignment]", True), ("# noqa", False)]:
+        if inline:
+            base = "\n".join(rows[:5] + [f"x = 1  {directive}"] + rows[6:]) + "\n"
+            head = "\n".join(rows[:6] + [f"x = 1  {directive}"] + rows[7:]) + "\n"
+        else:
+            base = "\n".join(rows[:5] + [directive] + rows[5:]) + "\n"
+            head = "\n".join(rows[:6] + [directive] + rows[6:]) + "\n"
+        assert compare(base, head).status == "drift"
+
+
 def git(repo: Path, *args: str) -> str:
     result = subprocess.run(
         [
