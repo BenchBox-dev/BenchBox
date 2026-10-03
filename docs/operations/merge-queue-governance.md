@@ -25,7 +25,7 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 | `docs` | `.github/workflows/ci.yml` | Sphinx build with warnings as errors, example validation, and spell check on docs changes. |
 | `landing` | `.github/workflows/ci.yml` | Site theme token scan on landing changes. |
 | `tooling` | `.github/workflows/ci.yml` | Every event. Content guard, skill integrity, and audit checks by path. |
-| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes only when the Codex connector app has reviewed the current head of a result-affecting pull request. A new push changes the head, so it needs a new review. Pending for more than four hours means the connector is down, and the owner reviews the change. |
+| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes only when the Codex connector app has reviewed the current head of a result-affecting pull request. A new push changes the head, so it needs a new review. Pending for more than four hours means the connector is down. The owner, not an agent, then reviews the change in their own session and either re-requests the connector review or merges through the GitHub UI after temporarily removing `oracle-review` from the required checks, restoring it afterwards. An owner comment does not satisfy the check, because every human and agent posts as the owner account. |
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
@@ -62,7 +62,7 @@ make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbox/core/expected_results/`, `auto_merge_soundness_paths.py`):
 1. The `auto-merge-on-open.yml` workflow revokes auto-merge on every push, so arm the pull request with `make pr-arm` after its last push.
 2. The required `oracle-review` check must pass on the current head before the pull request can merge.
-3. A pull request that sits green and unmerged because it was never armed is reported by the nightly green-unmerged sweep.
+3. A soundness-path pull request that sits green and unarmed is reported by the soundness-drain digest (`make soundness-drain-report`, see `docs/operations/soundness-drain.md`), not by the nightly green-unmerged sweep, which skips soundness-gated pull requests.
 
 ---
 
