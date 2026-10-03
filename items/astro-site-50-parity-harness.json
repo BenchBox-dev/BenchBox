@@ -1,11 +1,10 @@
 {
   "acceptance": [
     "Parity job runs on every PR touching docs/ or website/ (non-required)",
-    "Report: zero unexplained differences; allow-list entries each have a reason and approval",
-    "Redirect-page count reported against the 5% abandon threshold",
-    "Owner sign-off recorded in _project/decisions/astro-parity-signoff.md"
+    "URL compatibility report: zero broken public URLs and fragments; every redirect and allowed difference has a reason and approval",
+    "Owner sign-off recorded in _project/decisions/astro-parity-signoff.md, re-run on the cutover base SHA"
   ],
-  "description": "Add a non-required CI job that assembles both sites from the same develop SHA and runs `site_inventory diff` (astro-site-01) on them.\n\nIt checks:\n- missing paths\n- lost anchors\n- changed titles and headings\n- broken internal links\n- missing images\n- tag pages, archives and series\n- atom.xml entry ids\n- generated query pages\n- the API URL map\n\nIt also runs axe over every page template, the docs/blog Explorer-byte check, check_artifact_privacy.py, and the Pagefind smoke search.\n\nEvery remaining difference must be in an allow-list. Each allow-list entry carries a reason and an owner approval. Redirect pages count toward the ADR abandon threshold.\n\nGate: the owner signs off the parity report before astro-site-53 may start.",
+  "description": "Add a non-required CI job that builds both renderers from the same develop SHA and docs/ sources and runs `site_inventory diff` (astro-site-01) on them.\n\nIt checks:\n- missing paths\n- lost anchors and fragments\n- changed titles and headings\n- broken internal links\n- missing images\n- tag pages, archives and series\n- atom.xml entry ids\n- generated query pages\n- the API URL map\n\nIt also runs axe over every page template, the docs/blog Explorer-byte check, check_artifact_privacy.py, and the Pagefind smoke search.\n\nOutput a URL compatibility report. It requires zero broken public URLs and zero broken fragments. It lists every redirect page and every allowed difference, each with a reason and an owner approval.\n\nGate G2: the owner reviews and signs off the report before astro-site-53 may start.",
   "links": [
     "scripts/publication/check_artifact_privacy.py"
   ],
@@ -17,6 +16,14 @@
       "op": "create",
       "op_id": "2a5aab54b82a416da9d5c5237bff8a63",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:0acd2553342aecc14bcb06e1",
+      "at": "2026-10-03T14:47:16Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5a06febb79a841b78f1065bb5f4dbcc3",
+      "session_id": "0a04fc269d824c6d94e653994f36dbcb"
     }
   ]
 }
