@@ -1376,42 +1376,6 @@ def enqueue_pr(
 
 
 # ---------------------------------------------------------------------------
-# Queue-aware local publication policy (native-queue-local-landing)
-# ---------------------------------------------------------------------------
-def queue_report_verified(report: object) -> bool:
-    """Accept a queue verdict only when the checker explicitly proved it.
-
-    Missing, malformed, warning-only, overridden, or failed reports all use
-    the current-base fallback. This keeps a readable-but-incomplete API
-    response from becoming permission to publish a stale branch.
-    """
-    return (
-        isinstance(report, dict)
-        and report.get("status") == "ok"
-        and report.get("queue_verified") is True
-        and report.get("findings") == []
-        and report.get("blocking_findings") == []
-    )
-
-
-def stale_base_decision(*, queue_verified: bool | None, conflict: bool) -> str:
-    """Whether an ancestry-behind branch may publish without a refresh merge.
-
-    * conflict -> "resolve-conflict-first" (always; no refresh can fix it).
-    * verified native queue -> "publish-without-refresh": queue integration
-      tests the speculative merge, so an author-side refresh only destroys a
-      nearly-complete gate to no benefit.
-    * otherwise -> "require-current": the conservative ancestry fallback when
-      the queue is absent, unreadable, unsupported, or misconfigured.
-    """
-    if conflict:
-        return "resolve-conflict-first"
-    if queue_verified is True:
-        return "publish-without-refresh"
-    return "require-current"
-
-
-# ---------------------------------------------------------------------------
 # Resumable follow-up ownership (pr-followup-resumable-ownership)
 # ---------------------------------------------------------------------------
 TERMINAL_OUTCOMES = ("merged", "closed-merged", "abandoned", "superseded")
@@ -2131,11 +2095,6 @@ def main(argv: list[str] | None = None) -> int:
     arm = sub.add_parser("arm", help="arm the exact current checkout PR")
     arm.add_argument("--pr", type=int, default=None)
 
-    policy = sub.add_parser("queue-policy", help="stale-base publication decision")
-    policy.add_argument("--queue-verified", action="store_true")
-    policy.add_argument("--queue-report", type=Path, help="ruleset checker JSON report")
-    policy.add_argument("--conflict", action="store_true")
-
     rec = sub.add_parser("followup-record", help="persist continuation state")
     rec.add_argument("--key", required=True)
     rec.add_argument("--state-json", type=Path, required=True)
@@ -2176,17 +2135,6 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "arm":
             assert identity is not None
             return _run_arm(args, identity, repo)
-        if args.command == "queue-policy":
-            queue_verified: bool | None = args.queue_verified
-            if args.queue_report is not None:
-                try:
-                    report = json.loads(args.queue_report.read_text(encoding="utf-8"))
-                except (OSError, ValueError):
-                    report = None
-                queue_verified = queue_report_verified(report)
-            decision = stale_base_decision(queue_verified=queue_verified, conflict=args.conflict)
-            print(decision)
-            return 0 if decision == "publish-without-refresh" else 1
         directory = state_dir(repo)
         if args.command == "followup-record":
             try:

@@ -1347,7 +1347,7 @@ release-check:
 # branches stay live in parallel via worktrees.
 # =============================================================================
 
-.PHONY: pr-arm pr-preflight pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
+.PHONY: pr-arm pr-preflight pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test trunk-revert
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
@@ -1476,7 +1476,7 @@ pr-content-guard:
 # auto-merge by itself, so a follow-up commit pushed for review feedback cannot
 # race a merge. Arm with `make pr-arm` once the branch carries the review
 # fixes, or run `make pr-open READY=1` to open (or reuse) the PR and arm it in
-# one step. Arming enqueues the PR in the merge queue, which merges it when the
+# one step. Arming turns on auto-merge, which merges the PR when the
 # required checks pass.
 # Refuses to run from develop/release.
 #
@@ -1490,11 +1490,14 @@ pr-content-guard:
 # (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
 # before landing. Warn-only — does not block the push.
 #
-# Currency: after fetching origin/develop, an ancestor-only branch is accepted
-# by the native queue only after the live ruleset checker proves the queue and
-# its required protections. The merge-tree probe still blocks genuine base
-# conflicts. If the queue is absent, unknown, or misconfigured, the existing
-# current-base gate remains in force; `pr-refresh` is the only refresh path.
+# Currency: after fetching origin/develop, a branch behind it is published as
+# is; the merge-tree probe refuses only a genuine base conflict. Required
+# checks and auto-merge gate the merge, and the post-merge trunk run covers
+# the combined result. `pr-refresh` remains the explicit way to refresh a branch.
+#
+# Trunk gate: a non-revert branch is refused while the newest completed
+# `trunk.yml` run on develop has been red for more than 30 minutes. Revert
+# branches (`fix/revert-*`, see `make trunk-revert`) are exempt.
 pr-open:
 	@set -eu; \
 	$(MAKE) -s agent-write-preflight; \
@@ -1542,21 +1545,8 @@ pr-open:
 			echo "Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted." >&2; \
 			exit 1; \
 		fi; \
-		QUEUE_REPORT=$$(mktemp); \
-		trap 'rm -f "$$QUEUE_REPORT"' EXIT; \
-		if ! gh auth token 2>/dev/null | uv run -- python scripts/ruleset_drift_check.py --queue-policy \
-			--require-bypass-actor-visibility --repo "$$REPOSITORY" --token-stdin \
-			--output "$$QUEUE_REPORT"; then \
-			echo "Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate." >&2; \
-			exit 1; \
-		fi; \
-		if ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report "$$QUEUE_REPORT"); then \
-			echo "Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'." >&2; \
-			exit 1; \
-		fi; \
-		[ "$$DECISION" = "publish-without-refresh" ] || { echo "Refusing to open PR: unexpected stale-base decision $$DECISION." >&2; exit 1; }; \
-		echo "Verified native merge queue: publishing without an author-side base refresh."; \
 	fi; \
+	uv run -- python scripts/trunk_revert.py gate --branch "$$CURRENT" --repo "$$REPOSITORY"; \
 	$(MAKE) -s pr-conflict-scan BRANCH="$$CURRENT" || true; \
 	git push -u origin "$$CURRENT" || { echo "Push failed for $$CURRENT — aborting before opening a PR (remote branch may be stale)." >&2; exit 1; }; \
 	REUSED_PR=0; \
@@ -1579,7 +1569,7 @@ pr-open:
 	fi && \
 	echo "$$URL" && \
 	if [ "$(READY)" != "1" ]; then \
-		echo "Next: make pr-arm once the review fixes are pushed; the merge queue merges it when the required checks pass."; \
+		echo "Next: make pr-arm once the review fixes are pushed; auto-merge merges it when the required checks pass."; \
 	elif [ -n "$(EVIDENCE)$(BATCH)" ]; then \
 		if [ "$$REUSED_PR" != "1" ]; then \
 			echo "READY=1 with EVIDENCE or BATCH applies to a reused PR, so this new PR is not armed."; \
@@ -1642,6 +1632,17 @@ pr-arm: export PR_ARM_REPO := $(REPO)
 pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
 	@uv run -- python scripts/pr_arm.py
+
+# Opens a revert PR for a merged PR: `make trunk-revert PR=<number>`. Creates a
+# sibling worktree on fix/revert-<number> with `worktree-create`, reverts the
+# squash merge commit there, pushes, and opens the PR against develop. This
+# worktree is left untouched. Revert branches are exempt from the red-trunk
+# gate in `pr-open`. Refuses a PR that is not merged; the primary clone is
+# refused by `agent-write-preflight`.
+trunk-revert:
+	@$(MAKE) -s agent-write-preflight
+	@case "$(PR)" in ""|*[!0-9]*) echo "PR=<merged PR number> is required" >&2; exit 2 ;; esac
+	@uv run -- python scripts/trunk_revert.py revert --pr "$(PR)" --repo "$(or $(REPO),BenchBox-dev/BenchBox)"
 
 # Arms an open PR for an exact HEAD. Without EVIDENCE or BATCH this is
 # `make pr-arm` for the PR; with either one it runs the readiness evidence
