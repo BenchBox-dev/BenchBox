@@ -1,7 +1,9 @@
 {
   "acceptance": [
-    "Three Ubuntu CI runner runs each finish in 20 s or less of gate wall time with zero unclassified divergences",
-    "Mutation-target drift and Make/CI pinning guards pass in the same PR",
+    "Three Ubuntu CI runner runs each finish within the agreed budget, measured for the whole gate (data build or cache restore, SQL rendering, binding, both surfaces) with peak memory recorded; the 20 s figure is re-decided from those runs (Codex review: data build alone took 13.5 s at SF 0.1 in evidence/rev2/t05a_after2_0.1.jsonl)",
+    "All 99 query IDs execute in the enforced family; a missing implementation fails the gate (today cross_surface.py ~583-588 skips it and only a backend with zero coverage fails)",
+    "A repeated-run check that fails on cells whose outcome changes between runs is part of the enforced gate or a scheduled failing job (see n03)",
+    "Zero unclassified divergences; mutation-target drift and Make/CI pinning guards pass in the same PR",
     "known_divergences is empty and legitimately-empty entries meet dfparity-t19's criteria",
     "A maintainer signs off on promotion"
   ],
@@ -30,6 +32,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "3b21b82a10204b819df1469fe61daf2b",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:10:19Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6fadd4c61ca1463e82282f922c38427a",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
