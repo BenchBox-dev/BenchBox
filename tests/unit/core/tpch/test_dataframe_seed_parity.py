@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from threading import Barrier
 from typing import Any
 from unittest.mock import Mock, patch
 
@@ -171,3 +173,64 @@ def test_dataframe_result_records_bound_parameter_set() -> None:
     assert _describe_query_parameters("tpch", None) == "qgen -d (TPC-H default substitution parameters)"
     assert _describe_query_parameters("TPC-H", 17039360) == "qgen -r (17039360 + 1000 * stream_id)"
     assert _describe_query_parameters("tpcds", 17039360) is None
+
+
+def test_overlapping_runs_keep_seed_and_scale_bindings_isolated() -> None:
+    entered = Barrier(3)
+    observed = Barrier(3)
+
+    def extracted(seed, scale_factor):
+        return {3: {"segment": str(seed)}}
+
+    def run(seed, scale_factor):
+        with dq.seeded_parameter_overrides(seed, scale_factor, 0):
+            entered.wait(timeout=10)
+            segment = dq.get_tpch_parameters(3)["segment"]
+            fraction = dq.get_tpch_parameters(11)["fraction"]
+            observed.wait(timeout=10)
+            assert dq.get_tpch_parameters(3)["segment"] == segment
+            assert dq.get_tpch_parameters(11)["fraction"] == fraction
+            return segment, fraction
+
+    with (
+        patch("benchbox.core.tpch.parameter_extractor.get_tpch_extracted_parameters", side_effect=extracted),
+        ThreadPoolExecutor(max_workers=3) as executor,
+    ):
+        runs = [(101, 0.1), (202, 0.01), (None, 1.0)]
+        futures = [executor.submit(run, seed, scale) for seed, scale in runs]
+        assert [future.result(timeout=15) for future in futures] == [
+            ("101", 0.001),
+            ("202", 0.01),
+            ("BUILDING", 0.0001),
+        ]
+
+
+def test_nested_unseeded_run_restores_outer_seed_and_scale_after_failure() -> None:
+    with patch(
+        "benchbox.core.tpch.parameter_extractor.get_tpch_extracted_parameters",
+        return_value={3: {"segment": "OUTER"}},
+    ):
+        with dq.seeded_parameter_overrides(101, 0.1, 0):
+            assert dq.get_tpch_parameters(3)["segment"] == "OUTER"
+            assert dq.get_tpch_parameters(11)["fraction"] == 0.001
+            with pytest.raises(RuntimeError, match="inner failure"):
+                with dq.seeded_parameter_overrides(None, 0.01, 0):
+                    assert dq.get_tpch_parameters(3)["segment"] == "BUILDING"
+                    assert dq.get_tpch_parameters(11)["fraction"] == 0.01
+                    raise RuntimeError("inner failure")
+            assert dq.get_tpch_parameters(3)["segment"] == "OUTER"
+            assert dq.get_tpch_parameters(11)["fraction"] == 0.001
+    assert dq.get_tpch_parameters(3)["segment"] == "BUILDING"
+    assert dq.get_tpch_parameters(11)["fraction"] == 0.0001
+
+
+def test_failed_parameter_extraction_preserves_outer_bindings() -> None:
+    with dq.seeded_parameter_overrides(None, 0.1, 0):
+        with patch(
+            "benchbox.core.tpch.parameter_extractor.get_tpch_extracted_parameters",
+            side_effect=RuntimeError("extraction"),
+        ):
+            with pytest.raises(RuntimeError, match="extraction"), dq.seeded_parameter_overrides(101, 0.01, 0):
+                pytest.fail("failed extraction entered the run")
+        assert dq.get_tpch_parameters(3)["segment"] == "BUILDING"
+        assert dq.get_tpch_parameters(11)["fraction"] == 0.001
