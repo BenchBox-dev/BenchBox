@@ -94,6 +94,14 @@ runtime. A notice records the immutable blob SHA-256, retained byte range,
 retained-byte SHA-256, source identity, governing requirement, owner, and
 blocking disposition. Do not replace a notice with a blanket SPDX label.
 
+The validator checks each notice against the blob at the comparison base, so a
+notice entry must stay true on every later base. Record a notice here only for
+a file that changes rarely and whose exact bytes must be protected, such as a
+licence, EULA or vendor patch record. Notice comments in maintained source are
+registered individually in `quality/comment-policy.json` with their exact text,
+consumer and necessity; a source edit must not invalidate trusted ownership for
+later pull requests.
+
 An external entry excludes a path or directory prefix that another party owns.
 It records the selector, provenance, the governing owner decision, the owner,
 and the disposition, and its selector must match a tracked path. It applies only
