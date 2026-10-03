@@ -1,10 +1,11 @@
 {
   "acceptance": [
     "Overrides apply only to queries flagged as consuming their parameters",
-    "A seeded production DataFrame run for an enabled query uses the seed's parameters; a non-enabled query is unchanged",
+    "An end-to-end production check runs SQL and DataFrame for the same query, seed, scale and at least two streams, binding the DataFrame side from the values the SQL run actually used; production TPC-DS DataFrame resolution (benchbox/core/dataframe/query_resolution.py ~228-258) carries those bindings",
+    "The SQL stream limitation is handled: c_tools generate(..., stream_id=n) renders stream 0 (c_tools.py ~258-261), so stream n > 0 must be rendered from -LOG values or generate_dsqgen_streams before SQL and DataFrame can agree",
     "TPC-H behavior is unchanged"
   ],
-  "context": "Source: DataFrame query parity proposal v3 (item T7). Add every batch item created by dfparity-t05 to this item's needs when they exist. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Source: DataFrame query parity proposal v3 (item T7). Project owner does NOT accept earlier reviewers' TPC-H claims.\n\n2026-10-03 (Codex review, accepted in part): the gate certifies implementations under bound parameters, but production DataFrame runs still use defaults, so production results are not comparable to SQL until this item lands. It is part of the definition of done. Codex asked to move it before t20; rejected as a hard dependency because t20 certifies the implementations and t07 certifies the production wiring, and neither proves the other. Do both before claiming parity.",
   "description": "Restore the override call in the production DataFrame path (benchbox/platforms/dataframe/benchmark_mixin.py; set_parameter_overrides has had no production caller since #2126) but only for queries whose implementation consumes the mapped parameters with no literal fallback (per the T2 inventory and T6 lint). Unmapped keys are ignored by implementations, so enabling globally would ship partial, unfaithful parity as stale defaults. Needs owner decision D3 (runtime -LOG vs committed defaults) and must not change TPC-H behavior.",
   "sessions": [
     {
@@ -22,6 +23,14 @@
       "op": "update",
       "op_id": "5a65014313124b5bb1547aff32a0a2e7",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:10:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "dababc20eeaa4a2ea36859acaff84472",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
