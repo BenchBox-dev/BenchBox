@@ -5,7 +5,7 @@
     "Each entry cites the answer-set evidence of template validity and is covered on non-empty data by the t18 lane",
     "A backlog list of queries diverging at other scales exists and is excluded from coverage counts"
   ],
-  "context": "2026-10-03 draw search (SQL side only, develop 964bea289, evidence/rev3/t19_draw_search.md): up to 250 draws per query. SF 0.01: 31 empty queries; 22 have a non-empty draw; none found for Q4, Q8, Q23, Q24, Q31, Q41, Q54, Q61, Q90. SF 0.1: 23 empty; 17 have one; none for Q23, Q24, Q25, Q54, Q61, Q90. Weak hits (fewer than 3 in 250): Q37, Q41, Q58, Q93 at SF 0.01, and Q8, Q41, Q58 at SF 0.1. Verified causes of permanent emptiness: Q61, the only store's gmt_offset is -5 but dsqgen draws -6/-7; Q24, store market_id 2 vs drawn 5..10; Q90, the template hard-codes wp_char_count 5000-5200 vs 1564-3732 in the data; Q54, no customers in the only store's county at SF 0.01 and 4 at SF 0.1; Q23, no frequent items / no best customer buying them; Q25 at SF 0.1, no triples inside the fixed month windows. Many hits are one row (weak). Using an alternative draw needs the query's adapter (the t05 integration branch provides 58). Note: at SF 0.1 the gate has a single store, which is why the store-keyed templates stay empty.",
+  "context": "2026-10-03 draw search (SQL side only, develop 964bea289, evidence/rev3/t19_draw_search.md): up to 250 draws per query. SF 0.01: 31 empty queries; 22 have a non-empty draw; none found for Q4, Q8, Q23, Q24, Q31, Q41, Q54, Q61, Q90. SF 0.1: 23 empty; 17 have one; none for Q23, Q24, Q25, Q54, Q61, Q90. Weak hits (fewer than 3 in 250): Q37, Q41, Q58, Q93 at SF 0.01, and Q8, Q41, Q58 at SF 0.1. Verified causes of permanent emptiness: Q61, the only store's gmt_offset is -5 but dsqgen draws -6/-7; Q24, store market_id 2 vs drawn 5..10; Q90, the template hard-codes wp_char_count 5000-5200 vs 1564-3732 in the data; Q54, no customers in the only store's county at SF 0.01 and 4 at SF 0.1; Q23, no frequent items / no best customer buying them; Q25 at SF 0.1, no triples inside the fixed month windows. Many hits are one row (weak). Using an alternative draw needs the query's adapter (the t05 integration branch provides 58). Note: at SF 0.1 the gate has a single store, which is why the store-keyed templates stay empty.\n\n2026-10-03 resume (local integration, unpublished, D7 holds): the map is regenerated at the gate scale after binding (integration commit 6339c7d71). 33 entries for the default Power draw: 26 zero-row and 7 single all-NULL rows, each naming the filter or data limit and, where one exists, the row count when that filter alone is dropped (counted-stage probe). Old entries Q6/Q53/Q63/Q83 removed (now nonempty). The report counts all-NULL apart from zero rows; a stale entry fails the gate; non-default draws list vacuity without failing (474140bc7). Discriminating draws sought: four draws (None/0, None/1, 42/0, 42/1) give 77/103 nonempty at SF 0.01; the 26 statements vacuous on all four are nonempty at SF 1 with official qualification values and match SQL on Polars, pandas and DataFusion (run 94a6ab351, evidence/resume-20261003/sf1-94a6ab351-receipt.json). Official answer files for all 33 contain rows. Remaining for closure: publication after D7 and hosted CI on the final head.",
   "description": "After parameter alignment, re-derive _TPCDS_LEGITIMATELY_EMPTY. A query may be classified empty only when, at the gate's scale, the SQL reference returns 0 rows, both DataFrame families return 0 rows, parameters match, and the template is shown valid because the qualification binding returns rows (answer set). Queries that diverge at other scales go on an explicit backlog and are excluded from coverage counts; classified empties never count as coverage. Measured: emptiness is not monotonic in scale (23 queries are empty at some scales and not others; 5 go from rows to empty), the 8 SF=1-empty queries have non-empty official answer sets, and 7 of 12 queries empty at SF=0.1 diverge at SF=1.",
   "sessions": [
     {
@@ -47,6 +47,14 @@
       "op": "update",
       "op_id": "5402e62152644db48b7cfade42faaf1f",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:16df52d35735b09a63a9cabe",
+      "at": "2026-10-03T22:23:17Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "a4f2c808353040f2b58c665801976fd7",
+      "session_id": "7d6289696cb5495ca734933cfc874656"
     }
   ]
 }
