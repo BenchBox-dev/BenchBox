@@ -140,7 +140,14 @@ def test_configure_refuses_faulthandler_timeout(value: object) -> None:
 
 
 @pytest.mark.parametrize("ini", [{"faulthandler_timeout": 0.0}, {"faulthandler_timeout": ""}, {}])
-def test_configure_allows_unset_or_unregistered_faulthandler_timeout(ini: dict[str, object]) -> None:
+def test_configure_allows_unset_or_unregistered_faulthandler_timeout(
+    ini: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A controller run continues into the cap report, which pops these variables. Under a capped xdist
+    # run the worker inherits them from its controller, so the test owns them for its own duration.
+    monkeypatch.delenv("BENCHBOX_XDIST_CAP_REQUESTED", raising=False)
+    monkeypatch.delenv("BENCHBOX_XDIST_CAP_EFFECTIVE", raising=False)
+
     safety_plugin.pytest_configure(_IniConfig(ini))
 
 
