@@ -15,7 +15,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: trunk
+  # One group per ref: a manual run on another ref must not replace the pending run for develop.
+  group: trunk-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
