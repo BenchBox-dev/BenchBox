@@ -222,3 +222,13 @@ def test_workflow_is_the_only_new_pages_writer_and_legacy_writers_keep_the_group
     assert "site-deploy.yml" in writers
     for name in ("docs.yml", "publication-deploy.yml", "publication-transaction.yml"):
         assert "group: pages-deploy" in (WORKFLOWS_DIR / name).read_text(encoding="utf-8")
+
+
+def test_build_refuses_a_candidate_whose_control_plane_differs_from_the_dispatch() -> None:
+    steps = _steps("build")
+    names = [step.get("name", "") for step in steps]
+    guard = steps[names.index("Refuse a control plane that differs from the dispatched revision")]
+    assert guard["env"]["DISPATCH_SHA"] == "${{ github.sha }}"
+    for path in ("deploy", "scripts/site_deploy", "scripts/publication", "scripts/assemble_public_site.py"):
+        assert path in guard["run"]
+    assert names.index("Refuse a control plane that differs from the dispatched revision") < names.index("Run gates")

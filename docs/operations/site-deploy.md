@@ -38,6 +38,11 @@ closed.
   intermediate commits without a run. Those commits are uncertified and the walk
   skips them; the candidate is then an older certified commit until the burst's
   last commit is certified.
+- The build checks out the candidate, but the deploy control plane (this
+  workflow, `deploy/`, `scripts/site_deploy/`, the assembler, the publication
+  gate tools and the site inventory) must match the dispatched commit. If an
+  older candidate's copy differs, the run fails; dispatch again once trunk has
+  certified the newer commit.
 - Trunk does not build the docs or the Explorer. Site-deploy's own build and
   gates (privacy, Explorer compatibility, mixed versions, corpus bijection,
   digest, validator parity, links) are what cover those artifacts.

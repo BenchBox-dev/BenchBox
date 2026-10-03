@@ -131,6 +131,18 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
+      - name: Refuse a control plane that differs from the dispatched revision
+        if: inputs.mode != 'rollback'
+        working-directory: trunk
+        env:
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet HEAD "$DISPATCH_SHA" -- .github/workflows/site-deploy.yml deploy scripts/site_deploy scripts/assemble_public_site.py scripts/publication scripts/site_inventory.py _project/design/site-inventory; then
+            echo "::error::the candidate's deploy control plane differs from $DISPATCH_SHA; wait for trunk.yml to certify the newer commit, then dispatch again"
+            exit 1
+          fi
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         if: inputs.mode != 'rollback'
         with:
