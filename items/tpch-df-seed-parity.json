@@ -7,6 +7,7 @@
     "Unseeded SQL throughput and power use a consistent parameter policy, documented",
     "Result bundles record which parameter set was bound; a run whose validation failed is not reported as PASSED"
   ],
+  "context": "Owner approved 2026-10-03 (lifts D5 for this item's scope only). Soundness-path parts still follow D7 (wait for #2567); non-soundness parts may land now under D8.",
   "description": "Found by dfparity-t21 (evidence: /Users/joe/.jcode/scratch/dfparity-handoff/evidence/rev3/t21_tpch_findings.md, develop 964bea289). Independently spot-checked on the SF=1 DuckDB database for Q3, Q11, Q18 and Q20: the official answer files (_sources/tpc-h/dbgen/answers/) match `qgen -d` exactly (Q11 1048 rows, Q18 57, Q20 186). `qgen -r 17039360` gives 1469, 9 and 188 rows and different Q3 values. Findings: (1) TPCH_SF1_REFERENCE_SEED (benchmark.py ~31-47) is not the answer-file parameter set, so seeded SQL power runs at SF 1 report false row-count failures on Q11, Q16, Q18 and Q20, and the comments in benchmark.py, tpch_results.py and power_test.py ~317 are wrong. (2) Seeded DataFrame runs ignore the seed: set_parameter_overrides is never called, and they bind the -d defaults. _tpch_reference_context then labels them answer-file-valid. SQL and DataFrame parameters differ on 22 of 22 queries at seed 17039360. (3) In throughput runs, SQL derives a seed per stream and position, and unseeded throughput uses base seed 42 while the power test uses -d. DataFrame streams only reorder the -d queries, so bindings differ at 65 of 66 positions. The DataFrame path also ignores --streams. (4) The SQL bundle reports PASSED although its warm-up stream validation failed 4 checks. (5) The parameter extractor silently returns defaults on dialect-translated SQL, so extract from raw qgen text only.",
   "links": [
     "/Users/joe/.jcode/scratch/dfparity-handoff/evidence/rev3/t21_tpch_findings.md"
@@ -18,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "d2e84c3259c84eb58317b2b8f67560b9",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T14:48:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6bd44029ea054162a7ac07c6dcfcdc84",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
