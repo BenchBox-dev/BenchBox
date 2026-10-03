@@ -104,7 +104,6 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 
 | File | Classification | Property or reason |
 | --- | --- | --- |
-| `test_binary_manifest_workflow.py` | product-safety | Queue artifact verifies source-bound bundled generator hashes before upload |
 | `test_corpus_cutover.py` | product-safety | Corpus cutover |
 | `test_corpus_event_bridge.py` | product-safety | Corpus event integrity |
 | `test_corpus_trust_boundary.py` | product-safety | Corpus trust boundary |
