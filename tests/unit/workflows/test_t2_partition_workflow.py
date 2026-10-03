@@ -105,7 +105,10 @@ def test_native_binary_framing_remains_required_before_merge() -> None:
     jobs = _jobs("ci.yml")
     native = jobs["tpch-binary-framing"]
     assert native["needs"] == "ci-paths"
-    assert native["if"] == "${{ needs.ci-paths.outputs.heavy-needed == 'true' }}"
+    framing_condition = (
+        "${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }}"
+    )
+    assert native["if"] == framing_condition
     assert native["runs-on"] == "${{ matrix.os }}"
     assert native["timeout-minutes"] == 15
     assert native["strategy"] == {
@@ -122,7 +125,9 @@ def test_native_binary_framing_remains_required_before_merge() -> None:
     assert not framing.get("continue-on-error")
     assert "tpch-binary-framing" in jobs["core"]["needs"]
     core_text = "\n".join(step.get("run", "") for step in jobs["core"]["steps"])
-    assert "--expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }}" in core_text
+    expectation = framing_condition.removeprefix("${{ ").removesuffix(" }}")
+    assert f"--expect tpch-binary-framing=${{{{ {expectation} }}}}" in core_text
+    assert "framing-needed" in _jobs("ci.yml")["ci-paths"]["outputs"]
 
 
 def test_three_os_nightly_cells_retain_raw_framing_guard() -> None:

@@ -105,6 +105,7 @@ jobs:
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      framing-needed: ${{ steps.classify.outputs.framing-needed }}
       heavy-needed: ${{ steps.heavy.outputs.heavy-needed }}
       viz-needed: ${{ steps.classify.outputs.viz-needed }}
       explorer-vitest-needed: ${{ steps.classify.outputs.explorer-vitest-needed }}
@@ -205,15 +206,15 @@ jobs:
             --summary "$GITHUB_STEP_SUMMARY"
 
   # Cross-platform TPC-H binary framing: the only pre-merge macOS/Windows
-  # execution of the bundled dbgen framing guard. The merge queue runs direct
-  # macOS and Windows execution on every code-routed tree, while pull_request
-  # runs skip it unless a carve-out applies (merge_group event, soundness
-  # paths, or packaging paths via the heavy-needed output). Nightly retains
-  # the complete three-platform matrix.
+  # execution of the bundled dbgen framing guard. Pull requests run it when a
+  # carve-out applies (soundness or packaging paths via the heavy-needed
+  # output) or when the change touches test infrastructure or the bundled
+  # binaries (the framing-needed output). Nightly retains the complete
+  # three-platform matrix.
   tpch-binary-framing:
     name: TPC-H binary framing (${{ matrix.os }})
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -2148,7 +2149,7 @@ jobs:
             --expect medium-test=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect correctness-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
-            --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }} \
+            --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }} \
             --expect datafusion-integration=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect package-smoke=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} \
             --expect dist-artifact=${{ github.event_name == 'merge_group' }} \
