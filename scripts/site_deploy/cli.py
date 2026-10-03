@@ -434,13 +434,19 @@ def command_rollback_prepare(args: argparse.Namespace) -> int:
         raise rollback_module.RollbackError(
             f"downloaded receipt sha256 {restore.receipt_sha256} does not match the resolved {expected}"
         )
+    routes = restore.receipt["routes"]
     if args.phase == "ui-first":
-        if args.current_tree is None:
-            raise SystemExit("--current-tree is required for the ui-first phase")
+        if args.current_tree is None or args.current_receipt is None:
+            raise SystemExit("--current-tree and --current-receipt are required for the ui-first phase")
         current_sha = (resolved.get("deployed") or {}).get("artifact_sha256")
         if not current_sha:
             raise rollback_module.RollbackError("resolved.json carries no deployed artifact digest for ui-first")
         artifacts.verify_tree(args.current_tree, current_sha)
+        current = rollback_module.load_restore(args.current_receipt, args.current_tree)
+        if current.receipt_sha256 != (resolved.get("deployed") or {}).get("receipt_sha256"):
+            raise rollback_module.RollbackError("the current receipt is not the deployed generation's receipt")
+        restored_results = [route for route in restore.receipt["routes"] if route["path"] == "/results/"]
+        routes = [route for route in current.receipt["routes"] if route["path"] != "/results/"] + restored_results
         digest = artifacts.compose_ui_first(args.current_tree, args.restored_tree, args.site_dir)
         files = sum(1 for path in args.site_dir.rglob("*") if path.is_file())
     else:
@@ -453,7 +459,7 @@ def command_rollback_prepare(args: argparse.Namespace) -> int:
     corpus_sha = restore.receipt["corpus_sha"]
     if args.phase == "ui-first":
         corpus_sha = resolved["deployed"]["corpus_sha"]
-    assembly = {"routes": restore.receipt["routes"], "tree_sha256": digest, "total_bytes": total, "total_files": files}
+    assembly = {"routes": routes, "tree_sha256": digest, "total_bytes": total, "total_files": files}
     _write_json(args.out_dir / "route-assembly.json", assembly)
     _write_json(
         args.out_dir / "restore.json",
@@ -559,6 +565,7 @@ def build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--receipt", type=Path, required=True)
     prepare.add_argument("--restored-tree", type=Path, required=True)
     prepare.add_argument("--current-tree", type=Path)
+    prepare.add_argument("--current-receipt", type=Path)
     prepare.add_argument("--phase", choices=("full", "ui-first"), default="full")
     prepare.add_argument("--resolved", type=Path, required=True)
     prepare.add_argument("--site-dir", type=Path, required=True)

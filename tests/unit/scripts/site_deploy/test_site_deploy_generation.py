@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from dataclasses import dataclass, field
 
@@ -72,6 +73,13 @@ def test_forward_modes_never_regress_trunk_or_release() -> None:
     for trunk, tag, expected in FORWARD_CASES:
         for mode in ("deploy", "preview"):
             assert gate(trunk, tag, deployed(), mode).action == expected
+
+
+def test_identical_generation_redeploys_when_a_newer_deployment_carries_no_receipt() -> None:
+    unreceipted = dataclasses.replace(deployed(), newer_unreceipted=True)
+    assert gate(SHA_B, "v0.4.1", unreceipted).action == DEPLOY
+    assert gate(SHA_B, "v0.4.1", unreceipted, "rollback").action == DEPLOY
+    assert gate(SHA_B, "v0.4.1", deployed()).action == NOOP
 
 
 def test_rollback_may_move_backwards_and_diverge_but_identical_state_is_noop() -> None:

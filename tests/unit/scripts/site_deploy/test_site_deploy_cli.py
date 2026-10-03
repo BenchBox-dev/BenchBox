@@ -8,7 +8,7 @@ import pytest
 
 from scripts.publication.assembler import compute_tree_digest
 from scripts.site_deploy import checksums, cli, publish, receipt
-from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, make_receipt
+from tests.unit.scripts.site_deploy.site_deploy_fakes import SHA_A, SHA_B, make_receipt
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
@@ -37,11 +37,11 @@ def _site(root: Path, label: str, snapshot: int = 11) -> Path:
     return root
 
 
-def _stored_receipt(tmp_path: Path, tree: Path, run_id: int, ui: int, snapshot: int) -> Path:
+def _stored_receipt(tmp_path: Path, tree: Path, run_id: int, ui: int, snapshot: int, trunk: str = SHA_A) -> Path:
     digest, size, files = compute_tree_digest(tree)
-    built = make_receipt(run_id=run_id, trunk=SHA_A, ui=ui, snapshot=snapshot)
+    built = make_receipt(run_id=run_id, trunk=trunk, ui=ui, snapshot=snapshot)
     built["artifact"].update(sha256=digest, total_bytes=size, total_files=len(files))
-    built["routes"] = [{"path": path, "source_sha": SHA_A} for path in ROUTES]
+    built["routes"] = [{"path": path, "source_sha": trunk} for path in ROUTES]
     path = tmp_path / f"receipt-{run_id}.json"
     path.write_bytes(receipt.canonical_bytes(built))
     return path
@@ -124,9 +124,14 @@ def test_rollback_prepare_ui_first_keeps_the_current_snapshot_and_current_corpus
     restored = _site(tmp_path / "restored", "old", snapshot=11)
     current = _site(tmp_path / "current", "new", snapshot=12)
     stored = _stored_receipt(tmp_path, restored, 7, ui=11, snapshot=11)
+    current_receipt = _stored_receipt(tmp_path, current, 8, ui=12, snapshot=12, trunk=SHA_B)
     resolved = tmp_path / "resolved.json"
     current_digest = compute_tree_digest(current)[0]
-    deployed = {"corpus_sha": "9" * 40, "artifact_sha256": current_digest}
+    deployed = {
+        "corpus_sha": "9" * 40,
+        "artifact_sha256": current_digest,
+        "receipt_sha256": receipt.receipt_sha256(current_receipt.read_bytes()),
+    }
     resolved.write_text(json.dumps(_resolved(deployed, stored=stored)), encoding="utf-8")
     out = tmp_path / "out"
 
@@ -139,6 +144,8 @@ def test_rollback_prepare_ui_first_keeps_the_current_snapshot_and_current_corpus
             str(restored),
             "--current-tree",
             str(current),
+            "--current-receipt",
+            str(current_receipt),
             "--phase",
             "ui-first",
             "--resolved",
@@ -158,6 +165,14 @@ def test_rollback_prepare_ui_first_keeps_the_current_snapshot_and_current_corpus
         assert connection.execute("SELECT read_model_version FROM metadata").fetchone() == (12,)
     restore = json.loads((out / "restore.json").read_text(encoding="utf-8"))
     assert restore["corpus_sha"] == "9" * 40
+    routes = json.loads((out / "route-assembly.json").read_text(encoding="utf-8"))["routes"]
+    assert {route["path"]: route["source_sha"] for route in routes} == {
+        "/": SHA_B,
+        "/docs/": SHA_B,
+        "/docs/dev/": SHA_B,
+        "/blog/": SHA_B,
+        "/results/": SHA_A,
+    }
     assert (
         json.loads((out / "route-assembly.json").read_text(encoding="utf-8"))["tree_sha256"]
         == compute_tree_digest(site)[0]
@@ -311,6 +326,7 @@ def test_rollback_prepare_ui_first_refuses_a_current_tree_that_differs_from_the_
     restored = _site(tmp_path / "restored", "old", snapshot=11)
     current = _site(tmp_path / "current", "new", snapshot=12)
     stored = _stored_receipt(tmp_path, restored, 7, ui=11, snapshot=11)
+    current_receipt = _stored_receipt(tmp_path, current, 8, ui=12, snapshot=12, trunk=SHA_B)
     deployed = {"corpus_sha": "9" * 40, "artifact_sha256": compute_tree_digest(current)[0]}
     (current / "index.html").write_text("tampered", encoding="utf-8")
     code = _prepare(
@@ -320,6 +336,8 @@ def test_rollback_prepare_ui_first_refuses_a_current_tree_that_differs_from_the_
         _resolved(deployed, stored=stored),
         "--current-tree",
         str(current),
+        "--current-receipt",
+        str(current_receipt),
         "--phase",
         "ui-first",
     )

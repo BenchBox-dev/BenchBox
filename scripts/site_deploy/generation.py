@@ -88,8 +88,10 @@ def generation_gate(
     same_trunk = candidate_trunk == deployed.trunk_sha
     same_tag = candidate_tag == deployed.release_tag
     same_corpus = mode != "rollback" or candidate_corpus is None or candidate_corpus == deployed.corpus_sha
-    if same_trunk and same_tag and same_corpus:
+    if same_trunk and same_tag and same_corpus and not deployed.newer_unreceipted:
         return Decision(NOOP, f"generation {deployed.generation} already deployed")
+    if same_trunk and same_tag and same_corpus:
+        return Decision(DEPLOY, "a newer deployment carries no receipt; redeploying restores receipt authority")
     if mode == "rollback":
         return Decision(DEPLOY, "rollback to a previously deployed generation")
     try:

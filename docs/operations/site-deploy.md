@@ -139,7 +139,9 @@ the full restore would pair the current UI with an older snapshot, the gates
 fail and tell you to dispatch `-f rollback_phase=ui-first` first (restored UI
 over the current snapshot), then the same dispatch with `rollback_phase=full`.
 The ui-first phase also re-hashes the current generation's artifact against the
-digest in the current receipt before composing it.
+digest in the current receipt before composing it, and its receipt keeps the
+current generation's route records except `/results/`, which takes the restored
+one.
 
 ### Newest deployment has no receipt
 

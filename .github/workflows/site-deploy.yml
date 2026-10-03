@@ -213,7 +213,7 @@ jobs:
           if [ "$ROLLBACK_PHASE" = "ui-first" ]; then
             current_run=$(jq -r '.deployed.run_id' out/resolved.json)
             python -m scripts.site_deploy fetch-run --run-id "$current_run" --receipt-sha256 "$(jq -r '.deployed.receipt_sha256' out/resolved.json)" --receipt-dir current/receipt --tree-dir current/tree
-            args+=(--current-tree current/tree)
+            args+=(--current-tree current/tree --current-receipt current/receipt/receipt.json)
           fi
           python -m scripts.site_deploy rollback-prepare "${args[@]}"
 
