@@ -716,7 +716,7 @@ def test_ci_policy_is_always_required_and_has_local_equivalent() -> None:
     assert 'elif [ -z "$installed" ] && git merge-base --is-ancestor' in step["run"]
     assert "git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b" in step["run"]
     assert "pull_request.base.sha" in step["env"]["BASE_REF"]
-    assert "merge_group.base_sha" in step["env"]["BASE_REF"]
+    assert "merge_group" not in step["env"]["BASE_REF"]
     tooling = workflow["jobs"]["tooling"]
     assert "comment-policy" in tooling["needs"]
     assert any("--always comment-policy" in step.get("run", "") for step in tooling["steps"])

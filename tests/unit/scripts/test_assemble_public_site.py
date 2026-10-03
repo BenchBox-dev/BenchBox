@@ -113,8 +113,6 @@ def test_docs_workflow_reuses_assembler_and_binds_visual_approval_to_event_head(
     assert "uv run -- python scripts/assemble_public_site.py --site-dir site" in workflow
     assert "cat > site/404.html" not in workflow
     assert "github.event.pull_request.head.sha" in workflow
-    assert "github.event.merge_group.head_sha" in workflow
-    assert "github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA" in workflow
+    assert "merge_group" not in workflow
     assert "github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA" in workflow
-    assert "github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON" in workflow
     assert "github.event_name == 'pull_request' && vars.APPROVAL_REASON" in workflow
