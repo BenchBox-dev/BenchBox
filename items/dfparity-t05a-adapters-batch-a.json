@@ -31,6 +31,15 @@
       "op": "update",
       "op_id": "8103838f4c58414dbbed4135195aa5db",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ab23c3a6eef35cb685577a07",
+      "at": "2026-10-03T17:49:28Z",
+      "client": "codex-mcp-client",
+      "generation": "63754573652747ee8b178c13047c732d",
+      "op": "take",
+      "op_id": "e2938b8e0edf4f578ba858537cf1c346",
+      "session_id": "44c67cd709da49ea99eeabde2893ca2a"
     }
   ]
 }
