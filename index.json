@@ -1003,7 +1003,8 @@
       "claim": null,
       "needs": [
         "astro-site-02-api-reference-decision",
-        "astro-site-31-myst-to-mdx-converter"
+        "astro-site-31-myst-to-mdx-converter",
+        "astro-site-03-visual-change-procedure"
       ],
       "priority": "medium",
       "status": "open",
