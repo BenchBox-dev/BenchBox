@@ -899,6 +899,18 @@ def test_env_split_string_malformed_operand_fails_closed() -> None:
         stdin_language(["env", "-S", "'python -"])
 
 
+@pytest.mark.parametrize("operand", ["python - # ignored", r"python - \\c", "python - ${COMMAND}"])
+def test_env_split_string_special_gnu_syntax_fails_closed(operand: str) -> None:
+    with pytest.raises(ValueError, match="unsupported env split-string syntax"):
+        stdin_language(["env", "-S", operand])
+
+
+@pytest.mark.parametrize("operand", ["python - # ignored", r"python - \\c", "python - ${COMMAND}"])
+def test_env_split_string_special_syntax_is_reported_by_source_scan(operand: str) -> None:
+    findings = scan("a.sh", f"env -S '{operand}' <<'PY'\n# explanation\nPY\n", "bash")
+    assert findings[0].kind == "coverage-error"
+
+
 def test_heredoc_unknown_wrapper_option_fails_closed() -> None:
     findings = scan("a.sh", "uv run --unknown value python - <<'PY'\n# explanation\nPY\n", "bash")
     assert findings[0].kind == "coverage-error"

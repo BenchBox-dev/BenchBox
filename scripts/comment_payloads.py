@@ -118,6 +118,8 @@ def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: se
         if word in {"-S", "--split-string"} and word in value_options:
             if index + 1 >= len(words):
                 raise ValueError(f"{wrapper} option requires an operand: {word}")
+            if any(token in words[index + 1] for token in ("#", "\\c", "$")):
+                raise ValueError(f"unsupported {wrapper} split-string syntax")
             try:
                 split_words = shlex.split(words[index + 1])
             except ValueError as exc:
@@ -131,6 +133,8 @@ def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: se
                 wrapper=wrapper,
             )
         if word.startswith("--split-string=") and "--split-string" in value_options:
+            if any(token in word.split("=", 1)[1] for token in ("#", "\\c", "$")):
+                raise ValueError(f"unsupported {wrapper} split-string syntax")
             try:
                 split_words = shlex.split(word.split("=", 1)[1])
             except ValueError as exc:
