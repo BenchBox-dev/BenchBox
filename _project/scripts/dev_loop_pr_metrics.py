@@ -78,7 +78,7 @@ FAST_TEST_JOB_NAME = "test (ubuntu-latest, 3.12)"
 # timeout, so its wall time is tracked here to make the next resize proactive
 # rather than a reaction to a cancelled job (see ci.yml medium-test).
 MEDIUM_TEST_JOB_NAME = "medium-test"
-MEDIUM_SHARD_JOB_NAMES = ("medium-test (shard 0)", "medium-test (shard 1)")
+MEDIUM_SHARD_JOB_NAMES = tuple(f"medium-test (shard {index})" for index in range(4))
 API_RETRY_ATTEMPTS = 3
 # Versioned synchronize-event fan-out schema. Existing PrMetrics / summarize
 # keys stay unchanged so current consumers keep working.

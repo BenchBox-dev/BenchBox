@@ -1,5 +1,7 @@
 # Require public-site visual acceptance before merging into develop
 
+Superseded on 2026-10-03: the visual check is advisory until the public site is in production (see the pull request that made this change); the full record follows in the queue-retirement decision.
+
 Date: 2026-09-24
 Status: Decision recorded; enforcement is pending implementation.
 
