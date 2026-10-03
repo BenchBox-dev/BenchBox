@@ -1,4 +1,6 @@
 #!/bin/sh
+# $id:$
+# $log:$
 mkdir temp_build 2> /dev/null
 cd temp_build
 if [ -f FAILED ]

@@ -12,6 +12,6 @@ create table s_call_center as
        ,CC_TAX_PERCENTAGE call_tax_percentage
 from call_center left outer join date_dim d2 on CC_CLOSED_DATE_SK = d2.d_date_sk
                  left outer join date_dim d1 on CC_OPEN_DATE_SK = d1.d_date_sk
-where cc_rec_end_date is NULL
+where cc_rec_end_date is NULL -- need this to avoid duplicates
   and rownum < 5
 );

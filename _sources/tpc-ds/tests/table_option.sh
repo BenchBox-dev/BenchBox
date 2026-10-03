@@ -1,4 +1,6 @@
 #!/bin/sh
+# created in response to bug 350
+# assumes data set has been built in /data
 cd temp_build
 if [ -f FAILED ]
 then

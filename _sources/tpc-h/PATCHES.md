@@ -29,7 +29,7 @@ Add `EXTERN int zstdout;` to declare the global variable that controls stdout mo
 
 ```c
 EXTERN char *d_path;
-EXTERN int  zstdout;
+EXTERN int  zstdout;   /* <-- Added */
 ```
 
 Location: After line 281 (after `d_path` declaration)
@@ -59,8 +59,10 @@ Fix incorrect format specifier for money values. The `dollars` and `cents` varia
 are `int` type but were using `%ld` format which is undefined behavior.
 
 ```c
+// Before (incorrect):
 fprintf(target, "%ld.%02ld", dollars, cents);
 
+// After (correct):
 fprintf(target, "%d.%02d", dollars, cents);
 ```
 
@@ -77,14 +79,16 @@ fprintf (stderr, "-z     -- output to stdout\n");
 
 **b. Add 'z' to getopt string (line 454):**
 ```c
+// Before:
 "b:C:d:fi:hO:P:qs:S:T:U:v"
 
+// After:
 "b:C:d:fi:hO:P:qs:S:T:U:vz"
 ```
 
 **c. Add case handler (lines 525-527):**
 ```c
-case 'z':
+case 'z':               /* output to stdout */
     zstdout = 1;
     break;
 ```
@@ -92,10 +96,13 @@ case 'z':
 ### Usage
 
 ```bash
+# Generate customer table to stdout (can be piped to compression)
 ./dbgen -z -s 1 -T c | zstd > customer.tbl.zst
 
+# Generate all tables to stdout (one at a time)
 ./dbgen -z -s 1 -T c > customer.tbl
 ./dbgen -z -s 1 -T s > supplier.tbl
+# etc.
 ```
 
 ### Limitations
@@ -109,10 +116,13 @@ case 'z':
 After applying patches and recompiling:
 
 ```bash
+# Verify -z flag appears in help
 ./dbgen -h 2>&1 | grep -- "-z"
 
+# Test stdout output
 ./dbgen -z -s 0.01 -T c | head -5
 
+# Verify output matches file-based generation
 ./dbgen -z -s 0.01 -T c > /tmp/stdout.tbl
 ./dbgen -s 0.01 -T c
 diff /tmp/stdout.tbl customer.tbl
@@ -169,7 +179,9 @@ BenchBox build entrypoints are kept in sync:
 ### Verification
 
 ```bash
+# A generated row must NOT end with the field separator.
 ./dbgen -s 0.01 -T n && tail -n 1 nation.tbl | od -c | tail -n 2
+# The last byte before \n must be a data character, not '|'.
 ```
 
 `tests/unit/core/test_tpch_dbgen_framing.py` asserts this invariant across all
@@ -182,8 +194,10 @@ bundled per-platform binaries (skipping those the host can't execute).
 To apply these changes to a fresh TPC-H source distribution:
 
 ```bash
+# From the TPC-H source root directory (containing dbgen/)
 patch -p1 < stdout-support.patch
 
+# Rebuild
 make -f makefile.suite
 ```
 

@@ -12,6 +12,6 @@ create table s_web_page as
        ,WP_MAX_AD_COUNT WPAG_MAX_AD_COUNT
 from web_page left outer join date_dim d1 on wp_creation_date_sk = d1.d_date_sk
               left outer join date_dim d2 on wp_access_date_sk = d2.d_date_sk
-where wp_rec_end_date is null
+where wp_rec_end_date is null  -- need this to eliminate duplicates
   and rownum < 10
 );

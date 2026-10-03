@@ -32,6 +32,11 @@ from    s_purchase_m left outer join customer on (purc_customer_id = c_customer_
 where   purc_purchase_id = plin_purchase_id
     and i_rec_end_date is NULL
     and s_rec_end_date is NULL;
+-- for now delete the rows that have lineitem = null
+--delete from ssv where ss_item_sk is null;
 select count(*) from ssv where ss_item_sk is null;
+-- for now delete pk violaters
+--delete from ssv where ss_ticket_number in (select ss_ticket_number from (select ss_ticket_number,ss_item_sk from ssv group by ss_ticket_number,ss_item_sk having count(*) > 1));
+--select ss_ticket_number,ss_item_sk from ssv group by ss_ticket_number,ss_item_sk having count(*) > 1;
 select count(*) from s_purchase_m,s_purchase_lineitem_m where purc_purchase_id = plin_purchase_id;
 select count(*) from ssv;

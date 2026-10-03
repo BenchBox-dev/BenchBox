@@ -1,4 +1,13 @@
 #!/bin/sh
+# assumptions:
+#  user tpcds
+#  password tpcds
+#  database tpcds exists (required for privilege settings, below)
+#  privileges
+#    global
+#      file (to allow load data infile to work)
+#    database: tpcds
+#      all
 
 create_schema()
 {

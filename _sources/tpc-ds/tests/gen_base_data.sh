@@ -1,4 +1,6 @@
 #!/bin/sh
+# $id:$
+# $log:$
 cd temp_build
 rm -rf /data/*.csv
 child=1

@@ -38,8 +38,10 @@ matched "_FILTER".
 **File:** `_sources/tpc-ds/tools/params.h` line 64
 
 ```c
+// Before (broken):
 {"_FILTER",     OPT_FLG,            20, "output data to stdout", NULL, "N"},
 
+// After (fixed):
 {"FILTER",      OPT_FLG,            20, "output data to stdout", NULL, "N"},
 ```
 
@@ -52,16 +54,18 @@ causing "Failed to open output file!" errors.
 **File:** `_sources/tpc-ds/tools/print.c` lines 480-486
 
 ```c
+// Before (broken):
 #endif
        }
    }
 
-   fpOutfile = pTdef->outfile;
+   fpOutfile = pTdef->outfile;  // Overwrites stdout!
    res = (fpOutfile != NULL);
 
+// After (fixed):
 #endif
        }
-      fpOutfile = pTdef->outfile;
+      fpOutfile = pTdef->outfile;  // Moved inside else block
    }
 
    res = (fpOutfile != NULL);
@@ -70,10 +74,13 @@ causing "Failed to open output file!" errors.
 ### Usage
 
 ```bash
+# Generate ship_mode table to stdout (can be piped to compression)
 ./dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y | zstd > ship_mode.dat.zst
 
+# Generate date_dim to stdout with fixed seed for reproducibility
 ./dsdgen -TABLE date_dim -SCALE 1 -FILTER Y -RNGSEED 12345 > date_dim.dat
 
+# Verify stdout output works
 ./dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y -RNGSEED 1 | head -5
 ```
 
@@ -88,13 +95,19 @@ causing "Failed to open output file!" errors.
 After applying patches and recompiling:
 
 ```bash
+# Verify FILTER flag appears in help (not _FILTER)
 ./dsdgen -help 2>&1 | grep FILTER
+# Expected: "FILTER" without underscore prefix
 
+# Test stdout output produces data
 ./dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y -RNGSEED 1 | wc -l
+# Expected: 20 (ship_mode has 20 rows at SF1)
 
+# Verify output matches file-based generation
 ./dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y -RNGSEED 1 > /tmp/stdout.dat
 ./dsdgen -TABLE ship_mode -SCALE 1 -RNGSEED 1 -DIR /tmp -FORCE
 diff /tmp/stdout.dat /tmp/ship_mode.dat
+# Expected: No differences
 ```
 
 ---
@@ -143,10 +156,12 @@ LINUX_CFLAGS    = -g -Wall -fcommon
 ### Verification
 
 ```bash
+# Clean build on Linux
 cd _sources/tpc-ds/tools
 make clean
 make
 
+# Verify binaries were created
 ls -la dsdgen dsqgen
 ```
 
@@ -178,8 +193,10 @@ matching the SELECT and GROUP BY clauses which already use `d1.d_week_seq`.
 **File:** `query_templates/query72.tpl` line 65
 
 ```sql
+-- Before (broken):
 order by total_cnt desc, i_item_desc, w_warehouse_name, d_week_seq
 
+-- After (fixed):
 order by total_cnt desc, i_item_desc, w_warehouse_name, d1.d_week_seq
 ```
 
@@ -198,9 +215,11 @@ This fix must be applied to all copies of the query template:
 ### Verification
 
 ```bash
+# Generate Query 72 and verify the ORDER BY is qualified
 uv run benchbox run --platform duckdb --benchmark tpcds --scale 1.0 \
     --phases throughput --seed 463933
 
+# Should complete without "Ambiguous reference" errors for Query 72
 ```
 
 ### Notes
@@ -241,8 +260,10 @@ Mirror the DuckDB TPC-DS extension's approach: prevent `LogScale` / `LinearScale
 **File:** `_sources/tpc-ds/tools/params.h` line 53
 
 ```c
+// Before (rejects "0.01"):
 {"SCALE",   OPT_INT,    9, "volume of data to generate in GB", SetScaleIndex, "1"},
 
+// After (accepts "0.01"):
 {"SCALE",   OPT_STR,    9, "volume of data to generate in GB", SetScaleIndex, "1"},
 ```
 
@@ -254,7 +275,7 @@ Mirror the DuckDB TPC-DS extension's approach: prevent `LogScale` / `LinearScale
 
 ```c
 int     get_int(char *var);
-double  get_dbl(char *var);
+double  get_dbl(char *var);   // NEW
 void    set_int(char *var, char *val);
 ```
 
@@ -284,21 +305,29 @@ Mirrors `get_int()` but uses `atof()` instead of `atoi()`, so `"0.01"` yields `0
 Three coordinated changes:
 
 ```c
+// Before:
 static int bScaleSet = 0,
     nScale;
+// ...
 nScale = get_int("SCALE");
+// ...
 for (nTable=CALL_CENTER; nTable <= MAX_TABLE; nTable++) {
     switch(nScale) { ... }
+    // multiplier loop ...
     arRowcount[nTable].kBaseRowcount *= nMultiplier;
-}
+} /* for each table */
 
+// After:
 static int bScaleSet = 0;
 static double nScale;
 int iScale;
+// ...
 nScale = get_dbl("SCALE");
+// ...
 iScale = (nScale < 1) ? 1 : (int)nScale;
 for (nTable=CALL_CENTER; nTable <= MAX_TABLE; nTable++) {
     switch(iScale) { ... }
+    // multiplier loop ...
     arRowcount[nTable].kBaseRowcount *= nMultiplier;
 
     if (arRowcount[nTable].kBaseRowcount >= 0) {
@@ -312,7 +341,7 @@ for (nTable=CALL_CENTER; nTable <= MAX_TABLE; nTable++) {
                 arRowcount[nTable].kBaseRowcount = 1;
         }
     }
-}
+} /* for each table */
 ```
 
 `iScale = max(1, (int)nScale)` forces fractional scales into the `case 1:` branch of the switch, which reads the SF=1 rowcount directly from the distribution file and never calls `LogScale` / `LinearScale`. The post-multiplier block then scales the result proportionally for sub-SF1, with the min-1 floor preserving the small-dimension tables.
@@ -322,9 +351,11 @@ The guard `!(mem == 1 && nMultiplier == 1)` skips the multiplication for `Static
 Also updated:
 
 ```c
+// Before:
 if ((table == INVENTORY))
     return(sc_w_inventory(nScale));
 
+// After:
 if ((table == INVENTORY))
     return(sc_w_inventory((int)nScale));
 ```
@@ -336,15 +367,21 @@ if ((table == INVENTORY))
 **File:** `_sources/tpc-ds/tools/w_call_center.c`
 
 ```c
+// Before:
 static int bInit = 0,
     nScale;
+// ...
 nScale = get_int("SCALE");
+// ...
 genrand_integer(&r->cc_employees, DIST_UNIFORM, 1,
     CC_EMPLOYEE_MAX * nScale * nScale, 0, CC_EMPLOYEES);
 
+// After:
 static int bInit = 0;
 static double nScale;
+// ...
 nScale = get_dbl("SCALE");
+// ...
 genrand_integer(&r->cc_employees, DIST_UNIFORM, 1,
     nScale >= 1 ? (int)(CC_EMPLOYEE_MAX * nScale * nScale) : (int)CC_EMPLOYEE_MAX,
     0, CC_EMPLOYEES);
@@ -357,8 +394,10 @@ For fractional scales `CC_EMPLOYEE_MAX * nScale * nScale` collapses to 0 and yie
 Run on the host toolchain after rebuilding:
 
 ```bash
+# Rebuild
 cd _sources/tpc-ds/tools && make clean && make
 
+# Gate Zero probe (darwin-arm64 source build)
 for SF in 0.01 0.1 0.5 1.0; do
   for TBL in call_center store warehouse web_site; do
     ./dsdgen -verbose n -force y -terminate n -scale "$SF" -table "$TBL" -dir /tmp/probe
@@ -395,8 +434,10 @@ and verification of the root cause through testing.
 To apply these changes to a fresh TPC-DS source distribution:
 
 ```bash
+# From the TPC-DS source root directory (containing tools/)
 patch -p1 < stdout-support.patch
 
+# Rebuild
 cd tools
 make
 ```
