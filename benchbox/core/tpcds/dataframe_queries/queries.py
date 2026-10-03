@@ -2176,11 +2176,9 @@ def q79_expression_impl(ctx: DataFrameContext) -> Any:
     """
     params = get_parameters(79)
     year = params.get("year", 1998)
-    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
-    dow = params.get("dow", 1)
+    years = [year, year + 1, year + 2]
     dep_count = params.get("dep_count", 8)
-    emp_min = params.get("emp_min", 200)
-    emp_max = params.get("emp_max", 295)
+    vehicle_count = params.get("vehicle_count", 0)
     col = ctx.col
     lit = ctx.lit
     inner = (
@@ -2190,9 +2188,9 @@ def q79_expression_impl(ctx: DataFrameContext) -> Any:
         .join(ctx.get_table("household_demographics"), left_on="ss_hdemo_sk", right_on="hd_demo_sk")
         .filter(
             col("d_year").is_in(years)
-            & (col("d_dow") == lit(dow))
-            & ((col("hd_dep_count") == lit(dep_count)) | (col("hd_vehicle_count") > lit(0)))
-            & col("s_number_employees").is_between(emp_min, emp_max)
+            & (col("d_dow") == lit(1))
+            & ((col("hd_dep_count") == lit(dep_count)) | (col("hd_vehicle_count") > lit(vehicle_count)))
+            & col("s_number_employees").is_between(200, 295)
         )
         .group_by("ss_ticket_number", "ss_customer_sk", "ss_addr_sk", col("s_city").alias("s_city"))
         # SQL SUM() over all-NULL inputs is NULL (not 0.0): carry non-null
@@ -2224,11 +2222,9 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q79: Store Sales Customer/Store Profit (Pandas Family)."""
     params = get_parameters(79)
     year = params.get("year", 1998)
-    years = [year + offset for offset in params.get("year_offsets", [0, 1, 2])]
-    dow = params.get("dow", 1)
+    years = [year, year + 1, year + 2]
     dep_count = params.get("dep_count", 8)
-    emp_min = params.get("emp_min", 200)
-    emp_max = params.get("emp_max", 295)
+    vehicle_count = params.get("vehicle_count", 0)
 
     store_sales, date_dim, store, household_demographics, customer = _tables(
         ctx, "store_sales", "date_dim", "store", "household_demographics", "customer"
@@ -2238,10 +2234,10 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     merged = merged.merge(household_demographics, left_on="ss_hdemo_sk", right_on="hd_demo_sk")
     filtered = merged[
         (merged["d_year"].isin(years))
-        & (merged["d_dow"] == dow)
-        & ((merged["hd_dep_count"] == dep_count) | (merged["hd_vehicle_count"] > 0))
-        & (merged["s_number_employees"] >= emp_min)
-        & (merged["s_number_employees"] <= emp_max)
+        & (merged["d_dow"] == 1)
+        & ((merged["hd_dep_count"] == dep_count) | (merged["hd_vehicle_count"] > vehicle_count))
+        & (merged["s_number_employees"] >= 200)
+        & (merged["s_number_employees"] <= 295)
     ]
     inner = filtered.groupby(
         ["ss_ticket_number", "ss_customer_sk", "ss_addr_sk", "s_city"], as_index=False, dropna=False
@@ -3708,7 +3704,7 @@ def q83_expression_impl(ctx: DataFrameContext) -> Any:
     for items returned during specific date ranges.
     """
     params = get_parameters(83)
-    return_dates = params.get("dates", params.get("return_dates", ["2000-06-30", "2000-09-27", "2000-11-17"]))
+    return_dates = params.get("dates", ["1998-01-02", "1998-10-15", "1998-11-10"])
 
     col = ctx.col
     lit = ctx.lit
@@ -3784,7 +3780,7 @@ def q83_expression_impl(ctx: DataFrameContext) -> Any:
 def q83_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q83: Cross-Channel Returns Analysis (Pandas Family)."""
     params = get_parameters(83)
-    return_dates = params.get("dates", params.get("return_dates", ["2000-06-30", "2000-09-27", "2000-11-17"]))
+    return_dates = params.get("dates", ["1998-01-02", "1998-10-15", "1998-11-10"])
 
     # Get tables
     store_returns, catalog_returns, web_returns, item, date_dim = _tables(

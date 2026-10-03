@@ -397,24 +397,18 @@
   year: 2000
 65:
   dms: 1212
-  year: 2000
 66:
   catalog_net_col: cs_net_paid_inc_ship_tax
   catalog_sales_col: cs_sales_price
-  month_end: 4
-  month_start: 1
   ship_carriers:
   - DIAMOND
   - AIRBORNE
   time_start: 49530
-  web_names:
-  - pri
   web_net_col: ws_net_paid_inc_tax
   web_sales_col: ws_sales_price
   year: 2002
 67:
   dms: 1212
-  year: 2001
 68:
   cities:
   - Midway
@@ -435,10 +429,7 @@
   year: 1999
 70:
   dms: 1212
-  year: 2001
 71:
-  brand: 'amalgexporti #1'
-  manager_id: 1
   month: 12
   year: 2000
 72:
@@ -459,11 +450,9 @@
   category: Sports
   year: 2002
 76:
-  channel: store
   null_col_cs: cs_warehouse_sk
   null_col_ss: ss_addr_sk
   null_col_ws: ws_web_page_sk
-  year: 2001
 77:
   channel_type: store channel
   sales_date: '1998-08-04'
@@ -472,15 +461,8 @@
   year: 2000
 79:
   dep_count: 8
-  dow: 1
-  emp_max: 295
-  emp_min: 200
-  household_dep_count: 6
+  vehicle_count: 0
   year: 1998
-  year_offsets:
-  - 0
-  - 1
-  - 2
 80:
   sales_date: '1998-08-04'
   year: 2000
@@ -493,18 +475,14 @@
   - 129
   - 727
   - 663
-  month_end: 6
-  month_start: 1
   price_max: 60
   price_min: 30
   sales_date: '2002-05-30'
-  year: 2000
 83:
   dates:
   - '1998-01-02'
   - '1998-10-15'
   - '1998-11-10'
-  year: 1998
 84:
   city: Hopewell
   income_band: 32287

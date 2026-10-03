@@ -256,6 +256,38 @@ def _q49(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q50(values: Mapping[str, str]) -> dict[str, Any]:
+def _dms(values: Mapping[str, str]) -> dict[str, Any]:
+    # Q65, Q67 and Q70 all test d_month_seq between DMS and DMS+11; the implementations add the 11.
+    return {"dms": int(values["DMS.01"])}
+
+
+def _q65(values: Mapping[str, str]) -> dict[str, Any]:
+    return _dms(values)
+
+
+def _q66(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL window is TIMEONE through TIMEONE+28800; the implementations add the 28800. The carrier
+    # order matters because the query reports it as ship_carriers.
+    return {
+        "year": int(values["YEAR.01"]),
+        "time_start": int(values["TIMEONE.01"]),
+        "ship_carriers": [values["SMC.01"], values["SMC.02"]],
+        "web_sales_col": values["SALESONE.01"],
+        "web_net_col": values["NETONE.01"],
+        "catalog_sales_col": values["SALESTWO.01"],
+        "catalog_net_col": values["NETTWO.01"],
+    }
+
+
+def _q67(values: Mapping[str, str]) -> dict[str, Any]:
+    return _dms(values)
+
+
+def _q70(values: Mapping[str, str]) -> dict[str, Any]:
+    return _dms(values)
+
+
+def _q71(values: Mapping[str, str]) -> dict[str, Any]:
     year, month = _year_and_month(values)
     return {"year": year, "month": month}
 
@@ -289,6 +321,38 @@ def _q60(values: Mapping[str, str]) -> dict[str, Any]:
     year, month = _year_and_month(values)
     # GMT is a whole number of hours in the fips_county distribution; the SQL compares it with a decimal column.
     return {"year": year, "month": month, "category": values["CATEGORY.01"], "gmt_offset": int(values["GMT.01"])}
+def _q76(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "null_col_ss": values["NULLCOLSS.01"],
+        "null_col_ws": values["NULLCOLWS.01"],
+        "null_col_cs": values["NULLCOLCS.01"],
+    }
+
+
+def _q79(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL tests d_year in (YEAR, YEAR+1, YEAR+2); the implementations add the offsets.
+    return {
+        "year": int(values["YEAR.01"]),
+        "dep_count": int(values["DEPCNT.01"]),
+        "vehicle_count": int(values["VEHCNT.01"]),
+    }
+
+
+def _q82(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL tests i_current_price between PRICE and PRICE+30 and a 60-day window from INVDATE. YEAR only
+    # constrains how INVDATE was drawn, so it does not reach the SQL.
+    price = int(values["PRICE.01"])
+    return {
+        "price_min": price,
+        "price_max": price + 30,
+        "sales_date": values["INVDATE.01"],
+        "manufact_ids": [int(value) for value in _listed(values, "MANUFACT_ID")],
+    }
+
+
+def _q83(values: Mapping[str, str]) -> dict[str, Any]:
+    # Three dates, in the order the template lists them.
+    return {"dates": [values["RETURNED_DATE_ONE.01"], values["RETURNED_DATE_TWO.01"], values["RETURNED_DATE_THREE.01"]]}
 
 
 def _q93(values: Mapping[str, str]) -> dict[str, Any]:
@@ -340,6 +404,18 @@ ADAPTERS: dict[int, Adapter] = {
     60: _q60,
     62: _dms_window,
     63: _dms_window,
+    39: _q39,
+    44: _q44,
+    49: _q49,
+    65: _q65,
+    66: _q66,
+    67: _q67,
+    70: _q70,
+    71: _q71,
+    76: _q76,
+    79: _q79,
+    82: _q82,
+    83: _q83,
     93: _q93,
 }
 

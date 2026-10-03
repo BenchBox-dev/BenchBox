@@ -141,6 +141,7 @@ class TestAdapters:
         assert ADAPTERS[17]({"YEAR.01": "2001"}) == {"year": 2001, "quarter": 1}
         assert {39, 44, 49, 93} <= set(adapter_query_ids())
         assert adapter_query_ids() == (39, 44, 49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 93)
+        assert adapter_query_ids() == (39, 44, 49, 65, 66, 67, 70, 71, 76, 79, 82, 83, 93)
 
 
 class TestBinding:
