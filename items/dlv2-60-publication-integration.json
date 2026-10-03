@@ -48,6 +48,17 @@
       "op": "update",
       "op_id": "939159a7f29f42f38feec78706eaa46d",
       "session_id": "021e12dfd5aa41b38fc786d2a1a04293"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T18:02:34Z",
+      "client": "claude-code",
+      "displaced": "mcp:claude-code:root@vm:18597091d1eeb494a4ae3b6f",
+      "generation": "731d0df232e64f8f87a3b668b0eb61ee",
+      "op": "takeover",
+      "op_id": "3946665dad864ec9baa577112c572058",
+      "reason": "Holder is this same session (session_01GZSaWtTiCz9etgrhYRuVzu) before its worker restarted ~17:00Z; the restart changed the MCP worker identity, so the old one cannot resume. Work continues in the same worktree.",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
 }
