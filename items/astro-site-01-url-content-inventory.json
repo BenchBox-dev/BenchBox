@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "scripts/site_inventory.py with unit tests (fixture site, deterministic output, diff classification)",
+    "Baseline inventory from current develop committed as text; path count and page count reported in the PR",
+    "Diff mode exits non-zero on any missing path or broken internal link",
+    "Make target added and registered in make/inventory.json"
+  ],
+  "context": "Sphinx uses the html builder (URLs end in .html). Blog posts live at /blog/YYYY-MM-DD-slug.html and the feed at /blog/atom.xml. Assemble copies _static and _images to the site root. The inventory must cover the routes captured by e2e/captures/public-site-pages.spec.ts.",
+  "description": "Add scripts/site_inventory.py. It reads an assembled site directory: the output of `assemble_public_site.py --site-dir site`, or the CI artifact public-site-assembled-*. It emits a deterministic, sorted JSON inventory with:\n- every served path (html, xml, images, css/js referenced by pages)\n- per HTML page: title, meta description, canonical, h1, ordered h2/h3 text, internal link targets, image srcs\n- the atom.xml entry ids, titles and links\n- the 404.html results SPA fallback (sessionStorage key benchbox.results.redirect)\n\nAdd a `diff` mode that compares two inventories and classifies each difference as missing path, changed heading, broken internal link, or missing image.\n\nCommit the baseline inventory produced from current develop as a text file under _project/ (not a binary). This is the reference that astro-site-50 checks against.",
+  "links": [
+    "scripts/assemble_public_site.py",
+    "tests/unit/scripts/test_assemble_public_site.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:00:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "499cf1c58bf24ed497ab7849dfa77914",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
