@@ -27,6 +27,9 @@ Four pandas implementations (Q5, Q77, Q80, Q88) do not run to completion against
 dead-key result is a lower bound. The classification lists below may only shrink: a query that becomes
 ``a`` fails as an unexpected pass until it is removed.
 
+The inventory reads the defaults file, not the adapters, so it is a diagnostic. Whether an adapter binds
+everything the SQL and the implementation use is checked in ``test_parameter_binding_coverage.py``.
+
 Copyright 2026 Joe Harris / BenchBox Project
 
 TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
@@ -55,7 +58,7 @@ pytestmark = [
 ]
 
 # Queries whose implementations read a key missing from the defaults file (literal fallback).
-LITERAL_FALLBACK = frozenset({21, 23, 33, 34, 41, 45, 49, 54, 83, 84, 88, 90, 91})
+LITERAL_FALLBACK = frozenset({21, 23, 33, 34, 41, 45, 54, 83, 84, 88, 90, 91})
 
 # Implementations that do not run to completion against the stand-in context.
 INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
@@ -66,8 +69,8 @@ HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
 # Category (b): everything else the inventory finds a gap in. This may only shrink.
 BINDING_GAP = frozenset(
     {
-        18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 44, 45,
-        49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
+        18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 40, 45, 50, 51, 53, 54, 58, 59,
+        60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
     }
 )  # fmt: skip
 
