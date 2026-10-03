@@ -109,19 +109,31 @@ def example_blocks(source: str) -> list[tuple[int, str, str, str]]:
     return blocks
 
 
-def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: set[str], wrapper: str) -> list[str]:
+def _wrapper_operand(words: list[str | None], index: int, wrapper: str) -> str:
+    if index + 1 >= len(words):
+        raise ValueError(f"{wrapper} option requires an operand: {words[index]}")
+    operand = words[index + 1]
+    if operand is None:
+        raise ValueError(f"dynamic {wrapper} option operand requires an adapter")
+    return operand
+
+
+def _wrapper_tail(
+    words: list[str | None], *, value_options: set[str], flag_options: set[str], wrapper: str
+) -> list[str | None]:
     index = 0
     while index < len(words):
         word = words[index]
+        if word is None:
+            raise ValueError(f"dynamic {wrapper} option or executable requires an adapter")
         if word == "--":
             return words[index + 1 :]
         if word in {"-S", "--split-string"} and word in value_options:
-            if index + 1 >= len(words):
-                raise ValueError(f"{wrapper} option requires an operand: {word}")
-            if any(token in words[index + 1] for token in ("#", "\\c", "$")):
+            operand = _wrapper_operand(words, index, wrapper)
+            if any(token in operand for token in ("#", "\\c", "$")):
                 raise ValueError(f"unsupported {wrapper} split-string syntax")
             try:
-                split_words = shlex.split(words[index + 1])
+                split_words = shlex.split(operand)
             except ValueError as exc:
                 raise ValueError(f"malformed {wrapper} split-string operand") from exc
             if not split_words:
@@ -153,8 +165,7 @@ def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: se
                 index += 1
                 continue
         if word in value_options:
-            if index + 1 >= len(words):
-                raise ValueError(f"{wrapper} option requires an operand: {word}")
+            _wrapper_operand(words, index, wrapper)
             index += 2
             continue
         if word in flag_options:
@@ -166,8 +177,64 @@ def _wrapper_tail(words: list[str], *, value_options: set[str], flag_options: se
     return []
 
 
-def stdin_language(words: list[str]) -> str | None:
-    if not words:
+def inline_source_index(words: list[str | None], language: str | None) -> int | None:
+    inline_flags = {
+        "python": {"-c"},
+        "bash": {"-c", "-lc"},
+        "javascript": {"-e", "--eval"},
+        "sql": {"-c", "--command"},
+    }.get(language or "", {"-c", "-e", "--eval", "--command", "-lc"})
+    python_flags = {
+        "-b",
+        "-bb",
+        "-B",
+        "-d",
+        "-E",
+        "-i",
+        "-I",
+        "-O",
+        "-OO",
+        "-P",
+        "-q",
+        "-R",
+        "-s",
+        "-S",
+        "-u",
+        "-v",
+        "-x",
+    }
+    index = 1
+    while index < len(words):
+        word = words[index]
+        if word is None:
+            raise ValueError("dynamic interpreter option requires an adapter")
+        if word in inline_flags:
+            if index + 1 < len(words):
+                return index + 1
+            raise ValueError("inline interpreter argument requires explicit support")
+        if language == "python":
+            if word == "-m" or word == "--" or (word and not word.startswith("-")):
+                return None
+            if word not in python_flags and not word.startswith(("-W", "-X")):
+                raise ValueError("interpreter option operand requires explicit support")
+        if language == "bash" and word in {"-o", "+o"}:
+            if index + 1 >= len(words) or words[index + 1] is None:
+                raise ValueError("interpreter option operand requires explicit support")
+            index += 2
+            continue
+        if language == "bash" and (word == "--" or (word and not word.startswith("-"))):
+            return None
+        if language == "python" and word in {"-W", "-X"}:
+            if index + 1 >= len(words) or words[index + 1] is None:
+                raise ValueError("interpreter option operand requires explicit support")
+            index += 2
+        else:
+            index += 1
+    return None
+
+
+def command_words(words: list[str | None]) -> list[str | None]:
+    if not words or words[0] is None:
         raise ValueError("dynamic shell command receiving a heredoc")
     name = words[0].rsplit("/", 1)[-1]
     if name == "env":
@@ -188,11 +255,13 @@ def stdin_language(words: list[str]) -> str | None:
             flag_options={"-i", "--ignore-environment", "-0", "--null"},
             wrapper="env",
         )
-        while tail and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tail[0]):
+        while tail and tail[0] is not None and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", tail[0]):
             tail = tail[1:]
-        return stdin_language(tail)
+        return command_words(tail)
+    if name == "uv" and words[1:2] == [None]:
+        raise ValueError("dynamic uv command requires an adapter")
     if name == "uv" and words[1:2] == ["run"]:
-        return stdin_language(
+        return command_words(
             _wrapper_tail(
                 words[2:],
                 value_options={
@@ -283,11 +352,16 @@ def stdin_language(words: list[str]) -> str | None:
                     "-n",
                     "-q",
                     "-v",
-                    "--module",
                 },
                 wrapper="uv run",
             )
         )
+    return words
+
+
+def stdin_language(words: list[str]) -> str | None:
+    words = command_words(words)
+    name = words[0].rsplit("/", 1)[-1]
     if name.startswith("python") or name in {"node", "bash", "sh", "zsh", "ksh"}:
         args = words[1:]
         if "-c" in args or "-e" in args or "--eval" in args or any(not arg.startswith("-") for arg in args):
@@ -302,6 +376,7 @@ def stdin_language(words: list[str]) -> str | None:
 
 def heredoc_redirects(header: str) -> list[tuple[bashlex.ast.node, list[str], bool]]:
     redirects = []
+    header = re.sub(r"^(\s*)if(?=\s)", lambda match: match.group(1) + "  ", header)
     try:
         trees = bashlex.parse(header, strictmode=False)
     except (bashlex.errors.ParsingError, NotImplementedError) as exc:
@@ -389,17 +464,13 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
             if words:
                 command = words[0].word.rsplit("/", 1)[-1]
                 if command in {"env", "uv"}:
-                    interpreter = next(
-                        (
-                            index
-                            for index, word in enumerate(words[1:], 1)
-                            if re.fullmatch(r"python[0-9.]*|node|bash|sh|zsh", word.word)
-                        ),
-                        None,
-                    )
-                    if interpreter is not None:
-                        words = words[interpreter:]
-                        command = words[0].word
+                    if any(word.parts for word in words):
+                        raise ValueError("dynamic inline wrapper arguments require an adapter")
+                    normalized = command_words([word.word for word in words])
+                    if normalized != [word.word for word in words[-len(normalized) :]]:
+                        raise ValueError("inline split-string wrapper requires an adapter")
+                    words = words[-len(normalized) :]
+                    command = words[0].word.rsplit("/", 1)[-1]
                 language = (
                     "python"
                     if re.fullmatch(r"python[0-9.]*", command)
@@ -407,12 +478,17 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
                         command
                     )
                 )
-                flag = next(
-                    (index for index, word in enumerate(words[1:], 1) if word.word in {"-c", "-e", "--eval", "-lc"}),
-                    None,
+                source_index = (
+                    inline_source_index([None if word.parts else word.word for word in words], language)
+                    if language and command != "eval"
+                    else None
                 )
                 payload_words = (
-                    words[1:] if command == "eval" else words[flag + 1 : flag + 2] if flag is not None else []
+                    words[1:]
+                    if command == "eval"
+                    else words[source_index : source_index + 1]
+                    if source_index is not None
+                    else []
                 )
                 if language and payload_words:
                     if any(word.parts for word in payload_words):

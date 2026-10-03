@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 from collections import defaultdict
 
+from comment_payloads import command_words, inline_source_index
+
 
 class PythonBindings:
     def __init__(self, tree: ast.AST) -> None:
@@ -67,7 +69,7 @@ class PythonBindings:
             return None
         if isinstance(node, ast.Name):
             bound, value = self.lookup(node)
-            if not bound and node.id in {"exec", "eval", "compile"}:
+            if not bound and node.id in {"exec", "eval", "compile", "str"}:
                 return "builtins." + node.id
             if isinstance(value, str):
                 return value
@@ -106,18 +108,95 @@ class PythonBindings:
                 return command, "bash", self.literal(command)
         return None
 
+    def path_kind(self, node: ast.AST, seen: frozenset[ast.AST] = frozenset()) -> str | None:
+        node = self.dereference(node)
+        if node in seen:
+            return None
+        seen |= {node}
+        if isinstance(node, ast.Call):
+            if self.actor(node.func) == "pathlib.Path":
+                value = self.literal(node.args[0]) if len(node.args) == 1 and not node.keywords else None
+                return "absolute" if value and value.startswith("/") else "relative"
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr in {"resolve", "absolute"}
+                and not node.args
+                and not node.keywords
+                and self.path_kind(node.func.value, seen) is not None
+            ):
+                return "absolute"
+            return None
+        if isinstance(node, ast.Attribute) and node.attr == "parent":
+            return self.path_kind(node.value, seen)
+        if isinstance(node, ast.Subscript):
+            if (
+                isinstance(node.value, ast.Attribute)
+                and node.value.attr == "parents"
+                and isinstance(node.slice, ast.Constant)
+                and type(node.slice.value) is int
+            ):
+                return self.path_kind(node.value.value, seen)
+            return None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div) and self.literal(node.right) is not None:
+            return self.path_kind(node.left, seen)
+        return None
+
+    def command_word(self, node: ast.AST) -> str | None:
+        literal = self.literal(node)
+        if literal is not None:
+            return literal
+        value = self.dereference(node)
+        if (
+            isinstance(value, ast.Call)
+            and self.actor(value.func) == "builtins.str"
+            and len(value.args) == 1
+            and not value.keywords
+        ):
+            path = self.dereference(value.args[0])
+            if isinstance(path, ast.BinOp) and isinstance(path.op, ast.Div) and self.path_kind(path) == "absolute":
+                suffix = self.literal(path.right)
+                basename = suffix.replace("\\", "/").rsplit("/", 1)[-1] if suffix else ""
+                if basename and not basename.startswith("-"):
+                    return "/" + basename
+        return None
+
     def process_payload(self, args: list[ast.expr]) -> tuple[ast.AST, str, str | None] | None:
         if not args:
             return None
-        words = [self.literal(arg) for arg in args]
+        words = ["python" if self.actor(arg) == "sys.executable" else self.command_word(arg) for arg in args]
+        symbolic_operands = [arg for arg in args if self.actor(arg) == "sys.executable"]
         program = words[0]
+        name = program.rsplit("/", 1)[-1] if program else None
+        if name in {"env", "uv"}:
+            try:
+                normalized = command_words(words)
+            except ValueError:
+                return args[0], "unsupported", None
+            if normalized == words[-len(normalized) :]:
+                args = args[-len(normalized) :]
+            else:
+                expanded_args = []
+                for word in normalized:
+                    origin = next(
+                        (arg for arg, value in zip(args, words, strict=True) if value == word),
+                        args[0],
+                    )
+                    expanded_args.append(
+                        origin
+                        if self.actor(origin) == "sys.executable" or self.literal(origin) is None
+                        else ast.copy_location(ast.Constant(value=word), origin)
+                    )
+                args = expanded_args
+            words = normalized
+            program = words[0]
+            name = program.rsplit("/", 1)[-1]
+        if any(arg not in args for arg in symbolic_operands):
+            return args[0], "unsupported", None
+        words = [self.command_word(arg) for arg in args]
         if self.actor(args[0]) == "sys.executable":
-            program = "python"
-        if program == "uv":
-            index = next((index for index, word in enumerate(words) if word and word.startswith("python")), None)
-            if index is None:
-                return None
-            args, words, program = args[index:], words[index:], words[index]
+            words[0] = "python"
+        program = words[0]
+        name = program.rsplit("/", 1)[-1] if program else None
         language = (
             "python"
             if program and program.rsplit("/", 1)[-1].startswith("python")
@@ -128,58 +207,19 @@ class PythonBindings:
                 "zsh": "bash",
                 "psql": "sql",
                 "duckdb": "sql",
-            }.get(program or "")
+            }.get(name or "")
         )
         if language is None and program is not None:
             return None
-        inline_flags = {
-            "python": {"-c"},
-            "bash": {"-c", "-lc"},
-            "javascript": {"-e", "--eval"},
-            "sql": {"-c", "--command"},
-        }.get(language, {"-c", "-e", "--eval", "--command", "-lc"})
-        python_flags = {
-            "-b",
-            "-bb",
-            "-B",
-            "-d",
-            "-E",
-            "-i",
-            "-I",
-            "-O",
-            "-OO",
-            "-P",
-            "-q",
-            "-R",
-            "-s",
-            "-S",
-            "-u",
-            "-v",
-            "-x",
-        }
-        index = 1
-        while index < len(words):
-            word = words[index]
-            if word in inline_flags:
-                if index + 1 < len(args):
-                    return args[index + 1], language or "unsupported", words[index + 1]
-                return args[index], language or "unsupported", None
-            if language == "python":
-                if word == "-m" or word == "--" or (word and not word.startswith("-")):
-                    return None
-                if word is None or (word not in python_flags and not word.startswith(("-W", "-X"))):
-                    return args[index], "unsupported", None
-            if language == "bash" and word in {"-o", "+o"}:
-                if index + 1 >= len(words) or words[index + 1] is None:
-                    return args[index], "unsupported", None
-                index += 2
-                continue
-            if language == "bash" and (word == "--" or (word and not word.startswith("-"))):
-                return None
-            if language == "python" and word in {"-W", "-X"}:
-                if index + 1 >= len(words) or words[index + 1] is None:
-                    return args[index], "unsupported", None
-                index += 2
-            else:
-                index += 1
+        return self.inline_process_payload(args, words, language)
+
+    def inline_process_payload(
+        self, args: list[ast.expr], words: list[str | None], language: str | None
+    ) -> tuple[ast.AST, str, str | None] | None:
+        try:
+            index = inline_source_index(words, language)
+        except ValueError:
+            return args[0], "unsupported", None
+        if index is not None:
+            return args[index], language or "unsupported", self.literal(args[index])
         return None

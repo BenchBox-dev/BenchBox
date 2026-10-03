@@ -103,7 +103,13 @@ def check_owner(value: Any, label: str, task_ids: set[str] | None = None) -> str
 
 
 def load_policy(path: Path) -> dict[str, Any]:
-    policy = json.loads(path.read_text(encoding="utf-8"))
+    return load_policy_bytes(path.read_bytes())
+
+
+def load_policy_bytes(raw: bytes) -> dict[str, Any]:
+    policy = json.loads(raw)
+    if not isinstance(policy, dict):
+        raise PolicyError("policy must be an object")
     require_fields(
         policy,
         {
@@ -926,6 +932,56 @@ def owned_paths(
             }
         )
     return results, findings
+
+
+def immutable_external_ownership(
+    root: Path, base: str, legacy_external: list[dict[str, str]]
+) -> tuple[set[str], list[dict[str, Any]]] | None:
+    paths = tracked_paths(root, base)
+    if POLICY_PATH not in paths:
+        return None
+    policy = load_policy_bytes(base_blob(root, base, POLICY_PATH))
+    roots = validate_roots(policy)
+    rules = validate_rules(policy)
+    derived = validate_derived_rules(policy)
+    validate_rule_priorities(rules, derived)
+    external = validate_external_entries(policy, set(paths))
+    validate_evidence(policy, root, base, set(paths))
+    priorities: dict[str, int] = {}
+    resolved, _ = owned_paths(paths, roots, rules, priorities)
+    apply_derived_rules(resolved, derived, root, base, priorities)
+    notice_findings = apply_notice_owners(resolved, policy["notices"])
+    apply_external_entries(resolved, external)
+    if notice_findings or any(isinstance(record["rule"], list) for record in resolved):
+        raise PolicyError("immutable ownership contains conflicting owners")
+    excluded = {record["path"] for record in resolved if record["state"] == "excluded" and record["rule"] == "external"}
+    legacy_eligible = {
+        record["path"]
+        for record in resolved
+        if record["owner"] is None
+        and record["rule"] is None
+        or record["owner"] == "comment-cleanup-external-ownership"
+        and record["rule"] == "external-ownership-mirrors"
+    }
+    excluded.update(
+        path
+        for path in legacy_eligible
+        if not any(matches(path, entry["selector"]) for entry in external)
+        and any(
+            matches(path, {"prefix": entry["path"]}) if entry["path"].endswith("/") else path == entry["path"]
+            for entry in legacy_external
+        )
+    )
+    notices = [
+        {
+            **notice,
+            "whole_file": notice["byte_start"] == 0
+            and notice["byte_end"] == len(base_blob(root, base, notice["path"])),
+        }
+        for notice in policy["notices"]
+        if any(matches(notice["path"], entry["selector"]) for entry in external)
+    ]
+    return excluded, notices
 
 
 def dependency_findings(policy: dict[str, Any], resolved: list[dict[str, Any]]) -> list[Finding]:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import codecs
+import hashlib
 import io
 import json
 import os
@@ -15,6 +16,7 @@ from dataclasses import asdict
 from datetime import date
 from pathlib import Path, PurePosixPath
 
+from check_comment_cleanup_scope import immutable_external_ownership
 from comment_syntax import Finding, javascript_requests, language, scan, source_language
 
 POLICY_PATH = "quality/comment-policy.json"
@@ -249,13 +251,50 @@ def native_results(root: Path, requests: dict[str, str]) -> dict[str, list[dict]
     return results
 
 
+def ownership_base(mode: str, comparison: str | None, requested: str | None) -> str | None:
+    if mode == "transition":
+        if requested and requested != comparison:
+            raise ValueError("transition ownership base must match the comparison base")
+        return comparison
+    return requested
+
+
+def ownership_exclusions(root: Path, base: str | None, staged: bool) -> set[str] | None:
+    if base is None:
+        return None
+    if not re.fullmatch(r"[a-f0-9]{40}", base):
+        raise ValueError("ownership base must be a full commit SHA")
+    git(root, "cat-file", "-e", f"{base}^{{commit}}")
+    git(root, "merge-base", "--is-ancestor", base, "HEAD")
+    trusted_external = load_policy(git(root, "show", f"{base}:{POLICY_PATH}"))["external"]
+    snapshot = immutable_external_ownership(root, base, trusted_external)
+    if snapshot is None:
+        return None
+    excluded, notices = snapshot
+    for notice in notices:
+        raw = git(root, "show", f":{notice['path']}") if staged else (root / notice["path"]).read_bytes()
+        start, end = notice["byte_start"], notice["byte_end"]
+        if len(raw) < end or hashlib.sha256(raw[start:end]).hexdigest() != notice["retained_sha256"]:
+            raise ValueError(f"protected external notice changed: {notice['path']}")
+        if notice["whole_file"]:
+            if hashlib.sha256(raw).hexdigest() != notice["blob_sha256"]:
+                raise ValueError(f"protected external notice blob changed: {notice['path']}")
+            excluded.add(notice["path"])
+    return excluded
+
+
 def scan_sources(root: Path, sources: dict[str, bytes], policy: dict) -> list[Finding]:
     decoded = {}
     errors = []
     for path, raw in sources.items():
-        excluded = any(matches(path, e["path"]) for e in policy["external"])
-        if excluded and ("external_members" not in policy or path in policy["external_members"]):
-            continue
+        ownership_members = policy.get("ownership_excluded_members")
+        if ownership_members is not None:
+            if path in ownership_members:
+                continue
+        else:
+            excluded = any(matches(path, e["path"]) for e in policy["external"])
+            if excluded and ("external_members" not in policy or path in policy["external_members"]):
+                continue
         if language(path) or raw.startswith(b"#!"):
             try:
                 decoded[path] = decode(path, raw)
@@ -366,6 +405,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--mode", choices=("strict", "transition", "report"), default="strict")
     parser.add_argument("--base")
+    parser.add_argument("--ownership-base")
     parser.add_argument("--staged", action="store_true")
     parser.add_argument("--policy", default=POLICY_PATH)
     parser.add_argument("--bootstrap", action="store_true")
@@ -383,6 +423,8 @@ def main(argv: list[str] | None = None) -> int:
             raise ValueError("base must be a full commit SHA")
         if args.bootstrap and (args.mode != "transition" or not bootstrap_base_allowed(root, args.base or "")):
             raise ValueError("bootstrap requires a base that contains the initial rollout commit")
+        owner_base = ownership_base(args.mode, args.base, args.ownership_base)
+        owned_exclusions = ownership_exclusions(root, owner_base, args.staged)
         baseline_policy = policy
         if args.base and not args.bootstrap:
             baseline_policy = load_policy(git(root, "show", f"{args.base}:{POLICY_PATH}"))
@@ -426,6 +468,7 @@ def main(argv: list[str] | None = None) -> int:
         effective_policy = {
             **policy,
             "exceptions": [e for e in policy["exceptions"] if e in baseline_policy["exceptions"]],
+            "ownership_excluded_members": owned_exclusions,
         }
         base_paths = []
         if args.mode == "transition":
@@ -435,7 +478,9 @@ def main(argv: list[str] | None = None) -> int:
         failed = current
         if args.mode == "transition":
             base_sources = {path: git(root, "show", f"{args.base}:{path}") for path in base_paths if path in sources}
-            baseline = expired_policy_findings(baseline_policy) + scan_sources(root, base_sources, baseline_policy)
+            baseline = expired_policy_findings(baseline_policy) + scan_sources(
+                root, base_sources, {**baseline_policy, "ownership_excluded_members": owned_exclusions}
+            )
             failed = introduced(current, baseline, policy["completed"])
             if POLICY_PATH in changed:
                 failed.extend(finding for finding in expired_policy_findings(policy) if finding not in failed)

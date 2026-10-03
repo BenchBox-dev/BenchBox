@@ -13,6 +13,7 @@ from pathlib import Path
 BOOTSTRAP_BASE = "ed5c263c513ba65499f4918d3a7de607f280c65b"
 TRUSTED_FILES = (
     "scripts/check_comment_policy.py",
+    "scripts/check_comment_cleanup_scope.py",
     "scripts/comment_syntax.py",
     "scripts/comment_syntax_js.cjs",
     "scripts/comment_payloads.py",

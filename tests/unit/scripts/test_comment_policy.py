@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import json
 import os
@@ -940,7 +941,7 @@ def test_heredoc_arguments_and_script_input_are_data(source: str) -> None:
 
 @pytest.mark.parametrize(
     "header",
-    ["uv run --project . python -", "uv run --with pkg python -", "uv run --module python -", "env -u FOO python -"],
+    ["uv run --project . python -", "uv run --with pkg python -", "env -u FOO python -"],
 )
 def test_heredoc_wrapper_option_operands_reach_stdin_consumer(header: str) -> None:
     assert [f.text for f in scan("a.sh", f"{header} <<'PY'\n# explanation\nPY\n", "bash")] == ["# explanation"]
@@ -991,9 +992,26 @@ def test_env_split_string_special_syntax_is_reported_by_source_scan(operand: str
     assert findings[0].kind == "coverage-error"
 
 
+def test_heredoc_module_wrapper_requires_explicit_consumer_support() -> None:
+    findings = scan("a.sh", "uv run --module python - <<'PY'\n# explanation\nPY\n", "bash")
+    assert findings[0].kind == "coverage-error"
+
+
 def test_heredoc_unknown_wrapper_option_fails_closed() -> None:
     findings = scan("a.sh", "uv run --unknown value python - <<'PY'\n# explanation\nPY\n", "bash")
     assert findings[0].kind == "coverage-error"
+
+
+@pytest.mark.parametrize("command", ["python -", "uv run python -"])
+def test_conditional_heredoc_retains_executable_payload(command: str) -> None:
+    source = f"if {command} <<'PY'\n# explanation\npass\nPY\nthen\n  echo ok\nfi\n"
+    findings = scan("a.sh", source, "bash")
+    assert [(finding.line, finding.text) for finding in findings] == [(2, "# explanation")]
+
+
+def test_conditional_heredoc_unknown_consumer_fails_visibly() -> None:
+    source = "if \"$tool\" - <<'PY'\n# explanation\nPY\nthen\n  echo ok\nfi\n"
+    assert [finding.kind for finding in scan("a.sh", source, "bash")] == ["coverage-error"]
 
 
 def test_multiple_heredocs_and_continued_header() -> None:
@@ -1244,6 +1262,53 @@ def test_unknown_inline_process_source_still_fails_visibly(source: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["/bin/bash", "-e", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["/usr/bin/env", "-u", "IGNORED", "TOKEN=value", "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["env", "-S", "python3 -c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["/usr/bin/uv", "run", "--with", "pkg", "--", "/usr/bin/python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["env", "uv", "run", "--", "python3", "-c", "# explanation"])',
+    ],
+)
+def test_wrapped_and_absolute_inline_interpreters_are_scanned(source: str) -> None:
+    assert [finding.text for finding in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["uv", "tree", "python3", "-c", "# input data"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "pytest", "-c", "pytest.ini"])',
+    ],
+)
+def test_non_interpreter_wrapper_commands_are_not_inline_source(source: str) -> None:
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["env", "--unknown", "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--unknown", "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["env", option, "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "python3", "-c", source])',
+        'import subprocess\nsubprocess.run(["env", "-S", "python3 -c $CODE"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--module", "python3", "-c", "# input data"])',
+        'import subprocess\nsubprocess.run(["env", "uv", "run", "--module", "python3", "-c", "# input data"])',
+    ],
+)
+def test_unknown_wrapper_execution_fails_visibly(source: str) -> None:
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+def test_absolute_node_inline_source_reports_existing_adapter_gap() -> None:
+    source = 'import subprocess\nsubprocess.run(["/usr/bin/node", "-e", "// explanation"])'
+    findings = python_findings("a.py", source)
+    assert [(finding.kind, finding.payload) for finding in findings] == [("coverage-error", "// explanation")]
+
+
+@pytest.mark.parametrize(
     "source", ["exec(source)", 'code = code + "text"\nexec(code)', 'code = "before"\ncode = "after"\nexec(code)']
 )
 def test_python_unresolved_execution_fails_visibly(source: str) -> None:
@@ -1263,10 +1328,57 @@ def test_local_execution_names_and_ordinary_strings_are_data(source: str) -> Non
 
 
 @pytest.mark.parametrize(
-    "source", ['python3 -c "# explanation"', "eval 'echo ok # explanation'", "bash -lc 'echo ok # explanation'"]
+    "source",
+    [
+        'python3 -c "# explanation"',
+        "eval 'echo ok # explanation'",
+        "bash -lc 'echo ok # explanation'",
+        "VALUE=$(python3 -c '# explanation' || true\n)",
+    ],
 )
 def test_shell_executable_arguments_are_routed(source: str) -> None:
     assert [f.text for f in scan("a.sh", source, "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "bash -e -o pipefail -c 'echo ok # explanation'",
+        "bash +o pipefail -c 'echo ok # explanation'",
+        "python3 -W ignore -X dev -c '# explanation'",
+        "env -u UNUSED TOKEN=value /usr/bin/python3 -c '# explanation'",
+        "uv run --with pkg -- /usr/bin/python3 -c '# explanation'",
+    ],
+)
+def test_shell_uses_shared_interpreter_option_semantics(source: str) -> None:
+    assert [finding.text for finding in scan("a.sh", source, "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "python3 -m pytest -c '# input data'",
+        "python3 probe.py -c '# input data'",
+        "uv tree python3 -c '# input data'",
+        "pytest python3 -c '# input data'",
+    ],
+)
+def test_shell_application_arguments_are_not_executable_source(source: str) -> None:
+    assert not scan("a.sh", source, "bash")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "python3 --unknown -c '# explanation'",
+        'bash "$OPTIONS" -c "echo ok # explanation"',
+        "env --unknown python3 -c '# explanation'",
+        "uv run --module python3 -c '# input data'",
+        'env -S "python3 -c" "# explanation"',
+    ],
+)
+def test_shell_unresolved_interpreter_options_fail_visibly(source: str) -> None:
+    assert [finding.kind for finding in scan("a.sh", source, "bash")] == ["coverage-error"]
 
 
 @pytest.mark.parametrize("source", ["# explanation", "echo ok # explanation", "echo ok # explanation\n"])
@@ -1353,3 +1465,413 @@ def test_consumer_digest_has_stable_python_version_encoding() -> None:
 
     tree = ast.parse("def consume(value):\n    return value + 1\n")
     assert python_consumer_digest(tree) == "sha256:c6aaea25c78f8f6fdbf83d97c11fe1be21e859156b678d34cfbcc79f8c261c69"
+
+
+@pytest.mark.parametrize("prefix", [["python3"], ["env", "python3"], ["uv", "run", "python3"]])
+def test_sys_executable_inline_source_is_not_literal_program_name(prefix: list[str]) -> None:
+    prefix_expression = ", ".join(repr(word) for word in prefix)
+    source = f'import subprocess, sys\nsubprocess.run([{prefix_expression}, "-c", sys.executable])'
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+def test_sys_executable_in_wrapped_command_position_is_scanned() -> None:
+    source = 'import subprocess, sys\nsubprocess.run(["uv", "run", sys.executable, "-c", "# explanation"])'
+    assert [finding.text for finding in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize("prefix", [["uv", "run"], ["env", "--"]])
+def test_wrapped_non_interpreter_dynamic_arguments_are_data(prefix: list[str]) -> None:
+    prefix_expression = ", ".join(repr(word) for word in prefix)
+    source = f'import subprocess\nsubprocess.run([{prefix_expression}, "pytest", "-k", test_filter])'
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["uv", command, "python3", "-c", source])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--with", package, "python3", "-c", source])',
+    ],
+)
+def test_dynamic_wrapper_execution_prefix_fails_visibly(source: str) -> None:
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+OWNERSHIP_LEGACY_EXTERNAL = [
+    {"path": "benchbox/_binaries/vendor/tools/", "owner": "upstream", "provenance": "a.py"},
+    {"path": "catalog/tools/", "owner": "catalog", "provenance": "a.py"},
+]
+
+
+def ownership_policy(exclusions: set[str] | None) -> dict:
+    return policy(external=deepcopy(OWNERSHIP_LEGACY_EXTERNAL), ownership_excluded_members=exclusions)
+
+
+def ownership_repo(
+    tmp_path: Path, partial_notice: bool = False, outside_override: str | None = None
+) -> tuple[str, dict]:
+    git_repo(tmp_path, "value = 1\n")
+    directory = tmp_path / "benchbox/_binaries/vendor/tools"
+    directory.mkdir(parents=True)
+    (directory / "generator").write_bytes(b"\xff\x00upstream binary")
+    (directory / "owned.py").write_text("# maintained explanation\n")
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(external=OWNERSHIP_LEGACY_EXTERNAL)))
+    catalog = tmp_path / "catalog/tools"
+    catalog.mkdir(parents=True)
+    (catalog / "upstream.py").write_text("# catalog provenance\n")
+    notice = b"prefix\nProtected notice\nsuffix\n" if partial_notice else b"Required upstream notice\n"
+    (directory / "PATCHES.md").write_bytes(notice)
+    ledger = {
+        name: []
+        for name in (
+            "maintained_roots",
+            "ownership_rules",
+            "external_entries",
+            "format_classes",
+            "payloads",
+            "derived_rules",
+            "consumer_edges",
+            "directives",
+            "notices",
+            "obligations",
+            "review_dispositions",
+        )
+    }
+    ledger["version"] = 1
+    ledger["maintained_roots"] = [{"id": "repository", "selector": {"prefix": ""}, "kind": "source"}]
+    ledger["ownership_rules"] = [
+        {
+            "id": "owned",
+            "owner": "comment-cleanup-owned",
+            "state": "ready",
+            "priority": 10,
+            "blocking_disposition": "Maintained source.",
+            "selectors": [{"path": "benchbox/_binaries/vendor/tools/owned.py"}],
+        }
+    ]
+    ledger["external_entries"] = [
+        {
+            "selector": {"prefix": "benchbox/_binaries/vendor/"},
+            "owner": "comment-cleanup-vendor",
+            "provenance": "Upstream fixture",
+            "governing_requirement": "Approved upstream ownership.",
+            "blocking_disposition": "Excluded upstream source.",
+        }
+    ]
+    ledger["ownership_rules"].append(
+        {
+            "id": "external-ownership-mirrors",
+            "owner": "comment-cleanup-external-ownership",
+            "state": "blocked",
+            "priority": 10,
+            "blocking_disposition": "Frozen catalog audit role.",
+            "selectors": [{"prefix": "catalog/tools/"}],
+        }
+    )
+    if outside_override == "owned":
+        ledger["ownership_rules"].append(
+            {
+                "id": "catalog-owned",
+                "owner": "comment-cleanup-owned",
+                "state": "ready",
+                "priority": 20,
+                "blocking_disposition": "Maintained first-party source.",
+                "selectors": [{"path": "catalog/tools/upstream.py"}],
+            }
+        )
+    elif outside_override == "derived":
+        package = tmp_path / "benchbox/core/example.py"
+        package.parent.mkdir(parents=True)
+        package.write_text("value = 1\n")
+        (catalog / "upstream.py").write_text("from benchbox.core import example\n# maintained explanation\n")
+        ledger["ownership_rules"].append(
+            {
+                "id": "package-owned",
+                "owner": "comment-cleanup-owned",
+                "state": "ready",
+                "priority": 20,
+                "blocking_disposition": "Maintained package.",
+                "selectors": [{"path": "benchbox/core/example.py"}],
+            }
+        )
+        ledger["derived_rules"] = [
+            {
+                "id": "catalog-derived",
+                "method": "python-imports",
+                "state": "ready",
+                "priority": 30,
+                "blocking_disposition": "Owned by imported package.",
+                "selectors": [{"path": "catalog/tools/upstream.py"}],
+            }
+        ]
+    digest = hashlib.sha256(notice).hexdigest()
+    start = len(b"prefix\n") if partial_notice else 0
+    end = start + len(b"Protected notice\n") if partial_notice else len(notice)
+    ledger["notices"] = [
+        {
+            "path": "benchbox/_binaries/vendor/tools/PATCHES.md",
+            "blob_sha256": digest,
+            "byte_start": start,
+            "byte_end": end,
+            "retained_sha256": hashlib.sha256(notice[start:end]).hexdigest(),
+            "governing_requirement": "Retain exact notice.",
+            "source_identity": "fixture",
+            "owner": "comment-cleanup-vendor",
+            "blocking_disposition": "Preserve bytes.",
+        }
+    ]
+    if outside_override == "notice":
+        raw = (catalog / "upstream.py").read_bytes()
+        outside_notice = deepcopy(ledger["notices"][0])
+        outside_notice.update(
+            {
+                "path": "catalog/tools/upstream.py",
+                "blob_sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_start": 0,
+                "byte_end": len(raw),
+                "retained_sha256": hashlib.sha256(raw).hexdigest(),
+                "owner": "comment-cleanup-external-ownership",
+            }
+        )
+        ledger["notices"].append(outside_notice)
+    (tmp_path / "quality/comment-cleanup-scope.json").write_text(json.dumps(ledger))
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "add",
+            "benchbox/",
+            "catalog/tools",
+            "quality/comment-policy.json",
+            "quality/comment-cleanup-scope.json",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "ownership fixture",
+        ],
+        check=True,
+    )
+    base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    return base, ledger
+
+
+def test_immutable_ownership_excludes_approved_binary(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "benchbox/_binaries/vendor/tools/generator"
+    assert path in exclusions
+    registered = ownership_policy(exclusions)
+    assert scan_sources(ROOT, {path: b"\xff\x00upstream binary"}, registered) == []
+    assert [f.kind for f in scan_sources(ROOT, {path: b"\xff\x00upstream binary"}, policy())] == ["coverage-error"]
+
+
+def test_immutable_ownership_scans_new_vendor_member(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/new.py"
+    (tmp_path / path).write_text("# explanation\n")
+    registered = ownership_policy(check_comment_policy.ownership_exclusions(tmp_path, base, False))
+    assert [(f.path, f.text) for f in scan_sources(ROOT, {path: b"# explanation\n"}, registered)] == [
+        (path, "# explanation")
+    ]
+
+
+def test_candidate_ownership_expansion_is_ineffective(tmp_path: Path) -> None:
+    base, ledger = ownership_repo(tmp_path)
+    candidate = deepcopy(ledger)
+    candidate["external_entries"][0]["selector"] = {"prefix": "benchbox/"}
+    candidate["ownership_rules"] = []
+    (tmp_path / "quality/comment-cleanup-scope.json").write_text(json.dumps(candidate))
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "benchbox/core/new.py"
+    assert path not in exclusions
+    assert "benchbox/_binaries/vendor/tools/owned.py" not in exclusions
+    assert [f.text for f in scan_sources(ROOT, {path: b"# explanation\n"}, ownership_policy(exclusions))] == [
+        "# explanation"
+    ]
+
+
+@pytest.mark.parametrize("changed", [b"Modified upstream notice\n", b"Required upstream notice\nadded text\n"])
+def test_immutable_ownership_rejects_changed_notice(tmp_path: Path, changed: bytes) -> None:
+    base, _ = ownership_repo(tmp_path)
+    (tmp_path / "benchbox/_binaries/vendor/tools/PATCHES.md").write_bytes(changed)
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_immutable_ownership_respects_explicit_owned_override(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "benchbox/_binaries/vendor/tools/owned.py"
+    assert path not in exclusions
+    assert scan_sources(ROOT, {path: b"# maintained explanation\n"}, policy(external=OWNERSHIP_LEGACY_EXTERNAL)) == []
+    assert [
+        f.text for f in scan_sources(ROOT, {path: b"# maintained explanation\n"}, ownership_policy(exclusions))
+    ] == ["# maintained explanation"]
+
+
+def test_transition_cannot_select_different_ownership_base(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base, "--ownership-base", "a" * 40]) == 2
+
+
+@pytest.mark.parametrize("mode", ["strict", "report"])
+def test_ownership_mode_scans_new_legacy_prefix_member(tmp_path: Path, mode: str) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/new.py"
+    (tmp_path / path).write_text("# new explanation\n")
+    output = tmp_path / "findings.json"
+    status = main(["--root", str(tmp_path), "--mode", mode, "--ownership-base", base, "--json-out", str(output)])
+    assert status == (1 if mode == "strict" else 0)
+    findings = json.loads(output.read_text())["findings"]
+    assert any(f["path"] == path and f["text"] == "# new explanation" for f in findings)
+
+
+def test_ownership_freezes_legacy_members_outside_ledger_domains(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    old = "catalog/tools/upstream.py"
+    new = "catalog/tools/new.py"
+    assert old in exclusions
+    assert new not in exclusions
+    findings = scan_sources(
+        ROOT, {old: b"# catalog provenance\n", new: b"# new explanation\n"}, ownership_policy(exclusions)
+    )
+    assert [(f.path, f.text) for f in findings] == [(new, "# new explanation")]
+
+
+@pytest.mark.parametrize("mode", ["strict", "report"])
+def test_ownership_mode_ignores_candidate_external_expansion(tmp_path: Path, mode: str) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "a.py"
+    (tmp_path / path).write_text("# first-party explanation\n")
+    candidate = policy(external=[*OWNERSHIP_LEGACY_EXTERNAL, {"path": path, "owner": "fake", "provenance": path}])
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(candidate))
+    output = tmp_path / "findings.json"
+    status = main(["--root", str(tmp_path), "--mode", mode, "--ownership-base", base, "--json-out", str(output)])
+    assert status == (1 if mode == "strict" else 0)
+    findings = json.loads(output.read_text())["findings"]
+    assert any(f["path"] == path and f["text"] == "# first-party explanation" for f in findings)
+
+
+def test_ownership_staged_changed_notice_rejects_clean_worktree(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/PATCHES.md"
+    (tmp_path / path).write_bytes(b"Modified upstream notice\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", path], check=True)
+    (tmp_path / path).write_bytes(b"Required upstream notice\n")
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, True)
+    assert path in check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_ownership_staged_clean_notice_ignores_changed_worktree(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/PATCHES.md"
+    (tmp_path / path).write_bytes(b"Modified upstream notice\n")
+    assert path in check_comment_policy.ownership_exclusions(tmp_path, base, True)
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_ownership_partial_notice_allows_outside_edit_without_file_waiver(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path, partial_notice=True)
+    path = "benchbox/_binaries/vendor/tools/PATCHES.md"
+    raw = b"prefix\nProtected notice\nchanged suffix\n\n```python\n# outside explanation\n```\n"
+    (tmp_path / path).write_bytes(raw)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    assert path not in exclusions
+    assert [f.text for f in scan_sources(ROOT, {path: raw}, ownership_policy(exclusions))] == ["# outside explanation"]
+
+
+def test_ownership_partial_notice_rejects_inside_edit(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path, partial_notice=True)
+    (tmp_path / "benchbox/_binaries/vendor/tools/PATCHES.md").write_bytes(b"prefix\nModified notice!\nsuffix\n")
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_ownership_absent_ledger_preserves_legacy_behavior(tmp_path: Path) -> None:
+    base = git_repo(tmp_path, "value = 1\n")
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    assert exclusions is None
+    assert (
+        scan_sources(ROOT, {"benchbox/_binaries/vendor/tools/new.py": b"# explanation\n"}, ownership_policy(exclusions))
+        == []
+    )
+
+
+@pytest.mark.parametrize("override", ["owned", "notice", "derived"])
+def test_legacy_outside_domain_obeys_precise_owned_notice_and_derived_priority(tmp_path: Path, override: str) -> None:
+    base, _ = ownership_repo(tmp_path, outside_override=override)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "catalog/tools/upstream.py"
+    assert path not in exclusions
+    raw = (tmp_path / path).read_bytes()
+    assert scan_sources(ROOT, {path: raw}, policy(external=OWNERSHIP_LEGACY_EXTERNAL)) == []
+    assert [f.kind for f in scan_sources(ROOT, {path: raw}, ownership_policy(exclusions))] == ["comment"]
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            'import subprocess, sys\nfrom pathlib import Path\nroot = Path(__file__).resolve().parents[2]\nsubprocess.run([sys.executable, str(root / "scripts" / "validate.py"), *values])',
+            [],
+        ),
+        (
+            'import subprocess\nfrom pathlib import Path\nproject = Path(__file__).resolve().parent / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "--locked", "--", "tool", value])',
+            [],
+        ),
+        (
+            'import subprocess\nfrom pathlib import Path\nproject = Path(__file__).resolve().parent / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "python3", "-c", "# retained"])',
+            ["# retained"],
+        ),
+    ],
+)
+def test_path_backed_command_operands_preserve_argument_roles(source: str, expected: list[str]) -> None:
+    assert [finding.text for finding in python_findings("a.py", source)] == expected
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import subprocess, sys\nsubprocess.run([sys.executable, script, *values])",
+        'import subprocess\nfrom pathlib import Path\nproject = unknown / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "tool"])',
+        'import subprocess\nfrom pathlib import Path\nstr = converter\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "tool"])',
+        'import subprocess\nfrom pathlib import Path\nPath = constructor\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "tool"])',
+        'import subprocess\nfrom pathlib import Path\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), *command])',
+        'import subprocess\nfrom pathlib import Path\nsource = str(Path(__file__) / "source.py")\nsubprocess.run(["python3", "-c", source])',
+        'import subprocess\nfrom pathlib import Path\nsource = str(Path(__file__) / "source.py")\nsubprocess.run(["env", "-S", "python3 -c", source])',
+        'import subprocess\nfrom pathlib import Path\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "python3", "-c", code])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--with", package, "python3", "-c", code])',
+        'import subprocess\nfrom textwrap import dedent\nsource = dedent(f"print(\\"{value}\\")")\nsubprocess.run(["python3", "-c", source])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["uv", "run", "--project", str(Path("") / "-c"), "python3", "-c", code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["uv", "run", str(Path("") / "-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["env", "-S", "python3", str(Path("") / "-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "./-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / ".\\\\-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("-c") / "foo"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c/foo"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c\\\\foo"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path(root) / "script.py"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path(__file__).parent / "script.py"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("\\\\").parent / "-cprint(1)" / "x# hidden")])',
+    ],
+)
+def test_unproven_command_paths_and_dynamic_source_fail_visibly(source: str) -> None:
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
