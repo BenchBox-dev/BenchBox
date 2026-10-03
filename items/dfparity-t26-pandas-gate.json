@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Owner decision on pandas and DataFusion scope is recorded",
+    "If pandas is in scope: a pandas gate runs all 99 queries in CI within a measured budget with zero unclassified divergences and the repeat-run check",
+    "If out of scope: docs and the gate description state the Polars-only claim"
+  ],
+  "context": "Created 2026-10-03 from Codex's adversarial review of handoff revision 4 (finding 4, accepted). Scope is an open owner decision (handoff D-B); drop this item if the owner narrows the goal to Polars, after recording that in t23.",
+  "description": "The cross-surface contract names both expression (Polars) and pandas as shipped TPC-DS DataFrame backends (benchbox/core/equivalence/dataframe_surface.py ~47-55), but t20 enforces only Polars. Pandas has four incomplete inventory runs (Q5, Q77, Q80, Q88) and more divergences. Either make pandas a blocking lane with its own measured budget (all 99 queries execute, zero unclassified divergences, repeat-run check), or, if the owner narrows the goal, record the Polars-only scope in t23's docs and in the gate's description. Also record whether the expression family on DataFusion is in or out of scope.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:11:19Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d8a02e58a80044f68d22d52c396d4d0f",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}

@@ -6587,6 +6587,16 @@
       "status": "open",
       "title": "Re-measure TPC-DS DataFrame parity on develop at SF 0.01, 0.1 and 1 before the adapter batches"
     },
+    "dfparity-t26-pandas-gate": {
+      "claim": null,
+      "needs": [
+        "dfparity-t20-promote-polars-gate",
+        "dfparity-t24-residual-divergences"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Enforce the TPC-DS pandas-family gate, or record that the parity goal is Polars-only"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
