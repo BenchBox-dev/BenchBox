@@ -38,7 +38,7 @@ import logging
 import os
 import re
 import shutil
-import time
+import sys
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -107,25 +107,15 @@ DATAFRAME_CACHE_VERSION = "v8"
 # destroying raw datagen output (e.g. .tbl files) in the same directory.
 _KNOWN_FORMAT_DIRS = frozenset(f.value for f in DataFormat)  # {"csv", "parquet", "arrow"}
 
-# Temp files written by ``_atomic_cache_write`` are named
-# ``<final name>.<pid>.<32 hex digits>.tmp`` and live next to the final file so
-# the closing ``os.replace`` stays on one filesystem.
 _CACHE_TEMP_FILE_PATTERN = re.compile(r"\.\d+\.[0-9a-f]{32}\.tmp$")
-
-# A temp file untouched for this long belongs to a crashed writer. A live writer
-# keeps modifying its temp file, so younger files are left alone: another
-# process may still be writing one.
-CACHE_TEMP_FILE_MAX_AGE_SECONDS = 30 * 60
 
 
 def _is_cache_temp_file(name: str) -> bool:
-    """Return True when ``name`` looks like an in-progress atomic cache write."""
     return _CACHE_TEMP_FILE_PATTERN.search(name) is not None
 
 
 def _fsync_path(path: Path) -> None:
-    """Flush a finished file to disk so a crash cannot leave the rename ahead of its data."""
-    fd = os.open(path, os.O_RDONLY)
+    fd = os.open(path, os.O_RDWR if sys.platform == "win32" else os.O_RDONLY)
     try:
         os.fsync(fd)
     finally:
@@ -134,17 +124,6 @@ def _fsync_path(path: Path) -> None:
 
 @contextmanager
 def _atomic_cache_write(target_path: Path) -> Iterator[Path]:
-    """Yield a unique temp path that replaces ``target_path`` when the block succeeds.
-
-    The cache is shared by every BenchBox process on a machine, and readers
-    (Polars, DuckDB) memory-map cache files. Writing straight to the final
-    path truncates a file another process may have mapped, which crashes that
-    reader (SIGBUS, ``Invalid argument (os error 22)``, or a footer error).
-    Replacing the path with a fully written file leaves existing mappings on
-    the old inode and gives new readers a complete file.
-
-    On any error the temp file is removed and ``target_path`` is untouched.
-    """
     tmp_path = target_path.with_name(f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     try:
         yield tmp_path
@@ -1517,30 +1496,15 @@ class DataFrameDataLoader:
         return converted_list, table_entries
 
     def _prune_cache_leaf_files(self, cache_path: Path, tracked_files: set[str]) -> int:
-        """Prune untracked leaf files from a cache directory.
-
-        Keeps `_manifest.json` and the tracked file names for the current run.
-        Temp files from atomic writes are kept while they are recent, because
-        another process may still be writing one; only those untouched for
-        ``CACHE_TEMP_FILE_MAX_AGE_SECONDS`` (a crashed writer) are removed.
-        """
         if not cache_path.exists():
             return 0
 
         preserved = set(tracked_files)
         preserved.add("_manifest.json")
         removed = 0
-        now = time.time()
         for child in cache_path.iterdir():
-            if child.is_dir() or child.name in preserved:
+            if child.is_dir() or child.name in preserved or _is_cache_temp_file(child.name):
                 continue
-            if _is_cache_temp_file(child.name):
-                try:
-                    age = now - child.stat().st_mtime
-                except FileNotFoundError:
-                    continue  # the writer just renamed it into place
-                if age < CACHE_TEMP_FILE_MAX_AGE_SECONDS:
-                    continue
             child.unlink(missing_ok=True)
             removed += 1
         return removed

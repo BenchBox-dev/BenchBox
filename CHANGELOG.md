@@ -26,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while another run was scanning it could crash that run with a Polars
   `Invalid argument (os error 22)` panic, a SIGBUS or a "must end with PAR1"
   error. Cache files and manifests are now written to a temporary file and
-  renamed into place, and temporary files left by a crashed run are removed
-  after 30 minutes.
+  renamed into place. Routine pruning preserves writer files regardless of age;
+  an explicit cache clear removes files abandoned by a crashed run.
 
 ## [0.4.1] - 2026-09-24
 

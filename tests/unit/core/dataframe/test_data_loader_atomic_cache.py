@@ -1,10 +1,3 @@
-"""Atomic cache writes, temp-file pruning and content-based source hashing.
-
-The DataFrame cache is shared by every BenchBox process on a machine and its
-Parquet files are memory-mapped by readers, so a writer must never modify a
-cache file in place.
-"""
-
 from __future__ import annotations
 
 import json
@@ -19,12 +12,12 @@ import pytest
 
 from benchbox.core.dataframe.capabilities import DataFormat
 from benchbox.core.dataframe.data_loader import (
-    CACHE_TEMP_FILE_MAX_AGE_SECONDS,
     ConversionStatus,
     DataCache,
     DataFrameDataLoader,
     FormatConverter,
     _atomic_cache_write,
+    _fsync_path,
 )
 
 pytestmark = [
@@ -54,7 +47,6 @@ class TestAtomicCacheWrite:
             assert tmp.parent == target.parent
             assert tmp != target
             tmp.write_bytes(b"new")
-            # Half way through the write, readers still see the previous file.
             assert target.read_bytes() == b"old complete content"
 
         assert target.read_bytes() == b"new"
@@ -104,7 +96,6 @@ class TestParquetConversionIsAtomic:
 
         def observing_write_table(table, where, **kwargs):
             real_write_table(table, where, **kwargs)
-            # The new file is fully written but not yet published.
             assert Path(where) != target
             observed.append(pq.read_table(target).num_rows)
 
@@ -142,7 +133,6 @@ class TestParquetConversionIsAtomic:
         with pa.memory_map(str(target), "r") as mapped:
             _write_source(source, 10)
             assert _convert(source, target) == (ConversionStatus.SUCCESS, 10)
-            # The old mapping still reads the old, complete file.
             assert pq.read_table(mapped).num_rows == 200
 
         assert pq.read_table(target).num_rows == 10
@@ -171,7 +161,7 @@ class TestManifestWriteIsAtomic:
         assert _temp_files(manifest_path.parent) == []
 
 
-class TestPruneStaleTempFiles:
+class TestPrunePreservesWriterTempFiles:
     def _loader_and_cache(self, tmp_path: Path) -> tuple[DataFrameDataLoader, Path]:
         loader = DataFrameDataLoader(cache_dir=tmp_path)
         cache_path = loader.cache.get_cache_path("tpch", 0.01, DataFormat.PARQUET)
@@ -194,14 +184,25 @@ class TestPruneStaleTempFiles:
 
         assert live.exists()
 
-    def test_stale_temp_file_is_removed(self, tmp_path: Path) -> None:
+    def test_old_temp_file_is_kept(self, tmp_path: Path) -> None:
         loader, cache_path = self._loader_and_cache(tmp_path)
-        stale = self._make_temp(cache_path, "orders.parquet", age_seconds=CACHE_TEMP_FILE_MAX_AGE_SECONDS + 60)
+        stale = self._make_temp(cache_path, "orders.parquet", age_seconds=3600)
 
         removed = loader._prune_cache_leaf_files(cache_path, set())
 
-        assert not stale.exists()
-        assert removed == 1
+        assert stale.exists()
+        assert removed == 0
+
+    def test_live_writer_survives_pruning_after_a_clock_jump(self, tmp_path: Path) -> None:
+        loader, cache_path = self._loader_and_cache(tmp_path)
+        target = cache_path / "orders.parquet"
+        with _atomic_cache_write(target) as temporary:
+            temporary.write_bytes(b"complete")
+            stamp = time.time() - 86400
+            os.utime(temporary, (stamp, stamp))
+            assert loader._prune_cache_leaf_files(cache_path, set()) == 0
+            assert temporary.exists()
+        assert target.read_bytes() == b"complete"
 
     def test_untracked_non_temp_files_are_still_pruned(self, tmp_path: Path) -> None:
         loader, cache_path = self._loader_and_cache(tmp_path)
@@ -210,7 +211,6 @@ class TestPruneStaleTempFiles:
         (cache_path / "_manifest.json").write_text("{}")
         untracked = cache_path / "gone.parquet"
         untracked.write_bytes(b"x")
-        # A name that only resembles a temp file is not protected.
         lookalike = cache_path / "notes.tmp"
         lookalike.write_bytes(b"x")
 
@@ -220,3 +220,15 @@ class TestPruneStaleTempFiles:
         assert (cache_path / "_manifest.json").exists()
         assert not untracked.exists()
         assert not lookalike.exists()
+
+
+@pytest.mark.parametrize("platform, flags", [("win32", os.O_RDWR), ("darwin", os.O_RDONLY), ("linux", os.O_RDONLY)])
+def test_fsync_opens_file_with_platform_required_access(tmp_path: Path, platform: str, flags: int) -> None:
+    target = tmp_path / "complete.bin"
+    target.write_bytes(b"complete")
+    with (
+        patch("benchbox.core.dataframe.data_loader.sys.platform", platform),
+        patch("benchbox.core.dataframe.data_loader.os.open", wraps=os.open) as opening,
+    ):
+        _fsync_path(target)
+    opening.assert_called_once_with(target, flags)
