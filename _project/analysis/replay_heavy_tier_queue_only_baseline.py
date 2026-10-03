@@ -65,6 +65,35 @@ MINUTES_TOLERANCE = 0.5
 PCTL_TOLERANCE = 0.05
 
 
+CLI_DESCRIPTION = (
+    "Replay the pinned heavy-tier queue-only baseline cohort.\n"
+    "\n"
+    "The cohort covers ``pr.yml`` runs with events ``pull_request`` and\n"
+    "``merge_group`` created in [WINDOW_START, WINDOW_END]. The manifest pins every\n"
+    "run ID in that window plus the expected per-job aggregates (runner-minutes,\n"
+    "failure/cancellation counts, p50/p90). The replay re-fetches those runs and\n"
+    "their jobs read-only from the GitHub API and requires:\n"
+    "\n"
+    "1. the live windowed run-ID set to equal the pinned set exactly, and\n"
+    "2. the recomputed aggregates to match the pinned expected values.\n"
+    "\n"
+    "An offline mode recomputes from local runs/jobs JSON snapshots (the same shape\n"
+    "as the collectors in the handoff evidence directory produce) for manifest\n"
+    "construction audits without spending API budget::\n"
+    "\n"
+    "    uv run -- python _project/analysis/replay_heavy_tier_queue_only_baseline.py --self-test\n"
+    "    uv run -- python _project/analysis/replay_heavy_tier_queue_only_baseline.py \\\n"
+    "        --offline --runs-json <runs-pr.yml.json> --jobs-json <jobs-pr.yml.json>\n"
+    "\n"
+    "The live replay needs ``gh`` auth and roughly one jobs call per pinned run\n"
+    "(~1,100 calls); it checks the rate-limit budget first and refuses when the\n"
+    "remaining budget is below the estimate. Durations come from job\n"
+    "``started_at``/``completed_at`` timestamps; jobs with conclusion ``None`` or\n"
+    "``skipped``, or with missing timestamps, are excluded exactly as in the\n"
+    "baseline collectors.\n"
+)
+
+
 class ReplayError(RuntimeError):
     """The pinned cohort could not be replayed exactly."""
 
@@ -554,7 +583,7 @@ def self_test() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--offline", action="store_true")

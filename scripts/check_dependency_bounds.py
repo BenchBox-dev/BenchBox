@@ -51,6 +51,49 @@ from pathlib import Path
 
 from packaging.version import InvalidVersion, Version
 
+CLI_DESCRIPTION = (
+    "Dependency upper-bound health check.\n"
+    "\n"
+    "BenchBox caps a handful of high-risk dependencies in ``pyproject.toml``\n"
+    "(sqlglot, click, pydantic, pyarrow, duckdb today). Caps are enforced by\n"
+    "``uv lock`` at install time, but nothing blocks a release if a capped\n"
+    "dep has drifted into the last major before the ceiling. This script\n"
+    "surfaces that signal.\n"
+    "\n"
+    "Two modes\n"
+    "---------\n"
+    "* ``--fail-on=cap-reached``  (blocking, offline)\n"
+    "    Exit non-zero if any locked version is at or past the full stated\n"
+    "    upper bound. This should not happen under normal flow; it's a safety\n"
+    "    net for lockfile-level drift.\n"
+    "\n"
+    "* ``--report-only``  (non-blocking, offline)\n"
+    "    Emit a markdown report listing each capped dep, its locked version,\n"
+    "    the cap, and whether the locked major equals ``cap_major - 1`` (the\n"
+    '    "ceiling-minus-one" signal - the dep is one major away from\n'
+    "    requiring a bump/hold decision). Suitable for appending to release\n"
+    "    notes.\n"
+    "\n"
+    "Parsing is intentionally restrained: PEP 508 with a single exclusive\n"
+    "upper bound of the form ``<N`` or ``<N.0`` or ``<N.0.0`` or a tighter\n"
+    "minor/patch cap such as ``<1.4.0`` (the forms we actually use). Exotic\n"
+    "specifiers fall through untracked rather than being misparsed.\n"
+    "\n"
+    "Design notes\n"
+    "------------\n"
+    "* Offline by design - CI must not page on upstream outages.\n"
+    "* Single source of truth for bounds health; the quarterly review TODO\n"
+    "  invokes the same script so check logic never drifts.\n"
+    '* The "ceiling-minus-one" signal is warn-only (in --report-only) rather\n'
+    "  than blocking, because BenchBox's caps intentionally sit at\n"
+    "  current-major + 1, which means locked_major == cap_major - 1 is the\n"
+    "  steady state. The blocking signal is cap-reached - the case where\n"
+    "  bounds have already been violated.\n"
+    "\n"
+    "Copyright 2026 Joe Harris / BenchBox Project\n"
+    "Licensed under the MIT License. See LICENSE file in the project root.\n"
+)
+
 _UPPER_BOUND_RE = re.compile(r"<\s*(\d+(?:\.\d+)*)")
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -221,7 +264,7 @@ def render_report(deps: list[CappedDep]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--fail-on",
         choices=["cap-reached", "ceiling-minus-one", "never"],

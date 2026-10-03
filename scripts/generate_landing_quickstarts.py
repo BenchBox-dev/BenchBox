@@ -29,6 +29,8 @@ from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.utils.dependencies import list_available_dependency_groups
 
+CLI_DESCRIPTION = "Generate landing/prompts/catalog.generated.js from landing/prompts/catalog.yaml."
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SOURCE = REPO_ROOT / "landing" / "prompts" / "catalog.yaml"
 OUTPUT = REPO_ROOT / "landing" / "prompts" / "catalog.generated.js"
@@ -614,7 +616,7 @@ def render_js(catalog: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--write",
         action="store_true",

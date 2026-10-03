@@ -64,6 +64,8 @@ import yaml
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
+CLI_DESCRIPTION = "Regenerate the vendor-derived pricing tables from checked-in vendor evidence."
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COST_DIR = REPO_ROOT / "benchbox" / "core" / "cost"
 EVIDENCE_PATH = COST_DIR / "pricing_vendor_evidence.yaml"
@@ -979,7 +981,7 @@ def run_refresh(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--check",

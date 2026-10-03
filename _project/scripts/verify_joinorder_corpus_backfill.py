@@ -19,6 +19,9 @@ DEFAULT_STAGED_DIR = Path("~/Developer/benchmark_runs/submissions/uat_joinorder_
 DEFAULT_CORPUS_DIR = Path("results-data/bundles")
 
 
+CLI_DESCRIPTION = "Verify canonical JoinOrder corpus backfill bundles."
+
+
 def _discover_bundles(root: Path) -> list[Path]:
     bundle_root = root / "bundle" if (root / "bundle").is_dir() else root
     return [
@@ -118,7 +121,7 @@ def _validate_bundle(bundle_path: Path, root: Path, expected_identity: dict[str,
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--staged-dir", type=Path, default=DEFAULT_STAGED_DIR)
     parser.add_argument("--corpus-dir", type=Path, default=DEFAULT_CORPUS_DIR)
     parser.add_argument("--skip-staged", action="store_true")

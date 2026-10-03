@@ -36,6 +36,9 @@ REPLAY_COMMAND_TEMPLATE = (
 )
 
 
+CLI_DESCRIPTION = "Deterministic, bounded SQLGlot translation-fuzzing pilot."
+
+
 def _case_sql(rng: random.Random) -> str:
     """Produce a diverse query from a portable, deterministic grammar."""
     table = rng.choice(("orders", "customers", "events", "lineitem", "products", "accounts"))
@@ -316,7 +319,7 @@ def _load_replay(path: Path, args: argparse.Namespace) -> tuple[int, dict[str, A
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--source-dialect", required=True)
     parser.add_argument("--target-dialect", required=True)

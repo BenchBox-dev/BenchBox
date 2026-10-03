@@ -86,6 +86,14 @@ REQUIRED_NONEMPTY_SCANS: tuple[tuple[str, str], ...] = (
 )
 
 
+CLI_DESCRIPTION = (
+    "Validate Results Explorer DuckDB eligibility invariants.\n"
+    "\n"
+    "This script is intentionally independent of the build pipeline so release\n"
+    "gates can run it against any generated ``results.duckdb`` snapshot.\n"
+)
+
+
 def _count(con: Any, sql: str) -> int:
     row = con.execute(sql).fetchone()
     return int(row[0] if row else 0)
@@ -360,7 +368,7 @@ def check_snapshot(db_path: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("duckdb_path", type=Path)
     args = parser.parse_args(argv)
 

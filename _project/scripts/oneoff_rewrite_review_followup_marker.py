@@ -42,6 +42,36 @@ OLD_MARKER = "benchbox-codex-review-followup-actioned"
 NEW_MARKER = "benchbox-pr-review-followup-actioned"
 
 
+CLI_DESCRIPTION = (
+    "One-off migration: rewrite the OLD action marker in existing GitHub replies.\n"
+    "\n"
+    "Run AFTER the rename PR lands. The PR-review-followup routine previously posted\n"
+    "replies carrying the marker\n"
+    "\n"
+    "    benchbox-codex-review-followup-actioned\n"
+    "\n"
+    "The rename moved the marker to\n"
+    "\n"
+    "    benchbox-pr-review-followup-actioned\n"
+    "\n"
+    "Existing replies on GitHub still carry the OLD marker, so the new routine\n"
+    "would re-action threads that were already actioned. This script walks merged\n"
+    "PRs, finds review-comment replies whose body contains the OLD marker, and\n"
+    "PATCHes each one in place to use the NEW marker. Body content otherwise\n"
+    "unchanged.\n"
+    "\n"
+    "Dry-run by default (lists matches, no writes). Pass --apply to mutate.\n"
+    "\n"
+    "After this lands successfully, delete this script in a follow-up PR — it is\n"
+    "intentionally one-off and not part of the routine surface.\n"
+    "\n"
+    "Usage:\n"
+    "  uv run -- python _project/scripts/oneoff_rewrite_review_followup_marker.py\n"
+    "  uv run -- python _project/scripts/oneoff_rewrite_review_followup_marker.py --apply\n"
+    "  uv run -- python _project/scripts/oneoff_rewrite_review_followup_marker.py       --repo joeharris76/BenchBox --since 2026-01-01 --apply\n"
+)
+
+
 @dataclass(frozen=True)
 class CommentHit:
     pr_number: int
@@ -170,7 +200,7 @@ def resolve_repo(explicit: str | None) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repo", default=os.environ.get("PR_REVIEW_REPO"))
     parser.add_argument(
         "--since",

@@ -22,6 +22,21 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Summarize a release-canary run as an owned incident update.\n"
+    "\n"
+    "Release readiness blocks on a green, fresh canary, but a red canary used to\n"
+    "alert nobody: the 2026-09-14 regression stayed red for ten days while further\n"
+    "regressions piled on top of it. This script turns one canary run into the text\n"
+    "of an incident issue, so a red run opens (or updates) one owned issue and the\n"
+    "next green run closes it.\n"
+    "\n"
+    "It reads the shard pytest logs uploaded by the canary and the per-job results,\n"
+    "and writes a JSON document with the state (``red`` or ``green``), the failing\n"
+    "test IDs, and the issue title, body, and comment. Posting to GitHub stays in\n"
+    "the workflow.\n"
+)
+
 INCIDENT_LABEL = "incident:release-canary-red"
 INCIDENT_TITLE = "Release canary is red; releases are blocked"
 SHARD_LOG_GLOB = "shard-*-pytest.log"
@@ -145,7 +160,7 @@ def render(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--artifacts-dir", type=Path, required=True)
     parser.add_argument("--job-result", action="append", default=[], help="name=result; repeat per job")
     parser.add_argument("--run-url", required=True)

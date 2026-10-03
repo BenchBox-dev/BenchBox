@@ -27,6 +27,24 @@ from typing import Iterable
 
 from path_filter_decision import matches_any, normalize_path, unquote_yaml_scalar
 
+CLI_DESCRIPTION = (
+    "Decide which merge units a change touches.\n"
+    "\n"
+    "Reads ``.github/ci-units.yml`` and a newline-delimited list of changed paths\n"
+    "(or a diff against a base ref) and reports which of the six units\n"
+    "(``core``, ``explorer``, ``results-data``, ``docs``, ``landing``, ``tooling``)\n"
+    "have work to do.\n"
+    "\n"
+    "Rules:\n"
+    "\n"
+    "* A path belongs to every unit whose patterns match it.\n"
+    "* A path that matches no unit belongs to ``core`` (fail closed).\n"
+    "* A path matching ``all-units`` runs every unit.\n"
+    "* An empty change set runs every unit (fail closed).\n"
+    "\n"
+    "The script is stdlib-only so the classifier job needs no dependency sync.\n"
+)
+
 UNITS: tuple[str, ...] = ("core", "explorer", "results-data", "docs", "landing", "tooling")
 ALL_UNITS_KEY = "all-units"
 DEFAULT_RULES = Path(__file__).resolve().parents[1] / ".github" / "ci-units.yml"
@@ -120,7 +138,7 @@ def write_summary(path: Path, decision: dict[str, object]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--rules", type=Path, default=DEFAULT_RULES)
     parser.add_argument("--base-ref", help="Git ref to diff against, for example a base SHA")
     parser.add_argument("--changed-file", type=Path, help="Read changed paths from a newline-delimited file")

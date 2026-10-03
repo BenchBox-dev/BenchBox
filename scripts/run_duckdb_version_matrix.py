@@ -33,6 +33,25 @@ from typing import Any
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
+CLI_DESCRIPTION = (
+    "Run the reproducible DuckDB version matrix used by Results Explorer.\n"
+    "\n"
+    "The matrix is intentionally operator-run: it creates four SF10 synthetic\n"
+    "datasets once, then loads and measures each dataset with seven DuckDB package\n"
+    "versions. Each power cell is a separate BenchBox invocation, repeated three times. Generated\n"
+    "artifacts stay outside the checkout and are recorded in ``matrix-manifest.json``. Run the\n"
+    "analyzer with ``--explorer-bundles-dir`` to materialize one median bundle per cell for\n"
+    "Results Explorer; the raw repetitions remain external.\n"
+    "\n"
+    "Run from the BenchBox checkout with:\n"
+    "\n"
+    "    uv run --no-sync -- python scripts/run_duckdb_version_matrix.py       --output-dir /Users/joe/Developer/benchmark_runs/duckdb-version-matrix-20260829\n"
+    "\n"
+    "``--no-sync`` is required because the runner changes the active DuckDB wheel\n"
+    "between subprocesses while the BenchBox project lock intentionally remains\n"
+    "unchanged.\n"
+)
+
 VERSIONS = ("1.0.0", "1.1.3", "1.2.2", "1.3.2", "1.4.4", "1.5.5", "1.6.0.dev365")
 BENCHMARKS = (("tpch", 10.0), ("tpcds", 10.0), ("clickbench", 10.0), ("ssb", 10.0))
 REPETITIONS = 3
@@ -271,7 +290,7 @@ def run_matrix(*, output_dir: Path, repo_root: Path, dry_run: bool) -> dict[str,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--output-dir", type=Path, required=True, help="New output root outside the checkout")
     parser.add_argument("--dry-run", action="store_true", help="Print the 116-command matrix without running it")
     args = parser.parse_args(argv)

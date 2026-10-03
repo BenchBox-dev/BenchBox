@@ -99,6 +99,62 @@ _ABANDONED_CORRESPONDENCE: dict[str, str] = {
 _GATEABLE_STATUSES = frozenset({GATEABLE})
 
 
+CLI_DESCRIPTION = (
+    "Cross-surface applicability sweep (benchmark-cross-surface-equivalence-gate w2).\n"
+    "\n"
+    "The oracle coverage map flags a benchmark as a cross-surface candidate when it is\n"
+    "dual-surface (ships SQL queries AND has ``supports_dataframe=True``) and currently\n"
+    "unguarded. But ``supports_dataframe`` is a *loading* capability flag: it does NOT\n"
+    "mean the benchmark ships comparable DataFrame *query* implementations. The\n"
+    "cross-surface gate compares a query's SQL result to its DataFrame result, so it is\n"
+    "only applicable to benchmarks that ship DataFrame *queries*.\n"
+    "\n"
+    "Signal: each benchmark that ships a DataFrame query surface exposes a\n"
+    "``QueryRegistry`` (a ``<BENCH>_DATAFRAME_QUERIES`` instance) in its\n"
+    "``benchbox.core.<bench>.dataframe_queries`` module/package -- this is the registry\n"
+    "the cross-surface gate builders (e.g. ``build_clickbench_duckdb``) consume\n"
+    "directly. Detecting that registry is the authoritative gate-applicability signal.\n"
+    "\n"
+    "History: an earlier version of this sweep used the production query *resolver*\n"
+    "(``get_dataframe_queries_for_benchmark``). That under-counted: the resolver only\n"
+    "special-cases tpch/tpcds/clickbench plus a generic ``get_dataframe_queries()``\n"
+    "method, so benchmarks that expose only a ``<BENCH>_DATAFRAME_QUERIES`` registry\n"
+    "(e.g. coffeeshop -- which was nonetheless successfully gated in #842) resolved to\n"
+    "zero and were wrongly dispatched to a fallback oracle. Registry detection fixes\n"
+    "that.\n"
+    "\n"
+    "Classification per candidate:\n"
+    "  - ``gateable``: has a registry whose ids overlap the SQL ids as-is -> wire a\n"
+    "    cross-surface gate on the overlapping ids (w3). A non-zero VERIFIED id overlap\n"
+    "    is what makes a benchmark genuinely gateable.\n"
+    "  - ``candidate-unverified``: has a registry but ZERO ids overlap the SQL ids\n"
+    "    verbatim, so there is no verified SQL<->DataFrame query correspondence. A gate\n"
+    "    here would require GUESSING which DataFrame query maps to which SQL query, and\n"
+    '    the campaign\'s own TODO warns "do NOT guess" (e.g. nyctaxi/tsbs). This is NOT\n'
+    "    counted as gateable coverage: it needs an independent, per-benchmark id mapping\n"
+    "    to be confirmed first (some, like tpcds_obt at 3 DF vs ~89 SQL queries, may\n"
+    "    never be a clean correspondence). The honest status the M2 review demanded.\n"
+    "  - ``not-cheaply-gateable``: would need a full canonical dataset fetch, a\n"
+    "    downloader-backed network fetch, or a non-bounded scale (rejects SF=0.01,\n"
+    "    ships ``data_manifest.toml``, or ships a network-backed ``downloader.py``;\n"
+    "    e.g. joinorder accepts only SF=1.0 via its IMDb 2013 manifest, nyctaxi\n"
+    "    downloads the pinned TLC Parquet months before sampling) -> NOT wired as\n"
+    "    a routine-PR gate, no matter the id overlap. The reason names the scale /\n"
+    "    provenance evidence; joinorder_synthetic (already CI-enforced) is the\n"
+    "    scaled stand-in for joinorder.\n"
+    "  - ``no-df-query-surface``: no DataFrame query registry -> NOT cross-surface\n"
+    "    gateable; needs a w2 fallback oracle (differential second-engine or a curated\n"
+    "    expected-results subset).\n"
+    "  - ``blocked``: could not instantiate the benchmark or read its registry.\n"
+    "\n"
+    "Report-mode (regenerate the committed artifact). Detecting a registry + reading\n"
+    "SQL ids needs only an import + a benchmark instance (no generated data), so the\n"
+    "sweep is cheap. Enumerating real divergences still requires a load-faithful\n"
+    "per-benchmark gate builder (see ``build_ssb_duckdb`` /\n"
+    "``build_clickbench_duckdb``).\n"
+)
+
+
 def _dataframe_query_registry(benchmark_id: str) -> Any | None:
     """Return the benchmark's DataFrame ``QueryRegistry``, or ``None`` if it ships none.
 
@@ -403,7 +459,7 @@ def render_markdown(rows: list[dict[str, Any]]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--check", action="store_true", help="Fail if the committed artifact is stale.")
     args = parser.parse_args(argv)
 

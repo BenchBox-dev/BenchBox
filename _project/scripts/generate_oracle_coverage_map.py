@@ -110,6 +110,31 @@ JSON_ARTIFACT = ARTIFACT_DIR / "oracle-coverage-map.json"
 MARKDOWN_ARTIFACT = ARTIFACT_DIR / "oracle-coverage-map.md"
 
 
+CLI_DESCRIPTION = (
+    "Generate the benchmark correctness-oracle coverage map.\n"
+    "\n"
+    'The map is the authoritative, *generated* answer to "which correctness oracle, if\n'
+    'any, guards each shipped benchmark?" It is derived from live sources so it cannot\n'
+    "drift from reality:\n"
+    "\n"
+    "  - the benchmark registry (``benchbox.core.benchmark_registry``) for the set of\n"
+    "    shipped benchmarks and their surfaces (SQL / DataFrame);\n"
+    "  - the expected-results provider registry\n"
+    "    (``benchbox.core.expected_results.registry``) for stored answer keys;\n"
+    "  - the cross-surface gate registry\n"
+    "    (``benchbox.core.equivalence.cross_surface.GATES``) for SQL<->DataFrame gates;\n"
+    "  - module presence for the bespoke TPC-Havoc variant / variant-DataFrame gates.\n"
+    "\n"
+    "Run ``python _project/scripts/generate_oracle_coverage_map.py`` to (re)write the\n"
+    "checked-in artifacts under ``_project/analysis/``. Run with ``--check`` to fail if\n"
+    "those artifacts are stale (used by ``tests/unit/test_oracle_coverage_map.py``).\n"
+    "\n"
+    "This script owns w0 (the matrix) and feeds w3 (drift/UNGUARDED visibility) of the\n"
+    "``benchmark-correctness-oracle-coverage-map`` TODO. It deliberately does NOT build\n"
+    "per-benchmark oracles (w1/w2); it makes the gap legible and dispatchable.\n"
+)
+
+
 def _module_exists(dotted: str) -> bool:
     """True if an importable module exists, without importing it."""
     try:
@@ -652,7 +677,7 @@ def check_artifacts(rows: list[dict[str, Any]]) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--check",
         action="store_true",

@@ -13,6 +13,9 @@ MANIFEST_NAME = "SHA256MANIFEST.json"
 DEFAULT_ROOT = Path(__file__).resolve().parents[1] / "_binaries"
 
 
+CLI_DESCRIPTION = "Verify the complete bundled-generator tree shipped inside BenchBox."
+
+
 def _unique_object(pairs: Iterable[tuple[str, object]]) -> dict[str, object]:
     result: dict[str, object] = {}
     for key, value in pairs:
@@ -106,7 +109,7 @@ def verify_binary_tree(root: Path = DEFAULT_ROOT) -> None:
 def main(argv: list[str] | None = None) -> int:
     from benchbox.utils.printing import emit
 
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     args = parser.parse_args(argv)
     try:

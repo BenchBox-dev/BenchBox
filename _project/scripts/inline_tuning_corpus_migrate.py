@@ -43,6 +43,34 @@ CORPUS_ROOT = REPO_ROOT / "results-data" / "bundles"
 RETIRED_SUFFIXES = (".tuning.json", ".applied.json")
 
 
+CLI_DESCRIPTION = (
+    "Fold retired tuning companions into their corpus bundles.\n"
+    "\n"
+    "The requested tuning and the applied ledger used to ship beside a bundle as\n"
+    "``{stem}.tuning.json`` and ``{stem}.applied.json``. They now live in the\n"
+    "bundle's ``platform.tuning`` block, and nothing writes the companions any more.\n"
+    "Corpus bundles published before that change still carry them, so this moves the\n"
+    "evidence into the bundle, removes the companion files, and re-points the\n"
+    "submission manifest that pins their hashes.\n"
+    "\n"
+    "The move is value-preserving and never re-anonymizes: the companions in the\n"
+    "corpus are already public artifacts, and ``inline_tuning_artifacts`` only\n"
+    "relocates fields. Re-running is safe -- a bundle with no companions left is\n"
+    "skipped.\n"
+    "\n"
+    "Usage::\n"
+    "\n"
+    "    uv run -- python _project/scripts/inline_tuning_corpus_migrate.py [--check]\n"
+    "\n"
+    "``--check`` reports what would change and exits non-zero if anything would,\n"
+    "which is what CI needs to prove the corpus is already migrated.\n"
+    "\n"
+    "Copyright 2026 Joe Harris / BenchBox Project\n"
+    "\n"
+    "Licensed under the MIT License. See LICENSE file in the project root for details.\n"
+)
+
+
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -111,7 +139,7 @@ def migrate_bundle(bundle_path: Path, *, check: bool) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--check", action="store_true", help="report pending changes without writing")
     parser.add_argument("--root", type=Path, default=CORPUS_ROOT, help="corpus bundles directory")
     args = parser.parse_args(argv)

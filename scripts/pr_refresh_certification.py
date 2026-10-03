@@ -20,6 +20,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+CLI_DESCRIPTION = (
+    "Fail-closed exact-refresh certification classifier.\n"
+    "\n"
+    "Evidence generation only. This module never skips a CI job and never publishes\n"
+    "a required status context. Callers inject event, Git, ruleset, Check Run, and\n"
+    "Actions-run data so unit tests do not touch the network.\n"
+    "\n"
+    "Version 1 permits at most one shadow-eligible refresh after a trusted full\n"
+    "certification. Missing, stale, ambiguous, or untrusted input returns\n"
+    "``full_required``.\n"
+)
+
 DECISION_SHADOW = "shadow_eligible"
 DECISION_FULL = "full_required"
 
@@ -612,7 +624,7 @@ def merge_tree_write_tree(parent1: str, parent2: str) -> tuple[str | None, str |
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--input", type=Path, help="Classification request JSON")
     parser.add_argument("--json-out", type=Path, help="Write the decision JSON")
     args = parser.parse_args(argv)

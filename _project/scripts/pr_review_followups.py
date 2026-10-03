@@ -48,6 +48,20 @@ GH_API_RETRY_BACKOFFS: tuple[int, ...] = (1, 4, 9)
 HOOK_AUTOFIX_STDERR_MARKER = "files were modified by this hook"
 
 
+CLI_DESCRIPTION = (
+    "Action stale bot/agent review comments left on merged PRs.\n"
+    "\n"
+    "The script is intentionally an orchestrator, not a static fixer. It gathers\n"
+    "candidate inline review comments from configured authors, skips comments that\n"
+    "already carry the BenchBox action marker reply, asks the local executor (the\n"
+    "`codex` CLI) to assess and fix each remaining finding against the current\n"
+    "tree, replies to the source comment, and then optionally submits one batched\n"
+    "PR through the existing Make workflow. The reviewer set is configurable via\n"
+    "`--author`; the executor is currently codex but is isolated behind the\n"
+    "`--executor-*` flags so it can be swapped without touching the orchestration.\n"
+)
+
+
 @dataclass(frozen=True)
 class PullRequest:
     number: int
@@ -1434,7 +1448,7 @@ def run_action_loop(args: argparse.Namespace, runner: CommandRunner) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
     for command in ("list", "run"):
         sub = subparsers.add_parser(command)

@@ -10,6 +10,8 @@ from pathlib import Path, PurePosixPath
 
 from benchbox.utils.binary_manifest import DEFAULT_ROOT, MANIFEST_NAME, verify_binary_payload, verify_binary_tree
 
+CLI_DESCRIPTION = "Verify source, wheel, and sdist bundled generators against one manifest."
+
 
 def _member_name(raw_name: str, seen: dict[str, bool], binary_prefix: str, directory: bool) -> str:
     name = raw_name.removesuffix("/") if directory else raw_name
@@ -99,7 +101,7 @@ def verify_distribution_binaries(distribution: Path, source_root: Path = DEFAULT
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("distributions", type=Path, nargs="+")
     parser.add_argument("--source-root", type=Path, default=DEFAULT_ROOT)
     args = parser.parse_args(argv)

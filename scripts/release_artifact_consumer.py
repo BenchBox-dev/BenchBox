@@ -27,6 +27,13 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Bind release distributions to one successful merge-queue producer attempt.\n"
+    "\n"
+    "This admission boundary never builds or publishes packages. Older artifacts\n"
+    "without a producer receipt are deliberately unsupported.\n"
+)
+
 REPOSITORY = "BenchBox-dev/BenchBox"
 WORKFLOW = ".github/workflows/ci.yml"
 JOB_NAME = "dist-artifact"
@@ -719,7 +726,7 @@ def admit(root: Path, tag: str, output: Path, api: Api = github_json) -> dict[st
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     commands = parser.add_subparsers(dest="command", required=True)
     produce = commands.add_parser("producer")
     produce.add_argument("--dist", type=Path, required=True)

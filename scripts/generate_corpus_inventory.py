@@ -23,6 +23,8 @@ if str(CHECKOUT_ROOT) not in sys.path:
 
 from benchbox.validation.bundle import discover_bundles as discover_primary_bundles
 
+CLI_DESCRIPTION = "Generate `results-data/corpus-inventory.json` from schema-v2 bundles."
+
 # Canonical provenance vocabulary. Import the one source of truth when the full
 # package is available; fall back to inline literals on the slim
 # published-results branch (which runs this script without benchbox/). Keep the
@@ -291,7 +293,7 @@ def _normalized_inventory(inventory: dict) -> dict:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true", help="Fail if the on-disk inventory is stale.")
     mode.add_argument("--write", action="store_true", help="Write the regenerated inventory to disk.")

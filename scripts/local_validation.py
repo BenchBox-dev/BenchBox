@@ -40,6 +40,34 @@ import sys
 import time
 from pathlib import Path, PurePosixPath
 
+CLI_DESCRIPTION = (
+    "Serialize local validation gates and coalesce duplicate same-input runs.\n"
+    "\n"
+    "Two agents (or two worktrees) often invoke the same local gate against the\n"
+    "same tree within minutes of each other. The second invocation historically\n"
+    "collided on the shared test lock and retried in a lock-error loop. This tool\n"
+    "makes that case cheap and honest:\n"
+    "\n"
+    "* Identical validated inputs reuse a completed receipt instead of executing.\n"
+    "* Anything else (unknown identity, changed files/ref/tool, incomplete or\n"
+    "  failed prior run, different gate) executes.\n"
+    "* Concurrent identical requests serialize on a per-receipt lock: the waiter\n"
+    "  re-checks after acquiring and reuses the winner's receipt, so simultaneous\n"
+    "  identical requests execute once while unrelated gates proceed in parallel.\n"
+    "\n"
+    "Receipts never certify hosted required checks and never transfer across\n"
+    "changed integration trees: the worktree HEAD, status, base ref, and tool\n"
+    "versions are all part of the identity. A failed prior run leaves no receipt,\n"
+    "so failures always re-execute.\n"
+    "\n"
+    "Usage:\n"
+    "  python scripts/local_validation.py run --gate pr-preflight-fast -- make pr-preflight-fast-tests\n"
+    "  python scripts/local_validation.py run --gate member-check --batch-id B --batch-member M --batch-role member -- pytest tests/unit -q\n"
+    "  python scripts/local_validation.py ordered --focused-cmd 'pytest -m fast -q' --preflight-cmd 'make pr-preflight'\n"
+    "  python scripts/local_validation.py show --gate pr-preflight-fast\n"
+    "  python scripts/local_validation.py clear-test-lock ~/.benchbox/test.lock\n"
+)
+
 # Bounds keep identity computation cheap; exceeding them means "unknown",
 # which forces execution (fail open to running, never to false reuse).
 MAX_UNTRACKED_FILES = 200
@@ -1560,7 +1588,7 @@ def ordered_identity(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
     run = sub.add_parser("run", help="run a gate unless an identical completed receipt exists")
     run.add_argument("--gate", required=True, help="exact gate name (receipt namespace)")

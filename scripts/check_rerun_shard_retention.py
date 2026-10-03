@@ -28,6 +28,28 @@ import sys
 from datetime import date
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Enforce the generated-rerun-shard retention policy.\n"
+    "\n"
+    "Rerun shards under ``tests/uat/configs/generated-rerun-shards/`` are frozen\n"
+    "operational scratch from a named sweep, not reusable templates. They\n"
+    "accumulate without expiry: every checked-in shard keeps corpus-guard coverage\n"
+    "(load + enumerate on every fast-lane run) forever, even years after its sweep.\n"
+    "\n"
+    "Policy: a shard expires ``RETENTION_DAYS`` after the sweep date encoded in\n"
+    "its filename stem (``-<YYYYMMDD>``). An expired shard fails this check with\n"
+    "the exact archive command. Archival is ``git mv`` into\n"
+    "``_project/_archive/generated-rerun-shards-<YYYYMMDD>/`` (tracked evidence\n"
+    "outside corpus discovery) plus a README note naming the sweep.\n"
+    "\n"
+    "Exit status: 0 all shards within retention; 1 expired or undated shard(s) need\n"
+    "action; 2 the shard directory is missing.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/check_rerun_shard_retention.py            # check (CI mode)\n"
+    "    uv run -- python scripts/check_rerun_shard_retention.py --retention-days N\n"
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SHARD_DIR = REPO_ROOT / "tests" / "uat" / "configs" / "generated-rerun-shards"
 ARCHIVE_PARENT = REPO_ROOT / "_project" / "_archive"
@@ -71,7 +93,7 @@ def find_expired(today: date, retention_days: int) -> tuple[list[tuple[Path, dat
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--retention-days",
         type=int,

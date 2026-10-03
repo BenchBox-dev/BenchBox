@@ -10,6 +10,8 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = "Collect and deterministically partition release-canary pytest node IDs."
+
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
 MEDIUM_MARKER_EXPRESSION = "medium and not (slow or stress or resource_heavy or live_integration)"
 DEFAULT_SHARD_COUNT = 6
@@ -245,7 +247,7 @@ def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     collect_parser = subparsers.add_parser("collect", help="create the canonical node-id artifact")

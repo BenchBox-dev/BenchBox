@@ -130,6 +130,61 @@ SYNCHRONIZE_WORKFLOW_NAMES: tuple[str, ...] = (
 )
 
 
+CLI_DESCRIPTION = (
+    "Per-PR dev-loop CI-failure baseline metrics for merged `develop` PRs.\n"
+    "\n"
+    "Dev PRs land via squash auto-merge once the required checks are green, so a\n"
+    "merged PR's HEAD-SHA check runs are *always* green (see\n"
+    "`_project/scripts/detect_orphaned_commits.py`'s module docstring for the\n"
+    "related squash-merge mechanics). That makes head-SHA check-run status useless\n"
+    "as a CI-failure signal. The real failure cost shows up upstream of the merge:\n"
+    "fix-forward pushes after a PR is opened, PRs that touch the shared fast-test\n"
+    "guard file (`_project/config/fast_test_lane_policy.json`, a frequent\n"
+    "composition-conflict hotspot), and whether the PR's *first* required-lane\n"
+    'workflow run ("CI", `.github/workflows/ci.yml`; "Develop PR", the retired\n'
+    "`pr.yml`, for older PRs) went green\n"
+    "without a fix-forward push.\n"
+    "\n"
+    "This script computes, per merged `develop` PR in a trailing window:\n"
+    "\n"
+    "  - pushes_after_open: commits on the PR after its first commit (a proxy for\n"
+    '    fix-forward pushes; the initial push that opened the PR is not a "push\n'
+    '    after open").\n'
+    "  - open_to_merge_seconds: PR created_at -> merged_at wall time.\n"
+    "  - touched_fast_test_lane_policy: whether the PR's file list includes\n"
+    "    _project/config/fast_test_lane_policy.json.\n"
+    '  - first_pass_green: whether the PR\'s FIRST required-lane ("CI" or, for older\n'
+    '    PRs, "Develop PR") workflow run on its head branch concluded "success" -- i.e. the\n'
+    "    required lane went green without a fix-forward push. Uses per-branch\n"
+    "    Actions run history (event=pull_request), not the always-green head-SHA\n"
+    "    check runs.\n"
+    '  - fast_test_job_seconds: wall time of the "test (ubuntu-latest, 3.12)" job\n'
+    '    within that first "Develop PR" run (used to compute the window\'s average\n'
+    "    / p95 fast-test job wall time).\n"
+    "\n"
+    "Runtime data source, in order of preference: the `gh` CLI (`gh api ...`) when\n"
+    "on PATH; otherwise a raw GitHub REST call via `urllib` authenticated with\n"
+    '$GITHUB_TOKEN / $GH_TOKEN; otherwise this prints a "SKIPPED: no GitHub API\n'
+    'access" notice and exits 0 (mirrors the `|| true` graceful-degradation\n'
+    "pattern the existing `dev-loop-metrics` Make target uses for `gh run list`,\n"
+    "Makefile ~line 1520). This script performs read-only GitHub API calls; it\n"
+    "never mutates PRs, branches, or workflow state.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/dev_loop_pr_metrics.py\n"
+    "    uv run -- python _project/scripts/dev_loop_pr_metrics.py --days 28 --json\n"
+    "    uv run -- python _project/scripts/dev_loop_pr_metrics.py --collect-durations\n"
+    "    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-lifecycle-baseline LIFECYCLE --process-baseline PROCESS\n"
+    "    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-refresh-audit AUDIT --baseline LIFECYCLE\n"
+    "    uv run -- python _project/scripts/dev_loop_pr_metrics.py --validate-process-acceptance ACCEPTANCE --process-baseline PROCESS\n"
+    "\n"
+    "--collect-durations is a separate, local-machine-only mode: it runs the fast\n"
+    "test lane under `pytest --durations=20` and prints the slowest tests. It does\n"
+    "not touch the GitHub API and is not part of the default run (see the module\n"
+    "TODO context: dev-loop-metrics-ci-failure-baseline-2).\n"
+)
+
+
 def resolve_required_contexts(check_runs: list[dict]) -> tuple[str, ...]:
     """The required-context set that applies to one head's check runs.
 
@@ -2043,7 +2098,7 @@ def run_collect_durations() -> int:
 # CLI
 # ---------------------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--repo",
         default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO),

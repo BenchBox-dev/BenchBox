@@ -48,6 +48,24 @@ REPORT_AUTHORITY = {
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
+CLI_DESCRIPTION = (
+    "Bounded read-only audit of registered worktrees and local branches.\n"
+    "\n"
+    "Combines live Git structure, exact GitHub PR evidence, structural-branch\n"
+    "policy, and controller ownership evidence.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/worktree_audit.py\n"
+    "    uv run -- python _project/scripts/worktree_audit.py --format json\n"
+    "    uv run -- python _project/scripts/worktree_audit.py --repo BenchBox-dev/BenchBox\n"
+    "\n"
+    "Guarantees:\n"
+    "- Read-only: never mutates Git state, never prunes, never unlocks, never deletes.\n"
+    "- Fail-closed: incomplete collection, API errors, missing objects, and ambiguous states resolve to 'unavailable' or 'uncertain'.\n"
+    "- Zero deletion authority: output is a snapshot report for human inspection.\n"
+)
+
+
 @dataclasses.dataclass
 class WorktreeInfo:
     path: str
@@ -1020,7 +1038,7 @@ def render_text_report(report: Dict[str, Any]) -> str:
 # CLI Entry point
 # ---------------------------------------------------------------------------
 def main(argv: Optional[List[str]] = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--format",
         choices=["text", "json"],

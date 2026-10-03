@@ -25,6 +25,8 @@ from benchbox.mcp.readiness import (
     INSPECTOR_VERSION,
 )
 
+CLI_DESCRIPTION = "Run the revision-pinned MCP conformance and Inspector acceptance gate."
+
 CONFORMANCE_REPOSITORY = "https://github.com/modelcontextprotocol/conformance.git"
 SCENARIOS = (
     "caching",
@@ -223,7 +225,7 @@ def _write_evidence(path: Path, protocol_version: str) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--protocol-version", required=True)
     parser.add_argument("--evidence-output", type=Path)
     return parser

@@ -49,6 +49,41 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import queue_certification  # noqa: E402
 
+CLI_DESCRIPTION = (
+    "Decide whether the develop tip is already covered before an hourly sweep.\n"
+    "\n"
+    "The ``schedule`` trigger in ``develop-post-merge.yml`` exists to cover\n"
+    "dropped push events, but most sweeps re-run the slim gates on a tip SHA\n"
+    "that a per-push run already gated. A tip is *covered* when EITHER of the\n"
+    "following holds:\n"
+    "\n"
+    "1. A ``develop-post-merge.yml`` run with event ``push`` and ``head_sha``\n"
+    "   exactly equal to the tip reached a terminal conclusion of ``success``.\n"
+    "   Failed, cancelled, startup-failed, missing, or still-running runs are NOT\n"
+    "   coverage; the sweep runs the gates again.\n"
+    "2. The tip is queue-certified under the exact rule in ci-dedupe-01\n"
+    "   (:func:`queue_certification.find_certifying_run` with a push-to-develop\n"
+    "   event/ref): the merge queue already passed this exact SHA.\n"
+    "\n"
+    "Nothing else counts: no tree matching, no ``schedule``-run evidence, no\n"
+    "parent inheritance.\n"
+    "\n"
+    "Fail-open by design: any API error, pagination gap, missing permission,\n"
+    "ambiguous match, or timeout reports ``covered=false`` with a reason, and\n"
+    "the process still exits 0 so the lookup can never red a workflow on its\n"
+    "own. Callers gate the sweep gates on ``covered == 'true'`` and run the\n"
+    "full gates otherwise.\n"
+    "\n"
+    "The event gate lives HERE, not in a workflow ``if:``: downstream jobs\n"
+    "read this lookup's outputs on every event, and references to a skipped\n"
+    "job's outputs do not evaluate reliably. The sweep-coverage job therefore\n"
+    "runs unconditionally and this script returns ``covered=false`` without\n"
+    "any API call when the event is not ``schedule``.\n"
+    "\n"
+    "Stdlib-only (urllib, no ``gh`` dependency) so the lookup step needs no\n"
+    "dependency sync; unit tests inject a fake ``urlopen``.\n"
+)
+
 API_BASE = "https://api.github.com"
 POST_MERGE_WORKFLOW_FILE = ".github/workflows/develop-post-merge.yml"
 REQUEST_TIMEOUT_SECONDS = 20
@@ -197,7 +232,7 @@ def _write_github_output(path: Path, covered: bool, covering_run_id: int | None)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--sha", default=os.environ.get("GITHUB_SHA", ""))
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", ""))
     parser.add_argument("--token", default=os.environ.get("GH_TOKEN", ""))

@@ -8,6 +8,8 @@ import shutil
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+CLI_DESCRIPTION = "Assemble the exact directory tree published by the documentation workflow."
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 RESULTS_FALLBACK = """<!DOCTYPE html>
@@ -112,7 +114,7 @@ def assemble_public_site(*, repo_root: Path, site_dir: Path, prose_only: bool = 
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--site-dir", type=Path, required=True, help="destination for the assembled Pages tree")
     parser.add_argument(
         "--prose-only",

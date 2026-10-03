@@ -63,6 +63,63 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "influxdb"
 
 
+CLI_EPILOG = (
+    "Run TSBS DevOps benchmark on InfluxDB 3.x.\n"
+    "\n"
+    "InfluxDB 3.x is a time series database built on the FDAP stack (Apache Arrow,\n"
+    "DataFusion, Parquet) with native SQL support via FlightSQL protocol.\n"
+    "\n"
+    "This example demonstrates running the TSBS (Time Series Benchmark Suite)\n"
+    "DevOps workload against InfluxDB for time series query performance testing.\n"
+    "\n"
+    "Deployment Modes:\n"
+    "    - Cloud: InfluxDB Cloud managed service (default)\n"
+    "    - Core: Self-hosted InfluxDB Core (OSS)\n"
+    "\n"
+    "Prerequisites:\n"
+    "    1. InfluxDB 3.x instance (Cloud or Core)\n"
+    "    2. Authentication token with read/write permissions\n"
+    "    3. Database (bucket) created\n"
+    "\n"
+    "Required environment variables:\n"
+    "    INFLUXDB_TOKEN    Authentication token\n"
+    "\n"
+    "Optional environment variables (with defaults):\n"
+    "    INFLUXDB_HOST     Server hostname (default: localhost)\n"
+    "    INFLUXDB_PORT     Server port (default: 8086)\n"
+    "    INFLUXDB_ORG      Organization name\n"
+    "    INFLUXDB_DATABASE Database name (default: benchbox)\n"
+    "\n"
+    "Installation:\n"
+    "    uv add benchbox --extra influxdb\n"
+    "\n"
+    "Usage - InfluxDB Cloud:\n"
+    "    export INFLUXDB_TOKEN=your_token\n"
+    "    export INFLUXDB_HOST=us-east-1-1.aws.cloud2.influxdata.com\n"
+    "    export INFLUXDB_ORG=your-org\n"
+    "    export INFLUXDB_DATABASE=benchmarks\n"
+    "\n"
+    "    python examples/getting_started/cloud/influxdb_tsbs_devops.py\n"
+    "\n"
+    "Usage - InfluxDB Core (local Docker):\n"
+    "    # Start InfluxDB Core\n"
+    "    docker run -d --name influxdb -p 8086:8086 \\\n"
+    "      -e DOCKER_INFLUXDB_INIT_MODE=setup \\\n"
+    "      -e DOCKER_INFLUXDB_INIT_USERNAME=admin \\\n"
+    "      -e DOCKER_INFLUXDB_INIT_PASSWORD=password123 \\\n"
+    "      -e DOCKER_INFLUXDB_INIT_ORG=benchbox \\\n"
+    "      -e DOCKER_INFLUXDB_INIT_BUCKET=benchmarks \\\n"
+    "      -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-token \\\n"
+    "      influxdb:3.0\n"
+    "\n"
+    "    export INFLUXDB_TOKEN=my-token\n"
+    "    python examples/getting_started/cloud/influxdb_tsbs_devops.py --mode core --no-ssl\n"
+    "\n"
+    "Preview without execution:\n"
+    "    python examples/getting_started/cloud/influxdb_tsbs_devops.py --dry-run ./preview\n"
+)
+
+
 def _get_env(var_name: str, default: str | None = None) -> str | None:
     """Get environment variable with optional default."""
     return os.getenv(var_name, default)
@@ -87,7 +144,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run TSBS DevOps benchmark on InfluxDB 3.x",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
+        epilog=CLI_EPILOG,
     )
     parser.add_argument(
         "--mode",

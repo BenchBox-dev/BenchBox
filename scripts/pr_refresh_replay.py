@@ -23,6 +23,14 @@ from pr_refresh_certification import (
 
 from benchbox.core.results.metrics import percentile_ms
 
+CLI_DESCRIPTION = (
+    "Deterministic replay of recorded refresh events through the classifier.\n"
+    "\n"
+    "Evidence generation only. This module never skips a CI job and never\n"
+    "publishes a required status. Callers inject recorded PR, check-run, and\n"
+    "Actions-run data so unit tests do not touch the network.\n"
+)
+
 # GitHub check-run conclusions that represent a settled outcome. A lane whose
 # recorded value is absent, null, empty, "pending", or an unrecognized string has
 # no terminal result yet, so completeness must reject it rather than accept the
@@ -227,7 +235,7 @@ def completeness_errors(records: list[Mapping[str, Any]], results: list[ReplayRe
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--input", type=Path, help="Record JSON file or directory")
     parser.add_argument("--fixtures", type=Path, help="Alias for --input")
     parser.add_argument("--json-out", type=Path, help="Write replay summary JSON")

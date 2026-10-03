@@ -44,6 +44,41 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Build and diff develop-post-merge gate-job failure signatures.\n"
+    "\n"
+    "Each develop-post-merge gate job (lint, fast-test, explorer-tokens,\n"
+    'medium-test) emits a small JSON "signature" describing what, if anything,\n'
+    "failed in that job's run:\n"
+    "\n"
+    "- pytest-backed jobs (fast-test, medium-test) build the signature from the\n"
+    "  job's junit XML (``--junit``), extracting the failed/errored test node IDs.\n"
+    "- non-pytest jobs (lint, explorer-tokens) build the signature from a plain\n"
+    '  "job name + failed step" descriptor (``--failed-step``), since there is no\n'
+    "  junit output to parse.\n"
+    "\n"
+    "``diff`` compares the current run's signature against the previous run's and\n"
+    "reports the failure IDs that are new (present now, absent before). This lets\n"
+    "auto-revert-on-failure attribute a red develop run to the merge that actually\n"
+    "introduced a new failure, instead of blaming whichever commit merged last\n"
+    "while develop was already red for an unrelated reason.\n"
+    "\n"
+    "Blame rule today: revert ``github.sha`` of the first post-merge run whose\n"
+    "signature has new failure IDs. Residual: a latent environment-dependent\n"
+    "break can still make that SHA the first red run even when the blamed commit\n"
+    "did not touch the failing test. ``attribute`` downgrades that case to an\n"
+    "advisory when every extractable failing test path is outside the SHA's diff.\n"
+    "Job-level failures (lint, missing junit paths) stay fail-closed (revert).\n"
+    "Failure IDs no classifier understands escalate: the verdict carries\n"
+    "``action: escalate`` with the unrecognized IDs and the workflow must fail\n"
+    "loudly for human classification instead of reverting. The verdict always\n"
+    "records the blamed ``sha`` and ``attribution_basis`` so evidence applies\n"
+    "only to the commit it was computed against.\n"
+    "\n"
+    "Stdlib-only by design (see scripts/path_filter_decision.py for the same\n"
+    "precedent): this runs in a bare `python` step with no dependency sync.\n"
+)
+
 
 class SignatureError(Exception):
     """Raised when a signature cannot be built or read."""
@@ -653,7 +688,7 @@ def _diff_command(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     build_parser = subparsers.add_parser("build", help="Build a failure signature JSON.")

@@ -71,6 +71,37 @@ ATTESTATION = (
 )
 
 
+CLI_DESCRIPTION = (
+    "Backfill operator-attested CPU identity into curated Explorer bundles.\n"
+    "\n"
+    "No historical result recorded a CPU. The capture path took ``cpu_model`` from\n"
+    "``platform.processor()`` (the bare architecture on Darwin) and dropped\n"
+    "``cpu_vendor`` entirely, and the DataFrame adapters recorded no client host at\n"
+    "all -- see ``fix/cpu-identity-capture-source`` and the\n"
+    "``dataframe-client-host-capture-gap`` tracker item. So there is no measured\n"
+    "value in the archive to recover: 4 of 3845 raw local results carry a CPU, and\n"
+    "all four post-date the fix.\n"
+    "\n"
+    "The values written here are therefore an OPERATOR ATTESTATION, not a\n"
+    "measurement. The project maintainer attests that every run in this corpus\n"
+    "executed on one machine -- natively, or driving Apple container Linux images\n"
+    "whose engines share that host's CPU. That is consistent with the recorded\n"
+    "evidence: every bundle carrying a client host records ``Darwin``/``arm64`` and\n"
+    "the raw archive shows a single ``machine_id``.\n"
+    "\n"
+    "The attestation is recorded in the emitted manifest and in\n"
+    "``results-data/CORPUS_NOTES.md`` and as typed in-band CPU identity provenance.\n"
+    "\n"
+    "Default mode is a dry run. ``--write`` rewrites bundles, companions and\n"
+    "manifests atomically and emits the migration manifest.\n"
+    "\n"
+    "IMPORTANT: ``result_id`` embeds a SHA-256 prefix of the raw bundle bytes, so\n"
+    "editing a bundle renumbers it. That is expected and has precedent\n"
+    "(``path-privacy-migration``, ``unread-identifier-field-drop`` each renumbered\n"
+    "all 207 entries); the emitted manifest records every old -> new mapping.\n"
+)
+
+
 def _inject_cpu(data: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of *data* carrying the attested CPU identity.
 
@@ -213,7 +244,7 @@ def backfill(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--bundles-dir", type=Path, default=BUNDLES_DIR)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--write", action="store_true", help="rewrite bundles and manifests atomically")

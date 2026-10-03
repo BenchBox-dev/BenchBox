@@ -19,6 +19,17 @@ import sys
 import tempfile
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Render hero PNGs for v0.3.0 release blog posts.\n"
+    "\n"
+    "Two render modes:\n"
+    "  --ansi-file <path>  ANSI text → ansi2html → headless Chrome → PNG\n"
+    "  --url <url>         headless Chrome → PNG (for the /prompts/ landing page)\n"
+    "\n"
+    "Outputs land in ``_blog/building-benchbox/images`` and are synced into\n"
+    "``docs/blog/images``, matching ``scripts/capture_chart_images.py`` conventions.\n"
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 PRIMARY_OUT = ROOT / "_blog" / "building-benchbox" / "images"
 SYNC_OUT_DIRS = (ROOT / "docs" / "blog" / "images",)
@@ -149,7 +160,7 @@ def sync(name: str) -> int:
 
 
 def main() -> int:
-    p = argparse.ArgumentParser(description=__doc__)
+    p = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     p.add_argument("--name", required=True, help="Output basename (no extension)")
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--ansi-file", help="Path to an ANSI text fixture")

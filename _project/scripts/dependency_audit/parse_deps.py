@@ -34,6 +34,23 @@ _OUT_REL = "docs/development/dependency-audit-raw.md"
 _GENERATOR_REL = "_project/scripts/dependency_audit/parse_deps.py"
 
 
+CLI_EPILOG = (
+    "Parse pyproject.toml and emit a raw inventory of every declared dependency.\n"
+    "\n"
+    "This is the source-of-truth pass for w1 of the dependency audit. We deliberately\n"
+    "parse pyproject.toml directly rather than `uv pip list` because the latter\n"
+    "includes transitive packages, which would mask which extras group owns a dep.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/dependency_audit/parse_deps.py            # write docs\n"
+    "    uv run -- python _project/scripts/dependency_audit/parse_deps.py --check    # drift gate\n"
+    "\n"
+    "Exit codes:\n"
+    "    0  Doc written (default) or already up to date (--check).\n"
+    "    1  --check found drift between the committed doc and the manifest.\n"
+)
+
+
 def split_spec(spec: str) -> tuple[str, str, str]:
     """Return (name, version_spec, env_marker) from a PEP 508 requirement string."""
     s = spec.strip()
@@ -143,7 +160,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Parse pyproject.toml into docs/development/dependency-audit-raw.md.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
+        epilog=CLI_EPILOG,
     )
     parser.add_argument(
         "--check",

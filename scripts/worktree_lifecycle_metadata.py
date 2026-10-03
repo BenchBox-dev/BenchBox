@@ -35,6 +35,29 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+CLI_DESCRIPTION = (
+    "Minimal durable lifecycle metadata for BenchBox disposable worktrees.\n"
+    "\n"
+    "Extends worktree lifecycle operations so every newly created worktree carries\n"
+    "immutable provenance in per-worktree Git configuration:\n"
+    "- lifecycle ID (UUID4)\n"
+    "- creation timestamp (ISO 8601 UTC)\n"
+    "- branch name\n"
+    "- base ref and base commit OID\n"
+    "- initial head commit OID\n"
+    "- optional controller kind and stable controller ID (e.g. Bossmode)\n"
+    "\n"
+    "Separation of Concerns:\n"
+    "- Immutable provenance is recorded locally at creation time via `git config --worktree`.\n"
+    "- Mutable lifecycle state (task status, claims, runs, leases, liveness, evaluation)\n"
+    "  belongs to the controller (e.g. Bossmode) and is NEVER duplicated locally.\n"
+    "- Non-controller caller-owned worktrees support a non-destructive manual owner-release\n"
+    "  record (`manual_released_at`, `manual_released_by`).\n"
+    "- Legacy (uninstrumented) and foreign worktrees evaluate to unknown owner.\n"
+    "- Zero Deletion Authority: No metadata field alone authorizes deletion. Worktree removal\n"
+    "  remains strictly gated on explicit checks (clean, attached, unlocked).\n"
+)
+
 CONFIG_PREFIX = "benchbox.worktree"
 KNOWN_CONTROLLER_KINDS = {"bossmode", "manual", "none"}
 
@@ -322,7 +345,7 @@ def release_worktree(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="Publish immutable metadata for a new worktree")

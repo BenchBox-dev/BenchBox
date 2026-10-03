@@ -30,6 +30,29 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Feature-batch branch integration: one shared base, one integrator, bound receipts.\n"
+    "\n"
+    "A feature batch prepares members separately and lands them through a single\n"
+    "shared integration branch. This helper makes that discipline mechanical:\n"
+    "\n"
+    "* ``start`` records one shared base (ref + OID + timestamp) for the whole\n"
+    "  batch in per-worktree git config. Integration timestamps and ancestry are\n"
+    "  always evaluated against that recorded base, never the current tip of a\n"
+    "  moving ref. The helper never refreshes the base itself.\n"
+    "* ``verify`` checks the three integration gates: the recorded base (moved or\n"
+    "  not — reported, never auto-fixed), single-integrator authorship since the\n"
+    "  base, and member-head ancestry in the integration head.\n"
+    "* ``receipt`` binds per-item acceptance evidence (produced tracker-side) to\n"
+    "  the exact integration head it was evaluated against, with branch-history\n"
+    "  timestamps (first commit / first merge since the base, the observable\n"
+    "  proxies for first-prepare / first-integration). A moved head or\n"
+    "  base invalidates the binding instead of silently carrying it forward.\n"
+    "\n"
+    "Member preparation evidence never certifies the integrated tree: acceptance\n"
+    "must name the integration head, and the receipt refuses any other head.\n"
+)
+
 CONFIG_PREFIX = "benchbox.batch"
 DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
 
@@ -320,7 +343,7 @@ def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--worktree", type=Path, default=Path.cwd())
     sub = parser.add_subparsers(dest="command", required=True)
 

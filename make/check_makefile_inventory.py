@@ -45,6 +45,9 @@ DEFINE_RE = re.compile(r"^define\s+([^\s]+)\s*$")
 RULE_RE = re.compile(r"^([^#\t][^:=]*?):(.*)$")
 
 
+CLI_DESCRIPTION = "Fail closed when BenchBox's evaluated Make contract or migration baseline drifts."
+
+
 @dataclass(frozen=True)
 class SourceLine:
     text: str
@@ -514,7 +517,7 @@ def compare_inventory(root: Path) -> list[str]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--write", action="store_true")

@@ -47,6 +47,46 @@ import sys
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Detect develop commits that never got a develop-post-merge workflow run.\n"
+    "\n"
+    "GitHub has been observed to drop push delivery for consecutive develop merges\n"
+    "(see docs/operations/develop-post-merge-gaps.md). When that happens, the\n"
+    "push-triggered ``develop-post-merge.yml`` workflow never starts for those\n"
+    "SHAs, so develop tip can sit un-gated until the next successful delivery or\n"
+    "the scheduled sweep.\n"
+    "\n"
+    "This script is the instrumentation half of the fix:\n"
+    "\n"
+    "- given recent develop commit SHAs and recent ``develop-post-merge`` run\n"
+    "  head SHAs, report which commits lack any run (any status/conclusion);\n"
+    "- exit non-zero when gaps remain so a scheduled/canary workflow can fail\n"
+    "  loudly instead of silently.\n"
+    "\n"
+    "It does **not** open PRs, re-run gates, or mutate repository state. The\n"
+    "scheduled sweep in ``develop-post-merge.yml`` is the coverage half: it\n"
+    "re-gates the current tip (slim gates on schedule) within a bounded window.\n"
+    "\n"
+    "Live mode paginates the run list until it has enough **unique** headShas to\n"
+    "cover the commit lookback (plus margin). A fixed shallow limit is not safe:\n"
+    "after the hourly schedule lands, the most-recent N runs can all share the\n"
+    'same tip SHA and would otherwise "poison" the window so older push-covered\n'
+    "commits look uncovered.\n"
+    "\n"
+    "Usage:\n"
+    "    # Offline / unit-testable pure check:\n"
+    "    python scripts/detect_develop_post_merge_gaps.py \\\n"
+    "        --commits-file commits.txt --runs-file runs.txt\n"
+    "\n"
+    "    # Live check against origin/develop + GitHub Actions API via gh:\n"
+    "    python scripts/detect_develop_post_merge_gaps.py --live\n"
+    "\n"
+    "Exit codes:\n"
+    "    0 - every looked-up SHA has at least one develop-post-merge run\n"
+    "    1 - one or more SHAs lack a run (gap class still present)\n"
+    "    2 - usage / I/O error\n"
+)
+
 DEFAULT_COMMIT_LIMIT = 20
 DEFAULT_UNIQUE_MARGIN = 10
 DEFAULT_PAGE_SIZE = 100
@@ -275,7 +315,7 @@ def live_run_head_shas(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--live",
         action="store_true",

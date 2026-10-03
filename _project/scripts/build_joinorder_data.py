@@ -143,6 +143,24 @@ EXPECTED_ROW_COUNTS: dict[str, int] = {
 TABLE_NAMES = tuple(sorted(EXPECTED_ROW_COUNTS))
 
 
+CLI_DESCRIPTION = (
+    "Build canonical JoinOrder IMDb data artifacts.\n"
+    "\n"
+    "This script is intentionally outside the BenchBox runtime package. It owns the\n"
+    "network, Docker, and PostgreSQL tooling needed to turn the upstream Harvard\n"
+    "Dataverse pg_dump into build artifacts consumed by the cutover TODO.\n"
+    "\n"
+    "Foundation scope:\n"
+    "  - resolve and download the Harvard Dataverse pg_dump for doi:10.7910/DVN/2QYZBT\n"
+    "  - compute and record the upstream sha256 in a local build manifest\n"
+    "  - restore the custom-format pg_dump into a pinned PostgreSQL container\n"
+    "  - validate expected JOB tables and row counts within the TODO's +/-1% gate\n"
+    "  - extract CSV with explicit UTF-8/NULL semantics\n"
+    "  - convert to zstd Parquet, assemble manifests, gates, cardinalities, archive\n"
+    "  - stage the draft data release and emit the runtime data_manifest.toml\n"
+)
+
+
 class JoinOrderBuildError(RuntimeError):
     """Raised when the canonical JoinOrder build pipeline cannot proceed."""
 
@@ -3355,7 +3373,7 @@ def run_fk_dangling_census(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     download = subparsers.add_parser("download-pgdump", help="Download and verify the Dataverse pg_dump.")

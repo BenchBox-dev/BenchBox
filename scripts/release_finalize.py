@@ -10,6 +10,8 @@ import subprocess
 import sys
 from typing import Any
 
+CLI_DESCRIPTION = "Merge one checked release PR and tag its exact merge commit, with safe resume."
+
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
 VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.+-]+)?\Z")
 
@@ -164,7 +166,7 @@ def tag_merge_commit(version: str, commit: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--version", required=True)
     parser.add_argument("--required-contexts", required=True, help="Space-separated required release contexts")
     args = parser.parse_args(argv)

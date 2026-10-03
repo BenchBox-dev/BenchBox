@@ -34,6 +34,16 @@ MANIFEST_SUFFIX = ".manifest.json"
 STRUCTURAL_MANIFEST_KEYS = frozenset({"bundle_file", "bundle_hash", "companion_hashes"})
 
 
+CLI_DESCRIPTION = (
+    "Deterministically migrate curated Explorer bundles to the public path contract.\n"
+    "\n"
+    "The default mode is a dry run.  ``--write`` atomically rewrites primary bundles,\n"
+    "JSON companions, and their manifests with the same public anonymizer used by the\n"
+    "Explorer publication boundary.  A migration manifest records old/new hashes and\n"
+    "result IDs without copying any private value into the audit artifact.\n"
+)
+
+
 def _sha256(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
@@ -240,7 +250,7 @@ def migrate(*, bundles_dir: Path, write: bool, manifest_path: Path) -> dict[str,
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--bundles-dir", type=Path, default=BUNDLES_DIR)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--write", action="store_true", help="rewrite bundles and companions atomically")

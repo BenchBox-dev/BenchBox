@@ -28,6 +28,8 @@ from ruleset_review_enforcement import (  # noqa: E402
     tag_protection_findings,
 )
 
+CLI_DESCRIPTION = "Compare live GitHub rulesets with the repository admin runbook."
+
 # Findings with this prefix are surfaced (rendered, included in the JSON
 # `findings` list) exactly like any other drift finding, but do NOT flip the
 # exit code / `status` field to failed. They are reserved for explicit
@@ -457,7 +459,7 @@ def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) ->
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--runbook", type=Path, default=DEFAULT_RUNBOOK)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))

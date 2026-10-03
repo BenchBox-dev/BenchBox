@@ -34,6 +34,32 @@ import re
 import sys
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Detect drift between the two copies of the submission validator workflow.\n"
+    "\n"
+    "`validate-submission.yml` lives on both `develop` (the maintained source of\n"
+    "truth) and `published-results` (the branch copy that actually runs for\n"
+    "contributor PRs). The corpus sync bot cannot mirror workflow files\n"
+    "(`GITHUB_TOKEN` lacks `workflows: write`), so the published-results copy is\n"
+    "kept in sync by a hand-opened PR. That manual step is easy to forget, and a\n"
+    "drifted copy silently runs stale validation logic (this is exactly how the\n"
+    "§2.6/§2.7/§2.1 hardening and the Defect #1 fork gate came to lag behind).\n"
+    "\n"
+    "The two copies are intended to be byte-identical **except** for the uv\n"
+    "invocation: `develop` runs inside the project (`uv run -- python ...`), while\n"
+    "`published-results` is a slim branch with no `pyproject.toml`/`uv.lock` and\n"
+    "must run `uv run --no-project --python 3.11 -- python ...`. This tool\n"
+    "normalizes that one sanctioned difference away and reports any remaining\n"
+    "divergence as drift.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/check_submission_validator_sync.py         --develop .github/workflows/validate-submission.yml         --published /tmp/published-results-validate-submission.yml\n"
+    "\n"
+    "Exit code 0 when the copies match (after normalization), 1 on drift, 2 on a\n"
+    "usage/IO error. The scheduled `submission-validator-drift-check.yml` workflow\n"
+    "wires the two real branch copies into this script.\n"
+)
+
 # The published-results (slim-branch) invocation and the develop (in-project)
 # invocation are the only sanctioned difference between the two copies. Collapse
 # both spellings to a single canonical token before comparing so the diff
@@ -69,7 +95,7 @@ def diff(develop_text: str, published_text: str) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--develop",
         required=True,

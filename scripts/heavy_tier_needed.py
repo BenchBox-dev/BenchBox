@@ -40,6 +40,37 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+CLI_DESCRIPTION = (
+    "Decide whether a ci.yml run needs the heavy test tier.\n"
+    "\n"
+    "The heavy tier (medium-test, correctness-gate, plan-capture-gate,\n"
+    "tpch-binary-framing, and the postgres/datafusion/clickhouse integration\n"
+    "samples) runs only when needed:\n"
+    "\n"
+    "    heavy-needed = needs-code-ci\n"
+    "                   AND (event is merge_group\n"
+    "                        OR soundness paths touched\n"
+    "                        OR packaging-needed)\n"
+    "\n"
+    "Soundness uses the UNION of the base-ref copy and the PR (working tree)\n"
+    "copy of the soundness policy: a PR that rewrites the predicate or manifest\n"
+    "must not silently narrow what counts as a soundness path. Each snapshot\n"
+    "contains its wrapper, helper, and manifest from the same revision and runs\n"
+    "in an isolated stdlib-only interpreter. Historical standalone predicates\n"
+    "remain supported.\n"
+    "\n"
+    "Fail-closed: any lookup error, missing input, ambiguous match, or\n"
+    "classification failure reports ``heavy-needed=true`` so the tier runs.\n"
+    "The process still exits 0 (the safe direction is encoded in the output,\n"
+    "not the exit code) unless invoked with ``--check``, where true maps to\n"
+    "exit 0, false maps to exit 1, and a lookup error maps to exit 0.\n"
+    "\n"
+    "The event gate lives HERE, not in a workflow ``if:``: downstream jobs\n"
+    "read this lookup's outputs on every event, and references to a skipped\n"
+    "job's outputs do not evaluate reliably. Non-code-routed trees report\n"
+    "``heavy-needed=false`` without any further lookup.\n"
+)
+
 PREDICATE_REPO_PATH = "_project/scripts/auto_merge_soundness_paths.py"
 POLICY_PATHS = (PREDICATE_REPO_PATH, "_project/scripts/soundness_paths.py", ".github/soundness-paths.txt")
 MERGE_GROUP_EVENT = "merge_group"
@@ -191,7 +222,7 @@ def _write_github_output(path: Path, needed: bool) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--decision-in", type=Path, default=None)
     parser.add_argument("--event", default=os.environ.get("GITHUB_EVENT_NAME", ""))
     parser.add_argument("--base-ref", default=os.environ.get("GITHUB_BASE_REF", "origin/develop"))

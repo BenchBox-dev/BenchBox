@@ -36,6 +36,8 @@ from benchbox.sql_compat.context import Phase
 from benchbox.sql_compat.decision import CompatibilityDecision, SupportLevel
 from benchbox.sql_compat.registry import REGISTRY
 
+CLI_DESCRIPTION = "Generate sql_compat capability matrix and skip reference from the registry."
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs" / "compat"
 CAPABILITY_MATRIX_PATH = DOCS_DIR / "capability-matrix.md"
@@ -292,7 +294,7 @@ def _diff(path: Path, expected: str) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--check",
         action="store_true",

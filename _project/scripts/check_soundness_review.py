@@ -24,6 +24,9 @@ _RESOLUTION = re.compile(
 )
 
 
+CLI_DESCRIPTION = "Require an external adversarial review section for soundness-path PRs."
+
+
 def _plain_markdown(body: str) -> str:
     """Return non-quoted, non-fenced markdown lines for field matching."""
     lines: list[str] = []
@@ -79,7 +82,7 @@ def check_soundness_review(paths: list[str], body: str) -> list[str]:
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--paths-file", type=Path, required=True, help="Newline-delimited changed git paths")
     parser.add_argument("--body-file", type=Path, required=True, help="Pull request body markdown")
     return parser.parse_args(argv)

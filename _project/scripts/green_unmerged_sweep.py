@@ -153,6 +153,100 @@ TIMELINE_ACCEPT = "application/vnd.github.mockingbird-preview+json, application/
 # ---------------------------------------------------------------------------
 # Pure classification logic (unit-/self-tested; no git/network)
 # ---------------------------------------------------------------------------
+CLI_DESCRIPTION = (
+    "Nightly sweep for open develop PRs that look stranded after arm intent.\n"
+    "\n"
+    "Prior art: `harden-auto-merge-on-open-stranding` diagnosed the original\n"
+    "failure class -- auto-merge-on-open.yml's `enable` job completed with\n"
+    "`conclusion: success` while the PR's own `auto_merge` field later read\n"
+    "back `null`. After the intentional auto-merge hold (#1592 and follow-ons),\n"
+    "a green non-draft non-soundness PR with auto-merge OFF is **normal** when\n"
+    'nobody asked to arm it. This script therefore does NOT treat "auto-merge\n'
+    'off" alone as stranded.\n'
+    "\n"
+    "It is a read-only external observer that classifies every OPEN develop PR\n"
+    "and alerts only when all of the following hold:\n"
+    "\n"
+    "    (a) required-lane green -- EVERY develop-ruleset required status\n"
+    "        context in `REQUIRED_CHECK_NAMES` has its LATEST check run on the\n"
+    "        PR's head SHA completed with conclusion `success`. Today that is\n"
+    "        `ci-required-result`, `tooling`, `Results Explorer browser gate`,\n"
+    "        `ruleset-drift`, and `Public-site visual acceptance`\n"
+    "        (docs/operations/repo-admin-settings.md; live ruleset\n"
+    "        develop-squash-only). Partial green (one context success, another\n"
+    "        missing or red) is NOT required-green. Every required context\n"
+    "        reports (path-aware skip still concludes success); a missing run\n"
+    "        is fail-closed not-green.\n"
+    "    (b) auto-merge is OFF    -- the PR's own `auto_merge` field is falsy\n"
+    "        (null or an explicit off), re-read from REST (never inferred from\n"
+    '        a workflow run\'s conclusion; see "Known timing behavior" below).\n'
+    "    (c) not soundness-gated  -- `any_soundness_path` over the PR's changed\n"
+    "        files is False. Soundness-gated PRs correctly never auto-merge\n"
+    "        (see `auto_merge_soundness_paths.py` /\n"
+    "        `.github/workflows/auto-merge-on-open.yml`); that withheld state\n"
+    "        is by design and is covered by the separate daily\n"
+    "        soundness-drain digest, not this sweep.\n"
+    "    (d) past the grace period -- more than `GRACE_PERIOD_HOURS` (default\n"
+    "        2h) since the head commit was pushed, so an arm that just fired\n"
+    "        has had time to populate `auto_merge` before this sweep alerts.\n"
+    "    (e) not explicitly held -- the PR does not carry the durable hold\n"
+    "        label ``no-auto-merge`` (``AUTO_MERGE_HOLD_LABEL``). That label is\n"
+    "        the same durable hold ``auto-merge-on-open.yml`` honours: drafts\n"
+    "        are already excluded by (job skip / draft check); the label holds\n"
+    "        a non-draft without converting it to draft. An explicit hold is\n"
+    "        intentional, not stranded — this sweep must never re-arm it.\n"
+    "    (f) prior arm intent     -- the issue/PR timeline shows evidence that\n"
+    "        auto-merge was requested or previously enabled, then lost. Signals\n"
+    "        (any one is enough):\n"
+    "          * `ready_for_review` (draft → ready; historical workflow arm path,\n"
+    "            deleted 2026-08-06 — still valid as arm-intent evidence in old\n"
+    "            timelines)\n"
+    "          * `auto_squash_enabled` / `auto_merge_enabled` (arm succeeded once)\n"
+    "          * `auto_merge_disabled` (implies a prior enable that was dropped)\n"
+    "        Never-armed intentional holds have none of these events and are\n"
+    "        excluded even without the hold label. Missing timeline data\n"
+    '        fail-closes to "no arm intent" (prefer missing a true strand over\n'
+    "        false-positiveing holds).\n"
+    "\n"
+    "The only mutation this script ever performs (and only under `--apply`) is\n"
+    'creating/updating ONE marker-tagged tracking issue (title "Green-but-unmerged\n'
+    'PR sweep") with the current digest -- created/refreshed while the stranded\n'
+    "set is non-empty, and patched to the empty state exactly once when it\n"
+    "drains, then left alone. It never enables auto-merge, never merges, never labels, and\n"
+    "never comments on a PR -- enabling auto-merge outside the sanctioned\n"
+    "predicate path in `auto-merge-on-open.yml` / `make pr-ready` would bypass\n"
+    "the soundness gate and would re-arm intentional holds (including a\n"
+    "``no-auto-merge`` hold this sweep did not set).\n"
+    "\n"
+    "Known timing behavior (observed live 2026-07-23 against PRs #1282-#1286,\n"
+    "all opened and auto-merge-enabled the same day): the `auto-merge-on-open.yml`\n"
+    "`enable` job (`gh pr merge --auto --squash`) completed `conclusion: success`\n"
+    "on every one of those PRs' head SHAs, per the Actions API. However, reading\n"
+    "those same PRs back through the GitHub MCP server's `pull_request_read` tool\n"
+    "omitted the `auto_merge` field entirely rather than surfacing it as populated\n"
+    "or explicit `null` -- i.e. a caller relying on that read path cannot tell\n"
+    '"enabled but not yet visible" from "never enabled" from "the read path just\n'
+    "doesn't carry this field\". The raw REST `GET /pulls` endpoint (what this\n"
+    "script calls directly) does carry `auto_merge` on every PR, so this script\n"
+    "never infers state from a workflow run's conclusion -- it always re-fetches\n"
+    "each PR's own current `auto_merge` object. Arm intent is read from the\n"
+    "timeline REST endpoint (events such as `auto_squash_enabled`), not from\n"
+    "workflow conclusions either.\n"
+    "\n"
+    "Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the\n"
+    "REST API). If neither is set but the `gh` CLI is on PATH, its token\n"
+    "(`gh auth token`) is used instead -- this lets the script run locally\n"
+    "against an interactively-authenticated `gh` without exporting a token by\n"
+    "hand. No long-lived PAT is required or read from anywhere else.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/green_unmerged_sweep.py\n"
+    "    uv run -- python _project/scripts/green_unmerged_sweep.py --json\n"
+    "    uv run -- python _project/scripts/green_unmerged_sweep.py --apply\n"
+    "    uv run -- python _project/scripts/green_unmerged_sweep.py --self-test\n"
+)
+
+
 @dataclass(frozen=True)
 class ClassifiedPR:
     number: int
@@ -685,7 +779,7 @@ def run_self_test() -> int:
 # CLI
 # ---------------------------------------------------------------------------
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--repo",
         default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO),

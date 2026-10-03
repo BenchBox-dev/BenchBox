@@ -63,6 +63,25 @@ _MEMORY_UNITS = {
 _DECIMAL_GIB_EQUIVALENCE = 1000**3
 
 
+CLI_DESCRIPTION = (
+    "Measured ClickHouse streaming-memory traces for UAT calibration.\n"
+    "\n"
+    "The calibration TODO deliberately keeps measurement separate from the compose\n"
+    "memory-admission policy.  This module records the quantities that policy is\n"
+    "allowed to consume; it never turns a host-capacity guess into a memory limit.\n"
+    "\n"
+    "Use the module as a command wrapper around a real UAT cell or sweep::\n"
+    "\n"
+    '    uv run -- python -m tests.uat.clickhouse_memory       --output "$BENCHBOX_OUTPUT_DIR/clickhouse-memory-1g.json"       --rung baseline-1g -- -- benchbox run --platform clickhouse-server ...\n'
+    "\n"
+    "The trace is useful even when a cell fails: the failure, timeout, server\n"
+    "responsiveness, host memory, engine memory, and ClickHouse counters remain in\n"
+    "one atomic JSON artifact.  A trace is not considered calibration evidence\n"
+    "unless it has at least one successful responsiveness sample and passes the\n"
+    "native-streaming/no-legacy-batch guards.\n"
+)
+
+
 def runtime_limit_matches_rung(
     runtime_limit_bytes: int, requested_memory_gib: float, *, requested_bytes: int | None = None
 ) -> bool:
@@ -791,7 +810,7 @@ def _find_rung(name: str) -> MemoryRung:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--rung", type=_find_rung, default=DEFAULT_MEMORY_RUNGS[0])
     parser.add_argument("--host-port", type=int, default=8123)

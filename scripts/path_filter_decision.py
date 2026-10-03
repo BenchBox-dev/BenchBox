@@ -13,6 +13,8 @@ from typing import Iterable, cast
 
 from skill_sync_ci_policy import compare_repository_manifest
 
+CLI_DESCRIPTION = "Classify changed paths for the develop PR CI umbrella."
+
 DEFAULT_RULES = Path(".github/path-filters.yml")
 # The three buckets every ruleset must define. Any other top-level key in
 # path-filters.yml is treated as an "extra group" (see `extra_group_keys`)
@@ -279,7 +281,7 @@ def write_lists(directory: Path, decision: dict[str, object]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--rules", type=Path, default=DEFAULT_RULES)
     parser.add_argument("--base-ref", help="Git ref to diff against, for example origin/develop")
     parser.add_argument("--changed-file", type=Path, help="Read changed paths from a newline-delimited file")

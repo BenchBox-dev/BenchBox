@@ -177,6 +177,9 @@ _MARKDOWN_EMPHASIS = re.compile(r"[*_`]")
 _LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
 
 
+CLI_DESCRIPTION = "Deterministic audit for BenchBox's active agent instruction surface."
+
+
 def _paragraphs(text: str) -> list[tuple[int, str]]:
     """Split Markdown into (first line number, flattened text), one entry per paragraph or list item."""
     paragraphs: list[tuple[int, list[str]]] = []
@@ -781,7 +784,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--project", type=Path, default=ROOT)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     parser.add_argument("--json", action="store_true", dest="as_json")

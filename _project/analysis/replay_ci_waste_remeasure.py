@@ -37,6 +37,9 @@ DISTRIBUTION_METRICS = (
 )
 
 
+CLI_DESCRIPTION = "Replay the exact 2026-08-31 CI-waste cohort from its pinned manifest."
+
+
 class ReplayError(RuntimeError):
     """The pinned cohort could not be replayed exactly."""
 
@@ -347,7 +350,7 @@ def self_test() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)

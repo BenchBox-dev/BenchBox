@@ -102,6 +102,60 @@ API_ROOT = "https://api.github.com"
 # ---------------------------------------------------------------------------
 # Pure classification logic (unit-/self-tested; no git/network)
 # ---------------------------------------------------------------------------
+CLI_DESCRIPTION = (
+    "Daily observability signal for parked soundness-path PRs.\n"
+    "\n"
+    "Soundness-path PRs correctly never auto-merge (see\n"
+    "``_project/scripts/auto_merge_soundness_paths.py`` and\n"
+    "``.github/workflows/auto-merge-on-open.yml``: the owner must review and\n"
+    "merge those PRs by hand). That withholding gate is intentional and this\n"
+    "script does NOT touch it -- no auto-merge, no auto-approve, nothing that\n"
+    "changes whether or how a PR can merge. What the gate does not do on its own\n"
+    "is tell anyone a PR has been sitting there: #1116 and #1142 both sat parked\n"
+    "for days with accumulating conflicts before anyone noticed. This script is\n"
+    'the missing "someone should look at this" signal:\n'
+    "\n"
+    "- It classifies every OPEN PR targeting ``develop`` as qualifying for the\n"
+    "  drain queue when ALL of the following hold:\n"
+    "    (a) required-lane green  -- EVERY develop-ruleset required status\n"
+    "        context in ``REQUIRED_CHECK_NAMES`` has its LATEST check run on the\n"
+    "        PR's head SHA completed with conclusion ``success``. Today that is\n"
+    "        ``ci-required-result``, ``tooling``, ``Results Explorer browser gate``,\n"
+    "        ``ruleset-drift``, and ``Public-site visual acceptance``\n"
+    "        (docs/operations/repo-admin-settings.md; live ruleset\n"
+    "        develop-squash-only). Partial green -- one context success, another\n"
+    "        red or never reported -- is NOT required-green; a missing run is\n"
+    "        fail-closed not-green.\n"
+    "    (b) awaiting the owner   -- auto-merge is OFF *and* (the PR touches a\n"
+    "        soundness-critical path per ``SOUNDNESS_PREFIXES``, OR the owner is\n"
+    "        a requested reviewer).\n"
+    "    (c) parked > 24h          -- more than 24 hours of park time (anchored\n"
+    "        on the LAST required context to finish, NOT ``updated_at``: the label\n"
+    "        writes below and ordinary human comments bump ``updated_at``, and a\n"
+    "        gate based on it would flap a genuinely parked PR out of the queue).\n"
+    "- The only mutations it ever performs (and only under ``--apply``) are:\n"
+    "    1. adding/removing the ``awaiting-owner`` label to match the current\n"
+    "       qualifying set, and\n"
+    '    2. creating/updating ONE tracking issue (title "Soundness-PR drain\n'
+    '       queue") with the current digest -- created/refreshed only while the\n'
+    "       queue is non-empty; when the queue drains, an existing digest is\n"
+    "       patched to the empty state exactly once, then left alone (silent).\n"
+    "  It never merges, approves, or otherwise changes a PR's mergeability.\n"
+    "\n"
+    "Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the\n"
+    "REST API). If neither is set but the ``gh`` CLI is on PATH, its token\n"
+    "(``gh auth token``) is used instead -- this lets the script run locally\n"
+    "against an interactively-authenticated ``gh`` without exporting a token by\n"
+    "hand. No long-lived PAT is required or read from anywhere else.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/soundness_drain_report.py\n"
+    "    uv run -- python _project/scripts/soundness_drain_report.py --json\n"
+    "    uv run -- python _project/scripts/soundness_drain_report.py --apply\n"
+    "    uv run -- python _project/scripts/soundness_drain_report.py --self-test\n"
+)
+
+
 @dataclass(frozen=True)
 class ClassifiedPR:
     number: int
@@ -566,7 +620,7 @@ def run_self_test() -> int:
 # CLI
 # ---------------------------------------------------------------------------
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--repo",
         default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO),

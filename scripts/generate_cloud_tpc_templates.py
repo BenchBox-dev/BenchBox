@@ -47,6 +47,35 @@ from benchbox.core.tuning.workload_profiles import (  # noqa: E402
     load_tpc_tuning_profile,
 )
 
+CLI_DESCRIPTION = (
+    "Generate cloud TPC tuned templates from the logical tuning profile.\n"
+    "\n"
+    "Renders one `<benchmark>_tuned.yaml` per platform/benchmark from the\n"
+    "required candidates in `benchbox/core/tuning/profiles/tpc.yaml`, using each\n"
+    "platform's logical-to-physical mapping\n"
+    "(`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`).\n"
+    "\n"
+    "Platform rules honored here (mirroring the mappers, not reimplementing them):\n"
+    "\n"
+    "- BigQuery: at most 4 clustering columns per table; partitioning first.\n"
+    "- Redshift: single DISTKEY per table (first distribution candidate);\n"
+    "  remaining locality roles become compound sortkey entries.\n"
+    "- Snowflake: at most 4 clustering columns per table so the adapter resumes automatic reclustering.\n"
+    "\n"
+    "Only platforms whose mapped tuning types reach the physical layout at\n"
+    "execution time are generated here. BigQuery partitioning/clustering and\n"
+    "Redshift distribution/sorting are preview-only or inspect-and-log in the\n"
+    "current adapters (see benchbox/core/tuning/capability_registry.py), so they\n"
+    "stay out of the certified set until the adapters render them for real;\n"
+    "Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY and\n"
+    "is the one certified platform in this generator today.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/generate_cloud_tpc_templates.py --write\n"
+    "    uv run -- python scripts/generate_cloud_tpc_templates.py --check\n"
+    "    uv run -- python scripts/generate_cloud_tpc_templates.py --write --output-root examples/tunings\n"
+)
+
 PLATFORMS = ("snowflake",)
 BENCHMARKS = ("tpch", "tpcds")
 
@@ -178,7 +207,7 @@ def template_path(output_root: Path, platform: str, benchmark: str) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--write", action="store_true", help="Write generated templates.")
     parser.add_argument("--check", action="store_true", help="Fail when generated output differs.")
     parser.add_argument(

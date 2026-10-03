@@ -72,6 +72,69 @@ import sys
 from pathlib import Path
 from typing import Any, NamedTuple
 
+CLI_DESCRIPTION = (
+    "Select release-canary or local-medium tests that changed paths can affect.\n"
+    "\n"
+    "The daily release canary runs the full non-fast suite (about 644 tests in\n"
+    "72 files); running all of it in the merge queue would roughly double\n"
+    "merge-queue runner-minutes. This selector computes each canary test file's\n"
+    "dependencies from the tree under test and selects the tests whose\n"
+    "dependencies include a changed path.\n"
+    "\n"
+    "Dependency rules (each closes a known gap in naive import scanning):\n"
+    "\n"
+    "- static imports, including every parent package ``__init__.py`` (Python\n"
+    "  executes them on import), expanded transitively: an imported module's\n"
+    "  own imports are edges too, so re-exported names (``from pkg import X``\n"
+    "  where ``X`` lives in another module) and helper modules are covered;\n"
+    '- ``importlib.import_module("<literal>")`` and ``__import__("<literal>")``;\n'
+    '- repo paths built from constants: ``REPO_ROOT / "a" / "b"``,\n'
+    '  ``Path(__file__).with_name("x")``, and path string literals in path\n'
+    "  positions. A directory path depends on every file under it;\n"
+    "- imports inside a string constant that parses as Python (tests that run\n"
+    "  repo code via ``sys.executable -c <script>``);\n"
+    "- ``tests/conftest.py`` and every module in its ``pytest_plugins`` list,\n"
+    "  with their transitive dependencies, for every test;\n"
+    "- the per-directory conftest chain pytest loads for each test file\n"
+    "  (``tests/a/conftest.py`` for ``tests/a/b/test_x.py``), with their\n"
+    "  ``pytest_plugins`` modules;\n"
+    "- a changed non-Python file under ``benchbox/`` selects every canary test\n"
+    "  that imports a module in the same directory;\n"
+    "- changed or added canary test files always select themselves.\n"
+    "\n"
+    "Fail-safe rules (when unsure, select -- the selector may over-select but\n"
+    "must never under-select silently):\n"
+    "\n"
+    "- per test: a canary test containing a dynamic edge the selector cannot\n"
+    "  resolve (an import name or path built at runtime), in its own code or its\n"
+    "  conftest chain, is always selected. Unresolved imports in its test-specific\n"
+    "  library closure also select it;\n"
+    "- whole suite: ``pyproject.toml``, ``uv.lock``, pytest configuration,\n"
+    "  ``tests/conftest.py``, ``release-canary.yml``, or the selector itself\n"
+    "  changed;\n"
+    "- unmapped paths: a changed path that no dependency map references and\n"
+    "  that is not on the reviewed ``CANT_AFFECT_CANARY`` list runs the whole\n"
+    "  suite.\n"
+    "\n"
+    "Stdlib-only and read-only: the selector never imports ``benchbox`` and\n"
+    "never executes test code. The marker expression and collection parsing\n"
+    "are imported from ``scripts/release_canary_sharding.py``, not copied.\n"
+    "\n"
+    "Output is JSON with the selected node IDs, the reason each was selected\n"
+    "(which changed path, through which edge), whether a whole-suite fallback\n"
+    "fired and why, the dynamic edges observed in library code\n"
+    "(``dynamic_library_sites``, for the shadow watch), and\n"
+    "the canary collection it was computed against.\n"
+    "\n"
+    "Known limitation: registry-style dynamic loading inside the shared fixture\n"
+    "closure (``import_module(name)`` with a runtime name) is unbounded, so it is\n"
+    "reported rather than propagated: propagating it would always-select\n"
+    "every test. A changed file no test references\n"
+    "still runs the whole suite through the unmapped-path backstop; the\n"
+    "residual shape (a mapped file affecting a test only through dynamic\n"
+    "loading) is pinned by known-regression replay tests.\n"
+)
+
 try:  # executed as ``python scripts/canary_impact.py`` (scripts/ on sys.path)
     from release_canary_sharding import MARKER_EXPRESSION, parse_collection_output
 except ImportError:  # imported as ``scripts.canary_impact`` in tests
@@ -1748,7 +1811,7 @@ def _git_changed_paths(repo_root: Path, base_ref: str) -> list[str]:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--changed-path", action="append", default=[], help="changed repo-relative path (repeatable)")

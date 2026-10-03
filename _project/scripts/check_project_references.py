@@ -80,6 +80,39 @@ _SKIP_SUFFIXES = frozenset(
 )
 
 
+CLI_DESCRIPTION = (
+    "Fail on NEW stale ``_project/`` references from tracked files outside ``_project/``.\n"
+    "\n"
+    "Docs are sometimes created inside ``_project/`` and linked from outside\n"
+    "(``docs/``, ``README.md``, ``CLAUDE.md``, ...). When the ``_project/`` file is\n"
+    "moved, archived, or deleted, the outside link goes stale silently. This lint\n"
+    "catches new occurrences at CI time.\n"
+    "\n"
+    "Pre-existing stale references are recorded in a baseline file so this gate\n"
+    "blocks *new* breakage immediately without forcing a repo-wide cleanup. The\n"
+    "baseline cannot rot: an entry whose target now resolves (or whose scanned\n"
+    "file no longer mentions it) is reported as stale and must be removed\n"
+    "(regenerate with ``--update-baseline``).\n"
+    "\n"
+    "Behavior:\n"
+    "\n"
+    "* Scan every tracked file outside ``_project/`` for ``_project/<path>``\n"
+    "  mentions ending in ``.md`` (plus ``.yaml``/``.yml``/``.json``).\n"
+    "* Resolve each mention against the repo root. A mention is stale when the\n"
+    "  path does not exist in the working tree.\n"
+    "* Bare placeholder names (``foo``, ``bar``, ``example``) mark synthetic\n"
+    "  fixture strings and are ignored everywhere.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/check_project_references.py                   # check (CI mode)\n"
+    "    uv run -- python _project/scripts/check_project_references.py --update-baseline # regenerate baseline\n"
+    "\n"
+    "Exit codes:\n"
+    "    0 - No new stale references; baseline is current\n"
+    "    1 - New stale reference(s) found, or baseline contains stale entries\n"
+)
+
+
 def _tracked_files() -> list[str]:
     out = subprocess.check_output(["git", "ls-files", "-z"], cwd=REPO_ROOT, text=False)
     return [p for p in out.decode("utf-8", errors="replace").split("\0") if p]
@@ -124,7 +157,7 @@ def _read_baseline() -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--update-baseline",
         action="store_true",

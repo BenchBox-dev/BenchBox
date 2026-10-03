@@ -26,6 +26,25 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Check for Windows anti-patterns in the benchbox codebase.\n"
+    "\n"
+    "Uses AST analysis to find patterns that compile and run on Linux/macOS\n"
+    "but silently misbehave or fail on Windows:\n"
+    "\n"
+    "  1. os.access(path, os.X_OK) - always returns True on Windows; use\n"
+    '     .suffix == ".exe" or os.name checks instead.\n'
+    "  2. Unguarded Unix-only signals (SIGTERM, SIGKILL, SIGHUP, SIGUSR1/2,\n"
+    "     SIGCHLD, SIGPIPE) - these don't exist on Windows; guard with\n"
+    "     `if hasattr(signal, ...)`.\n"
+    "  3. pathlib-style read_text() calls without an explicit encoding - these use\n"
+    "     the locale encoding and can fail on non-UTF-8 Windows installations.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/check_windows_antipatterns.py\n"
+    "    uv run -- python scripts/check_windows_antipatterns.py --path benchbox/\n"
+)
+
 # Unix-only signal names that do not exist on Windows
 _UNIX_SIGNALS = {"SIGTERM", "SIGKILL", "SIGHUP", "SIGUSR1", "SIGUSR2", "SIGCHLD", "SIGPIPE"}
 
@@ -428,7 +447,7 @@ def check_tree(roots: list[Path]) -> tuple[list[Violation], int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--path",
         metavar="DIR",

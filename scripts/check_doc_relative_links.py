@@ -44,6 +44,44 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Check repo-local relative links in Markdown docs resolve to real files.\n"
+    "\n"
+    "Closes the detection gap that let a broken source-relative link\n"
+    "(`docs/contributing-results.md` -> `getting-started.rst`) ship undetected.\n"
+    "That class of link evades the existing docs gates three ways:\n"
+    "\n"
+    "  1. The Sphinx ``linkcheck`` builder only validates *external* (http/https)\n"
+    "     URLs -- it never checks local source-relative file links.\n"
+    "  2. The HTML build runs ``sphinx-build -b html --keep-going`` without\n"
+    "     ``-W``, so warnings never fail CI.\n"
+    '  3. ``docs/conf.py`` sets ``suppress_warnings = ["myst.xref_missing",\n'
+    '     "ref.myst"]``, suppressing the very warning a missing local target\n'
+    "     would otherwise raise.\n"
+    "\n"
+    "This check scans ``docs/**/*.md`` (excluding the generated ``_build/``\n"
+    "tree), extracts inline Markdown links ``[text](target)``, and asserts that\n"
+    "every *repo-local relative* target exists on disk. External URLs, ``mailto:``\n"
+    "and other schemes, bare ``#anchors``, and server-absolute ``/paths`` are left\n"
+    "to the external linkcheck / site routing and are not inspected here.\n"
+    "\n"
+    "Pre-existing broken links are recorded in a baseline file so this gate blocks\n"
+    "*new* breakage immediately without forcing a repo-wide cleanup. The baseline\n"
+    "cannot rot: an entry whose target now resolves is reported as stale and must\n"
+    "be removed (regenerate with ``--update-baseline``).\n"
+    "\n"
+    "Usage:\n"
+    "    python scripts/check_doc_relative_links.py            # check (CI mode)\n"
+    "    python scripts/check_doc_relative_links.py --update-baseline\n"
+    "\n"
+    "Exit codes:\n"
+    "    0 - No new broken relative links; baseline is current\n"
+    "    1 - New broken relative link(s) found, or baseline contains stale entries\n"
+    "\n"
+    "Copyright 2026 Joe Harris / BenchBox Project\n"
+    "Licensed under the MIT License.\n"
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS_DIR = REPO_ROOT / "docs"
 BASELINE_PATH = REPO_ROOT / "scripts" / "doc_relative_link_baseline.txt"
@@ -137,7 +175,7 @@ def write_baseline(broken: list[tuple[str, int, str]]) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--update-baseline",
         action="store_true",

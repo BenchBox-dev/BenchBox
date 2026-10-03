@@ -36,6 +36,23 @@ _SUCCESS_SUMMARY = "All checks passed!"
 _EXCLUSION_FIELDS = {"target", "line", "score", "owner", "rationale", "expires"}
 
 
+CLI_DESCRIPTION = (
+    "Report cyclomatic complexity and govern temporary hard-ceiling exceptions.\n"
+    "\n"
+    "Ruff's configured C901 rule and this checker are intentionally separate gates:\n"
+    "\n"
+    "* configured Ruff fails when complexity is greater than 18 in Ruff's configured\n"
+    "  file-discovery scope;\n"
+    "* this checker scans ``benchbox`` with isolated Ruff, reports scores from 12\n"
+    "  through 20, and fails on scores greater than 20 unless an exact, current\n"
+    "  exception exists.\n"
+    "\n"
+    "Exception metadata is fail-closed. An entry must pin the target, line, measured\n"
+    "score, owner, rationale, and a bounded future expiry date. Exceptions never\n"
+    "hide the advisory band and ``--no-fail`` never suppresses metadata errors.\n"
+)
+
+
 class PolicyError(ValueError):
     """The authoritative complexity policy cannot be loaded safely."""
 
@@ -353,7 +370,7 @@ def _validate_exclusions(
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--source-root", default="benchbox", help="Source root to scan (default: benchbox)")
     parser.add_argument("--max-complexity", type=int, default=None, help="Override the configured hard ceiling")
     parser.add_argument("--warn-complexity", type=int, default=None, help="Override the advisory threshold")

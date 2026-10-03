@@ -137,6 +137,29 @@ PKG_TO_IMPORTS: dict[str, set[str]] = {
 # ---------------------------------------------------------------------------
 
 
+CLI_EPILOG = (
+    "Dependency audit CI guard for BenchBox.\n"
+    "\n"
+    "Fails (exit 1) when:\n"
+    "  (a) A declared package has zero import sites AND is not in either allowlist.\n"
+    "  (b) [Future] An imported top-level module is undeclared and not in the\n"
+    "      guarded-optional allowlist. (Not yet enabled - Phase 5.)\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/dependency_audit/check_deps.py\n"
+    "    uv run -- python _project/scripts/dependency_audit/check_deps.py --help\n"
+    "\n"
+    "Exit codes:\n"
+    "    0  All checks pass.\n"
+    "    1  One or more violations found.\n"
+    "\n"
+    "See also:\n"
+    "    _project/scripts/dependency_audit/plugin_cli_allowlist.yaml\n"
+    "    _project/scripts/dependency_audit/guarded_optional_allowlist.yaml\n"
+    "    docs/development/dependency-inventory.md (Methodology section)\n"
+)
+
+
 def _strip_extras(name: str) -> str:
     return name.split("[", 1)[0]
 
@@ -271,7 +294,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Check declared deps against import sites. Fails if any unused dep is found.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
+        epilog=CLI_EPILOG,
     )
     parser.add_argument("--verbose", "-v", action="store_true", help="Show all packages, not just violations.")
     parser.add_argument("--root", type=pathlib.Path, default=_ROOT, help="Repo root (default: auto-detected).")

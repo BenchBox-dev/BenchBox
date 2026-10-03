@@ -23,6 +23,9 @@ GENERATED_START = "<!-- BEGIN GENERATED PLATFORM MANIFEST -->"
 GENERATED_END = "<!-- END GENERATED PLATFORM MANIFEST -->"
 
 
+CLI_DESCRIPTION = "Generate and validate platform-manifest projections without loading adapter SDKs."
+
+
 def _adapter_source_path(module: str) -> Path | None:
     module_path = REPO_ROOT.joinpath(*module.split("."))
     module_file = module_path.with_suffix(".py")
@@ -249,7 +252,7 @@ def _print_errors(errors: Iterable[str]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--check", action="store_true", help="Fail instead of updating stale generated output")
     args = parser.parse_args()
 

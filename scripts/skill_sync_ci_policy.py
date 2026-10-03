@@ -26,6 +26,24 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Fail-closed trust policy for BenchBox skill-sync CI routing.\n"
+    "\n"
+    "The tool pin is a trust anchor owned by BenchBox maintainers. It is\n"
+    "intentionally independent of every revision selected by ``skill-sync.conf``:\n"
+    "``TOOL_REF`` names the upstream commit the vendored wrapper was copied from\n"
+    "and ``TOOL_SHA256`` pins the exact vendored bytes, so a tampered\n"
+    "``tools/skill-sync`` fails validation even when the config is untouched.\n"
+    "Advance either only with a clean preview/apply/check/verify proof and full CI.\n"
+    "\n"
+    "The wrapper never fetches: ``skill-sync.conf`` names local source checkouts,\n"
+    "so the config carries no origin URLs. URL identity is still checked, but on\n"
+    "the committed per-target receipt instead: ``skill-sync`` records each\n"
+    "source's ``remote.origin.url`` there at apply time, and validation requires\n"
+    "exactly the approved set. Advancing a skill revision only with a reviewed\n"
+    "receipt diff is what keeps a forked checkout from riding the narrow lane.\n"
+)
+
 TOOL_REPOSITORY = "https://github.com/joeharris76/skill-sync.git"
 TOOL_REF = "25e1e47693d8b0b2aba91d3ad3dbc0c14b8d3c4c"
 TOOL_SHA256 = "01f2b383318c448e3ed94aed4781432ac69dbd33f1556dae9792e65f9883eb34"
@@ -267,7 +285,7 @@ def compare_repository_manifest(base_ref: str, *, manifest: Path = MANIFEST_PATH
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     subparsers = parser.add_subparsers(dest="command", required=True)
     validate = subparsers.add_parser("validate")
     validate.add_argument("--manifest", type=Path, default=MANIFEST_PATH)

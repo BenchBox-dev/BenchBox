@@ -53,6 +53,36 @@ _VERSION_BRANCH_RE = re.compile(r"^v\d")
 # ---------------------------------------------------------------------------
 # Pure logic (unit-tested; no git/network)
 # ---------------------------------------------------------------------------
+CLI_DESCRIPTION = (
+    "Detect orphaned (stranded) commits left on dead remote branches.\n"
+    "\n"
+    "Root cause (see _project/analysis/auto-merge-stranding-forensic.md): a commit\n"
+    "pushed to a feature branch AFTER that branch's only PR has already\n"
+    "squash-merged and closed is never covered by any `pull_request` event, so\n"
+    "`auto-merge-on-open.yml` never sees it and its content silently never reaches\n"
+    "`develop`. This happened three times in the results-explorer/publication\n"
+    "remediation and was only caught by a manual adversarial re-review.\n"
+    "\n"
+    "This detector is the scheduled backstop. For every remote branch whose PR has\n"
+    "merged, it flags commits that sit *after* the PR's pre-squash head (i.e. pushed\n"
+    "post-merge) and are not on `develop`. Squash-merge is handled correctly: we do\n"
+    "NOT compare patch-ids (a squash rewrites them); we compare against the exact\n"
+    "merged PR head SHA reported by the GitHub API, so only genuinely-post-merge\n"
+    "commits are flagged.\n"
+    "\n"
+    "Commits listed in the allowlist (_project/analysis/known-stranded-commits.txt)\n"
+    "are historical, already-resolved cases and do not fail the run. Any orphan NOT\n"
+    "in the allowlist is a NEW occurrence and exits non-zero.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/detect_orphaned_commits.py\n"
+    "    uv run -- python _project/scripts/detect_orphaned_commits.py --repo owner/name\n"
+    "\n"
+    "Auth: reads GITHUB_TOKEN from the environment (required to query PRs). Exit 0 =\n"
+    "no new orphans; 1 = new orphan(s) found; 2 = usage/IO error.\n"
+)
+
+
 def parse_allowlist(text: str) -> set[str]:
     """Parse full SHAs from the allowlist file (ignore comments/blank lines)."""
     out: set[str] = set()
@@ -189,7 +219,7 @@ def find_orphans(owner: str, repo: str, token: str) -> dict[str, list[str]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--repo",
         default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"),

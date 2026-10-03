@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
 
+CLI_DESCRIPTION = "Safely prune worktree-less local branches proven merged into develop."
+
 PROTECTED_BRANCHES = frozenset({"develop", "main", "release", "published-results"})
 TARGET_BRANCH = "develop"
 
@@ -447,7 +449,7 @@ def prune_merged_branches(repo_root: Path, *, dry_run: bool, out: TextIO = sys.s
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)

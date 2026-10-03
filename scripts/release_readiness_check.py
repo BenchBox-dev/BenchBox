@@ -33,6 +33,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+CLI_DESCRIPTION = (
+    "Release readiness gate: canary freshness with advisory UAT gate evidence.\n"
+    "\n"
+    "Used by the release-PR validation workflow. It fails closed unless the latest\n"
+    "completed release canary workflow run is green, fresh, and, by default, has a\n"
+    "summary artifact whose checked commit is an ancestor of the release PR head.\n"
+    "\n"
+    "Committed UAT gate evidence (`_project/release-evidence/uat-gate-summary.json`,\n"
+    "written by `make uat-gate-check`) is evaluated and reported when available,\n"
+    "but is a non-blocking campaign report. Missing, red, dirty, stale, or\n"
+    "non-ancestor UAT evidence does not fail release readiness. Release trees\n"
+    "curate `_project/` away, so in CI the optional evidence is read from the\n"
+    "fetched `origin/develop` ref via `git show`.\n"
+    "\n"
+    "The `RELEASE_READINESS_OVERRIDE_SHA`/`_REASON` admin escape hatch bypasses the\n"
+    "blocking canary check for one exact release head SHA.\n"
+)
+
 BOOTSTRAP_REQUIRED_EXIT_CODE = 20
 
 UAT_GATE_EVIDENCE_RELPATH = "_project/release-evidence/uat-gate-summary.json"
@@ -401,7 +419,7 @@ def _write_summary(result: ReadinessResult, *, summary_path: str | None, overrid
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--workflow", default=os.environ.get("RELEASE_CANARY_WORKFLOW", "release-canary.yml"))
     parser.add_argument(
         "--branch",

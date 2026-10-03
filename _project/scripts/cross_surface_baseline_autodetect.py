@@ -72,6 +72,43 @@ _CODE_ONLY_RE = re.compile(r": resolved entries (\[[^\]]*\]) are code-only \(Cla
 _REFUSED_MARKER = ": refusing to update baseline - gate reported other failure(s) above; nothing written."
 
 
+CLI_DESCRIPTION = (
+    "Detect + prune RESOLVED cross-surface known-divergence baseline entries.\n"
+    "\n"
+    "Supporting glue for the scheduled workflow\n"
+    "``.github/workflows/cross-surface-baseline-autodetect.yml``. #903 made every\n"
+    "enforced cross-surface gate (``benchbox/core/equivalence/cross_surface.py``\n"
+    "``GATES``) FAIL a normal (blocking) run when a ``known_divergences`` baseline\n"
+    'entry stops reproducing -- printing "GATE FAILURE - previously-known\n'
+    'divergences now equivalent: [...]" and telling the operator to prune it in a\n'
+    "reviewed change. #935 built the ``--update-baseline`` writer\n"
+    "(``make cross-surface-update-baseline BENCHMARK=<gate>``) that does the actual\n"
+    "prune, but running it has stayed a fully manual step.\n"
+    "\n"
+    "This module automates NOTICING that condition across every enforced gate and\n"
+    "invoking the existing writer, but reimplements neither:\n"
+    "\n"
+    "* Detection (:func:`detect_and_prune`, phase 1) runs the EXACT SAME call the\n"
+    "  blocking CI gate makes -- ``run_gate(gate, update_baseline=False)`` -- and\n"
+    "  READS the resolved-key list out of its own printed report (the very message\n"
+    "  quoted above). It never recomputes resolved-ness itself, and since\n"
+    "  ``update_baseline`` is False this call is byte-for-byte the blocking gate's\n"
+    "  own code path, so by construction it cannot write anything.\n"
+    "* Pruning (phase 2) runs ONLY when phase 1's report names at least one\n"
+    "  resolved key, and invokes ``run_gate(gate, update_baseline=True)`` -- the\n"
+    "  EXACT call ``--update-baseline``/``make cross-surface-update-baseline``\n"
+    "  makes. That call already refuses to write anything unless the run is\n"
+    "  otherwise completely clean (see ``_apply_baseline_update``'s docstring), so\n"
+    "  a still-reproducing divergence elsewhere on the same gate blocks the prune\n"
+    "  entirely; this module adds no separate safety logic of its own here either.\n"
+    "\n"
+    "The upshot: the blocking gate run (``ci.yml``'s ``correctness-gate`` job,\n"
+    "``make <gate>-cross-surface-equivalence-report``) is completely unmodified and\n"
+    "never prunes. Only THIS script, run by the scheduled workflow, ever calls\n"
+    "``run_gate(..., update_baseline=True)``.\n"
+)
+
+
 def _extract_list(pattern: re.Pattern[str], text: str) -> list[str]:
     """Parse a bracketed Python-list-literal capture group out of *text*.
 
@@ -219,7 +256,7 @@ def _print_report(outcomes: Sequence[GatePruneOutcome]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--gates",
         help="Comma-separated enforced gate names to check (default: every gate in GATES).",

@@ -55,6 +55,8 @@ from benchbox.core.query_catalog import (
     supports_dialect_translation,
 )
 
+CLI_DESCRIPTION = "Generate the per-query documentation tree under ``docs/benchmarks/queries/``."
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 QUERIES_DIR = REPO_ROOT / "docs" / "benchmarks" / "queries"
 
@@ -466,7 +468,7 @@ def write_tree(rendered: dict[str, str], root: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--check", action="store_true", help="Exit non-zero if the on-disk tree is stale.")
     args = parser.parse_args(argv)
 

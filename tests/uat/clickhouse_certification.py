@@ -17,6 +17,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Fail-closed result checks for ClickHouse server certification artifacts.\n"
+    "\n"
+    "The UAT runner records loaded rows per table in its result JSON and the data\n"
+    "generator records expected rows per file in ``_datagen_manifest``. Certification\n"
+    "compares those independently-produced records exactly; an aggregate total can\n"
+    "hide a table-level omission or duplication.\n"
+)
+
 
 class CertificationArtifactError(ValueError):
     """Raised when a certification artifact cannot support an exact-row gate."""
@@ -148,7 +157,7 @@ def validate_exact_manifest_rows(manifest_path: Path, result_path: Path, table_f
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--result", type=Path, required=True)
     parser.add_argument(

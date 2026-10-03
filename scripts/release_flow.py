@@ -40,6 +40,36 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Prepare and verify a release as an ordinary pull request on ``develop``.\n"
+    "\n"
+    "Two subcommands, exposed as ``make release-prep`` and ``make release-check``:\n"
+    "\n"
+    "``prep --version X.Y.Z``\n"
+    "    Bumps every version marker (``benchbox/__init__.py``, ``pyproject.toml``,\n"
+    "    the documentation release markers, the landing-page badge) with\n"
+    "    ``scripts/update_version.py``, refreshes ``uv.lock`` with ``uv lock``, and\n"
+    "    drafts the ``CHANGELOG.md`` section with\n"
+    "    ``scripts/generate_changelog_entry.py``. The result is one normal PR diff.\n"
+    "    The drafted changelog section still needs hand-curation; ``check`` fails\n"
+    "    until it is curated.\n"
+    "\n"
+    "``check --version X.Y.Z``\n"
+    "    Verifies the complete pre-tag state and exits non-zero with every problem\n"
+    "    found:\n"
+    "\n"
+    "    * ``pyproject.toml``, ``benchbox/__init__.py``, the documentation release\n"
+    "      markers, the landing-page badge, and the ``uv.lock`` package entry all\n"
+    "      carry the requested version;\n"
+    "    * ``CHANGELOG.md`` has a dated, hand-curated section for the version;\n"
+    "    * the ``uv.lock`` schema revision has not been downgraded;\n"
+    "    * every top-level path is accounted for in the release curation lists;\n"
+    "    * no capped dependency has reached its upper bound.\n"
+    "\n"
+    "    ``check`` is meant to run on a clean checkout, locally and in CI, so a tag\n"
+    "    is only cut from a tree that already passed it.\n"
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # A subprocess runner: (argv, cwd) -> (returncode, combined output). Injectable
@@ -373,7 +403,7 @@ def select_candidate(root: Path, base_sha: str) -> tuple[bool, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
 
     for name in ("prep", "check"):

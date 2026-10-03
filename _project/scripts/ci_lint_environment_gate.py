@@ -80,6 +80,44 @@ RUNNER_INAPPLICABLE_GUARDS: dict[str, str] = {
 }
 
 
+CLI_DESCRIPTION = (
+    "Decide whether a `make ci-lint` guard is meaningful on a CI runner.\n"
+    "\n"
+    "`ci-lint` (Makefile) exists to mirror the `ci.yml` `code-lint` job locally\n"
+    "(docs/operations/ci-local-parity.md), but `make ci-lint` can also run\n"
+    "directly on a real, ephemeral GitHub-hosted runner (no workflow does today; the\n"
+    "post-merge workflow that did was retired with the six-unit CI). Most\n"
+    "guards are equally meaningful there: they inspect the checked-out tree, the\n"
+    "installed venv, or the registries the repo ships, none of which differ\n"
+    "between a laptop and a runner.\n"
+    "\n"
+    "A small number of guards instead read state that only exists on a developer\n"
+    "machine -- a resolved Git identity, a tool installed at a hardcoded local\n"
+    "path -- and behave one of two bad ways on a runner that lacks it: they fail\n"
+    "for a reason that has nothing to do with the code under test (the pre-#1558\n"
+    "`agent-identity-check` behavior), or worse, they silently no-op and report\n"
+    "success while checking nothing (`skill-sync-check` against a `$(SKILL_SYNC)`\n"
+    "path that plainly does not exist on the runner). The second failure mode is\n"
+    "the more dangerous one: a guard that cannot fail reads as coverage in the\n"
+    "Actions log and is never investigated.\n"
+    "\n"
+    "This module is the single place that draws that boundary. Before the\n"
+    "Makefile recipe runs a runner-inapplicable guard, it asks this module; if the\n"
+    "guard is listed AND the process is actually running on a GitHub Actions\n"
+    "runner (`GITHUB_ACTIONS=true`, the platform-set variable -- never\n"
+    "hand-toggled), the guard is skipped with a printed reason instead of run and\n"
+    "either silently passing or noisily failing. Every other guard -- the\n"
+    "overwhelming majority -- is untouched: this is a narrow allowlist of\n"
+    "documented exceptions, not a generic on/off switch, and adding a guard here\n"
+    "requires the same reasoning as removing coverage, because that is exactly\n"
+    "what it does on a runner.\n"
+    "\n"
+    "Local and CI-local-parity invocations (`GITHUB_ACTIONS` unset) are never\n"
+    "affected by this table -- every guard always runs there, including the two\n"
+    "listed below, exactly as before this module existed.\n"
+)
+
+
 def runs_on_runner(guard: str, *, github_actions: bool) -> tuple[bool, str | None]:
     """Return `(should_run, reason)` for *guard* under the given environment.
 
@@ -112,7 +150,7 @@ DECISION_SKIP = "SKIP"
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("guard", help="ci-lint guard slug, e.g. 'agent-identity' or 'skill-sync-check'")
     args = parser.parse_args(argv)
 

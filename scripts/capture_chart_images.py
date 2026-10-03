@@ -20,6 +20,17 @@ import tempfile
 from pathlib import Path
 from typing import Iterable, Sequence
 
+CLI_DESCRIPTION = (
+    "Capture visualization screenshots and sync shared docs/blog image copies.\n"
+    "\n"
+    "Pipeline: ``benchbox visualize`` -> ANSI text -> ansi2html -> headless Chrome -> PNG.\n"
+    "\n"
+    "This script is the supported entrypoint for the historical blog/chart screenshot\n"
+    "automation. Fresh renders are written to ``_blog/building-benchbox/images`` and\n"
+    "then synced into ``docs/blog/images`` so the published docs do not drift from\n"
+    "the blog source tree.\n"
+)
+
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "benchmark_runs" / "results"
 OX_RESULTS = Path("/Users/joe/Developer/Oxbow/benchmark_runs/results")
@@ -88,7 +99,7 @@ HTML_TEMPLATE = """\
 
 def parse_args() -> argparse.Namespace:
     """Parse CLI args."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--sync-only",
         action="store_true",

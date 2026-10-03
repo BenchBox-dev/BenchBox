@@ -33,6 +33,22 @@ SOUNDNESS_PATH_GLOBS: tuple[str, ...] = (
 )
 
 
+CLI_DESCRIPTION = (
+    "Predicates for live develop-review and v* tag-creation enforcement.\n"
+    "\n"
+    "The develop ruleset's ``require_code_owner_review`` parameter is a\n"
+    "repo-admin control for CODEOWNERS-owned soundness paths. It is deliberately\n"
+    "checked without asserting ``required_approving_review_count``: that count is\n"
+    "branch-wide and would gate every develop PR. The same predicate is used by\n"
+    "the standalone CLI and ``scripts/ruleset_drift_check.py``'s canary wiring.\n"
+    "\n"
+    "The v* tag-creation predicate remains in this module as the second live\n"
+    "ruleset control. Both predicates fail closed on missing or incomplete live\n"
+    "payloads; the caller decides whether a finding is blocking during an explicit\n"
+    "migration override.\n"
+)
+
+
 def extract_rules(payload: Any) -> list[dict[str, Any]]:
     """Normalize either a ``rules/branches`` list or a full ruleset object."""
     if isinstance(payload, list):
@@ -313,7 +329,7 @@ def _load_rules(args: argparse.Namespace) -> list[dict[str, Any]]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--rules-file", help="Path to a JSON rules/ruleset payload, or '-' to read stdin.")
     parser.add_argument("--repo", default="BenchBox-dev/BenchBox", help="owner/repo for live fetch.")
     parser.add_argument("--branch", default="develop", help="Branch whose ruleset to check.")

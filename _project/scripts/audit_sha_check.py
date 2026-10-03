@@ -19,6 +19,9 @@ NUMERIC_EVIDENCE_RE = re.compile(
 )
 
 
+CLI_DESCRIPTION = "Validate tree and measurement SHA provenance on audit Markdown files."
+
+
 class AuditShaError(Exception):
     """Raised when an audit SHA check fails."""
 
@@ -214,7 +217,7 @@ def validate_audit(
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("files", nargs="+", type=Path, help="Audit Markdown file(s) to validate")
     parser.add_argument(
         "--target-ref",

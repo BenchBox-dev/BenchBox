@@ -35,6 +35,28 @@ from pathlib import Path
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.datagen_manifest import MANIFEST_FILENAME
 
+CLI_DESCRIPTION = (
+    "Measure actual uncompressed SF=1 source-data sizes for all benchmarks.\n"
+    "\n"
+    "Runs each benchmark's generator at scale_factor=1.0 with compression disabled\n"
+    "and sums the emitted file bytes. Real-data benchmarks (nyctaxi, flightdata,\n"
+    "clickbench) download or sample from finite corpora, so the script measures\n"
+    "what the generator actually emits rather than projecting from row counts.\n"
+    "\n"
+    "Results are written as JSON to stdout (or --output): one record per\n"
+    "benchmark with total bytes, file count, row counts where the manifest\n"
+    "reports them, elapsed seconds, method (generated | manifest | spec), and\n"
+    "any error.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/measure_sf1_sizes.py --output /tmp/sf1.json\n"
+    "    uv run -- python scripts/measure_sf1_sizes.py --benchmark tpch,ssb\n"
+    "\n"
+    "Parallel runs (--jobs N) execute benchmarks concurrently, one process per\n"
+    "benchmark. Keep the default sequential mode unless the scratch filesystem\n"
+    "has ample space: several SF=1 datasets exceed 1 GB.\n"
+)
+
 # Manifest row counts are advisory metadata: a generator may emit placeholder
 # or modelled counts rather than exact per-file rows. The measurement records
 # the summed manifest total whenever one is present.
@@ -437,7 +459,7 @@ def _is_alias(benchmark: str) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--benchmark",
         default="",

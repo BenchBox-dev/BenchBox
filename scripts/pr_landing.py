@@ -50,6 +50,36 @@ if str(REPO_ROOT) not in sys.path:
 
 from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # noqa: E402
 
+CLI_DESCRIPTION = (
+    "One cohesive revision/readiness/queue/follow-up helper behind the Make PR targets.\n"
+    "\n"
+    "Session history shows the failure modes this closes: queued-branch push\n"
+    "rejection after readiness was armed, unpublished fixes riding along, wrong-PR\n"
+    "operations from an inferred branch, and late-fix merges ahead of corrections.\n"
+    "The contract:\n"
+    "\n"
+    "* Every mutation names the exact repository, PR number/node, expected head,\n"
+    "  branch, and worktree. A PR resolved from a reused branch name alone is\n"
+    "  refused (wrong-PR protection).\n"
+    "* Readiness is withdrawn (auto-merge disabled and verified) before the first\n"
+    "  edit. If the merge wins the race, the helper stops and preserves commits\n"
+    "  for a correctly identified follow-up instead of modifying a closed PR.\n"
+    "* Ready requires local/remote head agreement on the exact expected head, no\n"
+    "  unpublished work, completed review evidence on that head, required checks\n"
+    "  green at that head, and no durable hold. Enqueue re-checks the remote head\n"
+    "  immediately before arming; a head change invalidates readiness.\n"
+    "* Feature-batch readiness additionally binds batch id/version, member set,\n"
+    "  owner generation, and integration head; late members or content edits\n"
+    "  invalidate it. Member SHAs must be ancestors of the integration head.\n"
+    "* Follow-up state (pre-PR assembly through post-merge) persists with an\n"
+    "  explicit owner and next action; retries are bounded to evidenced transient\n"
+    "  failures on unchanged heads; terminal state is explicit, never inferred\n"
+    "  from an empty PR list.\n"
+    "\n"
+    "All GitHub access goes through an injectable runner so tests replay races\n"
+    "with fake hosted events. The live runner shells out to `gh`.\n"
+)
+
 HOLD_LABEL = "no-auto-merge"
 REQUIRED_CONTEXTS: tuple[str, ...] = (
     "core",
@@ -2107,7 +2137,7 @@ def _run_ready(args: argparse.Namespace, identity: GitIdentity, branch: str, rep
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--repo", default=None)
     parser.add_argument("--worktree", type=Path, default=Path.cwd())
     parser.add_argument("--branch", default=None)

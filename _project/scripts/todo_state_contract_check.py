@@ -9,6 +9,8 @@ import re
 import zipfile
 from pathlib import Path
 
+CLI_DESCRIPTION = "Fail closed when BenchBox still carries the retired database tracker."
+
 
 class StateContractError(ValueError):
     """The repository's JSON/Git tracker contract is incomplete or stale."""
@@ -65,7 +67,7 @@ def validate_contract(*, repo_root: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args(argv)
     validate_contract(repo_root=args.repo_root.resolve())

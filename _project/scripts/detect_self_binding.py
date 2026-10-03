@@ -52,6 +52,50 @@ import sqlglot
 from sqlglot import exp
 from sqlglot.optimizer.scope import Scope, build_scope
 
+CLI_DESCRIPTION = (
+    "Static detector for correlated-subquery self-binding in benchmark SQL.\n"
+    "\n"
+    "PR #756 fixed three TPC-Havoc SQL variants where a correlated subquery's\n"
+    "UNQUALIFIED correlation column silently bound to the INNER relation instead of\n"
+    "the intended outer table, degenerating a per-row correlation into an\n"
+    'uncorrelated scan (wrong results, but execution stays "green"). Example::\n'
+    "\n"
+    "    -- intended: correlate inner ps2 to the OUTER partsupp row\n"
+    "    where ps2.ps_partkey = ps_partkey      -- BUG: ps_partkey binds to inner ps2\n"
+    "    where ps2.ps_partkey = partsupp.ps_partkey   -- FIX: qualified to the outer\n"
+    "\n"
+    "This module is a conservative, catalog-aware lint that surfaces such cases as\n"
+    "*candidates for human review* (it is advisory, not a hard gate - see\n"
+    "``_project/TODO/main/planning/correlated-subquery-self-binding-cross-surface-audit.yaml``).\n"
+    "\n"
+    "Heuristic\n"
+    "---------\n"
+    "Inside a subquery, an unqualified column in a comparison predicate is flagged\n"
+    "when ALL of the following hold:\n"
+    "\n"
+    "* the predicate's *other* operand is a column qualified by one of the subquery's\n"
+    "  own (inner) source aliases - i.e. the predicate is correlation-shaped, pairing\n"
+    "  an inner column with a bare column (a bare-column-vs-literal filter is ignored);\n"
+    "* the bare column is provided by an inner source (so it silently binds inner);\n"
+    "* the bare column is also provided by an enclosing (outer) source (so the author\n"
+    "  plausibly meant the outer relation - the binding is *ambiguous*, which is what\n"
+    "  makes the defect silent rather than an error).\n"
+    "\n"
+    'Inner/outer "provided" columns include base-table columns (from the benchmark\'s\n'
+    "own DDL) AND the output columns of derived-table / CTE sources, so a correlation\n"
+    "target that is a CTE (as in the #756 Q17 fix) is covered. Plain filters,\n"
+    "fully-qualified correlations, and unambiguous (inner-only or outer-only) columns\n"
+    "are not flagged, which keeps false positives low.\n"
+    "\n"
+    "The column->tables index is built by parsing the benchmark's own\n"
+    "``CREATE TABLE`` DDL, so the detector is benchmark-agnostic: hand it any DDL and\n"
+    "any SQL.\n"
+    "\n"
+    "Copyright 2026 Joe Harris / BenchBox Project\n"
+    "\n"
+    "Licensed under the MIT License. See LICENSE file in the project root for details.\n"
+)
+
 
 @dataclass(frozen=True)
 class SelfBindingCandidate:
@@ -249,7 +293,7 @@ def _scan_tpchavoc() -> int:
 
 def main() -> int:
     """CLI: scan a benchmark's SQL for self-binding candidates (advisory, always exits 0)."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--benchmark", default="tpchavoc", choices=["tpchavoc"], help="benchmark to scan")
     parser.parse_args()
     _scan_tpchavoc()

@@ -15,6 +15,14 @@ from typing import Literal
 PlatformKind = Literal["sql", "dataframe"]
 
 
+CLI_DESCRIPTION = (
+    "Print a file plan and checklist for adding a BenchBox platform.\n"
+    "\n"
+    "This helper is intentionally non-mutating. It measures extension cost up front\n"
+    "without creating another framework around platform authoring.\n"
+)
+
+
 @dataclass(frozen=True)
 class ScaffoldPlan:
     name: str
@@ -115,7 +123,7 @@ def _format_markdown(plan: ScaffoldPlan) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--name", required=True, help="Platform CLI/display slug, for example newdatabase")
     parser.add_argument("--kind", choices=("sql", "dataframe"), required=True, help="Primary platform kind")
     parser.add_argument("--format", choices=("markdown", "json"), default="markdown", help="Output format")

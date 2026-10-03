@@ -13,6 +13,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = "Compute median DuckDB version-matrix metrics from a run manifest."
+
 EXPECTED_VERSIONS = ("1.0.0", "1.1.3", "1.2.2", "1.3.2", "1.4.4", "1.5.5", "1.6.0.dev365")
 EXPECTED_BENCHMARKS = ("tpch", "tpcds", "clickbench", "ssb")
 EXPECTED_SCALES = {"tpch": 10.0, "tpcds": 10.0, "clickbench": 10.0, "ssb": 10.0}
@@ -251,7 +253,7 @@ def write_outputs(result: dict[str, Any], output_dir: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("manifest", type=Path, help="matrix-manifest.json emitted by the runner")
     parser.add_argument(
         "--explorer-bundles-dir",

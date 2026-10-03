@@ -28,6 +28,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pr_landing  # noqa: E402
 
+CLI_DESCRIPTION = "Arm a pull request for its exact head after a live check that nothing holds it."
+
 HOLD_LABEL = pr_landing.HOLD_LABEL
 REPOSITORY = "BenchBox-dev/BenchBox"
 BASE_BRANCH = "develop"
@@ -141,7 +143,7 @@ def _environment_selection(env: Mapping[str, str]) -> dict[str, str | None]:
 
 def main(argv: Sequence[str] | None = None, env: Mapping[str, str] | None = None) -> int:
     selected = _environment_selection(os.environ if env is None else env)
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--pr", default=selected["pr"], help="pull request number; default: the current branch's PR")
     parser.add_argument("--head", default=selected["head"], help="expected head SHA; refused unless it is local HEAD")
     parser.add_argument("--repo", default=selected["repo"] if selected["repo"] is not None else REPOSITORY)

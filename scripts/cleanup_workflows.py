@@ -21,6 +21,20 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+CLI_DESCRIPTION = (
+    "Delete old GitHub Actions workflow runs.\n"
+    "\n"
+    "Usage:\n"
+    "    # Dry-run (default): show what would be deleted\n"
+    "    python scripts/cleanup_workflows.py --older-than 60\n"
+    "\n"
+    "    # Actually delete workflows older than 60 minutes\n"
+    "    python scripts/cleanup_workflows.py --older-than 60 --delete\n"
+    "\n"
+    "    # Delete all workflow runs (use with caution)\n"
+    "    python scripts/cleanup_workflows.py --older-than 0 --delete\n"
+)
+
 
 def get_workflow_runs(repo: str | None = None) -> list[dict]:
     """Fetch all workflow runs from GitHub.
@@ -69,7 +83,7 @@ def delete_workflow_run(run_id: int, repo: str | None = None) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

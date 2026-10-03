@@ -11,6 +11,8 @@ from pathlib import Path
 
 from audit_sha_check import AuditShaError, parse_frontmatter, run_git
 
+CLI_DESCRIPTION = "Backfill `develop_sha` frontmatter into historical audit Markdown files."
+
 
 @dataclass(frozen=True)
 class Derivation:
@@ -125,7 +127,7 @@ def audit_paths(root: Path, paths: list[Path]) -> list[Path]:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("paths", nargs="*", type=Path, help="Specific audit Markdown files to backfill")
     parser.add_argument(
         "--target-ref",

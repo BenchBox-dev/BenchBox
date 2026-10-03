@@ -82,6 +82,47 @@ _COLLECT_COUNT_PATTERN = re.compile(r"(\d+)/(\d+) tests collected(?: \((\d+) des
 # ---------------------------------------------------------------------------
 # Pure logic (unit-/self-tested; no git/network)
 # ---------------------------------------------------------------------------
+CLI_DESCRIPTION = (
+    "Nightly auto-ratchet signal for the fast-lane test-count ceiling.\n"
+    "\n"
+    "Companion to `_project/scripts/fast_lane_ceiling_check.py` and\n"
+    "`_project/config/fast_lane_ceiling_log.md`'s +500 quantum / >=250 headroom\n"
+    "bump convention (see `fast-lane-decouple-ceiling-contention-2` and\n"
+    "docs/operations/fast-lane-budget.md for the full history/rationale). This\n"
+    "script does NOT bump the ceiling, open a PR, or push a branch -- GITHUB_TOKEN-\n"
+    "authored PRs get no required checks (see green_unmerged_sweep.py's own note\n"
+    "on that constraint), so a ceiling bump stays a deliberate human/agent-\n"
+    "authored PR. The only mutation this script ever performs (and only under\n"
+    "`--apply`) is creating/updating ONE marker-tagged tracking issue (title\n"
+    '"Fast-lane ceiling needs a quantum bump"), mirroring\n'
+    "`_project/scripts/green_unmerged_sweep.py`'s pinned-issue upsert pattern --\n"
+    "read that script first if extending this one.\n"
+    "\n"
+    "What it checks: collects the fast lane (`pytest -m fast --collect-only`,\n"
+    "same mechanism `fast_lane_ceiling_check.py` uses) and compares it against the\n"
+    "current `max_fast_tests` ceiling in `_project/config/fast_test_lane_policy.json`.\n"
+    "An optional named `reservation` in that policy raises the nightly action\n"
+    "threshold above `WARN_THRESHOLD` (100), so consuming reserved headroom files\n"
+    "the same actionable issue before the absolute ceiling is close. The hard\n"
+    "ceiling and PR-time warning remain unchanged. When headroom recovers (a bump\n"
+    "landed, the lane contracted, or a completed reservation is explicitly\n"
+    "cleared), the issue is patched to the clear state exactly once, then left\n"
+    "alone -- never repeatedly updated for a state that hasn't changed (same\n"
+    '"silent when clear" contract as green_unmerged_sweep.py).\n'
+    "\n"
+    "Auth: GITHUB_TOKEN or GH_TOKEN from the environment (used directly over the\n"
+    "REST API). If neither is set but the `gh` CLI is on PATH, its token\n"
+    "(`gh auth token`) is used instead. No long-lived PAT is required or read\n"
+    "from anywhere else.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python _project/scripts/fast_lane_ratchet_check.py\n"
+    "    uv run -- python _project/scripts/fast_lane_ratchet_check.py --json\n"
+    "    uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply\n"
+    "    uv run -- python _project/scripts/fast_lane_ratchet_check.py --self-test\n"
+)
+
+
 def parse_collect_count(output: str) -> int | None:
     match = _COLLECT_COUNT_PATTERN.search(output)
     if match:
@@ -405,7 +446,7 @@ def run_self_test() -> int:
 # CLI
 # ---------------------------------------------------------------------------
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument(
         "--repo",
         default=os.environ.get("GITHUB_REPOSITORY", DEFAULT_REPO),

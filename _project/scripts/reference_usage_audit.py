@@ -25,6 +25,15 @@ DEFAULT_REFERENCES = (
 )
 
 
+CLI_DESCRIPTION = (
+    "Classify reference-file mentions in Claude transcript JSONL files.\n"
+    "\n"
+    "This script makes instruction-pruning evidence reproducible. It separates\n"
+    "literal mentions from transcript tool-result filename lists, because a filename\n"
+    "list is not the same evidence as a file content read.\n"
+)
+
+
 @dataclass(frozen=True)
 class Hit:
     transcript: str
@@ -167,7 +176,7 @@ def _summary(hits: list[Hit]) -> dict[str, dict[str, int]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument(
         "--transcripts-dir",
         type=Path,

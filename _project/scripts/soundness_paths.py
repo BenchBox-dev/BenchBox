@@ -21,6 +21,9 @@ DATA_PATH = Path(
 _VALID_KINDS = {"file", "glob", "prefix", "regex"}
 
 
+CLI_DESCRIPTION = "Data-backed soundness-path predicate shared by CI and local tooling."
+
+
 @dataclass(frozen=True)
 class Rule:
     kind: str
@@ -103,7 +106,7 @@ def any_soundness_path(paths: Iterable[str]) -> bool:
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--stdin", action="store_true", help="Read newline-delimited paths from stdin.")
     parser.add_argument("--paths-file", help="Read newline-delimited paths from a file.")
     parser.add_argument(

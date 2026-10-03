@@ -37,6 +37,8 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = "Check that the bundled TPC-DS generators agree across platforms."
+
 DEFAULT_SCALE_FACTOR = 0.01
 DEFAULT_SEED = 7
 QUERY_IDS = tuple(range(1, 100))
@@ -166,7 +168,7 @@ def _load(paths: Sequence[Path]) -> dict[str, dict[str, Any]]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     commands = parser.add_subparsers(dest="command", required=True)
     build = commands.add_parser("manifest", help="generate data and parameters and write a manifest")
     build.add_argument("--out", type=Path, required=True)
