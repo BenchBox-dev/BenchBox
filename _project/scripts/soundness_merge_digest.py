@@ -1,28 +1,4 @@
 #!/usr/bin/env python3
-"""List soundness-path commits that reached develop and the review each had.
-
-The pre-merge review is bound by an arming check and by review threads, and an
-author with the owner's rights can bypass both. This report is the backstop: it
-reads every first-parent commit on develop since a stored checkpoint, keeps those
-that touch `.github/soundness-paths.txt`, and records which review signal the pull
-request had at its final head. A commit with no signal, with no pull request, or
-with a reviewer thread resolved and no later commit gets a tracking issue.
-
-A read that fails or comes back incomplete stops the run before the checkpoint
-moves, so a missed commit is reported on the next run and never skipped. A damaged
-or duplicated state issue stops the run the same way; only `--bootstrap` records a
-first checkpoint.
-
-A connector review counts when it names a commit that carries the final content.
-Reactions and posted reviews cannot name a commit, so they are compared with commit
-dates, which an author controls; the digest records that limit and does not hide it.
-
-Usage:
-    uv run -- python _project/scripts/soundness_merge_digest.py --since <sha>
-    uv run -- python _project/scripts/soundness_merge_digest.py --apply
-    uv run -- python _project/scripts/soundness_merge_digest.py --apply --bootstrap
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -30,17 +6,26 @@ import json
 import re
 import subprocess
 import sys
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-if str(SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(SCRIPT_DIR))
-
-from soundness_paths import any_soundness_path  # noqa: E402
-
+MANIFEST_PATH = ".github/soundness-paths.txt"
+PREDICATE_PATH = "_project/scripts/soundness_paths.py"
+GOVERNANCE_PATHS = frozenset(
+    {
+        MANIFEST_PATH,
+        PREDICATE_PATH,
+        "_project/scripts/soundness_merge_digest.py",
+        ".github/workflows/soundness-merge-digest.yml",
+    }
+)
+PREDICATE_DRIVER = (
+    "import json, sys; sys.path.insert(0, sys.argv[1]); from soundness_paths import is_soundness_path; "
+    "print(json.dumps([p for p in json.load(sys.stdin) if is_soundness_path(p)]))"
+)
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 BASE_BRANCH = "develop"
 STATE_LABEL = "soundness-merge-digest"
@@ -56,7 +41,7 @@ PULL_EVENTS = frozenset({"pull_request", "pull_request_target"})
 
 
 class ReadError(RuntimeError):
-    """A GitHub or git read failed or came back incomplete."""
+    pass
 
 
 @dataclass(frozen=True)
@@ -108,13 +93,11 @@ class PullEvidence:
 
     @property
     def content_cutoff(self) -> str:
-        """Arrival time of the last content commit; a clean merge of the base only refreshes it."""
         content = [c for c in self.commits if not c.is_refresh]
         return content[-1].arrived_at if content else ""
 
     @property
     def content_shas(self) -> frozenset[str]:
-        """Commits at or after the last content commit, which carry the final content."""
         last = max((i for i, c in enumerate(self.commits) if not c.is_refresh), default=0)
         return frozenset(c.sha for c in self.commits[last:])
 
@@ -145,7 +128,6 @@ class Entry:
 
 
 def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
-    """Return the review signals that were visible at merge for the pull request's final content."""
     cutoff = evidence.content_cutoff
 
     def in_window(at: str) -> bool:
@@ -170,7 +152,6 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
 
 
 def unreviewed_thread_count(evidence: PullEvidence) -> int:
-    """Count reviewer threads that were resolved although no commit followed them."""
     return sum(
         1
         for thread in evidence.threads
@@ -192,7 +173,6 @@ def classify(sha: str, subject: str, files: Sequence[str], pull: PullEvidence | 
 
 
 def render(entries: Sequence[Entry], *, since: str, until: str) -> str:
-    """Render the digest as markdown."""
     lines = [f"Soundness-path commits on develop from {since[:9]} to {until[:9]}: {len(entries)}.", ""]
     if not entries:
         return "\n".join(lines + ["None."])
@@ -242,7 +222,6 @@ def merged_commits(ref: str, since: str) -> list[str]:
 
 
 def commit_files(sha: str, *, cwd: Path | None = None) -> list[str]:
-    """Return every path the commit changes, counting both sides of a rename."""
     return run(["git", "diff", "--name-only", "--no-renames", f"{sha}~1", sha], cwd=cwd).splitlines()
 
 
@@ -256,11 +235,6 @@ def is_ancestor(commit: str, descendant: str, *, cwd: Path | None = None) -> boo
 
 
 def merge_adds_content(sha: str, base: str, *, cwd: Path | None = None) -> bool:
-    """Return whether a merge is anything other than a mechanical merge of the base branch.
-
-    A refresh has exactly two parents, one of them already on the base branch, and a tree
-    equal to merging the parents mechanically. Anything else may have altered reviewed content.
-    """
     parents = run(["git", "rev-list", "--parents", "-n", "1", sha], cwd=cwd).split()[1:]
     if len(parents) != 2 or not any(is_ancestor(parent, base, cwd=cwd) for parent in parents):
         return True
@@ -331,7 +305,6 @@ def collect_threads(repo: str, number: int) -> tuple[Thread, ...]:
 
 
 def merged_pull_number(repo: str, sha: str) -> int | None:
-    """Return the pull request merged into the base branch as this commit, or None."""
     candidates = [
         pr
         for pr in gh_pages(f"repos/{repo}/commits/{sha}/pulls")
@@ -345,11 +318,6 @@ def merged_pull_number(repo: str, sha: str) -> int | None:
 
 
 def belongs_to_pull(run_: dict[str, Any], number: int, pull: dict[str, Any]) -> bool:
-    """Return whether a workflow run was started by this pull request after it was opened.
-
-    A run that lists no pull request is matched by head repository and branch name, which a
-    reused branch name can still confuse; the digest documents that residual limit.
-    """
     if run_.get("event") not in PULL_EVENTS or run_["created_at"] < pull["created_at"]:
         return False
     listed = run_.get("pull_requests") or []
@@ -361,7 +329,6 @@ def belongs_to_pull(run_: dict[str, Any], number: int, pull: dict[str, Any]) -> 
 
 
 def server_arrival(repo: str, sha: str, number: int, pull: dict[str, Any]) -> str | None:
-    """Return when GitHub first ran this pull request's workflows for the commit, or None."""
     runs = gh_json("api", f"repos/{repo}/actions/runs?head_sha={sha}&per_page=100")["workflow_runs"]
     times = [run_["created_at"] for run_ in runs if belongs_to_pull(run_, number, pull)]
     return min(times) if times else None
@@ -370,7 +337,6 @@ def server_arrival(repo: str, sha: str, number: int, pull: dict[str, Any]) -> st
 def collect_commits(
     repo: str, number: int, pull: dict[str, Any], base: str, *, cwd: Path | None = None
 ) -> tuple[PullCommit, ...]:
-    """Read the pull request's commits, requiring the list to be complete and to end at its head."""
     commits = gh_pages(f"repos/{repo}/pulls/{number}/commits")
     if len(commits) >= MAX_PULL_COMMITS:
         raise ReadError(f"#{number} has {len(commits)} commits, the most the API lists")
@@ -431,10 +397,28 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
     )
 
 
+def soundness_files(sha: str, files: Sequence[str], *, cwd: Path | None = None) -> list[str]:
+    if not files:
+        return []
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for relative in (MANIFEST_PATH, PREDICATE_PATH):
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(run(["git", "show", f"{sha}~1:{relative}"], cwd=cwd), encoding="utf-8")
+        output = run(
+            [sys.executable, "-c", PREDICATE_DRIVER, str(root / "_project" / "scripts")],
+            input_text=json.dumps(list(files)),
+            cwd=cwd,
+        )
+    matched = set(json.loads(output))
+    return [path for path in files if path in matched or path in GOVERNANCE_PATHS]
+
+
 def collect_entries(repo: str, ref: str, since: str) -> list[Entry]:
     entries: list[Entry] = []
     for sha in merged_commits(ref, since):
-        files = [path for path in commit_files(sha) if any_soundness_path([path])]
+        files = soundness_files(sha, commit_files(sha))
         if files:
             entries.append(classify(sha, commit_subject(sha), files, collect_pull(repo, sha)))
     return entries
@@ -448,7 +432,6 @@ def find_state_issue(repo: str) -> dict[str, Any] | None:
 
 
 def read_checkpoint(repo: str) -> str | None:
-    """Return the stored checkpoint, None when no state issue exists, and fail on a damaged one."""
     issue = find_state_issue(repo)
     if issue is None:
         return None
@@ -510,7 +493,9 @@ def open_gap_issues(repo: str, entries: Sequence[Entry]) -> list[str]:
 
 
 def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(
+        description="List soundness-path commits that reached develop and the review each had"
+    )
     parser.add_argument("--repo", default=DEFAULT_REPO)
     parser.add_argument("--ref", default="origin/develop")
     parser.add_argument("--since", help="start after this commit; defaults to the stored checkpoint")

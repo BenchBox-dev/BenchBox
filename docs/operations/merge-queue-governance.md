@@ -123,7 +123,7 @@ Disabling the queue restores immediate single-PR squash merges under the `SHADOW
 
 ## 5. Post-Merge Soundness Digest
 
-`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that change a path on `.github/soundness-paths.txt`, counting both sides of a rename. For each one it finds the pull request that merged into `develop` as that commit and records which review signal the pull request had at merge, for its final content:
+`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that change a path on `.github/soundness-paths.txt`, counting both sides of a rename. Each commit is judged by the manifest and predicate (`_project/scripts/soundness_paths.py`) as they stood at its first parent, so a later commit that removes a rule cannot hide an earlier change, and a commit that removes a rule cannot hide its own. The manifest, the predicate, the digest script and the digest workflow are always kept, whatever the manifest says. The digest script and workflow are also listed in the manifest and in CODEOWNERS. For each one it finds the pull request that merged into `develop` as that commit and records which review signal the pull request had at merge, for its final content:
 
 - the Codex connector's submitted review of the last content commit, or of a merge that only refreshed the base after it;
 - the connector's thumbs-up reaction, or

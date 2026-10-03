@@ -1,5 +1,3 @@
-"""Tests for the soundness merge digest."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -320,6 +318,84 @@ def test_a_rename_reports_both_the_old_and_the_new_path(repo):
     git(repo, "mv", "f", "renamed")
     git(repo, "commit", "-qm", "rename")
     assert set(digest.commit_files(git(repo, "rev-parse", "HEAD"), cwd=repo)) == {"f", "renamed"}
+
+
+def seed_predicate(repo, extra_rules):
+    (repo / ".github").mkdir(exist_ok=True)
+    (repo / "_project/scripts").mkdir(parents=True, exist_ok=True)
+    manifest = (ROOT / ".github/soundness-paths.txt").read_text(encoding="utf-8")
+    write(repo, ".github/soundness-paths.txt", manifest + extra_rules)
+    write(
+        repo, "_project/scripts/soundness_paths.py", (ROOT / "_project/scripts/soundness_paths.py").read_text("utf-8")
+    )
+
+
+def test_a_commit_is_judged_by_the_manifest_of_its_first_parent(repo):
+    seed_predicate(repo, "file\tsecret.py\n")
+    write(repo, "secret.py", "1\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "protect")
+    write(repo, "secret.py", "2\n")
+    git(repo, "commit", "-qam", "edit protected file")
+    edit = git(repo, "rev-parse", "HEAD")
+    seed_predicate(repo, "")
+    git(repo, "commit", "-qam", "drop the rule")
+    write(repo, "secret.py", "3\n")
+    git(repo, "commit", "-qam", "edit after the rule is gone")
+    assert digest.soundness_files(edit, ["secret.py"], cwd=repo) == ["secret.py"]
+    assert digest.soundness_files(git(repo, "rev-parse", "HEAD"), ["secret.py"], cwd=repo) == []
+
+
+def test_a_commit_that_removes_a_rule_and_edits_the_path_it_covered_is_still_flagged(repo):
+    seed_predicate(repo, "file\tsecret.py\n")
+    write(repo, "secret.py", "1\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "protect")
+    seed_predicate(repo, "")
+    write(repo, "secret.py", "2\n")
+    git(repo, "commit", "-qam", "drop the rule and edit")
+    changed = digest.commit_files(git(repo, "rev-parse", "HEAD"), cwd=repo)
+    assert "secret.py" in digest.soundness_files(git(repo, "rev-parse", "HEAD"), changed, cwd=repo)
+
+
+def test_a_rule_added_later_does_not_apply_to_earlier_commits(repo):
+    seed_predicate(repo, "")
+    write(repo, "late.py", "1\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "base")
+    write(repo, "late.py", "2\n")
+    git(repo, "commit", "-qam", "edit before the rule")
+    edit = git(repo, "rev-parse", "HEAD")
+    seed_predicate(repo, "file\tlate.py\n")
+    git(repo, "commit", "-qam", "add the rule")
+    assert digest.soundness_files(edit, ["late.py"], cwd=repo) == []
+
+
+@pytest.mark.parametrize("path", sorted(digest.GOVERNANCE_PATHS))
+def test_the_governance_files_stay_protected_when_the_manifest_does_not_list_them(repo, path):
+    seed_predicate(repo, "")
+    manifest = repo / ".github/soundness-paths.txt"
+    kept = [line for line in manifest.read_text("utf-8").splitlines() if not line.endswith(path)]
+    manifest.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "base")
+    write(repo, "unrelated.py", "1\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "next")
+    sha = git(repo, "rev-parse", "HEAD")
+    assert digest.soundness_files(sha, [path, "unrelated.py"], cwd=repo) == [path]
+
+
+def test_a_commit_with_no_changed_files_reads_nothing(repo):
+    assert digest.soundness_files(git(repo, "rev-parse", "HEAD"), [], cwd=repo) == []
+
+
+def test_a_parent_without_the_predicate_is_a_read_error(repo):
+    write(repo, "h", "1\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "next")
+    with pytest.raises(digest.ReadError):
+        digest.soundness_files(git(repo, "rev-parse", "HEAD"), ["h"], cwd=repo)
 
 
 def pull_stub(monkeypatch, *, pulls):

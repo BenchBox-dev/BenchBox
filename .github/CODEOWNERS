@@ -106,3 +106,5 @@ scripts/run_comment_policy.py @joeharris76
 scripts/comment_payloads.py @joeharris76
 scripts/comment_execution.py @joeharris76
 scripts/comment_policy_entry.py @joeharris76
+_project/scripts/soundness_merge_digest.py @joeharris76
+.github/workflows/soundness-merge-digest.yml @joeharris76
