@@ -408,13 +408,53 @@ def herestring_data_only(header: str) -> None:
         raise ValueError("shell here-string requires an executable-payload adapter")
 
 
-def heredoc_redirects(header: str) -> list[tuple[bashlex.ast.node, list[str], bool]]:
+def unclosed_shell_suffix(text: str) -> str:
+    stack: list[str] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        top = stack[-1] if stack else None
+        if top == "'":
+            if char == "'":
+                stack.pop()
+        elif char == "\\":
+            index += 1
+        elif text.startswith("$(", index):
+            stack.append(")")
+            index += 1
+        elif char == ")" and top == ")":
+            stack.pop()
+        elif char == '"':
+            if top == '"':
+                stack.pop()
+            else:
+                stack.append('"')
+        elif char == "'" and top != '"':
+            stack.append("'")
+        index += 1
+    if "'" in stack:
+        raise ValueError("unterminated single quote in heredoc header")
+    return "".join(reversed(stack))
+
+
+def heredoc_redirects(header: str) -> list[tuple[str, str, list[str], bool]]:
     redirects = []
     header = re.sub(r"^(\s*)if(?=\s)", lambda match: match.group(1) + "  ", header)
+    raw_markers = None
     try:
         trees = bashlex.parse(header, strictmode=False)
     except (bashlex.errors.ParsingError, NotImplementedError) as exc:
-        raise ValueError("shell heredoc header requires an adapter") from exc
+        tokens = re.findall(r"(?<!<)<<-?\s*(['\"]?[A-Za-z_][A-Za-z0-9_]*['\"]?)", header)
+        markers = [token.strip("'\"") for token in tokens]
+        unquoted = re.sub(
+            r"(?<!<)(<<-?\s*)['\"]([A-Za-z_][A-Za-z0-9_]*)['\"]", r"\1\2", header.rstrip("\n").replace('"$(', "$(")
+        )
+        closed = "\n".join([unquoted, *markers, unclosed_shell_suffix(unquoted)]) + "\n"
+        try:
+            trees = bashlex.parse(closed, strictmode=False)
+        except (bashlex.errors.ParsingError, NotImplementedError, ValueError):
+            raise ValueError("shell heredoc header requires an adapter") from exc
+        raw_markers = tokens
 
     def visit(node: bashlex.ast.node, pipeline: list | None = None) -> None:
         if node.kind == "pipeline":
@@ -433,10 +473,20 @@ def heredoc_redirects(header: str) -> list[tuple[bashlex.ast.node, list[str], bo
             visit(child, pipeline)
         for child in getattr(node, "list", []):
             visit(child, pipeline)
+        if node.kind in {"commandsubstitution", "processsubstitution"}:
+            visit(node.command)
 
     for tree in trees:
         visit(tree)
-    return sorted(redirects, key=lambda item: item[0].pos[0])
+    redirects.sort(key=lambda item: item[0].pos[0])
+    if raw_markers is None:
+        raw_markers = [header[redirect.output.pos[0] : redirect.output.pos[1]] for redirect, _, _ in redirects]
+    elif len(raw_markers) != len(redirects):
+        raise ValueError("shell heredoc header requires an adapter")
+    return [
+        (raw, redirect.type, consumer, effective)
+        for raw, (redirect, consumer, effective) in zip(raw_markers, redirects, strict=True)
+    ]
 
 
 def shell_payloads(path: str, source: str, include_data: bool = False) -> list[tuple[int, str, str, str, str]]:
@@ -454,8 +504,7 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
                 herestring_data_only(header)
             continue
         redirects = heredoc_redirects(header)
-        for redirect, consumer, effective in redirects:
-            raw_marker = header[redirect.output.pos[0] : redirect.output.pos[1]]
+        for raw_marker, redirect_type, consumer, effective in redirects:
             parsed = shlex.split(raw_marker)
             if len(parsed) != 1:
                 raise ValueError("dynamic heredoc delimiter requires an adapter")
@@ -463,15 +512,16 @@ def shell_payloads(path: str, source: str, include_data: bool = False) -> list[t
             start = index
             while (
                 index < len(lines)
-                and (lines[index].lstrip("\t") if redirect.type == "<<-" else lines[index]).rstrip("\r\n") != marker
+                and (lines[index].lstrip("\t") if redirect_type == "<<-" else lines[index]).rstrip("\r\n") != marker
             ):
                 index += 1
             if index == len(lines):
                 raise ValueError("unterminated shell heredoc")
             text = "".join(lines[start:index])
-            if redirect.type == "<<-":
+            if redirect_type == "<<-":
                 text = "".join(line.lstrip("\t") for line in lines[start:index])
-            if not any(char in raw_marker for char in "'\"\\") and ("$(" in text or "`" in text):
+            unescaped = re.sub(r"\\.", "", text)
+            if not any(char in raw_marker for char in "'\"\\") and ("$(" in unescaped or "`" in unescaped):
                 raise ValueError("executable substitution in a shell heredoc requires an adapter")
             nested_lang = stdin_language(consumer) if effective else None
             if nested_lang or include_data:
@@ -489,6 +539,8 @@ def unwrap_static_command(words: list) -> list:
         separator = next((i for i, word in enumerate(words) if word.word == "--" and not word.parts), None)
         if separator is not None and separator + 1 < len(words):
             return words[separator + 1 :]
+        if len(words) > 2 and not words[2].parts and re.fullmatch(r"python[0-9.]*|node|bash|sh|zsh", words[2].word):
+            return words[2:]
     if command == "env":
         index = 1
         while index < len(words) and (
@@ -559,6 +611,27 @@ def shell_logical_chunks(source: str) -> list[tuple[int, str]]:
     return chunks
 
 
+def neutral_list_operators(text: str) -> str:
+    characters = list(text)
+    quote = None
+    index = 0
+    while index < len(characters):
+        char = characters[index]
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif char == "\\":
+            index += 1
+        elif quote == '"':
+            quote = None if char == '"' else quote
+        elif char in "'\"":
+            quote = char
+        elif text.startswith(("||", "&&"), index):
+            characters[index : index + 2] = [";", " "]
+            index += 1
+        index += 1
+    return "".join(characters)
+
+
 def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, str, str]]:
     if not SHELL_INLINE_INTERPRETER.search(source):
         return []
@@ -572,7 +645,10 @@ def shell_command_payloads(path: str, source: str) -> list[tuple[int, str, str, 
             try:
                 units.append((offset, chunk, bashlex.parse(chunk)))
             except (bashlex.errors.ParsingError, NotImplementedError):
-                raise ValueError("shell command source requires an executable-payload adapter") from exc
+                try:
+                    units.append((offset, chunk, bashlex.parse(neutral_list_operators(chunk))))
+                except (bashlex.errors.ParsingError, NotImplementedError):
+                    raise ValueError("shell command source requires an executable-payload adapter") from exc
     result = []
     for offset, text, trees in units:
         result.extend(shell_command_unit(path, source, offset, text, trees))

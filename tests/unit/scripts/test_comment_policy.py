@@ -2619,3 +2619,34 @@ def test_shell_fallback_scans_interpreter_chunks_when_full_parse_fails() -> None
 def test_shell_fallback_keeps_unparsable_interpreter_chunks_visible() -> None:
     source = 'X=$(git show a:b 2>/dev/null \\\n  || echo "{}")\npython3 -c "$(cat <<EOF\nprint(1)\nEOF\n)"\n'
     assert any(f.kind == "coverage-error" for f in scan("a.sh", source, "bash"))
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ("gh pr create --title t \\\n  --body \"$(cat <<'EOF'\n# Heading is PR text\nEOF\n)\"\n", []),
+        ("BODY=$(cat <<EOF | awk '{print}'\ntext\nEOF\n)\n", []),
+        ("X=\"$(python3 - <<'PY'\nimport os  # note\nPY\n)\"\n", ["comment"]),
+    ],
+)
+def test_heredoc_inside_command_substitution(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_shell_list_operators_inside_substitution_do_not_hide_inline_code() -> None:
+    source = 'X=$(a | b \\\n  || true)\nY=$(echo "$L" | python3 -c "import sys  # note" || echo "")\n'
+    assert [(f.kind, f.text) for f in scan("a.sh", source, "bash")] == [("comment", "# note")]
+
+
+@pytest.mark.parametrize(
+    ("body", "kinds"),
+    [("Escaped \\`code\\` and \\$(not run)\n", []), ("Real `date`\n", ["coverage-error"])],
+)
+def test_unquoted_heredoc_ignores_escaped_substitutions(body: str, kinds: list) -> None:
+    source = "cat <<EOF\n" + body + "EOF\n"
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_uv_run_interpreter_with_dynamic_script_arguments() -> None:
+    source = 'uv run python -c "import sys  # note" "$RUN_ID"\n'
+    assert [(f.kind, f.text) for f in scan("a.sh", source, "bash")] == [("comment", "# note")]

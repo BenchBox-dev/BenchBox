@@ -62,7 +62,7 @@ jobs:
           GENERATION="${{ inputs.generation }}"
           APPROVER="${{ inputs.approver }}"
           for label in DEVELOP_SHA PUBLISHED_SHA RELEASE_SHA; do
-            val="$(eval "echo \$$label")"
+            val="${!label}"
             if ! printf '%s' "$val" | grep -qE '^[0-9a-f]{40}$'; then
               echo "::error::$label must be a 40-hex commit SHA, got: $val"
               exit 1

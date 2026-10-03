@@ -1091,7 +1091,7 @@ jobs:
           PY
             then
               ARTIFACT_NAME=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json'))['rollback_artifact_name'])")
-              ARTIFACT_RUN_ID=$(uv run python -c "import json; print(json.load(open('candidate/live-receipt.json')).get('rollback_artifact_run_id', '$RUN_ID'))")
+              ARTIFACT_RUN_ID=$(uv run python -c "import json, sys; print(json.load(open('candidate/live-receipt.json')).get('rollback_artifact_run_id', sys.argv[1]))" "$RUN_ID")
               cp -R candidate/. known-good-receipt/
               echo "artifact_name=$ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
               echo "artifact_run_id=$ARTIFACT_RUN_ID" >> "$GITHUB_OUTPUT"

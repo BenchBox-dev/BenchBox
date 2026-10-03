@@ -858,12 +858,6 @@ jobs:
               validate_stream_success,
           )
 
-          # Narrow window: the timestamp captured immediately before the sweep
-          # step above, not a full-hour lookback -- see that step's comment.
-          # The capture step writes UTC (date -u); strptime yields a naive
-          # datetime whose .timestamp() would otherwise be read as LOCAL, so
-          # anchor it to UTC explicitly -- correct on any runner TZ, not just
-          # ubuntu-latest's UTC.
           started_after = datetime.datetime.strptime(
               os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
           ).replace(tzinfo=timezone.utc)
@@ -889,20 +883,11 @@ jobs:
               print(f'::error::{reason}')
               sys.exit(1)
           print(f'OK: stream count and per-stream success both verified ({result_path})')
-          # Throughput@Size floor (relative model -- see
-          # docs/operations/uat-framework.md 'Throughput performance floor').
-          # Additive to the stream-count hard gate above: a floor failure
-          # never masks or replaces a stream-count failure. With no baseline
-          # configured this only reports the observed value for future
-          # baseline accumulation and never fails: a threshold set before a
-          # stable baseline exists manufactures false failures.
           tpc_metrics = (result_json.get('summary') or {}).get('tpc_metrics') or {}
           observed = tpc_metrics.get('throughput_at_size')
           print(f'::notice::Throughput@Size observed: {observed!r} (duckdb/tpch-sf1)')
           import math
           floor_median = os.environ.get('THROUGHPUT_FLOOR_MEDIAN')
-          # `or` (not a get-default): a defined-but-empty variable must fall
-          # back too, otherwise float('') fails the gate on valid input.
           floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION') or '0.2'
           if floor_median:
               try:

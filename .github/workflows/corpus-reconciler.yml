@@ -89,11 +89,11 @@ jobs:
           event = {
               'merge_sha': sys.argv[1],
               'base_sha': sys.argv[2],
-              'ts': '$(date -u +%Y-%m-%dT%H:%M:%SZ)',
+              'ts': sys.argv[4],
           }
           with open(sys.argv[3], 'w') as f:
               f.write(json.dumps(event) + '\n')
-          " "$MERGE_SHA" "$BASE_SHA" "$EVENTS_FILE"
+          " "$MERGE_SHA" "$BASE_SHA" "$EVENTS_FILE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
           echo "events_file=$EVENTS_FILE" >> "$GITHUB_OUTPUT"
           echo "Created events file with merge_sha=$MERGE_SHA"

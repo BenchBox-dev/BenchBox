@@ -245,10 +245,11 @@ jobs:
             "import json; print(json.load(open('rec/soak-state.json'))['soak_start'])")
           NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           ELAPSED=$(uv run -- python -c "
+          import sys
           from datetime import datetime, timezone
-          s = datetime.fromisoformat('$SOAK_START'.replace('Z', '+00:00'))
-          n = datetime.fromisoformat('$NOW'.replace('Z', '+00:00'))
-          print(int((n - s).total_seconds() // 3600))")
+          s = datetime.fromisoformat(sys.argv[1].replace('Z', '+00:00'))
+          n = datetime.fromisoformat(sys.argv[2].replace('Z', '+00:00'))
+          print(int((n - s).total_seconds() // 3600))" "$SOAK_START" "$NOW")
           echo "soak elapsed: ${ELAPSED}h (need >= 12)"
           if [ "$ELAPSED" -lt 12 ]; then
             echo "::error::soak window incomplete: ${ELAPSED}h < 12h since $SOAK_START"
