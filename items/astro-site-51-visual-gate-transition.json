@@ -1,11 +1,11 @@
 {
   "acceptance": [
     "Visual capture runs against the Astro build in a dry-run job and produces the full route/viewport matrix",
-    "Approval runbook for the one intentional baseline change written in docs/operations/repo-admin-settings.md or the visual runbook",
+    "Cutover approval steps for both slots written into the astro-site-03 runbook",
     "test_public_site_visual_workflow.py updated and green; ruleset drift check unchanged",
     "No change to required-context names or exact-base-SHA semantics"
   ],
-  "description": "The required context \"Public-site visual acceptance\" (ci-dedupe-11) compares captures from e2e/captures/public-site-pages.spec.ts with exact-base-SHA baseline artifacts.\n\nPrepare the switch for the cutover PR:\n- Capture the same routes from the Astro build. Routes are unchanged under D3; if any changes, update the route/viewport matrix in the same PR.\n- Point visual-inputs path classification at website/ and the docs/ sources.\n- Plan the one intentional, reviewed baseline acceptance through the existing exact-head approval path.\n\nNever skip, disable or loosen the comparison. The baseline producer must publish an Astro-built baseline for the cutover merge commit. Account for the known stacked-merge-group baseline gap: land the cutover PR alone at the queue front.",
+  "description": "The required context \"Public-site visual acceptance\" (ci-dedupe-11) compares captures from e2e/captures/public-site-pages.spec.ts with exact-base-SHA baseline artifacts.\n\nPrepare the renderer switch:\n- Capture the same routes from the Astro build. Routes are unchanged under D3; if any changes, update the route/viewport matrix in the same PR.\n- Point visual-inputs path classification at website/ and docs/.\n- Plan the intentional baseline change through the astro-site-03 procedure: separate exact-head approvals for the PR head and the merge_group head_sha. Queue position does not substitute for either.\n\nNever skip, disable or loosen the comparison. The baseline producer must publish an Astro-rendered baseline for the merge commit that switches the CI renderer.",
   "links": [
     "results-explorer/e2e/captures/public-site-pages.spec.ts",
     "results-explorer/scripts/download-public-site-visual-baseline.mjs",
@@ -20,6 +20,14 @@
       "op": "create",
       "op_id": "e4d2ac01f72646a9a5d6ade94a39ba1a",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:0acd2553342aecc14bcb06e1",
+      "at": "2026-10-03T14:47:43Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8db532ea02a94d73bc689ba8e6630ea4",
+      "session_id": "0a04fc269d824c6d94e653994f36dbcb"
     }
   ]
 }
