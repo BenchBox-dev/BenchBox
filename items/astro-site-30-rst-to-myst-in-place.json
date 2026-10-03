@@ -1,10 +1,11 @@
 {
   "acceptance": [
-    "No non-API .rst remains under docs/ (count reported)",
-    "sphinx-build -W green; site_inventory diff vs baseline shows zero missing paths and zero heading changes beyond whitespace",
+    "No non-autodoc .rst remains under docs/ (count reported)",
+    "sphinx-build -W green; site_inventory diff vs baseline shows zero missing paths, zero lost anchors, zero heading changes beyond whitespace",
+    "Navigation order per section identical to before (inventory sidebar/toctree comparison)",
     "Public-site visual acceptance passes without baseline approval, or every diff is explained and approved via the ci-dedupe-11 path"
   ],
-  "description": "De-risk the port while Sphinx is still the oracle: convert each .rst page in docs/ (index.rst, the toctree hubs, benchmarks/*.rst, the blog index.rst, etc.) to MyST .md. The autodoc pages are excluded; astro-site-02 decides their fate.\n\nKeep each output URL identical: same stem, same .html. Translate any sphinx_design and rst-only directives to their MyST forms or to plain Markdown. The existing Sphinx -W build, spellcheck and public-site visual acceptance must stay green, so this ships value even if the migration stops.\n\nSplitting into several PRs by docs section is fine.",
+  "description": "This is a semantic migration, carried out while Sphinx is still the oracle. The scope is the .rst files in docs/ that do not contain autodoc directives: 53 .rst total minus the 27 autodoc files, which astro-site-34 handles.\n\nPreserve everything the RST carries:\n- toctree navigation (39 toctrees across all .rst) and :doc: references (236 across docs/)\n- labels and anchors, tables (list-table, csv-table), captions, sphinx_design blocks, tag pages\n\nEach output keeps its URL: same stem, same .html. Use MyST forms the Astro converter supports, preferring plain Markdown.\n\nThe existing Sphinx -W build, spellcheck and public-site visual acceptance must stay green, so this ships value even if the migration stops. Splitting into several PRs by docs section is fine.",
   "links": [
     "docs/index.rst",
     "docs/benchmarks",
@@ -25,6 +26,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "501bdb430d094c56b98f59f395dc7e6c",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:08:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5e390683d8964e7081c5c6c16fb89ec0",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]

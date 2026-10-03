@@ -957,7 +957,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Convert the 53 non-API .rst docs pages to MyST Markdown inside the current Sphinx build"
+      "title": "Convert the 26 non-autodoc .rst docs pages to MyST Markdown inside the current Sphinx build"
     },
     "astro-site-31-myst-to-mdx-converter": {
       "claim": null,
