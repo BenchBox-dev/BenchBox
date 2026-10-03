@@ -188,12 +188,12 @@ The comparison still evaluates the exact-head approval slots.
 - **Runbook.** It covers both phases: an advisory review recorded in the PR
   now, and the two exact-head approval slots once the check is required again.
   It lives in the [visual check runbook](../../docs/development/results-explorer-browser-testing.md).
-- **Rehearsal.** `astro-site-03` requires one real PR that makes an intentional
-  change to a captured route and is merged using both approval slots, with run
-  ids recorded here. The slots are repository variables. Setting them needs
-  repository administration, which the coordinating session does not have.
-  `astro-site-03` therefore stays open until the owner sets the slots for one
-  such PR. The acceptance is not amended without the owner.
+- **Rehearsal (owner decision, 2026-10-03).** The runbook's merge closes
+  `astro-site-03`. The two-slot rehearsal moves to `astro-site-21`'s PR, because
+  adopting the shared tokens restyles the landing page, which is a genuine
+  intentional visual change. The owner sets the four slot variables for that
+  PR's head and merge group, since setting them needs repository
+  administration. The run ids are recorded in this section when it merges.
 
 ### Site inventory: decided
 
