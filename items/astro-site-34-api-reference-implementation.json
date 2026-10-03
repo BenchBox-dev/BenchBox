@@ -6,7 +6,7 @@
     "No new docstrings (comment-policy-check green); examples covered by example-validation",
     "api-docs lane outputs documented and tested"
   ],
-  "context": "Write the authored contracts as MyST Markdown in docs/reference/python-api/ at the same stems as the .rst files they replace. Until cutover, Sphinx renders them at the same URLs, and the Astro converter picks them up like any other page. The reference then never has a gap.",
+  "context": "Prepared locally in worktree BenchBox.wt-astro-34 (uncommitted), to ship in one PR with astro-site-31 after PR #2597 merges. 27 autodoc .rst pages replaced by authored .md contract pages plus new pages for the previously uncovered symbols (benchmarks/{coffeeshop,datavault,flightdata,metadata-primitives,nyctaxi,tpcds-obt,tpch-skew,tpchavoc,tsbs-devops,transaction-primitives,vector-search}, dataframe.md, core.md, platforms/polars.md; sections added to tuning/platforms/utilities/tpcdi). All 81 symbols covered; known_import_failure symbols documented as failing. Full Sphinx -W build clean; all 1851 url-map ids present once, section ids keep heading text (only the get_query \\* escape differs); expected-removals-api-reference.json (85 entries) + repeatable --expected-removals in scripts/site_inventory.py with a test; 44 stale autodoc consumer_edges removed from quality/comment-cleanup-scope.json. Independent review round 1 FAIL (coverage, stale edges) -> fixed; round 2 PASS (no Critical/High); its Medium (TPC-H Skew uniform phase on empty tables) and Lows fixed. Known product defects documented on pages, follow-ups queued: TPCDSOBT templates missing from the wheel; TPC-H DataFrame registry circular import.",
   "description": "Implement ADR D7. For each symbol on the explicit public-symbol list, write a curated Markdown contract: purpose, parameters, return semantics, errors, examples and compatibility notes.\n\nDocstrings at the pinned SHA are source material to select from and validate against current behaviour. Do not copy them wholesale, and never archive removed prose.\n\nIf D7 chose a drift tool, wire it as a CI check that compares the authored contracts with the released wheel's signatures and types, importing only the listed symbols in an isolated pinned environment.\n\nEvery current reference URL and anchor serves the new page or a listed redirect page. Update the api-docs lane contract to the new outputs.\n\nDelete the 27 autodoc .rst files in this item's PR, once their replacements exist. Rendered output changes, so use the astro-site-03 visual procedure. Do not add docstrings to code.",
   "links": [
     "docs/reference/python-api",
@@ -44,6 +44,14 @@
       "op": "update",
       "op_id": "2b0cddca107b40d68426ae5e627e3604",
       "session_id": "0a04fc269d824c6d94e653994f36dbcb"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T22:31:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "92fc43256318442ab847609dfd45de16",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
 }
