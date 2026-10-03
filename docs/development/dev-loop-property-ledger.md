@@ -199,6 +199,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_pr_ready_make.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
+| `test_required_case_evidence.py` | product-safety | A required local-engine case that skips, is deselected, fails or is expected to fail fails the required-case check |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
@@ -274,6 +275,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `publication/test_transaction_executor.py` | product-safety |
 | `publication/test_verify_corpus_promotion.py` | product-safety |
 | `publication/test_verify_live.py` | product-safety |
+| `test_tpcds_divergence_report.py` | tooling |
 | `test_tpcds_platform_identity.py` | product-safety |
 
 ### `tests/unit/release/`
@@ -323,6 +325,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `bundled_binary_manifest.py` | product-safety | Deterministic hashes of the shipped generator tree |
 | `verify_distribution_binaries.py` | product-safety | Distribution membership, archive safety, and source-bound generator hashes |
 | Remaining scripts (ledger-catch-all: scripts/) | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
+| `tpcds_divergence_report.py` | product-safety | Cause labels for DataFrame-versus-SQL divergences (report only, no verdict) |
 | `tpcds_platform_identity.py` | product-safety | Cross-platform agreement of the bundled TPC-DS generators |
 
 ### `_project/scripts/`

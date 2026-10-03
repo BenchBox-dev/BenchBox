@@ -1493,3 +1493,77 @@ class TestLegacyAnonymizationSchemeIsGone:
                 assert dropped not in out
             if "submission_path" in payload:
                 assert _is_public_pseudonym(out["submission_path"], "path")
+
+
+class TestCloudWarehouseAndOutputLocation:
+    """Databricks warehouse ids and saved cloud output locations never publish raw."""
+
+    def test_databricks_warehouse_id_is_pseudonymised_everywhere(self):
+        payload = {
+            "platform": {
+                "config": {"warehouse_id": "04851bf1f1d8ff51"},
+                "compute": {"warehouse_id": "04851bf1f1d8ff51"},
+                "raw_metadata": {"compute_configuration": {"warehouse_id": "04851bf1f1d8ff51"}},
+            }
+        }
+        public = AnonymizationManager().anonymize_result_payload(payload)
+        text = json.dumps(public)
+        assert "04851bf1f1d8ff51" not in text
+        assert public["platform"]["config"]["warehouse_id"].startswith("warehouse_")
+
+    def test_cloud_default_output_location_is_pseudonymised(self):
+        payload = {"config": {"platform_options": {"default_output_location": "gs://benchbox_uploads/"}}}
+        public = AnonymizationManager().anonymize_result_payload(payload)
+        assert "benchbox_uploads" not in json.dumps(public)
+
+    def test_pseudonymised_values_are_a_fixed_point(self):
+        manager = AnonymizationManager()
+        payload = {"platform": {"config": {"warehouse_id": "04851bf1f1d8ff51"}}}
+        once = manager.anonymize_result_payload(payload)
+        assert manager.anonymize_result_payload(once) == once
+
+    def test_cloud_namespace_fields_are_pseudonymised(self):
+        payload = {
+            "platform": {
+                "config": {
+                    "dataset_id": "tpch_sf1_notuning_noconstraints",
+                    "uc_catalog": "workspace",
+                    "uc_schema": "benchbox",
+                    "uc_volume": "data",
+                    "catalog": "duckdb",
+                }
+            }
+        }
+        config = AnonymizationManager().anonymize_result_payload(payload)["platform"]["config"]
+        assert config["dataset_id"].startswith("dataset_")
+        assert config["uc_catalog"].startswith("catalog_")
+        assert config["uc_schema"].startswith("schema_")
+        assert config["uc_volume"].startswith("volume_")
+        # Plain `catalog` carries an engine catalog type in local bundles; it stays readable.
+        assert config["catalog"] == "duckdb"
+
+    def test_option_source_labels_stay_readable(self):
+        payload = {
+            "config": {
+                "platform_options": {"default_output_location": "gs://bucket/", "database": "prod"},
+                "platform_option_sources": {
+                    "default_output_location": "saved_config",
+                    "database": "cli_option",
+                    "warehouse": "not-a-label",
+                },
+            }
+        }
+        config = AnonymizationManager().anonymize_result_payload(payload)["config"]
+        assert config["platform_option_sources"]["default_output_location"] == "saved_config"
+        assert config["platform_option_sources"]["database"] == "cli_option"
+        # Anything outside the label vocabulary is still treated as a value.
+        assert config["platform_option_sources"]["warehouse"].startswith("warehouse_")
+        assert "bucket" not in json.dumps(config["platform_options"])
+
+    def test_option_source_labels_match_metadata_source_vocabulary(self):
+        from typing import get_args
+
+        from benchbox.core.results import anonymization
+        from benchbox.core.results.environment import MetadataSource
+
+        assert frozenset(get_args(MetadataSource)) == anonymization._OPTION_SOURCE_LABELS
