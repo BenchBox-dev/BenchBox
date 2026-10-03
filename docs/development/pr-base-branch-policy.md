@@ -36,9 +36,10 @@ reach `develop` only when the parent merged — never validated on its own and
 attributed to the parent's PR.
 
 `.github/workflows/ci.yml` has **no** `branches:` filter on `pull_request`, so
-a PR against any base now gets the six unit results. We still do not support
-stacking: squash-merge chains need rebases, and running the units against a
-feature base would not validate the tree that lands on `develop`.
+a PR against any base now gets the six unit results. Units run against a
+parent branch validate the child on top of its parent, not the tree that lands
+on `develop`, so the rebase onto `develop` and the CI rerun after it are what
+gate the merge.
 
 ## Loud failure: the `base-guard` job
 
@@ -48,14 +49,17 @@ required `tooling` check red. It always reports:
 
 - Base is `develop` / `release` / `published-results` → pass in seconds; the
   normal CI lanes apply.
-- Base is anything else → fail with an explicit message to retarget or fold
-  into the parent.
+- Base is anything else and the PR is a draft → pass; the PR cannot be armed
+  until it is retargeted at `develop`.
+- Base is anything else and the PR is ready → fail with an explicit message to
+  retarget to `develop` after the parent merges.
 
-`ci.yml` also listens for `edited` so retargeting an open PR re-evaluates (a
-PR opened on `develop` and later pointed at a feature branch must not keep a
-stale green result). On a PR against a non-integration base, `tooling` is red
-by design and the other five units still report, which is expected, not a
-separate defect.
+`ci.yml` also listens for `edited`, `ready_for_review` and
+`converted_to_draft` so retargeting a PR or changing its draft state
+re-evaluates (a PR pointed at a feature branch, or a draft marked ready, must
+not keep a stale result). On a ready PR against a non-integration base,
+`tooling` is red by design and the other five units still report, which is
+expected, not a separate defect.
 
 Unit pins live in `tests/unit/workflows/test_stacked_pr_base_guard.py`.
 
@@ -65,13 +69,18 @@ there. Porting it is a manual maintainer step (see
 
 ## After a parent merges
 
-`develop` is squash-merge only. A stacked chain would need a rebase and
-force-push after every parent merge anyway. Preferred workflow:
+`develop` is squash-merge only, so a child stacked on a merged parent must be
+rebased before it can land:
 
-1. Open each PR against `develop` (or the appropriate integration base).
-2. If work depends on an unmerged parent, wait or fold into the parent PR.
-3. After the parent squash-merges, rebase the child onto the updated base and
-   force-push with `--force-with-lease` on the feature branch only.
+1. Retarget the child PR to `develop`.
+2. Rebase it onto the squash commit with
+   `git rebase --onto origin/develop <old parent tip>` and force-push with
+   `--force-with-lease` on the feature branch only.
+3. Wait for CI on the new head. For a soundness-path change, also wait for a
+   Codex connector review or thumbs-up on the rebased head: the rebase
+   rewrites the head, so review of the draft against its parent no longer
+   covers it.
+4. Arm it with `make pr-arm`.
 
 ## "No checks" is not one failure mode
 
@@ -80,7 +89,7 @@ Use REST `mergeable_state` vocabulary from `docs/operations/pr-triage.md`
 
 | Symptom | Cause | What to do |
 | --- | --- | --- |
-| Guard red; other lanes absent | Base is not an integration branch | Retarget to `develop` (or the correct lane base) |
+| Guard red on a ready PR; other lanes absent | Base is not an integration branch | Retarget to `develop` (or the correct lane base), or convert to a draft if it is an upper stack PR |
 | `mergeable_state: dirty` (GraphQL `mergeable: CONFLICTING`) | Conflicts with the base tip | Rebase/resolve onto the base tip |
 | Required checks missing/stuck on an integration base; `mergeable_state: blocked` | CI unfinished, path gate, or ruleset | Inspect check runs — do not retarget |
 
@@ -97,8 +106,10 @@ conflicts, or a filter bug, from an empty or partial check list alone.
 
 - `make pr-open` (and manual `gh pr create`) must target `develop` unless the
   change is explicitly for `release` or `published-results`.
-- Never open a PR with `--base` set to another feature branch.
-- If `pr-base-guard` fails, fix the base; do not try to "add CI" to the
-  stacked base by editing branch filters.
+- Open a PR with `--base` set to another feature branch only as a draft in a
+  stack (one author, one tracker item, depth 3 or less); never arm it before
+  it is retargeted at `develop`.
+- If `base-guard` fails on a ready PR, fix the base; do not try to "add CI" to
+  the stacked base by editing branch filters.
 - Short agent-facing summary: `AGENTS.md` → section **Verification and
-  close-out** (stacked/feature-base PRs are unsupported).
+  close-out** (stacking rule).

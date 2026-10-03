@@ -161,3 +161,16 @@ def test_stacked_pr_base_guard_fails_a_ready_pr_on_a_feature_base() -> None:
     assert "::error::" in result.stdout
     assert "fix/parent-branch" in result.stdout
     assert "retarget this PR at develop" in result.stdout
+
+
+def test_stacking_rule_is_stated_consistently_in_agent_and_policy_docs() -> None:
+    policy = (REPO_ROOT / "docs" / "development" / "pr-base-branch-policy.md").read_text(encoding="utf-8")
+    agents = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    index = (REPO_ROOT / "docs" / "development" / "index.md").read_text(encoding="utf-8")
+    assert "unsupported" not in index.lower()
+    assert "do not support" not in policy.lower()
+    assert "never open a pr with `--base`" not in policy.lower()
+    for text in (policy, agents):
+        assert "git rebase --onto origin/develop <old parent tip>" in text
+    assert "converted_to_draft" in policy
+    assert "connector review" in policy
