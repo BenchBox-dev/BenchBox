@@ -5,6 +5,7 @@
     "Every DataFusion cell matches SQL or carries an evidenced classification.",
     "The DataFusion cell is enforced in CI with the repeat-run check, its whole-gate time is measured, and a maintainer signs off."
   ],
+  "context": "2026-10-03 feasibility (develop 964bea289, SF 0.01, evidence/rev3/t27_datafusion_feasibility.md): all 99 expression implementations exist; 97 run on DataFusion, 2 error (Q27 Int64 AND Int64; Q51 SanityCheckPlan). 76 match SQL (25 vacuous), 21 diverge. Cause groups: A rollup_helper.get_output_name lacks a DataFusion branch (Q5 14 18 22 36 67 70 80 86; ~3 lines, verified by monkeypatch); B unified_frame.py aggregate rewrite multiplies aggregates inside CASE (Q20 59 66 76 77 78 98); C Int64/Int64 integer division in UnifiedExpr.__truediv__ (Q21; verified); D rank() without over() (Q44); E `& lit(1)` at queries.py ~8170 (Q27); F cum_sum/cum_max without ordered frame + SanityCheckPlan (Q51); G Polars also diverges (Q9 46 68, shared impl defects). Gate plumbing: add datafusion to _PRODUCTION_ADAPTERS, a backend-to-family map {datafusion: expression}, materialize_rows support for pa.Table / RecordBatch lists (today it fails with 'cannot materialize result of type list'). Plan: A+C (and E after the batch-b adapters land), then gate plumbing (soundness path, waits for #2567 per D7), then B, D, F.",
   "description": "Owner decision D6 (2026-10-03) puts DataFusion in the parity goal. Today the cross-surface gate runs the expression family on Polars only (DATAFRAME_BACKENDS = (\"expression\", \"pandas\") in benchbox/core/equivalence/dataframe_surface.py). benchbox/platforms/dataframe/datafusion_df.py exists. First establish whether the 99 TPC-DS expression implementations run on DataFusion, then add a DataFusion cell to the gate and enforce it.",
   "sessions": [
     {
@@ -13,6 +14,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "2608a5cab7044a5d925ce823202b5259",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:44:23Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "17bada7ba4f84261a15236f0877dc5b0",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
