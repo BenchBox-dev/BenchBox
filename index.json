@@ -6559,6 +6559,23 @@
       "status": "open",
       "title": "Document the two parameter bindings, the two gates, and how to add a TPC-DS query"
     },
+    "dfparity-t24-residual-divergences": {
+      "claim": null,
+      "needs": [
+        "dfparity-t25-remeasure-baseline",
+        "dfparity-t05a-adapters-batch-a",
+        "dfparity-t05b-adapters-batch-b",
+        "dfparity-t05c-adapters-batch-c",
+        "dfparity-t05d-adapters-batch-d",
+        "dfparity-t05e-adapters-batch-e",
+        "dfparity-t05f-adapters-batch-f",
+        "dfparity-t05g-adapters-hard-coded",
+        "dfparity-t05h-adapters-q44-q49-inventory"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Fix or classify every TPC-DS divergence that remains after parameter alignment"
+    },
     "dfparity-t25-remeasure-baseline": {
       "claim": null,
       "needs": [],
