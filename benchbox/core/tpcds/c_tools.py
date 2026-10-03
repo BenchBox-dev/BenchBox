@@ -15,7 +15,7 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from benchbox.core.tpcds.parameter_log import TemplateParameters, parse_dsqgen_parameter_log
 from benchbox.utils.tpc_compilation import (
@@ -376,15 +376,28 @@ class DSQGenBinary:
         return self._run_dsqgen_with_log(cmd, opt, query_id, variant, capture_log=False)[0]
 
     def _run_dsqgen_with_log(
-        self, cmd: list[str], opt: str, query_id: int, variant: Optional[str], *, capture_log: bool
+        self,
+        cmd: list[str],
+        opt: str,
+        query_id: int,
+        variant: Optional[str],
+        *,
+        capture_log: bool,
+        edit_workdir: Optional[Callable[[Path], None]] = None,
     ) -> tuple[subprocess.CompletedProcess, Optional[str]]:
-        """Run dsqgen in a staged workdir; with ``capture_log`` also return its ``-LOG`` text."""
+        """Run dsqgen in a staged workdir; with ``capture_log`` also return its ``-LOG`` text.
+
+        ``edit_workdir`` is called with the staged workdir before dsqgen runs, so a caller can change
+        the staged template without touching the installed copy.
+        """
         import tempfile
 
         log_text: Optional[str] = None
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             env = self._stage_dsqgen_workdir(temp_path)
+            if edit_workdir is not None:
+                edit_workdir(temp_path)
 
             cmd.extend([f"{opt}INPUT", "q/templates.lst"])
             cmd.extend([f"{opt}DIRECTORY", "q"])
@@ -1025,31 +1038,21 @@ class DSQGenBinary:
         cmd, opt = self._build_dsqgen_cmd(base_query_id, variant, seed, scale_factor, dialect, is_multi_part)
         q = f"{base_query_id}{variant or ''}"
 
-        import tempfile
+        def substitute(temp_path: Path) -> None:
+            template = (temp_path / "q" / self._resolve_template_arg(base_query_id, variant, is_multi_part)).resolve()
+            template.write_text(
+                _substitute_parameters(template.read_text(encoding="utf-8"), parameters, q), encoding="utf-8"
+            )
 
         try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                temp_path = Path(temp_dir)
-                env = self._stage_dsqgen_workdir(temp_path)
-                template = (
-                    temp_path / "q" / self._resolve_template_arg(base_query_id, variant, is_multi_part)
-                ).resolve()
-                template.write_text(
-                    _substitute_parameters(template.read_text(encoding="utf-8"), parameters, q), encoding="utf-8"
-                )
-
-                cmd.extend([f"{opt}INPUT", "q/templates.lst", f"{opt}DIRECTORY", "q"])
-                result = subprocess.run(cmd, cwd=temp_dir, capture_output=True, text=True, timeout=30, env=env)
+            result, _ = self._run_dsqgen_with_log(
+                cmd, opt, base_query_id, variant, capture_log=False, edit_workdir=substitute
+            )
         except subprocess.TimeoutExpired:
             raise TPCDSError(f"dsqgen timed out for query {q}") from None
         except FileNotFoundError:
             raise TPCDSError(f"dsqgen binary not found at {self.dsqgen_path}") from None
 
-        if result.returncode != 0:
-            raise TPCDSError(
-                f"dsqgen failed for query {q} with parameters (exit code {result.returncode}): "
-                f"{(result.stderr or 'Unknown error').strip()}"
-            )
         sql_query = self._extract_sql_from_output(result.stdout, base_query_id, variant)
         return self._select_multi_part(sql_query, base_query_id, variant) if is_multi_part else sql_query
 

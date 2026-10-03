@@ -73,6 +73,63 @@ two-layer safety contract:
 The repository's code-owner review setting remains configured but is not solely relied
 upon as the authorization mechanism.
 
+Amended 2026-10-02: the external review stays, but a PR-body attestation checked by CI
+will no longer bind it. The author of a change writes its own attestation, so the check
+can only test that the text is present; it never tests the review. The review is bound
+by three controls:
+
+1. Review findings. The external reviewer's Critical and High findings are posted as PR
+   review threads, and the ruleset requires every thread to be resolved before a merge
+   (`required_review_thread_resolution`). GitHub lets an author with write access resolve
+   a thread, so resolution shows that someone dispositioned the finding, not that it was
+   fixed. The digest below is the check on that.
+2. Review signal at arming. For changes on the narrowed soundness path list, `make
+   pr-arm` refuses until a completed review is visible on the current head: the Codex
+   connector's submitted review or thumbs-up reaction, or an external review posted as a
+   PR comment. An "eyes" reaction alone means the review has started, not finished. A
+   posted comment shows that a review was recorded, not what it examined.
+3. Post-merge digest. A scheduled report lists the commits that reached `develop` on the
+   narrowed paths and records which review signal each had at merge. It also flags each
+   review thread that was resolved with no later commit. It opens a tracker item for
+   each commit with no signal or with such a thread. An agent then runs the external
+   review and either records a clean result or opens a fix or revert PR.
+
+The first two controls can be bypassed by an author acting alone with the owner's
+rights, because every agent shares one account. They make a skipped review visible and
+slower to skip; the digest detects a bypass after the merge and is the backstop. A
+squash commit is one revert unit, but a revert on a busy trunk is not always clean, so
+the backstop does not replace the review before the merge.
+
+The arming refusal is a merge-blocking automated review signal. It supersedes item 3 of
+`_project/decisions/codeowner-approving-count-zero-constraint-2026-09-15.md` for paths on
+the soundness list only, and only that item. That decision kept such signals advisory
+because a batch of failing Codex reviews exhausted the usage limit and deadlocked the
+queue. To keep one provider's limit from blocking arming, any of the Codex connector,
+the `codex` CLI, `muse` and `agy` satisfies the signal, and each has its own quota.
+
+When none of them can complete a review, the owner's own review of the PR satisfies the
+signal: a review comment from the repository owner, left on the current head, counts as
+the completed review and `make pr-arm` accepts it. The owner is the one party whose
+review does not share the author's context, so this keeps the review independent instead
+of lowering it to a same-model reader. Two conditions apply. The PR body names each
+reviewer that was tried and quotes the quota error each returned, so the fallback leaves
+a record; and the fallback holds only while no listed reviewer can run, so an agent that
+can obtain an external review must do so rather than wait for the owner. All four
+reviewers were exhausted at once on 2026-10-02, which blocked every workflow change for
+three days under the fail-closed rule alone.
+
+The soundness path list is narrowed to code that produces, normalizes, compares or
+validates results, every workflow, the release and binary paths, and `AGENTS.md`.
+Documentation, decision records, runbooks and threat models leave the list, because a
+review of prose gives no protection against a wrong result. The CI detection layer is
+unchanged, and the external review requirement is unchanged except for the quota
+fallback above. `AGENTS.md` still states the requirement without the fallback; the change
+that removes the attestation check from `ci.yml` rewrites that sentence, because
+`AGENTS.md` is itself a soundness path and must carry the attestation until then. The
+arming refusal, the digest and the narrowed list land in separate changes; until the
+attestation check is removed from `ci.yml`, a PR on a soundness path must still carry a
+valid `Soundness review:` section.
+
 ### D5: Retain agent write tooling, retire PR-loop scripts
 
 Agent workspace safety tooling is retained:

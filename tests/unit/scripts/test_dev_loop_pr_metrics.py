@@ -114,6 +114,8 @@ def _partitioned_jobs() -> list[dict]:
         _check("medium-collect", started="2026-07-27T10:00:00Z", completed="2026-07-27T10:02:00Z"),
         _check("medium-test (shard 0)", started="2026-07-27T10:03:00Z", completed="2026-07-27T10:18:00Z"),
         _check("medium-test (shard 1)", started="2026-07-27T10:02:30Z", completed="2026-07-27T10:14:00Z"),
+        _check("medium-test (shard 2)", started="2026-07-27T10:03:30Z", completed="2026-07-27T10:13:00Z"),
+        _check("medium-test (shard 3)", started="2026-07-27T10:03:45Z", completed="2026-07-27T10:12:30Z"),
     ]
 
 
@@ -129,14 +131,14 @@ def test_partitioned_medium_metric_includes_collector_and_wait_without_summing_p
     assert metrics._medium_budget_warning(1080.0) is None
 
 
-@pytest.mark.parametrize("missing", [0, 1, 2])
-def test_partitioned_medium_metric_requires_collector_and_both_shards(missing: int) -> None:
+@pytest.mark.parametrize("missing", [0, 1, 2, 3, 4])
+def test_partitioned_medium_metric_requires_collector_and_every_shard(missing: int) -> None:
     jobs = _partitioned_jobs()
     jobs.pop(missing)
     assert _partitioned_result(jobs)[2] is None
 
 
-@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("index", [0, 1, 2, 3, 4])
 @pytest.mark.parametrize("conclusion", ["failure", "cancelled", "skipped", None])
 def test_partitioned_medium_metric_excludes_censored_observations(index: int, conclusion: str | None) -> None:
     jobs = _partitioned_jobs()
@@ -160,7 +162,7 @@ def test_partitioned_medium_metric_rejects_incomplete_or_invalid_intervals(field
     assert _partitioned_result(jobs)[2] is None
 
 
-@pytest.mark.parametrize("name", ["medium-test (shard 0)", "medium-test (shard 2)"])
+@pytest.mark.parametrize("name", ["medium-test (shard 0)", "medium-test (shard 4)"])
 def test_partitioned_medium_metric_rejects_duplicate_or_unaccounted_shards(name: str) -> None:
     jobs = _partitioned_jobs()
     jobs.append(_check(name, started="2026-07-27T10:03:00Z", completed="2026-07-27T10:25:00Z"))
@@ -1363,3 +1365,9 @@ def test_lifecycle_rejects_observed_head_without_retrieval_ids() -> None:
     process = {"schema": "pr_process_acceptance_baseline_v1", "criteria_version": "1.0.0"}
     errors = metrics.validate_lifecycle_baseline(lifecycle, process, "digest-of-frozen-process-baseline")
     assert any("no run retrieval IDs" in e for e in errors)
+
+
+def test_medium_shard_job_names_cover_the_workflow_matrix() -> None:
+    from scripts.release_canary_sharding import MEDIUM_SHARD_COUNT
+
+    assert tuple(f"medium-test (shard {i})" for i in range(MEDIUM_SHARD_COUNT)) == metrics.MEDIUM_SHARD_JOB_NAMES

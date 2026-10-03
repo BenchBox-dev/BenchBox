@@ -139,7 +139,7 @@ further heuristic mistakes. The corrected mappings:
 | `_apply_datafusion_post_ops`, `_datafusion_join_with_exprs` | `datafusion.DataFrame` |
 | `_get_datafusion_ast_string`, `_rebuild_datafusion_pure_aggregate`, `_extract_datafusion_agg_arithmetic` | `datafusion.Expr` |
 | `_DataFusionSplitListExpr.__init__`, `_DataFusionSplitListExpr.get` (removed; str.split now returns a real list via `string_to_array`), `_DataFusionDeferredRank.__init__` (2 expressions × 1-2 params) | `datafusion.Expr` |
-| `_DataFusionDeferredFilter.__init__` (expr + condition) | reverted to `Any` after review - call site unwraps `.native` (which is `Any`); see commit 0a58d15e2 |
+| `_DataFusionDeferredFilter.__init__` (expr + condition) | `datafusion.Expr` records the runtime contract, consistent with `_DataFusionDeferredRank`; callers still use `Any`, so this adds no checking at the call boundary |
 | `_PySparkDeferredRank.__init__` | `pyspark.sql.Column` |
 
 CSV at `unified_frame_any_survey.csv`.
