@@ -1,12 +1,3 @@
-"""Ingest dtype contract tests for TPC-DI file transforms on pandas 3.x.
-
-The TPC-DI file transforms must keep date-like payloads as text through
-ingest: downstream loads treat them as strings, and a silent datetime64
-inference would change stored values. These tests pin the exact ingest
-dtypes for the CSV, fixed-width, and JSON transform paths so any dtype
-drift (including datetime64 inference) fails loudly.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -50,7 +41,7 @@ def test_csv_transform_dtype_contract(tmp_path: Path) -> None:
 def test_fixed_width_transform_dtype_contract(tmp_path: Path) -> None:
     benchmark = _make_benchmark(tmp_path)
     source = tmp_path / "securities.dat"
-    # Real column widths: symbol 8, name 30, exchange 10, shares 15.
+
     rows = [
         f"{'AAA11111'}{'Acme Corp One':<30}{'NYSE':<10}{'100':<15}",
         f"{'BBB22222'}{'Beta Industries Two':<30}{'NASDAQ':<10}{'200':<15}",
@@ -72,8 +63,7 @@ def test_fixed_width_transform_dtype_contract(tmp_path: Path) -> None:
 def test_json_transform_keeps_dates_as_strings(tmp_path: Path) -> None:
     benchmark = _make_benchmark(tmp_path)
     source = tmp_path / "accounts.json"
-    # "date" is the adversarial case: pandas infers datetimes by column
-    # name, so a literal "date" column is what convert_dates would catch.
+
     source.write_text(
         '[{"account_id": 1, "date": "2023-01-01", "opening_date": "2023-01-01", "status": "Active"},'
         ' {"account_id": 2, "date": "2023-02-01", "opening_date": "2023-02-01", "status": "Active"}]',
@@ -90,7 +80,6 @@ def test_json_transform_keeps_dates_as_strings(tmp_path: Path) -> None:
 
 
 def test_pandas_floor_is_declared_in_packaging_metadata() -> None:
-    """The pandas>=3 floor lives in pyproject.toml, not the environment."""
     import re
 
     from packaging.specifiers import SpecifierSet

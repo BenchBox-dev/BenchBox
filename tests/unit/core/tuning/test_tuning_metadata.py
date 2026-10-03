@@ -109,7 +109,6 @@ def test_metadata_validation_result_helpers():
 
 
 def test_fetch_helpers_support_execute_only_connections():
-    """ClickHouse Local/chDB exposes execute() but intentionally has no cursor()."""
     manager = TuningMetadataManager(_Adapter(platform_name="clickhouse-local"))
     connection = _ExecuteOnlyConn([("orders", "sorting")])
 
@@ -119,8 +118,6 @@ def test_fetch_helpers_support_execute_only_connections():
 
 
 class _QueryJobConn:
-    """BigQuery Client shape: neither cursor() nor execute(), only query() jobs."""
-
     def __init__(self, rows):
         self.rows = rows
         self.queried: list[str] = []
@@ -137,7 +134,6 @@ class _QueryJobConn:
 
 
 def test_fetch_helpers_support_query_job_connections():
-    """BigQuery Client exposes query() jobs but no cursor() or execute()."""
     manager = TuningMetadataManager(_Adapter(platform_name="bigquery"))
     connection = _QueryJobConn([("orders", "sorting")])
 
@@ -152,14 +148,6 @@ def test_fetch_one_query_job_connection_empty():
 
 
 def test_fetch_helpers_qualify_metadata_reads_through_adapter():
-    """Job-style reads must resolve the qualified uppercased table.
-
-    BigQuery creation qualifies/uppercases benchbox_tuning_metadata via
-    execute_query() (_convert_to_bigquery_table -> _qualify_table_target),
-    while the job connection carries no default dataset. The query()-job
-    branch therefore routes SELECTs through the same adapter qualification
-    instead of passing the raw unqualified lowercase SQL to query().
-    """
 
     class _QualifyingAdapter(_Adapter):
         def _qualify_table_names(self, sql):
@@ -177,7 +165,6 @@ def test_fetch_helpers_qualify_metadata_reads_through_adapter():
 
 
 def test_fetch_helpers_query_job_without_adapter_qualification_passes_sql_through():
-    """Adapters without _qualify_table_names keep the previous behavior."""
 
     class _PlainAdapter:
         platform_name = "custom"
@@ -190,8 +177,6 @@ def test_fetch_helpers_query_job_without_adapter_qualification_passes_sql_throug
 
 
 class _JobStyleAdapter(_Adapter):
-    """Adapter returning a query()-only connection like bigquery.Client."""
-
     def __init__(self):
         super().__init__(platform_name="bigquery")
         self.executed_sql: list[str] = []
@@ -214,11 +199,6 @@ def _manager_with_job_adapter():
 
 
 def test_batch_insert_records_supports_query_job_connections():
-    """Writes must not call cursor()/commit() on job-style clients.
-
-    The BigQuery client exposes only query(): placeholders are inlined via
-    the adapter's execute_query path so the qualified table resolves.
-    """
     manager = _manager_with_job_adapter()
     record = TuningMetadata(
         table_name="orders",
@@ -237,7 +217,6 @@ def test_batch_insert_records_supports_query_job_connections():
 
 
 def test_clear_tunings_uses_where_true_for_bigquery():
-    """BigQuery rejects WHERE-less DELETE: the clear spells WHERE TRUE."""
     manager = _manager_with_job_adapter()
     manager._table_exists_check = lambda: True
     assert manager.clear_tunings() is True
@@ -262,11 +241,6 @@ def test_create_table_sql_varies_by_platform(platform, needle):
 
 @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-local", "clickhouse-server"])
 def test_clickhouse_create_table_sql_does_not_corrupt_varchar_columns(platform):
-    """A prior str.replace(")", ...) rewrote every closing paren in the base
-    SQL, including each VARCHAR(N) column-width parenthesis, not just the
-    CREATE TABLE's final closing paren - producing invalid DDL like
-    'VARCHAR(255 ENGINE = MergeTree() ... ) NOT NULL'.
-    """
     sql = TuningMetadataManager(_Adapter(platform_name=platform))._get_create_table_sql()
 
     assert "VARCHAR(255) NOT NULL" in sql
@@ -498,15 +472,6 @@ def test_get_metadata_summary_handles_no_data_and_errors(monkeypatch):
     assert "boom" in summary["error"]
 
 
-# --- Widened drift persistence: unique/check constraints + platform optimizations ---
-#
-# TuningMetadataManager._as_benchmark_tunings previously only carried pk/fk
-# enable flags + table_tunings; unique/check constraints and ALL platform
-# optimizations (z-ordering, liquid clustering, bloom filters, ...) were
-# invisible to reused-database drift detection. The tests below cover the
-# section-hash marker rows that widen that comparison.
-
-
 def test_hash_section_is_stable_regardless_of_key_order():
     manager = TuningMetadataManager(_Adapter("duckdb"))
     payload_a = {"b": 1, "a": 2}
@@ -535,10 +500,6 @@ def test_build_section_marker_records_shape():
 
 
 def test_rebuild_tunings_from_records_skips_section_marker_rows():
-    """A prior version would KeyError here: sentinel tuning_type values like
-    "platform_optimizations_hash" aren't one of the four column-tuning keys
-    the per-table dict is seeded with.
-    """
     manager = TuningMetadataManager(_Adapter("duckdb"))
     records = [
         ("orders", TuningType.SORTING.value, "o_orderkey", 1, "h", datetime.now(), "duckdb"),
@@ -569,10 +530,6 @@ def test_rebuild_tunings_from_records_skips_section_marker_rows():
 
 
 def test_compare_section_hashes_warns_when_no_markers_found(monkeypatch):
-    """must_preserve: a benchbox_tuning_metadata table written before this
-    widening has no section-marker rows at all. That must be a warning
-    (drift for those sections is simply unknown), never an error.
-    """
     manager = TuningMetadataManager(_Adapter("duckdb"))
     monkeypatch.setattr(manager, "_load_section_markers", dict)
 
@@ -595,7 +552,6 @@ def test_compare_section_hashes_detects_platform_optimization_drift(monkeypatch)
     }
     monkeypatch.setattr(manager, "_load_section_markers", lambda: saved_markers)
 
-    # Reused database, now expecting no platform optimizations.
     drifted = UnifiedTuningConfiguration()
 
     result = MetadataValidationResult()
@@ -768,14 +724,6 @@ def test_marker_write_failure_is_nonfatal_but_observable(monkeypatch):
 
 
 class _FakeCursor:
-    """Minimal SQL-shape-aware cursor backed by a shared in-memory row list.
-
-    Only understands the handful of statement shapes TuningMetadataManager
-    actually issues (see metadata.py): CREATE TABLE/INDEX, DELETE FROM,
-    INSERT INTO, the full column-tuning SELECT, the "table exists" COUNT(*)
-    probe, and the section-marker SELECT filtered by table_name.
-    """
-
     def __init__(self, table: list[tuple]):
         self._table = table
         self._result: Any = []
@@ -821,11 +769,6 @@ class _FakeConn:
 
 
 class _FakeAdapter:
-    """Stateful fake platform adapter simulating a single persisted table,
-    shared across manager instances -- lets tests exercise a genuine
-    save -> reuse -> validate round trip instead of monkeypatching internals.
-    """
-
     def __init__(self, platform_name: str = "duckdb"):
         self.platform_name = platform_name
         self.canonical_platform_type = platform_name
@@ -840,19 +783,12 @@ class _FakeAdapter:
 
 
 def test_validate_unified_tunings_detects_platform_optimization_drift_on_reuse():
-    """w3: reused-database drift detection must catch a toggled platform
-    optimization (e.g. z_ordering) that _as_benchmark_tunings previously
-    dropped entirely. Full round trip through save_unified_tunings and
-    validate_unified_tunings against a shared fake database.
-    """
     adapter = _FakeAdapter("databricks")
 
     original = UnifiedTuningConfiguration()
     original.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
     assert TuningMetadataManager(adapter).save_unified_tunings(original) is True
 
-    # Simulate reusing the same database with a different expected config
-    # (z-ordering no longer requested).
     drifted = UnifiedTuningConfiguration()
     result = TuningMetadataManager(adapter).validate_unified_tunings(drifted)
 
@@ -905,11 +841,6 @@ def test_validate_unified_tunings_detects_sort_attribute_drift_on_reuse():
 
 
 def test_validate_unified_tunings_old_format_table_loads_without_error():
-    """must_preserve: a benchbox_tuning_metadata table written by a version
-    that predates this widening has no section-marker rows at all. Loading
-    and validating it must not error -- drift for the widened sections is
-    simply unknown (a warning), not a hard failure.
-    """
     adapter = _FakeAdapter("duckdb")
     adapter.table.append(("orders", TuningType.SORTING.value, "o_orderkey", 1, "somehash", datetime.now(), "duckdb"))
 
@@ -923,19 +854,12 @@ def test_validate_unified_tunings_old_format_table_loads_without_error():
 
 
 def test_validate_unified_tunings_section_only_config_matches_is_valid():
-    """Regression: a config with platform optimizations/constraint toggles but
-    ZERO column-based table tunings is exactly the whole-config-sections-only
-    scenario this widening exists for. load_tunings correctly filters sentinel
-    rows and returns a real (but empty, len==0) BenchmarkTunings -- validate_tunings
-    must not treat that falsy-but-not-None object as "no metadata found".
-    """
     adapter = _FakeAdapter("databricks")
 
     config = UnifiedTuningConfiguration()
     config.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
     assert TuningMetadataManager(adapter).save_unified_tunings(config) is True
 
-    # Re-validate the identical config against the same (reused) database.
     result = TuningMetadataManager(adapter).validate_unified_tunings(config)
 
     assert result.is_valid is True
@@ -944,20 +868,12 @@ def test_validate_unified_tunings_section_only_config_matches_is_valid():
 
 
 def test_validate_unified_tunings_section_only_config_detects_drift_without_false_hard_error():
-    """Companion to the above: when a section-only config *does* drift, the
-    result must carry the drift error/drifted_sections and must NOT also
-    carry the now-fixed false "No tuning metadata found in database" error --
-    that string previously fired at the same time genuine drift did, since
-    both come from the same (0 column-tunings, non-empty metadata) shape.
-    """
     adapter = _FakeAdapter("databricks")
 
     saved = UnifiedTuningConfiguration()
     saved.enable_platform_optimization(TuningType.Z_ORDERING, columns=["o_orderdate"])
     assert TuningMetadataManager(adapter).save_unified_tunings(saved) is True
 
-    # Reused database, now expecting no platform optimizations -- still zero
-    # column-based table tunings on both sides.
     drifted = UnifiedTuningConfiguration()
     result = TuningMetadataManager(adapter).validate_unified_tunings(drifted)
 
@@ -968,11 +884,7 @@ def test_validate_unified_tunings_section_only_config_detects_drift_without_fals
 
 
 def test_validate_tunings_still_hard_errors_on_a_truly_empty_table():
-    """Not every falsy load_tunings() result is the section-only scenario:
-    a table with zero rows at all (nothing ever saved) must still hard-error
-    when the expected config has real column-based table tunings to check.
-    """
-    adapter = _FakeAdapter("duckdb")  # no rows appended -- truly empty
+    adapter = _FakeAdapter("duckdb")
 
     unified = UnifiedTuningConfiguration()
     unified.table_tunings["orders"] = TableTuning(table_name="orders", sorting=[_col("o_orderkey", 1)])
@@ -984,14 +896,6 @@ def test_validate_tunings_still_hard_errors_on_a_truly_empty_table():
 
 
 def test_load_unified_tunings_section_only_config_is_not_none():
-    """Regression for #1187: load_unified_tunings previously used a
-    truthiness check (`if not benchmark_tunings`) instead of `is None`, so a
-    section-only config (platform optimizations/constraints, zero column
-    tunings) -- which load_tunings correctly returns as a real, empty
-    (len==0) BenchmarkTunings -- was silently converted to None. That broke
-    every caller, e.g. _validate_database_tunings' "DB has tuning metadata
-    but none expected" warning, which never fired for section-only configs.
-    """
     adapter = _FakeAdapter("databricks")
 
     config = UnifiedTuningConfiguration()

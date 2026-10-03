@@ -1,11 +1,3 @@
-"""Regression coverage for TPC-DS Q70 totals on the expression (Polars) DataFrame family.
-
-``ss_net_profit`` is a two-decimal DECIMAL in SQL, so the rollup totals are exact. Float
-sums are not: 0.1 + 0.2 is 0.30000000000000004. Unrounded totals can order differently
-from the SQL result when they are compared, so the expression impl rounds them to the
-source scale, as the pandas impl already does.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -14,7 +6,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def _q70_tables():
-    # One state, two counties. Profits whose float sums are not exactly representable.
+
     return {
         "store_sales": {
             "ss_sold_date_sk": [1, 1, 1],
@@ -43,4 +35,4 @@ def test_q70_expression_totals_are_rounded_to_the_decimal_scale(monkeypatch):
     totals = [row[0] for row in rows]
     assert totals, "Q70 returned no rows"
     assert all(total == round(total, 2) for total in totals), totals
-    assert 0.3 in totals  # county A: 0.1 + 0.2 must be exactly 0.3, not 0.30000000000000004
+    assert 0.3 in totals

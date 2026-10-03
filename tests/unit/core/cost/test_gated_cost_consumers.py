@@ -1,13 +1,3 @@
-"""Gate every cost consumer on cost_status (R15) and suppress fallback optimizer advice (R14).
-
-A fallback-priced number must not land in the local database, in plots, in
-platform rankings, in TCO projections, or in optimizer recommendations. Each
-consumer below either checks ``cost_status`` via
-:func:`benchbox.core.cost.models.published_total_cost` (or the warnings-based
-object-level equivalent) or receives a value already gated upstream at the
-per-query stamp point in ``cost/integration.py``.
-"""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -44,7 +34,6 @@ _NORMALIZED_SUMMARY = {
 
 
 def _athena_results(region: str):
-    """Athena-shaped results whose only status signal is the region fallback."""
     return make_benchmark_results(
         benchmark_name="TPC-H",
         platform="athena",
@@ -106,8 +95,7 @@ def _comparable_result(platform: str, cost_summary: dict | None):
 
 class TestPerQueryCostGatedAtStamp:
     def test_fallback_region_stamps_no_per_query_cost(self) -> None:
-        # sa-east-1 is a priced Athena region ($9.00/TB); moon-east-1 is unlisted
-        # and exercises the fallback path.
+
         results = add_cost_estimation_to_results(_athena_results("moon-east-1"))
 
         stamped = results.query_results[0]
@@ -119,7 +107,7 @@ class TestPerQueryCostGatedAtStamp:
         results = add_cost_estimation_to_results(_athena_results("us-east-1"))
 
         stamped = results.query_results[0]
-        # Decimal TB per the unit contract: 2^40 bytes at $5.00/TB.
+
         assert stamped["cost"] == pytest.approx((1024**4) / (10**12) * 5.0)
         assert "cost_status" not in stamped
         assert results.cost_summary["normalized_cost"]["cost_status"] == "normalized"
@@ -269,7 +257,6 @@ class TestOptimizerSuppressesFallbackPrices:
         )
 
     def test_unknown_node_type_suppresses_region_rule_with_reason(self) -> None:
-        """R14: the $1.00/$1.00 accidental None becomes a stated suppression."""
         report = CostOptimizer().analyze(
             benchmark_cost=self._redshift_cost(),
             platform_config={"platform": "redshift", "region": "us-east-1", "node_type": "mystery.xlarge"},

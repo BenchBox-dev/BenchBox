@@ -1,11 +1,3 @@
-"""Unit tests for TPC-DI Doris dialect overrides.
-
-Verifies that:
-- AQ7, AQ8, AQ10 replace JULIANDAY() with Doris-compatible date functions
-- EQ3 flattens the spurious double-nested COUNT scalar subquery
-- EQ7 uses the MySQL-compatible derived-table variant
-"""
-
 from __future__ import annotations
 
 import re
@@ -25,7 +17,6 @@ def _bench():
 
 
 def test_aq7_doris_replaces_julianday_with_datediff():
-    """AQ7 for Doris must not use JULIANDAY() and must use CURDATE()/DATE_SUB()."""
     q = _bench().get_queries(dialect="doris")["AQ7"]
     assert "JULIANDAY" not in q.upper(), f"AQ7 must not use JULIANDAY for Doris:\n{q}"
     assert "DATEDIFF(" in q, f"AQ7 must use DATEDIFF() for Doris:\n{q}"
@@ -34,21 +25,18 @@ def test_aq7_doris_replaces_julianday_with_datediff():
 
 
 def test_aq8_doris_replaces_julianday():
-    """AQ8 for Doris must not use JULIANDAY()."""
     q = _bench().get_queries(dialect="doris")["AQ8"]
     assert "JULIANDAY" not in q.upper(), f"AQ8 must not use JULIANDAY for Doris:\n{q}"
     assert "DATEDIFF(" in q, f"AQ8 must use DATEDIFF() for Doris:\n{q}"
 
 
 def test_aq10_doris_replaces_julianday():
-    """AQ10 for Doris must not use JULIANDAY()."""
     q = _bench().get_queries(dialect="doris")["AQ10"]
     assert "JULIANDAY" not in q.upper(), f"AQ10 must not use JULIANDAY for Doris:\n{q}"
     assert "DATEDIFF(" in q, f"AQ10 must use DATEDIFF() for Doris:\n{q}"
 
 
 def test_eq3_doris_flattens_nested_count():
-    """EQ3 for Doris must flatten the spurious double-nested COUNT scalar subquery."""
     q = _bench().get_queries(dialect="doris")["EQ3"]
     assert not re.search(
         r"SELECT\s+COUNT\s*\(\s*\*\s*\)\s+FROM\s+\(\s*SELECT\s+COUNT",
@@ -63,14 +51,12 @@ def test_eq3_doris_flattens_nested_count():
 
 
 def test_eq7_doris_uses_derived_table_variant():
-    """EQ7 for Doris must use the derived-table rewrite shared with StarRocks."""
     q = _bench().get_queries(dialect="doris")["EQ7"]
     assert "quality_metrics" in q, f"EQ7 must alias the derived table as quality_metrics:\n{q}"
     assert "overall_quality_score" in q, f"EQ7 must project overall_quality_score:\n{q}"
 
 
 def test_non_overridden_queries_present_in_doris_dialect():
-    """Doris dialect must not drop or empty any queries."""
     bench = _bench()
     base = bench.get_queries()
     doris = bench.get_queries(dialect="doris")

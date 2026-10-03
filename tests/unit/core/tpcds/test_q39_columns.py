@@ -1,10 +1,3 @@
-"""Regression coverage for the output columns of TPC-DS Q39 on both DataFrame families.
-
-The SQL selects ``inv1.w_warehouse_sk, inv1.i_item_sk, inv1.d_moy, inv1.mean, inv1.cov`` and the
-same five columns from ``inv2``: ten columns. A Polars join drops the right-hand key columns, so the
-expression family returned eight until the keys were joined on copies.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -34,8 +27,7 @@ def _context(family, tables):
 
 
 def _tables():
-    # One item in one warehouse. Each month has quantities 1, 1 and 100: mean 34, sample stdev about 57.2,
-    # so cov is about 1.68 and clears the "cov > 1" filter in both months.
+
     return {
         "inventory": {
             "inv_item_sk": [1] * 6,

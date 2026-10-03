@@ -1,10 +1,3 @@
-"""Regression coverage for SQL NULL semantics in the TPC-DS DataFrame implementations.
-
-SQL orders NULLs last (the reference engine's default), keeps a NULL grouping key as its own
-group, and treats NULLs as equal in INTERSECT and EXCEPT. Polars sorts NULLs first and does
-not match NULL join keys, and pandas drops NULL grouping keys, so each had to be handled.
-"""
-
 from __future__ import annotations
 
 from datetime import date
@@ -61,7 +54,6 @@ def test_joined_aggregate_keeps_a_null_group_and_sorts_it_last(family):
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_joined_aggregate_orders_null_as_the_largest_value(family):
-    """The reference SQL is ASC (NULLS LAST by default) and DESC NULLS FIRST, so NULL is the largest value."""
     from benchbox.core.tpcds.dataframe_queries import queries
 
     spec = {
@@ -90,7 +82,7 @@ def test_q34_sorts_null_names_last_and_reports_them_as_none(family, monkeypatch)
     from benchbox.core.tpcds.dataframe_queries import queries
 
     monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"year": 1998})
-    tickets = 15  # Q34 keeps tickets with 15 to 20 line items
+    tickets = 15
     tables = {
         "store_sales": {
             "ss_sold_date_sk": [1] * (2 * tickets),
@@ -125,7 +117,6 @@ def test_q34_sorts_null_names_last_and_reports_them_as_none(family, monkeypatch)
 
 
 def _three_channel_tables(store, catalog, web):
-    """Customers 1 (NULL names) and 2 ('Lee', 'Ann') buy on one date; customer 99 has no customer row."""
     return {
         "store_sales": {"ss_sold_date_sk": [1] * len(store), "ss_customer_sk": store},
         "catalog_sales": {"cs_sold_date_sk": [1] * len(catalog), "cs_bill_customer_sk": catalog},
@@ -139,11 +130,8 @@ def _three_channel_tables(store, catalog, web):
 @pytest.mark.parametrize(
     "query_id, impl_name, store, catalog, web, expected",
     [
-        # INTERSECT: the NULL-named customer is in all three channels and counts once.
         (38, "q38", [1, 2], [1], [1, 2], 1),
-        # EXCEPT: the NULL-named customer is removed by the other channels; only customer 2 remains.
         (87, "q87", [1, 2], [1], [1], 1),
-        # EXCEPT with nothing matching leaves both customers, including the NULL-named one.
         (87, "q87", [1, 2], [99], [99], 2),
     ],
 )
@@ -165,7 +153,7 @@ def test_q34_orders_a_null_preferred_flag_first_because_the_key_is_descending(fa
 
     monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"year": 1998})
     tickets = 15
-    flags = [None, "Y", "N"]  # three customers with identical names; c_preferred_cust_flag is DESC
+    flags = [None, "Y", "N"]
     count = len(flags)
     tables = {
         "store_sales": {
@@ -247,7 +235,6 @@ def _q76_tables():
 
 @pytest.mark.parametrize("family", FAMILIES)
 def test_q71_sums_only_nulls_to_null_and_sorts_it_first_because_the_key_is_descending(family, monkeypatch):
-    """SQL SUM of only NULLs is NULL, and ``ext_price DESC`` puts it first; ``i_brand_id`` ascends."""
     from benchbox.core.tpcds.dataframe_queries import queries
 
     monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"year": 2000, "month": 12})
@@ -281,7 +268,6 @@ def test_q76_sorts_a_null_category_last_and_reports_it_as_none(family, monkeypat
 
 
 def test_q71_and_q76_run_on_dask_and_keep_a_null_total():
-    """Dask has no lambda aggregation, prunes columns an opaque filter needs, and cannot test a lazy frame for NULLs."""
     dd = pytest.importorskip("dask.dataframe")
     import pandas as pd
 
@@ -299,7 +285,6 @@ def test_q71_and_q76_run_on_dask_and_keep_a_null_total():
         q71 = run(queries.q71_pandas_impl, _q71_tables())
         q76 = run(queries.q76_pandas_impl, _q76_tables())
 
-    # A mixed-direction sort keeps NULLs last on Dask, so only the values are compared for Q71.
     assert sorted(q71.itertuples(index=False, name=None), key=str) == sorted(
         [(1, "a", 18, 26, None), (3, "c", 18, 26, 20.0), (2, "b", 18, 26, 8.0)], key=str
     )
@@ -307,7 +292,6 @@ def test_q71_and_q76_run_on_dask_and_keep_a_null_total():
 
 
 def test_joined_aggregate_runs_on_dask_and_keeps_a_null_group_last():
-    """Dask Series has no ``notna``, and its sort cannot use helper columns; the helper must still run."""
     dd = pytest.importorskip("dask.dataframe")
     import pandas as pd
 

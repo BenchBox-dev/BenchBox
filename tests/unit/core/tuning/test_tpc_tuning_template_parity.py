@@ -1,5 +1,3 @@
-"""Cross-platform parity tests for TPC tuned templates."""
-
 from __future__ import annotations
 
 import subprocess
@@ -234,7 +232,7 @@ def test_tuning_companion_payload_carries_logical_profile_metadata() -> None:
         tunings_applied={"configuration": {"tuning_mode": "tuned"}},
         tuning_source_file="examples/tunings/duckdb/tpch_tuned.yaml",
         tuning_config_hash="abc123",
-        tuning_validation_status="applied_unverified",  # execution-derived; see test_validation_status_vocabulary.py
+        tuning_validation_status="applied_unverified",
         execution_metadata={"tuning_profile": metadata},
     )
 
@@ -273,7 +271,7 @@ def test_result_payload_platform_tuning_summary_carries_logical_profile_metadata
         tunings_applied={"configuration": {"tuning_mode": "tuned"}},
         tuning_source_file="examples/tunings/duckdb/tpch_tuned.yaml",
         tuning_config_hash="abc123",
-        tuning_validation_status="applied_unverified",  # execution-derived; see test_validation_status_vocabulary.py
+        tuning_validation_status="applied_unverified",
         execution_metadata={"tuning_profile": metadata},
     )
 
@@ -313,19 +311,13 @@ def test_cloud_tpc_tuned_templates_certify_against_logical_profile(platform: str
     )
 
     assert result.is_valid, [issue.to_dict() for issue in result.issues]
-    # Columns beyond a platform cap report as capped, not missing: mapped +
-    # capped covers every required candidate.
+
     assert result.mapped_count + result.capped_count == result.required_count
     assert result.unsupported_count == 0
     assert result.waived_count == 0
 
 
 def test_generated_cloud_templates_match_checked_in_files() -> None:
-    """The generator and the certified Snowflake templates must not drift.
-
-    Runs ``generate_cloud_tpc_templates.py --check`` so a hand edit to the
-    profile or a template fails CI until the generator is re-run.
-    """
     script = CHECKOUT_ROOT / "scripts" / "generate_cloud_tpc_templates.py"
     completed = subprocess.run(
         [sys.executable, str(script), "--check"],
@@ -337,7 +329,6 @@ def test_generated_cloud_templates_match_checked_in_files() -> None:
 
 
 def test_snowflake_templates_carry_at_most_four_clustering_columns() -> None:
-    """Snowflake fact tables stay within the adapter's RESUME RECLUSTER limit."""
     for benchmark_id in ("tpch", "tpcds"):
         payload = yaml.safe_load((TUNING_ROOT / "snowflake" / f"{benchmark_id}_tuned.yaml").read_text(encoding="utf-8"))
         for table, block in payload.get("table_tunings", {}).items():
@@ -346,16 +337,6 @@ def test_snowflake_templates_carry_at_most_four_clustering_columns() -> None:
 
 
 def test_bigquery_and_redshift_templates_stay_out_of_the_certified_set() -> None:
-    """BigQuery/Redshift layouts never reach the tables at execution time.
-
-    The capability registry records BigQuery partitioning/clustering and
-    Redshift distribution as preview-only and Redshift sorting as gated on
-    sorted ingestion (off in the generated templates), so tuned experiments
-    on those platforms would run untuned while profile metadata says the
-    mapping passed. The generator therefore certifies Snowflake only, and
-    this test pins that exclusion: no checked-in BigQuery/Redshift tuned
-    template may exist until the adapters render those layouts for real.
-    """
     for platform in ("bigquery", "redshift"):
         for benchmark_id in ("tpch", "tpcds"):
             assert not (TUNING_ROOT / platform / f"{benchmark_id}_tuned.yaml").exists(), (
@@ -365,14 +346,6 @@ def test_bigquery_and_redshift_templates_stay_out_of_the_certified_set() -> None
 
 
 def test_bigquery_cap_overflow_is_capped_not_missing(monkeypatch: pytest.MonkeyPatch) -> None:
-    """BigQuery's 4-column clustering cap reports overflow as capped.
-
-    Uses a synthetic seven-candidate profile over one table so the test does
-    not depend on the checked-in BigQuery tuned templates, which stay out of
-    the certified set until the adapter renders clustering for real. The
-    rendering gate is bypassed by monkeypatching the verified set to
-    clustering-only so this test isolates the cap-overflow accounting.
-    """
     from benchbox.core.tuning import profile_validation
     from benchbox.core.tuning.workload_profiles import (
         ACCEPTED,
@@ -436,15 +409,6 @@ def test_bigquery_cap_overflow_is_capped_not_missing(monkeypatch: pytest.MonkeyP
 def test_redshift_sorting_is_not_capped_by_the_distkey_limit(
     monkeypatch: pytest.MonkeyPatch, second_distribution: bool, include_sort: bool
 ) -> None:
-    """Redshift's single-key limit governs DISTKEY alone, not SORTKEY.
-
-    A synthetic two-candidate profile (one distribution-plus-locality
-    candidate, one locality-only candidate on the same table) keeps a
-    template that carries the DISTKEY plus both sort columns fully valid:
-    the second candidate's sorting entry must not be misread as capped.
-    The rendering gate is bypassed by monkeypatching the verified set to
-    distribution-plus-sorting so this test isolates the cap scoping.
-    """
     from benchbox.core.tuning import profile_validation
     from benchbox.core.tuning.workload_profiles import (
         ACCEPTED,

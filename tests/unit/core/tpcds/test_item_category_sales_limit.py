@@ -1,9 +1,3 @@
-"""Regression coverage for the LIMIT of the shared item-category sales helper.
-
-Q12 (web) and Q20 (catalog) end with ``LIMIT 100``; Q98 (store) has no LIMIT and must return
-every row. All three share ``_item_category_sales_*``, so the limit is a spec argument.
-"""
-
 from __future__ import annotations
 
 from datetime import date
@@ -12,7 +6,7 @@ import pytest
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
-ITEM_COUNT = 150  # more than the SQL LIMIT of 100
+ITEM_COUNT = 150
 
 
 def _tables(prefix: str, sales_table: str, prices: list[float | None] | None = None):
@@ -76,7 +70,6 @@ def test_item_category_sales_limit_follows_the_sql(family, query_id, prefix, sal
 
 @pytest.mark.parametrize("family", ["expression", "pandas"])
 def test_all_null_group_keeps_a_null_ratio_and_a_zero_group_stays_zero(family, monkeypatch):
-    """SQL SUM() over only NULLs is NULL, so the item's ratio is NULL; a real 0 sum gives 0.0."""
     from benchbox.core.tpcds.dataframe_queries import queries
 
     monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"sales_date": "2001-01-12"})
@@ -91,7 +84,6 @@ def test_all_null_group_keeps_a_null_ratio_and_a_zero_group_stays_zero(family, m
 
 @pytest.mark.parametrize("family", ["expression", "pandas"])
 def test_zero_total_class_keeps_nan_ratios(family, monkeypatch):
-    """A class whose revenue sums to a real 0 gives 0/0 = NaN in SQL; only an all-NULL group is NULL."""
     import math
 
     from benchbox.core.tpcds.dataframe_queries import queries

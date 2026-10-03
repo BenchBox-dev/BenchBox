@@ -1,13 +1,3 @@
-"""The core run service: configuration resolution and execution orchestration.
-
-`one-engine-core-run-service` w2. The characterization suite in
-tests/unit/cli/test_run_config_resolution_characterization.py already runs
-through this code, because BenchmarkOrchestrator._prepare_run_config now
-delegates here -- that is the pure-move proof. What this module adds is the
-service's own contract: that it can be called with no CLI object at all, and
-that core stays below platforms and cli.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -41,8 +31,6 @@ def _config(**kwargs) -> BenchmarkConfig:
 
 
 class TestLayering:
-    """The constraint that shapes every signature in the module."""
-
     def test_run_service_does_not_export_unused_request_or_plan_models(self):
         import benchbox.core.run_service as run_service
 
@@ -59,7 +47,6 @@ class TestLayering:
         assert offenders == []
 
     def test_the_service_resolves_without_importing_the_cli(self):
-        """A caller with no CLI must get a RunConfig, not an ImportError."""
         run_config = resolve_run_config(_config(), database_path="/tmp/x.duckdb", verbosity=SilentVerbosity())
 
         assert run_config.connection["database_path"] == "/tmp/x.duckdb"
@@ -67,10 +54,7 @@ class TestLayering:
 
 class TestResolveRunConfig:
     def test_a_path_object_is_stringified(self):
-        # The property under test is "a Path becomes a str", not the separator
-        # the host OS uses. Hardcoding the POSIX spelling failed on Windows,
-        # where str(Path("/tmp/db.duckdb")) is "\\tmp\\db.duckdb" and the
-        # behaviour is correct.
+
         database_path = Path("/tmp/db.duckdb")
         run_config = resolve_run_config(_config(), database_path=database_path, verbosity=SilentVerbosity())
 
@@ -83,7 +67,6 @@ class TestResolveRunConfig:
         assert run_config.iterations == GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
 
     def test_silent_verbosity_produces_a_quiet_run_config(self):
-        """The value MCP will pass, having no console to configure."""
         run_config = resolve_run_config(_config(), database_path="x", verbosity=SilentVerbosity())
 
         assert run_config.quiet is True
@@ -101,8 +84,6 @@ class TestResolveRunConfig:
 
 
 class TestOrchestratorDelegatesRatherThanDuplicates:
-    """A reintroduced local copy is how these surfaces drifted apart before."""
-
     def test_orchestrator_produces_the_same_run_config_as_the_service(self, tmp_path):
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
 
@@ -124,13 +105,11 @@ class TestOrchestratorDelegatesRatherThanDuplicates:
         source = (REPO_ROOT / "benchbox/cli/orchestrator.py").read_text(encoding="utf-8")
 
         assert "resolve_run_config" in source
-        # The moved arithmetic must not survive alongside the delegation.
+
         assert "GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS" not in source
 
 
 class TestExecutionPort:
-    """w3: orchestration in core, adapter construction injected by the surface."""
-
     @staticmethod
     def _phases(**kwargs):
         from benchbox.core.run_service import resolve_lifecycle_phases
@@ -209,7 +188,6 @@ class TestExecutionPort:
         assert "requested_phases" not in (config.options or {})
 
     def test_the_adapter_factory_receives_the_resolved_phases(self):
-        """The injection seam: core asks, the surface builds."""
         from unittest.mock import patch
 
         from benchbox.core.run_service import execute_run
@@ -245,7 +223,6 @@ class TestExecutionPort:
         assert lifecycle.call_args.kwargs["platform_adapter"] == "ADAPTER"
 
     def test_a_factory_returning_none_is_honoured(self):
-        """A data-only run has no database to adapt."""
         from unittest.mock import patch
 
         from benchbox.core.run_service import execute_run
@@ -294,10 +271,7 @@ class TestExecutionPort:
 
 
 class TestInteractionStaysInTheCli:
-    """The anti-pattern: interaction-scoped code must not follow into core."""
-
     def test_core_emits_no_console_output(self):
-        """Structural, not substring: no print calls, no console imports."""
         tree = ast.parse(RUN_SERVICE_SOURCE.read_text(encoding="utf-8"))
 
         called = {
@@ -315,7 +289,6 @@ class TestInteractionStaysInTheCli:
         assert not any(m.startswith("rich") or m.endswith("printing") for m in modules)
 
     def test_the_credential_retry_stayed_behind(self):
-        """Interactive recovery is CLI-scoped and must not have followed."""
         tree = ast.parse(RUN_SERVICE_SOURCE.read_text(encoding="utf-8"))
         defined = {node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)}
 
@@ -370,14 +343,6 @@ class TestInteractionStaysInTheCli:
 
 
 class TestTheExportedSurface:
-    """`__all__` is the layering contract's public face, so it must be true.
-
-    Three helpers migrated from MCP were once listed here under their old
-    module-private names while both surfaces imported them across package
-    boundaries, and five genuinely public names were missing entirely. Both
-    directions are checked so neither can drift back silently.
-    """
-
     @staticmethod
     def _module_level_public_names() -> set[str]:
         tree = ast.parse(RUN_SERVICE_SOURCE.read_text(encoding="utf-8"))
@@ -411,7 +376,6 @@ class TestTheExportedSurface:
         assert unresolved == [], f"exported but undefined: {unresolved}"
 
     def test_no_surface_imports_a_private_run_service_symbol(self):
-        """The underscore names were reachable because the surfaces imported them."""
         offenders = []
         for surface in ("benchbox/cli", "benchbox/mcp"):
             for path in sorted((REPO_ROOT / surface).rglob("*.py")):
