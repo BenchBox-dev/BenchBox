@@ -22,6 +22,15 @@
       "op": "update",
       "op_id": "b40eb46c159d464da1d364a92ec3c63a",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:22:49Z",
+      "client": "claude-code",
+      "generation": "ea2bcf86b3a34777a32118c4d02ecf23",
+      "op": "take",
+      "op_id": "b19174e5c83045bebaac06d3d796ae5b",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
