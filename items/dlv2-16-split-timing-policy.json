@@ -4,7 +4,7 @@
     "Fast-lane ceiling code, its JSON policy, ceiling log, and the timing-policy-fast-lane pre-push hook are isolated so dlv2-42/dlv2-44 can delete them without touching (a)",
     "Property ledger row for monotonic-clock policy points at the new location"
   ],
-  "context": "agy A2 (verified): R1 wrongly deleted both.\n\nStop checkpoint 2026-09-30 12:20 UTC: PR2448 remotea0d6098be65c880d6d316ba47a48e6f3ab6c5a13; clean LOCALe2c33d575614011df4601e58d49281f8ac5d7073 aftere950 merge/inventory217targets211public and acceptedP1 release-curation lists use both newproject-dependent tests. Meaningful isolatedgit-rm+actualpytestcollection OLD3FAIL1PASS→new100PASSzeroSKIP; Ruff/ty/hooksPASS, Tier2MuseSHIP0CriticalRequired/tmp/dlv2-2448-muse-review.log. Canonical not started; unpublished increment, P1thread stillunresolved. Must incorporate acceptedguard/currentdevelop, canonical/currentidentity/review/body thenmakepr-open and publishedfix reply/resolution. Existingclock/ceiling thresholds preserved. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
+  "context": "agy A2 (verified): R1 wrongly deleted both.\n\nClosed 2026-10-03 by merged PR #2448 (squash commit 4cb3bc85e7d68b01ca1abf446ac5643d9790cdd9, merged 2026-09-30T20:07Z). Verified on develop 922eaba6e: _project/scripts/timing_policy_check.py has no fast_lane references and runs standalone via hook timing-policy-check, the ci.yml tooling step and tests/unit/scripts/test_timing_policy_check.py; the ceiling lives in _project/scripts/fast_lane_ceiling_check.py with its own test, ceiling log and timing-policy-fast-lane pre-push hook; docs/development/dev-loop-property-ledger.md row 'Monotonic-clock policy (wall-clock part)' names timing_policy_check.py and timing_audit.py, and the ceiling script has its own pure-process row. Follow-up retirement of the ceiling is dlv2-42/dlv2-44 scope.",
   "description": "_project/scripts/timing_policy_check.py enforces two unrelated things: (a) the product invariant that benchmark code uses benchbox.utils.clock.mono_time() rather than wall clocks (with timing_audit.py and a wall-clock allowlist; AGENTS.md documents it), and (b) the fast-lane test-count ceiling (_check_fast_lane_policy, _project/config/fast_lane_ceiling_log.md). (a) is product safety and stays as a pre-commit hook and T1 check. (b) is dev-loop machinery replaced by dlv2-13 duration tiering.",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "generation": "116361936d824696afb9fe5fc0d18a63",
       "op": "take",
       "op_id": "aeb1b981d63b4e6fb81294450ed03808",
+      "session_id": "cc596d308acb47cca2393bab672e93be"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:9509e403d03f67d617690747",
+      "at": "2026-10-03T12:55:51Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7f269a42d48a47f8993554c9fdec7bff",
       "session_id": "cc596d308acb47cca2393bab672e93be"
     }
   ]
