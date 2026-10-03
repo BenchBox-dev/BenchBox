@@ -223,32 +223,40 @@
   order_by: ss1.ca_county
   year: 2000
 32:
-  days: 90
+  manufact_id: 269
   sales_date: '1998-03-18'
-  year: 2000
 33:
-  categories:
-  - Books
+  category: Books
   gmt_offset: -5.0
-  manufacturer_id: 88
   month: 3
   year: 1999
 34:
   buy_potential_1: '>10000'
   buy_potential_2: Unknown
-  county: Williamson County
-  state: TN
+  counties:
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
+  - Williamson County
   year: 1998
 35:
+  aggone: avg
+  aggthree: sum
+  aggtwo: max
   year: 1999
-  years:
-  - 1999
-  - 2000
-  - 2001
-  - 2002
 36:
-  state: TN
   states:
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
+  - TN
   - TN
   year: 2000
 37:
@@ -259,13 +267,9 @@
   - 964
   - 918
   - 849
-  month_end: 6
-  month_start: 1
   sales_date: '2001-06-02'
-  year: 2000
 38:
   dms: 1212
-  year: 2002
 39:
   months:
   - 1
@@ -273,7 +277,6 @@
   year: 2001
 40:
   sales_date: '1998-04-08'
-  year: 2000
 41:
   manufact_ids:
   - 738
@@ -290,22 +293,9 @@
   null_col: ss_addr_sk
   store_sk: 4
 45:
+  gbobc: ca_county
   qoy: 2
-  quarters:
-  - 1
-  - 2
-  - 3
   year: 2000
-  zip_codes:
-  - '85669'
-  - '86197'
-  - '88274'
-  - '83405'
-  - '86475'
-  - '85392'
-  - '85460'
-  - '80348'
-  - '81792'
 46:
   cities:
   - Midway
@@ -564,6 +554,7 @@
   year: 1999
 92:
   days: 90
+  manufact_id: 269
   sales_date: '1998-03-18'
   year: 2000
 93:

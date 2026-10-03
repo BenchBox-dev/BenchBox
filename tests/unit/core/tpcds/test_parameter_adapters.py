@@ -46,6 +46,26 @@ class TestAdapters:
     def test_q93_takes_the_reason_text(self):
         assert ADAPTERS[93]({"REASON.01": "Did not like the warranty"}) == {"reason": "Did not like the warranty"}
 
+    def test_q37_reproduces_the_templates_price_range(self):
+        logged = {
+            "PRICE.01": "22",
+            "INVDATE.01": "2001-06-02",
+            **{f"MANUFACT_ID.0{n}": str(n * 100) for n in (1, 2, 3, 4)},
+        }
+        assert ADAPTERS[37](logged) == {
+            "current_price_min": 22,
+            "current_price_max": 52,
+            "manufact_ids": [100, 200, 300, 400],
+            "sales_date": "2001-06-02",
+        }
+
+    def test_q34_collects_the_eight_counties_in_template_order(self):
+        logged = {f"COUNTY_{letter}.01": f"County {letter}" for letter in "ABCDEFGH"}
+        logged.update({"YEAR.01": "1999", "BPONE.01": ">10000", "BPTWO.01": "Unknown"})
+        parameters = ADAPTERS[34](logged)
+        assert parameters["counties"] == [f"County {letter}" for letter in "ABCDEFGH"]
+        assert parameters["year"] == 1999
+
     def test_q41_the_negative_control_has_no_adapter(self):
         assert 41 not in ADAPTERS
         assert adapter_query_ids() == (1, 3, 7, 8, 10, 12, 13, 14, 17, 39, 44, 49, 93)

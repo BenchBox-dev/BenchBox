@@ -58,7 +58,7 @@ pytestmark = [
 ]
 
 # Queries whose implementations read a key missing from the defaults file (literal fallback).
-LITERAL_FALLBACK = frozenset({33, 34, 41, 45, 54, 83, 84, 88, 90, 91})
+LITERAL_FALLBACK = frozenset({41, 54, 83, 84, 88, 90, 91})
 
 # Implementations that do not run to completion against the stand-in context.
 INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
@@ -69,8 +69,7 @@ HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
 # Category (b): everything else the inventory finds a gap in. This may only shrink.
 BINDING_GAP = frozenset(
     {
-        32, 33, 34, 35, 36, 37, 38, 40, 45, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83,
-        84, 86, 87, 90, 91, 92, 97, 98, 99,
+        50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 97, 98, 99,
     }
 )  # fmt: skip
 

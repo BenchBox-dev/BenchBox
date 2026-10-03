@@ -184,6 +184,54 @@ def _q31(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": int(values["YEAR.01"]), "order_by": values["AGG.01"]}
 
 
+def _q32(values: Mapping[str, str]) -> dict[str, Any]:
+    # The template's YEAR only feeds CSDATE, which is the first day of a 90-day window in the SQL.
+    return {"manufact_id": int(values["IMID.01"]), "sales_date": values["CSDATE.01"]}
+
+
+def _q33(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "gmt_offset": float(values["GMT.01"]), "category": values["CATEGORY.01"]}
+
+
+def _q34(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL tests d_year in (YEAR, YEAR+1, YEAR+2); the implementation adds the offsets itself.
+    return {
+        "year": int(values["YEAR.01"]),
+        "counties": [values[f"COUNTY_{letter}.01"] for letter in "ABCDEFGH"],
+        "buy_potential_1": values["BPONE.01"],
+        "buy_potential_2": values["BPTWO.01"],
+    }
+
+
+def _q35(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "aggone": values["AGGONE.01"],
+        "aggtwo": values["AGGTWO.01"],
+        "aggthree": values["AGGTHREE.01"],
+    }
+
+
+def _q36(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "states": [values[f"STATE_{letter}.01"] for letter in "ABCDEFGH"]}
+
+
+def _q37(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL tests i_current_price between PRICE and PRICE+30.
+    price = int(values["PRICE.01"])
+    return {
+        "current_price_min": price,
+        "current_price_max": price + 30,
+        "manufact_ids": [int(value) for value in _listed(values, "MANUFACT_ID")],
+        "sales_date": values["INVDATE.01"],
+    }
+
+
+def _q38(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"dms": int(values["DMS.01"])}
+
+
 def _q39(values: Mapping[str, str]) -> dict[str, Any]:
     # The SQL compares month MONTH with month MONTH+1; the log has only MONTH.
     year, month = _year_and_month(values)
@@ -192,6 +240,14 @@ def _q39(values: Mapping[str, str]) -> dict[str, Any]:
 
 def _q44(values: Mapping[str, str]) -> dict[str, Any]:
     return {"store_sk": int(values["STORE.01"]), "null_col": values["NULLCOLSS.01"]}
+
+
+def _q40(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"sales_date": values["SALES_DATE.01"]}
+
+
+def _q45(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"year": int(values["YEAR.01"]), "qoy": int(values["QOY.01"]), "gbobc": values["GBOBC.01"]}
 
 
 def _q49(values: Mapping[str, str]) -> dict[str, Any]:
@@ -224,6 +280,17 @@ ADAPTERS: dict[int, Adapter] = {
     31: _q31,
     39: _q39,
     44: _q44,
+    32: _q32,
+    33: _q33,
+    34: _q34,
+    35: _q35,
+    36: _q36,
+    37: _q37,
+    38: _q38,
+    39: _q39,
+    40: _q40,
+    44: _q44,
+    45: _q45,
     49: _q49,
     93: _q93,
 }
