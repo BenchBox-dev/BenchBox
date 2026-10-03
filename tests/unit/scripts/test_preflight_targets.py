@@ -124,6 +124,16 @@ def test_deleted_test_file_is_not_selected(repo: Path) -> None:
     assert pt.map_tests(repo, paths) == []
 
 
+def test_renamed_source_keeps_the_old_path_for_test_mapping(repo: Path) -> None:
+    _git(repo, "mv", "benchbox/core/engine.py", "benchbox/core/motor.py")
+    _commit_all(repo)
+
+    paths = pt.changed_paths(repo, "origin/develop")
+
+    assert paths == ["benchbox/core/engine.py", "benchbox/core/motor.py"]
+    assert pt.map_tests(repo, paths) == ["tests/integration/test_engine.py", "tests/unit/core/test_engine.py"]
+
+
 def test_project_scripts_module_maps_to_its_test(repo: Path) -> None:
     _write(repo, "_project/scripts/audit.py")
     _write(repo, "tests/unit/scripts/test_audit.py")

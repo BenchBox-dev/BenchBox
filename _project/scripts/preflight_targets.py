@@ -17,8 +17,8 @@ def _git_lines(repo: Path, *args: str) -> list[str]:
 
 def changed_paths(repo: Path, base_ref: str) -> list[str]:
     base = _git_lines(repo, "merge-base", base_ref, "HEAD")[0]
-    names = set(_git_lines(repo, "diff", "--name-only", f"{base}...HEAD"))
-    names.update(_git_lines(repo, "diff", "--name-only", "HEAD"))
+    names = set(_git_lines(repo, "diff", "--name-only", "--no-renames", f"{base}...HEAD"))
+    names.update(_git_lines(repo, "diff", "--name-only", "--no-renames", "HEAD"))
     names.update(_git_lines(repo, "ls-files", "--others", "--exclude-standard"))
     return sorted(names)
 
