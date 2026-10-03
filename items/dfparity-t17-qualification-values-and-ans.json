@@ -4,7 +4,7 @@
     "Value-level answer parsing has unit tests for normal, NULLS_FIRST and NULLS_LAST answer files, and a parse error fails loudly instead of returning a partial mapping (the t17b branch currently warns and returns partial results, loader.py ~507-543)",
     "The 8 SF=1-empty queries are confirmed to have non-empty answer sets in a test"
   ],
-  "context": "Owner decision D7 (2026-10-03): part 2 (wt-tpcds-t17b, which edits benchbox/core/expected_results/loader.py, a soundness path) waits until #2567 retires the merge queue. #2552 (part 1) merged. 2026-10-03: part 2 was merged with develop locally and commit 28f6a14dd makes parse errors raise ValueError naming the file and the result set. The only official file that does not parse is 24.ans (its second column is one character shorter than its dashes); it is currently named in _UNPARSEABLE_ANSWER_FILES and skipped. That conflicts with t18 ('fails unless all 99 answer sets parse'), so 24.ans must be parsed instead (a fix is in progress). Not pushed; a fresh preflight is needed after merging develop again.",
+  "context": "Owner decision D7 (2026-10-03): part 2 (wt-tpcds-t17b, which edits benchbox/core/expected_results/loader.py, a soundness path) waits until #2567 retires the merge queue. #2552 (part 1) merged. 2026-10-03: part 2 is local at 0ee964148, merged with develop. Parse errors raise ValueError naming the file and the result set. 24.ans (fields drift 1-2 columns left of the dashes) now parses through a bounded fallback: it is tried only after the exact cut fails, allows at most 2 characters of drift, and requires exactly one field per column. With the fallback off, only 24.ans fails. All 129 official files parse, and all 99 queries load for both null orders. The Q24 values were checked by eye against the file. 173 expected_results tests pass. Not pushed; a fresh preflight is needed after merging develop again.",
   "description": "Commit the specification's qualification parameter values as a data file with a test against the spec text (_sources/tpc-ds/specification/specification_4.0.0.pdf). Extend benchbox/core/expected_results/loader.py, which parses only row counts for TPC-DS (parse_tpcds_answer_file, ~line 66), to parse answer-set values (_sources/tpc-ds/answer_sets/<n>.ans), including the _NULLS_FIRST and _NULLS_LAST variants, following the TPC-H load_tpch_value_digests pattern (~line 224). The 8 queries empty at SF=1 in the gate (8, 24, 25, 29, 37, 41, 54, 58) have non-empty official answer sets (verified), so they are parameter problems, not legitimately empty.",
   "sessions": [
     {
@@ -45,6 +45,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "e3c5ffb2ab7d478a89a8bb984783bcc6",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T15:39:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f29a9cf761f148f1a6f69baa8844d900",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
