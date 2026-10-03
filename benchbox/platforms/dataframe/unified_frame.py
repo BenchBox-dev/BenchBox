@@ -1735,30 +1735,12 @@ class UnifiedExpr(_DataFusionDeferredOperations):
     # =========================================================================
 
     def rank(self, method: str = "min", descending: bool = False) -> UnifiedExpr:
-        """Compute rank within partition.
-
-        Provides unified ranking:
-        - Polars: Uses .rank(method=method, descending=descending)
-        - PySpark: Requires Window specification - returns a deferred rank expression
-        - DataFusion: Requires Window specification - returns a deferred rank expression
-
-        Note: For PySpark/DataFusion, this returns a deferred expression. The actual ranking
-        requires calling .over() with a window specification.
-
-        Args:
-            method: Ranking method: "min", "max", "dense", "ordinal", "average"
-            descending: Whether to rank in descending order
-
-        Returns:
-            UnifiedExpr with rank values (Polars) or deferred for window (PySpark/DataFusion)
-        """
         if self._is_pyspark:
             # For PySpark, we need to store the rank parameters for later use with over()
             # Return a wrapper that tracks the ranking need
             # The actual rank will be computed when over() is called
             return _PySparkDeferredRank(self._expr, method, descending)
         if self._is_datafusion:
-            # For DataFusion, we also need deferred ranking with over()
             return _DataFusionDeferredRank(self._expr, method, descending)
         return UnifiedExpr(self._expr.rank(method=method, descending=descending))
 
@@ -2110,6 +2092,31 @@ class _PySparkDeferredRank(UnifiedExpr):
         return UnifiedExpr(rank_expr)
 
 
+_DATAFUSION_RANK_METHODS = frozenset({"min", "max", "dense", "ordinal", "average"})
+
+
+def _datafusion_whole_frame_rank(expr: DataFusionExpr, method: str, descending: bool) -> DataFusionExpr:
+    from datafusion import functions as df_f, lit as df_lit
+    from datafusion.expr import Window
+
+    nulls_last_window = Window(order_by=[expr.sort(ascending=not descending, nulls_first=False)])
+    rows_sharing_value = df_f.count(expr).over(Window(partition_by=[expr]))
+    min_rank = df_f.rank().over(nulls_last_window)
+    if method == "min":
+        ranked = min_rank
+    elif method == "dense":
+        ranked = df_f.dense_rank().over(nulls_last_window)
+    elif method == "ordinal":
+        ranked = df_f.row_number().over(nulls_last_window)
+    elif method == "max":
+        ranked = min_rank + rows_sharing_value - df_lit(1)
+    elif method == "average":
+        ranked = min_rank + (rows_sharing_value - df_lit(1)) / df_lit(2.0)
+    else:
+        raise ValueError(f"Unsupported rank method: {method!r}. Expected one of {sorted(_DATAFUSION_RANK_METHODS)}.")
+    return df_f.when(expr.is_null(), df_lit(None)).otherwise(ranked)
+
+
 class _DataFusionDeferredRank(UnifiedExpr):
     """Deferred rank expression for DataFusion.
 
@@ -2125,7 +2132,8 @@ class _DataFusionDeferredRank(UnifiedExpr):
             method: Ranking method: "min", "max", "dense", "ordinal", "average"
             descending: Whether to rank in descending order
         """
-        super().__init__(expr)
+        super().__init__(_datafusion_whole_frame_rank(expr, method, descending))
+        self._rank_source = expr
         self._rank_method = method
         self._rank_descending = descending
 
@@ -2134,15 +2142,6 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_by: str | list[str],
         order_by: str | None = None,
     ) -> UnifiedExpr:
-        """Apply ranking over a window partition.
-
-        Args:
-            partition_by: Column(s) to partition by
-            order_by: Optional column to order by (ignored, uses self._expr)
-
-        Returns:
-            UnifiedExpr with rank values
-        """
         from datafusion import col as df_col, functions as df_f
         from datafusion.expr import Window
 
@@ -2151,7 +2150,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_exprs = [df_col(c) if isinstance(c, str) else c for c in partition_cols]
 
         # Build ordering based on the expression
-        order_expr = self._expr.sort(ascending=not self._rank_descending)
+        order_expr = self._rank_source.sort(ascending=not self._rank_descending)
 
         # Build Window specification
         window = Window(partition_by=partition_exprs, order_by=[order_expr])

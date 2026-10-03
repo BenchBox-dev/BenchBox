@@ -517,6 +517,97 @@ def test_datafusion_string_add_concat(datafusion_frame):
     assert d["name_excl"] == ["Alice!", "Bob!"]
 
 
+_RANK_VALUES = [3.0, None, 1.0, 3.0, 2.0, None, 5.0, 1.0]
+
+
+_ASCENDING_MIN_RANK_BY_ID = {0: 4, 1: None, 2: 1, 3: 4, 4: 3, 5: None, 6: 6, 7: 1}
+_DESCENDING_TOP_TWO_MIN_RANK_BY_ID = [(0, 2), (3, 2), (6, 1)]
+
+
+def _non_null_ranks(rank_by_id):
+    return sorted(rank for rank in rank_by_id.values() if rank is not None)
+
+
+def _null_rank_ids(rank_by_id):
+    return {row_id for row_id, rank in rank_by_id.items() if rank is None}
+
+
+@pytest.fixture()
+def datafusion_rank_frame():
+    ctx = datafusion.SessionContext()
+    table = pa.table(
+        {"id": list(range(len(_RANK_VALUES))), "x": _RANK_VALUES, "g": ["a", "a", "a", "a", "b", "b", "b", "b"]}
+    )
+    ctx.register_record_batches("rank_t", [table.to_batches()])
+    return UnifiedLazyFrame(ctx.sql("SELECT * FROM rank_t"), adapter=SimpleNamespace(platform_name="DataFusion"))
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+@pytest.mark.parametrize("descending", [False, True])
+@pytest.mark.parametrize("method", ["min", "max", "dense", "ordinal", "average"])
+def test_datafusion_rank_without_over_ranks_the_whole_frame(datafusion_rank_frame, method, descending):
+    pl = pytest.importorskip("polars")
+
+    result = datafusion_rank_frame.with_columns(
+        UnifiedExpr(datafusion.col("x")).rank(method=method, descending=descending).alias("r")
+    ).collect()
+    got = dict(zip(result.column("id").to_pylist(), result.column("r").to_pylist(), strict=True))
+
+    expected_series = pl.DataFrame({"x": _RANK_VALUES}).select(pl.col("x").rank(method=method, descending=descending))[
+        "x"
+    ]
+    expected = dict(enumerate(expected_series.to_list()))
+
+    assert len(got) == len(_RANK_VALUES)
+    if method == "ordinal":
+        assert _non_null_ranks(got) == _non_null_ranks(expected)
+        assert _null_rank_ids(got) == _null_rank_ids(expected)
+    else:
+        assert got == expected
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_rank_without_over_returns_ranks_not_the_input_column(datafusion_rank_frame):
+    result = datafusion_rank_frame.with_columns(
+        UnifiedExpr(datafusion.col("x")).rank(method="min").alias("r")
+    ).collect()
+    got = dict(zip(result.column("id").to_pylist(), result.column("r").to_pylist(), strict=True))
+
+    assert got == _ASCENDING_MIN_RANK_BY_ID
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_rank_without_over_column_can_be_filtered_like_an_ordinary_column(datafusion_rank_frame):
+    ranked = datafusion_rank_frame.with_columns(
+        UnifiedExpr(datafusion.col("x")).rank(method="min", descending=True).alias("rnk")
+    )
+    result = ranked.filter(UnifiedExpr(datafusion.col("rnk")) <= 2).select(["id", "rnk"]).collect()
+
+    id_and_rank = zip(result.column("id").to_pylist(), result.column("rnk").to_pylist(), strict=True)
+    assert sorted(id_and_rank) == _DESCENDING_TOP_TWO_MIN_RANK_BY_ID
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_rank_over_partition_still_partitions():
+    ctx = datafusion.SessionContext()
+    table = pa.table(
+        {"id": [0, 1, 2, 3, 4, 5], "x": [3.0, 1.0, 3.0, 2.0, 9.0, 4.0], "g": ["a", "a", "a", "b", "b", "b"]}
+    )
+    ctx.register_record_batches("rank_g", [table.to_batches()])
+    frame = UnifiedLazyFrame(ctx.sql("SELECT * FROM rank_g"), adapter=SimpleNamespace(platform_name="DataFusion"))
+
+    result = frame.with_columns(UnifiedExpr(datafusion.col("x")).rank(method="min").over("g").alias("r")).collect()
+    got = dict(zip(result.column("id").to_pylist(), result.column("r").to_pylist(), strict=True))
+
+    assert got == {1: 1, 0: 2, 2: 2, 3: 1, 5: 2, 4: 3}
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_rank_rejects_unknown_method(datafusion_rank_frame):
+    with pytest.raises(ValueError, match="Unsupported rank method"):
+        UnifiedExpr(datafusion.col("x")).rank(method="bogus")
+
+
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
 def test_datafusion_integer_division_is_true_division(datafusion_frame):
     _, frame = datafusion_frame

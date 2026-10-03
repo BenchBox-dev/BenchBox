@@ -30,6 +30,9 @@ class _DFExpr:
     def over(self, window):
         return _DFExpr(("over", self.value, window))
 
+    def is_null(self):
+        return _DFExpr(("is_null", self.value))
+
     def filter(self, condition):
         return _DFAggExpr(("filtered", self.value, getattr(condition, "value", condition)))
 
@@ -106,6 +109,9 @@ class _DFFunctions:
 
     def case(self, cond):
         return _DFCaseBuilder(cond)
+
+    def when(self, cond, value):
+        return _DFCaseBuilder(cond).when(cond, value)
 
 
 class _DFWindow:
