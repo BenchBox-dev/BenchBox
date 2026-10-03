@@ -6526,7 +6526,9 @@
         "dfparity-t05d-adapters-batch-d",
         "dfparity-t05e-adapters-batch-e",
         "dfparity-t05f-adapters-batch-f",
-        "dfparity-t05g-adapters-hard-coded"
+        "dfparity-t05g-adapters-hard-coded",
+        "dfparity-t05h-adapters-q44-q49-inventory",
+        "dfparity-t24-residual-divergences"
       ],
       "priority": "medium-high",
       "status": "open",
