@@ -531,6 +531,8 @@ def mask_embedded_sources(path: str, source: str, lang: str) -> str:
             source,
             flags=re.I | re.S,
         )
+    if lang == "css":
+        return re.sub(r"@apply\b[^;{}/]*;", lambda m: re.sub(r"[^\n]", " ", m.group()), source)
     return source
 
 

@@ -372,7 +372,8 @@ class PythonBindings:
                 and self.actor(path.func) == "pathlib.Path"
                 and len(path.args) == 1
                 and not path.keywords
-                and (self.literal(path.args[0]) or "").startswith("/")
+                and self.literal(path.args[0])
+                and not self.literal(path.args[0]).startswith("-")
             ):
                 return self.literal(path.args[0])
             leaf = None

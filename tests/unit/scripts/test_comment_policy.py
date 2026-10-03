@@ -2533,3 +2533,17 @@ def test_module_file_path_script_operand_is_resolved() -> None:
     assert scan("a.py", source, "python", {}) == []
     rebound = "__file__ = '-c'\n" + source
     assert [f.kind for f in scan("a.py", rebound, "python", {})] == ["payload-error"]
+
+
+def test_tailwind_apply_does_not_hide_css_comments() -> None:
+    source = ".btn {\n  @apply inline-flex px-4;\n}\n/* note */\n"
+    assert [(f.line, f.kind) for f in scan("a.css", source, "css")] == [(4, "comment")]
+
+
+@pytest.mark.parametrize(
+    ("literal", "kinds"),
+    [("_binaries/dsdgen", []), ("-c", ["payload-error"])],
+)
+def test_literal_path_executable_must_not_be_an_option(literal: str, kinds: list) -> None:
+    source = f"import subprocess\nfrom pathlib import Path\nexe = Path({literal!r})\nsubprocess.run([str(exe), '-c', 'print(1)'])\n"
+    assert [f.kind for f in scan("a.py", source, "python", {})] == kinds

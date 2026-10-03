@@ -171,11 +171,13 @@ class MyBenchmark(BaseBenchmark):
 
 ### Jupyter Notebooks
 
-```python
-# Install in notebook
-!uv pip install benchbox
+Install BenchBox in the notebook environment first:
 
-# Import and run
+```bash
+uv pip install benchbox
+```
+
+```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
@@ -185,7 +187,6 @@ benchmark.generate_data()
 adapter = DuckDBAdapter(database_path=":memory:")
 results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-# Visualize results
 import pandas as pd
 import matplotlib.pyplot as plt
 

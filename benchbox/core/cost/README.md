@@ -671,7 +671,8 @@ databricks_config = {
 
 ## Output Schema
 
-Cost information is included in the JSON export (schema v1.1):
+Cost information is included in the JSON export (schema v1.1). Each query's
+`cost` is its cost in USD:
 
 ```json
 {
@@ -682,7 +683,7 @@ Cost information is included in the JSON export (schema v1.1):
         {
           "id": "Q1",
           "execution_time": 1.5,
-          "cost": 0.25,  // Per-query cost in USD
+          "cost": 0.25,
           "resource_usage": {
             "credits_used": 0.125
           }

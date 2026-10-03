@@ -96,15 +96,15 @@ contract exception. The min-row floor ensures all tables should be generated.
 
 ### Manifest Fields
 
-The `_datagen_manifest.json` for a subscale run must include:
+The `_datagen_manifest.json` for a subscale run must include these fields,
+alongside the other standard manifest fields:
 
 ```json
 {
   "benchmark": "tpcds",
   "scale_factor": 0.1,
   "compliance_class": "unofficial_subscale",
-  "expected_table_count": 25,
-  ...
+  "expected_table_count": 25
 }
 ```
 
