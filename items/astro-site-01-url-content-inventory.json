@@ -5,7 +5,7 @@
     "Diff mode exits non-zero on any missing path or broken internal link",
     "Make target added and registered in make/inventory.json"
   ],
-  "context": "Sphinx uses the html builder (URLs end in .html). Blog posts live at /blog/YYYY-MM-DD-slug.html and the feed at /blog/atom.xml. Assemble copies _static and _images to the site root. The inventory must cover the routes captured by e2e/captures/public-site-pages.spec.ts.",
+  "context": "Sphinx uses the html builder (URLs end in .html). Blog posts live at /blog/YYYY-MM-DD-slug.html and the feed at /blog/atom.xml. Assemble copies _static and _images to the site root. The inventory must cover the routes captured by e2e/captures/public-site-pages.spec.ts.\n\nDONE 2026-10-03: merged in https://github.com/BenchBox-dev/BenchBox/pull/2585. scripts/site_inventory.py (build/diff/check, sharded output) with 30 unit tests; baseline in _project/design/site-inventory/baseline-develop/ from 6a649c97 (6,230 paths, 1,919 HTML pages, 10 Atom entries, 106,270 ids; 16 files under 800 KB); diff exits non-zero on missing path, missing fragment, newly broken internal link, missing image, feed regression and canonical loss; check with known-broken-links.json (92 pre-existing incl. 10 Atom entry links to /blog/blog/). Make targets site-inventory, site-inventory-diff, site-inventory-check registered in make/inventory.json. Owed to astro-site-50: fragment-only expected-removal patterns for theme ids, feed allowances (see ADR 'Site inventory').",
   "description": "Add scripts/site_inventory.py. It reads an assembled site directory: the output of `assemble_public_site.py --site-dir site`, or the CI artifact public-site-assembled-*. It emits a deterministic, sorted JSON inventory with:\n- every served path (html, xml, images, css/js referenced by pages)\n- per HTML page: title, meta description, canonical, h1, ordered h2/h3 text, internal link targets, image srcs\n- the atom.xml entry ids, titles and links\n- the 404.html results SPA fallback (sessionStorage key benchbox.results.redirect)\n\nAdd a `diff` mode that compares two inventories and classifies each difference as missing path, changed heading, broken internal link, or missing image.\n\nCommit the baseline inventory produced from current develop as a text file under _project/ (not a binary). This is the reference that astro-site-50 checks against.",
   "links": [
     "scripts/assemble_public_site.py",
@@ -27,6 +27,14 @@
       "generation": "262d6df14b2443b1a419768cd167ed23",
       "op": "take",
       "op_id": "53d8f9da360e4f81ba5f44980b1f99d3",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T17:59:08Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "cf8445d4c3814cd4aa14d6ab2a52459b",
       "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
