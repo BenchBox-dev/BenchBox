@@ -195,21 +195,6 @@ class ExpectedResultsRegistry:
 
         return expected_result, LoadOutcome.HIT
 
-    def _get_benchmark_results(self, benchmark_key: str, scale_factor: float) -> BenchmarkExpectedResults | None:
-        """Get or load benchmark results for a specific scale factor.
-
-        Thread-safe: Uses lock to protect cache and single-flight pattern to prevent duplicate loads.
-
-        Args:
-            benchmark_key: Normalized benchmark name (lowercase)
-            scale_factor: Scale factor
-
-        Returns:
-            Benchmark expected results, or None if not available
-        """
-        results, _ = self._load_benchmark_results(benchmark_key, scale_factor)
-        return results
-
     def _load_benchmark_results(
         self, benchmark_key: str, scale_factor: float
     ) -> tuple[BenchmarkExpectedResults | None, LoadOutcome]:
