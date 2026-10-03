@@ -14,6 +14,15 @@
       "op": "create",
       "op_id": "3047982f552b4a5ea1c88cea623cd378",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ab23c3a6eef35cb685577a07",
+      "at": "2026-10-03T17:54:01Z",
+      "client": "codex-mcp-client",
+      "generation": "e3afa217bde2483396d5f58425cbc248",
+      "op": "take",
+      "op_id": "233f31f516044f4c8a713c2f6e3462da",
+      "session_id": "44c67cd709da49ea99eeabde2893ca2a"
     }
   ]
 }
