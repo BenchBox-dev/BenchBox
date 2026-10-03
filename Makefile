@@ -765,8 +765,6 @@ guards-fix:
 	@$(MAKE) -s compat-docs
 	@echo "-- vendor-derived pricing tables (offline, from checked-in evidence) --"
 	@$(MAKE) -s pricing-data
-	@echo "-- Makefile public contract inventory --"
-	@uv run -- python make/check_makefile_inventory.py --write
 	@echo "-- skill-sync (fail-closed: a missing wrapper aborts instead of no-op-ing) --"
 	@# Last regen step, contained: a failing skill-sync apply (e.g. an
 	@# unresolvable source rev in a fresh worktree) used to abort guards-fix

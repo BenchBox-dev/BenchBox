@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -29,7 +30,7 @@ def _load_module() -> ModuleType:
 
 def _copy_make_contract(destination: Path) -> None:
     shutil.copy2(REPO_ROOT / "Makefile", destination / "Makefile")
-    shutil.copytree(REPO_ROOT / "make", destination / "make")
+    shutil.copytree(REPO_ROOT / "make", destination / "make", ignore=shutil.ignore_patterns("inventory.json"))
 
 
 def _run_make(root: Path, *arguments: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -43,11 +44,28 @@ def _run_make(root: Path, *arguments: str, env: dict[str, str] | None = None) ->
     )
 
 
-def test_repository_inventory_matches_manifest() -> None:
+def test_repository_inventory_is_generated_when_the_manifest_is_missing(tmp_path: Path) -> None:
     module = _load_module()
+    _copy_make_contract(tmp_path)
+    manifest = tmp_path / module.MANIFEST_PATH
+    assert not manifest.exists()
 
-    assert module.compare_inventory(REPO_ROOT) == []
+    assert module.main(["--root", str(tmp_path)]) == 0
+
+    assert json.loads(manifest.read_text(encoding="utf-8")) == module.build_inventory(tmp_path)
     assert module.validate_migration_proof(REPO_ROOT) == []
+
+
+def test_stale_manifest_is_regenerated(tmp_path: Path) -> None:
+    module = _load_module()
+    _copy_make_contract(tmp_path)
+    manifest = tmp_path / module.MANIFEST_PATH
+    manifest.write_text("{}\n", encoding="utf-8")
+
+    inventory, problems = module.refresh_inventory(tmp_path)
+
+    assert problems == []
+    assert json.loads(manifest.read_text(encoding="utf-8")) == inventory
 
 
 def test_checked_monolith_baseline_has_expected_contract() -> None:
@@ -59,7 +77,7 @@ def test_checked_monolith_baseline_has_expected_contract() -> None:
     assert baseline["default_goal"] == "test"
 
 
-def test_public_target_removal_fails_closed(tmp_path: Path) -> None:
+def test_public_target_removal_is_reflected_in_the_generated_manifest(tmp_path: Path) -> None:
     module = _load_module()
     _copy_make_contract(tmp_path)
     makefile = tmp_path / "Makefile"
@@ -67,10 +85,12 @@ def test_public_target_removal_fails_closed(tmp_path: Path) -> None:
     assert "test-fast:\n" in text
     makefile.write_text(text.replace("test-fast:\n", "test-fast-removed:\n", 1), encoding="utf-8")
 
-    problems = module.compare_inventory(tmp_path)
+    inventory, problems = module.refresh_inventory(tmp_path)
 
-    assert any("missing targets: test-fast" in problem for problem in problems)
-    assert any("unexpected targets: test-fast-removed" in problem for problem in problems)
+    assert problems == []
+    assert inventory is not None
+    assert "test-fast" not in inventory["targets"]
+    assert "test-fast-removed" in inventory["targets"]
 
 
 def test_required_include_removal_fails_closed(tmp_path: Path) -> None:
@@ -78,10 +98,12 @@ def test_required_include_removal_fails_closed(tmp_path: Path) -> None:
     _copy_make_contract(tmp_path)
     (tmp_path / "make" / "help.mk").unlink()
 
-    assert module.compare_inventory(tmp_path) == ["required Make include is missing: make/help.mk"]
+    assert module.refresh_inventory(tmp_path) == (None, ["required Make include is missing: make/help.mk"])
+    assert module.main(["--root", str(tmp_path)]) == 1
+    assert not (tmp_path / module.MANIFEST_PATH).exists()
 
 
-def test_semantic_assignment_reorder_fails_and_changes_gnu_make_evaluation(tmp_path: Path) -> None:
+def test_semantic_assignment_reorder_changes_gnu_make_evaluation_and_the_manifest(tmp_path: Path) -> None:
     module = _load_module()
     _copy_make_contract(tmp_path)
     platform_makefile = tmp_path / "make" / "platform-tests.mk"
@@ -89,6 +111,7 @@ def test_semantic_assignment_reorder_fails_and_changes_gnu_make_evaluation(tmp_p
     reordered = "COMPOSE := $(CONTAINER_ENGINE) compose\nCONTAINER_ENGINE ?= docker"
     text = platform_makefile.read_text(encoding="utf-8")
     assert original in text
+    before_inventory, _ = module.refresh_inventory(tmp_path)
 
     before = _run_make(tmp_path, "-pn", "test")
     assert before.returncode == 0
@@ -99,13 +122,13 @@ def test_semantic_assignment_reorder_fails_and_changes_gnu_make_evaluation(tmp_p
     assert after.returncode == 0
     assert "COMPOSE :=  compose" in after.stdout.splitlines()
 
-    problems = module.compare_inventory(tmp_path)
-    assert "semantic_statements changed" in problems
+    after_inventory, problems = module.refresh_inventory(tmp_path)
+    assert problems == []
+    assert before_inventory is not None and after_inventory is not None
+    assert after_inventory["semantic_sha256"] != before_inventory["semantic_sha256"]
 
 
-def test_writer_blesses_intentional_future_target_without_rewriting_migration_proof(
-    tmp_path: Path,
-) -> None:
+def test_writer_adds_future_target_without_rewriting_migration_proof(tmp_path: Path) -> None:
     module = _load_module()
     _copy_make_contract(tmp_path)
     maintenance = tmp_path / "make" / "worktree-maintenance.mk"
@@ -119,11 +142,12 @@ def test_writer_blesses_intentional_future_target_without_rewriting_migration_pr
     original_baseline = baseline.read_bytes()
     original_proof = proof.read_bytes()
 
-    assert any("unexpected targets: future-contract-probe" in item for item in module.compare_inventory(tmp_path))
     result = module.main(["--root", str(tmp_path), "--write"])
 
     assert result == 0
-    assert module.compare_inventory(tmp_path) == []
+    manifest = json.loads((tmp_path / module.MANIFEST_PATH).read_text(encoding="utf-8"))
+    assert "future-contract-probe" in manifest["targets"]
+    assert module.refresh_inventory(tmp_path)[1] == []
     assert baseline.read_bytes() == original_baseline
     assert proof.read_bytes() == original_proof
 

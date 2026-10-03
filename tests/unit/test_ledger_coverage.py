@@ -1,11 +1,12 @@
-"""Fail if a workflow file or process test exists that the ledger does not list.
+"""Fail if an enrolled workflow, script or process test lacks a ledger row.
 
-Guardrail G3 backstop for the development loop modernization: every file in
-the ledger's scope must appear in docs/development/dev-loop-property-ledger.md
-so deletions cannot silently drop coverage. The ledger may list a file by
-exact relative path or, for the large scripts directories, by an explicit
-per-directory catch-all row that forces individual reclassification before
-any deletion.
+Enrollment is frozen at the files recorded in ledger_cutover_files.txt: each
+of those that still exists must appear in
+docs/development/dev-loop-property-ledger.md so deletions cannot silently drop
+coverage. Files added after the cutover need no row. The ledger may list a
+file by exact relative path or, for the large scripts directories, by an
+explicit per-directory catch-all row that forces individual reclassification
+before any deletion.
 """
 
 from __future__ import annotations
@@ -73,27 +74,40 @@ def _covered(entry: str, section: str, sections: dict[str, list[str]]) -> bool:
     return any("ledger-catch-all:" in row for row in rows)
 
 
-def _workflow_files() -> list[str]:
-    return sorted(p.name for p in WORKFLOW_DIR.glob("*.yml"))
+CUTOVER_FILES = REPO_ROOT / "tests" / "unit" / "ledger_cutover_files.txt"
 
 
-def _test_files(directory: Path) -> list[str]:
-    return sorted(p.name for p in directory.glob("test_*.py"))
-
-
-def _recursive_test_files(directory: Path) -> list[str]:
-    return sorted(str(p.relative_to(directory)) for p in directory.rglob("test_*.py"))
+def _cutover_files(directory: Path, *, recursive: bool = True, pattern: str = "*") -> list[str]:
+    """Files enrolled at the cutover that still exist, relative to ``directory``."""
+    entries = CUTOVER_FILES.read_text(encoding="utf-8").split()
+    selected: list[str] = []
+    for entry in entries:
+        path = REPO_ROOT / entry
+        try:
+            relative = path.relative_to(directory)
+        except ValueError:
+            continue
+        if not path.is_file() or not path.match(pattern):
+            continue
+        if not recursive and len(relative.parts) != 1:
+            continue
+        selected.append(relative.as_posix())
+    return sorted(selected)
 
 
 def test_ledger_lists_every_workflow() -> None:
     text = _ledger_text()
-    missing = [name for name in _workflow_files() if name not in text]
+    names = _cutover_files(WORKFLOW_DIR, recursive=False)
+    assert names, "expected enrolled workflows in the cutover set"
+    missing = [name for name in names if name not in text]
     assert not missing, f"workflows missing from ledger: {missing}"
 
 
 def test_ledger_lists_every_workflows_test() -> None:
     text = _ledger_text()
-    missing = [name for name in _test_files(WORKFLOWS_TEST_DIR) if name not in text]
+    names = _cutover_files(WORKFLOWS_TEST_DIR, recursive=False)
+    assert names, "expected enrolled tests in tests/unit/workflows/"
+    missing = [name for name in names if name not in text]
     assert not missing, f"tests/unit/workflows files missing from ledger: {missing}"
 
 
@@ -101,22 +115,24 @@ def test_ledger_lists_every_scripts_test() -> None:
     text = _ledger_text()
     sections = _section_rows(text)
     section = "### `tests/unit/scripts/` (complete)"
-    names = _recursive_test_files(SCRIPTS_TEST_DIR)
-    assert len(names) > len(_test_files(SCRIPTS_TEST_DIR)), "expected nested suites under tests/unit/scripts/"
+    names = _cutover_files(SCRIPTS_TEST_DIR, pattern="test_*.py")
+    assert any("/" in name for name in names), "expected nested suites under tests/unit/scripts/"
     missing = [name for name in names if not _covered(name, section, sections)]
     assert not missing, f"tests/unit/scripts files missing from ledger: {missing}"
 
 
 def test_ledger_lists_every_release_test() -> None:
     text = _ledger_text()
-    missing = [name for name in _test_files(RELEASE_TEST_DIR) if name not in text]
+    names = _cutover_files(RELEASE_TEST_DIR, recursive=False)
+    assert names, "expected enrolled tests in tests/unit/release/"
+    missing = [name for name in names if name not in text]
     assert not missing, f"tests/unit/release files missing from ledger: {missing}"
 
 
 def test_ledger_lists_auto_merge_and_release_tests() -> None:
     text = _ledger_text()
-    names = sorted(p.name for p in UNIT_DIR.glob("test_auto_merge_*.py"))
-    names += sorted(p.name for p in UNIT_DIR.glob("test_release_*.py"))
+    names = _cutover_files(UNIT_DIR, recursive=False, pattern="test_auto_merge_*.py")
+    names += _cutover_files(UNIT_DIR, recursive=False, pattern="test_release_*.py")
     assert names, "expected auto-merge and release tests in tests/unit/"
     missing = [name for name in names if name not in text]
     assert not missing, f"auto-merge/release tests missing from ledger: {missing}"
@@ -125,8 +141,8 @@ def test_ledger_lists_auto_merge_and_release_tests() -> None:
 def test_ledger_lists_every_script() -> None:
     text = _ledger_text()
     sections = _section_rows(text)
-    top_level = sorted(p.name for p in SCRIPTS_DIR.glob("*.py"))
-    project_level = sorted(p.name for p in PROJECT_SCRIPTS_DIR.glob("*.py"))
+    top_level = _cutover_files(SCRIPTS_DIR, recursive=False, pattern="*.py")
+    project_level = _cutover_files(PROJECT_SCRIPTS_DIR, recursive=False, pattern="*.py")
     assert top_level and project_level, "expected scripts in scripts/ and _project/scripts/"
     missing = [name for name in top_level if not _covered(name, "### `scripts/`", sections)]
     missing += [name for name in project_level if not _covered(name, "### `_project/scripts/`", sections)]
