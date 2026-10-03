@@ -142,6 +142,7 @@ class TestAdapters:
         assert {39, 44, 49, 93} <= set(adapter_query_ids())
         assert adapter_query_ids() == (39, 44, 49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 93)
         assert adapter_query_ids() == (39, 44, 49, 65, 66, 67, 70, 71, 76, 79, 82, 83, 93)
+        assert adapter_query_ids() == (39, 44, 49, 84, 86, 87, 90, 91, 92, 93, 97, 98, 99)
 
 
 class TestBinding:

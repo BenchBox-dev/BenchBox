@@ -361,6 +361,7 @@ def _excess_discount_expression(
     manufact_id: int,
     sales_date_default: str = "1998-03-18",
 ) -> Any:
+    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     sales = ctx.get_table(sales_table)
@@ -410,6 +411,7 @@ def _excess_discount_pandas(
 ) -> Any:
     import pandas as pd
 
+    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
     manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     sales = ctx.get_table(sales_table)
@@ -1551,7 +1553,9 @@ def _joined_agg_expression_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> 
         list(spec.get("descending", (False,) * len(spec["sort_by"]))),
     )
     limit = spec.get("limit", 100)
-    return result if limit is None else result.limit(limit)
+    result = result if limit is None else result.limit(limit)
+    # Group keys the SQL groups by but does not return (Q91's marital and education status).
+    return result.select(*spec["select"]) if "select" in spec else result
 
 
 def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
@@ -1576,7 +1580,9 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
     descending = spec.get("descending", (False,) * len(spec["sort_by"]))
     result = _sort_null_largest_pandas(result, list(spec["sort_by"]), list(descending))
     limit = spec.get("limit", 100)
-    return result if limit is None else result.head(limit)
+    result = result if limit is None else result.head(limit)
+    # Group keys the SQL groups by but does not return (Q91's marital and education status).
+    return result[list(spec["select"])] if "select" in spec else result
 
 
 def _make_joined_agg_impl(query_id: int, title: str, family: str, spec: dict[str, Any]) -> QueryImpl:
@@ -3651,13 +3657,13 @@ def q45_pandas_impl(ctx: DataFrameContext) -> Any:
 
 def _q90_params() -> tuple[int, int, int, int, int]:
     params = get_parameters(90)
-    hours = params.get("hours", [(8, 9), (19, 20)])
+    # The template fixes the web page character-count range; only the hours and dependent count are drawn.
     return (
-        params.get("hour_am", hours[0][0]),
-        params.get("hour_pm", hours[1][0]),
+        params.get("hour_am", 8),
+        params.get("hour_pm", 19),
         params.get("dep_count", 8),
-        params.get("char_count_min", 5000),
-        params.get("char_count_max", 5200),
+        5000,
+        5200,
     )
 
 
@@ -11319,8 +11325,9 @@ def q84_expression_impl(ctx: DataFrameContext) -> Any:
     """Q84: Customer lookup filtered by city and income band (Polars)."""
     params = get_parameters(84)
     city = params.get("city", "Edgewood")
-    income_min = params.get("income_band", params.get("income_min", 38128))
-    income_max = params.get("income_max", income_min + 50000)
+    income_min = params.get("income_band", 38128)
+    # The template bounds the band at [INCOME] + 50000.
+    income_max = income_min + 50000
 
     # Get tables
     customer, customer_address, customer_demographics, household_demographics, income_band, store_returns = _tables(
@@ -11350,7 +11357,9 @@ def q84_expression_impl(ctx: DataFrameContext) -> Any:
         .join(customer_demographics, left_on="c_current_cdemo_sk", right_on="cd_demo_sk")
         .join(household_demographics, left_on="c_current_hdemo_sk", right_on="hd_demo_sk")
         .join(ib_filtered, left_on="hd_income_band_sk", right_on="ib_income_band_sk")
-        .join(store_returns, left_on="c_current_cdemo_sk", right_on="sr_cdemo_sk", how="semi")
+        # An inner join, not a semi join: the SQL repeats a customer once for each return on the same
+        # demographic row.
+        .join(store_returns.select("sr_cdemo_sk"), left_on="c_current_cdemo_sk", right_on="sr_cdemo_sk")
     )
 
     # Select and format output
@@ -11375,8 +11384,9 @@ def q84_pandas_impl(ctx: DataFrameContext) -> Any:
     """Q84: Customer lookup filtered by city and income band (Pandas)."""
     params = get_parameters(84)
     city = params.get("city", "Edgewood")
-    income_min = params.get("income_band", params.get("income_min", 38128))
-    income_max = params.get("income_max", income_min + 50000)
+    income_min = params.get("income_band", 38128)
+    # The template bounds the band at [INCOME] + 50000.
+    income_max = income_min + 50000
 
     # Get tables
     customer, customer_address, customer_demographics, household_demographics, income_band, store_returns = _tables(
@@ -11403,9 +11413,9 @@ def q84_pandas_impl(ctx: DataFrameContext) -> Any:
     result = result.merge(household_demographics, left_on="c_current_hdemo_sk", right_on="hd_demo_sk")
     result = result.merge(ib_filtered, left_on="hd_income_band_sk", right_on="ib_income_band_sk")
 
-    # Filter to customers with store returns (semi-join)
-    sr_cdemo_sks = set(store_returns["sr_cdemo_sk"].dropna())
-    result = result[result["c_current_cdemo_sk"].isin(sr_cdemo_sks)]
+    # An inner join, not a semi join: the SQL repeats a customer once for each return on the same
+    # demographic row.
+    result = result.merge(store_returns[["sr_cdemo_sk"]], left_on="c_current_cdemo_sk", right_on="sr_cdemo_sk")
 
     # Format output
     result["customername"] = result["c_last_name"].fillna("") + ", " + result["c_first_name"].fillna("")

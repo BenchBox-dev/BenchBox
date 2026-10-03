@@ -223,6 +223,7 @@
   order_by: ss1.ca_county
   year: 2000
 32:
+  days: 90
   manufact_id: 269
   sales_date: '1998-03-18'
 33:
@@ -490,11 +491,8 @@
   year: 1998
 86:
   dms: 1212
-  year: 2001
 87:
   dms: 1212
-  month: 4
-  year: 2001
 88:
   year: 1998
 89:
@@ -502,22 +500,18 @@
   class_id: 1
   year: 2000
 90:
-  hours:
-  - - 6
-    - 7
-  - - 14
-    - 15
   dep_count: 8
-  year: 2001
+  hour_am: 6
+  hour_pm: 14
 91:
   buy_potential: 0-500
+  gmt_offset: -7
   month: 11
   year: 1999
 92:
   days: 90
   manufact_id: 269
   sales_date: '1998-03-18'
-  year: 2000
 93:
   reason: reason 28
 94:
@@ -538,16 +532,11 @@
   store_name: ese
 97:
   dms: 1212
-  month: 4
-  year: 2002
 98:
   categories:
   - Jewelry
   - Sports
   - Books
   sales_date: '2001-01-12'
-  year: 1999
 99:
   dms: 1212
-  month: 2
-  year: 1999

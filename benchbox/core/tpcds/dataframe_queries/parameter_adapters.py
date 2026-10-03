@@ -417,6 +417,59 @@ ADAPTERS: dict[int, Adapter] = {
     82: _q82,
     83: _q83,
     93: _q93,
+def _q84(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL bounds the income band at INCOME and INCOME + 50000; the implementation adds the 50000.
+    return {"city": values["CITY.01"], "income_band": int(values["INCOME.01"])}
+
+
+def _month_seq(values: Mapping[str, str]) -> dict[str, Any]:
+    # Q86, Q87, Q97 and Q99 filter d_month_seq to DMS through DMS + 11; the implementations add the 11.
+    return {"dms": int(values["DMS.01"])}
+
+
+def _q90(values: Mapping[str, str]) -> dict[str, Any]:
+    # The SQL takes the two hours HOUR_AM and HOUR_AM + 1, and HOUR_PM and HOUR_PM + 1; the implementation adds the 1.
+    return {
+        "hour_am": int(values["HOUR_AM.01"]),
+        "hour_pm": int(values["HOUR_PM.01"]),
+        "dep_count": int(values["DEPCNT.01"]),
+    }
+
+
+def _q91(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {
+        "year": year,
+        "month": month,
+        "buy_potential": values["BUY_POTENTIAL.01"],
+        "gmt_offset": int(values["GMT.01"]),
+    }
+
+
+def _q92(values: Mapping[str, str]) -> dict[str, Any]:
+    # YEAR only bounds the draw of WSDATE; the SQL uses the manufacturer id and the date.
+    return {"manufact_id": int(values["IMID.01"]), "sales_date": values["WSDATE.01"]}
+
+
+def _q98(values: Mapping[str, str]) -> dict[str, Any]:
+    # YEAR only bounds the draw of SDATE; the SQL uses the three categories and the date.
+    return {"categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
+
+
+ADAPTERS: dict[int, Adapter] = {
+    39: _q39,
+    44: _q44,
+    49: _q49,
+    84: _q84,
+    86: _month_seq,
+    87: _month_seq,
+    90: _q90,
+    91: _q91,
+    92: _q92,
+    93: _q93,
+    97: _month_seq,
+    98: _q98,
+    99: _month_seq,
 }
 
 
