@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Explorer vitest, jest-axe and Playwright chromium suites green with no test logic changes beyond selectors for the shared header",
+    "Deep-link, back/forward, query-string restore and worker/WASM recovery verified by e2e against the assembled site",
+    "Docs and blog pages load zero Explorer/DuckDB bytes (network assertion)",
+    "Loading/error states pass axe and announce via live region",
+    "Explorer artifact digest recorded separately from the site artifact"
+  ],
+  "description": "results-explorer/src/App.tsx owns the routing (preact-router, absolute /results/ paths) and the full layout.\n\nWork:\n- Extract the header and frame into the shared shell component from astro-site-22, consumed by both the site and the Explorer.\n- Scope or remove Explorer global CSS so it cannot leak into or be overridden by site CSS.\n- Keep query-string state, nested-route deep links, the hard-coded /results/ links (resultsNav.ts, MetaLeaderboard.tsx, headerContract.ts), the DuckDB fetch path /results/data/results.duckdb, and worker/WASM asset paths.\n- Give loading and error states accessible names and live regions.\n- The Explorer stays a separate build artifact pinned by its own SHA and digest (D12). The site build consumes its dist; it does not rebuild Explorer source.\n\nNo changes to queries, metrics, admission or withdrawal logic.",
+  "links": [
+    "results-explorer/src/App.tsx",
+    "results-explorer/src/db.ts",
+    "results-explorer/vite.config.ts",
+    "results-explorer/e2e"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:11:26Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "45b394a5089f4b128ad8126fce234ba3",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
