@@ -196,6 +196,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_mirror_partial_validation_policy.py` | pure-process |
 | `test_oracle_review_check.py` | product-safety | Connector review decision for soundness-path changes |
 | `test_path_filter_decision.py` | tooling |
+| `test_preflight_targets.py` | pure-process |
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
 | `test_pr_arm.py` | pure-process |
@@ -323,7 +324,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `pr_refresh_certification.py` | pure-process | Refresh mechanics |
 | `pr_refresh_replay.py` | pure-process | Refresh mechanics |
 | `post_merge_signature.py` | pure-process | Post-merge mechanics |
-| `local_validation.py` | pure-process | PR-loop mechanics |
+| `local_validation.py` | pure-process | Shared test-lock mechanics |
 | `phase2_metrics.py` | pure-process | Legacy metrics mechanics |
 | `bundled_binary_manifest.py` | product-safety | Deterministic hashes of the shipped generator tree |
 | `verify_distribution_binaries.py` | product-safety | Distribution membership, archive safety, and source-bound generator hashes |
@@ -352,6 +353,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `todo_state_contract_check.py` | tooling | Tracker state contract |
 | `check_uv_lock_revision.py` | tooling | Lockfile hygiene |
 | `pr_review_followups.py` | pure-process | PR-loop mechanics |
+| `preflight_targets.py` | pure-process | Changed-file lint and test selection for the local preflight |
 | `dev_loop_pr_metrics.py` | pure-process | Program baseline metrics mechanics |
 | Remaining project scripts (ledger-catch-all: _project/scripts/) | product-safety | Sweep, corpus, and validation product code; reclassify individually before any deletion |
 
@@ -365,7 +367,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `timing-policy-check` | product-safety | Monotonic-clock policy |
 | `comment-policy` | tooling | Comments, docstrings, parser coverage and completed-scope enforcement |
 | `timing-policy-fast-lane` | pure-process | Fast-lane mechanics |
-| `pr-preflight-fast-tests` | pure-process | PR-loop mechanics |
+| `pr-preflight` | pure-process | PR-loop mechanics |
 | `blind-spot-validate` | product-safety | Blind-spot coverage |
 | `explorer-tokens` | product-safety | Explorer token integrity |
 | `duplicate-code-warn` | tooling | Hygiene |
