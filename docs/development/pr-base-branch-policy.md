@@ -1,8 +1,13 @@
 # PR base branch policy
 
-BenchBox does **not** support stacked PRs (a PR whose base is another feature
-branch). Open every change against an integration branch and rebase children
-after each parent lands.
+Only PRs based on an integration branch enter the merge queue. Stacking is
+allowed narrowly: a stack belongs to one author and one tracker item and is at
+most three PRs deep. Every PR above the bottom one is a **draft** that targets
+its parent branch, so it gets Codex connector review and CI there. When the
+parent squash-merges, retarget the child to `develop`, rebase it onto the
+squash commit with `git rebase --onto origin/develop <old parent tip>`, let CI
+rerun, and only then arm it. `make pr-arm` refuses a PR whose base is not
+`develop`.
 
 ## Allowed bases
 
