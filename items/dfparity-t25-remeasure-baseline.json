@@ -4,7 +4,7 @@
     "Every divergent cell has a t14 cause label and its full detail string",
     "Counts and wall times are recorded in this item and in the handoff evidence directory"
   ],
-  "context": "Created 2026-10-03 from the adversarial re-evaluation of the parity handoff. Earlier numbers: SF=1 default parameters, expression 75 match / 24 divergent, pandas 71 / 28 (evidence/rev2/sf1_perquery.jsonl in /Users/joe/.jcode/scratch/dfparity-handoff). Run after #2541 merges if possible so Q20/Q78 are current; note which open PRs were or were not on develop. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "context": "Done 2026-10-03 on develop 964bea289 (evidence/rev3/t25_baseline.md, probe_*.jsonl, report_*.md). Match/divergent/vacuous per family: SF 0.01 expr 65/3/31, pandas 65/3/31; SF 0.1 expr 68/8/23, pandas 66/10/23; SF 1 expr 73/17/9, pandas 66/24/9. No errors, timeouts or missing implementations. Probe wall: 22 s, 29 s, 461 s (SF 1 build 165 s, peak RSS 3.7 GB, load ~20). No flaky cells at SF 0.01/0.1 with --repeat 5; SF 1 ran --repeat 1. Adapted cells still divergent at SF 1 (not drift): Q39 pandas (146 vs 123 rows), Q93 both families. Q41 at SF 1: SQL empty, both families 12 rows. Classifier defects found: (1) a Polars PanicException (BaseException) escapes _run_cell's `except Exception` and kills the report; (2) 'null order' also labels NULL vs number (Q5 None vs 0.0, Q27 pandas None vs NaN); (3) int vs float (Q30 31 vs 31.0) labelled decimal/float; (4) ORDER BY mismatches on non-NULL keys come out unclassified.",
   "description": "The last full measurements predate Q39 (#2543), Q66 (#2539), the parameter adapters (#2526) and, once merged, Q20/Q78 (#2541) and the Q36 tie fix (#2547). Run the per-query probe for both families (expression = Polars, pandas) at SF 0.01, 0.1 and 1 on current develop, label every divergent cell with the t14 divergence report (scripts/tpcds_divergence_report.py, from #2553 or its branch feat/tpcds-divergence-classifier if not merged), and record match / divergent / empty / error counts per family and scale plus wall time. This is the baseline the t05 batches and t24 measure against. SF=1 needs the owner's approval before running (heavy run: about 4 GB RAM, several minutes).",
   "sessions": [
     {
@@ -13,6 +13,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "b4dbec1414344564a43546f0a7ecb2f2",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:48:03Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "02549fab014e43d18c694ee59184ed0d",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
