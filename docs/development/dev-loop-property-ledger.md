@@ -90,10 +90,13 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
 | `test.yml` | product-safety | Test tiers; replaced by ci.yml units |
 | `todo-state-validate.yml` | tooling | Tracker state validation |
+| `tpcds-staged-maturation.yml` | tooling | Weekly TPC-DS cross-surface maturation report |
+| `trunk.yml` | product-safety | Post-merge fast lane, medium tier and correctness gate on develop |
 | `upload-answers.yml` | product-safety | Answer file publication |
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
 | `validate-submission-comment.yml` | product-safety | Submission validation comment |
+| `tpcds-platform-identity.yml` | product-safety | Bundled TPC-DS generators agree across platforms (data checksums and dsqgen parameters) |
 
 ### `tests/unit/workflows/`
 
@@ -108,6 +111,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
+| `test_trunk_workflow.py` | product-safety | Post-merge workflow triggers, per-ref queueing and read-only permissions |
 | `test_publication_canaries.py` | product-safety | Publication canaries |
 | `test_publication_preview.py` | product-safety | Preview deployment |
 | `test_publication_recover.py` | product-safety | Publication recovery |
@@ -153,11 +157,16 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_check_makefile_inventory.py` | tooling |
 | `test_check_project_references.py` | product-safety |
 | `test_check_release_curation.py` | product-safety |
+| `test_check_rerun_shard_retention.py` | tooling |
+| `test_check_sqlglot_repro_retirement.py` | tooling |
 | `test_check_submission_validator_sync.py` | product-safety |
 | `test_check_uv_lock_revision.py` | tooling |
 | `test_check_windows_antipatterns.py` | tooling |
+| `test_comment_policy.py` | tooling |
+| `test_comment_syntax_js.cjs` | tooling |
 | `test_ci_lint_environment_boundary.py` | tooling |
 | `test_comment_cleanup_scope.py` | tooling |
+| `test_comment_parity.py` | tooling |
 | `test_compile_all_platforms.py` | product-safety |
 | `test_compose_joinorder_hero.py` | product-safety |
 | `test_corpus_cohort_depth.py` | product-safety |
@@ -185,12 +194,17 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_path_filter_decision.py` | tooling |
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
+| `test_pr_arm.py` | pure-process |
+| `test_pr_ready_make.py` | pure-process |
 | `test_pr_landing.py` | pure-process |
 | `test_pytest_shard_evidence.py` | product-safety | Real serial and distributed test selection and execution conservation |
 | `test_pr_refresh_certification.py` | pure-process |
 | `test_pr_refresh_replay.py` | pure-process |
 | `test_pr_review_followups.py` | pure-process |
 | `test_reference_usage_audit.py` | tooling |
+| `test_release_admitted_dist.py` | product-safety | Admitted directory matches its admission receipt, the tag and the commit before publication; only the verified wheel and sdist are staged |
+| `test_release_artifact_consumer.py` | product-safety | Producer receipt, provenance selection and archive admission fail closed |
+| `test_release_artifact_execution.py` | product-safety | Real tag objects, isolated verifier boundary, credential and Git configuration isolation, bounded download and no-replace publication |
 | `test_release_cut_start.py` | product-safety |
 | `test_release_finalize.py` | product-safety |
 | `test_release_flow.py` | product-safety |
@@ -258,6 +272,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `publication/test_transaction_executor.py` | product-safety |
 | `publication/test_verify_corpus_promotion.py` | product-safety |
 | `publication/test_verify_live.py` | product-safety |
+| `test_tpcds_platform_identity.py` | product-safety |
 
 ### `tests/unit/release/`
 
@@ -306,6 +321,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `bundled_binary_manifest.py` | product-safety | Deterministic hashes of the shipped generator tree |
 | `verify_distribution_binaries.py` | product-safety | Distribution membership, archive safety, and source-bound generator hashes |
 | Remaining scripts (ledger-catch-all: scripts/) | product-safety | Benchmark, corpus, and validation product code; reclassify individually before any deletion |
+| `tpcds_platform_identity.py` | product-safety | Cross-platform agreement of the bundled TPC-DS generators |
 
 ### `_project/scripts/`
 
@@ -337,6 +353,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `uv-lock-revision-guard` | tooling | Lockfile hygiene |
 | `uat-loc-table` | tooling | UAT table hygiene |
 | `timing-policy-check` | product-safety | Monotonic-clock policy |
+| `comment-policy` | tooling | Comments, docstrings, parser coverage and completed-scope enforcement |
 | `timing-policy-fast-lane` | pure-process | Fast-lane mechanics |
 | `pr-preflight-fast-tests` | pure-process | PR-loop mechanics |
 | `blind-spot-validate` | product-safety | Blind-spot coverage |

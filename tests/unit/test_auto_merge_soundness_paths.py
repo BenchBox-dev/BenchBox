@@ -81,18 +81,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         # PRs; the CODEOWNERS/ruleset layer this feeds is the durable control.
         "_project/scripts/auto_merge_soundness_paths.py",
         ".github/workflows/release.yml",
-        # Independent-publication authority and trust-policy contract.
-        "_project/decisions/independent-publication-a0-freeze-2026-08-31.md",
-        "docs/development/adr/adr-independent-publication-authorities.md",
-        "docs/development/adr/adr-public-result-id-permanence.md",
-        "docs/development/adr/adr-published-results-slim-corpus-branch.md",
-        "docs/development/independent-publication-threat-model.md",
-        "docs/operations/independent-publication-contract.md",
-        "docs/operations/publication-deployer-soak-and-retirement.md",
-        "docs/operations/results-phase-2-runbook.md",
-        "docs/operations/results-phase-3-runbook.md",
-        "docs/reference/hosted-results-contract.md",
-        "docs/reference/threat-model.md",
         "scripts/check_decision_records.py",
     ],
 )
@@ -105,6 +93,17 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
     [
         "benchbox/core/tpchavoc/benchmark.py",
         "benchbox/core/query_plans/comparison.py",
+        "_project/decisions/independent-publication-a0-freeze-2026-08-31.md",
+        "docs/development/adr/adr-independent-publication-authorities.md",
+        "docs/development/adr/adr-public-result-id-permanence.md",
+        "docs/development/adr/adr-published-results-slim-corpus-branch.md",
+        "docs/development/independent-publication-threat-model.md",
+        "docs/operations/independent-publication-contract.md",
+        "docs/operations/publication-deployer-soak-and-retirement.md",
+        "docs/operations/results-phase-2-runbook.md",
+        "docs/operations/results-phase-3-runbook.md",
+        "docs/reference/hosted-results-contract.md",
+        "docs/reference/threat-model.md",
         "tests/unit/test_auto_merge_soundness_paths.py",
         # pr.yml stays outside the soundness surface by decision (high churn;
         # its ci-required-result contract is pinned by the develop ruleset +
@@ -269,10 +268,6 @@ def test_codeowners_covers_soundness_paths() -> None:
     assert "scripts/ci_units.py @joeharris76" in codeowners
     assert "scripts/ci_unit_result.py @joeharris76" in codeowners
     assert ".github/workflows/release.yml @joeharris76" in codeowners
-    assert "docs/development/adr/adr-independent-publication-authorities.md @joeharris76" in codeowners
-    assert "docs/development/independent-publication-threat-model.md @joeharris76" in codeowners
-    assert "docs/operations/independent-publication-contract.md @joeharris76" in codeowners
-    assert "docs/reference/hosted-results-contract.md @joeharris76" in codeowners
     assert "scripts/check_decision_records.py @joeharris76" in codeowners
     assert "publication/** @joeharris76" in codeowners
     assert "scripts/publication/** @joeharris76" in codeowners

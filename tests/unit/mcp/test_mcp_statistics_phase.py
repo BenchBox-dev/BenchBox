@@ -36,11 +36,15 @@ pytestmark = [
 
 def _get_tool_functions() -> dict[str, Any]:
     """Create a fresh MCP server and expose public tool invokers."""
+    import benchbox.utils.printing as printing
     from benchbox.mcp import create_server
     from tests.unit.mcp.public_api import get_tool_functions
 
-    server = create_server()
-    return get_tool_functions(server)
+    quiet = printing._QUIET
+    try:
+        return get_tool_functions(create_server())
+    finally:
+        printing._QUIET = quiet
 
 
 @pytest.fixture(scope="module")

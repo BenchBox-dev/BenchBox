@@ -100,6 +100,7 @@ MERGE_GATE_WORKFLOWS = {
     "test.yml": RELEASE_TEST_WORKFLOW,
 }
 MERGE_GATE_SETUP_NAMES = {
+    "Install Python dependencies",
     "Checkout code",
     "Checkout repository",
     "Install dependencies",
@@ -143,6 +144,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "dist-artifact", "Verify source bundled binary manifest"): "scripts/bundled_binary_manifest.py",
     ("ci.yml", "dist-artifact", "Build wheel and sdist"): "scripts/verify_distribution_binaries.py",
     ("ci.yml", "ci-paths", "Check release content"): "release-check",
+    ("ci.yml", "comment-policy", "Enforce comment and docstring policy"): "comment-policy-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
@@ -331,10 +333,6 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ),
     ("test.yml", "test-package", "Test package installation"): "Covered by the local `test-package` target.",
     ("test.yml", "pyspark-tests", "Run PySpark tests"): "Covered by the local `test-pyspark` target.",
-    ("ci.yml", "soundness-flag", "soundness-flag"): (
-        "Hosted soundness review gate reads the live PR body via the API; the "
-        "checker logic is covered locally by tests/unit/test_soundness_review_flag.py."
-    ),
     ("ci.yml", "ruleset-drift", "Compare live governance with the trusted runbook"): (
         "Hosted governance check reads the live ruleset via the API with a "
         "secret token; covered locally by tests/unit/test_ruleset_drift.py."
@@ -399,9 +397,6 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ),
     ("ci.yml", "example-validation", "Check for unsafe patch() string paths in tests"): (
         "Covered by the local example-validation lane in preflight."
-    ),
-    ("ci.yml", "docstring-coverage", "Check docstring coverage"): (
-        "Covered by the local `docstring-coverage` lane in preflight."
     ),
 }
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import zipfile
 from pathlib import Path
@@ -13,7 +14,9 @@ import pytest
 pytestmark = [pytest.mark.integration, pytest.mark.fast]
 
 ROOT = Path(__file__).resolve().parents[3]
-CATALOG_REV = "5c7ff93e8103ee5a4ac59ea2330625e85250b206"
+# The catalog revision that delivered the batch contract; the evidence file records it as history,
+# so a later catalog bump does not change it.
+DELIVERY_CATALOG_REV = "5c7ff93e8103ee5a4ac59ea2330625e85250b206"
 SOURCE_REV = "aaad6c97632f0a36341cb670c9e1a7fe0b3a860b"
 TODO_DB_VERSION = "0.8.1"
 SCRIPTS_PROJECT = ROOT / "_project/scripts"
@@ -59,11 +62,14 @@ def test_pin_receipt_and_tracked_mirror_bind_catalog_tip() -> None:
     config = (ROOT / "skill-sync.conf").read_text(encoding="utf-8")
     receipt = (ROOT / ".claude/skills/skill-sync.receipt").read_text(encoding="utf-8")
     evidence = _evidence()
-    assert f"rev    = {CATALOG_REV}" in config
-    assert f"rev = {CATALOG_REV}" in receipt
-    assert evidence["catalog"]["merge_revision"] == CATALOG_REV
+    # Every catalog revision the config pins is the one the tracked mirror was materialized from.
+    pins = re.findall(r"^source = ~/Developer/skill-sync-skills\nrev\s+=\s+([0-9a-f]{40})$", config, re.MULTILINE)
+    assert pins, "skill-sync.conf pins no catalog revision"
+    for pin in pins:
+        assert f"rev = {pin}" in receipt
+    assert evidence["catalog"]["merge_revision"] == DELIVERY_CATALOG_REV
     assert evidence["source"]["merge_revision"] == SOURCE_REV
-    assert evidence["benchbox_pin"]["after"] == CATALOG_REV
+    assert evidence["benchbox_pin"]["after"] == DELIVERY_CATALOG_REV
     for relative, expected in evidence["mirrors"]["tracked_target"]["files"].items():
         assert _sha256(ROOT / ".claude/skills/todo" / relative) == expected
 

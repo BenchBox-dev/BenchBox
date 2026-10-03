@@ -35,6 +35,10 @@ enforcement"); `_project/scripts/ruleset_review_enforcement.py`;
    queue. Automated review signals stay advisory: recorded, never a member
    of the readiness failure set. This does not weaken item 2 — the human
    CODEOWNERS gate above stays merge-blocking.
+   Amended 2026-10-02: for paths on `.github/soundness-paths.txt`, `make pr-arm`
+   will refuse until a completed external review is visible on the head. Any of
+   four independent reviewers satisfies it, so one provider's limit does not
+   deadlock the queue. See `docs/development/adr/adr-dev-loop-v2.md` D4.
 
 ## What this item does not do
 

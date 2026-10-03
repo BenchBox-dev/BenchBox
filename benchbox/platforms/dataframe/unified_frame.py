@@ -2109,18 +2109,13 @@ class _DataFusionDeferredFilter(UnifiedExpr):
     an aggregate method (sum, count, etc.) is called.
     """
 
-    def __init__(self, expr: Any, condition: Any) -> None:
+    def __init__(self, expr: DataFusionExpr, condition: DataFusionExpr) -> None:
         """Initialize the deferred filter.
 
         Args:
             expr: The column expression to aggregate (DataFusion `Expr` at runtime)
             condition: The filter condition to apply (DataFusion `Expr` at runtime)
 
-        Both params stay `Any`: the only call site (`UnifiedExpr.filter` in
-        the DataFusion branch) unwraps `condition.native` which itself
-        returns `Any`. Tightening the annotation here would mis-state the
-        contract - runtime values are DataFusion expressions, but the
-        type-checker can't see the dynamic dispatch that guarantees it.
         """
         super().__init__(expr)
         self._filter_condition = condition

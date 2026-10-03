@@ -9,7 +9,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from benchbox.platforms.duckdb import DuckDBAdapter
-from benchbox.utils.printing import set_quiet
 
 pytestmark = [
     pytest.mark.unit,
@@ -561,13 +560,13 @@ class TestDuckDBPlanCapture:
         assert "ANALYZE" not in called_sql, f"Default capture must not run EXPLAIN ANALYZE: {called_sql}"
         assert "FORMAT JSON" in called_sql
 
-    def test_analyze_plans_notice_printed_once_per_run(self, capsys):
+    def test_analyze_plans_notice_printed_once_per_run(self, capsys, monkeypatch):
         """A one-time notice is printed the first time analyze_plans=True actually captures.
 
         The notice must not repeat on subsequent captures within the same run, and
         must not appear at all when analyze_plans is left at its False default.
         """
-        set_quiet(False)
+        monkeypatch.setattr("benchbox.utils.printing._QUIET", False)
         adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
         connection = adapter.create_connection()
 
@@ -590,11 +589,10 @@ class TestDuckDBPlanCapture:
             assert "re-executes each query" in third_output, "Notice must reprint after a stats reset (new run)"
         finally:
             adapter.close_connection(connection)
-            set_quiet(False)
 
-    def test_no_notice_when_analyze_plans_default(self, capsys):
+    def test_no_notice_when_analyze_plans_default(self, capsys, monkeypatch):
         """No re-execution notice is printed when analyze_plans stays at its False default."""
-        set_quiet(False)
+        monkeypatch.setattr("benchbox.utils.printing._QUIET", False)
         adapter = DuckDBAdapter(capture_plans=True)
         connection = adapter.create_connection()
 
@@ -607,7 +605,6 @@ class TestDuckDBPlanCapture:
             assert "re-executes each query" not in output
         finally:
             adapter.close_connection(connection)
-            set_quiet(False)
 
 
 class TestDuckDBFingerprintIntegration:

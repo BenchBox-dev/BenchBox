@@ -221,6 +221,13 @@ old 30-minute cap. PR #1306 was cancelled twice at 30m16s having reached
 95% of the suite; it added three monkeypatched tests worth ~2s, so it was
 the straw, not the cause. `29.9 * 1.3 = 38.9 -> 40`.
 
+**2026-10-03 resize, 40 -> 25 min, with four shards.** The medium tier is
+now split across four runners instead of two, so each shard does half the
+work it did. Hosted four-shard runs finished their shards in about 4 to 9
+minutes, which leaves the 25-minute timeout well above the sizing rule's
+headroom while still backstopping a hang. The earlier 30 -> 40 figures above
+are the history of the two-shard tier.
+
 **Read the old numbers as a floor, not a distribution.** A cancelled job
 never reports a true wall time, so runs that would have exceeded the cap
 are absent from the successful sample entirely. The observed p95 is
@@ -230,7 +237,7 @@ lane starts cancelling.
 **Review hook.** `make dev-loop-metrics` reports `medium-test job seconds
 avg/p95` beside the fast-test figures and prints
 `MEDIUM_TEST_BUDGET_WARNING` once p95 reaches 75% of the timeout
-(30 min against the current 40). That threshold is deliberately the point
+(18.75 min against the current 25). That threshold is deliberately the point
 at which the *previous* cap began cancelling, so the next regression of
 this shape is flagged with ~10 minutes still in hand. On a warning: resize
 per the rule above, or split the tier. `MEDIUM_TEST_TIMEOUT_MINUTES` in
@@ -240,7 +247,7 @@ so the metric and the budget it measures cannot drift apart.
 ## Linux queue partitions
 
 The medium tier collects its complete marker-selected test set once at the
-checked commit, then splits sorted node IDs across two standard Linux runners.
+checked commit, then splits sorted node IDs across four standard Linux runners.
 Each shard preserves the medium timeout and worker limits. Pytest records its
 actual collection and execution; the core result rejects missing, duplicate,
 deselected, failed, or stale evidence before accepting the combined set.
@@ -252,7 +259,7 @@ no-skip checks. Raw bundled dbgen framing remains a required pre-merge check on
 macOS and Windows. It also runs in the nightly Python 3.12 cells on Linux,
 macOS, and Windows, alongside the installed-wheel generator smoke.
 
-At maximum packaging coverage, the heavy payload uses ten standard Linux
+At maximum packaging coverage, the heavy payload uses twelve standard Linux
 runners, including the shared collector. This follows the approved sharding
 allowance in [the development-loop ADR](../development/adr/adr-dev-loop-v2.md).
 Classifier, aggregate, fast-tier, and other merge-unit jobs are counted
