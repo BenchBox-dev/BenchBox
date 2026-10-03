@@ -962,7 +962,8 @@
       "claim": null,
       "needs": [
         "astro-site-10-spike-and-go-gate",
-        "astro-site-02-api-reference-decision"
+        "astro-site-02-api-reference-decision",
+        "astro-site-03-visual-change-procedure"
       ],
       "priority": "medium",
       "status": "open",
