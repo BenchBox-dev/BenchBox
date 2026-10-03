@@ -6516,18 +6516,13 @@
       "title": "Parameter adapters, batch A: Q1, Q3, Q7, Q8, Q10, Q12, Q13, Q14, Q17"
     },
     "dfparity-t05b-adapters-batch-b": {
-      "claim": {
-        "expires_at": "2026-10-04T17:53:27Z",
-        "generation": "1e2a89cf16014ebeae0fc0ff4b17889a",
-        "renewals": 0,
-        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ab23c3a6eef35cb685577a07"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t04-adapter-prototype",
         "dfparity-t02-parameter-inventory-test"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Parameter adapters, batch B: Q18, Q20, Q21, Q22, Q23, Q25, Q26, Q27, Q31"
     },
     "dfparity-t05c-adapters-batch-c": {
