@@ -5,7 +5,7 @@
     "With the adapter binding, each query matches the DuckDB reference on both families at SF 0.1, or the reason is documented (for example vacuous empty at that scale)",
     "No other query's status changes in the SF 0.1 per-query probe"
   ],
-  "context": "2026-10-03: a partial implementation exists, unverified and unpushed: worktree BenchBox.wt-tpcds-t05a, branch feat/tpcds-adapters-batch-a (head ab4e4665c; main commit c16bbf83e plus a Q1 test fix). It adds adapters for all nine queries, removes them from BINDING_GAP and Q8/Q10 from LITERAL_FALLBACK, and adds test_adapter_batch_semantics.py. It predates #2560 and merges cleanly into develop 922eaba6e; after merging develop, confirm the inventory stand-in keeps #2560's properties. Review the diff and run the SF 0.1 per-query probe before opening a PR. Why batches serialize: they all edit queries.py, parameter_adapters.py and the inventory test, so parallel PRs conflict; stacked PRs (depth 3 or less) are allowed if draft #2567 lands. Compare results against the t25 baseline.",
+  "context": "2026-10-03: a partial implementation exists, unverified and unpushed: worktree BenchBox.wt-tpcds-t05a, branch feat/tpcds-adapters-batch-a (head ab4e4665c; main commit c16bbf83e plus a Q1 test fix). It adds adapters for all nine queries, removes them from BINDING_GAP and Q8/Q10 from LITERAL_FALLBACK, and adds test_adapter_batch_semantics.py. It predates #2560 and merges cleanly into develop 922eaba6e; after merging develop, confirm the inventory stand-in keeps #2560's properties. Review the diff and run the SF 0.1 per-query probe (evidence/rev2/t05a_*_0.1.* hold earlier runs) before opening a PR. Batches land one at a time because they all edit queries.py, parameter_adapters.py and the inventory test. Stacked PRs are out of policy (docs/development/pr-base-branch-policy.md); do not use them unless that policy changes. Compare results against the t25 baseline and meet t05h's binding-coverage test once it exists.",
   "description": "For each listed query: add an adapter in benchbox/core/tpcds/dataframe_queries/parameter_adapters.py from dsqgen -LOG names to the DataFrame keys (reproduce template arithmetic such as [MONTH]+1); make the implementation read the mapped keys with no literal fallback (Q8 and Q10 currently have literal fallbacks); delete dead YAML keys in default_parameters.yaml; remove the query from BINDING_GAP (and LITERAL_FALLBACK) in tests/unit/core/tpcds/test_parameter_consumption_inventory.py so the strict xfail turns into a pass. Follow the t04 pattern (bind_parameters, ParameterBinding, parameter_overrides). Queries.py edits queue one PR at a time, never two queries.py PRs in the merge queue together. Effort about 2 days (judgement, not measured).",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "623d8c0cf9e94dd28b792bea10222666",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:12:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "8103838f4c58414dbbed4135195aa5db",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
