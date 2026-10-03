@@ -1550,7 +1550,9 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # SF=0.05 matrix exceeds the gate's short-run budget and also exposes unrelated
 # larger-cell divergences, so these entries describe the bounded gate cell rather
 # than claiming that the predicates are empty at every scale. Every listed query
-# returns zero rows in the SQL reference and in both DataFrame families at SF=0.01.
+# returns zero rows, or the single all-NULL row of a scalar aggregate over an empty
+# input (which the gate counts as empty), in the SQL reference and in both DataFrame
+# families at SF=0.01.
 _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
     "3": (
         "The bounded SF=0.01 cell has no December sales for manufacturer 436, so the exact "
@@ -1576,12 +1578,29 @@ _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
         "The bounded cell has no customer with qualifying store and web revenue growth across the required "
         "years; the empty SQL result is mirrored by both DataFrame families."
     ),
+    "13": (
+        "Scalar aggregate that returns the single all-NULL row at the bounded SF=0.01 cell. Verified 2026-10-02 "
+        "against the SQL reference: 2 store sales in 2001 satisfy the demographic disjunction and 59 satisfy the "
+        "state and net-profit disjunction, but no sale satisfies both, so the conjunction matches nothing. The result "
+        "is mirrored by both DataFrame families."
+    ),
+    "23": (
+        "Scalar SUM that returns the single all-NULL row at the bounded SF=0.01 cell. Verified 2026-10-02 against the "
+        "SQL reference: no store item is sold more than four times on one date in 1999 to 2002, so the frequent-item "
+        "set is empty and no catalog or web sale in January 1999 qualifies. The result is mirrored by both DataFrame "
+        "families."
+    ),
     "24": (
         "The bounded cell has no qualifying store-return rows for the configured item color and market filters; "
         "the empty SQL result is mirrored by both DataFrame families."
     ),
     "31": (
         "The bounded cell has no customer satisfying the six-channel quarterly sales comparison; the empty SQL "
+        "result is mirrored by both DataFrame families."
+    ),
+    "32": (
+        "Scalar SUM that returns the single all-NULL row at the bounded SF=0.01 cell. Verified 2026-10-02 against the "
+        "SQL reference: the item dimension has no item with manufacturer 269, so no catalog sale qualifies. The "
         "result is mirrored by both DataFrame families."
     ),
     "37": (
@@ -1616,6 +1635,11 @@ _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
         "The bounded cell has no item with comparable revenue in all three channels during the week containing the "
         "configured February 1998 date; the empty SQL result is mirrored by both DataFrame families."
     ),
+    "61": (
+        "Scalar ratio that returns the single all-NULL row at the bounded SF=0.01 cell. Verified 2026-10-02 against "
+        "the SQL reference: the only store has GMT offset -5, so the s_gmt_offset = -7 filter matches no store and "
+        "both the promotional and total sums are NULL. The result is mirrored by both DataFrame families."
+    ),
     "63": (
         "The bounded cell has no manager whose twelve-month sales deviation exceeds ten percent for the configured "
         "item filters; the empty SQL result is mirrored by both DataFrame families."
@@ -1644,9 +1668,19 @@ _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
         "The bounded cell has no web return satisfying the 1998 date, customer-demographic, state, and profit "
         "conditions; the empty SQL result is mirrored by both DataFrame families."
     ),
+    "90": (
+        "Scalar ratio that returns the single all-NULL row at the bounded SF=0.01 cell. Verified 2026-10-02 against "
+        "the SQL reference: the one web page has no character count between 5000 and 5200, so the morning and evening "
+        "counts are both 0 and the NULLIF-guarded ratio is NULL. The result is mirrored by both DataFrame families."
+    ),
     "91": (
         "The bounded cell has no call-center return satisfying the November 1999 demographic and GMT-offset filters; "
         "the empty SQL result is mirrored by both DataFrame families."
+    ),
+    "92": (
+        "Scalar SUM that returns the single all-NULL row at the bounded SF=0.01 cell. Verified 2026-10-02 against the "
+        "SQL reference: the item dimension has no item with manufacturer 269, so no web sale qualifies. The result is "
+        "mirrored by both DataFrame families."
     ),
     "93": (
         "The bounded cell has no store sale joined to a return reason of 'Did not like the warranty'; the empty SQL "
