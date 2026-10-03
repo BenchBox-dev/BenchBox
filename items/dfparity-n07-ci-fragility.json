@@ -3,6 +3,7 @@
     "Each of the three is fixed or closed with a reason",
     "Any soundness-path change has the required review and a maintainer merge"
   ],
+  "context": "Closed 2026-10-03 with no change. (1) The soundness-flag job was removed from CI in #2558. (2) test_unit_marker_functionality was removed in #2507: it spawned a whole-suite collect-only pytest run (~33,000 tests), and collection is covered by --strict-markers and tests/unit/test_marker_strategy.py. (3) The 600 s visual-baseline wait (ci.yml ~1998, docs.yml ~294) applies only to merge-queue followers. It already polls and returns early (waitForTrustedBaseline: 6 tries at 2 s, then every 60 s), the 60 s interval protects the shared GITHUB_TOKEN budget, and tests/unit/workflows/test_public_site_visual_workflow.py pins it. The design is in _project/decisions/visual-baseline-queue-candidate-2026-09-26.md and the site-equivalent-ancestor record of 2026-09-27.",
   "description": "(1) The soundness-flag job diffs from the PR's recorded base to a merge ref on current develop, so a stale base gives a false 'PR body must contain a Soundness review' failure (a soundness path, so it needs the owner). (2) The test_unit_marker_functionality test is a 60 s flake. (3) The 600 s baseline wait in the PR workflow. Each is independent.",
   "sessions": [
     {
@@ -12,6 +13,14 @@
       "op": "create",
       "op_id": "d7bcee0e24af49f3b979be721c228870",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T14:01:38Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b531f051093a4f7184ff16d6a57d4453",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
