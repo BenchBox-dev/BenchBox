@@ -87,15 +87,61 @@ def test_null_order_needs_the_same_rows_when_the_rows_are_known():
     assert label_detail(ORDER_KEY_NULL, different)[0] == NULL_VALUE
 
 
+def test_an_integer_against_the_same_float_is_a_dtype_difference():
+    detail = "Q30.0: Value mismatch at row 4, column 5. Original: 31, Variant: 31.0"
+    assert label_detail(detail)[0] == INT_VS_FLOAT
+
+
+@pytest.mark.parametrize("prefix", [("31", "31.0"), ("1.12345678499", "1.12345678501")])
+def test_equal_numeric_key_cells_do_not_hide_a_later_null_nan_difference(prefix):
+    left, right = prefix
+    detail = (
+        f"Q1.0: ORDER BY key mismatch at position 0. Original key: ({left}, None), "
+        f"Variant key: ({right}, nan) (order-key columns [0, 1]) - the returned order differs"
+    )
+
+    assert label_detail(detail)[0] == NULL_VS_NAN
+    assert label_detail(ORDER_KEY_INT_FLOAT)[0] == NULL_VS_NAN
+
+
+@pytest.mark.parametrize("prefix", [("31", "32"), ("nan", "nan")])
+def test_a_real_earlier_key_difference_is_not_skipped(prefix):
+    left, right = prefix
+    detail = (
+        f"Q1.0: ORDER BY key mismatch at position 0. Original key: ({left}, None), "
+        f"Variant key: ({right}, nan) (order-key columns [0, 1]) - the returned order differs"
+    )
+
+    assert label_detail(detail)[0] == UNCLASSIFIED
+
+
 @pytest.mark.parametrize(
-    "detail",
+    ("left", "right", "cause"),
     [
-        "Q30.0: Value mismatch at row 4, column 5. Original: 31, Variant: 31.0",
-        ORDER_KEY_INT_FLOAT,
+        (1.123456781, 1.123456784, ROW_COUNT_LOGIC),
+        (1.12345678499, 1.12345678501, ORDER),
     ],
 )
-def test_an_integer_against_the_same_float_is_a_dtype_difference(detail):
-    assert label_detail(detail)[0] == INT_VS_FLOAT
+def test_captured_rows_use_validator_tolerance_when_classifying_order(left, right, cause):
+    reference = [(0.0, 976, left), (0.0, 52, 7.0)]
+    candidate = [(0.0, 52.0, 7.0), (0.0, 976.0, right)]
+
+    assert label_detail(ORDER_KEY_REORDERED, (reference, candidate))[0] == cause
+
+
+@pytest.mark.parametrize("value", [float("nan"), 0.0])
+def test_captured_rows_preserve_strict_null_value_differences(value):
+    reference = [(0.0, 976, None), (0.0, 52, 7.0)]
+    candidate = [(0.0, 52.0, 7.0), (0.0, 976.0, value)]
+
+    assert label_detail(ORDER_KEY_REORDERED, (reference, candidate))[0] == ROW_COUNT_LOGIC
+
+
+def test_captured_rows_preserve_row_multiplicity():
+    reference = [(0.0, 976), (0.0, 976), (0.0, 52)]
+    candidate = [(0.0, 52.0), (0.0, 52.0), (0.0, 976.0)]
+
+    assert label_detail(ORDER_KEY_REORDERED, (reference, candidate))[0] == ROW_COUNT_LOGIC
 
 
 def test_float_noise_between_two_floats_is_still_decimal_float():
@@ -130,7 +176,7 @@ def test_an_ordering_difference_is_evidence_on_its_own_without_an_adapter():
     rows = ([(0.0, 976), (0.0, 52)], [(0.0, 52), (0.0, 976)])
 
     assert classify_cell(ORDER_KEY_REORDERED, adapted=False, rows=rows)["cause"] == ORDER
-    assert classify_cell(ORDER_KEY_INT_FLOAT, adapted=False)["cause"] == INT_VS_FLOAT
+    assert classify_cell(ORDER_KEY_INT_FLOAT, adapted=False)["cause"] == NULL_VS_NAN
     assert classify_cell("Q5.0: Value mismatch at row 0, column 3. Original: None, Variant: 0.0", adapted=False)[
         "cause"
     ] == (NULL_VALUE)
@@ -243,7 +289,7 @@ def test_a_real_divergence_is_still_divergent():
 
 
 class _PanicException(BaseException):
-    """Stands in for ``pyo3_runtime.PanicException``, which derives from BaseException and is named this."""
+    pass
 
 
 _PanicException.__name__ = "PanicException"
@@ -274,15 +320,13 @@ def test_other_base_exceptions_still_stop_the_run(exc):
 
 
 class _Fetching:
-    """A harness that fetches and materializes rows through the module-level functions, as the real one does."""
-
     def __init__(self):
         self.fetch_reference_rows = lambda *_a, **_k: [(1,), (2,)]
         self.materialize_rows = lambda *_a, **_k: [(2.0,), (1.0,)]
 
     def find_cross_surface_divergences(self, *_args, **_kwargs):
         reference = self.fetch_reference_rows()
-        self.fetch_reference_rows()  # a later fetch (the boundary-tie probe) must not replace the reference
+        self.fetch_reference_rows()
         self.materialize_rows()
         return [_Divergence(ORDER_KEY_REORDERED)] if reference else []
 
@@ -297,3 +341,27 @@ def test_the_rows_of_a_comparison_are_captured_and_the_harness_is_left_as_it_was
     assert capture.rows == ([(1,), (2,)], [(2.0,), (1.0,)])
     assert (xs.fetch_reference_rows, xs.materialize_rows) == (fetch, materialize)
     assert label_detail(ORDER_KEY_REORDERED, capture.rows)[0] == ORDER
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "cause"),
+    [
+        (1.123456781, 1.123456784, ROW_COUNT_LOGIC),
+        (1.12345678499, 1.12345678501, ORDER),
+    ],
+)
+def test_captured_row_tolerance_reaches_the_rendered_report(left, right, cause):
+    xs = _Fetching()
+    xs.fetch_reference_rows = lambda *_a, **_k: [(0.0, 976, left), (0.0, 52, 7.0)]
+    xs.materialize_rows = lambda *_a, **_k: [(0.0, 52.0, 7.0), (0.0, 976.0, right)]
+    capture = _RowCapture()
+
+    status, detail = _run_cell(xs, _Gate(), _Data(), None, "93", "pandas", None, capture)
+    record = classify_cell(detail, adapted=True, rows=capture.rows)
+    cell = Cell(scale=0.1, backend="pandas", query="93", status=status, evidence=detail, **record)
+
+    report = render_markdown([cell])
+
+    assert record["cause"] == cause
+    assert f"| Q93 | pandas | divergent | {cause} |" in report
+    assert detail in report

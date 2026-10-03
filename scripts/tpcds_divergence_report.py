@@ -15,39 +15,24 @@ Causes:
 ``unbound (no adapter)``
     The query has no adapter, so the DataFrame side runs on the defaults file while the SQL carries
     dsqgen's values. A value or row-count difference cannot be told apart from drift until the query
-    has an adapter. The detail-based label is kept as the secondary cause. NULL, dtype and ordering labels
-    are evidence on their own and are not replaced by this one.
+    has an adapter. The detail-based label is kept as the secondary cause.
 ``null order``
-    The same rows come back but a NULL sits at a different position in the ORDER BY. Needs the rows;
-    from the detail text alone, an ORDER BY key that is NULL on one side and a value on the other.
-``null value``
-    A NULL against a value (a number, say) in a result cell. That is a NULL-handling difference in the
-    value, not ORDER BY placement.
-``null vs nan``
-    A NULL against NaN. The DataFrame side represents a missing value as NaN where SQL has NULL.
-``int vs float``
-    The same number as an integer on one side and a float on the other (``31`` against ``31.0``). A
-    dtype difference, not a value difference.
+    An ORDER BY key is NULL on one side and a value on the other at the first mismatching position.
 ``decimal/float``
     A value or an ORDER BY key that differs only by float noise (relative difference under 1e-6).
-``order``
-    The same rows (compared as a multiset, with integers and floats of equal value treated as equal)
-    come back in a different order. Needs the rows, which the detail text does not carry.
 
+A tie between rows cannot be proved from the detail text, so no cell is labelled a tie here: a cell that
+looks like one (an ORDER BY or value mismatch between small integers, say) is ``unclassified``, and a tie
+that comes and goes between runs shows up as ``flaky`` with ``--repeat``. Tie canonicalization belongs to
+the comparator and only for causes shown to be ties.
 ``row count/logic``
-    A different number of rows or columns, or a value that differs by more than noise, or an ORDER
-    BY mismatch where the rows themselves differ (so it is not only an ordering difference).
+    A different number of rows or columns, or a value that differs by more than noise.
 ``flaky``
     With ``--repeat N``, the cell did not give the same outcome on every run.
 ``error``
-    The comparison raised. A Polars ``PanicException`` is a ``BaseException`` and is recorded here too.
+    The comparison raised.
 ``unclassified``
     The detail text fits none of the above.
-
-A tie between rows is never labelled: the comparator already reshuffles tie groups, so a reported ORDER BY
-key mismatch is a mismatch between keys that are not equal. A tie that comes and goes between runs shows up
-as ``flaky`` with ``--repeat``. Tie canonicalization belongs to the comparator and only for causes shown to
-be ties.
 
 Usage::
 
@@ -64,6 +49,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import dataclasses
 import json
@@ -74,6 +60,8 @@ from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
+
+from benchbox.core.tpchavoc.validation import ResultValidator
 
 PARAMETER_DRIFT = "parameter drift"
 UNBOUND = "unbound (no adapter)"
@@ -89,6 +77,7 @@ ERROR = "error"
 UNCLASSIFIED = "unclassified"
 
 FLOAT_NOISE = 1e-6
+_VALIDATOR = ResultValidator()
 
 _ORDER_KEY = re.compile(
     r"ORDER BY key mismatch at position (\d+)\. Original key: (.*?), Variant key: (.*?) \(order-key", re.S
@@ -126,30 +115,23 @@ def _text(cell: str) -> str:
     return cell.strip().strip("'\"")
 
 
-def _canonical(value: Any) -> Any:
-    """A hashable form of one cell in which an integer and a float of equal value are the same."""
-    if isinstance(value, bool) or value is None:
-        return value
-    if isinstance(value, (int, float)):
-        return "nan" if value != value else float(f"{value:.9g}")
-    return value
+def _key_value(cell: str) -> Any:
+    try:
+        return ast.literal_eval(cell)
+    except (ValueError, SyntaxError):
+        if cell.lower() in {"nan", "inf", "-inf"}:
+            return float(cell)
+        return cell
 
 
 def _same_rows(rows: tuple[Sequence[tuple], Sequence[tuple]] | None) -> bool | None:
-    """Whether the reference and the DataFrame result hold the same rows, ignoring their order.
-
-    ``None`` when the rows were not captured, so the question cannot be answered.
-    """
     if rows is None:
         return None
     reference, candidate = rows
-    return Counter(tuple(_canonical(v) for v in row) for row in reference) == Counter(
-        tuple(_canonical(v) for v in row) for row in candidate
-    )
+    return _VALIDATOR._multisets_equal(list(reference), list(candidate))
 
 
 def _null_difference(a: str, b: str) -> str | None:
-    """``NULL_VS_NAN`` or ``NULL_VALUE`` when exactly one of two printed cells is NULL, else ``None``."""
     if (a == "None") == (b == "None"):
         return None
     other = _text(b if a == "None" else a)
@@ -157,7 +139,6 @@ def _null_difference(a: str, b: str) -> str | None:
 
 
 def _number_difference(a: str, b: str, what: str) -> tuple[str, str] | None:
-    """Label two printed cells that are numbers equal within float noise, else ``None``."""
     left, right = _number(a), _number(b)
     if left is None or right is None or not _close(left, right):
         return None
@@ -167,11 +148,6 @@ def _number_difference(a: str, b: str, what: str) -> tuple[str, str] | None:
 
 
 def label_detail(detail: str, rows: tuple[Sequence[tuple], Sequence[tuple]] | None = None) -> tuple[str, str]:
-    """Return ``(cause, why)`` for one full divergence detail string.
-
-    ``rows`` is the ``(reference, candidate)`` result pair when it was captured. The detail text alone
-    cannot show that the same rows came back in a different order, so ``order`` needs it.
-    """
     if _COLUMN_COUNT.search(detail):
         return ROW_COUNT_LOGIC, "different number of columns"
     match = _ROW_COUNT.search(detail)
@@ -180,7 +156,10 @@ def label_detail(detail: str, rows: tuple[Sequence[tuple], Sequence[tuple]] | No
     match = _ORDER_KEY.search(detail)
     if match:
         original, variant = _key_cells(match.group(2)), _key_cells(match.group(3))
-        pairs = [(a, b) for a, b in zip(original, variant) if a != b]
+        printed_differences = [(a, b) for a, b in zip(original, variant) if a != b]
+        pairs = [
+            (a, b) for a, b in zip(original, variant) if not _VALIDATOR._values_equal(_key_value(a), _key_value(b))
+        ]
         same_rows = _same_rows(rows)
         if pairs:
             a, b = pairs[0]
@@ -194,6 +173,11 @@ def label_detail(detail: str, rows: tuple[Sequence[tuple], Sequence[tuple]] | No
                 return NULL_ORDER, f"first differing key cell is NULL on one side ({a} against {b})"
             if null:
                 return NULL_VALUE, f"first differing key cell is NULL on one side and the rows differ ({a} against {b})"
+            number = _number_difference(a, b, "order key")
+            if number:
+                return number
+        if not pairs and printed_differences:
+            a, b = printed_differences[0]
             number = _number_difference(a, b, "order key")
             if number:
                 return number
@@ -226,12 +210,6 @@ def classify_cell(
     error: str | None = None,
     rows: tuple[Sequence[tuple], Sequence[tuple]] | None = None,
 ) -> dict[str, str]:
-    """Cause record for one divergent cell.
-
-    ``adapted`` says the query has a parameter adapter. ``outcomes`` are the per-run detail strings
-    when the cell was repeated; a cell whose runs differ is flaky whatever the detail says. ``rows`` is
-    the captured ``(reference, candidate)`` result pair, when there is one.
-    """
     if outcomes is not None and len(set(outcomes)) > 1:
         return {
             "cause": FLAKY,
@@ -248,8 +226,6 @@ def classify_cell(
         }
     cause, why = label_detail(detail, rows)
     if not adapted and cause in {ROW_COUNT_LOGIC, UNCLASSIFIED, DECIMAL_FLOAT}:
-        # NULL handling, dtype and ordering differences are evidence on their own; anything else may just be
-        # different parameters.
         return {"cause": UNBOUND, "why": f"no adapter, so parameters are not bound ({why})", "secondary": cause}
     return {"cause": cause, "why": why, "secondary": ""}
 
@@ -269,8 +245,6 @@ class Cell:
 
 
 class _RowCapture:
-    """The reference rows and the DataFrame rows of one comparison, kept to tell an ordering difference from a value one."""
-
     def __init__(self) -> None:
         self.reference: list[tuple] | None = None
         self.candidate: list[tuple] | None = None
@@ -284,7 +258,6 @@ class _RowCapture:
 
 @contextlib.contextmanager
 def _capturing(xs: Any, capture: _RowCapture | None) -> Iterator[None]:
-    """Record the rows ``xs`` fetches and materializes during one comparison, without changing them."""
     fetch = getattr(xs, "fetch_reference_rows", None)
     materialize = getattr(xs, "materialize_rows", None)
     if capture is None or fetch is None or materialize is None:
@@ -293,7 +266,7 @@ def _capturing(xs: Any, capture: _RowCapture | None) -> Iterator[None]:
 
     def fetch_recorded(*args: Any, **kwargs: Any) -> Any:
         rows = fetch(*args, **kwargs)
-        if capture.reference is None:  # the first fetch is the reference; later ones are the harness's probes
+        if capture.reference is None:
             capture.reference = rows
         return rows
 
@@ -318,10 +291,6 @@ def _run_cell(
     dataframe_query: Callable,
     capture: _RowCapture | None = None,
 ) -> tuple[str, str]:
-    """One comparison. Returns ``(status, text)`` where text is the full detail or the error.
-
-    ``capture``, when given, is filled with the reference and DataFrame rows.
-    """
     try:
         with _capturing(xs, capture):
             divergences = xs.find_cross_surface_divergences(
@@ -336,8 +305,6 @@ def _run_cell(
     except Exception as exc:  # noqa: BLE001 - a comparison that raises is a result, not a crash
         return "error", f"{type(exc).__name__}: {exc}"
     except BaseException as exc:
-        # A Polars panic (for example "os error 22") derives from BaseException, so the clause above misses
-        # it. Record it for this cell; KeyboardInterrupt, SystemExit and any other BaseException still stop the run.
         if type(exc).__name__ != "PanicException":
             raise
         return "error", f"{type(exc).__name__}: {exc}"
