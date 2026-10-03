@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Cutover PR merged with all required checks green and the visual change approved on the exact head",
+    "Production receipt shows Astro artifacts on trunk routes; probes green",
+    "Production rollback drill and roll-forward evidence recorded",
+    "Inventory diff against production: zero missing paths; atom.xml ids unchanged",
+    "Release-pinned /docs/ switches automatically at the next release that contains website/ (verified at that release)"
+  ],
+  "description": "Go only if all of these hold:\n- the G2 parity sign-off is current, re-run on the cutover base SHA\n- the visual approval runbook is ready\n- site-deploy has a successful Astro preview with a rollback drill on record\n- the owner approves in writing\n\nOne PR to develop, alone at the queue front:\n1. Commit the converted content as the new canonical source under website/src/content. Make docs/ read-only by deleting the Sphinx sources, or keep them only if the ADR says so.\n2. Swap the docs unit in ci.yml from docs-build to site-build. Required-CI wiring and the drift guard change in the same PR.\n3. Point visual capture at the Astro build and accept the one intentional baseline change through the exact-head approval path.\n4. Switch the trunk routes in routes.yml to Astro.\n\nAfter merge: deploy through site-deploy, probe every route, record the receipt, run one production rollback drill to the last Sphinx artifact and forward again.\n\nRollback trigger: any probe failure, a feed id change, or a missing inventory path. Response: redeploy the prior artifact by receipt and revert the PR.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:13:35Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "8097f824517b4be6bdbe7d422d6e6d07",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}

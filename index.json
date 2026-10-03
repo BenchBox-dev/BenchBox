@@ -1058,6 +1058,17 @@
       "status": "open",
       "title": "Wire the Astro build into site-deploy routes while keeping per-artifact provenance, gates, and rollback"
     },
+    "astro-site-53-cutover": {
+      "claim": null,
+      "needs": [
+        "astro-site-50-parity-harness",
+        "astro-site-51-visual-gate-transition",
+        "astro-site-52-site-deploy-integration"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Decision gate G3: cut docs/ authoring and production routes over to the Astro site in one reviewed PR"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
