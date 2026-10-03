@@ -155,6 +155,15 @@
       "op": "update",
       "op_id": "96ff17700bf24688a7758fdc5a5355e1",
       "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T18:08:19Z",
+      "client": "claude-code",
+      "generation": "aff5a6882e5749c9a77cf52f74969c9b",
+      "op": "finish",
+      "op_id": "3cc9b658175d4bae8967b8cb547da331",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
 }

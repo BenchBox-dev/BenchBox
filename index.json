@@ -7214,15 +7214,10 @@
       "title": "Deferral: TPC-H correctness gate value-digest mismatch on darwin-arm64 (Q2, Q10, Q15)"
     },
     "dlv2-f0-stabilize-queue-and-open-prs": {
-      "claim": {
-        "expires_at": "2026-10-04T18:07:25Z",
-        "generation": "aff5a6882e5749c9a77cf52f74969c9b",
-        "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486"
-      },
+      "claim": null,
       "needs": [],
       "priority": "critical",
-      "status": "active",
+      "status": "done",
       "title": "Stabilize the merge queue now and unstick the open dev-loop PRs"
     },
     "dlv2-f1-build-flip-branch": {
