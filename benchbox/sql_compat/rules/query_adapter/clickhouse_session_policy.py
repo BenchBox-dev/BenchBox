@@ -30,7 +30,7 @@ for _qid in ("23a", "23b", "87"):
             failure_mode=FailureMode.UNSUPPORTED_FEATURE,
             payload=SetSessionPolicyPayload(
                 settings=_SETTING,
-                issue_url=None,
+                issue_url=None,  # TODO: link GitHub issue documenting the sqlglot AST gap
             ),
             reason=_REASON,
         ),
