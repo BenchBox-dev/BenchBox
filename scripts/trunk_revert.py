@@ -44,7 +44,7 @@ def _parse_time(value: str) -> datetime:
 def trunk_red_since(run: Runner = live_run, repo: str = REPOSITORY) -> datetime | None:
     code, out = run(
         ["gh", "run", "list", "--repo", repo, "--workflow", TRUNK_WORKFLOW, "--branch", BASE_BRANCH]
-        + ["--limit", "5", "--json", RUN_FIELDS]
+        + ["--status", "completed", "--limit", "5", "--json", RUN_FIELDS]
     )
     if code != 0:
         raise TrunkError(f"gh run list failed: {out.strip()}")

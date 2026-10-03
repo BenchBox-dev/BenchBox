@@ -132,7 +132,16 @@ def _gate(runs: list[dict] | None, branch: str = "fix/thing", *, code: int = 0, 
 
     def run(cmd: list[str]) -> tuple[int, str]:
         assert cmd[:3] == ["gh", "run", "list"]
-        assert cmd[cmd.index("--workflow") :][:6] == ["--workflow", "trunk.yml", "--branch", "develop", "--limit", "5"]
+        assert cmd[cmd.index("--workflow") :][:8] == [
+            "--workflow",
+            "trunk.yml",
+            "--branch",
+            "develop",
+            "--status",
+            "completed",
+            "--limit",
+            "5",
+        ]
         assert cmd[-2:] == ["--json", "conclusion,status,updatedAt"]
         return code, payload
 
