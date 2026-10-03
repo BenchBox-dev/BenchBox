@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "6a33d1032ea1c4da2d9f476ce8550ddf9ef1f04a20c9ddb714af3f6897477ade",
+  "contract_sha256": "6fd0f9321de6b59e173ead08dc0ec875731bf085b78c1eda5fbb7a9dbef4562c",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -2235,7 +2235,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "51623ecee3938c4654712d119d09ce38c1c0600f562246db8d83c2e4cc597b50",
+  "semantic_sha256": "b9b0c9e0561fe27c52c73765545a0d5650b1816fb72d3d7fd99439500788fafe",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -2370,9 +2370,17 @@
       "sha256": "93bfcb8d27d574a2338b1a52b64fbc2ddc52c9f3a6a15846522f61ba8292d2c3"
     },
     {
-      "body": ".PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix test-required-local-cases joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit",
+      "body": ".PHONY: coverage-check",
       "kind": "rule",
-      "sha256": "edad20ed81b60ec9b2eefafa6952a8d253f8e85a9891725418cc32f1c8ee88d2",
+      "sha256": "33a91b537a56c27d0d10d4e8cf70c37382aa6c754be1c272699dc8e4ff7c9b2b",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
+      "body": ".PHONY: test",
+      "kind": "rule",
+      "sha256": "5d5400369fe14e514fd2f58bf07f156ce510fad8cb555a1843e0f095cf43bc87",
       "targets": [
         ".PHONY"
       ]
@@ -2466,11 +2474,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-all",
+      "kind": "rule",
+      "sha256": "aed16376805a757b791eb568e1fff256bd0e57ce95b766c7c446d399f3b4cd9f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-all:\n\t@echo \"Running non-resource-heavy tests in parallel...\"\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"not (slow or stress or resource_heavy or live_integration)\" --timeout=300\n\t@echo \"Running slow and resource-heavy tests serially...\"\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"(slow or resource_heavy) and not (stress or live_integration)\" -n 0 --timeout=1200",
       "kind": "rule",
       "sha256": "1f50fbdfb13554b932637fc3cfc583e018967bb4b58d08a03a1e1c7d721ff727",
       "targets": [
         "test-all"
+      ]
+    },
+    {
+      "body": ".PHONY: test-unit",
+      "kind": "rule",
+      "sha256": "45d57549ff2dc82886e4d3e51edc80b7214fea4f78f6f0d6b4ecbd26e1bf96d6",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2482,11 +2506,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-integration",
+      "kind": "rule",
+      "sha256": "6a614eddd5a4ba59d606825d585668f3fc9ff0229af4046b17b6c922bb12e726",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-integration:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"integration and not live_integration and not stress\" --tb=short",
       "kind": "rule",
       "sha256": "cf0b471bff195d054677ce571522bcdee0f582a20e8bf89b16fd9e75664f94f0",
       "targets": [
         "test-integration"
+      ]
+    },
+    {
+      "body": ".PHONY: test-tpch",
+      "kind": "rule",
+      "sha256": "bdd70a27a52bbf2433f9310ade8c56110c578fe4142cd3a964695d88be7848cc",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2514,11 +2554,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-pytest",
+      "kind": "rule",
+      "sha256": "b018e4bd8572b2a002db08e3264bdbd8b66265b93649e35ef35b2b114853737e",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-pytest:\n\tBENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m \"not stress\"",
       "kind": "rule",
       "sha256": "1cda8ae602e6c8631738f831db0562f40adf7ffbbf4d720778047bd5f435254c",
       "targets": [
         "test-pytest"
+      ]
+    },
+    {
+      "body": ".PHONY: test-fast",
+      "kind": "rule",
+      "sha256": "e30865dff9e396a462586c23ba016f92404cff094013f5cf47f59122ef0abde1",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2530,11 +2586,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-unlock",
+      "kind": "rule",
+      "sha256": "1f63d0e5d14e8daf53cf9303571389a880d502445a855c90869b54d3604bde20",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-unlock:\n\t@LOCK_DIR=\"$${BENCHBOX_TEST_LOCK_DIR:-$$HOME/.benchbox}\"; \\\n\tcase \"$$LOCK_DIR\" in \\\n\t\t\"~\") LOCK_DIR=\"$$HOME\" ;; \\\n\t\t\"~/\"*) LOCK_DIR=\"$$HOME/$${LOCK_DIR#\\~/}\" ;; \\\n\tesac; \\\n\tLOCK_PATH=\"$$LOCK_DIR/test.lock\"; \\\n\tpython3 scripts/local_validation.py clear-test-lock \"$$LOCK_PATH\"",
       "kind": "rule",
       "sha256": "b59f0f48e1dc55d1607a88b85ee8dab10fcb9c5597caa5f99209cffe849900e6",
       "targets": [
         "test-unlock"
+      ]
+    },
+    {
+      "body": ".PHONY: test-medium",
+      "kind": "rule",
+      "sha256": "21f8351d295e32e78521dfdeabae2106e735f3b758c29ec0fa0e1e1f790eb315",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2546,6 +2618,14 @@
       ]
     },
     {
+      "body": ".PHONY: test-medium-selected",
+      "kind": "rule",
+      "sha256": "35e3c8b2509f84ddfa90977ccdc82bef73cf0f09733e34bc1c9affb4ece5d465",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-medium-selected:\n\t@set -eu; \\\n\tOUTPUT=$$(mktemp); \\\n\ttrap 'rm -f \"$$OUTPUT\"' EXIT; \\\n\tBENCHBOX_TEST_TIER=t2 uv run -- python scripts/canary_impact.py \\\n\t\t--changed-json-env BENCHBOX_MEDIUM_CHANGED_PATHS_JSON \\\n\t\t--marker-expression \"medium and not (slow or stress or resource_heavy or live_integration)\" --cant-affect-list empty \\\n\t\t--product-code-only --run-selected --output \"$$OUTPUT\"",
       "kind": "rule",
       "sha256": "819553d0d8de41794f60d986e696b456cf43b5e20de9ee5771996ba3cdebb6ae",
@@ -2554,11 +2634,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-slow",
+      "kind": "rule",
+      "sha256": "a2bfa22a04ce1684aa940a22f06be395ed91becc30a55d38142d21ce5638fa6f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-slow:\n\tBENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m \"slow and not (stress or live_integration)\" -n 0 --tb=short -v --timeout=1200",
       "kind": "rule",
       "sha256": "4efff690996db16af0169c51d4eee9279ad50eeedeae2ebb47de9fd5b39b04fd",
       "targets": [
         "test-slow"
+      ]
+    },
+    {
+      "body": ".PHONY: test-stress",
+      "kind": "rule",
+      "sha256": "ff01edd44067a0d54b8a6a2e19f8cfbda6abc2a82fa01337c4aeab80746340db",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2592,11 +2688,27 @@
       "sha256": "40bcc61f39fc7be7c737d7a2d74706f27180c744c03f9646edb1fe497350312a"
     },
     {
+      "body": ".PHONY: test-correctness-gate",
+      "kind": "rule",
+      "sha256": "59ee90f44a45f62ec999ceafbff3f16de61b32e5a977d1336a573dca46430043",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-correctness-gate:\n\t@REPORT=\"$$(mktemp)\"; \\\n\tBENCHBOX_STRICT_EXPECTED_RESULTS=1 BENCHBOX_EMIT_RESULT_DIGEST=1 BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python -m pytest -m stress \"tests/integration/test_local_platform_benchmark_matrix.py::test_local_platform_benchmark_matrix[tpch-duckdb]\" -n 0 --tb=short --timeout=1200 -v --junitxml=\"$$REPORT\"; \\\n\tPYTEST_STATUS=$$?; \\\n\tuv run -- python -c \"import sys, xml.etree.ElementTree as ET; root = ET.parse(sys.argv[1]).getroot(); suites = [root] if root.tag == 'testsuite' else root.findall('testsuite'); tests = sum(int(s.get('tests') or 0) for s in suites); skipped = sum(int(s.get('skipped') or 0) for s in suites); errors = sum(int(s.get('errors') or 0) for s in suites); failures = sum(int(s.get('failures') or 0) for s in suites); print('correctness gate guard: ran=%d skipped=%d failures=%d errors=%d' % (tests, skipped, failures, errors)); sys.exit(0 if (tests == 1 and skipped == 0 and errors == 0 and failures == 0) else 'correctness gate: expected exactly 1 node to run with 0 skipped/failed/errored; a selected skip means duckdb/tpch dropped from the stable matrix or the node-id drifted')\" \"$$REPORT\"; \\\n\tGUARD_STATUS=$$?; \\\n\trm -f \"$$REPORT\"; \\\n\ttest $$PYTEST_STATUS -eq 0 && test $$GUARD_STATUS -eq 0",
       "kind": "rule",
       "sha256": "45d44ca6f4e0804e2330956017b6960ab92978673cf5fce6c9e46c8769ca024f",
       "targets": [
         "test-correctness-gate"
+      ]
+    },
+    {
+      "body": ".PHONY: plan-capture-gate",
+      "kind": "rule",
+      "sha256": "1742ea4b7021c3aed39eb8f7ff2b7aec772704ee08694b7cc16089bc91f25f72",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2608,11 +2720,27 @@
       ]
     },
     {
+      "body": ".PHONY: correctness-gate-digests-regen",
+      "kind": "rule",
+      "sha256": "7a874408416c6e3f9a628fcf24971ba05021e4ebbf98f8ab893e761c16e14996",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "correctness-gate-digests-regen:\n\tBENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python _project/scripts/regenerate_correctness_gate_digests.py",
       "kind": "rule",
       "sha256": "577bafc9a8438de078aa69ccc40cad6b8df8ad405bb3211dcd6c849f0288cf1f",
       "targets": [
         "correctness-gate-digests-regen"
+      ]
+    },
+    {
+      "body": ".PHONY: tpchavoc-equivalence-report",
+      "kind": "rule",
+      "sha256": "1a9ba52bda5d6329751748d8b2e2fc29d1dec97bd3715ad9123cd8703943afa9",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2624,11 +2752,27 @@
       ]
     },
     {
+      "body": ".PHONY: tpchavoc-equivalence-report-postgres",
+      "kind": "rule",
+      "sha256": "3b2d9f0031693d68c75bf20ee8f03513a9a3608e82e40e724d43c271e8cab99a",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "tpchavoc-equivalence-report-postgres:\n\tuv run -- python -m benchbox.core.tpchavoc.equivalence --engine postgres",
       "kind": "rule",
       "sha256": "6e5d88408d4260e51be0868371a3102b7324bbab8285b9c3d782c8acf23cab99",
       "targets": [
         "tpchavoc-equivalence-report-postgres"
+      ]
+    },
+    {
+      "body": ".PHONY: tpchavoc-equivalence-report-datafusion",
+      "kind": "rule",
+      "sha256": "5b9241ef63ab0e8a3e8955acdf6d592c8e6e35cf9fa806402f6a9faea806236b",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2640,11 +2784,27 @@
       ]
     },
     {
+      "body": ".PHONY: tpchavoc-equivalence-report-clickhouse",
+      "kind": "rule",
+      "sha256": "8ae7388d24926bb8302a8f9bd3c6cdf7917f02bf7d4530e1940a69dbe4f4f080",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "tpchavoc-equivalence-report-clickhouse:\n\tuv run -- python -m benchbox.core.tpchavoc.equivalence --engine clickhouse",
       "kind": "rule",
       "sha256": "52ec723b4f81d8f312dd3535996bc12d3bde04e985b9f2ee02b34b642933d019",
       "targets": [
         "tpchavoc-equivalence-report-clickhouse"
+      ]
+    },
+    {
+      "body": ".PHONY: tpchavoc-dataframe-equivalence-report",
+      "kind": "rule",
+      "sha256": "9e66311fc30eb0c92735cdea66ea890f755831a8a2f720a47f0d4ba40c87048f",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2656,11 +2816,27 @@
       ]
     },
     {
+      "body": ".PHONY: ssb-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "be9ab1fa7c24856a3c6df4b21f6ad453b8f67cc76be2d4a7701e735f23009f08",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "ssb-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark ssb",
       "kind": "rule",
       "sha256": "2bd348176461619545ebf3747d566075a438b3dc79284389a96fa1a2dbea01c0",
       "targets": [
         "ssb-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": ".PHONY: amplab-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "9d9d142abdc3916aa356a3413eb64e10e49f1480dbd89e22f905601229ac5aa5",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2672,11 +2848,27 @@
       ]
     },
     {
+      "body": ".PHONY: coffeeshop-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "752ad0870adb4786b5d8bfc78cd169f90cb9f3399043020ffb6a3132de68d09d",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "coffeeshop-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop",
       "kind": "rule",
       "sha256": "c3c6c50ce8b8c65f13f76bee813c685b3be0fae810e7b6abe9fc0ae472038c39",
       "targets": [
         "coffeeshop-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": ".PHONY: clickbench-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "617cd5de313281606695ec3ab537cbf58f172323494038f1a9c6d0f1a3fd60e2",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2688,6 +2880,14 @@
       ]
     },
     {
+      "body": ".PHONY: joinorder-synthetic-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "8b2986a6ee3a03871dc19cae217352e516ec0569631a96114564b10dd909bd89",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "joinorder-synthetic-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic",
       "kind": "rule",
       "sha256": "1093f9bd22f87c7dbdbbcd637b1372b4d5f9987c1de50ddec7d2d52ecb774377",
@@ -2696,11 +2896,27 @@
       ]
     },
     {
+      "body": ".PHONY: h2odb-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "34ba82ade408aabbb66a0b982d427bc775501a1e18901d7c88d12d1e450f6ec6",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "h2odb-cross-surface-equivalence-report:\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark h2odb",
       "kind": "rule",
       "sha256": "53bb2709f071f1a6ad650ab2b51bc210bcf19367df001c3b4eb2eafff54d73fd",
       "targets": [
         "h2odb-cross-surface-equivalence-report"
+      ]
+    },
+    {
+      "body": ".PHONY: read-primitives-cross-surface-equivalence-report",
+      "kind": "rule",
+      "sha256": "c77f6a97ae44b7236d91dd99597570fddb24731e7ea9ff554e42004cdae67b50",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2768,11 +2984,27 @@
       ]
     },
     {
+      "body": ".PHONY: cross-surface-update-baseline",
+      "kind": "rule",
+      "sha256": "f315a98e37eff4bbc793b82647571875db389173c42578625677f40b15189c73",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "cross-surface-update-baseline:\n\t@test -n \"$(BENCHMARK)\" || { echo \"Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>\"; exit 1; }\n\tuv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline",
       "kind": "rule",
       "sha256": "73d61228a59596dfe0540a1c17bc28f39a8795873f6feac62a75334927ab27b9",
       "targets": [
         "cross-surface-update-baseline"
+      ]
+    },
+    {
+      "body": ".PHONY: cross-surface-baseline-autodetect",
+      "kind": "rule",
+      "sha256": "628643198df349fcd3d94bc9314a4805ed074de63831d4c9ef12c05b532fe66e",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2784,11 +3016,27 @@
       ]
     },
     {
+      "body": ".PHONY: oracle-coverage-map",
+      "kind": "rule",
+      "sha256": "4ec53ce95c2e744f5f99cb0809593a37444b7ac4330e575222d6a03237e94d94",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "oracle-coverage-map:\n\tuv run -- python _project/scripts/generate_oracle_coverage_map.py",
       "kind": "rule",
       "sha256": "6c6f61c501e184c70da95231af2c6b684d3c12b9c7ee746ac725d24e7af71570",
       "targets": [
         "oracle-coverage-map"
+      ]
+    },
+    {
+      "body": ".PHONY: oracle-coverage-map-check",
+      "kind": "rule",
+      "sha256": "3116c171f60db9058864a5ed0b9ec20bf1b51426e1504c4f67c174fb549f5395",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2800,11 +3048,27 @@
       ]
     },
     {
+      "body": ".PHONY: cross-surface-applicability-report",
+      "kind": "rule",
+      "sha256": "35eb5b0bdae036ab7100db0721a772ac13432de7abd7d84f0a4f2893bf3d3d22",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "cross-surface-applicability-report:\n\tuv run -- python _project/scripts/cross_surface_applicability_sweep.py",
       "kind": "rule",
       "sha256": "437c4027b2eb738e42399529796f241470ae8e39204623e16da31addbfba868b",
       "targets": [
         "cross-surface-applicability-report"
+      ]
+    },
+    {
+      "body": ".PHONY: test-local-matrix",
+      "kind": "rule",
+      "sha256": "9b08b3e30df236546aca1be89cbf82cc0d5246ce2a40b79b7ca180cfb947b3b4",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2816,11 +3080,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-required-local-cases",
+      "kind": "rule",
+      "sha256": "00272d091d9f94b7d6fe3808766e49ae47f55acdbc6efd30953a300a82a70b5d",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-required-local-cases:\n\t@set -eu; \\\n\tDIR=$$(mktemp -d); \\\n\ttrap 'rm -rf \"$$DIR\"' EXIT; \\\n\tSHA=$$(git rev-parse HEAD); \\\n\tuv run -- python -c \"from tests.required_local_cases import REQUIRED_LOCAL_CASES; print('\\n'.join(REQUIRED_LOCAL_CASES))\" > \"$$DIR/required.txt\"; \\\n\tset -- $$(cat \"$$DIR/required.txt\"); \\\n\tSTATUS=0; \\\n\tuv run -- python -m pytest -m \"\" -n 0 --tb=short --timeout=1200 -v -p scripts.pytest_shard_evidence \\\n\t\t--basetemp \"$$DIR/basetemp\" --assigned-nodeids \"$$DIR/required.txt\" --shard-evidence \"$$DIR/evidence.json\" \\\n\t\t--checked-sha \"$$SHA\" \"$$@\" || STATUS=$$?; \\\n\tuv run -- python scripts/release_canary_sharding.py verify-required --evidence \"$$DIR/evidence.json\" \\\n\t\t--nodeids \"$$DIR/required.txt\" --checked-sha \"$$SHA\" || STATUS=$$?; \\\n\texit $$STATUS",
       "kind": "rule",
       "sha256": "59e61a84fbd0f7c0fb17e9408941c8e5c4a286ccd6bf569459c54b0824c00a9c",
       "targets": [
         "test-required-local-cases"
+      ]
+    },
+    {
+      "body": ".PHONY: joinorder-verify-reference-results",
+      "kind": "rule",
+      "sha256": "ffc97bcc49bdac5c6c801a6e6ba01fa477b18ac2c7f7e66f01a200d56cf38da8",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2832,11 +3112,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-duckdb",
+      "kind": "rule",
+      "sha256": "dfe05318d0ad7c6b1f565c2370cec71956084b97bbd8a079874573ca06d66639",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-duckdb:\n\tuv run -- python -m pytest -m \"duckdb\" --tb=short",
       "kind": "rule",
       "sha256": "6f6adff5f4b4ca0f4f810a14582834861cc38b352d9a5cd515b4bc45824d3d73",
       "targets": [
         "test-duckdb"
+      ]
+    },
+    {
+      "body": ".PHONY: test-sqlite",
+      "kind": "rule",
+      "sha256": "1ad824f438f16159ec7e3d81081edf6f766e8fabd4fd5e3fffcceeffac5d5cc6",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2848,6 +3144,14 @@
       ]
     },
     {
+      "body": ".PHONY: test-pyspark",
+      "kind": "rule",
+      "sha256": "b714ea92913f571ca29fc1a92325dd1ba49f66b77adf249422f7643ed8dff91e",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-pyspark:\n\t./scripts/run_pyspark_tests.sh",
       "kind": "rule",
       "sha256": "50ae60689133575f014cba9cc2a3438f6a7cb73b9a35dc5c3b8305131b73282b",
@@ -2856,11 +3160,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-read-primitives",
+      "kind": "rule",
+      "sha256": "f31b3f564dc3fc9cc8bfc00fce861103262388dc9b5e2323cd861f2509ebc2f5",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-read-primitives:\n\tuv run -- python -m pytest -m \"primitives\" --tb=short",
       "kind": "rule",
       "sha256": "4310cfcff51d43131a82955578f8ecd45148640ab9ad94a28aeb498e9b639f56",
       "targets": [
         "test-read-primitives"
+      ]
+    },
+    {
+      "body": ".PHONY: test-benchmarks",
+      "kind": "rule",
+      "sha256": "74ee5b0810ec43b2cffad57fc0e8661d9306adcadca5f6674e461cb7de5b0c1b",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -2893,6 +3213,14 @@
       "sha256": "acc4a321bf5020140e8ce33761773aee5d40528237480fa6dd627efcc79891bd",
       "targets": [
         "test-window"
+      ]
+    },
+    {
+      "body": ".PHONY: test-ci",
+      "kind": "rule",
+      "sha256": "77a2e0c3a03b9d145d199f229c4b1e18591e2baed0cd7da873524cf8500116d7",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3186,11 +3514,27 @@
       ]
     },
     {
+      "body": ".PHONY: coverage-fast",
+      "kind": "rule",
+      "sha256": "47ae43223c063862f13f064538292e4538910bfae4a6fcb5d296596c58fdc074",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "coverage-fast:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"fast and not (slow or stress or resource_heavy or live_integration or cloud_import)\" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120",
       "kind": "rule",
       "sha256": "eed50a348183411a5a517fcaf478da5824dd19036b8ca6271b526f33d97d990c",
       "targets": [
         "coverage-fast"
+      ]
+    },
+    {
+      "body": ".PHONY: coverage-all",
+      "kind": "rule",
+      "sha256": "1ac501e6196f6b6570907f83b08735e0f8688bf178e564f59015affa78a6f405",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3202,11 +3546,27 @@
       ]
     },
     {
+      "body": ".PHONY: coverage-opt-in-all",
+      "kind": "rule",
+      "sha256": "9b74aed36f09ced46aeeeefb88c24ee9c30d29736306067a90f98c7c9c8e270b",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "coverage-opt-in-all:\n\tuv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0",
       "kind": "rule",
       "sha256": "8b924ebd6e64af86869d0111d6768a3de02ea65e7e46ff9cc908c826c56034f0",
       "targets": [
         "coverage-opt-in-all"
+      ]
+    },
+    {
+      "body": ".PHONY: coverage",
+      "kind": "rule",
+      "sha256": "6ea2ddd27bdde9f8f70ff618ca581e055697c5288df53279e173e0ed50c84598",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3218,11 +3578,27 @@
       ]
     },
     {
+      "body": ".PHONY: coverage-html",
+      "kind": "rule",
+      "sha256": "10bf6d356e814ace95b3684b40f57f85b672ef8d1e506682437fd5642508be25",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "coverage-html:\n\tuv run -- python -m pytest -c pytest-ci.ini -m \"not (stress or resource_heavy or live_integration)\" --cov=benchbox --cov-report=html:htmlcov --cov-fail-under=0",
       "kind": "rule",
       "sha256": "f3680a6dbd6d194e918f300a2207f8ab464b869d06cb7abaedc279194dc30c48",
       "targets": [
         "coverage-html"
+      ]
+    },
+    {
+      "body": ".PHONY: coverage-report",
+      "kind": "rule",
+      "sha256": "763c8e1aefce8e07cb66078dd18f38f2b02521cf20f2193051e5a182a5d01e5b",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3234,11 +3610,27 @@
       ]
     },
     {
+      "body": ".PHONY: complexity-check",
+      "kind": "rule",
+      "sha256": "caa3d646f5bb873277b919b3c61ef8cf6299193a594ef06a5f1ac5e5d15afda7",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "complexity-check:\n\tuv run -- python _project/scripts/check_complexity.py",
       "kind": "rule",
       "sha256": "d46c5bf28c6bac574ace125a6bd66ebc48468b2a22068450d87453ba58b85769",
       "targets": [
         "complexity-check"
+      ]
+    },
+    {
+      "body": ".PHONY: complexity-report",
+      "kind": "rule",
+      "sha256": "c05696ef009b8d484903c03514e8c8b641582e7aa5b9ff31a84046e87822958f",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3250,11 +3642,27 @@
       ]
     },
     {
+      "body": ".PHONY: quality-governance-typecheck",
+      "kind": "rule",
+      "sha256": "892c797e6ea1570639ed9d9a5dad22106fde42886baa091be46b25fafa198b48",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "quality-governance-typecheck:\n\tuv run ty check --error all _project/scripts/check_complexity.py",
       "kind": "rule",
       "sha256": "c08f4857752073c75692d6ced4878c5a5fc103b458b72e63aca01c19be2bc871",
       "targets": [
         "quality-governance-typecheck"
+      ]
+    },
+    {
+      "body": ".PHONY: install",
+      "kind": "rule",
+      "sha256": "6672618ba88d4a15d4abc6b1e4756d770593d789a86fa07237f7447fc7c8e121",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3266,6 +3674,14 @@
       ]
     },
     {
+      "body": ".PHONY: develop",
+      "kind": "rule",
+      "sha256": "ea096de890af3f2b00db7bbc67b0319025eee4fd51dcc165bd0687bc91a5d0c6",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "develop:\n\tuv sync --group dev",
       "kind": "rule",
       "sha256": "4edf77d5d3647124f58a27f895ad68e8647da54b7c9b00bb967ca6552b855af0",
@@ -3274,11 +3690,27 @@
       ]
     },
     {
+      "body": ".PHONY: clean",
+      "kind": "rule",
+      "sha256": "6671ad5f7dea9eabcab8ac29a1eeabbef7cd40bc5f69060b6f978dc088c67b4c",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "clean:\n\trm -rf build/\n\trm -rf dist/\n\trm -rf *.egg-info/\n\trm -rf __pycache__/\n\trm -rf .pytest_cache/\n\trm -rf .coverage\n\trm -rf htmlcov/\n\tfind . -name '*.pyc' -delete\n\tfind . -name '__pycache__' -delete\n\tfind . -name '*.pyo' -delete\n\tfind . -name '.DS_Store' -delete",
       "kind": "rule",
       "sha256": "126c9dc00587f543c71d0677fc969564c7b29e30c9ba7813299c7320e85e2245",
       "targets": [
         "clean"
+      ]
+    },
+    {
+      "body": ".PHONY: lint",
+      "kind": "rule",
+      "sha256": "ae72407f088082d68be12cc6ace31500cd669a461b2cd05b507bce1ba307626f",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3346,6 +3778,14 @@
       ]
     },
     {
+      "body": ".PHONY: audit-sha-check",
+      "kind": "rule",
+      "sha256": "1b7534811203df09a15aa2e04f8fb917226691888a1a60fd03eade20ebc17761",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "audit-sha-check:\n\t@test -n \"$(FILE)\" || { echo \"Usage: make audit-sha-check FILE=<audit.md>\"; exit 1; }\n\tuv run --no-project -- python _project/scripts/audit_sha_check.py \\\n\t\t--target-ref \"$(AUDIT_SHA_TARGET_REF)\" \\\n\t\t--ancestry-ref \"$(or $(AUDIT_SHA_ANCESTRY_REF),HEAD)\" \\\n\t\t$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \\\n\t\t\"$(FILE)\"",
       "kind": "rule",
       "sha256": "a47dc8588a1d9eba836b5ab43fc1c22099ca6939bc5fc209bcda2e987e16ebec",
@@ -3370,9 +3810,9 @@
       ]
     },
     {
-      "body": ".PHONY: comment-policy-check comment-policy-strict comment-policy-report",
+      "body": ".PHONY: comment-policy-check",
       "kind": "rule",
-      "sha256": "4d6ae188b4539ff5879338a3a1b4ef600ca842689c2d1671dd3bef249db625bc",
+      "sha256": "f441ddb6449903781ddd281edb04444912812fcb32483bb2d4b335f01833e570",
       "targets": [
         ".PHONY"
       ]
@@ -3386,11 +3826,27 @@
       ]
     },
     {
+      "body": ".PHONY: comment-policy-strict",
+      "kind": "rule",
+      "sha256": "c84207bb198d4b07b1154d9ce4b932297c13b7580ca5d83dc4bf45131742e97c",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "comment-policy-strict:\n\tuv run -- python scripts/check_comment_policy.py --mode strict",
       "kind": "rule",
       "sha256": "35788f00f48922565a984e22e24efa0a5b729921efe471a45c81f3313b557270",
       "targets": [
         "comment-policy-strict"
+      ]
+    },
+    {
+      "body": ".PHONY: comment-policy-report",
+      "kind": "rule",
+      "sha256": "58324361abd74812b110f4337964b0a471afcfc80ecbbded60295570fdff1d81",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3402,11 +3858,27 @@
       ]
     },
     {
+      "body": ".PHONY: lint-markers",
+      "kind": "rule",
+      "sha256": "222b31f49afc861e743c256633f9adb4acc90850b8d5cb753b37cfda8a205a28",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "lint-markers:\n\tuv run -- python -m pytest --collect-only -q -p no:warnings\n\tuv run -- python -m pytest tests/unit/test_marker_strategy.py -q",
       "kind": "rule",
       "sha256": "4b5d672359ee9be7034c2cfd54acf9a9f5da753c98560bb138e3b6bb82595c91",
       "targets": [
         "lint-markers"
+      ]
+    },
+    {
+      "body": ".PHONY: lint-imports",
+      "kind": "rule",
+      "sha256": "6735292ff27a5257f8a7c873d3276f06a39a1b3542a1c57ddb32f7f49d23f6d5",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3418,11 +3890,27 @@
       ]
     },
     {
+      "body": ".PHONY: lint-explorer-tokens",
+      "kind": "rule",
+      "sha256": "6042e66478c59b2e2c2e8750c29a4f8f651551d84cce3d2de36b2be6d2598717",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "lint-explorer-tokens:\n\tpython3 _project/scripts/scan_explorer_tokens.py",
       "kind": "rule",
       "sha256": "d6d8e292fb8acf9ca389852539e528df2a5f27f25652bd3d59125c95804dc5ac",
       "targets": [
         "lint-explorer-tokens"
+      ]
+    },
+    {
+      "body": ".PHONY: lint-site-theme-tokens",
+      "kind": "rule",
+      "sha256": "272f49eb566a758911ae32fd702d4de63faa5803bce5fcc75d3deae2e1126f62",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3464,6 +3952,14 @@
       ]
     },
     {
+      "body": ".PHONY: artifact-hygiene",
+      "kind": "rule",
+      "sha256": "f9f0c575146ee7fe24d0e05b92aee4508b1b54e4eeec7adf9962869419371054",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "artifact-hygiene:\n\tuv run -- python _project/scripts/artifact_hygiene_check.py --all-tracked",
       "kind": "rule",
       "sha256": "27dffba659c9a14ef30c9c207ca05615ab2fdc736c8fe10377161a1a80fd28b6",
@@ -3472,11 +3968,27 @@
       ]
     },
     {
+      "body": ".PHONY: agent-instructions-check",
+      "kind": "rule",
+      "sha256": "4ce24fe465d79bc0d4c4dfae7d7ab42f34568ada2dfd819538c1c050be43f95f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "agent-instructions-check:\n\tuv run -- python _project/scripts/agent_instruction_audit.py",
       "kind": "rule",
       "sha256": "5059fb5a6913143b3951fe737b32e7ef36baac2e34bb04573b22e692c20968cd",
       "targets": [
         "agent-instructions-check"
+      ]
+    },
+    {
+      "body": ".PHONY: agent-identity-check",
+      "kind": "rule",
+      "sha256": "6a949273800284f96def4ea23626968826ae689c05deaa3a541682dd8a3afd64",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3494,6 +4006,14 @@
       "sha256": "d142996e3747e004f44f89c10aca6657e8d4a82042f6975a70f0c26172570473"
     },
     {
+      "body": ".PHONY: agent-commit-range-check",
+      "kind": "rule",
+      "sha256": "aaf9897a857d276b9391ad90c0b0f0a639ea213556e970aa49e9c6e23853b0aa",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "agent-commit-range-check:\n\t@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true\n\tuv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)",
       "kind": "rule",
       "sha256": "cf6cba45abaec1b37112722742b7d327b218aca55bbc28f6aa0a627af6e6e2f4",
@@ -3508,11 +4028,27 @@
       "sha256": "cda86820a785804e159f6a964f7ce171474102f93dd29f585be06f172c991990"
     },
     {
+      "body": ".PHONY: skill-sync",
+      "kind": "rule",
+      "sha256": "3027299c82814f181342c3d5e18f1476df77a4c0114ca86c1a7306a62e475b98",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "skill-sync:\n\t@# This recipe contains $$(MAKE), so make executes this whole logical line\n\t@# even under `-n` (recursive dry-run passthrough). The guard below must\n\t@# therefore stay in the SAME logical line: its `exit 0` is what stops\n\t@# `make -n skill-sync` and `make -n guards-fix` from really executing\n\t@# the apply and mutating the skill mirrors. Short flags arrive grouped\n\t@# and sorted in MAKEFLAGS (`make -nw` becomes `wn`), so a bare-word\n\t@# match misses them: scan every word for a bare `n` or a letter-only\n\t@# cluster containing `n` instead. For a real read-only preview, run\n\t@# `tools/skill-sync preview` directly.\n\t@dry_run=\"\"; \\\n\tfor flag_word in $(MAKEFLAGS); do \\\n\t\tcase \"$$flag_word\" in \\\n\t\t\tn|-n|--dry-run|--just-print) dry_run=1; break ;; \\\n\t\t\t-*) ;; \\\n\t\t\t*n*) case \"$$flag_word\" in *[!a-zA-Z]*) ;; *) dry_run=1; break ;; esac ;; \\\n\t\tesac; \\\n\tdone; \\\n\tif [ -n \"$$dry_run\" ]; then echo \"dry-run (-n): skipping skill-sync\"; exit 0; fi; \\\n\tif [ ! -x \"$(SKILL_SYNC)\" ]; then \\\n\t\techo \"skill-sync wrapper not found or not executable at $(SKILL_SYNC); refusing to report success without syncing (override with SKILL_SYNC=path/to/skill-sync)\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\t$(MAKE) -s agent-write-preflight && \\\n\t\"$(SKILL_SYNC)\" apply && \\\n\tcp .claude/skills/skill-sync.config.yaml .agents/skills/skill-sync.config.yaml\n\t@# The project-owned settings file lives at the path the skills read\n\t@# (`.claude/skills/skill-sync.config.yaml`, tracked). The wrapper owns\n\t@# only skill directories plus receipt/manifest, so the recipe mirrors the\n\t@# same file into the untracked agents workspace for local parity.",
       "kind": "rule",
       "sha256": "8321069cf1aa5f0944e2e05d7132c7acdd32a595af06e2ce48f002d86699f94f",
       "targets": [
         "skill-sync"
+      ]
+    },
+    {
+      "body": ".PHONY: skill-sync-check",
+      "kind": "rule",
+      "sha256": "80f21433031ebe57aec74841e189aa432d7678a4f9c5e3a9e68aa89e963fee4f",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3524,11 +4060,27 @@
       ]
     },
     {
+      "body": ".PHONY: skill-integrity-check",
+      "kind": "rule",
+      "sha256": "9b26f51b846e44ea81c117d870d2c11ecf034aab59839c341cc38685e71c0adc",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "skill-integrity-check:\n\t@set -eu; \\\n\tuv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf; \\\n\t\"$(SKILL_SYNC)\" verify; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t$(MAKE) agent-instructions-check; \\\n\t$(MAKE) agent-identity-check; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t$(MAKE) artifact-hygiene",
       "kind": "rule",
       "sha256": "90cecbf82e3dbdbffcdd3c416d49df6cd9b0566b77f505e4cb7858fc96d7661c",
       "targets": [
         "skill-integrity-check"
+      ]
+    },
+    {
+      "body": ".PHONY: duplicate-check",
+      "kind": "rule",
+      "sha256": "5e0d946ab59045a54572835a85092491724bdd7976f0de67e37de80ca6ed052d",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3540,11 +4092,27 @@
       ]
     },
     {
+      "body": ".PHONY: duplicate-check-verbose",
+      "kind": "rule",
+      "sha256": "af4e97fe0e070783ba7822407f11bc55d9b63ee259dcdd525388a3fb8f940bce",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "duplicate-check-verbose:\n\tuv run -- python scripts/check_duplicate_code.py --verbose --top-n 30",
       "kind": "rule",
       "sha256": "b44d5a607b378f1f5954b27ca53f426df49032b84afa92a6b9eb4c9fe44807d9",
       "targets": [
         "duplicate-check-verbose"
+      ]
+    },
+    {
+      "body": ".PHONY: duplicate-check-json",
+      "kind": "rule",
+      "sha256": "346ee640e3b37af61d989a4c5e234c4b3f720143a690cd70c1fa7a4994ac4b65",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3556,6 +4124,14 @@
       ]
     },
     {
+      "body": ".PHONY: duplicate-check-delta",
+      "kind": "rule",
+      "sha256": "f8f2bef1dc7b33f123c1c3295171816d6746fa1a40ea3cef206331860b34a5ef",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "duplicate-check-delta:\n\tuv run -- python scripts/check_duplicate_code.py --delta-vs \"$(if $(BASE_REF),$(BASE_REF),origin/develop)\"",
       "kind": "rule",
       "sha256": "215f8257f6d2e8ab927abfd7541079041edf75b562801ad8e7757c88b57bce2a",
@@ -3564,11 +4140,27 @@
       ]
     },
     {
+      "body": ".PHONY: makefile-inventory-check",
+      "kind": "rule",
+      "sha256": "03e6d4bf38d4500e1e84b055952e41eaceadbed867e3800597204a4bf2ea3a55",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "makefile-inventory-check:\n\tuv run -- python make/check_makefile_inventory.py",
       "kind": "rule",
       "sha256": "0d2b45c6d74a9e14486e7a4a4928f6b0732c35d70d1fa85ebb7e8c4ca4272fa1",
       "targets": [
         "makefile-inventory-check"
+      ]
+    },
+    {
+      "body": ".PHONY: mutation-test",
+      "kind": "rule",
+      "sha256": "0aedc323dd9c7993284d793906c800fa7a4802aa3727fcc1a3c5db14fef07000",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3596,11 +4188,27 @@
       ]
     },
     {
+      "body": ".PHONY: ci-lint",
+      "kind": "rule",
+      "sha256": "8fb37186993bb6a11dee844c7cbd8f3a93488f2f3417131ecefe71b13074aca6",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "ci-lint:\n\t@echo \"Running CI lint checks...\"\n\t@case \" $(MAKEFLAGS) \" in *\" n \"*|*\" -n \"*|*\" --just-print \"*) echo \"Dry-run: ci-lint guards suppressed\"; exit 0;; esac; \\\n\tset +e; failed=\"\"; \\\n\tuv run ruff check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-check\"; \\\n\tuv run ruff format --check .; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ruff-format\"; \\\n\tuv run ty check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed ty-check\"; \\\n\t$(MAKE) quality-governance-typecheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed quality-governance-typecheck\"; \\\n\t$(MAKE) uv-lock-revision-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uv-lock-revision\"; \\\n\t$(MAKE) sqlglot-repro-retirement-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed sqlglot-repro-retirement\"; \\\n\t$(MAKE) lint-markers; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-markers\"; \\\n\t$(MAKE) lint-imports; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-imports\"; \\\n\t$(MAKE) windows-antipatterns-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed windows-antipatterns\"; \\\n\t$(MAKE) comment-policy-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed comment-policy\"; \\\n\t$(MAKE) lint-explorer-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-explorer-tokens\"; \\\n\t$(MAKE) lint-site-theme-tokens; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed lint-site-theme-tokens\"; \\\n\t$(MAKE) artifact-hygiene; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed artifact-hygiene\"; \\\n\t$(MAKE) agent-instructions-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-instructions\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py agent-identity || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) agent-identity-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed agent-identity\"; \\\n\tfi; \\\n\t$(MAKE) agent-commit-range-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed agent-commit-range\"; \\\n\tGATE=$$(uv run -- python _project/scripts/ci_lint_environment_gate.py skill-sync-check || true); \\\n\tif [ \"$$GATE\" != \"SKIP\" ]; then \\\n\t\t$(MAKE) skill-sync-check; \\\n\t\t[ $$? -eq 0 ] || failed=\"$$failed skill-sync-check\"; \\\n\tfi; \\\n\tuv run -- python _project/scripts/timing_policy_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed timing-policy\"; \\\n\tuv run -- python _project/scripts/fast_lane_ceiling_check.py --strict; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed fast-lane-ceiling\"; \\\n\tuv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed uat-loc-table\"; \\\n\t$(MAKE) compat-docs-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed compat-docs-check\"; \\\n\t$(MAKE) platform-manifest-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed platform-manifest-check\"; \\\n\t$(MAKE) oracle-coverage-map-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed oracle-coverage-map-check\"; \\\n\t$(MAKE) pricing-data-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed pricing-data-check\"; \\\n\t$(MAKE) makefile-inventory-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed makefile-inventory-check\"; \\\n\tuv run -- python scripts/check_public_contract_drift.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed public-contract-drift\"; \\\n\t$(MAKE) audit-deps; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-deps\"; \\\n\t$(MAKE) audit-raw-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed audit-raw-check\"; \\\n\tuv run -- python scripts/check_release_curation.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed release-curation\"; \\\n\tsh scripts/check_untracked_skill_mirrors.sh; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed skill-mirror-drift\"; \\\n\t$(MAKE) duplicate-check-delta; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed duplicate-delta\"; \\\n\t$(MAKE) complexity-check; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed complexity-check\"; \\\n\t$(MAKE) spellcheck; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed spellcheck\"; \\\n\tuv run -- python scripts/check_rerun_shard_retention.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed rerun-shard-retention\"; \\\n\tuv run -- python _project/scripts/check_project_references.py; \\\n\t[ $$? -eq 0 ] || failed=\"$$failed project-references\"; \\\n\tif [ -n \"$$failed\" ]; then \\\n\t\techo \"\"; \\\n\t\techo \"\u274c FAILED guards:$$failed\"; \\\n\t\texit 1; \\\n\tfi; \\\n\techo \"\u2705 CI lint checks passed\"",
       "kind": "rule",
       "sha256": "81371bd3ef82f5c6055a5d7bcbe804ba092bc85871c203199a3781352d80a544",
       "targets": [
         "ci-lint"
+      ]
+    },
+    {
+      "body": ".PHONY: ci-test",
+      "kind": "rule",
+      "sha256": "c04e20e52404c2f660cb52e2496d10b2f21796abbf525cad0d9479d1ab6323e2",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3612,11 +4220,27 @@
       ]
     },
     {
+      "body": ".PHONY: ci-docs",
+      "kind": "rule",
+      "sha256": "e6d3b7def652b3d92fcb167c8fd19edf9cbf5ac38664b5922723c80a7ab3819a",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "ci-docs:\n\t@echo \"Running CI docs checks...\"\n\t@$(MAKE) docs-validate\n\t@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html\n\t@echo \"\u2705 CI docs build passed\"",
       "kind": "rule",
       "sha256": "f41ad8893d3dc408d72519c15b3ec00bb8970495b845161a0f2a01d1d7a7a1bb",
       "targets": [
         "ci-docs"
+      ]
+    },
+    {
+      "body": ".PHONY: security-audit",
+      "kind": "rule",
+      "sha256": "ddfbb331570b91189d207d733683f56734d34d46e8a810f476ad7ae103a29110",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3640,6 +4264,14 @@
       "sha256": "8da94e66ccb09cd5a7200ebdbdc52e3751d8401386f81d0c97aec55bf5b084d0"
     },
     {
+      "body": ".PHONY: spellcheck",
+      "kind": "rule",
+      "sha256": "829afdccae2e09537d4b8dbf61664d0bbc122c318a551cebbbd4c6a408f42686",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "spellcheck:\n\t@echo \"Running spellcheck...\"\n\tgit ls-files -z -- $(SPELLCHECK_EXCLUDE_PATHS) \\\n\t\t| xargs -0 uvx codespell --ignore-words=.codespell-ignore.txt --skip=\"$(SPELLCHECK_SKIP_GLOBS)\"\n\t@echo \"\u2705 Spellcheck passed\"",
       "kind": "rule",
       "sha256": "ac529e5da6fdb0a375cef21f9e750b72aabede22fd17f6bcdd9ef495cb130548",
@@ -3656,6 +4288,14 @@
       ]
     },
     {
+      "body": ".PHONY: test-package",
+      "kind": "rule",
+      "sha256": "dc2052c744db25c138b78bbe08b1d848b5e307a1996c60ab1f18ad2c47a69935",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-package:\n\t@echo \"Building and testing package installation...\"\n\trm -rf dist/\n\tuv build\n\tuvx twine check dist/*\n\t@echo \"Testing package installation...\"\n\t@wheel_count=$$(find \"$$PWD/dist\" -maxdepth 1 -type f -name '*.whl' | wc -l | tr -d '[:space:]'); \\\n\tif [ \"$$wheel_count\" != \"1\" ]; then \\\n\t\techo \"Expected exactly one wheel, found $$wheel_count\"; \\\n\t\tfind \"$$PWD/dist\" -maxdepth 1 -type f -print; \\\n\t\texit 1; \\\n\tfi; \\\n\twheel=$$(find \"$$PWD/dist\" -maxdepth 1 -type f -name '*.whl' -print -quit); \\\n\ttmpdir=$$(mktemp -d); \\\n\ttrap 'rm -rf \"$$tmpdir\"' EXIT; \\\n\tcd \"$$tmpdir\"; \\\n\tuv run --isolated --no-project --with \"$$wheel\" -- python -c \"import benchbox; print('Package installation successful')\"; \\\n\tuv run --isolated --no-project --with \"$$wheel\" -- benchbox --help > /dev/null\n\t@echo \"\u2705 Package test passed\"",
       "kind": "rule",
       "sha256": "370e52673932b9f704ffcde91d3cc9f41807f4de225bc8f341ae54092c2ffe1f",
@@ -3664,11 +4304,27 @@
       ]
     },
     {
+      "body": ".PHONY: test-integration-smoke",
+      "kind": "rule",
+      "sha256": "85efa72388b905c12b48276e4aa61ea700ca1526cd1204336592ab31d1299091",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "test-integration-smoke:\n\t@echo \"Running integration smoke tests...\"\n\tuv run -- python -m pytest tests/integration -m \"platform_smoke or (integration and fast)\" --tb=short\n\t@echo \"\u2705 Integration smoke tests passed\"",
       "kind": "rule",
       "sha256": "61a6edbfc84a55b74ece0ad5522bb6925cf7bcb1bca55424d00f66011163d47d",
       "targets": [
         "test-integration-smoke"
+      ]
+    },
+    {
+      "body": ".PHONY: ci-local",
+      "kind": "rule",
+      "sha256": "223e60d106cf7fc39a8c67c51d2f9990786dd75213e5b27eb3f993e9eede016d",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3708,6 +4364,14 @@
       ]
     },
     {
+      "body": ".PHONY: typecheck",
+      "kind": "rule",
+      "sha256": "ef6c8b2f95ce3e087d94d21415e072ff01add930fa5215c29e05d2c280810d40",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "typecheck:\n\tuv run ty check",
       "kind": "rule",
       "sha256": "37b8e643b046bf0ab7065214a816506fd62cd1484857d3e8ee90f6a7a45fa77e",
@@ -3724,11 +4388,27 @@
       ]
     },
     {
+      "body": ".PHONY: validate-imports",
+      "kind": "rule",
+      "sha256": "2023494688197e211b4fefb8777cfd925e6a6cdcb8bdb83de21555b696ce1bbb",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "validate-imports: lint-imports",
       "kind": "rule",
       "sha256": "ec94e5b03b382aee301da84e27e285ccb4ae045fe571937eba60a79963b555e9",
       "targets": [
         "validate-imports"
+      ]
+    },
+    {
+      "body": ".PHONY: catalog-schema-check",
+      "kind": "rule",
+      "sha256": "b1f4a2974de7393a348649b687cbce2dc0598a06a421291847aaebc408c716f6",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3740,11 +4420,27 @@
       ]
     },
     {
+      "body": ".PHONY: dependency-check",
+      "kind": "rule",
+      "sha256": "e763f79cc06afac8ab36345a089eebdbfe792273bc9f26f584ed0ba23141cc20",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "dependency-check:\n\tuv run -- python -m benchbox.utils.dependency_validation $(ARGS)",
       "kind": "rule",
       "sha256": "e4da282c2c5cf9f21e640e6eac3eb623a33eee0f8f44cebd65c2a627bd6de813",
       "targets": [
         "dependency-check"
+      ]
+    },
+    {
+      "body": ".PHONY: format",
+      "kind": "rule",
+      "sha256": "3378b05742d273001dce46b3f993914aa4692f6eec5831fe1a95504f9f8e0684",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3756,11 +4452,27 @@
       ]
     },
     {
+      "body": ".PHONY: docs-build",
+      "kind": "rule",
+      "sha256": "c8c8b8e7183d55ac507f188f356e0a53add021b29f88d090d8af9be22547c7e7",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "docs-build:\n\t@echo \"Building documentation...\"\n\t@cd docs && uv run sphinx-build -b html --keep-going . _build/html\n\t@echo \"\u2705 Docs built: docs/_build/html/index.html\"",
       "kind": "rule",
       "sha256": "a65f488108269164b67225c2ea9d271867fa81038c910ae78f2b93ffc45d3044",
       "targets": [
         "docs-build"
+      ]
+    },
+    {
+      "body": ".PHONY: docs-serve",
+      "kind": "rule",
+      "sha256": "44470d7c11d2c0006ed2852daa524faf905d25944f934254499cc83c83a9e38a",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3772,11 +4484,27 @@
       ]
     },
     {
+      "body": ".PHONY: docs-clean",
+      "kind": "rule",
+      "sha256": "dde4a1df14882fa73e28b28b768f192d96ce9be7e7a5e8569791def2706d97e6",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "docs-clean:\n\t@echo \"Cleaning documentation build artifacts...\"\n\t@rm -rf docs/_build\n\t@echo \"\u2705 Documentation artifacts cleaned\"",
       "kind": "rule",
       "sha256": "6b4cde887ecb109a8e85625b81a158c45fb33a9f080318da0faf2e733f12131a",
       "targets": [
         "docs-clean"
+      ]
+    },
+    {
+      "body": ".PHONY: docs-linkcheck",
+      "kind": "rule",
+      "sha256": "420357b23befe708f0e08fad2d2380a85a522984019d2aeb19860ca2ea3d9597",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3788,11 +4516,27 @@
       ]
     },
     {
+      "body": ".PHONY: docs-validate",
+      "kind": "rule",
+      "sha256": "25d32b8cd33c0b68204c759701e3833085e059955dbcfc4557be1a75f3a9faf3",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "docs-validate:\n\t@echo \"Validating example file references...\"\n\t@uv run -- python scripts/validate_example_references.py\n\t@echo \"\"\n\t@echo \"Checking example file syntax...\"\n\t@uv run -- python scripts/check_example_syntax.py\n\t@echo \"\"\n\t@echo \"Validating visualization screenshot sync...\"\n\t@uv run -- python scripts/validate_visualization_images.py\n\t@echo \"\"\n\t@echo \"Generating per-query template pages (link targets, not committed)...\"\n\t@uv run -- python scripts/generate_query_docs.py\n\t@echo \"\"\n\t@echo \"Checking repo-local doc relative links...\"\n\t@uv run -- python scripts/check_doc_relative_links.py",
       "kind": "rule",
       "sha256": "cc7ed1c8baf5896e794fdc0b70d602635fa310a1e6af6ff1d51fba0bfe8b041c",
       "targets": [
         "docs-validate"
+      ]
+    },
+    {
+      "body": ".PHONY: docs-images",
+      "kind": "rule",
+      "sha256": "525aecb3d6031c29d8d1090f697ab7130bd1467cfc383ae3cf51a633b8623830",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3820,11 +4564,27 @@
       ]
     },
     {
+      "body": ".PHONY: query-docs",
+      "kind": "rule",
+      "sha256": "37d5cb7e826005155337bacf043443e1783da025c64f595e6cf4d29142181081",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "query-docs:\n\tuv run -- python scripts/generate_query_docs.py",
       "kind": "rule",
       "sha256": "4c4f089ef07834427964eecc20323daee6cfded27f1c3600eeef0f260a77f35b",
       "targets": [
         "query-docs"
+      ]
+    },
+    {
+      "body": ".PHONY: docs-check",
+      "kind": "rule",
+      "sha256": "9fb212311cf1e535f61a82b99f81776288c7efdc113d860b66ce5c3d0ee3b723",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3836,11 +4596,27 @@
       ]
     },
     {
+      "body": ".PHONY: compile-tpcds-binaries",
+      "kind": "rule",
+      "sha256": "0887c609245b77499fd1c69842c28e467de2efa7d2fd88437552c77eadeb2e66",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "compile-tpcds-binaries:\n\tbash _sources/compilation/scripts/compile-all-platforms.sh --native",
       "kind": "rule",
       "sha256": "0f4884e66ac559844b0c36671403a1c1b272c39b5c1dc8299274e02baf48bbba",
       "targets": [
         "compile-tpcds-binaries"
+      ]
+    },
+    {
+      "body": ".PHONY: parity-fixtures",
+      "kind": "rule",
+      "sha256": "929ff2e034958baf66dec5253fa2ac7b929d321e440b37b858132a45df4140a0",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3852,11 +4628,27 @@
       ]
     },
     {
+      "body": ".PHONY: compat-docs",
+      "kind": "rule",
+      "sha256": "12fbbef3bdf5f93066efb5f516533a637ef929dab44e22cc9ffeb5dba2304ad4",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "compat-docs:\n\tuv run -- python scripts/generate_compat_docs.py",
       "kind": "rule",
       "sha256": "0456cd86b61a7b9ad16b67f8563caa49120d702a382c1a0eac9dde7637813512",
       "targets": [
         "compat-docs"
+      ]
+    },
+    {
+      "body": ".PHONY: compat-docs-check",
+      "kind": "rule",
+      "sha256": "eeb7c1a44c665c460208aa8a8461943d9b61757edd20f28343a09b2213bf4c0e",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3868,11 +4660,27 @@
       ]
     },
     {
+      "body": ".PHONY: pricing-data",
+      "kind": "rule",
+      "sha256": "c7217f6dc791a932f3a5233f504f4411fe8856c76883958dac2ba3980683c01b",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pricing-data:\n\tuv run -- python scripts/generate_pricing_data.py",
       "kind": "rule",
       "sha256": "ad4c9f19eee883626ce7ea966cf31c24176c92cb9252b6864c464aa65a4d3f6e",
       "targets": [
         "pricing-data"
+      ]
+    },
+    {
+      "body": ".PHONY: pricing-data-check",
+      "kind": "rule",
+      "sha256": "42533a784d3d9eb6b25ff8d22fac7f038a515ffe8487712f61e743d77490ea02",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3884,6 +4692,14 @@
       ]
     },
     {
+      "body": ".PHONY: platform-manifest",
+      "kind": "rule",
+      "sha256": "412fdfd347dacb764602e99bb94663ead6eee05ef4432d676e30ff0acc9ed0c8",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "platform-manifest:\n\tuv run -- python _project/scripts/platform_manifest.py",
       "kind": "rule",
       "sha256": "1c9c8e57a6102914b2f7d373d764527d389bb795b91a928dd9e76ca8d6a5eb07",
@@ -3892,11 +4708,27 @@
       ]
     },
     {
+      "body": ".PHONY: platform-manifest-check",
+      "kind": "rule",
+      "sha256": "fc21811612a66a26e1ad776079f645f22227f12c83723707741815a30e44389b",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "platform-manifest-check:\n\tuv run -- python _project/scripts/platform_manifest.py --check",
       "kind": "rule",
       "sha256": "a3ed04c6e5eeafaf89b91b50c72f6ced100688062e90e61cbf3b787ed29bfa9d",
       "targets": [
         "platform-manifest-check"
+      ]
+    },
+    {
+      "body": ".PHONY: parity-check",
+      "kind": "rule",
+      "sha256": "b634fb4644796db201f8111be865407011da67a78459ca93c0ac9f719f67268b",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3930,9 +4762,9 @@
       "sha256": "59c6786d40fb9ee6dae1f50e07b6384cedc54b2718415ef3c12ef8d154f57b83"
     },
     {
-      "body": ".PHONY: release-cut release-cut-abort release-finalize .release-cut-tree-required",
+      "body": ".PHONY: .release-cut-tree-required",
       "kind": "rule",
-      "sha256": "6baacdedd9d8818960a527879024fda2ffc6cc6c7253219afd94390410b0512d",
+      "sha256": "c99fc60aed034f089382ceb1bc1559e314715069f55a823557b1eb6796364338",
       "targets": [
         ".PHONY"
       ]
@@ -3946,11 +4778,27 @@
       ]
     },
     {
+      "body": ".PHONY: release-cut",
+      "kind": "rule",
+      "sha256": "bd5b12a15ab2bdba47c42fec46beb930310110cb8aded92b8f9df7dd4325788e",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "release-cut: .release-cut-tree-required\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-cut VERSION=X.Y.Z\" && exit 1)\n\tsh scripts/release_cut_start.sh \"$(VERSION)\"\n\tuv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject\n\t@# Refresh uv.lock now that pyproject.toml carries the new version, so the\n\t@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1\n\t@# aborted because the tracked lock was stale and the hook rewrote it).\n\tuv lock\n\tuv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release\n\t@# The generated section is raw commit subjects across the whole\n\t@# origin/release..HEAD delta (release lags develop by many releases), so it always\n\t@# needs hand-curation. Open $$EDITOR when there is a terminal to open it in;\n\t@# either way the --check-curation gate below decides, on the section's own\n\t@# text, whether curation actually happened. The old gate tested only whether\n\t@# EDITOR was set and stdin was a TTY, which `EDITOR=true` defeated.\n\t@if [ -n \"$$EDITOR\" ] && [ -t 0 ]; then \\\n\t\techo \"==> Opening CHANGELOG.md in $$EDITOR for hand-curation\"; \\\n\t\t$$EDITOR CHANGELOG.md; \\\n\telse \\\n\t\techo \"==> Non-interactive: CHANGELOG.md holds the raw generated draft.\"; \\\n\t\techo \"    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)\"; \\\n\tfi\n\tuv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)\n\t@# Curation FIRST so dev-only paths are never staged. Order matters: git rm\n\t@# before git add ensures untracked files inside _project/ etc. don't end up\n\t@# staged-for-add by a later git add.\n\t@# Curation list: A3 of _project/decisions/single-repo-migration.md. The\n\t@# Explorer is an intentional curated-preview exception: keep its corpus,\n\t@# application, and only the three build-time helpers required by docs.yml.\n\t@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec\n\t@# is untracked, and a leading `-` would hide that, silently skipping all\n\t@# curation on that line (v0.3.1 shipped uncurated because of this). With\n\t@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure\n\t@# is real, so no `-` prefix: real failures must abort the cut.\n\tgit rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini tools\n\tgit rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md\n\tgit rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml\n\t@# Tests that import _project/dev-only tooling, depend on development-only\n\t@# fixtures, or enforce contracts for curated-out development surfaces cannot\n\t@# collect or run on the release tree. The v0.4.0 release PR exposed the\n\t@# additional paths below after the original v0.3.1 curation list had passed.\n\tgit rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer\n\tgit rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py\n\tgit rm -f --ignore-unmatch tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py\n\tgit rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py\n\tgit rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py\n\t@# The v0.4.1 release PR exposed these tests for PR landing, worktree, queue, tracker,\n\t@# publication, and submission-workflow tooling; they import or read curated-away paths.\n\tgit rm -f --ignore-unmatch tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py\n\t@# Post-curation guard: every curated path must be gone from the index.\n\t@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_soundness_merge_digest.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \\\n\tif [ -n \"$$LEFTOVER\" ]; then \\\n\t\techo \"ERROR: release curation incomplete; development-only paths still tracked:\" >&2; \\\n\t\techo \"$$LEFTOVER\" | sed 's/^/  /' >&2; \\\n\t\texit 1; \\\n\tfi\n\t@for required_dir in results-data results-explorer _project/scripts/explorer_pipeline; do \\\n\t\ttest -d \"$$required_dir\" || { echo \"ERROR: curated Explorer publication directory is missing: $$required_dir\" >&2; exit 1; }; \\\n\t\tgit ls-files \"$$required_dir\" | grep -q . || { echo \"ERROR: curated Explorer publication directory is not tracked: $$required_dir\" >&2; exit 1; }; \\\n\tdone\n\t@for required_file in _project/scripts/explorer_publish.py _project/scripts/results_explorer_snapshot_invariants.py; do \\\n\t\ttest -f \"$$required_file\" && git ls-files --error-unmatch \"$$required_file\" >/dev/null || { echo \"ERROR: curated Explorer publication helper is missing: $$required_file\" >&2; exit 1; }; \\\n\tdone\n\t@# Stage only the files update_version.py + generate_changelog_entry.py +\n\t@# uv lock write. Explicit list (not `git add -A`) to avoid staging\n\t@# build/cache artifacts.\n\tgit add pyproject.toml uv.lock benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md\n\t@# --no-verify: the curation above (git rm) already deleted\n\t@# .pre-commit-config.yaml and _project/scripts/ (the repo:local hook\n\t@# entrypoints) from this working tree. The pre-commit git hook is still\n\t@# installed locally and would otherwise run against a config/entrypoints\n\t@# that no longer exist, aborting this commit with a false failure on\n\t@# every release cut. Nothing is skipped that matters: develop's PRs\n\t@# already ran these hooks before this content was curated.\n\tgit commit --no-verify -m \"Release v$(VERSION)\"\n\t@# Align release histories. release and develop have unrelated roots (Phase 4\n\t@# filter-merge) and diverge permanently: release carries one squash commit per\n\t@# release that develop never sees, and A4 step 6 (rebase develop onto release)\n\t@# was removed by the 2026-04-27 amendment. So a branch cut cleanly from\n\t@# develop is NOT mergeable into release \u2014 GitHub cannot compute a merge ref, the\n\t@# PR sits at CONFLICTING, and *no CI runs at all*: neither validate-base nor\n\t@# release-required-result ever trigger. Every cut before v0.3.1 (#711, #712,\n\t@# #1029, #1043, #1072) fixed this by hand.\n\t@#\n\t@# `-s ours` records origin/release as a second parent while keeping the curated\n\t@# release tree byte-for-byte; release-finalize's squash-merge then collapses\n\t@# the branch to one commit, so this merge never reaches the release branch's\n\t@# release-only ledger. Run AFTER the changelog step: --since-ref origin/release\n\t@# computes the patch delta against a release branch that is not yet an ancestor\n\t@# of this branch.\n\t@#\n\t@# --no-verify: merge fires pre-merge-commit (not pre-commit). That hook is not\n\t@# in default_install_hook_types today, so this is defensive \u2014 but curation has\n\t@# already deleted .pre-commit-config.yaml and the repo:local hook entrypoints,\n\t@# so adding pre-merge-commit later would otherwise break every cut here.\n\t@echo \"==> Aligning release histories: merging origin/release into v$(VERSION) (strategy: ours)\"\n\t@RELEASE_TREE=$$(git rev-parse 'HEAD^{tree}') && \\\n\tgit merge -s ours --no-verify --allow-unrelated-histories origin/release \\\n\t\t-m \"Merge release into v$(VERSION) (strategy: ours) to align release histories\" && \\\n\tMERGED_TREE=$$(git rev-parse 'HEAD^{tree}') && \\\n\tif [ \"$$RELEASE_TREE\" != \"$$MERGED_TREE\" ]; then \\\n\t\techo \"ERROR: alignment merge changed the curated release tree ($$RELEASE_TREE -> $$MERGED_TREE)\" >&2; \\\n\t\texit 1; \\\n\tfi\n\tPRE_COMMIT_ALLOW_NO_CONFIG=1 git push -u origin v$(VERSION)\n\tgh pr create --base release --head v$(VERSION) --title \"Release v$(VERSION)\" --body-file .github/RELEASE_PR_TEMPLATE.md\n\t@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).\n\t@# ls-remote patterns match the LAST path component, so 'v*' alone also matches\n\t@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full\n\t@# refs against the release-branch shape, mirroring _RELEASE_BRANCH_RE in\n\t@# scripts/generate_changelog_entry.py.\n\t@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.\n\t@for br in $$(git ls-remote --heads origin 'v*' | awk '$$2 ~ /^refs\\/heads\\/v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.+-]+)?$$/ {print $$2}' | sed 's|refs/heads/||' | grep -Fxv \"v$(VERSION)\"); do \\\n\t\techo \"==> Deleting prior release branch on origin: $$br\"; \\\n\t\tPRE_COMMIT_ALLOW_NO_CONFIG=1 git push origin --delete \"$$br\" || true; \\\n\tdone\n\t@echo\n\t@echo \"Release PR opened. Next steps:\"\n\t@echo \"  1. Review the PR diff; confirm CHANGELOG and curation are correct.\"\n\t@echo \"  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"  3. make release-finalize VERSION=$(VERSION)\"",
       "kind": "rule",
       "sha256": "9b8a29e57eeaec149b731551eae33b2dfabd366a307f461f4afb8e199892915d",
       "targets": [
         "release-cut"
+      ]
+    },
+    {
+      "body": ".PHONY: release-cut-abort",
+      "kind": "rule",
+      "sha256": "c52489f3312fdd73b8aa3ac4d2bc6f1d18b1f4beb26c0ad976765ef93ab2e4ba",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -3962,6 +4810,14 @@
       ]
     },
     {
+      "body": ".PHONY: release-finalize",
+      "kind": "rule",
+      "sha256": "735df582108311faad8a0c831f9b2246ac046bbe1af2129d1a8110b675360121",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "release-finalize:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-finalize VERSION=X.Y.Z\" && exit 1)\n\tuv run -- python scripts/release_finalize.py --version \"$(VERSION)\" --required-contexts \"$(RELEASE_REQUIRED_CONTEXTS)\"\n\t@echo\n\t@echo \"Check the matching release.yml run before reporting publication.\"\n\t@echo \"Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS).\"\n\t@echo \"develop is intentionally unchanged \u2014 dev-only paths persist on develop.\"",
       "kind": "rule",
       "sha256": "736088d0645a292c23ffc49483f39acee4e6f1d7c75f286f7f3017d95097ae65",
@@ -3970,9 +4826,9 @@
       ]
     },
     {
-      "body": ".PHONY: release-prep release-check",
+      "body": ".PHONY: release-prep",
       "kind": "rule",
-      "sha256": "b0b94f58b8bfe8ae4f4716c87e904f5e16759ef2df5dc10b417b39e9bca637c6",
+      "sha256": "3c38a048e8a7d8f5a6ec1f2f2e593101888196a67c5cbed0b6961ad28d3452e8",
       "targets": [
         ".PHONY"
       ]
@@ -3986,6 +4842,14 @@
       ]
     },
     {
+      "body": ".PHONY: release-check",
+      "kind": "rule",
+      "sha256": "957ebc0827bab6397410be2f90b89ec035e3bcdf29fe6b945eedf35e8329303a",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "release-check:\n\t@test -n \"$(VERSION)\" || (echo \"Usage: make release-check VERSION=X.Y.Z\" && exit 1)\n\tuv run --locked -- python scripts/release_flow.py check --version \"$(VERSION)\" $(if $(BASE_REF),--baseline-ref \"$(BASE_REF)\",)",
       "kind": "rule",
       "sha256": "9bb77e2c1eec91e15f2ac8ae507e8a10f120d53b2e2c3e36a033275ab1e6e3bb",
@@ -3994,9 +4858,9 @@
       ]
     },
     {
-      "body": ".PHONY: pr-arm pr-preflight pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test",
+      "body": ".PHONY: agent-write-preflight",
       "kind": "rule",
-      "sha256": "4fb632635630123758543441f5f1e7d7e66c3ae419c0f08acf7eace08ac7bcff",
+      "sha256": "ca29d53f789c20f1378057ad2c4435eb84c415a8a0b427afd5b977b335f96cb8",
       "targets": [
         ".PHONY"
       ]
@@ -4010,11 +4874,27 @@
       ]
     },
     {
+      "body": ".PHONY: pr-preflight",
+      "kind": "rule",
+      "sha256": "dd3a85a0e6242b7a43b81de9f63d4e23acbecacf04ec56fdbfeffb542902ccd5",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-preflight:\n\t@set -eu; \\\n\tgit fetch origin develop --quiet; \\\n\tPY_LIST=$$(mktemp); \\\n\tTEST_LIST=$$(mktemp); \\\n\ttrap 'rm -f \"$$PY_LIST\" \"$$TEST_LIST\"' EXIT; \\\n\tuv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > \"$$PY_LIST\"; \\\n\tuv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > \"$$TEST_LIST\"; \\\n\tif [ -s \"$$PY_LIST\" ]; then \\\n\t\techo \"==> ruff (changed Python files)\"; \\\n\t\tuv run -- ruff check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\t\tuv run -- ruff format --check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\telse \\\n\t\techo \"No Python files changed; skipping ruff.\"; \\\n\tfi; \\\n\tif [ ! -s \"$$TEST_LIST\" ]; then \\\n\t\techo \"No test files map to the changed paths; CI runs the fast lane.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\techo \"==> tests for changed files\"; \\\n\tSTATUS=0; \\\n\tenv $$(env | sed -n 's/^\\(GIT_[A-Za-z0-9_]*\\)=.*/-u \\1/p') uv run -- python -m pytest -q -n 0 --tb=short --ff $$(cat \"$$TEST_LIST\") || STATUS=$$?; \\\n\tif [ \"$$STATUS\" -eq 5 ]; then echo \"Mapped tests are all deselected by the default markers.\"; STATUS=0; fi; \\\n\texit \"$$STATUS\"",
       "kind": "rule",
       "sha256": "be835f93f8a63bca2c782d0ddd2027b16242b7247f2f93eb28e8aa0c9ab54882",
       "targets": [
         "pr-preflight"
+      ]
+    },
+    {
+      "body": ".PHONY: pr-preflight-fast-tests",
+      "kind": "rule",
+      "sha256": "56c08727cb377411ba2f5755c560f319f0699ba350ff4269da6c5d9b0056ea7d",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4066,6 +4946,14 @@
       ]
     },
     {
+      "body": ".PHONY: pr-content-guard",
+      "kind": "rule",
+      "sha256": "5bd35f3101339563c32444bdc46f5e875597e590c5de9d6165bcff0478bd11e7",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-content-guard:\n\t@set -eu; \\\n\t[ -n \"$(PATH_LISTS)\" ] || { echo \"PATH_LISTS is required\"; exit 2; }; \\\n\tEXISTING=$$(mktemp); \\\n\ttrap 'rm -f \"$$EXISTING\"' EXIT; \\\n\t$(MAKE) artifact-hygiene; \\\n\tif [ -s \"$(PATH_LISTS)/yaml.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted YAML path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/yaml.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run check-yaml --files $$(cat \"$$EXISTING\"); else echo \"No existing YAML content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No YAML content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/markdown.txt\" ]; then \\\n\t\t: > \"$$EXISTING\"; \\\n\t\twhile IFS= read -r path; do \\\n\t\t\tif [ -e \"$$path\" ]; then printf '%s\\n' \"$$path\" >> \"$$EXISTING\"; else echo \"Skipping deleted markdown path: $$path\"; fi; \\\n\t\tdone < \"$(PATH_LISTS)/markdown.txt\"; \\\n\t\tif [ -s \"$$EXISTING\" ]; then uv run -- pre-commit run markdownlint --files $$(cat \"$$EXISTING\"); else echo \"No existing markdown content paths to lint.\"; fi; \\\n\telse \\\n\t\techo \"No markdown content paths changed.\"; \\\n\tfi; \\\n\tif [ -s \"$(PATH_LISTS)/docs.txt\" ]; then \\\n\t\t$(MAKE) docs-validate; \\\n\telse \\\n\t\techo \"No docs paths changed.\"; \\\n\tfi",
       "kind": "rule",
       "sha256": "8ac2a80d32569e3cbddd446fa6971550960b71cab3b63119292d7b997fce57b7",
@@ -4074,11 +4962,27 @@
       ]
     },
     {
+      "body": ".PHONY: pr-open",
+      "kind": "rule",
+      "sha256": "047e4ff615f938362ea9d82af1f7d5b982df48cc87e0270914db3e6500636191",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-open:\n\t@set -eu; \\\n\t$(MAKE) -s agent-write-preflight; \\\n\tCURRENT=$$(git branch --show-current); \\\n\tcase \"$$CURRENT\" in \\\n\t\tdevelop|main|release) echo \"Refusing to open PR from $$CURRENT \u2014 switch to a feature branch.\"; exit 1 ;; \\\n\tesac; \\\n\tif [ -n \"$(PR_BODY_FILE)\" ] && [ ! -f \"$(PR_BODY_FILE)\" ]; then \\\n\t\techo \"PR_BODY_FILE does not exist: $(PR_BODY_FILE)\" >&2; \\\n\t\texit 1; \\\n\tfi; \\\n\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\tcase \"$$REPOSITORY\" in \\\n\t\t*/*/*|/*|*/|\"\") echo \"REPO must be a GitHub owner/name identity\" >&2; exit 2 ;; \\\n\t\t*/*) ;; \\\n\t\t*) echo \"REPO must be a GitHub owner/name identity\" >&2; exit 2 ;; \\\n\tesac; \\\n\tORIGIN_URL=$$(git remote get-url --push origin) || { echo \"Could not resolve the origin remote\" >&2; exit 1; }; \\\n\tcase \"$$ORIGIN_URL\" in \\\n\t\tgit@github.com:*) ORIGIN_REPOSITORY=\"$${ORIGIN_URL#git@github.com:}\" ;; \\\n\t\tssh://git@github.com/*) ORIGIN_REPOSITORY=\"$${ORIGIN_URL#ssh://git@github.com/}\" ;; \\\n\t\thttps://github.com/*) ORIGIN_REPOSITORY=\"$${ORIGIN_URL#https://github.com/}\" ;; \\\n\t\t*) echo \"origin remote is not a supported GitHub URL or SSH form\" >&2; exit 1 ;; \\\n\tesac; \\\n\tORIGIN_REPOSITORY=\"$${ORIGIN_REPOSITORY%.git}\"; \\\n\tORIGIN_REPOSITORY=\"$${ORIGIN_REPOSITORY%/}\"; \\\n\tORIGIN_OWNER=\"$${ORIGIN_REPOSITORY%%/*}\"; \\\n\tcase \"$$ORIGIN_REPOSITORY\" in \\\n\t\t*/*/*|/*|*/|\"\") echo \"origin remote is not a GitHub owner/name identity\" >&2; exit 1 ;; \\\n\t\t*/*) ;; \\\n\t\t*) echo \"origin remote is not a GitHub owner/name identity\" >&2; exit 1 ;; \\\n\tesac; \\\n\tHEAD_SPEC=\"$$CURRENT\"; \\\n\tORIGIN_REPOSITORY_KEY=$$(printf '%s' \"$$ORIGIN_REPOSITORY\" | tr 'A-Z' 'a-z'); \\\n\tTARGET_REPOSITORY_KEY=$$(printf '%s' \"$$REPOSITORY\" | tr 'A-Z' 'a-z'); \\\n\tif [ \"$$ORIGIN_REPOSITORY_KEY\" != \"$$TARGET_REPOSITORY_KEY\" ]; then \\\n\t\tHEAD_SPEC=\"$$ORIGIN_OWNER:$$CURRENT\"; \\\n\tfi; \\\n\tPR_HEAD_OWNER=\"$$ORIGIN_OWNER\"; \\\n\tPR_HEAD_NAME=\"$$CURRENT\"; \\\n\texport PR_HEAD_OWNER PR_HEAD_NAME; \\\n\tgit fetch origin develop --quiet; \\\n\tif ! git merge-base --is-ancestor origin/develop HEAD; then \\\n\t\tif ! git merge-tree --write-tree origin/develop HEAD >/dev/null 2>&1; then \\\n\t\t\techo \"Refusing to open PR: HEAD conflicts with origin/develop. Resolve the conflict first; no refresh merge is attempted.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\tQUEUE_REPORT=$$(mktemp); \\\n\t\ttrap 'rm -f \"$$QUEUE_REPORT\"' EXIT; \\\n\t\tif ! gh auth token 2>/dev/null | uv run -- python scripts/ruleset_drift_check.py --queue-policy \\\n\t\t\t--require-bypass-actor-visibility --repo \"$$REPOSITORY\" --token-stdin \\\n\t\t\t--output \"$$QUEUE_REPORT\"; then \\\n\t\t\techo \"Refusing to open PR: native merge queue and its protections could not be verified. Run 'make pr-refresh' to satisfy the current-base gate.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\tif ! DECISION=$$(uv run -- python scripts/pr_landing.py --worktree . queue-policy --queue-report \"$$QUEUE_REPORT\"); then \\\n\t\t\techo \"Refusing to open PR: queue policy did not authorize stale-base publication. Run 'make pr-refresh'.\" >&2; \\\n\t\t\texit 1; \\\n\t\tfi; \\\n\t\t[ \"$$DECISION\" = \"publish-without-refresh\" ] || { echo \"Refusing to open PR: unexpected stale-base decision $$DECISION.\" >&2; exit 1; }; \\\n\t\techo \"Verified native merge queue: publishing without an author-side base refresh.\"; \\\n\tfi; \\\n\t$(MAKE) -s pr-conflict-scan BRANCH=\"$$CURRENT\" || true; \\\n\tgit push -u origin \"$$CURRENT\" || { echo \"Push failed for $$CURRENT \u2014 aborting before opening a PR (remote branch may be stale).\" >&2; exit 1; }; \\\n\tREUSED_PR=0; \\\n\tURL=$$(gh pr list --repo \"$$REPOSITORY\" --base develop --state open \\\n\t\t--json url,headRepositoryOwner,headRefName \\\n\t\t--jq '.[] | select((.headRepositoryOwner.login | ascii_downcase) == (env.PR_HEAD_OWNER | ascii_downcase) and .headRefName == env.PR_HEAD_NAME) | .url' \\\n\t\t2>/dev/null | sed -n '1p'); \\\n\tif [ -z \"$$URL\" ]; then \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tURL=$$(gh pr create --repo \"$$REPOSITORY\" --base develop --fill --head \"$$HEAD_SPEC\" --body-file \"$(PR_BODY_FILE)\"); \\\n\t\telse \\\n\t\t\tURL=$$(gh pr create --repo \"$$REPOSITORY\" --base develop --fill --head \"$$HEAD_SPEC\"); \\\n\t\tfi; \\\n\telse \\\n\t\tREUSED_PR=1; \\\n\t\techo \"Reusing existing PR: $$URL\"; \\\n\t\tif [ -n \"$(PR_BODY_FILE)\" ]; then \\\n\t\t\tgh pr edit --repo \"$$REPOSITORY\" \"$$URL\" --body-file \"$(PR_BODY_FILE)\"; \\\n\t\tfi; \\\n\tfi && \\\n\techo \"$$URL\" && \\\n\tif [ \"$(READY)\" != \"1\" ]; then \\\n\t\techo \"Next: make pr-arm once the review fixes are pushed; the merge queue merges it when the required checks pass.\"; \\\n\telif [ -n \"$(EVIDENCE)$(BATCH)\" ]; then \\\n\t\tif [ \"$$REUSED_PR\" != \"1\" ]; then \\\n\t\t\techo \"READY=1 with EVIDENCE or BATCH applies to a reused PR, so this new PR is not armed.\"; \\\n\t\t\techo \"Arm it after review with make pr-arm, or with the evidence transaction: make pr-ready REPO=\\\"$$REPOSITORY\\\" URL=\\\"$$URL\\\" HEAD=\\\"$$(git rev-parse HEAD)\\\" EVIDENCE=\\\"<readiness-evidence.json>\\\"\"; \\\n\t\telse \\\n\t\t\t$(MAKE) -s pr-ready REPO=\"$$REPOSITORY\" URL=\"$$URL\" HEAD=\"$$(git rev-parse HEAD)\" EVIDENCE=\"$(EVIDENCE)\" BATCH=\"$(BATCH)\"; \\\n\t\tfi; \\\n\telse \\\n\t\tPR_NUMBER=$$(gh pr view --repo \"$$REPOSITORY\" \"$$URL\" --json number --jq '.number') || { echo \"Could not resolve $$URL to a PR in $$REPOSITORY\" >&2; exit 1; }; \\\n\t\t$(MAKE) -s pr-arm PR=\"$$PR_NUMBER\" REPO=\"$$REPOSITORY\" HEAD=\"$$(git rev-parse HEAD)\"; \\\n\tfi",
       "kind": "rule",
       "sha256": "0b086fe9c29c43ce17baca7061a3abb18d054f22c88b69f45b33e5d06bfe412c",
       "targets": [
         "pr-open"
+      ]
+    },
+    {
+      "body": ".PHONY: pr-arm-auto-merge",
+      "kind": "rule",
+      "sha256": "c66c70377fc8af9050a39a4c05deee1bd2a1ae185600a9201c4c3bb68fa1f221",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4106,6 +5010,14 @@
       "kind": "variable",
       "name": "PR_ARM_REPO_SET",
       "sha256": "b84e5c990c6bc5770585ab8f599e1b1ba2295fe817f93849d315fdce8ea83561"
+    },
+    {
+      "body": ".PHONY: pr-arm",
+      "kind": "rule",
+      "sha256": "232ee709f03b9f356ba730b111cb33b31543904dee63e6ac479807f04b308769",
+      "targets": [
+        ".PHONY"
+      ]
     },
     {
       "body": "pr-arm: override PR := $(value PR)",
@@ -4188,11 +5100,27 @@
       ]
     },
     {
+      "body": ".PHONY: pr-ready",
+      "kind": "rule",
+      "sha256": "3c4a399232c9aaf6e060a394fb47a8317d45757b2a7e5b202fa8547aa47960ff",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-ready:\n\t@[ -n \"$(PR)\" ] || [ -n \"$(URL)\" ] || { echo \"PR or URL is required\" >&2; exit 2; }\n\t@[ -n \"$(HEAD)\" ] || { echo \"HEAD is required\" >&2; exit 2; }\n\t@if [ -n \"$(EVIDENCE)$(BATCH)\" ]; then \\\n\t\t$(MAKE) -s pr-arm-auto-merge REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" PR=\"$(PR)\" URL=\"$(URL)\" HEAD=\"$(HEAD)\" EVIDENCE=\"$(EVIDENCE)\" BATCH=\"$(BATCH)\"; \\\n\telif [ -n \"$(URL)\" ]; then \\\n\t\t[ -z \"$(PR)\" ] || { echo \"PR and URL are mutually exclusive\" >&2; exit 2; }; \\\n\t\tREPOSITORY=\"$(or $(REPO),BenchBox-dev/BenchBox)\"; \\\n\t\tPR_INFO=$$(gh pr view --repo \"$$REPOSITORY\" \"$(URL)\" --json number,url --jq '\"\\(.number) \\(.url)\"') || { echo \"Could not resolve URL to a PR in $$REPOSITORY\" >&2; exit 1; }; \\\n\t\tPR_NUMBER=\"$${PR_INFO%% *}\"; PR_URL=$$(printf '%s' \"$${PR_INFO#* }\" | tr 'A-Z' 'a-z'); \\\n\t\tWANT=$$(printf '%s' \"$$REPOSITORY\" | tr 'A-Z' 'a-z'); \\\n\t\tcase \"$$PR_URL\" in \"https://github.com/$$WANT/pull/\"*) ;; *) echo \"URL names a PR outside $$REPOSITORY; refusing to arm it\" >&2; exit 2 ;; esac; \\\n\t\t$(MAKE) -s pr-arm PR=\"$$PR_NUMBER\" REPO=\"$$REPOSITORY\" HEAD=\"$(HEAD)\"; \\\n\telse \\\n\t\t$(MAKE) -s pr-arm PR=\"$(PR)\" REPO=\"$(or $(REPO),BenchBox-dev/BenchBox)\" HEAD=\"$(HEAD)\"; \\\n\tfi",
       "kind": "rule",
       "sha256": "a45b4485c4afff45b24592e84e59ca00d9001e0144c03f8180e1f1197f5d4830",
       "targets": [
         "pr-ready"
+      ]
+    },
+    {
+      "body": ".PHONY: shrink-rollup",
+      "kind": "rule",
+      "sha256": "91aab7c682e602968553b5c6dfd9d18eeb6aeeba98b19625c8bdedb724743d56",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4204,11 +5132,27 @@
       ]
     },
     {
+      "body": ".PHONY: pr-fanout",
+      "kind": "rule",
+      "sha256": "d5b5293206f700082ab29bf4afc284e395a66c5aa55f9beb297571ec6dd19b5d",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-fanout:\n\t@MAIN_CLONE=$$(dirname \"$$(realpath \"$$(git rev-parse --git-common-dir)\")\"); \\\n\tTMP=$$(mktemp); \\\n\tLOGDIR=$$(mktemp -d); \\\n\ttrap 'rm -f \"$$TMP\"; rm -rf \"$$LOGDIR\"' EXIT; \\\n\tgit worktree list --porcelain | sed -n 's/^worktree //p' | while IFS= read -r wt; do \\\n\t\t[ \"$$(realpath \"$$wt\")\" = \"$$MAIN_CLONE\" ] && { echo \"(skip $$wt: main clone)\"; continue; }; \\\n\t\tBR=$$(git -C \"$$wt\" branch --show-current 2>/dev/null); \\\n\t\tcase \"$$BR\" in develop|main|release|\"\") echo \"(skip $$wt: branch=$$BR)\"; continue ;; esac; \\\n\t\tIDX=$$(($${IDX:-0} + 1)); \\\n\t\tprintf '%06d|%s\\0' \"$$IDX\" \"$$wt\" >> \"$$TMP\"; \\\n\tdone; \\\n\tif [ ! -s \"$$TMP\" ]; then exit 0; fi; \\\n\txargs -0 -n 1 -P \"$(PR_FANOUT_JOBS)\" sh -c 'logdir=\"$$1\"; record=\"$$2\"; idx=\"$${record%%|*}\"; wt=\"$${record#*|}\"; br=$$(git -C \"$$wt\" branch --show-current 2>/dev/null); { echo \"==> $$wt [$$br]\"; ( cd \"$$wt\" && $(MAKE) -s pr-open ) || { echo \"(failed: $$wt)\"; exit 1; }; } > \"$$logdir/$$idx.log\" 2>&1' sh \"$$LOGDIR\" < \"$$TMP\"; \\\n\tSTATUS=$$?; \\\n\tfor log in \"$$LOGDIR\"/*.log; do [ -e \"$$log\" ] && cat \"$$log\"; done; \\\n\texit $$STATUS",
       "kind": "rule",
       "sha256": "0bb1b198c1b801396ef2e5582a7408232b2bec29e03cb4069a50bd69c0fcb3f6",
       "targets": [
         "pr-fanout"
+      ]
+    },
+    {
+      "body": ".PHONY: pr-refresh",
+      "kind": "rule",
+      "sha256": "a065e545f9537eee6d4913f30cfd604f5707ee68186c2de987bc63f3a3c29803",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4220,11 +5164,27 @@
       ]
     },
     {
+      "body": ".PHONY: pr-conflict-scan",
+      "kind": "rule",
+      "sha256": "3605d06eea92ee6f47ed9771a70b18176496f89de24f1c1de9ad6a06791f212f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-conflict-scan:\n\t@CURRENT=\"$(BRANCH)\"; \\\n\t[ -n \"$$CURRENT\" ] || CURRENT=$$(git branch --show-current); \\\n\tgh pr list --base develop --state open --json number,headRefName \\\n\t\t--jq '.[] | \"\\(.number) \\(.headRefName)\"' 2>/dev/null | \\\n\twhile read num branch; do \\\n\t\t[ \"$$branch\" = \"$$CURRENT\" ] && continue; \\\n\t\tgit fetch origin \"$$branch\" --quiet 2>/dev/null || continue; \\\n\t\tgit rev-parse --verify --quiet \"origin/$$branch^{commit}\" >/dev/null || continue; \\\n\t\tout=$$(git merge-tree --write-tree --name-only HEAD \"origin/$$branch\" 2>/dev/null); \\\n\t\t[ $$? -eq 1 ] || continue; \\\n\t\tfiles=$$(printf '%s\\n' \"$$out\" | awk 'NR>1 && NF==0{exit} NR>1{printf \"%s%s\", sep, $$0; sep=\", \"}'); \\\n\t\techo \"  \u26a0 textual conflict with PR #$$num ($$branch) in $$files \u2014 coordinate before landing\"; \\\n\tdone; true",
       "kind": "rule",
       "sha256": "6c5c01f97d3974c2074c38bca66a3462783d13597417339da05acc4dedee7aed",
       "targets": [
         "pr-conflict-scan"
+      ]
+    },
+    {
+      "body": ".PHONY: pr-status",
+      "kind": "rule",
+      "sha256": "c042d239b533e140499413b1bc23c6fff6768fcf9fd34506df967a2ea4b2d837",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4236,6 +5196,14 @@
       ]
     },
     {
+      "body": ".PHONY: pr-review-followups-list",
+      "kind": "rule",
+      "sha256": "f6327b66deaec88da5ad777c4c5fae2c1b17f700645bab8a72cb43f45cbb51a9",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-review-followups-list:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_RESOLVED)),--include-resolved) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_FAIL_ON_PENDING)),--fail-on-pending) \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\")",
       "kind": "rule",
       "sha256": "62919477cf9fabbe481a36f78cd3630f1f674fbbe3ccbcce91defd5254d5c733",
@@ -4244,11 +5212,27 @@
       ]
     },
     {
+      "body": ".PHONY: pr-review-followups",
+      "kind": "rule",
+      "sha256": "81183ee1e20650225c926fab24b501dea0d6c09600bcd289a7d65d0d377225fa",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "pr-review-followups:\n\t@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \\\n\t\t--base \"$(PR_REVIEW_BASE)\" \\\n\t\t--limit-prs \"$(PR_REVIEW_PR_LIMIT)\" \\\n\t\t--max-comments \"$(PR_REVIEW_MAX_COMMENTS)\" \\\n\t\t--executor-sandbox \"$(PR_REVIEW_EXECUTOR_SANDBOX)\" \\\n\t\t--executor-approval \"$(PR_REVIEW_EXECUTOR_APPROVAL)\" \\\n\t\t$(if $(PR_REVIEW_REPO),--repo \"$(PR_REVIEW_REPO)\") \\\n\t\t$(if $(PR_REVIEW_SINCE),--since \"$(PR_REVIEW_SINCE)\") \\\n\t\t$(if $(PR_REVIEW_UNTIL),--until \"$(PR_REVIEW_UNTIL)\") \\\n\t\t$(if $(PR_REVIEW_EXECUTOR_MODEL),--executor-model \"$(PR_REVIEW_EXECUTOR_MODEL)\") \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_INCLUDE_POST_MERGE)),--include-post-merge) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_REPLY)),--no-reply) \\\n\t\t$(if $(filter 0 false no,$(PR_REVIEW_SUBMIT)),--no-submit) \\\n\t\t$(if $(filter 1 true yes,$(PR_REVIEW_RESUME)),--resume)",
       "kind": "rule",
       "sha256": "b7a3f2964bb583d63b485d26add4afbf3e8774f4e328e398d9e9362ee974d9d9",
       "targets": [
         "pr-review-followups"
+      ]
+    },
+    {
+      "body": ".PHONY: dev-loop-metrics",
+      "kind": "rule",
+      "sha256": "a6c507fb45ade68d23b669313c525260bea78cbf0f36c4074185f50d26a000e4",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4296,6 +5280,14 @@
       "sha256": "c907015391f09a11b59d477991bc8ef887498eed81d4befc688d4e3e97c144e1"
     },
     {
+      "body": ".PHONY: worktree-create",
+      "kind": "rule",
+      "sha256": "0d455a645807b4940afec9b6f3d31f7cf1555cabd3de8c280ca2725880289b0f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "worktree-create: export BRANCH := $(BRANCH)",
       "kind": "rule",
       "sha256": "7f0152ec70ae3b6e03535065cd2145f508cfd1cd905f427bffc6ecee498a3a2b",
@@ -4333,6 +5325,14 @@
       "sha256": "70fb4e84e1941af5de1effd3090c14424c6cb57ec0a16cc0cc07805945c052b0",
       "targets": [
         "worktree-create"
+      ]
+    },
+    {
+      "body": ".PHONY: worktree-remove",
+      "kind": "rule",
+      "sha256": "13991a52f1cfe9f2a03baf40d4f971985f7651e2c7d802d69c81ca87c7af231c",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4400,11 +5400,27 @@
       ]
     },
     {
+      "body": ".PHONY: worktree-list",
+      "kind": "rule",
+      "sha256": "9bec45868c288c7dfed1e58691946722fbf1814d515db7887631d836bd5112bf",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "worktree-list:\n\t@git worktree list --porcelain",
       "kind": "rule",
       "sha256": "8a92b72d57817ac81c022dd36f141e1d06d8838e9ae2e496920ff142d84d3315",
       "targets": [
         "worktree-list"
+      ]
+    },
+    {
+      "body": ".PHONY: blind-spots-list",
+      "kind": "rule",
+      "sha256": "cebb8b8b3c3fc385f50ebbf14264c645f59063557ded28cbf61e6ea56c747dae",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4416,11 +5432,27 @@
       ]
     },
     {
+      "body": ".PHONY: blind-spots-report",
+      "kind": "rule",
+      "sha256": "49348126656e2b9a2b51839099328e903799bbb605be836d9e08b427c09800df",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "blind-spots-report:\n\t@uv run --project _project/scripts -- python _project/scripts/sweep_blind_spots.py report",
       "kind": "rule",
       "sha256": "cca6f064ec1c1d0173ccfd39593b4f89e084a4821ee68304476d2a6edac521a1",
       "targets": [
         "blind-spots-report"
+      ]
+    },
+    {
+      "body": ".PHONY: blind-spots-sweep",
+      "kind": "rule",
+      "sha256": "bd80b5047fb42115878352f78395656034c1e8bbc728c9e44cbf26d5b80e65eb",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4432,11 +5464,27 @@
       ]
     },
     {
+      "body": ".PHONY: soundness-drain-report",
+      "kind": "rule",
+      "sha256": "fa462902262406b12fb43cc1080b4558ac7fb12ad181c62d5c962834208d555f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "soundness-drain-report:\n\t@uv run -- python _project/scripts/soundness_drain_report.py",
       "kind": "rule",
       "sha256": "f5e989fd671b459e8b23dc735a0614cf17693e45e90ecd957799f6e5fb312742",
       "targets": [
         "soundness-drain-report"
+      ]
+    },
+    {
+      "body": ".PHONY: soundness-drain-self-test",
+      "kind": "rule",
+      "sha256": "6e093dabd14dd12e11a690bf42d4207b48dcc1ac729b2be7947d0607ca01a767",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4464,6 +5512,14 @@
       ]
     },
     {
+      "body": ".PHONY: branch-prune-merged",
+      "kind": "rule",
+      "sha256": "4d8e40e5a7743204d0981e3feed81e8dd4578762582f9eb29a7ecc5f22208c3d",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "branch-prune-merged:\n\t@command -v gh >/dev/null 2>&1 || { echo \"gh CLI required for branch-prune-merged\" >&2; exit 1; }\n\t@DRY_RUN='$(if $(filter 1,$(DRY_RUN)),1,$(if $(strip $(DRY_RUN)),invalid,))' \\\n\t\tuv run -- python scripts/branch_prune_merged.py",
       "kind": "rule",
       "sha256": "ec096bc141eec85fc85c478e0cab5d28ffe94c38f80e5f75c857d86be1902415",
@@ -4472,9 +5528,9 @@
       ]
     },
     {
-      "body": ".PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-smoke uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check",
+      "body": ".PHONY: uat-artifact-hygiene",
       "kind": "rule",
-      "sha256": "f1a41f289e6bc1645a605ce109fb7dd94d60c3c9d259f32bd346236cce10429e",
+      "sha256": "4e35acb96dd566166c85febf2ff9bfa4940d98eee9c82a8a30650234012218af",
       "targets": [
         ".PHONY"
       ]
@@ -4488,11 +5544,27 @@
       ]
     },
     {
+      "body": ".PHONY: uat-cell",
+      "kind": "rule",
+      "sha256": "bff5435cabb3e1e72b3365d5170cfff790eec441ca2cb0ed8563ac68d9055703",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-cell:\n\t@if [ -z \"$(PLATFORM)\" ] || [ -z \"$(BENCHMARK)\" ] || [ -z \"$(SCALE)\" ]; then \\\n\t\techo \"Usage: make uat-cell PLATFORM=<name> BENCHMARK=<name> SCALE=<float>\" >&2; \\\n\t\texit 2; \\\n\tfi\n\t@uv run --no-sync -- python -m tests.uat._cli \\\n\t\t--platform \"$(PLATFORM)\" \\\n\t\t--benchmark \"$(BENCHMARK)\" \\\n\t\t--scale \"$(SCALE)\" \\\n\t\t$(if $(PHASES),--phases \"$(PHASES)\",) \\\n\t\t$(if $(COMPRESSION),--compression \"$(COMPRESSION)\",) \\\n\t\t$(if $(TIMEOUT_S),--timeout-s \"$(TIMEOUT_S)\",) \\\n\t\t$(if $(LOG_DIR),--log-dir \"$(LOG_DIR)\",)",
       "kind": "rule",
       "sha256": "40ca7de8cc308d9fc72ff5f0debaca9a6a7f6c5c52f827a3e420677b9d7637ab",
       "targets": [
         "uat-cell"
+      ]
+    },
+    {
+      "body": ".PHONY: uat-validate",
+      "kind": "rule",
+      "sha256": "051f99821fa2d22e0b11024a55256f4109222aadb7112483d45e8df625ba7d72",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4504,6 +5576,14 @@
       ]
     },
     {
+      "body": ".PHONY: uat-report",
+      "kind": "rule",
+      "sha256": "148884a0db3275cd36a5a01eac159798460568d1b14a65e037af131e91202270",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-report:\n\t@if [ -z \"$(CELLS_JSONL)\" ] || [ -z \"$(OUTPUT_TSV)\" ]; then \\\n\t\techo \"Usage: make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=...] [CROSS_SCALE_FLOOR=N]\" >&2; \\\n\t\texit 2; \\\n\tfi\n\t@uv run --no-sync -- python -m tests.uat._cli report \\\n\t\t--cells-jsonl \"$(CELLS_JSONL)\" \\\n\t\t--output-tsv \"$(OUTPUT_TSV)\" \\\n\t\t$(if $(RUNGS),--rungs \"$(RUNGS)\",) \\\n\t\t$(if $(CROSS_SCALE_FLOOR),--cross-scale-floor \"$(CROSS_SCALE_FLOOR)\",)",
       "kind": "rule",
       "sha256": "e16af4cf56a9e48d95012163d3075e9969eb10b061cf52d9e0968b694657f9d4",
@@ -4512,11 +5592,27 @@
       ]
     },
     {
+      "body": ".PHONY: uat-explorer-smoke",
+      "kind": "rule",
+      "sha256": "da3f44539ce16ee3a1ef28f2c82b60b0a4d48a61c1f5710320e9e6011e2a697f",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-explorer-smoke:\n\t@if [ -z \"$(BUNDLES_DIR)\" ] || [ -z \"$(OUTPUT_DIR)\" ] || [ -z \"$(LOG_DIR)\" ]; then \\\n\t\techo \"Usage: make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]\" >&2; \\\n\t\texit 2; \\\n\tfi\n\t@uv run --no-sync -- python -m tests.uat._cli explorer-smoke \\\n\t\t--data-dir \"$(BUNDLES_DIR)\" \\\n\t\t--output-dir \"$(OUTPUT_DIR)\" \\\n\t\t--log-dir \"$(LOG_DIR)\" \\\n\t\t$(if $(BROWSERS),--browsers \"$(BROWSERS)\",)",
       "kind": "rule",
       "sha256": "2ad74877b95d1a665f7613094df2821f621dfd30cf898b32a339aa88f41abaa6",
       "targets": [
         "uat-explorer-smoke"
+      ]
+    },
+    {
+      "body": ".PHONY: uat-package",
+      "kind": "rule",
+      "sha256": "97df684b29384d6fdd75cf18708970b89d9a7d54022dab00958e339ca0665e43",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4534,11 +5630,27 @@
       "sha256": "275982c2f114df44c26e5f9a965254d1f93b05e0a6d198008ee2adf4c33463e1"
     },
     {
+      "body": ".PHONY: uat-bring-up",
+      "kind": "rule",
+      "sha256": "1275243347ce58548dfc33730953be3d474168e8912787a79c65827b8b848df1",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-bring-up:\n\t$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)\n\t@if [ -z \"$(PLATFORM)\" ]; then \\\n\t\techo \"Usage: make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1] [BENCHMARK_RUNS_DIR=~/Developer/benchmark_runs]\" >&2; \\\n\t\texit 2; \\\n\tfi\n\t@uv run --no-sync -- python scripts/uat-bring-up/uat_bring_up.py \\\n\t\t--platform \"$(PLATFORM)\" \\\n\t\t$(if $(TIMEOUT_S),--timeout-s \"$(TIMEOUT_S)\",) \\\n\t\t$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir \"$(BENCHMARK_RUNS_DIR)\",) \\\n\t\t$(if $(DRY_RUN),--dry-run,)",
       "kind": "rule",
       "sha256": "89ed81ac30c9c0afd3fc30697b1a1018e3206b3453fb9970c493b63c4a131873",
       "targets": [
         "uat-bring-up"
+      ]
+    },
+    {
+      "body": ".PHONY: uat-prepull",
+      "kind": "rule",
+      "sha256": "388f5a7ae27edaedabb43f4c1672bb54afdf6c45ab81da381ff18849f49c24c5",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4550,11 +5662,27 @@
       ]
     },
     {
+      "body": ".PHONY: uat-docker-cleanup",
+      "kind": "rule",
+      "sha256": "d78e676e59c272f846644274adf8232dfbd231face0287a9fd5978e96f753a61",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-docker-cleanup:\n\t@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \\\n\t\t$(if $(ENGINE),--engine \"$(ENGINE)\",) \\\n\t\t$(if $(MODE),--mode \"$(MODE)\",) \\\n\t\t$(if $(PREFIX),--prefix \"$(PREFIX)\",) \\\n\t\t$(if $(APPLY),--apply,)",
       "kind": "rule",
       "sha256": "f394b0ced4b145094e5021a3fd5c9e32ca883a7e8159e426379bc0247e24f9c8",
       "targets": [
         "uat-docker-cleanup"
+      ]
+    },
+    {
+      "body": ".PHONY: uat-sweep",
+      "kind": "rule",
+      "sha256": "36cab39aac45666a1416f0a04809345e0f74b681b0490145f5e7b0121b2ac876",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4566,11 +5694,27 @@
       ]
     },
     {
+      "body": ".PHONY: uat-smoke",
+      "kind": "rule",
+      "sha256": "1d4ea92c206b67d9224c2507fd322d9bdbe446b4a59a5c065a43f47f5c8bc4db",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-smoke:\n\t@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml",
       "kind": "rule",
       "sha256": "af3ca72b8a923ae00ca4940ea865b5953548ffcc7e06bdbdddcd4ce9b25e2fa9",
       "targets": [
         "uat-smoke"
+      ]
+    },
+    {
+      "body": ".PHONY: uat-stress",
+      "kind": "rule",
+      "sha256": "74ea8466314d28779838444d747abe94a6e928689254301ec5db59fcab33367f",
+      "targets": [
+        ".PHONY"
       ]
     },
     {
@@ -4582,11 +5726,27 @@
       ]
     },
     {
+      "body": ".PHONY: uat-gate-check",
+      "kind": "rule",
+      "sha256": "adf8f8a2b3c6a2cd951374a3c41ed47d9d8f23a46213e9216d7f23f680e7fa08",
+      "targets": [
+        ".PHONY"
+      ]
+    },
+    {
       "body": "uat-gate-check:\n\t@if [ -z \"$(STAGE1)\" ] || [ -z \"$(STAGE2)\" ] || [ -z \"$(STAGE3)\" ]; then \\\n\t\techo \"Usage: make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]\" >&2; \\\n\t\texit 2; \\\n\tfi\n\t@uv run --no-sync -- python -m tests.uat._cli gate-check \\\n\t\t--stage1 \"$(STAGE1)\" \\\n\t\t--stage2 \"$(STAGE2)\" \\\n\t\t--stage3 \"$(STAGE3)\" \\\n\t\t$(if $(OUTPUT),--output \"$(OUTPUT)\",)",
       "kind": "rule",
       "sha256": "d08393f6d33d085d3ee5db77b25c794678593fec5c0bccc1c0548caca9b6e109",
       "targets": [
         "uat-gate-check"
+      ]
+    },
+    {
+      "body": ".PHONY: uat-execute",
+      "kind": "rule",
+      "sha256": "a9e93af1718fce7e3317d85470c4186508087dc39784ebc3f0b5b20ebc5ae309",
+      "targets": [
+        ".PHONY"
       ]
     },
     {

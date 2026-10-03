@@ -784,7 +784,9 @@ class TestReleaseInfrastructure:
         assert "git switch --discard-changes" in abort_script
         assert 'git branch -d "$branch"' in abort_script
         assert "git ls-remote --heads origin" in abort_script
-        assert ".PHONY: release-cut release-cut-abort release-finalize" in _makefile_text()
+        phony_lines = {line.strip() for line in _makefile_text().splitlines() if line.startswith(".PHONY:")}
+        for target in ("release-cut", "release-cut-abort", "release-finalize"):
+            assert f".PHONY: {target}" in phony_lines
 
     def test_release_cut_curation_survives_untracked_paths(self):
         """Curation `git rm` lines must use --ignore-unmatch and abort on real failures.
