@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -195,6 +196,97 @@ def test_public_site_theme_inputs_trigger_their_dedicated_gate(rules: dict[str, 
     assert decision["site_theme_needed"] is True
     assert decision["site_theme_paths"] == paths
     assert decision["explorer_paths_needed"] is False
+
+
+FRAMING_TRIGGER_PATHS = [
+    "tests/utilities/session_isolation.py",
+    "tests/conftest.py",
+    "tests/unit/core/conftest.py",
+    "tests/plugins/hook.py",
+    "tests/unit/plugins/hook.py",
+    "tests/fixtures/utility_fixtures.py",
+    "_benchbox_pytest_xdist_safety.py",
+    "scripts/local_validation.py",
+    "tests/duration_policy.py",
+    "pytest.ini",
+    "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py",
+    "benchbox/__init__.py",
+    "benchbox/_binaries/tpc-h/windows-x86_64/dbgen.exe",
+]
+
+
+@pytest.mark.parametrize("path", FRAMING_TRIGGER_PATHS)
+def test_framing_inputs_trigger_the_cross_platform_framing_job(rules: dict[str, list[str]], path: str) -> None:
+    decision = classify_paths([path], rules)
+
+    assert decision["framing_needed"] is True
+    assert decision["framing_paths"] == [path]
+    assert decision["needs_code_ci"] is True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "benchbox/cli/run.py",
+        "tests/unit/core/test_runner.py",
+        "tests/fixtures/golden/q1.sql",
+        "docs/development/testing.md",
+        "benchbox/_binaries/tpc-ds/linux-x86_64/dsdgen",
+    ],
+)
+def test_unrelated_changes_skip_the_cross_platform_framing_job(rules: dict[str, list[str]], path: str) -> None:
+    decision = classify_paths([path], rules)
+
+    assert decision["framing_needed"] is False
+    assert decision["framing_paths"] == []
+
+
+def test_every_registered_pytest_plugin_triggers_the_framing_job(rules: dict[str, list[str]]) -> None:
+    repo_root = REPO_RULES.parents[1]
+    modules = re.findall(r"^\s*-p\s+(?!no:)(\S+)", (repo_root / "pytest.ini").read_text(encoding="utf-8"), re.M)
+    conftest = (repo_root / "tests" / "conftest.py").read_text(encoding="utf-8")
+    block = re.search(r"pytest_plugins\s*=\s*\[(.*?)\]", conftest, re.S)
+    assert block is not None
+    modules += re.findall(r'"([\w.]+)"', block.group(1))
+
+    assert modules
+    for module in modules:
+        path = f"{module.replace('.', '/')}.py"
+        assert (repo_root / path).is_file(), path
+        assert classify_paths([path], rules)["framing_needed"] is True, path
+
+
+def test_first_party_imports_of_pytest_startup_files_trigger_the_framing_job(rules: dict[str, list[str]]) -> None:
+    repo_root = REPO_RULES.parents[1]
+    entry_points = ["tests/conftest.py", "tests/utilities/session_isolation.py"]
+    imported: set[str] = set()
+    for entry in entry_points:
+        tree = ast.parse((repo_root / entry).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imported.add(node.module)
+            elif isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+
+    first_party = sorted(
+        module for module in imported if module.split(".")[0] in {"scripts", "tests"} and module != "tests"
+    )
+    assert "scripts.local_validation" in first_party
+    for module in first_party:
+        path = f"{module.replace('.', '/')}.py"
+        assert (repo_root / path).is_file(), path
+        assert classify_paths([path], rules)["framing_needed"] is True, path
+
+
+def test_github_output_exposes_framing_needed(rules: dict[str, list[str]], tmp_path: Path) -> None:
+    output = tmp_path / "github-output.txt"
+
+    write_github_output(output, classify_paths(["tests/utilities/paths.py"], rules))
+    assert "framing-needed=true\n" in output.read_text(encoding="utf-8")
+
+    skipped = tmp_path / "skipped-output.txt"
+    write_github_output(skipped, classify_paths(["benchbox/cli/run.py"], rules))
+    assert "framing-needed=false\n" in skipped.read_text(encoding="utf-8")
 
 
 def test_github_output_exposes_explorer_paths_alias(rules: dict[str, list[str]], tmp_path: Path) -> None:
