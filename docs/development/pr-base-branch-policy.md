@@ -18,7 +18,9 @@ an upper draft with `gh pr create --draft --base <parent branch>`.
 | `release` | Release-lane PRs only |
 | `published-results` | Published-results lane only |
 
-Any other base (including a sibling feature branch) is out of policy.
+The only other allowed base is the parent branch of a draft PR in a stack. A
+ready PR on any other base, including a sibling feature branch, is out of
+policy.
 
 ## Why stacked bases used to get zero CI
 
