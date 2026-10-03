@@ -803,9 +803,6 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
 
-          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
-          # jq parse failure or an empty guard set must fail the job -- never
-          # fall through to "all passed" with zero guards inspected.
           ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
             echo "aggregator: jq failed to parse the steps context" >&2
             exit 1

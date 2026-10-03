@@ -36,7 +36,6 @@ Re-run the method when adding a new develop-push workflow.
 
 | Workflow | Push scope | Schedule | Dispatch | Role | Push-drop residual | Disposition |
 | --- | --- | --- | --- | --- | --- | --- |
-| `fast-lane-baseline.yml` | `develop`, all paths | **none** | yes | Safety-critical input — records the fast-lane test count that the `guard-fast-lane-delta` step in `ci.yml` restores by exact base SHA | A dropped push leaves that commit without a baseline, so PRs cut from it fail the delta guard closed | **Accepted risk** — the failure is loud and self-describing (`DELTA_CHECK_BASELINE_ERROR`); recover with `gh workflow run fast-lane-baseline.yml --ref develop`, then re-run the PR |
 | `docs.yml` | `develop` and `release`, all paths | **none** | yes | Safety-critical input — captures the SHA-bound public-site visual baseline and, on `release` pushes, runs the Pages deploy | A dropped develop push leaves the exact base SHA without a baseline; an affected PR or merge-group visual comparison fails closed | Dispatch on `develop` with `baseline_source_sha=<exact-protected-base-sha>` to rebuild that ancestor's baseline, then re-run the failed check; see `docs/development/results-explorer-browser-testing.md` |
 | `pricing-data-drift-check.yml` | `develop` + pricing generator/inputs path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — regenerated pricing tables vs vendor APIs | Weekly schedule + dispatch bound drift even if a path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
 | `submission-validator-drift-check.yml` | `develop` + validator path filter | weekly Mon `0 6 * * 1` | yes | Safety-critical integrity — develop vs `published-results` validator copy | Weekly schedule + dispatch bound drift even if a path-matched push is dropped | **Covered** — schedule present; path filter already limits push volume |
@@ -86,11 +85,7 @@ Three develop-push workflows lack a schedule:
    `workflow_dispatch` of the mirror. That is an accepted residual risk with a
    bounded detection window (≤ ~1 day), not an untracked gap.
 
-2. **`fast-lane-baseline.yml`** — A missing baseline blocks PRs rather than
-   letting them through, so the risk is friction, not an unsafe merge. The
-   failure names its own cause and the recovery is one dispatch.
-
-3. **`docs.yml`** — The same fail-closed shape for the visual baseline. The
+2. **`docs.yml`** — The same fail-closed shape for the visual baseline. The
    dispatch input `baseline_source_sha` exists for exactly this recovery.
 
 ### Covered rows (schedule present)
@@ -119,7 +114,7 @@ one other develop-push subject:
 
 ```bash
 test -f docs/operations/develop-push-drop-inventory.md
-rg -q "fast-lane-baseline" docs/operations/develop-push-drop-inventory.md
+rg -q "docs.yml" docs/operations/develop-push-drop-inventory.md
 rg -q "sync-results-data-to-published|submission-validator-drift-check" \
   docs/operations/develop-push-drop-inventory.md
 rg -q "push-drop|push gaps" docs/operations/develop-post-merge-gaps.md
@@ -160,14 +155,13 @@ PY
 ```
 
 Expected subject set (names only):
-`docs.yml`, `fast-lane-baseline.yml`, `pricing-data-drift-check.yml`,
+`docs.yml`, `pricing-data-drift-check.yml`,
 `submission-validator-drift-check.yml`, `sync-results-data-to-published.yml`.
 
 ## Manual recovery cheatsheet
 
 | If this is silent / red after a develop burst | Recover |
 | --- | --- |
-| Fast-lane delta guard reports a missing baseline | `gh workflow run fast-lane-baseline.yml --ref develop` |
 | Visual comparison reports a missing baseline | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
 | Corpus mirror lag | `gh workflow run corpus-drift-check.yml` then, if develop-ahead, `gh workflow run sync-results-data-to-published.yml --ref develop` |
 | Validator drift | `gh workflow run submission-validator-drift-check.yml --ref develop` |

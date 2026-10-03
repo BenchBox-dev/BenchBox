@@ -1148,12 +1148,15 @@ class TestReleaseInfrastructure:
             for hook in repo.get("hooks", [])
             if hook.get("id") == "pr-preflight-fast-tests"
         )
-        entry = hook["entry"]
+        entry_script = tmp_path / "hook-entry.sh"
+        entry_script.write_text(hook["entry"], encoding="utf-8")
 
         skipped_env = os.environ.copy()
         skipped_env.pop("BENCHBOX_PREPUSH", None)
         skipped_env["BENCHBOX_VALIDATION_RECEIPTS_DIR"] = str(tmp_path / "skipped-receipts")
-        skipped = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env)
+        skipped = subprocess.run(
+            ["bash", str(entry_script)], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env
+        )
         assert skipped.returncode == 0
         assert "SKIPPED" in skipped.stdout
 
@@ -1167,7 +1170,9 @@ class TestReleaseInfrastructure:
         active_env.update(
             {"BENCHBOX_PREPUSH": "1", "HOOK_TRACE": str(trace), "PATH": f"{bin_dir}:{active_env['PATH']}"}
         )
-        active = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=active_env)
+        active = subprocess.run(
+            ["bash", str(entry_script)], cwd=REPO_ROOT, capture_output=True, text=True, env=active_env
+        )
         assert active.returncode == 0, active.stderr
         assert "local-validation" in trace.read_text(encoding="utf-8")
         assert "GATE=local-focused-check" in trace.read_text(encoding="utf-8")

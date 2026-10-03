@@ -522,7 +522,6 @@ def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
 
 
 def test_fast_lane_guard_command_is_mirrored_in_ci_lint() -> None:
-    """The marker and path guards run the same command in the workflow and in ci-lint."""
     guard = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-markers")
     workflow_run = str(guard["run"])
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())

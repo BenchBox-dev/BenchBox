@@ -1,12 +1,3 @@
-"""Fast-lane marker and path guards.
-
-Owns the pytest-collection checks that keep disallowed tests out of the
-``fast`` lane: the forbidden-marker intersections and the forbidden-path
-substrings. The lane has no test-count limit. It is deliberately independent
-of the monotonic-clock policy in ``timing_policy_check.py`` so either can
-change or be removed on its own.
-"""
-
 from __future__ import annotations
 
 import argparse

@@ -691,8 +691,7 @@ transfer, re-apply in this order:
    workflows; do not treat a stale numeric id as authority.
 3. Verify with the `gh api … rulesets/<id> --jq …` command above.
 4. Open a no-op pull request against develop and confirm the six unit
-   results report on it. Merge it through the queue and confirm
-   `fast-lane-baseline.yml` records the fast-lane count for the new tip.
+   results report on it. Merge it through the queue.
    This validates that workflow permissions are correct end-to-end.
 
 ## Out-of-scope

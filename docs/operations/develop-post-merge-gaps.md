@@ -32,14 +32,13 @@ its daily gap detector (`develop-post-merge-gap-detector.yml`) were retired.
 Required checks now run on the exact tree that lands: the merge queue runs the
 six units on the speculative merge commit, so a dropped push on develop no
 longer leaves the tip ungated. What a dropped push can still cost is confined
-to the push-only workflows in the inventory. Two matter for the queue itself:
+to the push-only workflows in the inventory. One matters for the queue itself:
 
 | Workflow | Loses when its push is dropped | Recovery |
 | --- | --- | --- |
-| `fast-lane-baseline.yml` | The fast-lane count for that commit. The PR delta guard restores it by exact base SHA and **fails closed** on a miss, so PRs cut from that commit fail `guard-fast-lane-delta` until it exists. | `gh workflow run fast-lane-baseline.yml --ref develop` |
 | `docs.yml` | The protected public-site visual baseline for that commit. A PR or queue entry whose render inputs changed then fails closed at the baseline download. | `gh workflow run docs.yml --ref develop -f baseline_source_sha=<sha>` |
 
-Check whether a commit has a baseline before blaming a PR for either failure.
+Check whether a commit has a baseline before blaming a PR for this failure.
 
 ## Diagnostic
 
@@ -48,7 +47,7 @@ Exact-SHA coverage for the last 10 develop commits, for one workflow:
 ```bash
 bash -c '
   shas=$(git log --format=%H origin/develop -10)
-  runs=$(gh run list --workflow fast-lane-baseline.yml --limit 100 --json headSha --jq .[].headSha)
+  runs=$(gh run list --workflow docs.yml --limit 100 --json headSha --jq .[].headSha)
   for s in $shas; do
     echo "$runs" | grep -q "$s" || { echo "missing: $s"; }
   done

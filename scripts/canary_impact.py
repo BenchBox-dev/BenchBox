@@ -118,13 +118,7 @@ CANT_AFFECT_CANARY = frozenset(
         # Decision and audit reports: read only by fast unit tests, never by
         # canary tests, and outside the docs build source tree.
         "_project/audits/",
-        # Fast-lane timing policy and its ceiling log: consumed by the
-        # timing-policy gate and lane checks, never imported or read by a
-        # canary test (the four policy-reading tests are medium-tier but
-        # outside the canary set, verified 2026-09-24). A ceiling bump
-        # riding along with a fix must not force the whole suite.
         "_project/config/fast_test_lane_policy.json",
-        "_project/config/fast_lane_ceiling_log.md",
     }
 )
 

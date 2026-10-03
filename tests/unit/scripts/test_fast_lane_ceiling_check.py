@@ -1,13 +1,3 @@
-"""Unit tests for _project/scripts/fast_lane_ceiling_check.py: the forbidden-marker
-and forbidden-path guards.
-
-The pytest-collection subprocess itself is monkeypatched out via
-`_run_pytest_collect` (fast, offline, deterministic) -- these tests pin the
-guards' own parsing and violation logic, not pytest's collection output
-format, which is exercised for real by `fast_lane_ceiling_check.py --strict`
-itself.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -100,13 +90,7 @@ def test_forbidden_path_in_the_fast_lane_is_a_violation(monkeypatch: pytest.Monk
 # ------------------------------------------------------------------ #
 # Environment failure vs policy violation                             #
 # ------------------------------------------------------------------ #
-def test_check_fast_lane_policy_raises_when_collect_cannot_run(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A collect that never ran is not a set of policy violations.
-
-    Running the check with an interpreter that lacks pytest used to yield
-    FAST_LANE_VIOLATIONs on a perfectly healthy tree, indistinguishable from a
-    genuine breach.
-    """
+def test_collect_that_cannot_run_is_an_environment_error_not_a_violation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         mod, "_run_pytest_collect", _fake_collect("ModuleNotFoundError: No module named 'pytest'", rc=1)
     )
@@ -141,7 +125,6 @@ def test_path_guard_collect_failure_is_an_environment_error(monkeypatch: pytest.
 
 
 def test_path_violation_survives_a_later_marker_collect_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A later collect failure must not erase violations found by the path guard."""
     outputs = iter(
         [
             (0, "tests/unit/spark/test_x.py::test_a\n1/9000 tests collected"),
