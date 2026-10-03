@@ -20044,7 +20044,7 @@
         "tpcds-parity-b4-windows-semantics"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "TPC-DS parity B5: vacuity closeout (scale probe or legitimately-empty)"
     },
     "tpcds-parity-b6-promote": {
