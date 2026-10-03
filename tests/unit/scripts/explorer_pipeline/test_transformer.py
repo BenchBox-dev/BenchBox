@@ -636,6 +636,36 @@ class TestExtendedManifestFields:
         assert entry.requested_config_hash == "a" * 64
         assert entry.applied_ledger_hash == "b" * 64
 
+    def test_benchmark_support_status_resolved_from_registry(self, bundle_file: Path) -> None:
+        """The manifest entry carries the registry support status (tpch is stable)."""
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+        assert entry.benchmark == "tpch"
+        assert entry.benchmark_support_status == "stable"
+
+    def test_benchmark_support_status_canonicalizes_legacy_slug(self, tmp_path: Path) -> None:
+        """Legacy star_schema slugs resolve through the ssb canonical alias."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["benchmark"]["id"] = "star_schema"
+        bundle = tmp_path / "legacy_slug.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+        assert entry.benchmark_support_status == "stable"
+
+    def test_benchmark_support_status_none_for_unknown_slug(self, tmp_path: Path) -> None:
+        """Custom bundles the registry never declared carry no status."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["benchmark"]["id"] = "custom-internal-benchmark"
+        bundle = tmp_path / "custom_slug.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+        assert entry.benchmark_support_status is None
+
     def test_config_hashes_none_for_legacy_bundle(self, bundle_file: Path) -> None:
         """Legacy bundles (no platform.tuning hashes) keep current behavior: None."""
         entry = BundleTransformer().to_manifest_entry(bundle_file)
