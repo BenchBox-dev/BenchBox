@@ -248,7 +248,10 @@ def _check_dependencies_impl(platform: str | None, verbose: bool) -> dict[str, A
 def register_discovery_tools(mcp: MCPServer) -> None:
     """Register discovery tools with the MCP server."""
 
-    @mcp.tool(annotations=READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="List available platforms, benchmarks, or chart templates.\n\n        Args:\n            category: What to list: 'platforms', 'benchmarks', 'charts', or 'all'\n\n        Returns:\n            Available items in the requested category.\n        ",
+        annotations=READONLY_ANNOTATIONS,
+    )
     def list_available(category: str = "all") -> dict[str, Any]:
         """List available platforms, benchmarks, or chart templates.
 
@@ -260,7 +263,10 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         """
         return _list_available_impl(category)
 
-    @mcp.tool(annotations=READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description='Get detailed information about a specific benchmark.\n\n        Args:\n            benchmark: Any registered benchmark ID; call list_available("benchmarks") to enumerate.\n\n        Returns:\n            Detailed benchmark information including queries and schema.\n        ',
+        annotations=READONLY_ANNOTATIONS,
+    )
     def get_benchmark_info(benchmark: str) -> dict[str, Any]:
         """Get detailed information about a specific benchmark.
 
@@ -272,7 +278,10 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         """
         return _get_benchmark_info_impl(benchmark)
 
-    @mcp.tool(annotations=READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="Get system profile information.\n\n        Returns:\n            System info including CPU, memory, disk, and package versions.\n        ",
+        annotations=READONLY_ANNOTATIONS,
+    )
     def system_profile() -> dict[str, Any]:
         """Get system profile information.
 
@@ -281,7 +290,10 @@ def register_discovery_tools(mcp: MCPServer) -> None:
         """
         return _system_profile_impl()
 
-    @mcp.tool(annotations=READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="Check platform dependencies and installation status.\n\n        Args:\n            platform: Specific platform to check (omit to check all)\n            verbose: Include detailed package information\n\n        Returns:\n            Dependency status with missing packages and install commands.\n        ",
+        annotations=READONLY_ANNOTATIONS,
+    )
     def check_dependencies(
         platform: str | None = None,
         verbose: bool = False,

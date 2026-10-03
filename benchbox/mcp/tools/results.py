@@ -50,7 +50,10 @@ EXPORT_ANNOTATIONS = ToolAnnotations(
 def register_results_tools(mcp: MCPServer, *, results_dir: PathProvider) -> None:
     """Register results tools with the MCP server."""
 
-    @mcp.tool(annotations=RESULTS_READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="Get benchmark results or list recent runs.\n\n        Args:\n            result_file: Result filename (omit to list recent runs)\n            format: Output format: 'list', 'details', 'json', 'csv', 'html', 'text', 'markdown'\n            output_path: File path for export (relative to results dir)\n            limit: Max results when listing (default: 10)\n            platform: Filter by platform name (for listing)\n            benchmark: Filter by benchmark name (for listing)\n            include_queries: Include per-query details (default: True)\n\n        Returns:\n            List of runs, full results, or exported content.\n        ",
+        annotations=RESULTS_READONLY_ANNOTATIONS,
+    )
     def get_results(
         result_file: str | None = None,
         format: str = "details",

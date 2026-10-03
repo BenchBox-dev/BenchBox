@@ -113,7 +113,10 @@ def register_benchmark_tools(
             boundary, so exported bundles are anonymized.
     """
 
-    @mcp.tool(annotations=RUN_BENCHMARK_ANNOTATIONS)
+    @mcp.tool(
+        description="Run a benchmark on a database platform.\n\n        Args:\n            platform: Target platform (duckdb, polars-df, snowflake, etc.)\n            benchmark: Benchmark to run (tpch, tpcds, tpcds_obt, ssb, joinorder, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, tpcdi, write_primitives, read_primitives, and more)\n            scale_factor: Data scale factor (0.01 for testing, 1+ for production; joinorder uses canonical IMDb 2013 data and only accepts 1.0)\n            queries: Comma-separated query IDs to run (e.g., \"1,3,6\")\n            phases: Comma-separated phases (default: \"load,power\")\n            mode: Execution mode: 'sql', 'dataframe', or 'data_only'\n            capture_plans: Capture query execution plans (3-8%% overhead). Supported: DuckDB, PostgreSQL, DataFusion.\n            dry_run: Preview execution plan without running\n            validate_only: Validate configuration without running\n            link_probe: Measure post-benchmark statement overhead (6 metered SELECT 1 statements on billable warehouses). Set false to skip; equivalent to the CLI --no-link-probe flag.\n            platform_options: Bounded, non-secret platform settings approved for the selected platform.\n\n        Returns:\n            Benchmark results, dry-run preview, or validation status.\n\n        Platform options are a deliberately smaller MCP contract than the CLI\n        ``--platform-option`` surface. Only bounded, non-secret execution\n        settings are accepted; credentials, endpoints, paths, and package\n        installation controls must remain server configuration.\n\n        JoinOrder note:\n            The public joinorder benchmark downloads and verifies the canonical IMDb 2013\n            Parquet archive on first use, then reuses BENCHBOX_OUTPUT_DIR/benchmark_runs/datagen/joinorder_sf1/.\n        ",
+        annotations=RUN_BENCHMARK_ANNOTATIONS,
+    )
     def run_benchmark(
         platform: str,
         benchmark: str,
@@ -202,7 +205,10 @@ def register_benchmark_tools(
             anonymize=anonymize_results,
         )
 
-    @mcp.tool(annotations=QUERY_DETAILS_ANNOTATIONS)
+    @mcp.tool(
+        description="Get detailed information about a specific query.\n\n        Args:\n            benchmark: Benchmark name (tpch, tpcds, ssb, clickbench, nyctaxi, tsbs_devops, h2odb, amplab, coffeeshop, tpch_skew, datavault, and more)\n            query_id: Query identifier (e.g., '1', 'Q1', '17')\n            platform: Target platform for dialect translation\n            mode: Execution mode: 'sql' or 'dataframe'\n\n        Returns:\n            Query details including SQL text or DataFrame source code.\n        ",
+        annotations=QUERY_DETAILS_ANNOTATIONS,
+    )
     def get_query_details(
         benchmark: str,
         query_id: str,

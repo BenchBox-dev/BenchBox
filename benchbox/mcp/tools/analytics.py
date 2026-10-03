@@ -81,7 +81,10 @@ def register_analytics_tools(
     """
     tenant_scoped = not isinstance(results_dir, Path)
 
-    @mcp.tool(annotations=ANALYTICS_READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="Analyze benchmark results.\n\n        Args:\n            analysis: Analysis type: 'compare', 'regressions', 'trends', 'aggregate'\n            file1: Baseline result file (for 'compare')\n            file2: Comparison result file (for 'compare')\n            platform: Filter by platform name\n            benchmark: Filter by benchmark name\n            threshold_percent: Change threshold for regressions (default: 10%)\n            metric: Metric for trends: geometric_mean, p50, p95, p99, total_time\n            group_by: Grouping for aggregate: platform, benchmark, date\n            limit: Max runs to analyze (default: 10)\n\n        Returns:\n            Analysis results based on the selected type.\n        ",
+        annotations=ANALYTICS_READONLY_ANNOTATIONS,
+    )
     def analyze_results(
         analysis: str = "compare",
         file1: str | None = None,
@@ -139,7 +142,10 @@ def register_analytics_tools(
                 details={"valid_types": ["compare", "regressions", "trends", "aggregate"]},
             )
 
-    @mcp.tool(annotations=ANALYTICS_READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="Get query execution plan from benchmark results.\n\n        Args:\n            result_file: Result file containing query plans\n            query_id: Query identifier (e.g., '1', 'Q1', 'q05')\n            format: Output format: 'tree', 'json', 'summary'\n\n        Returns:\n            Query plan in the requested format.\n        ",
+        annotations=ANALYTICS_READONLY_ANNOTATIONS,
+    )
     def get_query_plan(
         result_file: str,
         query_id: str,
@@ -189,7 +195,10 @@ def register_analytics_tools(
                 details={"exception_type": type(e).__name__},
             )
 
-    @mcp.tool(annotations=ANALYTICS_READONLY_ANNOTATIONS)
+    @mcp.tool(
+        description="Validate integrity, completeness, and believability of result JSON files.\n\n        Provide result_file (single file path) or directory (batch mode).\n        Returns structured check results with PASS/WARN/FAIL status per check.\n\n        Args:\n            result_file: Path to a single result JSON file\n            directory: Path to a directory of result JSON files\n            verbose: Include PASS checks in output (default: WARN+FAIL only)\n\n        Returns:\n            Validation report with per-check status and overall result.\n        ",
+        annotations=ANALYTICS_READONLY_ANNOTATIONS,
+    )
     def validate_results(
         result_file: str = "",
         directory: str = "",

@@ -1393,7 +1393,10 @@ def _public_status(job: JobRecord) -> dict[str, Any]:
 def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> None:
     """Register remote-only durable benchmark job tools."""
 
-    @mcp.tool(annotations=START_ANNOTATIONS)
+    @mcp.tool(
+        description="Queue a tenant-owned benchmark and immediately return its durable handle.",
+        annotations=START_ANNOTATIONS,
+    )
     async def start_benchmark(
         platform: str,
         benchmark: str,
@@ -1430,14 +1433,19 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
         )
         return {**_public_status(job), "created": created}
 
-    @mcp.tool(annotations=READ_ANNOTATIONS)
+    @mcp.tool(
+        description="Read the status of a benchmark job owned by the current principal.", annotations=READ_ANNOTATIONS
+    )
     async def get_benchmark_status(execution_id: str) -> dict[str, Any]:
         """Read the status of a benchmark job owned by the current principal."""
         principal = authenticated_principal()
         job = await anyio.to_thread.run_sync(_owned_job, runtime.repository, execution_id, principal)
         return _public_status(job)
 
-    @mcp.tool(annotations=READ_ANNOTATIONS)
+    @mcp.tool(
+        description="Report queue depth and running capacity without exposing other tenants.\n\n        Global row counts are aggregates only; the per-principal slice and\n        the quarantined job list are restricted to the current principal.\n        ",
+        annotations=READ_ANNOTATIONS,
+    )
     async def get_benchmark_capacity() -> dict[str, Any]:
         """Report queue depth and running capacity without exposing other tenants.
 
@@ -1460,7 +1468,10 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
             ],
         }
 
-    @mcp.tool(annotations=READ_ANNOTATIONS)
+    @mcp.tool(
+        description="Return a completed owned result without exposing another tenant's paths.",
+        annotations=READ_ANNOTATIONS,
+    )
     async def get_benchmark_result(execution_id: str) -> dict[str, Any]:
         """Return a completed owned result without exposing another tenant's paths."""
         principal = authenticated_principal()
@@ -1481,7 +1492,10 @@ def register_durable_job_tools(mcp: MCPServer, runtime: DurableJobRuntime) -> No
             raise MCPError(JOB_NOT_READY, "Benchmark artifact is invalid")
         return payload
 
-    @mcp.tool(annotations=CANCEL_ANNOTATIONS)
+    @mcp.tool(
+        description="Cancel queued work, request cancellation at the next safe boundary, or report it is too late.",
+        annotations=CANCEL_ANNOTATIONS,
+    )
     async def cancel_benchmark(execution_id: str) -> dict[str, Any]:
         """Cancel queued work, request cancellation at the next safe boundary, or report it is too late."""
         principal = authenticated_principal()
