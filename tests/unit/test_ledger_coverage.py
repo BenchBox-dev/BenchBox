@@ -1,14 +1,3 @@
-"""Fail if a workflow, script or enrolled process test lacks a ledger row.
-
-Every workflow and script must appear in
-docs/development/dev-loop-property-ledger.md. Test enrollment is frozen at the
-files recorded in ledger_cutover_files.txt: each of those that still exists
-must have a row so deletions cannot silently drop coverage, and tests added
-after the cutover need no row. The ledger may list a file by exact relative
-path or, for the large scripts directories, by an explicit per-directory
-catch-all row that forces individual reclassification before any deletion.
-"""
-
 from __future__ import annotations
 
 import re
@@ -86,7 +75,6 @@ CUTOVER_FILES = REPO_ROOT / "tests" / "unit" / "ledger_cutover_files.txt"
 
 
 def _cutover_files(directory: Path, *, recursive: bool = True, pattern: str = "*") -> list[str]:
-    """Files enrolled at the cutover that still exist, relative to ``directory``."""
     entries = CUTOVER_FILES.read_text(encoding="utf-8").split()
     selected: list[str] = []
     for entry in entries:

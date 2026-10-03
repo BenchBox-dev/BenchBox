@@ -480,8 +480,6 @@ def write_manifest(root: Path, inventory: dict[str, Any]) -> None:
 
 
 def evaluate_inventory(root: Path) -> tuple[dict[str, Any] | None, list[str]]:
-    """Build the inventory in memory and validate the migration proof without writing anything."""
-
     root = root.resolve()
     try:
         inventory = build_inventory(root)
