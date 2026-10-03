@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "URL scheme agreed and recorded in the ADR before implementation",
+    "Summary pages generated from canonical pipeline output; values match the Explorer for the same snapshot",
+    "Withdrawn-result fixture absent from pages and search index after rebuild",
+    "Results section of search returns a platform and a benchmark by name"
+  ],
+  "description": "A post-cutover feature with its own owner approval before starting.\n\nPagefind cannot see results loaded through DuckDB-WASM. At build time, generate static summary pages for each platform and benchmark from the same canonical pipeline output as the Explorer (explorer_publish.py and results.duckdb). Each page links into the Explorer view, and Pagefind indexes these pages under the Results search section.\n\nPages carry their snapshot identity, follow admission and withdrawal rules (withdrawn results are excluded from indexes and pages on the next build), and must not conflict with Explorer client routes: agree the URL scheme first, e.g. render at the same /results/platforms/<id> paths with the island hydrating on top.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:14:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9754deb55ef440f48a520910d51ac05e",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
