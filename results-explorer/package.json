@@ -14,7 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "audit:high": "npm audit --audit-level=high",
+    "audit:high": "node scripts/audit-high.mjs",
     "test:e2e:chromium": "npm run test:e2e:fixtures && npm run build && npm run test:e2e:chromium:run",
     "test:e2e:chromium:run": "E2E_EXCLUDE_FAILURES=1 playwright test --project=chromium --workers=1 --grep-invert @performance && E2E_CAPTURE_FIRST_FAILURE=1 playwright test --project=chromium --workers=1 --retries=0 e2e/failures/ && playwright test --project=chromium --workers=1 --retries=0 e2e/performance.spec.ts",
     "test:e2e:chromium:setup": "npm run test:e2e:install:chromium && npm run test:e2e:chromium",
