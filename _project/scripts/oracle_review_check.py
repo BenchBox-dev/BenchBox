@@ -136,13 +136,17 @@ def head_transition_date(committer_date: str, run_dates: Iterable[str]) -> str:
     return max([committer_date, *run_dates], key=_parse_time)
 
 
+def own_run_dates(runs: Iterable[dict[str, Any]]) -> list[str]:
+    return [run["created_at"] for run in runs if (run.get("path") or "").split("@", 1)[0] == WORKFLOW_PATH]
+
+
 def fetch_head_date(token: str, repo: str, sha: str) -> str:
     committer_date = _request(token, f"{API_ROOT}/repos/{repo}/commits/{sha}")["commit"]["committer"]["date"]
     runs = _request(
         token,
         f"{API_ROOT}/repos/{repo}/actions/runs?head_sha={sha}&event=pull_request&per_page={PAGE_SIZE}",
     )["workflow_runs"]
-    return head_transition_date(committer_date, [run["created_at"] for run in runs if run.get("path") == WORKFLOW_PATH])
+    return head_transition_date(committer_date, own_run_dates(runs))
 
 
 def changed_paths(items: Iterable[dict[str, Any]]) -> list[str]:

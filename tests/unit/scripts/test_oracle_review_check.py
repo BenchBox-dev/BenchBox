@@ -174,3 +174,13 @@ def test_complete_file_list_uses_the_soundness_predicate() -> None:
     matcher = oracle_review_check.path_matcher(listed_files=2, changed_files=2)
     assert matcher(OTHER_FILES) is False
     assert matcher(SOUNDNESS_FILES) is True
+
+
+def test_own_run_dates_match_plain_and_ref_qualified_workflow_paths() -> None:
+    runs = [
+        {"path": ".github/workflows/oracle-review.yml", "created_at": "2026-10-01T14:00:00Z"},
+        {"path": ".github/workflows/oracle-review.yml@refs/pull/7/merge", "created_at": "2026-10-01T15:00:00Z"},
+        {"path": ".github/workflows/ci.yml", "created_at": "2026-10-01T16:00:00Z"},
+        {"created_at": "2026-10-01T17:00:00Z"},
+    ]
+    assert oracle_review_check.own_run_dates(runs) == ["2026-10-01T14:00:00Z", "2026-10-01T15:00:00Z"]
