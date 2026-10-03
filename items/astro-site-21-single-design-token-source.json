@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "One token file; website and explorer both import it",
+    "Explorer public-site visual capture unchanged for /results/* routes (visual acceptance green without baseline approval)",
+    "lint-site-theme-tokens / lint-explorer-tokens updated and green; test_public_site_theme_contract.py passes",
+    "Sphinx and landing keep their current CSS until cutover (no regression on those routes)"
+  ],
+  "description": "Today tokens live in landing/shared/site-theme.css, the Furo variables in docs/_static, and the explorer's Tailwind config. scan_explorer_tokens.py, scan_explorer_stale_theme.py and lint-site-theme-tokens police the drift.\n\nCreate one CSS custom-property token file, light and dark, covering color, type, spacing and radius. website/ imports it. results-explorer's Tailwind config reads the same variables, so explorer output does not change visually.\n\nPoint the token lint targets at the new source. Keep the light/dark behaviour and the benchbox:theme key.",
+  "links": [
+    "landing/shared/site-theme.css",
+    "results-explorer/tailwind.config.js",
+    "_project/scripts/scan_explorer_tokens.py",
+    "tests/unit/test_public_site_theme_contract.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:01:52Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "08f57ece2f4d434286b27b44dc429441",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}

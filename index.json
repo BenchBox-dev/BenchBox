@@ -930,6 +930,15 @@
       "status": "open",
       "title": "Scaffold website/ with pinned tooling, make targets, and a non-required site-build CI job"
     },
+    "astro-site-21-single-design-token-source": {
+      "claim": null,
+      "needs": [
+        "astro-site-20-package-scaffold-and-ci"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Make one design-token source that website/ and results-explorer both consume"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
