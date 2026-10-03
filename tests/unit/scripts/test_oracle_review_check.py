@@ -186,26 +186,14 @@ def test_own_run_dates_match_plain_and_ref_qualified_workflow_paths() -> None:
     assert oracle_review_check.own_run_dates(runs) == ["2026-10-01T14:00:00Z", "2026-10-01T15:00:00Z"]
 
 
-def test_reopen_or_ready_runs_do_not_move_the_head_transition() -> None:
+def test_latest_run_for_a_restored_head_moves_the_head_transition() -> None:
     first_run = "2026-10-01T12:30:00Z"
-    reopened_run = "2026-10-01T15:00:00Z"
-    dates = oracle_review_check.transition_event_dates([reopened_run, first_run], [])
-    assert dates == [first_run]
-    assert oracle_review_check.head_transition_date(HEAD_DATE, dates) == first_run
-
-
-def test_force_push_to_an_already_seen_commit_moves_the_head_transition() -> None:
-    first_run = "2026-10-01T12:30:00Z"
-    force_push = "2026-10-01T16:00:00Z"
-    timeline = [
-        {"event": "commented", "created_at": "2026-10-01T17:00:00Z"},
-        {"event": "head_ref_force_pushed", "created_at": force_push},
-    ]
-    dates = oracle_review_check.transition_event_dates([first_run], timeline)
-    assert oracle_review_check.head_transition_date(HEAD_DATE, dates) == force_push
+    restored_run = "2026-10-01T16:00:00Z"
+    head_date = oracle_review_check.head_transition_date(HEAD_DATE, [first_run, restored_run])
+    assert head_date == restored_run
     status, _ = oracle_review_check.decide(
         HEAD,
-        force_push,
+        head_date,
         SOUNDNESS_FILES,
         [],
         [_reaction(created_at=AFTER_HEAD)],

@@ -132,28 +132,21 @@ def fetch_pull(token: str, repo: str, pr: int) -> dict[str, Any]:
     return _request(token, f"{API_ROOT}/repos/{repo}/pulls/{pr}")
 
 
-def head_transition_date(committer_date: str, event_dates: Iterable[str]) -> str:
-    return max([committer_date, *event_dates], key=_parse_time)
+def head_transition_date(committer_date: str, run_dates: Iterable[str]) -> str:
+    return max([committer_date, *run_dates], key=_parse_time)
 
 
 def own_run_dates(runs: Iterable[dict[str, Any]]) -> list[str]:
     return [run["created_at"] for run in runs if (run.get("path") or "").split("@", 1)[0] == WORKFLOW_PATH]
 
 
-def transition_event_dates(run_dates: list[str], timeline: Iterable[dict[str, Any]]) -> list[str]:
-    first_run = [min(run_dates, key=_parse_time)] if run_dates else []
-    force_pushes = [event["created_at"] for event in timeline if event.get("event") == "head_ref_force_pushed"]
-    return first_run + force_pushes
-
-
-def fetch_head_date(token: str, repo: str, pr: int, sha: str) -> str:
+def fetch_head_date(token: str, repo: str, sha: str) -> str:
     committer_date = _request(token, f"{API_ROOT}/repos/{repo}/commits/{sha}")["commit"]["committer"]["date"]
     runs = _request(
         token,
         f"{API_ROOT}/repos/{repo}/actions/runs?head_sha={sha}&event=pull_request&per_page={PAGE_SIZE}",
     )["workflow_runs"]
-    timeline = _paginate(token, f"/repos/{repo}/issues/{pr}/timeline")
-    return head_transition_date(committer_date, transition_event_dates(own_run_dates(runs), timeline))
+    return head_transition_date(committer_date, own_run_dates(runs))
 
 
 def changed_paths(items: Iterable[dict[str, Any]]) -> list[str]:
@@ -248,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
             return PASS
         status, message = decide(
             head_sha,
-            fetch_head_date(token, args.repo, args.pr, head_sha),
+            fetch_head_date(token, args.repo, head_sha),
             files,
             fetch_reviews(token, args.repo, args.pr),
             fetch_reactions(token, args.repo, args.pr),
