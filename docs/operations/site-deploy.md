@@ -146,7 +146,8 @@ over the current snapshot), then the same dispatch with `rollback_phase=full`.
 The ui-first phase also re-hashes the current generation's artifact against the
 digest in the current receipt before composing it, and its receipt keeps the
 current generation's route records except `/results/`, which takes the restored
-one.
+one. It also restores the root `404.html`, the Results deep-link fallback that
+the restored UI reads.
 
 ### Newest deployment has no receipt
 

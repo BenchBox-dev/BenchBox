@@ -7,6 +7,7 @@ from scripts.publication.assembler import compute_tree_digest
 
 RESULTS_DIR = "results"
 SNAPSHOT_DIR = "data"
+RESULTS_FALLBACK = "404.html"
 
 
 class ArtifactError(RuntimeError):
@@ -26,6 +27,8 @@ def compose_ui_first(current_tree: Path, restored_tree: Path, destination: Path)
     for label, tree in (("current", current_tree), ("restored", restored_tree)):
         if not (tree / RESULTS_DIR).is_dir():
             raise ArtifactError(f"{label} artifact has no {RESULTS_DIR}/ tree")
+    if not (restored_tree / RESULTS_FALLBACK).is_file():
+        raise ArtifactError(f"restored artifact has no {RESULTS_FALLBACK} deep-link fallback")
     if destination.exists():
         shutil.rmtree(destination)
     shutil.copytree(current_tree, destination)
@@ -41,5 +44,6 @@ def compose_ui_first(current_tree: Path, restored_tree: Path, destination: Path)
             shutil.copytree(entry, results / entry.name)
         else:
             shutil.copy2(entry, results / entry.name)
+    shutil.copy2(restored_tree / RESULTS_FALLBACK, destination / RESULTS_FALLBACK)
     digest, _, _ = compute_tree_digest(destination)
     return digest

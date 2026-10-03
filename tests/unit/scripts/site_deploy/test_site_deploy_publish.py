@@ -197,14 +197,24 @@ def test_ui_first_artifact_keeps_the_current_snapshot_and_restores_the_ui(tmp_pa
     _write(current / "results" / "assets" / "app-new.js", "new ui")
     restored = _site(tmp_path / "restored", "old", dev=False)
     _write(restored / "results" / "assets" / "app-old.js", "old ui")
+    _write(restored / "404.html", "old fallback")
     out = tmp_path / "composed"
     digest = artifacts.compose_ui_first(current, restored, out)
+    assert (out / "404.html").read_text(encoding="utf-8") == "old fallback"
     assert (out / "results" / "index.html").read_text(encoding="utf-8") == "old explorer"
     assert (out / "results" / "assets" / "app-old.js").is_file()
     assert not (out / "results" / "assets" / "app-new.js").exists()
     assert (out / "results" / "data" / "results.duckdb").read_text(encoding="utf-8") == "new snapshot"
     assert (out / "docs" / "dev" / "index.html").read_text(encoding="utf-8") == "new dev docs"
     assert digest == compute_tree_digest(out)[0]
+
+
+def test_ui_first_refuses_a_restored_artifact_without_the_fallback(tmp_path: Path) -> None:
+    current = _site(tmp_path / "current", "new", dev=True)
+    restored = _site(tmp_path / "restored", "old", dev=False)
+    (restored / "404.html").unlink()
+    with pytest.raises(artifacts.ArtifactError, match="deep-link fallback"):
+        artifacts.compose_ui_first(current, restored, tmp_path / "composed")
 
 
 def test_verify_tree_rejects_a_digest_mismatch(tmp_path: Path) -> None:
