@@ -348,6 +348,7 @@ APPROVED_MERGE_QUEUE_CONTEXTS: tuple[str, ...] = (
     "docs",
     "landing",
     "tooling",
+    "oracle-review",
 )
 
 

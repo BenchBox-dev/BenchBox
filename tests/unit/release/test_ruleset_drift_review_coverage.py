@@ -90,6 +90,7 @@ def _live_develop_ruleset(
                         {"context": "docs"},
                         {"context": "landing"},
                         {"context": "tooling"},
+                        {"context": "oracle-review"},
                     ],
                 },
             },

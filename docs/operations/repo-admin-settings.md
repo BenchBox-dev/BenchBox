@@ -57,6 +57,7 @@ Required status checks:
 - docs
 - landing
 - tooling
+- oracle-review
 ```
 
 Each required context is one always-reporting result job in
@@ -155,6 +156,10 @@ gh api repos/BenchBox-dev/BenchBox/rulesets/15611785 --jq '
 Agents arm a PR with `make pr-arm`, which enables auto-merge; it squash-merges
 when the required checks pass and every review thread is resolved. The drift
 check reports a `merge_queue` rule that reappears.
+
+`oracle-review` (from `.github/workflows/oracle-review.yml`) is required: it
+passes when the change touches no soundness path, or when the Codex connector
+has reviewed the current head and none of its review threads is unresolved.
 
 ### Soundness-path review enforcement (enforced; operational caution)
 
