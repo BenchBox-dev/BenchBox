@@ -1,11 +1,5 @@
 name: Trunk
 
-# Tests `develop` in its merged state after every push. This is the post-merge
-# counterpart of the pull-request checks in ci.yml: the fast lane, the medium
-# tier and the correctness gate, run on the commit that landed. It is not a
-# required check; a red run means `develop` itself needs a fix or a revert.
-# Runs queue behind each other (one pending run is kept) so busy hours batch.
-
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
 
@@ -15,7 +9,6 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # One group per ref: a manual run on another ref must not replace the pending run for develop.
   group: trunk-${{ github.ref }}
   cancel-in-progress: false
 
@@ -59,8 +52,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          # Full history: the canary live-tree tests diff historical
-          # regression commits, which a shallow checkout cannot resolve.
           fetch-depth: 0
 
       - name: Set up Python 3.12
@@ -115,8 +106,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          # Full history: the canary live-tree tests diff historical
-          # regression commits, which a shallow checkout cannot resolve.
           fetch-depth: 0
 
       - name: Set up Python 3.12
@@ -193,7 +182,6 @@ jobs:
   correctness-gate:
     name: correctness-gate (${{ matrix.partition }})
     runs-on: ubuntu-latest
-    # Preserve every gate; split measured work across standard Linux runners.
     timeout-minutes: 25
     strategy:
       fail-fast: false

@@ -79,7 +79,6 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);
       if (route.slug === "landing") {
-        // A smooth scroll still in flight at capture time leaves sticky bars a few pixels off.
         await page.addStyleTag({ content: "html { scroll-behavior: auto !important; }" });
         for (const selector of [".feature-card", ".benchmark-card", ".install-step"]) {
           const cards = page.locator(selector);

@@ -13,7 +13,6 @@ from typing import Any
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
 MEDIUM_MARKER_EXPRESSION = "medium and not (slow or stress or resource_heavy or live_integration)"
 DEFAULT_SHARD_COUNT = 6
-# ci.yml shards the medium tier this many ways; the core aggregate checks all of them ran.
 MEDIUM_SHARD_COUNT = 4
 
 
