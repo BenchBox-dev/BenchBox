@@ -519,6 +519,18 @@ def test_datafusion_string_add_concat(datafusion_frame):
 _RANK_VALUES = [3.0, None, 1.0, 3.0, 2.0, None, 5.0, 1.0]
 
 
+_ASCENDING_MIN_RANK_BY_ID = {0: 4, 1: None, 2: 1, 3: 4, 4: 3, 5: None, 6: 6, 7: 1}
+_DESCENDING_TOP_TWO_MIN_RANK_BY_ID = [(0, 2), (3, 2), (6, 1)]
+
+
+def _non_null_ranks(rank_by_id):
+    return sorted(rank for rank in rank_by_id.values() if rank is not None)
+
+
+def _null_rank_ids(rank_by_id):
+    return {row_id for row_id, rank in rank_by_id.items() if rank is None}
+
+
 @pytest.fixture()
 def datafusion_rank_frame():
     ctx = datafusion.SessionContext()
@@ -533,7 +545,6 @@ def datafusion_rank_frame():
 @pytest.mark.parametrize("descending", [False, True])
 @pytest.mark.parametrize("method", ["min", "max", "dense", "ordinal", "average"])
 def test_datafusion_rank_without_over_ranks_the_whole_frame(datafusion_rank_frame, method, descending):
-    """rank() with no .over() ranks the whole frame like Polars, with NULL inputs getting a NULL rank."""
     pl = pytest.importorskip("polars")
 
     result = datafusion_rank_frame.with_columns(
@@ -548,39 +559,31 @@ def test_datafusion_rank_without_over_ranks_the_whole_frame(datafusion_rank_fram
 
     assert len(got) == len(_RANK_VALUES)
     if method == "ordinal":
-        # Ties are broken arbitrarily, so compare the set of ranks and which rows are NULL.
-        assert sorted(r for r in got.values() if r is not None) == sorted(r for r in expected.values() if r is not None)
-        assert {i for i, r in got.items() if r is None} == {i for i, r in expected.items() if r is None}
+        assert _non_null_ranks(got) == _non_null_ranks(expected)
+        assert _null_rank_ids(got) == _null_rank_ids(expected)
     else:
         assert got == expected
 
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
-def test_datafusion_rank_without_over_is_not_the_input_column(datafusion_rank_frame):
-    """Used to return the ranked column itself instead of a rank."""
+def test_datafusion_rank_without_over_returns_ranks_not_the_input_column(datafusion_rank_frame):
     result = datafusion_rank_frame.with_columns(
         UnifiedExpr(datafusion.col("x")).rank(method="min").alias("r")
     ).collect()
     got = dict(zip(result.column("id").to_pylist(), result.column("r").to_pylist(), strict=True))
 
-    # x = [3, None, 1, 3, 2, None, 5, 1] -> ascending min ranks over the non-NULL rows
-    assert got == {0: 4, 1: None, 2: 1, 3: 4, 4: 3, 5: None, 6: 6, 7: 1}
+    assert got == _ASCENDING_MIN_RANK_BY_ID
 
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
-def test_datafusion_rank_without_over_can_be_filtered_and_joined(datafusion_rank_frame):
-    """A whole-frame rank column is usable as an ordinary column, as in TPC-DS Q44."""
+def test_datafusion_rank_without_over_column_can_be_filtered_like_an_ordinary_column(datafusion_rank_frame):
     ranked = datafusion_rank_frame.with_columns(
         UnifiedExpr(datafusion.col("x")).rank(method="min", descending=True).alias("rnk")
     )
     result = ranked.filter(UnifiedExpr(datafusion.col("rnk")) <= 2).select(["id", "rnk"]).collect()
 
-    # Descending min ranks: 5 -> 1, both 3s -> 2
-    assert sorted(zip(result.column("id").to_pylist(), result.column("rnk").to_pylist(), strict=True)) == [
-        (0, 2),
-        (3, 2),
-        (6, 1),
-    ]
+    id_and_rank = zip(result.column("id").to_pylist(), result.column("rnk").to_pylist(), strict=True)
+    assert sorted(id_and_rank) == _DESCENDING_TOP_TWO_MIN_RANK_BY_ID
 
 
 @pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
