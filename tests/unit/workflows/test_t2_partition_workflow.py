@@ -99,7 +99,7 @@ def test_the_medium_shard_records_memory_and_stalled_stacks() -> None:
     assert names.index(memory_step["name"]) == names.index(run_step["name"]) + 1
 
 
-def test_heavy_payload_uses_at_most_thirteen_standard_linux_runners() -> None:
+def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
     jobs = _jobs("ci.yml")
     payload = (
         "medium-collect",
@@ -109,7 +109,6 @@ def test_heavy_payload_uses_at_most_thirteen_standard_linux_runners() -> None:
         "plan-capture-gate",
         "datafusion-integration",
         "package-smoke",
-        "dist-artifact",
         "dependency-audit",
     )
     count = 0
@@ -117,7 +116,7 @@ def test_heavy_payload_uses_at_most_thirteen_standard_linux_runners() -> None:
         assert jobs[name]["runs-on"] == "ubuntu-latest"
         matrix = jobs[name].get("strategy", {}).get("matrix", {})
         count += prod(len(values) for values in matrix.values())
-    assert count == 13
+    assert count == 12
 
 
 def test_native_binary_framing_remains_required_before_merge() -> None:
