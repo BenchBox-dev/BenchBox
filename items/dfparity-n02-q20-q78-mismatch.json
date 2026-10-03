@@ -4,6 +4,7 @@
     "Each matches at SF 0.03 and 0.1, or is reclassified with evidence",
     "No comparator change"
   ],
+  "context": "2026-10-03: the fix is #2541 (branch fix/tpcds-q20-q78-order, worktree BenchBox.wt-tpcds-n02). Live check: OPEN, mergeable, NOT armed, no auto-merge, no queue entry, unchanged since 2026-10-02 22:37Z (an earlier note said it was queued; that was wrong). Merges cleanly into develop at 922eaba6e. Next: merge origin/develop, wait for CI on the new head, arm with the owner's go-ahead; close this item when it merges. Codex's Dask Q98 NaN finding is recorded under n04, not fixed here.",
   "description": "Q20 diverges at SF 0.03 and is unclassified (split out of t09 and t12); Q78 still diverges on some cells after #2504. Reproduce, state the cause, then fix at the cause or reclassify.",
   "sessions": [
     {
@@ -13,6 +14,14 @@
       "op": "create",
       "op_id": "95f4545792b94aafbb437c8f5df07770",
       "session_id": "3d91d7ab409242898061c99a9d176bb1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:56:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5bdf952683cd4da989743a6577014f54",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
