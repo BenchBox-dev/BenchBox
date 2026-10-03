@@ -886,6 +886,13 @@
       "status": "done",
       "title": "ASCII chart golden-output test: make a missing golden file a hard, non-self-healing failure"
     },
+    "astro-site-00-decisions-adr": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Decision gate: record the ADR for moving benchbox.dev to one Astro site"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
