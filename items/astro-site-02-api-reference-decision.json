@@ -1,13 +1,13 @@
 {
   "acceptance": [
-    "Public-surface list (verified against runtime lazy exports) recorded in the ADR",
-    "Harvest source SHA pinned and recorded",
+    "Explicit public-symbol list recorded, verified by importing exactly those symbols from the matching released wheel in an isolated pinned environment",
+    "Source SHA pinned as provenance; selection rule (keep public contract, drop implementation prose) written down",
     "Authored-contract page template agreed, with one worked example page",
-    "Drift-check tooling decision recorded (none, or named tool with lazy-export verification result)",
-    "Every current reference URL and API anchor mapped (kept or redirect)",
+    "Drift-check tooling decision recorded (none, or named tool verified against lazy exports)",
+    "Every current reference URL and API anchor mapped (kept or listed redirect)",
     "Owner approval recorded"
   ],
-  "description": "Today docs/api.rst and docs/reference/python-api/** (27 .rst files with autodoc directives) render module dumps through autodoc, napoleon and viewcode. Docstrings are being removed (COMMENT-POLICY-001). docs/development/comment-policy.md:5 says a useful public contract belongs in the canonical API reference, so that reference must be authored.\n\nDecide and record in ADR D7:\n(1) The deliberately selected public surface: the symbols users are meant to import, derived from benchbox exports, docs and examples. Not every module member. benchbox/__init__.py uses lazy __getattr__ exports, so the list must be verified at runtime, not only by static scan.\n(2) The authored format: Markdown pages per area (benchmarks, platforms, results, utilities), each with purpose, parameters, return semantics, examples and compatibility notes.\n(3) Harvest: port the existing explanations, parameter descriptions, examples and notes from docstrings at a pinned SHA taken before docstring removal, so content is not lost.\n(4) Optional tooling: griffe or similar may extract signatures and types or check drift between the authored contracts and code. It may never render explanatory docstrings, and its handling of lazy exports must be verified before use.\n(5) Release pinning: the reference documents the released wheel, per adr-independent-publication-authorities.\n(6) A URL map for every existing reference URL and anchor: kept path, or a counted redirect page.\nRejected: keeping a reduced Sphinx autodoc lane.",
+  "description": "Today docs/api.rst and docs/reference/python-api/** (27 .rst files with autodoc directives) render module dumps. Docstrings are being removed. docs/development/comment-policy.md says a useful public contract goes in the canonical API reference, and removed prose must not be moved into inert strings or metadata. The reference is therefore a curated, authored product, not an archive.\n\nDecide and record in ADR D7:\n(1) An explicit public-symbol list: what users are meant to import, chosen from docs, examples and exports. Not every module member.\n(2) Verification: check the list at runtime against the matching released wheel, installed in an isolated environment with pinned dependencies. Import only the listed symbols (benchbox uses lazy __getattr__ exports); never import packages wholesale.\n(3) Authored format: Markdown pages per area, each with purpose, parameters, return semantics, errors, examples and compatibility notes.\n(4) Source material: existing docstrings at a pinned SHA are input to select from and validate, not text to copy. Each kept statement must be checked against current behaviour; anything that only explains implementation is dropped.\n(5) Optional tooling: a signature/type drift check between the authored contracts and the released wheel. It renders nothing, and it never reads explanatory docstrings.\n(6) A URL map for every existing reference URL and anchor: kept path, or a listed redirect page.\nRejected: keeping a reduced Sphinx autodoc lane.",
   "links": [
     "docs/api.rst",
     "docs/reference/python-api",
@@ -32,6 +32,14 @@
       "op": "update",
       "op_id": "a0b68fed15a948e4b7805dbc33145809",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:0acd2553342aecc14bcb06e1",
+      "at": "2026-10-03T14:46:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "bf72a8df14e84414a0af6693fc662a55",
+      "session_id": "0a04fc269d824c6d94e653994f36dbcb"
     }
   ]
 }
