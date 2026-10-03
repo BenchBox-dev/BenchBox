@@ -14,6 +14,7 @@ from scripts.release_canary_sharding import (
     DEFAULT_SHARD_COUNT,
     MARKER_EXPRESSION,
     MEDIUM_MARKER_EXPRESSION,
+    MEDIUM_SHARD_COUNT,
     collect_node_ids,
     parse_collection_output,
     partition_node_ids,
@@ -130,13 +131,13 @@ def _medium_artifacts(root: Path, sha: str) -> list[str]:
         collection / "medium-nodeids.txt",
         collection / "medium-collection.json",
         expected_count=6,
-        shard_count=2,
+        shard_count=MEDIUM_SHARD_COUNT,
         checked_sha=sha,
         workflow="ci.yml",
         job="medium-collect",
         marker_expression=MEDIUM_MARKER_EXPRESSION,
     )
-    for index in range(2):
+    for index in range(MEDIUM_SHARD_COUNT):
         shard = root / f"t2-medium-shard-{index}-{sha}"
         shard.mkdir()
         write_shard(
@@ -144,14 +145,14 @@ def _medium_artifacts(root: Path, sha: str) -> list[str]:
             shard / "assigned.txt",
             shard / "summary.json",
             shard_index=index,
-            shard_count=2,
+            shard_count=MEDIUM_SHARD_COUNT,
             workflow="ci.yml",
             job="medium-test",
             marker_expression=MEDIUM_MARKER_EXPRESSION,
             collection_summary=collection / "medium-collection.json",
             checked_sha=sha,
         )
-        assigned = partition_node_ids(ids, index, 2)
+        assigned = partition_node_ids(ids, index, MEDIUM_SHARD_COUNT)
         (shard / f"shard-{index}-execution.json").write_text(
             json.dumps(
                 {
@@ -235,7 +236,7 @@ def test_medium_partition_refuses_a_changed_collection(tmp_path: Path, field: st
             tmp_path / "ids",
             tmp_path / "summary",
             shard_index=0,
-            shard_count=2,
+            shard_count=MEDIUM_SHARD_COUNT,
             workflow="ci.yml",
             job="medium-test",
             marker_expression=MEDIUM_MARKER_EXPRESSION,
