@@ -53,3 +53,14 @@ def test_fast_job_enforces_the_ungraced_fast_lane_ceiling() -> None:
     assert len(ceiling) == 1
     assert "--strict" in ceiling[0]
     assert "--ceiling-grace" not in ceiling[0]
+
+
+def test_required_local_cases_run_after_each_merge() -> None:
+    job = _workflow()["jobs"]["required-local-cases"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 20
+    assert "needs" not in job and "if" not in job and "strategy" not in job
+    runs = [step["run"] for step in job["steps"] if "run" in step]
+    assert runs.count("make test-required-local-cases") == 1
+    assert not job.get("continue-on-error")
+    assert not any(step.get("continue-on-error") for step in job["steps"])

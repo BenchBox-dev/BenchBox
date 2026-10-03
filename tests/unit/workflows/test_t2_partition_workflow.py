@@ -43,6 +43,24 @@ def test_correctness_partitions_preserve_each_gate_once() -> None:
     assert not any(step.get("continue-on-error") for step in steps)
 
 
+def test_required_local_cases_run_before_merge_and_gate_core() -> None:
+    jobs = _jobs("ci.yml")
+    job = jobs["required-local-cases"]
+    assert job["needs"] == "ci-paths"
+    assert job["if"] == jobs["correctness-gate"]["if"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 20
+    assert "strategy" not in job
+    runs = [step["run"] for step in job["steps"] if "run" in step]
+    assert runs.count("make test-required-local-cases") == 1
+    assert not job.get("continue-on-error")
+    assert not any(step.get("continue-on-error") for step in job["steps"])
+    assert "required-local-cases" in jobs["core"]["needs"]
+    core_text = "\n".join(step.get("run", "") for step in jobs["core"]["steps"])
+    condition = "${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}"
+    assert f"--expect required-local-cases={condition}" in core_text
+
+
 def test_medium_selection_and_receipts_gate_core() -> None:
     jobs = _jobs("ci.yml")
     medium = jobs["medium-test"]
@@ -81,12 +99,13 @@ def test_the_medium_shard_records_memory_and_stalled_stacks() -> None:
     assert names.index(memory_step["name"]) == names.index(run_step["name"]) + 1
 
 
-def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
+def test_heavy_payload_uses_at_most_thirteen_standard_linux_runners() -> None:
     jobs = _jobs("ci.yml")
     payload = (
         "medium-collect",
         "medium-test",
         "correctness-gate",
+        "required-local-cases",
         "plan-capture-gate",
         "datafusion-integration",
         "package-smoke",
@@ -98,14 +117,17 @@ def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
         assert jobs[name]["runs-on"] == "ubuntu-latest"
         matrix = jobs[name].get("strategy", {}).get("matrix", {})
         count += prod(len(values) for values in matrix.values())
-    assert count == 12
+    assert count == 13
 
 
 def test_native_binary_framing_remains_required_before_merge() -> None:
     jobs = _jobs("ci.yml")
     native = jobs["tpch-binary-framing"]
     assert native["needs"] == "ci-paths"
-    assert native["if"] == "${{ needs.ci-paths.outputs.heavy-needed == 'true' }}"
+    framing_condition = (
+        "${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }}"
+    )
+    assert native["if"] == framing_condition
     assert native["runs-on"] == "${{ matrix.os }}"
     assert native["timeout-minutes"] == 15
     assert native["strategy"] == {
@@ -122,7 +144,9 @@ def test_native_binary_framing_remains_required_before_merge() -> None:
     assert not framing.get("continue-on-error")
     assert "tpch-binary-framing" in jobs["core"]["needs"]
     core_text = "\n".join(step.get("run", "") for step in jobs["core"]["steps"])
-    assert "--expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }}" in core_text
+    expectation = framing_condition.removeprefix("${{ ").removesuffix(" }}")
+    assert f"--expect tpch-binary-framing=${{{{ {expectation} }}}}" in core_text
+    assert "framing-needed" in _jobs("ci.yml")["ci-paths"]["outputs"]
 
 
 def test_three_os_nightly_cells_retain_raw_framing_guard() -> None:
