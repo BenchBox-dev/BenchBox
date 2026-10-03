@@ -1,9 +1,10 @@
 {
   "acceptance": [
-    "Runbook section published in the visual check runbook / docs/operations/repo-admin-settings.md",
-    "One real PR with an intentional docs visual change merged using both approval slots; run ids recorded",
-    "No change to the required context, its semantics or the ruleset"
+    "Runbook section published in the visual check runbook (docs/development/results-explorer-browser-testing.md)",
+    "No change to the required context, its semantics or the ruleset",
+    "The two-slot rehearsal is carried by astro-site-21 (owner decision 2026-10-03; recorded in the ADR section 'Visual-change procedure')"
   ],
+  "context": "Owner decision 2026-10-03 (session_01GZSaWtTiCz9etgrhYRuVzu, via AskUserQuestion): the runbook's merge closes this item; the two-slot rehearsal (one real intentional visual change merged using both approval slots, run ids recorded) moves to astro-site-21, whose shared tokens restyle the landing page. The owner sets the four repo variables for that PR. Work landed in PR https://github.com/BenchBox-dev/BenchBox/pull/2585 (bundled with 00, 01, 02).",
   "description": "Several migration items change what the live Sphinx site renders before cutover: rst→MyST (astro-site-30), authored API contracts (astro-site-34), and the shared-token adoption if it touches landing or docs CSS (astro-site-21). Their PRs must be able to land with intentional, reviewed visual changes.\n\nPer _project/decisions/public-site-visual-required-check-2026-09-24.md, an approval is bound to an exact tree:\n- one slot for the PR head SHA\n- a second, separate slot for the merge_group head_sha, each with its own nonempty review note\n- group values are cleared after the reviewed run\nA PR approval is never valid for the merge group, and queue position does not change this.\n\nWrite a migration runbook section that covers:\n- how to review the visual diagnostics\n- setting both approval slots\n- what to do when the merge group is re-formed\n- the known stacked-merge-group baseline gap\n- how to recover a missing exact-SHA baseline\n\nRehearse it once on a small real docs change.",
   "links": [
     "_project/decisions/public-site-visual-required-check-2026-09-24.md",
@@ -18,6 +19,14 @@
       "op": "create",
       "op_id": "d025ffb66a244d6ab977facd447bce65",
       "session_id": "0a04fc269d824c6d94e653994f36dbcb"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T17:31:17Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3fc03f7e75de4809b5170f43cf859925",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
 }
