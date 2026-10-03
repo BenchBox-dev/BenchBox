@@ -43,13 +43,15 @@ Quick Start
 API Reference
 -------------
 
+.. py:module:: benchbox.ssb
+
 SSB Class
 ~~~~~~~~~
 
-.. autoclass:: benchbox.ssb.SSB
-   :members:
-   :inherited-members:
-   :show-inheritance:
+.. py:class:: SSB(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any)
+
+   SSB benchmark implementation with 13 queries in four flights.
+
 
 Constructor
 ~~~~~~~~~~~
@@ -64,7 +66,7 @@ Constructor
 
 Parameters:
 
-- **scale_factor** (float): Data size multiplier. SF=1.0 generates ~500MB (~6M rows in fact table). Range: 0.01 to 100+
+- **scale_factor** (float): Data size multiplier. SF=1.0 generates approximately six million fact-table rows. Range: 0.01 to 100+
 - **output_dir** (str|Path, optional): Directory for generated data files. Default: temporary directory
 - **kwargs**: Additional options (e.g., date_range_years, partition_fact_table)
 
@@ -141,19 +143,19 @@ Parameters:
 Returns:
     dict[str, str]: Dictionary mapping query IDs to SQL text
 
-get_schema()
-~~~~~~~~~~~~
+get_schema() -> dict[str, dict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Get SSB schema information.
 
 .. code-block:: python
 
     schema = benchmark.get_schema()
-    for table in schema:
-        print(f"{table['name']}: {len(table['columns'])} columns")
+    for table_name, table in schema.items():
+        print(f"{table_name}: {len(table['columns'])} columns")
 
 Returns:
-    list[dict]: List of table definitions (5 tables: date, customer, supplier, part, lineorder)
+    dict[str, dict]: Mapping of table names to their definitions (5 tables: date, customer, supplier, part, lineorder)
 
 get_create_tables_sql(dialect="standard", tuning_config=None)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -281,7 +283,7 @@ Basic Benchmark Run
     from benchbox.ssb import SSB
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark with scale factor 1 (~500MB)
+    # Create benchmark with scale factor 1
     benchmark = SSB(scale_factor=1.0)
 
     # Generate data

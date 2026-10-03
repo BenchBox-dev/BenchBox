@@ -39,12 +39,19 @@ Quick Start
 API Reference
 -------------
 
+.. py:module:: benchbox.amplab
+
 AMPLab Class
 ~~~~~~~~~~~~
 
-.. autoclass:: benchbox.amplab.AMPLab
-   :members:
-   :inherited-members:
+.. py:class:: AMPLab(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs)
+
+   AMPLab web-analytics benchmark implementation.
+
+
+   .. py:method:: generate_data() -> list[Union[str, Path]]
+
+      Generate this benchmark's data files and return their paths. Generator errors propagate to the caller.
 
 **Constructor**:
 
@@ -58,7 +65,7 @@ AMPLab Class
 
 **Parameters**:
 
-- **scale_factor** (float): Data size multiplier (1.0 ≈ 10GB)
+- **scale_factor** (float): Data size multiplier (choose a scale appropriate for the available storage)
 - **output_dir** (str | Path | None): Output directory for generated data
 
 Schema Methods
@@ -74,9 +81,9 @@ Get SQL to create all AMPLab tables (rankings, uservisits, documents).
 
     schema_sql = benchmark.get_create_tables_sql(dialect="duckdb")
 
-**get_schema() -> list[dict]**
+**get_schema() -> dict[str, dict]**
 
-Get detailed schema information.
+Get the table-definition mapping keyed by table name.
 
 Query Methods
 ~~~~~~~~~~~~~
@@ -87,7 +94,7 @@ Get specific AMPLab query with optional parameters.
 
 **Parameters**:
 
-- **query_id** (int | str): Query ID (1-3 or "1a", "2a", "3a")
+- **query_id** (int | str): Query ID (1, 1a, 2, 2a, 3, 3a, 4, or 5)
 - **params** (dict | None): Query parameters
 
 **Supported Parameters**:
@@ -98,6 +105,10 @@ Get specific AMPLab query with optional parameters.
 - limit_rows (int): Result limit
 - search_term (str): Search keyword
 - min_visits (int): Minimum visit count
+- keyword1 (str): First content keyword (default: ``web``)
+- keyword2 (str): Second content keyword (default: ``data``)
+- min_content_length (int): Minimum content length (default: 1000)
+- min_revenue (float): Minimum revenue (default: 1.0)
 
 **Example**:
 
@@ -110,8 +121,8 @@ Get specific AMPLab query with optional parameters.
 
     # Join query with date range
     join_query = benchmark.get_query("2", params={
-        'start_date': '1980-01-01',
-        'end_date': '1980-04-01',
+        'start_date': '2000-01-01',
+        'end_date': '2000-01-03',
         'limit_rows': 100
     })
 
@@ -123,7 +134,7 @@ Get specific AMPLab query with optional parameters.
 
 **get_queries(dialect=None) -> dict[str, str]**
 
-Get all AMPLab queries (5 queries total).
+Get all eight AMPLab queries.
 
 **Example**:
 
@@ -131,7 +142,7 @@ Get all AMPLab queries (5 queries total).
 
     queries = benchmark.get_queries()
     print(f"Available queries: {list(queries.keys())}")
-    # Output: ['1', '1a', '2', '2a', '3', '3a']
+    # Output: ['1', '1a', '2', '2a', '3', '3a', '4', '5']
 
 Usage Examples
 --------------
@@ -176,13 +187,14 @@ Query Type Testing
     query_types = {
         'Scan': ['1', '1a'],
         'Join': ['2', '2a'],
-        'Analytics': ['3', '3a']
+        'Analytics': ['3', '3a'],
+        'Extended analytics': ['4', '5']
     }
 
     params = {
         'pagerank_threshold': 1000,
-        'start_date': '1980-01-01',
-        'end_date': '1980-04-01',
+        'start_date': '2000-01-01',
+        'end_date': '2000-01-03',
         'limit_rows': 100
     }
 
@@ -252,8 +264,8 @@ Best Practices
 
        params = {
            'pagerank_threshold': 1000,
-           'start_date': '1980-01-01',
-           'end_date': '1980-04-01',
+           'start_date': '2000-01-01',
+           'end_date': '2000-01-03',
            'limit_rows': 100,
            'search_term': 'google',
            'min_visits': 10
@@ -272,7 +284,7 @@ Best Practices
        join_queries = ['2', '2a']
 
        # Test analytics performance
-       analytics_queries = ['3', '3a']
+       analytics_queries = ['3', '3a', '4', '5']
 
 See Also
 --------

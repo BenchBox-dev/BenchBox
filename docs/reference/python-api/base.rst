@@ -59,196 +59,158 @@ Quick Example
     print(f"Completed {results.successful_queries}/{results.total_queries} queries")
     print(f"Average query time: {results.average_query_time:.3f}s")
 
-Core Classes
-------------
+BaseBenchmark contract
+----------------------
 
-.. autoclass:: benchbox.base.BaseBenchmark
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :special-members: __init__
+.. py:module:: benchbox.base
 
-Key Methods
------------
+.. py:class:: BaseBenchmark(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any)
 
-Data Generation
-~~~~~~~~~~~~~~~
+   Abstract base class for BenchBox benchmark implementations. ``scale_factor`` must be positive; values of one or
+   greater must be whole numbers. If ``output_dir`` is omitted, BenchBox resolves a benchmark-specific data-generation
+   directory. ``verbose`` and ``quiet`` in ``kwargs`` configure verbosity; other keyword arguments become instance
+   attributes for benchmark-specific configuration.
 
-.. automethod:: benchbox.base.BaseBenchmark.generate_data
-   :noindex:
+   .. py:attribute:: benchmark_name
 
-   **Required override** - Each benchmark implements data generation logic.
+      Human-readable benchmark name used in result metadata. Concrete benchmarks provide it through their name or
+      implementation object.
 
-   Returns list of paths to generated data files (Parquet, CSV, etc.).
+   .. py:attribute:: scale_factor
 
-Query Access
-~~~~~~~~~~~~
+      Instance data scale factor selected at construction. It is not a class attribute or callable API.
 
-.. automethod:: benchbox.base.BaseBenchmark.get_queries
-   :noindex:
+   .. py:attribute:: output_dir
 
-   **Required override** - Returns all queries for the benchmark.
+      Resolved local or cloud-backed output-directory handler. Assigning it forwards the value to a wrapped
+      implementation when present.
 
-   Example return value:
+   .. py:attribute:: api_surface
 
-   .. code-block:: python
+      Class metadata identifying this benchmark API as ``"beta-public"``.
 
-       {
-           "q1": "SELECT ...",
-           "q2": "SELECT ...",
-           # ...
-       }
+   .. py:attribute:: run_with_platform_api_surface
 
-.. automethod:: benchbox.base.BaseBenchmark.get_query
-   :noindex:
+      Class metadata identifying :meth:`run_with_platform` as ``"beta-public"``.
 
-   **Required override** - Get single query by ID with optional parameters.
+   .. py:attribute:: DATA_SOURCE_BENCHMARK
 
-   Example:
+      Optional lower-case identifier of the benchmark whose generated data this class reuses. Set it when the runner
+      must resolve shared data before construction; leave it ``None`` when the benchmark generates its own data.
 
-   .. code-block:: python
+   .. py:attribute:: SKIP_DATA_LOADING
 
-       query_sql = benchmark.get_query("q1", params={"date": "1998-09-02"})
+      Class flag for benchmarks whose queries require schema objects but no generated data files. Its default is
+      ``False``.
 
-Database Setup
-~~~~~~~~~~~~~~
+   .. py:attribute:: tables
 
-.. automethod:: benchbox.base.BaseBenchmark.setup_database
-   :noindex:
+      Mapping from table names to generated-data paths. Wrapper instances delegate the mapping to their implementation.
 
-   Sets up database schema and loads data. Automatically calls :meth:`generate_data` if needed.
+   .. py:attribute:: csv_delimiter
 
-Execution
-~~~~~~~~~
+      Optional CSV delimiter supplied by the benchmark implementation for platform data loading.
 
-.. automethod:: benchbox.base.BaseBenchmark.run_query
-   :noindex:
+   .. py:attribute:: csv_null_marker
 
-   Execute single query and return detailed results including timing and row counts.
+      Optional CSV null marker supplied by the benchmark implementation for platform data loading.
 
-.. automethod:: benchbox.base.BaseBenchmark.run_benchmark
-   :noindex:
+   .. py:method:: cleanup() -> None
 
-   Execute complete benchmark suite with optional filtering by query IDs.
+      Compatibility lifecycle hook. The public base performs no cleanup itself, while older implementations may call it
+      after releasing their resources.
 
-   Example:
+   .. py:method:: get_csv_loading_config(table_name: str) -> Optional[list[str]]
 
-   .. code-block:: python
+      Return platform-specific CSV loading options for ``table_name`` when a wrapped implementation supplies them;
+      otherwise return ``None``.
 
-       # Run all queries
-       results = benchmark.run_benchmark(connection)
+   .. py:method:: generate_data() -> list[Union[str, Path]]
 
-       # Run specific queries only
-       results = benchmark.run_benchmark(
-           connection,
-           query_ids=["q1", "q3", "q7"]
-       )
+      Required override. Generate the benchmark's data artifacts and return their paths. Concrete implementations
+      choose the file layout and formats.
 
-.. automethod:: benchbox.base.BaseBenchmark.run_with_platform
-   :noindex:
+   .. py:method:: get_queries() -> dict[str, str]
 
-   **Recommended entry point** - Run benchmark using platform adapter for optimized execution.
+      Required override. Return the benchmark query catalog as query-ID-to-SQL mapping.
 
-   This method delegates to the platform adapter's :meth:`run_benchmark` implementation,
-   which handles:
+   .. py:method:: get_query(query_id: Union[int, str], *, params: Optional[dict[str, Any]] = None) -> str
 
-   - Connection management
-   - Data loading optimizations (bulk loading, parallel ingestion)
-   - Query execution with retry logic
-   - Results collection and validation
+      Required override. Return one query with supported parameter values resolved. An invalid query ID raises
+      ``ValueError``; individual benchmark pages specify whether parameters are supported.
 
-   Example:
+   .. py:method:: setup_database(connection: DatabaseConnection) -> None
 
-   .. code-block:: python
+      Generate data when it has not already been generated, then call the benchmark's loading hook for ``connection``.
+      Exceptions from generation or loading propagate to the caller.
 
-       from benchbox.tpcds import TPCDS
-       from benchbox.platforms import DatabricksAdapter
+   .. py:method:: run_query(query_id: Union[int, str], connection: DatabaseConnection, params: Optional[dict[str, Any]] = None, fetch_results: bool = False) -> dict[str, Any]
 
-       benchmark = TPCDS(scale_factor=1)
-       adapter = DatabricksAdapter(
-           host="https://your-workspace.cloud.databricks.com",
-           token="your-token",
-           http_path="/sql/1.0/warehouses/abc123"
-       )
+      Execute one query and return its ID, elapsed seconds, SQL text, result rows when requested, and row count. Query
+      lookup and database execution errors propagate.
 
-       results = benchmark.run_with_platform(
-           adapter,
-           query_subset=["q1", "q2", "q3"]  # Optional filtering
-       )
+   .. py:method:: run_benchmark(connection: DatabaseConnection, query_ids: Optional[list[Union[int, str]]] = None, fetch_results: bool = False, setup_database: bool = True) -> dict[str, Any]
 
-SQL Translation
-~~~~~~~~~~~~~~~
+      Run the selected queries, or every query when ``query_ids`` is omitted. With ``setup_database=True``, it sets up
+      the database first. The returned mapping contains timing summaries, setup time, counts of successful and failed
+      queries, and one result entry per attempted query; individual query failures are captured in those entries.
 
-.. automethod:: benchbox.base.BaseBenchmark.translate_query
-   :noindex:
+   .. py:method:: run_with_platform(platform_adapter: SQLBenchmarkExecutor, **run_config: Any) -> BenchmarkResults
 
-   Translate query to different SQL dialect using sqlglot.
+      Standard platform-execution entry point. It sets ``benchmark_type`` to the benchmark default when absent and
+      delegates connection management, loading, and execution to the supplied SQL platform adapter. ``run_config`` can
+      include a query subset, categories, connection configuration, and a benchmark-type override.
 
-   Supported dialects: postgres, mysql, sqlite, duckdb, snowflake, bigquery, redshift, clickhouse, databricks, and more.
+      .. code-block:: python
 
-   .. note::
-      **Dialect Translation vs Platform Adapters**: BenchBox can translate queries to many SQL dialects,
-      but this doesn't mean platform adapters exist for all those databases. BenchBox supports 30+ platforms
-      including DuckDB, SQLite, PostgreSQL, Databricks, BigQuery, Redshift, Snowflake, Trino, Athena, and more.
-      See :doc:`/platforms/index` for the full list or :doc:`/development/roadmap` for planned platforms (MySQL, etc.).
+         from benchbox.tpcds import TPCDS
+         from benchbox.platforms.duckdb import DuckDBAdapter
 
-   Example:
+         benchmark = TPCDS(scale_factor=1)
+         results = benchmark.run_with_platform(
+             DuckDBAdapter(), query_subset=["q1", "q2", "q3"]
+         )
 
-   .. code-block:: python
+   .. py:method:: translate_query(query_id: Union[int, str], dialect: str) -> str
 
-       # Translate TPC-H query to Snowflake dialect (fully supported)
-       snowflake_sql = benchmark.translate_query("q1", dialect="snowflake")
+      Return one query translated to ``dialect``. Translation support and SQL compatibility limits are benchmark- and
+      dialect-specific.
 
-       # Translate to BigQuery (fully supported)
-       bigquery_sql = benchmark.translate_query("q1", dialect="bigquery")
+      Dialect translation does not imply that an execution adapter exists for the target database. See
+      :doc:`/platforms/index` for supported platform adapters.
 
-       # Translate to PostgreSQL dialect (translation only - adapter not yet available)
-       postgres_sql = benchmark.translate_query("q1", dialect="postgres")
+   .. py:method:: create_enhanced_benchmark_result(platform: str, query_results: list[dict[str, Any]], execution_metadata: Optional[dict[str, Any]] = None, phases: Optional[dict[str, dict[str, Any]]] = None, resource_utilization: Optional[dict[str, Any]] = None, performance_characteristics: Optional[dict[str, Any]] = None, duration_seconds: Optional[float] = None, **kwargs: Any) -> BenchmarkResults
 
-Results Creation
-~~~~~~~~~~~~~~~~
+      Build the canonical ``BenchmarkResults`` payload. Wrapper benchmarks delegate to their implementation when it
+      supplies this method; otherwise the shared result factory combines the supplied execution and resource metadata.
 
-.. automethod:: benchbox.base.BaseBenchmark.create_enhanced_benchmark_result
-   :noindex:
+   .. py:method:: create_minimal_benchmark_result(*, validation_status: str, validation_details: Optional[dict[str, Any]] = None, duration_seconds: float = 0.0, platform: str = "unknown", execution_metadata: Optional[dict[str, Any]] = None, system_profile: Optional[dict[str, Any]] = None, phases: Optional[dict[str, dict[str, Any]]] = None, **overrides: Any) -> BenchmarkResults
 
-   Create standardized :class:`~benchbox.core.results.models.BenchmarkResults` object with structured metadata.
+      Build a minimal result for validation failures or interrupted execution. It contains no query results and records
+      ``validation_status`` plus optional validation details and caller overrides.
 
-   Used internally by platform adapters to ensure consistent result formatting.
+   .. py:method:: validate_preflight(*, output_dir: Optional[Union[str, Path]] = None, benchmark_name: Optional[str] = None) -> ValidationResult
 
-Properties
-----------
+      Resolve the data directory and run preflight validation for the effective benchmark identifier and scale factor.
+      A missing output directory raises ``RuntimeError``.
 
-.. autoattribute:: benchbox.base.BaseBenchmark.benchmark_name
-   :noindex:
-   :annotation: str
+   .. py:method:: validate_manifest(*, manifest_path: Optional[Union[str, Path]] = None, benchmark_name: Optional[str] = None) -> ValidationResult
 
-   Human-readable benchmark name (e.g., "TPC-H", "ClickBench").
+      Validate the supplied manifest, or ``_datagen_manifest.json`` under the resolved output directory. If no manifest
+      path can be derived, it returns an invalid validation result with a manifest-path error.
 
-.. autoattribute:: benchbox.base.BaseBenchmark.scale_factor
-   :annotation: float
+   .. py:method:: validate_loaded_data(connection: Any, *, benchmark_name: Optional[str] = None) -> ValidationResult
 
-   Data scale factor (1.0 = standard size, 0.01 = 1% size, 10 = 10x size).
+      Validate the post-load database state for ``connection`` using the effective benchmark identifier and scale factor.
 
-.. autoattribute:: benchbox.base.BaseBenchmark.output_dir
-   :noindex:
-   :annotation: Path
+   .. py:method:: format_results(benchmark_result: dict[str, Any]) -> str
 
-   Directory where generated data files are stored.
+      Format a result mapping from :meth:`run_benchmark` as a human-readable summary of query counts and timings.
 
-Utility Methods
----------------
+   .. py:method:: get_data_source_benchmark() -> Optional[str]
 
-.. automethod:: benchbox.base.BaseBenchmark.format_results
-   :noindex:
-
-   Format benchmark results dictionary into human-readable string.
-
-.. automethod:: benchbox.base.BaseBenchmark.get_data_source_benchmark
-   :noindex:
-
-   Returns name of source benchmark if this benchmark reuses data from another.
-
-   For example, ``Primitives`` benchmark reuses TPC-H data, so it returns ``"tpch"``.
+      Return the canonical source benchmark for shared generated data, or ``None`` when the benchmark generates its own
+      data. Implementations can declare ``DATA_SOURCE_BENCHMARK`` or override this method.
 
 Best Practices
 --------------

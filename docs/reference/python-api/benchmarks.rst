@@ -14,6 +14,7 @@ This section provides detailed API documentation for all supported benchmarks.
    benchmarks/tpcdi
    benchmarks/ssb
    benchmarks/clickbench
+   benchmarks/coffeeshop
    benchmarks/joinorder
    benchmarks/amplab
    benchmarks/h2odb

@@ -40,12 +40,19 @@ Quick Start
 API Reference
 -------------
 
+.. py:module:: benchbox.h2odb
+
 H2ODB Class
 ~~~~~~~~~~~
 
-.. autoclass:: benchbox.h2odb.H2ODB
-   :members:
-   :inherited-members:
+.. py:class:: H2ODB(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs)
+
+   H2O database benchmark implementation for taxi-trip analytical queries.
+
+
+   .. py:method:: generate_data() -> list[Union[str, Path]]
+
+      Generate this benchmark's data files and return their paths. Generator errors propagate to the caller.
 
 **Constructor**:
 
@@ -75,9 +82,9 @@ Get SQL to create the TRIPS table with taxi trip data schema.
 
     schema_sql = benchmark.get_create_tables_sql(dialect="duckdb")
 
-**get_schema() -> list[dict]**
+**get_schema() -> dict[str, dict]**
 
-Get detailed schema information for the TRIPS table.
+Get the table-definition mapping for the TRIPS table.
 
 Query Methods
 ~~~~~~~~~~~~~
@@ -89,14 +96,7 @@ Get specific H2O.ai query with optional parameters.
 **Parameters**:
 
 - **query_id** (int | str): Query ID (Q1-Q10 or 1-10)
-- **params** (dict | None): Query parameters
-
-**Supported Parameters**:
-
-- start_date (str): Start date for temporal filtering
-- end_date (str): End date for temporal filtering
-- min_fare (float): Minimum fare amount
-- max_fare (float): Maximum fare amount
+- **params**: Must be omitted. H2O DB queries are static; supplying parameters raises ``ValueError``.
 
 **Example**:
 
@@ -105,17 +105,11 @@ Get specific H2O.ai query with optional parameters.
     # Basic aggregation query
     count_query = benchmark.get_query("Q1")
 
-    # Temporal analysis with date range
-    temporal_query = benchmark.get_query("Q8", params={
-        'start_date': '2020-01-01',
-        'end_date': '2020-01-31'
-    })
+    # Temporal aggregation by year and hour
+    temporal_query = benchmark.get_query("Q8")
 
-    # Statistical analysis with fare filter
-    stats_query = benchmark.get_query("Q9", params={
-        'min_fare': 5.0,
-        'max_fare': 100.0
-    })
+    # Percentile analysis by passenger count
+    stats_query = benchmark.get_query("Q9")
 
 **get_queries(dialect=None) -> dict[str, str]**
 
@@ -203,17 +197,10 @@ Query Group Testing
         'Advanced': ['Q9', 'Q10']
     }
 
-    params = {
-        'start_date': '2020-01-01',
-        'end_date': '2020-01-31',
-        'min_fare': 5.0,
-        'max_fare': 100.0
-    }
-
     for group_name, query_ids in query_groups.items():
         print(f"\n{group_name} Queries:")
         for query_id in query_ids:
-            query = benchmark.get_query(query_id, params=params)
+            query = benchmark.get_query(query_id)
 
             start = time.time()
             result = conn.execute(query).fetchall()
@@ -344,18 +331,9 @@ Best Practices
        # Test advanced analytics performance
        advanced_queries = ['Q9', 'Q10']
 
-3. **Parameterize Temporal Queries**
+3. **Use the fixed query corpus**
 
-   .. code-block:: python
-
-       params = {
-           'start_date': '2020-01-01',
-           'end_date': '2020-01-31',
-           'min_fare': 5.0,
-           'max_fare': 100.0
-       }
-
-       query = benchmark.get_query("Q8", params=params)
+   H2O DB query SQL is static. Select a query ID such as ``Q8`` or ``Q9`` without parameters.
 
 4. **Monitor Memory for Large Grouping Operations**
 

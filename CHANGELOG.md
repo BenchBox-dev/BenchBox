@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- CLI help and MCP tool descriptions now use explicit metadata. The base benchmark
+  and SSB, AMPLab, H2ODB, ClickBench, and CoffeeShop API references retain their
+  public contracts independently of source docstrings.
+
 - **TPC-DS queries now use parameters for the data's scale factor.** Standard
   TPC-DS runs at a scale factor other than 1 used to take their query
   parameters from scale factor 1. They now use values generated for the scale

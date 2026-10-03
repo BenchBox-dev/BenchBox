@@ -46,6 +46,9 @@ Standard Benchmarks
    * - ClickBench
      - Real-world analytics
      - 43 queries
+   * - :doc:`coffeeshop`
+     - Coffee-shop transaction analytics
+     - 11 queries
 
 Quick Start
 -----------

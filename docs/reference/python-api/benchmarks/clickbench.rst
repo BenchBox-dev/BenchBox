@@ -43,13 +43,15 @@ Quick Start
 API Reference
 -------------
 
+.. py:module:: benchbox.clickbench
+
 ClickBench Class
 ~~~~~~~~~~~~~~~~
 
-.. autoclass:: benchbox.clickbench.ClickBench
-   :members:
-   :inherited-members:
-   :show-inheritance:
+.. py:class:: ClickBench(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs)
+
+   ClickBench implementation with its 43-query analytics corpus.
+
 
 Constructor
 ~~~~~~~~~~~
@@ -111,7 +113,7 @@ Get a specific ClickBench query.
 Parameters:
 
 - **query_id** (int|str): Query ID (Q1-Q43 or 1-43)
-- **params** (dict, optional): Query parameters (rarely used in ClickBench)
+- **params**: Must be omitted. ClickBench queries are static; supplying parameters raises ``ValueError``.
 
 Returns:
     str: Query SQL text
@@ -159,14 +161,17 @@ Returns:
 
 **Categories**:
 
-- **scan**: Simple table scans (Q1, Q2, Q7)
-- **aggregation**: Aggregation functions (Q3-Q6)
-- **grouping**: GROUP BY queries (Q8-Q19)
-- **string**: String operations (Q20-Q29)
-- **complex**: Complex analytics (Q30-Q43)
+- **basic_aggregation**: Q1-Q7
+- **grouping_and_ordering**: Q8-Q15
+- **user_analysis**: Q16-Q20
+- **text_and_pattern_matching**: Q21-Q27
+- **string_operations**: Q28-Q29
+- **mathematical_operations**: Q30
+- **complex_grouping**: Q31-Q36
+- **time_based_analysis**: Q37-Q43
 
-get_schema()
-~~~~~~~~~~~~
+get_schema() -> list[dict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Get ClickBench schema information.
 
@@ -177,7 +182,7 @@ Get ClickBench schema information.
         print(f"{table['name']}: {len(table['columns'])} columns")
 
 Returns:
-    list[dict]: List of table definitions (single HITS table with ~100 columns)
+    list[dict]: Table definitions without their mapping keys (the single HITS table has ~100 columns)
 
 get_create_tables_sql(dialect="standard", tuning_config=None)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -235,113 +240,24 @@ Raises:
 Query Categories
 ----------------
 
-ClickBench organizes 43 queries into 5 performance categories:
+``get_query_categories()`` returns these eight source-defined groups:
 
-Scan Queries (Q1, Q2, Q7)
-~~~~~~~~~~~~~~~~~~~~~~~~~
+- ``basic_aggregation``: Q1-Q7
+- ``grouping_and_ordering``: Q8-Q15
+- ``user_analysis``: Q16-Q20
+- ``text_and_pattern_matching``: Q21-Q27
+- ``string_operations``: Q28-Q29
+- ``mathematical_operations``: Q30
+- ``complex_grouping``: Q31-Q36
+- ``time_based_analysis``: Q37-Q43
 
-Tests basic table scanning and filtering performance.
-
-.. code-block:: python
-
-    # Scan category tests sequential scan optimization
-    scan_queries = ["Q1", "Q2", "Q7"]
-
-    for query_id in scan_queries:
-        query = benchmark.get_query(query_id)
-        # Execute query...
-
-**Query Characteristics**:
-
-- **Q1**: Simple COUNT(*) - Tests raw scan speed
-- **Q2**: Filtered COUNT - Tests predicate evaluation
-- **Q7**: Complex filter - Tests multiple predicates
-
-Aggregation Queries (Q3-Q6)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Tests aggregation function performance.
+Use the returned mapping rather than maintaining a local category list:
 
 .. code-block:: python
 
-    # Aggregation category tests vectorized operations
-    agg_queries = ["Q3", "Q4", "Q5", "Q6"]
-
-    for query_id in agg_queries:
-        query = benchmark.get_query(query_id)
-        # Execute query...
-
-**Query Characteristics**:
-
-- **Q3**: Multiple aggregations (SUM, COUNT, AVG)
-- **Q4**: MIN/MAX operations
-- **Q5**: COUNT DISTINCT - Tests hash table efficiency
-- **Q6**: Complex expressions in aggregations
-
-Grouping Queries (Q8-Q19)
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Tests GROUP BY and ORDER BY performance.
-
-.. code-block:: python
-
-    # Grouping category tests hash aggregation
-    grouping_queries = ["Q8", "Q9", "Q10", "Q11", "Q12", "Q13",
-                        "Q14", "Q15", "Q16", "Q17", "Q18", "Q19"]
-
-    for query_id in grouping_queries:
-        query = benchmark.get_query(query_id)
-        # Execute query...
-
-**Query Characteristics**:
-
-- **Q8-Q10**: Basic GROUP BY with ordering
-- **Q11-Q13**: COUNT DISTINCT by group
-- **Q14-Q19**: Complex grouping with TOP-N
-
-String Operations Queries (Q20-Q29)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Tests string processing and pattern matching.
-
-.. code-block:: python
-
-    # String operations category tests text processing
-    string_queries = ["Q20", "Q21", "Q22", "Q23", "Q24",
-                      "Q25", "Q26", "Q27", "Q28", "Q29"]
-
-    for query_id in string_queries:
-        query = benchmark.get_query(query_id)
-        # Execute query...
-
-**Query Characteristics**:
-
-- **Q20-Q22**: LIKE pattern matching
-- **Q23-Q25**: String functions (LENGTH, SUBSTRING)
-- **Q26-Q29**: Regular expressions and complex string operations
-
-Complex Analytics Queries (Q30-Q43)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Tests complex analytical operations.
-
-.. code-block:: python
-
-    # Complex category tests advanced query optimization
-    complex_queries = ["Q30", "Q31", "Q32", "Q33", "Q34", "Q35",
-                       "Q36", "Q37", "Q38", "Q39", "Q40", "Q41",
-                       "Q42", "Q43"]
-
-    for query_id in complex_queries:
-        query = benchmark.get_query(query_id)
-        # Execute query...
-
-**Query Characteristics**:
-
-- **Q30**: Wide aggregation (89 columns)
-- **Q31-Q36**: Complex expressions and calculations
-- **Q37-Q40**: Time series analysis
-- **Q41-Q43**: Advanced analytics with HAVING
+    for category, query_ids in benchmark.get_query_categories().items():
+        for query_id in query_ids:
+            sql = benchmark.get_query(query_id)
 
 Usage Examples
 --------------
@@ -476,7 +392,7 @@ Performance Analysis
         print(f"{query_id:<8} {stats['mean']:<10.4f} {stats['median']:<10.4f} "
               f"{stats['min']:<10.4f} {stats['max']:<10.4f}")
 
-    # Calculate geometric mean
+    # Calculate arithmetic mean
     all_times = [stats["median"] for stats in all_results.values()]
     geomean = (1.0 / len(all_times)) * sum(all_times)
     print(f"\nGeometric mean query time: {geomean:.4f}s")
