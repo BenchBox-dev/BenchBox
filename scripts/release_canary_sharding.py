@@ -206,11 +206,6 @@ def _validate_node_outcomes(outcomes: object, assigned: list[str]) -> None:
 
 
 def _validate_required_outcomes(outcomes: object, required: list[str]) -> None:
-    """Require every case in ``required`` to have run all three phases and passed.
-
-    ``_validate_node_outcomes`` tolerates a skip with an observed reason, which suits optional tests.
-    A required case may not skip, be deselected, or be expected to fail, so any reason field fails it.
-    """
     by_node = {item["node_id"]: item["reports"] for item in outcomes if isinstance(item, dict)}
     for node_id in required:
         reports = by_node.get(node_id)
@@ -225,11 +220,6 @@ def _validate_required_outcomes(outcomes: object, required: list[str]) -> None:
 
 
 def verify_required_cases(evidence_path: Path, checked_sha: str, nodeids_path: Path) -> None:
-    """Prove a pytest run collected, executed and passed exactly the required cases, never skipping one.
-
-    The evidence is the file ``scripts.pytest_shard_evidence`` writes when the run is assigned the required
-    node IDs, so a case that is deselected or missing fails collection and a skipped one fails the outcome check.
-    """
     required = read_node_ids(nodeids_path)
     if not required:
         raise ValueError("required case list is empty")

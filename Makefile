@@ -378,11 +378,6 @@ test-local-matrix:
 	uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -m stress -n 0 --tb=short -v
 	@echo "Tip: set BENCHBOX_SERVICE_LOCAL_MATRIX=1 to include Trino/Presto/Firebolt/PostgreSQL/TimescaleDB service-backed locals."
 
-# Run exactly the required local-engine cases (tests/required_local_cases.py) and fail unless every one was
-# collected, executed and passed. A skip, an expected failure, a deselection or a missing case fails the target:
-# the run is assigned the required node IDs through scripts/pytest_shard_evidence.py and its evidence is checked
-# by `release_canary_sharding.py verify-required`. Output goes under a temporary directory outside the checkout,
-# which the SQLite value-parity case requires.
 test-required-local-cases:
 	@set -eu; \
 	DIR=$$(mktemp -d); \

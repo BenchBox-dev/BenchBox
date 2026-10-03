@@ -1,5 +1,3 @@
-"""A required case that skips, is deselected, fails, or is expected to fail must fail the required-case check."""
-
 from __future__ import annotations
 
 import os
@@ -11,8 +9,6 @@ import pytest
 
 from scripts.release_canary_sharding import verify_required_cases
 
-# Medium tier: every case runs a real pytest session in a subprocess, which would add fast-lane tests the
-# ceiling cannot spare. The medium tier runs on every merge group.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ROOT = Path(__file__).resolve().parents[3]
 SHA = "b" * 40
@@ -29,7 +25,6 @@ MODULES = {
 
 
 def _run(tmp_path: Path, body: str, *extra: str, selected: list[str] | None = None) -> tuple[Path, Path, int]:
-    """Run real pytest assigned the required node IDs; return the evidence path, the node-id file and the exit code."""
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_required.py").write_text(body)
@@ -89,7 +84,7 @@ def test_a_required_case_that_skips_fails_or_is_expected_to_fail_is_rejected(
 
 def test_a_deselected_required_case_is_rejected(tmp_path: Path) -> None:
     evidence, nodeids, status = _run(tmp_path, MODULES["pass"], "-k", "not test_b")
-    assert status != 0  # the evidence plugin fails a run that did not collect its whole assignment
+    assert status != 0
     with pytest.raises(ValueError, match="not all collected and executed successfully"):
         verify_required_cases(evidence, SHA, nodeids)
 
@@ -152,8 +147,8 @@ def test_the_make_target_runs_the_required_cases_under_the_evidence_plugin() -> 
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     body = makefile.split("\ntest-required-local-cases:", 1)[1].split("\n\n", 1)[0]
     assert "REQUIRED_LOCAL_CASES" in body
-    assert '-m ""' in body  # the cases are stress-marked and the default expression deselects them
+    assert '-m ""' in body
     for needle in ("-p scripts.pytest_shard_evidence", "--assigned-nodeids", "--shard-evidence", "--basetemp"):
         assert needle in body
     assert "release_canary_sharding.py verify-required" in body
-    assert "exit $$STATUS" in body  # a failed run or a failed verification fails the target
+    assert "exit $$STATUS" in body
