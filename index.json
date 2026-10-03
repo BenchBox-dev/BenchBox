@@ -6354,17 +6354,12 @@
       "title": "Parameter adapters, category (c) rewrites: Q16, Q24, Q41, Q73, Q74, Q85, Q88, Q89"
     },
     "dfparity-t05h-adapters-q44-q49-inventory": {
-      "claim": {
-        "expires_at": "2026-10-04T13:24:41Z",
-        "generation": "78e7d4ec30414cb69e4a7559885485a0",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t04-adapter-prototype"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Close the Q44 and Q49 inventory gap and make the inventory count adapter bindings"
     },
     "dfparity-t06-literal-fallback-lint": {
