@@ -50,6 +50,15 @@
       "op": "take",
       "op_id": "7b17964eddc44bda88136afd1eff6285",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T14:02:29Z",
+      "client": "claude-code",
+      "generation": "0e9ca0285fe147d098ec7f8bfc1ad495",
+      "op": "release",
+      "op_id": "a3d41c8138754fae875d7a2a3c3381dd",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
