@@ -948,6 +948,15 @@
       "status": "open",
       "title": "Build the shared site shell: header, footer, docs sidebar, theme toggle, and Pagefind search"
     },
+    "astro-site-30-rst-to-myst-in-place": {
+      "claim": null,
+      "needs": [
+        "astro-site-02-api-reference-decision"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Convert the 53 non-API .rst docs pages to MyST Markdown inside the current Sphinx build"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],

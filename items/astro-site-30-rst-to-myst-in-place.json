@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "No non-API .rst remains under docs/ (count reported)",
+    "sphinx-build -W green; site_inventory diff vs baseline shows zero missing paths and zero heading changes beyond whitespace",
+    "Public-site visual acceptance passes without baseline approval, or every diff is explained and approved via the ci-dedupe-11 path"
+  ],
+  "description": "De-risk the port while Sphinx is still the oracle: convert each .rst page in docs/ (index.rst, the toctree hubs, benchmarks/*.rst, the blog index.rst, etc.) to MyST .md. The autodoc pages are excluded; astro-site-02 decides their fate.\n\nKeep each output URL identical: same stem, same .html. Translate any sphinx_design and rst-only directives to their MyST forms or to plain Markdown. The existing Sphinx -W build, spellcheck and public-site visual acceptance must stay green, so this ships value even if the migration stops.\n\nSplitting into several PRs by docs section is fine.",
+  "links": [
+    "docs/index.rst",
+    "docs/benchmarks",
+    "make/documentation.mk"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:03:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4b0c9aa21ae3478199baaeb4c8c4ce94",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
