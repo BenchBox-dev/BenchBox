@@ -174,6 +174,7 @@ def test_stacking_rule_is_stated_consistently_in_agent_and_policy_docs() -> None
         assert "git rebase --onto origin/develop <old parent tip>" in text
     assert "converted_to_draft" in policy
     assert "gh pr ready" in policy
+    assert "git rebase --onto <new B tip> <old B tip>" in policy
     assert "mark ready" in agents
     allowed = policy.split("## Allowed bases")[1].split("\n## ")[0]
     assert "draft PR in a stack" in allowed

@@ -86,6 +86,13 @@ rebased before it can land:
    covers it.
 5. Arm it with `make pr-arm`.
 
+In a stack three deep (`A <- B <- C`), rewriting `B` leaves `C` based on the
+old `B` tip. Immediately after force-pushing `B`, rebase `C` onto the new `B`
+tip with `git rebase --onto <new B tip> <old B tip>` and force-push it, so `C`
+always sits on the current tip of its parent. The `<old parent tip>` used when
+`B` later squash-merges is then `C`'s base at that moment, which isolates `C`'s
+own commits.
+
 ## "No checks" is not one failure mode
 
 Use REST `mergeable_state` vocabulary from `docs/operations/pr-triage.md`
