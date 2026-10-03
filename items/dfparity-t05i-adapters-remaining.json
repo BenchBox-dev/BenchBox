@@ -4,6 +4,7 @@
     "PENDING_ADAPTER is empty; the literal-fallback lint and completeness test pass",
     "Each bound query matches DuckDB on both families at SF 0.01 and 0.1 for the default draw and several other seeds/streams, or the divergence is fixed at its cause"
   ],
+  "context": "2026-10-03 progress. Batch 1 done (feat/tpcds-adapters-remaining-1, bed9c6b25): Q2, Q5, Q6, Q15, Q28, Q29, Q30, Q42 and Q43 are bound, with 0 divergences over 6 draws on both families. Fixes: Q29 hard-coded SUM (it now applies the drawn AGG; pandas gives None for a one-row stddev_samp); Q5 per-group sums gave 0.0 where SQL gives NULL (count-and-mask); Q28 silent per-bucket fallbacks are replaced by a 6-value check; Q15 template constants are now literals. Test change to review in the PR: test_binding_supplies_every_key_the_implementation_reads now accepts runs already pinned in INCOMPLETE_RUNS (5/77/80 pandas stop in rollup_helper against the stand-in) and checks only the keys read before the stop. Batches 2 (Q47 48 52 55 56 57 61 64 69) and 3 (Q72 75 77 78 80 81 94 95 96) are in progress.",
   "description": "The t06 lint (branch feat/tpcds-literal-fallback-lint, e82f89910) found 33 queries with no adapter whose dsqgen draws reach the SQL. The inventory classified them as 'a' only because its name heuristic matched defaults-file keys. Q4, Q9, Q11, Q19, Q46 and Q68 already have adapters on local fix branches. Remaining 27: 2, 5, 6, 15, 28, 29, 30, 42, 43, 47, 48, 52, 55, 56, 57, 61, 64, 69, 72, 75, 77, 78, 80, 81, 94, 95, 96. Q5, Q47, Q57, Q77, Q80, Q94 and Q95 read no parameters at all, so their drawn values are hard-coded in the implementations. The lint pins these in PENDING_ADAPTER, which may only shrink.",
   "sessions": [
     {
@@ -12,6 +13,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "1634eaa4dcd84233b8df5f5a9887ed88",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T16:29:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2a9a0bb89a434332bd32099e1b0c017c",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
