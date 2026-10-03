@@ -75,14 +75,17 @@ def display_benchmark_list(benchmark_classes: dict[str, Any]) -> None:
     Args:
         benchmark_classes: Dictionary mapping benchmark names to classes
     """
+    from benchbox.core.benchmark_registry import get_benchmark_metadata
+
     emit("Available benchmarks:")
     for benchmark_name in sorted(benchmark_classes.keys()):
         benchmark_class = benchmark_classes[benchmark_name]
-        description = (
-            getattr(benchmark_class, "__doc__", "").split("\n")[0]
-            if benchmark_class.__doc__
-            else "No description available"
-        )
+        metadata = get_benchmark_metadata(benchmark_name)
+        description = metadata.get("description") if metadata else None
+        if not isinstance(description, str) or not description:
+            description = getattr(benchmark_class, "description", None)
+        if not isinstance(description, str) or not description:
+            description = "No description available"
         emit(f"  {benchmark_name}: {description}")
 
 

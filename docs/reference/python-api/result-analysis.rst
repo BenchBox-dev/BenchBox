@@ -603,6 +603,13 @@ Configuration for result anonymization.
 Display Utilities
 ~~~~~~~~~~~~~~~~~
 
+Benchmark listings use descriptions from the benchmark registry. Custom
+classes passed to ``display_benchmark_list()`` can supply a ``description``
+string attribute; otherwise the listing shows ``No description available``.
+Class docstrings do not provide listing descriptions. Custom callers that
+previously used a class docstring should move their short description to this
+attribute.
+
 .. autofunction:: benchbox.core.results.display.display_results
 
 Display benchmark results in standardized format.

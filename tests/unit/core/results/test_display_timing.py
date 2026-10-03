@@ -60,6 +60,33 @@ def test_display_results_success_and_failure(capsys):
     assert "benchmark failed" in out
 
 
+def test_display_benchmark_list_uses_registry_without_class_docstring(capsys):
+    class NoDocMeta(type):
+        def __getattribute__(cls, name):
+            if name == "__doc__":
+                raise AssertionError("benchmark display must not read class docstrings")
+            return super().__getattribute__(name)
+
+    class NoDoc(metaclass=NoDocMeta):
+        pass
+
+    display_benchmark_list({"tpch": NoDoc})
+
+    assert "  tpch: Decision Support Benchmark" in capsys.readouterr().out
+
+
+def test_display_benchmark_list_supports_custom_description_and_fallback(capsys):
+    class CustomBenchmark:
+        description = "Custom benchmark"
+
+    display_benchmark_list({"custom": CustomBenchmark, "unknown": object})
+
+    output = capsys.readouterr().out
+    assert "  custom: Custom benchmark" in output
+    assert "  unknown: No description available" in output
+    assert output.index("custom:") < output.index("unknown:")
+
+
 def test_display_helpers_and_phase_printers(capsys):
     display_platform_list({"duckdb": True, "snowflake": False}, get_requirements_func=lambda p: f"needs-{p}")
     display_benchmark_list({"alpha": type("Alpha", (), {"__doc__": "Alpha benchmark\nDetails"})})
