@@ -5,7 +5,7 @@
     "Skipping any required case fails the T2 job (demonstrated in a test)",
     "Correctness gate NOT required on macOS until dlv2-defer-tpch-digest-darwin-arm64 is done"
   ],
-  "context": "Measured locally (clean env, 3 workers): duckdb tpch+tpcds + datafusion tpch 75 s; polars-df tpch 32 s; correctness gate 23 s.\n\nStop checkpoint 2026-09-30 12:20 UTC: OPEN/notready, needs11 unmet. No Task15 WT/branch/source/tests/claim. Approved independent first slice: single tests/required_local_cases.py exact4existing matrix node IDs plusSQLite SF.01/fixedseedQ1,Q6,Q14; extend existing matrix with freshSQLite DB/all8TABLES positivecounts, exact successful measurement-ID multiset, reopen generatedDB and compare actualSQLiteAdapter fullrows to DuckDB loadedsamefiles via existing TPCHavoc ResultValidator(tolerance1e-10), with same-cardinality wrong-result negative. Existing4workload bodies unchanged. Later reuse accepted T2 scripts/pytest_shard_evidence.py opt-in required-pass collection/threephase/wasxfail checks and existingconsumer; do not copy pending feature code or invent parallelframework. Preserve12literalcommands/18Linuxoracle/10payloadrunners/20minbudget and fresh queue proof. Required-mode BENCHBOX_OUTPUT_DIR per-case isolation remains unresolved; root never approved agent proposal before stop. Create fix/required-local-engine-cases only after resume; sharedtestslot and externaloutput stress announcement required. See /tmp/HANDOFF-dlv2-codex-20260930T1220Z.md.",
+  "context": "2026-10-03 verification (read-only, no close). MET: (1) required list in one module, tests/required_local_cases.py REQUIRED_LOCAL_CASES (duckdb tpch+tpcds, datafusion tpch, polars-df tpch, SQLite fixed-seed parity), asserted against real collected IDs by tests/unit/test_required_local_cases.py; PR #2528, merge f011cdb9b. (2) SQLite subset: test_sqlite_tpch_fixed_seed_value_parity (SF .01, seed 42, Q1/Q6/Q14, rows equal DuckDB at 1e-10, wrong-value negative); #2528. (3, partial) skip/deselect/fail detection exists and is demonstrated: make test-required-local-cases + release_canary_sharding.py verify-required, 12 tests in tests/unit/scripts/test_required_case_evidence.py incl. skip mark, in-test skip, xfail, deselected, missing; PR #2545, merge b219da678 (merged 2026-10-03T14:22Z). (4) correctness gate is not a required case on macOS; it keeps its own target (#2528, #2545 bodies). NOT MET: no workflow runs the target. grep of every .github/workflows/*.yml on develop finds no test-required-local-cases or verify-required; ci.yml and trunk.yml run only test-correctness-gate. #2545 body states 'No workflow calls the target yet'. So a skipped required case does not fail any T2/CI job. REMAINS: add a Linux T2 job step in .github/workflows/ci.yml (and trunk.yml if T2 runs there) running make test-required-local-cases, add it to the required-gate needs/--expect list (ci.yml ~2109-2149), keep the 18-query correctness gate job; budget about 5 min (measured 5m02s locally). Not taken, not finished.",
   "description": "tests/integration/test_local_platform_benchmark_matrix.py:39-43 has LOCAL_SQL_STABLE_MATRIX duckdb {tpch,tpcds}, datafusion {tpch}, sqlite set() and skips excluded cases (line ~457). Define the required T2 set explicitly: duckdb tpch + tpcds, datafusion tpch (tpcds when stable), polars-df tpch, and a new SQLite subset. A required case that skips or is deselected fails T2 (generalize the JUnit guard used by the Makefile test-correctness-gate target). Keep the 18-query correctness gate (CORRECTNESS_GATE_QUERY_IDS) and its oracle checks in T2 on Linux.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "op": "update",
       "op_id": "67a78f5e635f40e6bde5ca42da3d0673",
       "session_id": "3596d314cb5a4d6d9a30621673dff602"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:9509e403d03f67d617690747",
+      "at": "2026-10-03T14:49:37Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "255ac5bf7009478b8e487d6d81e6ebd2",
+      "session_id": "cc596d308acb47cca2393bab672e93be"
     }
   ]
 }
