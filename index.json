@@ -912,17 +912,12 @@
       "title": "Decision gate: define authored API contracts as the source of truth that replaces the 27 autodoc pages"
     },
     "astro-site-03-visual-change-procedure": {
-      "claim": {
-        "expires_at": "2026-10-04T18:01:14Z",
-        "generation": "a90258b70be04e9d8ace3275cefd6925",
-        "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486"
-      },
+      "claim": null,
       "needs": [
         "astro-site-00-decisions-adr"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Document and rehearse the visual-change approval procedure before any migration PR changes rendered output"
     },
     "astro-site-10-spike-and-go-gate": {
