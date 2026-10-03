@@ -82,14 +82,17 @@ def test_stacked_pr_base_guard_reevaluates_when_a_pr_is_retargeted() -> None:
     assert "opened" in types
 
 
-def test_stacked_pr_base_guard_reevaluates_when_a_draft_is_marked_ready() -> None:
-    """Marking a draft ready must re-run the guard.
+def test_stacked_pr_base_guard_reevaluates_when_draft_status_changes() -> None:
+    """Both draft transitions must re-run the guard.
 
     A draft stacked on a parent branch passes; without `ready_for_review` it
-    would keep that stale pass after losing its draft status.
+    would keep that stale pass after losing its draft status, and without
+    `converted_to_draft` a ready PR that failed on a feature base would keep
+    its stale failure after becoming an allowed draft.
     """
     types = (_triggers(_load())["pull_request"] or {}).get("types", [])
     assert "ready_for_review" in types, "guard does not re-evaluate when a draft becomes ready"
+    assert "converted_to_draft" in types, "guard does not re-evaluate when a ready PR becomes a draft"
 
 
 def test_stacked_pr_base_guard_names_integration_branches_and_can_fail() -> None:
