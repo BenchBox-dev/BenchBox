@@ -939,6 +939,15 @@
       "status": "open",
       "title": "Make one design-token source that website/ and results-explorer both consume"
     },
+    "astro-site-22-shared-layout-shell": {
+      "claim": null,
+      "needs": [
+        "astro-site-21-single-design-token-source"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Build the shared site shell: header, footer, docs sidebar, theme toggle, and Pagefind search"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
