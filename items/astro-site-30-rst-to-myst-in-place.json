@@ -18,6 +18,14 @@
       "op": "create",
       "op_id": "4b0c9aa21ae3478199baaeb4c8c4ce94",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:04:05Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "501bdb430d094c56b98f59f395dc7e6c",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]
 }

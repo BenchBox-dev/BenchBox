@@ -951,6 +951,7 @@
     "astro-site-30-rst-to-myst-in-place": {
       "claim": null,
       "needs": [
+        "astro-site-10-spike-and-go-gate",
         "astro-site-02-api-reference-decision"
       ],
       "priority": "medium",
