@@ -48,7 +48,7 @@ class TestAdapters:
 
     def test_q41_the_negative_control_has_no_adapter(self):
         assert 41 not in ADAPTERS
-        assert adapter_query_ids() == (39, 44, 49, 93)
+        assert adapter_query_ids() == (39, 44, 49, 84, 86, 87, 90, 91, 92, 93, 97, 98, 99)
 
 
 class TestBinding:
