@@ -20026,7 +20026,7 @@
         "tpcds-parity-b2-params"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "TPC-DS parity B3: fix multi-channel unions and ROLLUP grouping sets"
     },
     "tpcds-parity-b4-windows-semantics": {
