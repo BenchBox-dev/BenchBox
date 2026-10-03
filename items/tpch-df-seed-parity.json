@@ -7,7 +7,7 @@
     "Unseeded SQL throughput and power use a consistent parameter policy, documented",
     "Result bundles record which parameter set was bound; a run whose validation failed is not reported as PASSED"
   ],
-  "context": "Owner approved 2026-10-03 (lifts D5 for this item's scope only). Soundness-path parts still follow D7 (wait for #2567); non-soundness parts may land now under D8.",
+  "context": "Owner approved 2026-10-03 (lifts D5 for this item only). Non-soundness part done locally on fix/tpch-dataframe-seed-parity (worktree BenchBox.wt-tpch-seed): c62131f08, 581aea8ff, 818622dfa; PR body in evidence/rev3/tpch_seed_fix/pr_body.md; preflight paused in the lock queue.\n- TPCH_SF1_REFERENCE_SEED is removed; only no-seed binds the answer-file parameters; seeded SQL power runs relax Q11/Q16/Q18/Q20 to ranges; _tpch_reference_context is true only at SF 1 with no seed.\n- Seeded DataFrame runs bind the per-stream qgen parameters (seed + 1000*stream, the same formula as SQL), extracted from raw qgen text.\n- The extractor raises instead of returning defaults, and a real Q6 bug is fixed: 0.06+0.01 float bounds excluded 0.07 rows.\n- The DataFrame throughput phase is rejected before data generation.\n- DataFrame bundles record config.query_parameters.\n- The parity test matches 22/22 queries at no seed, 17039360 and 4242 for streams 0-2. End-to-end at SF 0.01 seed 17039360: row counts equal for 66/66 (stream, query) pairs, 42/66 before. Extraction costs ~0.19 s per stream, outside query timers.\nREMAINING (soundness paths, wait for #2567, D7): result_capture.py should record query_parameters for SQL; expected_results/tpch_results.py docstring and reference_digests 'reference_seed' are wrong; bundle.py and status.py report PASSED despite failed warm-up checks; the cross_surface.py ~1814 comment is wrong. Also not a soundness path but deferred: query_validation.py set_reference_seed_context docstring. FOLLOW-UPS: tpch_skew and tpchavoc DataFrame runs still ignore --seed; `run --dry-run --seed` previews qgen -d SQL.",
   "description": "Found by dfparity-t21 (evidence: /Users/joe/.jcode/scratch/dfparity-handoff/evidence/rev3/t21_tpch_findings.md, develop 964bea289). Independently spot-checked on the SF=1 DuckDB database for Q3, Q11, Q18 and Q20: the official answer files (_sources/tpc-h/dbgen/answers/) match `qgen -d` exactly (Q11 1048 rows, Q18 57, Q20 186). `qgen -r 17039360` gives 1469, 9 and 188 rows and different Q3 values. Findings: (1) TPCH_SF1_REFERENCE_SEED (benchmark.py ~31-47) is not the answer-file parameter set, so seeded SQL power runs at SF 1 report false row-count failures on Q11, Q16, Q18 and Q20, and the comments in benchmark.py, tpch_results.py and power_test.py ~317 are wrong. (2) Seeded DataFrame runs ignore the seed: set_parameter_overrides is never called, and they bind the -d defaults. _tpch_reference_context then labels them answer-file-valid. SQL and DataFrame parameters differ on 22 of 22 queries at seed 17039360. (3) In throughput runs, SQL derives a seed per stream and position, and unseeded throughput uses base seed 42 while the power test uses -d. DataFrame streams only reorder the -d queries, so bindings differ at 65 of 66 positions. The DataFrame path also ignores --streams. (4) The SQL bundle reports PASSED although its warm-up stream validation failed 4 checks. (5) The parameter extractor silently returns defaults on dialect-translated SQL, so extract from raw qgen text only.",
   "links": [
     "/Users/joe/.jcode/scratch/dfparity-handoff/evidence/rev3/t21_tpch_findings.md"
@@ -27,6 +27,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "6bd44029ea054162a7ac07c6dcfcdc84",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T15:54:37Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "551961da529a42559237e730e67f6c4c",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
