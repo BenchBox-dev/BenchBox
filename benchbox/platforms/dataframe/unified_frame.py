@@ -1664,9 +1664,9 @@ class UnifiedExpr:
         Provides unified ranking:
         - Polars: Uses .rank(method=method, descending=descending)
         - PySpark: Requires Window specification - returns a deferred rank expression
-        - DataFusion: Requires Window specification - returns a deferred rank expression
+        - DataFusion: Ranks over the whole frame, or over a partition when .over() follows
 
-        Note: For PySpark/DataFusion, this returns a deferred expression. The actual ranking
+        Note: For PySpark, this returns a deferred expression. The actual ranking
         requires calling .over() with a window specification.
 
         Args:
@@ -1682,7 +1682,8 @@ class UnifiedExpr:
             # The actual rank will be computed when over() is called
             return _PySparkDeferredRank(self._expr, method, descending)
         if self._is_datafusion:
-            # For DataFusion, we also need deferred ranking with over()
+            # For DataFusion the rank is deferred so .over() can partition it;
+            # without .over() it is a rank over the whole frame
             return _DataFusionDeferredRank(self._expr, method, descending)
         return UnifiedExpr(self._expr.rank(method=method, descending=descending))
 
@@ -2034,6 +2035,42 @@ class _PySparkDeferredRank(UnifiedExpr):
         return UnifiedExpr(rank_expr)
 
 
+_DATAFUSION_RANK_METHODS = frozenset({"min", "max", "dense", "ordinal", "average"})
+
+
+def _datafusion_whole_frame_rank(expr: DataFusionExpr, method: str, descending: bool) -> DataFusionExpr:
+    """Build a DataFusion expression that ranks ``expr`` over the whole frame.
+
+    Matches Polars' ``Expr.rank(method, descending)``: NULL inputs get a NULL
+    rank and are left out of the ranking of the other rows. DataFusion's rank
+    functions rank NULLs like any other value, so NULLs are ordered last
+    (they never shift the ranks of non-NULL rows) and their rank is masked.
+
+    Polars' ``max`` and ``average`` methods have no DataFusion rank function.
+    ``max`` is the ``min`` rank plus the number of tied rows minus one, and
+    ``average`` is the mean of the ``min`` and ``max`` ranks.
+    """
+    from datafusion import functions as df_f, lit as df_lit
+    from datafusion.expr import Window
+
+    window = Window(order_by=[expr.sort(ascending=not descending, nulls_first=False)])
+    # Number of rows sharing this row's value, so ``min + ties - 1`` is the ``max`` rank
+    ties = df_f.count(expr).over(Window(partition_by=[expr]))
+    if method == "min":
+        ranked = df_f.rank().over(window)
+    elif method == "dense":
+        ranked = df_f.dense_rank().over(window)
+    elif method == "ordinal":
+        ranked = df_f.row_number().over(window)
+    elif method == "max":
+        ranked = df_f.rank().over(window) + ties - df_lit(1)
+    elif method == "average":
+        ranked = df_f.rank().over(window) + (ties - df_lit(1)) / df_lit(2.0)
+    else:
+        raise ValueError(f"Unsupported rank method: {method!r}. Expected one of {sorted(_DATAFUSION_RANK_METHODS)}.")
+    return df_f.when(expr.is_null(), df_lit(None)).otherwise(ranked)
+
+
 class _DataFusionDeferredRank(UnifiedExpr):
     """Deferred rank expression for DataFusion.
 
@@ -2049,7 +2086,12 @@ class _DataFusionDeferredRank(UnifiedExpr):
             method: Ranking method: "min", "max", "dense", "ordinal", "average"
             descending: Whether to rank in descending order
         """
-        super().__init__(expr)
+        # Used without .over(), the rank covers the whole frame, as Polars'
+        # Expr.rank() does. Wrapping that expression as the native value means a
+        # caller that never windows the rank gets a real rank rather than the
+        # ranked column itself.
+        super().__init__(_datafusion_whole_frame_rank(expr, method, descending))
+        self._rank_source = expr
         self._rank_method = method
         self._rank_descending = descending
 
@@ -2062,7 +2104,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
 
         Args:
             partition_by: Column(s) to partition by
-            order_by: Optional column to order by (ignored, uses self._expr)
+            order_by: Optional column to order by (ignored, ranks by the source expression)
 
         Returns:
             UnifiedExpr with rank values
@@ -2075,7 +2117,7 @@ class _DataFusionDeferredRank(UnifiedExpr):
         partition_exprs = [df_col(c) if isinstance(c, str) else c for c in partition_cols]
 
         # Build ordering based on the expression
-        order_expr = self._expr.sort(ascending=not self._rank_descending)
+        order_expr = self._rank_source.sort(ascending=not self._rank_descending)
 
         # Build Window specification
         window = Window(partition_by=partition_exprs, order_by=[order_expr])
