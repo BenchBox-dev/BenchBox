@@ -13,6 +13,8 @@ from typing import Any
 MARKER_EXPRESSION = "(slow or resource_heavy) and not (stress or live_integration)"
 MEDIUM_MARKER_EXPRESSION = "medium and not (slow or stress or resource_heavy or live_integration)"
 DEFAULT_SHARD_COUNT = 6
+# ci.yml shards the medium tier this many ways; the core aggregate checks all of them ran.
+MEDIUM_SHARD_COUNT = 4
 
 
 def _canonical_node_ids(node_ids: Iterable[str]) -> list[str]:
@@ -205,7 +207,7 @@ def _validate_node_outcomes(outcomes: object, assigned: list[str]) -> None:
 
 
 def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
-    """Prove both medium shards executed the exact collected set once."""
+    """Prove every medium shard executed the exact collected set once."""
     collection_root = artifact_root / f"t2-medium-nodeids-{checked_sha}"
     node_ids = read_node_ids(collection_root / "medium-nodeids.txt")
     collection = json.loads((collection_root / "medium-collection.json").read_text(encoding="utf-8"))
@@ -214,16 +216,18 @@ def verify_medium_shards(artifact_root: Path, checked_sha: str) -> None:
         "job": "medium-collect",
         "commit_sha": checked_sha,
         "marker_expression": MEDIUM_MARKER_EXPRESSION,
-        "shard_count": 2,
+        "shard_count": MEDIUM_SHARD_COUNT,
         "total_count": len(node_ids),
         "node_ids_sha256": _node_ids_sha256(node_ids),
-        "shard_counts": [len(partition_node_ids(node_ids, index, 2)) for index in range(2)],
+        "shard_counts": [
+            len(partition_node_ids(node_ids, index, MEDIUM_SHARD_COUNT)) for index in range(MEDIUM_SHARD_COUNT)
+        ],
     }
     if not isinstance(collection, dict) or any(collection.get(key) != value for key, value in expected.items()):
         raise ValueError("medium collection does not match the checked SHA or selected node IDs")
     executed = []
-    for index in range(2):
-        assigned = partition_node_ids(node_ids, index, 2)
+    for index in range(MEDIUM_SHARD_COUNT):
+        assigned = partition_node_ids(node_ids, index, MEDIUM_SHARD_COUNT)
         if not assigned:
             raise ValueError("medium shard assignment is empty")
         shard_root = artifact_root / f"t2-medium-shard-{index}-{checked_sha}"

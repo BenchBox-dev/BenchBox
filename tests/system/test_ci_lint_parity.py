@@ -333,10 +333,6 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ),
     ("test.yml", "test-package", "Test package installation"): "Covered by the local `test-package` target.",
     ("test.yml", "pyspark-tests", "Run PySpark tests"): "Covered by the local `test-pyspark` target.",
-    ("ci.yml", "soundness-flag", "soundness-flag"): (
-        "Hosted soundness review gate reads the live PR body via the API; the "
-        "checker logic is covered locally by tests/unit/test_soundness_review_flag.py."
-    ),
     ("ci.yml", "ruleset-drift", "Compare live governance with the trusted runbook"): (
         "Hosted governance check reads the live ruleset via the API with a "
         "secret token; covered locally by tests/unit/test_ruleset_drift.py."

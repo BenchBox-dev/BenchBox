@@ -79,6 +79,8 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);
       if (route.slug === "landing") {
+        // A smooth scroll still in flight at capture time leaves sticky bars a few pixels off.
+        await page.addStyleTag({ content: "html { scroll-behavior: auto !important; }" });
         for (const selector of [".feature-card", ".benchmark-card", ".install-step"]) {
           const cards = page.locator(selector);
           for (let index = 0; index < (await cards.count()); index += 1) {
@@ -114,6 +116,7 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
 
       const filename = `${route.slug}-${width}.png`;
       const screenshotPath = path.join(OUTPUT, filename);
+      await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: screenshotPath, fullPage: true });
       const digest = createHash("sha256").update(await readFile(screenshotPath)).digest("hex");
       captures.push({ digest, filename, route: route.path, viewport_width: width });
