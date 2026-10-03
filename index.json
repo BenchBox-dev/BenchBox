@@ -6141,12 +6141,17 @@
       "title": "Diagnose the Q66 value mismatch at SF 0.03 to 0.1 on both families"
     },
     "dfparity-n02-q20-q78-mismatch": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-04T13:22:21Z",
+        "generation": "d4980701d4f0438291cb56045843eaa5",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755"
+      },
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Diagnose the Q20 mismatch at SF 0.03 and the Q78 mismatch"
     },
     "dfparity-n03-flaky-q36-cell": {
