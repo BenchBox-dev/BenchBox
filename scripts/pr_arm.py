@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Arm a pull request for its exact head after a live check that nothing holds it.
 
-The merge queue and the required status checks decide whether a PR merges; this
-helper only enqueues the head the author pushed. It reads the live PR first and
+The required status checks decide whether a PR merges; this helper only turns on
+auto-merge for the head the author pushed. It reads the live PR first and
 refuses, without merging, when a durable hold label, a requested change, an
 unresolved review thread, a draft or closed state, a base other than `develop`,
 unpublished local work, or a head other than local HEAD says the PR is not ready.
-Re-enqueueing after a spurious queue ejection uses the same command, so a policy
-hold is never mistaken for a queue failure.
+Re-arming after auto-merge was disabled uses the same command, so a policy hold
+is never mistaken for a check failure.
 
 It enforces only what GitHub can state mechanically. A required external review
 that returned HOLD is not visible there; stopping for it stays the author's duty
@@ -122,7 +122,18 @@ def arm(
                 print(f"pr-arm: refusing to arm PR #{view['number']}: {reason}", file=sys.stderr)
             return 2
         code, out = run(
-            ["gh", "pr", "merge", str(view["number"]), "--repo", repo, "--squash", "--match-head-commit", local_head]
+            [
+                "gh",
+                "pr",
+                "merge",
+                str(view["number"]),
+                "--repo",
+                repo,
+                "--squash",
+                "--auto",
+                "--match-head-commit",
+                local_head,
+            ]
         )
         print(out.strip())
         return code

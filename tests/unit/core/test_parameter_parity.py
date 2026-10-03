@@ -134,7 +134,7 @@ class TestTPCDSParameterOverrides:
         assert params.get("year") == 2001
         assert params.get("state") == "CA"
         # Non-overridden key preserved
-        assert params.get("agg_field") == "sr_return_amt"
+        assert params.get("agg_field") == TPCDS_DEFAULT_PARAMS[1]["agg_field"]
 
     def test_override_does_not_affect_other_queries(self):
         """Overriding Q1 does not affect Q2."""

@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpch_sf10_databricks_sql_20261003_120202_e83ea509.json",
+  "bundle_hash": "5f5ccaf2062354fa06d158513d7c4748f377a2b42f0f6d0c8f07d9e81acd5833",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

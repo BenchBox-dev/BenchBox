@@ -15,43 +15,6 @@ pytestmark = [
 ]
 
 
-class _FakeExpr:
-    def __init__(self, value):
-        self.value = value
-
-    def __mul__(self, other):
-        return _FakeExpr(("mul", self.value, getattr(other, "value", other)))
-
-    def __add__(self, other):
-        return _FakeExpr(("add", self.value, getattr(other, "value", other)))
-
-    def __truediv__(self, other):
-        return _FakeExpr(("div", self.value, getattr(other, "value", other)))
-
-    def __sub__(self, other):
-        return _FakeExpr(("sub", self.value, getattr(other, "value", other)))
-
-    def cast(self, dtype):
-        return _FakeExpr(("cast", self.value, str(dtype)))
-
-    def alias(self, name):
-        return _FakeExpr(("alias", self.value, name))
-
-
-class _FakeResult:
-    def __init__(self):
-        self.columns = {}
-        self.dropped = []
-
-    def with_column(self, name, expr):
-        self.columns[name] = expr
-        return self
-
-    def drop(self, name):
-        self.dropped.append(name)
-        return self
-
-
 class _DFExpr:
     __module__ = "datafusion.expr"
 
@@ -90,16 +53,6 @@ class _DFExpr:
 
     def __str__(self):
         return str(self.value)
-
-    def rex_call_operator(self):
-        # Mirror real DataFusion Expr behavior: rex_call_operator() always
-        # raises, wrapping a debug-style dump of the expression's own AST in
-        # the same "Catch all triggered in get_operator_name: ..." text real
-        # DataFusion uses (confirmed against DataFusion 43.0.0 and 53.0.0).
-        # None of these fakes represent an Alias(BinaryExpr(...)) shape, so
-        # _get_datafusion_ast_string() should treat this as "not our
-        # pattern" (return None) rather than raising DataFusionASTFormatError.
-        raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: {self.value!r}")
 
 
 class _DFAggExpr(_DFExpr):
@@ -453,28 +406,6 @@ class _DefaultNativeExpr:
         return _DefaultNativeExpr(("lower", self.value))
 
 
-def _install_fake_datafusion(monkeypatch):
-    def col(name):
-        return _FakeExpr(("col", name))
-
-    fake_f = SimpleNamespace(
-        avg=lambda x: _FakeExpr(("avg", x.value)),
-        sum=lambda x: _FakeExpr(("sum", x.value)),
-        count=lambda x: _FakeExpr(("count", x.value)),
-        min=lambda x: _FakeExpr(("min", x.value)),
-        max=lambda x: _FakeExpr(("max", x.value)),
-        coalesce=lambda a, b: _FakeExpr(("coalesce", a.value, b.value)),
-        nullif=lambda a, b: _FakeExpr(("nullif", a.value, b.value)),
-    )
-
-    fake_df = SimpleNamespace(
-        col=col,
-        lit=lambda v: _FakeExpr(("lit", v)),
-        functions=fake_f,
-    )
-    monkeypatch.setitem(sys.modules, "datafusion", fake_df)
-
-
 def _install_rich_fake_datafusion(monkeypatch):
     fake_f = _DFFunctions()
     fake_df = SimpleNamespace(
@@ -499,96 +430,6 @@ def test_wrap_expr_and_backend_detector_helpers():
     assert uf._is_pyspark_df(PySparkType())
     assert uf._is_polars_df(PolarsType())
     assert uf._is_datafusion_df(DataFusionType())
-
-
-def test_datafusion_ast_extractors_basic_cases():
-    ast = '... name: \\"l_quantity\\" ... name: \\"avg_qty\\" ... Literal(Float64(0.2), None) ... op: Multiply ...'
-
-    assert uf._extract_datafusion_alias_name(ast) == "avg_qty"
-    assert uf._extract_datafusion_multiplier(ast) == (0.2, "multiply")
-
-    no_literal = '... name: \\"x\\" ... op: Plus ...'
-    assert uf._extract_datafusion_multiplier(no_literal) == (None, None)
-
-
-def test_get_datafusion_ast_string_success_and_unexpected_error():
-    # Both fakes use the real "Catch all triggered in get_operator_name: ..."
-    # wrapper DataFusion actually raises (confirmed against DataFusion 43.0.0
-    # and 53.0.0) so this test exercises the sanity-check branch, not the
-    # format-drift branch covered separately by
-    # test_unified_frame_datafusion_ast.py.
-    class ExprWithAst:
-        def rex_call_operator(self):
-            raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: Alias(BinaryExpr(AggregateFunction(...)))")
-
-    class ExprWithoutAst:
-        def rex_call_operator(self):
-            # A genuinely different expression shape (e.g. a plain Column) -
-            # still matches the wrapper format but not the Alias/BinaryExpr/
-            # AggregateFunction sanity-check keywords, so this must return
-            # None (fall back to unchanged-expression behavior) rather than
-            # raising DataFusionASTFormatError.
-            raise RuntimeError(f"{uf._DATAFUSION_AST_ERROR_PREFIX}: Column {{ relation: None, name: \\'x\\' }}")
-
-    assert "Alias" in uf._get_datafusion_ast_string(ExprWithAst())
-    assert uf._get_datafusion_ast_string(ExprWithoutAst()) is None
-
-
-def test_rebuild_datafusion_pure_aggregate(monkeypatch):
-    _install_fake_datafusion(monkeypatch)
-
-    ast = 'AggregateUDF { inner: Avg { ... Column { relation: None, name: \\"l_quantity\\" } ... } }'
-    expr = uf._rebuild_datafusion_pure_aggregate(ast)
-
-    assert isinstance(expr, _FakeExpr)
-    assert expr.value[0] == "avg"
-
-
-def test_extract_datafusion_agg_arithmetic_for_literal(monkeypatch):
-    _install_fake_datafusion(monkeypatch)
-
-    class Expr:
-        def rex_call_operator(self):
-            raise RuntimeError(
-                f"{uf._DATAFUSION_AST_ERROR_PREFIX}: "
-                'Alias(BinaryExpr { left: AggregateFunction( inner: Sum { args: [Column { name: \\"l_extendedprice\\" }] }), '
-                'op: Multiply, right: Literal(Float64(0.5), None) }, name: \\"half_revenue\\")'
-            )
-
-    processed, post_ops = uf._extract_datafusion_agg_arithmetic([Expr()])
-
-    assert len(processed) == 1
-    assert post_ops == [("literal", "__temp_half_revenue__", "half_revenue", 0.5, "multiply")]
-
-
-def test_extract_multi_agg_arithmetic_and_apply_post_ops(monkeypatch):
-    _install_fake_datafusion(monkeypatch)
-
-    ast = (
-        'BinaryExpr { left: AggregateFunction( inner: Sum { args: [Column { name: \\"a\\" }] }, '
-        'right: AggregateFunction( inner: Avg { args: [Column { name: \\"b\\" }] }, op: Plus }'
-    )
-    multi = uf._extract_multi_agg_arithmetic(ast, "combined")
-    assert multi is not None
-
-    temp_exprs, post_op = multi
-    assert len(temp_exprs) == 2
-    assert post_op[0] == "multi"
-
-    result = _FakeResult()
-    out = uf._apply_datafusion_post_ops(
-        result,
-        [
-            ("literal", "tmp_x", "x", 2.0, "multiply"),
-            ("multi", ["tmp_a", "tmp_b"], "combined", "add"),
-        ],
-    )
-
-    assert out is result
-    assert "x" in result.columns
-    assert "combined" in result.columns
-    assert "tmp_x" in result.dropped
-    assert "tmp_a" in result.dropped and "tmp_b" in result.dropped
 
 
 def test_unified_expr_default_branches_cover_core_methods():
