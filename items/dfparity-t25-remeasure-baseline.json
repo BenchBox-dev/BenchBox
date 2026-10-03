@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Per-query results at SF 0.01, 0.1 and 1 for both families are saved with the develop commit they ran on",
+    "Every divergent cell has a t14 cause label and its full detail string",
+    "Counts and wall times are recorded in this item and in the handoff evidence directory"
+  ],
+  "context": "Created 2026-10-03 from the adversarial re-evaluation of the parity handoff. Earlier numbers: SF=1 default parameters, expression 75 match / 24 divergent, pandas 71 / 28 (evidence/rev2/sf1_perquery.jsonl in /Users/joe/.jcode/scratch/dfparity-handoff). Run after #2541 merges if possible so Q20/Q78 are current; note which open PRs were or were not on develop. Project owner does NOT accept earlier reviewers' TPC-H claims.",
+  "description": "The last full measurements predate Q39 (#2543), Q66 (#2539), the parameter adapters (#2526) and, once merged, Q20/Q78 (#2541) and the Q36 tie fix (#2547). Run the per-query probe for both families (expression = Polars, pandas) at SF 0.01, 0.1 and 1 on current develop, label every divergent cell with the t14 divergence report (scripts/tpcds_divergence_report.py, from #2553 or its branch feat/tpcds-divergence-classifier if not merged), and record match / divergent / empty / error counts per family and scale plus wall time. This is the baseline the t05 batches and t24 measure against. SF=1 needs the owner's approval before running (heavy run: about 4 GB RAM, several minutes).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:54:53Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b4dbec1414344564a43546f0a7ecb2f2",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}

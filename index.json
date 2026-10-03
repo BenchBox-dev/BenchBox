@@ -6550,6 +6550,13 @@
       "status": "open",
       "title": "Document the two parameter bindings, the two gates, and how to add a TPC-DS query"
     },
+    "dfparity-t25-remeasure-baseline": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Re-measure TPC-DS DataFrame parity on develop at SF 0.01, 0.1 and 1 before the adapter batches"
+    },
     "disable-auto-merge-is-not-durable": {
       "claim": null,
       "needs": [],
