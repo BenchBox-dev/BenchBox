@@ -1010,25 +1010,35 @@ class UnifiedExpr:
         # DataFusion: use nullif to prevent DivideByZero errors
         # dividend / nullif(divisor, 0) returns NULL when divisor is 0
         if self._is_datafusion:
+            import pyarrow as pa
             from datafusion import functions as df_f, lit as df_lit
 
+            # DataFusion divides Int64 by Int64 as integer division, while SQL and
+            # Polars `/` are true division. Cast the numerator to float64 so the
+            # result is fractional for integer operands.
+            numerator = self._expr.cast(pa.float64())
             if isinstance(other_expr, (int, float)):
                 # Literal divisor - no need for nullif if non-zero
                 if other_expr == 0:
-                    return UnifiedExpr(self._expr / df_f.nullif(df_lit(other_expr), df_lit(0)))
-                return UnifiedExpr(self._expr / other_expr)
+                    return UnifiedExpr(numerator / df_f.nullif(df_lit(other_expr), df_lit(0)))
+                return UnifiedExpr(numerator / other_expr)
             # Column divisor - wrap in nullif for safety
-            return UnifiedExpr(self._expr / df_f.nullif(other_expr, df_lit(0)))
+            return UnifiedExpr(numerator / df_f.nullif(other_expr, df_lit(0)))
         return UnifiedExpr(self._expr / other_expr)
 
     def __rtruediv__(self, other: Any) -> UnifiedExpr:
         other_expr = self._unwrap(other)
         # DataFusion: use nullif to prevent DivideByZero errors
         if self._is_datafusion:
+            # self._expr is the divisor here. Make the division true division,
+            # as in __truediv__, by casting the numerator to float64.
+            import pyarrow as pa
             from datafusion import functions as df_f, lit as df_lit
 
-            # self._expr is the divisor here
-            return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
+            numerator = (
+                df_lit(float(other_expr)) if isinstance(other_expr, (int, float)) else other_expr.cast(pa.float64())
+            )
+            return UnifiedExpr(numerator / df_f.nullif(self._expr, df_lit(0)))
         return UnifiedExpr(other_expr / self._expr)
 
     # =========================================================================

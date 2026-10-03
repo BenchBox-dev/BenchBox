@@ -514,3 +514,32 @@ def test_datafusion_string_add_concat(datafusion_frame):
 
     d = result.to_pydict()
     assert d["name_excl"] == ["Alice!", "Bob!"]
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_integer_division_is_true_division(datafusion_frame):
+    """Int64 / Int64 is true division, as in SQL and Polars, not integer division."""
+    _, frame = datafusion_frame
+
+    result = frame.select(
+        (UnifiedExpr(datafusion.col("a")) / UnifiedExpr(datafusion.col("b"))).alias("col_by_col"),
+        (UnifiedExpr(datafusion.col("a")) / 4).alias("col_by_lit"),
+        (1 / UnifiedExpr(datafusion.col("b"))).alias("lit_by_col"),
+    ).collect()
+
+    assert result.column("col_by_col").to_pylist() == pytest.approx([1 / 3, 2 / 4])
+    assert result.column("col_by_lit").to_pylist() == pytest.approx([0.25, 0.5])
+    assert result.column("lit_by_col").to_pylist() == pytest.approx([1 / 3, 1 / 4])
+
+
+@pytest.mark.skipif(not HAS_DATAFUSION, reason="datafusion not installed")
+def test_datafusion_division_by_zero_is_null(datafusion_frame):
+    _, frame = datafusion_frame
+
+    result = frame.select(
+        (
+            UnifiedExpr(datafusion.col("a")) / (UnifiedExpr(datafusion.col("b")) - UnifiedExpr(datafusion.col("b")))
+        ).alias("q")
+    ).collect()
+
+    assert result.column("q").to_pylist() == [None, None]

@@ -22,11 +22,13 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
-import contextlib
+import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     pass
+
+logger = logging.getLogger(__name__)
 
 
 def expand_rollup_expression(
@@ -69,8 +71,12 @@ def expand_rollup_expression(
     results = []
     n = len(group_cols)
 
-    def get_output_name(expr: Any) -> str:
-        """Get the alias/output name from an aggregation expression."""
+    def get_output_name(expr: Any) -> str | None:
+        """Get the alias/output name from an aggregation expression.
+
+        Returns None when the engine's expression type is not recognized, so
+        the caller can tell a real name from a placeholder.
+        """
         # Unwrap UnifiedExpr if needed
         native = expr.native if isinstance(expr, UnifiedExpr) else expr
         # Polars - use meta.output_name()
@@ -89,10 +95,24 @@ def expand_rollup_expression(
                 return name.strip("`")
             except Exception:
                 pass
-        # Fallback
-        return f"agg_{id(expr)}"
+        # DataFusion - Expr.schema_name() is the output column name, alias included
+        if hasattr(native, "schema_name"):
+            try:
+                return native.schema_name()
+            except Exception:
+                pass
+        return None
 
-    agg_col_names = [get_output_name(e) for e in agg_exprs]
+    resolved_names = [get_output_name(e) for e in agg_exprs]
+    names_resolved = all(name is not None for name in resolved_names)
+    agg_col_names = [name if name is not None else f"agg_{id(e)}" for name, e in zip(resolved_names, agg_exprs)]
+    if not names_resolved:
+        unresolved = next(e for name, e in zip(resolved_names, agg_exprs) if name is None)
+        logger.warning(
+            "ROLLUP: cannot read the output name of a %s aggregation expression; "
+            "skipping the column reorder, so levels are unioned in their own column order",
+            type(unresolved.native if isinstance(unresolved, UnifiedExpr) else unresolved).__name__,
+        )
 
     for i in range(n + 1):
         # Columns to group by at this level
@@ -126,9 +146,11 @@ def expand_rollup_expression(
         grouping_id = sum(2**j for j in range(i))
         grouped = grouped.with_columns(lit(grouping_id).alias("grouping_id"))
 
-        # Reorder columns to consistent layout (if column ordering fails, continue with current layout)
-        all_cols = group_cols + agg_col_names + ["grouping_id"]
-        with contextlib.suppress(Exception):
+        # Reorder columns to one layout for every level. Engines that union by
+        # position (DataFusion) need this to line the levels up, so a failure
+        # here must surface instead of producing misaligned rows.
+        if names_resolved:
+            all_cols = group_cols + agg_col_names + ["grouping_id"]
             # Use *args for UnifiedLazyFrame, list for native
             grouped = grouped.select(*all_cols) if isinstance(grouped, UnifiedLazyFrame) else grouped.select(all_cols)
 
