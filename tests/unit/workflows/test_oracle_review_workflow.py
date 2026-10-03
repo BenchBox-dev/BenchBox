@@ -36,7 +36,7 @@ def test_triggers_cover_pushes_reviews_and_merge_queue() -> None:
     assert set(triggers) == {"pull_request", "pull_request_review", "merge_group"}
     assert triggers["merge_group"]["types"] == ["checks_requested"]
     assert triggers["pull_request"]["types"] == ["opened", "synchronize", "reopened", "ready_for_review"]
-    assert triggers["pull_request_review"]["types"] == ["submitted"]
+    assert triggers["pull_request_review"]["types"] == ["submitted", "dismissed"]
 
 
 def test_permissions_are_read_only() -> None:

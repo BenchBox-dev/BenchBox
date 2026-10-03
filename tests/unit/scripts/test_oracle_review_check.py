@@ -161,3 +161,16 @@ def test_head_transition_date_falls_back_to_the_committer_date_without_runs() ->
 
 def test_head_transition_date_keeps_a_later_committer_date() -> None:
     assert oracle_review_check.head_transition_date(AFTER_HEAD, [HEAD_DATE]) == AFTER_HEAD
+
+
+def test_truncated_file_list_is_treated_as_a_soundness_change() -> None:
+    matcher = oracle_review_check.path_matcher(listed_files=3000, changed_files=3001)
+    assert matcher(OTHER_FILES) is True
+    status, _ = oracle_review_check.decide(HEAD, HEAD_DATE, OTHER_FILES, [], [], [], matcher)
+    assert status == 1
+
+
+def test_complete_file_list_uses_the_soundness_predicate() -> None:
+    matcher = oracle_review_check.path_matcher(listed_files=2, changed_files=2)
+    assert matcher(OTHER_FILES) is False
+    assert matcher(SOUNDNESS_FILES) is True

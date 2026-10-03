@@ -128,8 +128,8 @@ def _paginate(token: str, path: str) -> list[dict[str, Any]]:
         page += 1
 
 
-def fetch_head_sha(token: str, repo: str, pr: int) -> str:
-    return _request(token, f"{API_ROOT}/repos/{repo}/pulls/{pr}")["head"]["sha"]
+def fetch_pull(token: str, repo: str, pr: int) -> dict[str, Any]:
+    return _request(token, f"{API_ROOT}/repos/{repo}/pulls/{pr}")
 
 
 def head_transition_date(committer_date: str, run_dates: Iterable[str]) -> str:
@@ -154,8 +154,14 @@ def changed_paths(items: Iterable[dict[str, Any]]) -> list[str]:
     return paths
 
 
-def fetch_files(token: str, repo: str, pr: int) -> list[str]:
-    return changed_paths(_paginate(token, f"/repos/{repo}/pulls/{pr}/files"))
+def fetch_files(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
+    return _paginate(token, f"/repos/{repo}/pulls/{pr}/files")
+
+
+def path_matcher(listed_files: int, changed_files: int) -> Callable[[Iterable[str]], bool]:
+    if listed_files < changed_files:
+        return lambda _paths: True
+    return any_soundness_path
 
 
 def fetch_reviews(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
@@ -221,9 +227,12 @@ def main(argv: list[str] | None = None) -> int:
         print("oracle-review: error: --repo must be OWNER/NAME", file=sys.stderr)
         return ERROR
     try:
-        head_sha = fetch_head_sha(token, args.repo, args.pr)
-        files = fetch_files(token, args.repo, args.pr)
-        if not any_soundness_path(files):
+        pull = fetch_pull(token, args.repo, args.pr)
+        head_sha = pull["head"]["sha"]
+        items = fetch_files(token, args.repo, args.pr)
+        files = changed_paths(items)
+        matcher = path_matcher(len(items), pull["changed_files"])
+        if not matcher(files):
             print("oracle-review: not a soundness path change")
             return PASS
         status, message = decide(
@@ -233,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
             fetch_reviews(token, args.repo, args.pr),
             fetch_reactions(token, args.repo, args.pr),
             fetch_threads(token, args.repo, args.pr),
-            any_soundness_path,
+            matcher,
         )
     except (CheckError, KeyError, ValueError) as exc:
         print(f"oracle-review: error: {exc}", file=sys.stderr)
