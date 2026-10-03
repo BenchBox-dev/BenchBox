@@ -500,6 +500,11 @@ SITE_BUILD_INPUTS = [
     "results-explorer/src/App.tsx",
     "results-data/corpus-inventory.json",
     "scripts/generate_query_docs.py",
+    "scripts/publication/check_artifact_privacy.py",
+    "Makefile",
+    "make/documentation.mk",
+    "pyproject.toml",
+    "uv.lock",
     ".github/workflows/ci.yml",
 ]
 
