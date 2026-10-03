@@ -51,6 +51,8 @@ file	.github/workflows/publication-canaries.yml
 file	scripts/publication/verify_lane_isolation.py
 file	_project/scripts/auto_merge_soundness_paths.py
 file	_project/scripts/soundness_paths.py
+file	_project/scripts/oracle_review_check.py
+file	.github/workflows/oracle-review.yml
 file	_project/scripts/check_soundness_review.py
 file	.github/soundness-paths.txt
 file	.github/PULL_REQUEST_TEMPLATE.md

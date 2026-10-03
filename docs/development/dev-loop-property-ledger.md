@@ -72,6 +72,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `lint.yml` | tooling | Lint gate |
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
+| `oracle-review.yml` | product-safety | Result-affecting changes need the Codex connector's review, whose identity is the only unforgeable review signal |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -109,6 +110,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
 | `test_docs_skip_marker.py` | pure-process | Docs skip mechanics |
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
+| `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the connector-review check |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
 | `test_trunk_workflow.py` | product-safety | Post-merge workflow triggers, per-ref queueing and read-only permissions |
@@ -191,6 +193,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_local_validation.py` | pure-process |
 | `test_migrate_clickhouse_labels.py` | product-safety |
 | `test_mirror_partial_validation_policy.py` | pure-process |
+| `test_oracle_review_check.py` | product-safety | Connector review decision for soundness-path changes |
 | `test_path_filter_decision.py` | tooling |
 | `test_phase2_metrics.py` | pure-process |
 | `test_post_merge_signature.py` | pure-process |
@@ -336,6 +339,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `timing_policy_check.py` | product-safety | Monotonic-clock policy (KEEP trap) |
 | `fast_lane_ceiling_check.py` | pure-process | Fast-lane ceiling and delta; retires with the fast lane |
 | `auto_merge_soundness_paths.py` | product-safety | Soundness path manifest |
+| `oracle_review_check.py` | product-safety | Connector review check for soundness-path changes |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
 | `fast_lane_ratchet_check.py` | pure-process | Fast-lane mechanics; retires with the fast lane |
