@@ -6268,17 +6268,12 @@
       "title": "Commit a test that replays all 99 templates' complete logs through generate_with_parameters"
     },
     "dfparity-n07-ci-fragility": {
-      "claim": {
-        "expires_at": "2026-10-04T14:03:29Z",
-        "generation": "e27ca8eec8be4fe993ead88310bbde26",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755"
-      },
+      "claim": null,
       "needs": [
         "dfparity-t00-owner-decisions"
       ],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Fix CI fragility found during the parity work"
     },
     "dfparity-n08-render-scale-user-note": {
