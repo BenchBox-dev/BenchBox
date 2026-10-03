@@ -170,6 +170,7 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "code-lint", "Release curation list drift check"): "ci-lint",
     ("ci.yml", "code-lint", "Untracked skill-mirror drift guard (cloud parity)"): "ci-lint",
     ("ci.yml", "parity-check", "Verify parity fixtures match Python source"): "parity-check",
+    ("ci.yml", "required-local-cases", "Run the required local-engine cases"): "test-required-local-cases",
     ("test.yml", "test", "Run linting"): "ci-lint",
     ("test.yml", "test", "Run type checking"): "ci-lint",
     ("test.yml", "compat-test", "Run linting"): "ci-lint",
@@ -333,10 +334,6 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ),
     ("test.yml", "test-package", "Test package installation"): "Covered by the local `test-package` target.",
     ("test.yml", "pyspark-tests", "Run PySpark tests"): "Covered by the local `test-pyspark` target.",
-    ("ci.yml", "soundness-flag", "soundness-flag"): (
-        "Hosted soundness review gate reads the live PR body via the API; the "
-        "checker logic is covered locally by tests/unit/test_soundness_review_flag.py."
-    ),
     ("ci.yml", "ruleset-drift", "Compare live governance with the trusted runbook"): (
         "Hosted governance check reads the live ruleset via the API with a "
         "secret token; covered locally by tests/unit/test_ruleset_drift.py."

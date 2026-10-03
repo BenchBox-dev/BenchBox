@@ -15,7 +15,9 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ITEM_COUNT = 150  # more than the SQL LIMIT of 100
 
 
-def _tables(prefix: str, sales_table: str, prices: list[float | None] | None = None):
+def _tables(
+    prefix: str, sales_table: str, prices: list[float | None] | None = None, classes: list[str | None] | None = None
+):
     items = list(range(1, (len(prices) if prices else ITEM_COUNT) + 1))
     count = len(items)
     return {
@@ -29,18 +31,18 @@ def _tables(prefix: str, sales_table: str, prices: list[float | None] | None = N
             "i_item_id": [f"ITEM{i:04d}" for i in items],
             "i_item_desc": [f"desc {i}" for i in items],
             "i_category": ["Sports"] * count,
-            "i_class": ["golf"] * count,
+            "i_class": classes if classes else ["golf"] * count,
             "i_current_price": [1.0] * count,
         },
         "date_dim": {"d_date_sk": [1], "d_date": [date(2001, 1, 15)]},
     }
 
 
-def _run(family, query_id, prefix, sales_table, prices=None):
+def _run(family, query_id, prefix, sales_table, prices=None, classes=None):
     from benchbox.core.equivalence.dataframe_surface import materialize_rows
     from benchbox.core.tpcds.dataframe_queries import queries
 
-    tables = _tables(prefix, sales_table, prices)
+    tables = _tables(prefix, sales_table, prices, classes)
     if family == "expression":
         pl = pytest.importorskip("polars")
         from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
@@ -102,3 +104,31 @@ def test_zero_total_class_keeps_nan_ratios(family, monkeypatch):
 
     assert [row[-2] for row in rows] == [0.0, 0.0]
     assert all(isinstance(row[-1], float) and math.isnan(row[-1]) for row in rows)
+
+
+@pytest.mark.parametrize("family", ["expression", "pandas"])
+def test_a_null_class_is_kept_sorts_last_and_stays_none(family, monkeypatch):
+    """The reference orders NULLs last for an ascending key (Polars sorts them first), keeps a NULL key as a
+    group (pandas drops it) and reports it as NULL (pandas reports NaN)."""
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    monkeypatch.setattr(queries, "get_parameters", lambda _query_id: {"sales_date": "2001-01-12"})
+
+    rows = _run(family, 20, "cs", "catalog_sales", prices=[1.0, 2.0, 3.0], classes=[None, "golf", "golf"])
+
+    assert [row[0] for row in rows] == ["ITEM0002", "ITEM0003", "ITEM0001"]
+    assert rows[-1][3] is None  # NULL, not NaN
+
+
+def test_none_for_null_converts_lazily_on_dask():
+    """A lazy Dask frame cannot be tested for NULLs without computing, so named columns convert lazily."""
+    dd = pytest.importorskip("dask.dataframe")
+    import pandas as pd
+
+    from benchbox.core.tpcds.dataframe_queries import queries
+
+    frame = dd.from_pandas(pd.DataFrame({"k": ["a", None, "c"], "n": [1.0, None, 3.0], "i": [1, 2, 3]}), npartitions=2)
+
+    rows = queries._none_for_null(frame, ["k", "n"]).compute().to_dict("records")
+
+    assert rows == [{"k": "a", "n": 1.0, "i": 1}, {"k": None, "n": None, "i": 2}, {"k": "c", "n": 3.0, "i": 3}]

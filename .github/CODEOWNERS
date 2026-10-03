@@ -71,6 +71,8 @@ AGENTS.md @joeharris76
 .github/PULL_REQUEST_TEMPLATE.md @joeharris76
 .github/soundness-paths.txt @joeharris76
 _project/scripts/soundness_paths.py @joeharris76
+_project/scripts/oracle_review_check.py @joeharris76
+.github/workflows/oracle-review.yml @joeharris76
 _project/scripts/check_soundness_review.py @joeharris76
 .github/workflows/ci.yml @joeharris76
 .github/ci-units.yml @joeharris76
@@ -106,3 +108,5 @@ scripts/run_comment_policy.py @joeharris76
 scripts/comment_payloads.py @joeharris76
 scripts/comment_execution.py @joeharris76
 scripts/comment_policy_entry.py @joeharris76
+_project/scripts/soundness_merge_digest.py @joeharris76
+.github/workflows/soundness-merge-digest.yml @joeharris76

@@ -163,6 +163,41 @@ deletion-only PR, because the mirror's union overlay does not propagate
 develop-side deletions. Restoring cloud coverage means fresh runs, not
 reverting this removal.
 
+## Live cloud corpus (2026-10-02)
+
+84 maintainer-run bundles from live BigQuery, Snowflake and Databricks runs
+(2026-09-20 to 2026-10-01) were added with `result_source: internal`
+submission manifests. They cover 28 benchmark/scale cohorts, one bundle per
+platform in each, so every cohort meets the three-identity floor:
+nyctaxi, flightdata, tsbs_devops, tpch_skew, datavault and tpchavoc at SF 0.1,
+1 and 10; tpcds_obt at SF 1; read_primitives at SF 0.01 and 0.1;
+write_primitives and transaction_primitives at SF 0.01, 0.1 and 1; and
+metadata_primitives at SF 1. This is the first coverage for
+metadata_primitives, write_primitives, transaction_primitives and tsbs_devops.
+
+Before publication, every bundle was re-run through the public anonymiser
+(`_project/scripts/results_explorer_corpus_migrate.py`) after it gained rules
+for the Databricks `warehouse_id` and saved cloud `default_output_location`,
+which earlier runs had stored raw. Only those fields and the content-derived
+result IDs changed.
+
+What these results are and are not:
+
+- Databricks and Snowflake runs disabled the result cache per session and
+  record a validated cache receipt; BigQuery jobs run with
+  `use_query_cache=False` (not recorded in the bundle).
+- FlightData SF 10 uses real BTS months only.
+- Three BigQuery bundles carry reviewed validator overrides
+  (`<bundle>.override.json`): `timing-plateau` for tpch_skew SF 0.1, and
+  `small-scale-floor` for transaction_primitives SF 0.01 and SF 0.1.
+- Write and transaction bundles raise the `result-rows-empty` warning because
+  DML operations report no result rows; operations the benchmark catalog marks
+  unsupported on a platform (for example `RETURNING`, bulk loads) are
+  recorded as SKIPPED, not failed.
+- Five older BigQuery bundles (nyctaxi SF 10, flightdata SF 0.1/1/10,
+  tpch_skew SF 10) predate the `provenance.source` field; their manifests
+  record `result_source: internal`.
+
 ## Public-path single-pass status (2026-08-05)
 
 Verified with `results_explorer_corpus_migrate.py` dry-run: 0/207 bundles changed under the current public anonymization pass. The `test_rederiv_fresh_public_pass_equals_curated_for_all_fields` gate pins the fixed point.
