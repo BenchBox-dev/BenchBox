@@ -6672,17 +6672,12 @@
       "title": "Define the required T2 engine cases and fail T2 when a required case skips"
     },
     "dlv2-16-split-timing-policy": {
-      "claim": {
-        "expires_at": "2026-10-04T12:55:37Z",
-        "generation": "116361936d824696afb9fe5fc0d18a63",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:9509e403d03f67d617690747"
-      },
+      "claim": null,
       "needs": [
         "dlv2-02-property-ledger"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Split timing_policy_check.py: keep the monotonic-clock policy, separate the fast-lane ceiling for retirement"
     },
     "dlv2-20-ci-units-classifier": {
