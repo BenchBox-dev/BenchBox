@@ -1,16 +1,3 @@
-"""Cloud Spark adapter integration smoke tests.
-
-Tests for:
-- AWS Athena Spark
-- AWS EMR Serverless
-- GCP Dataproc
-- GCP Dataproc Serverless
-
-These adapters use session-based/batch-based execution patterns that differ from
-traditional SQL adapters. The stubs simulate the AWS/GCP APIs without requiring
-real cloud services.
-"""
-
 import pytest
 
 from benchbox.core.exceptions import ConfigurationError
@@ -29,15 +16,10 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# AWS Athena Spark Tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_athena_spark_requires_workgroup(monkeypatch):
-    """Test that Athena Spark adapter requires workgroup configuration."""
+
     install_athena_spark_stub(monkeypatch)
 
     from benchbox.platforms.aws import AthenaSparkAdapter
@@ -51,7 +33,7 @@ def test_athena_spark_requires_workgroup(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_athena_spark_requires_s3_staging(monkeypatch):
-    """Test that Athena Spark adapter requires S3 staging directory."""
+
     install_athena_spark_stub(monkeypatch)
 
     from benchbox.platforms.aws import AthenaSparkAdapter
@@ -65,7 +47,7 @@ def test_athena_spark_requires_s3_staging(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_athena_spark_validates_s3_path(monkeypatch):
-    """Test that Athena Spark adapter validates S3 path format."""
+
     install_athena_spark_stub(monkeypatch)
 
     from benchbox.platforms.aws import AthenaSparkAdapter
@@ -73,7 +55,7 @@ def test_athena_spark_validates_s3_path(monkeypatch):
     with pytest.raises(ConfigurationError) as excinfo:
         AthenaSparkAdapter(
             workgroup="spark-workgroup",
-            s3_staging_dir="/invalid/path",  # Not an S3 path
+            s3_staging_dir="/invalid/path",
         )
 
     assert "s3://" in str(excinfo.value).lower()
@@ -82,7 +64,7 @@ def test_athena_spark_validates_s3_path(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_athena_spark_platform_info(monkeypatch):
-    """Test Athena Spark platform info retrieval."""
+
     state: CloudSparkStubState = install_athena_spark_stub(monkeypatch)
 
     from benchbox.platforms.aws import AthenaSparkAdapter
@@ -105,7 +87,7 @@ def test_athena_spark_platform_info(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_athena_spark_configure_for_benchmark(monkeypatch):
-    """Test Athena Spark benchmark configuration via CloudSparkConfigMixin."""
+
     state: CloudSparkStubState = install_athena_spark_stub(monkeypatch)
 
     from benchbox.platforms.aws import AthenaSparkAdapter
@@ -116,21 +98,15 @@ def test_athena_spark_configure_for_benchmark(monkeypatch):
         region=state.region,
     )
 
-    # Should not raise - uses inherited CloudSparkConfigMixin
     adapter.configure_for_benchmark(None, "tpch")
     assert adapter._benchmark_type == "tpch"
     assert adapter._spark_config is not None
 
 
-# ---------------------------------------------------------------------------
-# AWS EMR Serverless Tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_emr_serverless_requires_s3_staging(monkeypatch):
-    """Test that EMR Serverless adapter requires S3 staging directory."""
+
     install_emr_serverless_stub(monkeypatch)
 
     from benchbox.platforms.aws import EMRServerlessAdapter
@@ -147,7 +123,7 @@ def test_emr_serverless_requires_s3_staging(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_emr_serverless_requires_execution_role(monkeypatch):
-    """Test that EMR Serverless adapter requires execution role ARN."""
+
     install_emr_serverless_stub(monkeypatch)
 
     from benchbox.platforms.aws import EMRServerlessAdapter
@@ -164,7 +140,7 @@ def test_emr_serverless_requires_execution_role(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_emr_serverless_requires_application_id_or_create(monkeypatch):
-    """Test that EMR Serverless requires application_id or create_application."""
+
     install_emr_serverless_stub(monkeypatch)
 
     from benchbox.platforms.aws import EMRServerlessAdapter
@@ -181,7 +157,7 @@ def test_emr_serverless_requires_application_id_or_create(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_emr_serverless_platform_info(monkeypatch):
-    """Test EMR Serverless platform info retrieval."""
+
     state: CloudSparkStubState = install_emr_serverless_stub(monkeypatch)
 
     from benchbox.platforms.aws import EMRServerlessAdapter
@@ -204,7 +180,7 @@ def test_emr_serverless_platform_info(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_emr_serverless_configure_for_benchmark(monkeypatch):
-    """Test EMR Serverless benchmark configuration via CloudSparkConfigMixin."""
+
     state: CloudSparkStubState = install_emr_serverless_stub(monkeypatch)
 
     from benchbox.platforms.aws import EMRServerlessAdapter
@@ -221,15 +197,10 @@ def test_emr_serverless_configure_for_benchmark(monkeypatch):
     assert adapter._spark_config is not None
 
 
-# ---------------------------------------------------------------------------
-# GCP Dataproc Tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_requires_project_id(monkeypatch):
-    """Test that Dataproc adapter requires project_id configuration."""
+
     install_dataproc_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocAdapter
@@ -243,7 +214,7 @@ def test_dataproc_requires_project_id(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_requires_gcs_staging(monkeypatch):
-    """Test that Dataproc adapter requires GCS staging directory."""
+
     install_dataproc_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocAdapter
@@ -257,7 +228,7 @@ def test_dataproc_requires_gcs_staging(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_validates_gcs_path(monkeypatch):
-    """Test that Dataproc adapter validates GCS path format."""
+
     install_dataproc_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocAdapter
@@ -265,7 +236,7 @@ def test_dataproc_validates_gcs_path(monkeypatch):
     with pytest.raises(ConfigurationError) as excinfo:
         DataprocAdapter(
             project_id="smoke-project",
-            gcs_staging_dir="/invalid/path",  # Not a GCS path
+            gcs_staging_dir="/invalid/path",
         )
 
     assert "gs://" in str(excinfo.value).lower()
@@ -274,7 +245,7 @@ def test_dataproc_validates_gcs_path(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_platform_info(monkeypatch):
-    """Test Dataproc platform info retrieval."""
+
     state: CloudSparkStubState = install_dataproc_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocAdapter
@@ -296,7 +267,7 @@ def test_dataproc_platform_info(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_configure_for_benchmark(monkeypatch):
-    """Test Dataproc benchmark configuration via CloudSparkConfigMixin."""
+
     state: CloudSparkStubState = install_dataproc_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocAdapter
@@ -312,15 +283,10 @@ def test_dataproc_configure_for_benchmark(monkeypatch):
     assert adapter._spark_config is not None
 
 
-# ---------------------------------------------------------------------------
-# GCP Dataproc Serverless Tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_serverless_requires_project_id(monkeypatch):
-    """Test that Dataproc Serverless adapter requires project_id."""
+
     install_dataproc_serverless_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -334,7 +300,7 @@ def test_dataproc_serverless_requires_project_id(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_serverless_requires_gcs_staging(monkeypatch):
-    """Test that Dataproc Serverless adapter requires GCS staging."""
+
     install_dataproc_serverless_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -348,7 +314,7 @@ def test_dataproc_serverless_requires_gcs_staging(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_serverless_validates_gcs_path(monkeypatch):
-    """Test that Dataproc Serverless validates GCS path format."""
+
     install_dataproc_serverless_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -356,7 +322,7 @@ def test_dataproc_serverless_validates_gcs_path(monkeypatch):
     with pytest.raises(ConfigurationError) as excinfo:
         DataprocServerlessAdapter(
             project_id="smoke-project",
-            gcs_staging_dir="s3://wrong-cloud/path",  # Not a GCS path
+            gcs_staging_dir="s3://wrong-cloud/path",
         )
 
     assert "gs://" in str(excinfo.value).lower()
@@ -365,7 +331,7 @@ def test_dataproc_serverless_validates_gcs_path(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_serverless_platform_info(monkeypatch):
-    """Test Dataproc Serverless platform info retrieval."""
+
     state: CloudSparkStubState = install_dataproc_serverless_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -387,7 +353,7 @@ def test_dataproc_serverless_platform_info(monkeypatch):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_dataproc_serverless_configure_for_benchmark(monkeypatch):
-    """Test Dataproc Serverless benchmark config via CloudSparkConfigMixin."""
+
     state: CloudSparkStubState = install_dataproc_serverless_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -403,11 +369,6 @@ def test_dataproc_serverless_configure_for_benchmark(monkeypatch):
     assert adapter._spark_config is not None
 
 
-# ---------------------------------------------------------------------------
-# Cross-Platform Mixin Tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 @pytest.mark.parametrize(
@@ -420,7 +381,7 @@ def test_dataproc_serverless_configure_for_benchmark(monkeypatch):
     ],
 )
 def test_cloud_spark_config_mixin_benchmark_types(monkeypatch, benchmark_type):
-    """Test CloudSparkConfigMixin handles all benchmark types."""
+
     state: CloudSparkStubState = install_dataproc_serverless_stub(monkeypatch)
 
     from benchbox.platforms.gcp import DataprocServerlessAdapter
@@ -431,7 +392,6 @@ def test_cloud_spark_config_mixin_benchmark_types(monkeypatch, benchmark_type):
         gcs_staging_dir=f"gs://{state.bucket}/staging/",
     )
 
-    # Should not raise for any benchmark type
     adapter.configure_for_benchmark(None, benchmark_type)
     assert adapter._benchmark_type == benchmark_type.lower()
     assert isinstance(adapter._spark_config, dict)

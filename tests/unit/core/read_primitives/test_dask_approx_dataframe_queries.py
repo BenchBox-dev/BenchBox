@@ -1,5 +1,3 @@
-"""Dask-specific checks for read_primitives approximate DataFrame queries."""
-
 from __future__ import annotations
 
 from datetime import date
@@ -39,7 +37,6 @@ class _DaskContext:
 
 
 def test_approx_count_distinct_simple_uses_dask_hll(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The Dask pandas-family path should use Dask's native HLL aggregate."""
     with dask.config.set({"dataframe.convert-string": False}):
         orders = dd.from_pandas(
             pd.DataFrame(

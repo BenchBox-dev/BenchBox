@@ -1,5 +1,3 @@
-"""PostgreSQL integration smoke tests with stubbed psycopg."""
-
 import pytest
 
 from .common import PostgreSQLStubState, install_postgresql_stub
@@ -13,7 +11,7 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_postgresql_smoke_run(monkeypatch, tmp_path):
-    """Test basic PostgreSQL adapter workflow."""
+
     state: PostgreSQLStubState = install_postgresql_stub(monkeypatch)
 
     from benchbox.platforms.postgresql import PostgreSQLAdapter
@@ -39,16 +37,14 @@ def test_postgresql_smoke_run(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_postgresql_requires_database(monkeypatch):
-    """Test that PostgreSQL adapter requires database configuration."""
+
     install_postgresql_stub(monkeypatch)
 
     from benchbox.platforms.postgresql import PostgreSQLAdapter
 
-    # PostgreSQL adapter uses defaults if not provided
     adapter = PostgreSQLAdapter(
         host="localhost",
         username="postgres",
     )
 
-    # Should use default database name
     assert adapter.platform_name == "PostgreSQL"

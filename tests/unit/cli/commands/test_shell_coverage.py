@@ -1,5 +1,3 @@
-"""Coverage tests for cli/commands/shell.py helper logic."""
-
 from __future__ import annotations
 
 import importlib
@@ -123,12 +121,10 @@ def test_shell_discovery_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
     monkeypatch.setattr(mod, "filter_databases", lambda dbs, *_a, **_k: dbs)
     monkeypatch.setattr(mod, "_launch_duckdb_shell", lambda _p: None)
 
-    # list only
     assert CliRunner().invoke(mod.shell, ["--list"]).exit_code == 0
-    # last picks first
+
     assert CliRunner().invoke(mod.shell, ["--last"]).exit_code == 0
 
-    # interactive selection canceled
     monkeypatch.setattr(mod, "select_database_interactive", lambda _dbs: None)
     canceled = CliRunner().invoke(mod.shell, [])
     assert canceled.exit_code == 0
@@ -161,7 +157,6 @@ def test_duckdb_sqlite_launch_and_info_helpers(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr("builtins.input", lambda _p="": next(answers))
     mod._launch_duckdb_shell(str(tmp_path / "x.duckdb"))
 
-    # sqlite path with fake sqlite3 module
     class _Cursor:
         description = [("c1",)]
 
@@ -199,7 +194,6 @@ def test_duckdb_sqlite_launch_and_info_helpers(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr("builtins.input", lambda _p="": next(answers2))
     mod._launch_sqlite_shell(str(db))
 
-    # helper coverage explicit
     mod._display_database_info_duckdb(_DuckConn(), str(db))
     mod._show_tables_duckdb(_DuckConn())
     mod._show_schema_duckdb(_DuckConn(), None)

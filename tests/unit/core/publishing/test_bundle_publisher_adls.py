@@ -1,5 +1,3 @@
-"""ADLS publishing uses a remote file client instead of local staging wrappers."""
-
 from __future__ import annotations
 
 import sys

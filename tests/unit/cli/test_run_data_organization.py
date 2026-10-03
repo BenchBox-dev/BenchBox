@@ -1,5 +1,3 @@
-"""Tests for run-command data organization payload extraction."""
-
 from __future__ import annotations
 
 import pytest

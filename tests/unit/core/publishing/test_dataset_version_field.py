@@ -1,5 +1,3 @@
-"""Dataset identity fields in publication metadata."""
-
 from __future__ import annotations
 
 import json

@@ -1,5 +1,3 @@
-"""Integration coverage for DuckDB runtime version isolation."""
-
 from __future__ import annotations
 
 import json

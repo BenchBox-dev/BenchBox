@@ -1,5 +1,3 @@
-"""Tests for DataFrame row-count validation evidence."""
-
 from __future__ import annotations
 
 from unittest.mock import patch
