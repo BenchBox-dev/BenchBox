@@ -68,7 +68,13 @@ class TestAdapters:
 
     def test_q41_the_negative_control_has_no_adapter(self):
         assert 41 not in ADAPTERS
-        assert adapter_query_ids() == (1, 3, 7, 8, 10, 12, 13, 14, 17, 39, 44, 49, 93)
+
+    def test_adapted_queries_are_the_known_ones(self):
+        # Pinned so an adapter cannot be dropped unnoticed; the hard-coded queries (Q16, Q24, Q41, Q73, Q74,
+        # Q85, Q88, Q89) and the queries that draw nothing the DataFrame reads have none yet.
+        assert adapter_query_ids() == (
+            1, 3, 7, 8, 10, 12, 13, 14, 17, 18, 20, 21, 22, 23, 25, 26, 27, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 44, 45, 49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 65, 66, 67, 70, 71, 76, 79, 82, 83, 84, 86, 87, 90, 91, 92, 93, 97, 98, 99,
+        )  # fmt: skip
 
     def test_q1_lowers_the_drawn_return_column(self):
         # COUNTY.01 is the index the template turns into STATE; only the state reaches the SQL.
@@ -139,10 +145,6 @@ class TestAdapters:
         assert ADAPTERS[14]({"YEAR.01": "1999", "DAY.01": "16"}) == {"year": 1999}
         # Q17's quarters are fixed in the template; the first is bound so the implementation never falls back.
         assert ADAPTERS[17]({"YEAR.01": "2001"}) == {"year": 2001, "quarter": 1}
-        assert {39, 44, 49, 93} <= set(adapter_query_ids())
-        assert adapter_query_ids() == (39, 44, 49, 50, 51, 53, 54, 58, 59, 60, 62, 63, 93)
-        assert adapter_query_ids() == (39, 44, 49, 65, 66, 67, 70, 71, 76, 79, 82, 83, 93)
-        assert adapter_query_ids() == (39, 44, 49, 84, 86, 87, 90, 91, 92, 93, 97, 98, 99)
 
 
 class TestBinding:

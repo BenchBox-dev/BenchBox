@@ -223,7 +223,6 @@
   order_by: ss1.ca_county
   year: 2000
 32:
-  days: 90
   manufact_id: 269
   sales_date: '1998-03-18'
 33:
@@ -509,7 +508,6 @@
   month: 11
   year: 1999
 92:
-  days: 90
   manufact_id: 269
   sales_date: '1998-03-18'
 93:

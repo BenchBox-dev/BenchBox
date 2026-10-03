@@ -67,11 +67,7 @@ INCOMPLETE_RUNS = frozenset({"5:pandas", "77:pandas", "80:pandas", "88:pandas"})
 HARD_CODED = frozenset({16, 24, 41, 73, 74, 85, 88, 89})
 
 # Category (b): everything else the inventory finds a gap in. This may only shrink.
-BINDING_GAP = frozenset(
-    {
-
-    }
-)  # fmt: skip
+BINDING_GAP: frozenset[int] = frozenset()
 
 # The gate in the inventory's work item: more hard-coded queries than this makes the adapter work a
 # separate program.

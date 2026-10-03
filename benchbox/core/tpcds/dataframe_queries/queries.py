@@ -363,20 +363,23 @@ def _excess_discount_expression(
 ) -> Any:
     manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
-    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim")
     col = ctx.col
     lit = ctx.lit
+    # The SQL's subquery is correlated on the item (``cs_item_sk = i_item_sk``): each sale is compared with
+    # the average discount of its own item over the window, not the average over every item.
     avg_discount = (
         sales.join(date_dim, left_on=date_key, right_on="d_date_sk")
         .filter((col("d_date") >= lit(start_date)) & (col("d_date") <= lit(end_date)))
-        .select(col(discount_col).mean().alias("avg_discount"))
+        .group_by(item_key)
+        .agg(col(discount_col).mean().alias("avg_discount"))
+        .select(col(item_key).alias("avg_item_sk"), col("avg_discount"))
     )
     return (
         sales.join(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
         .join(date_dim, left_on=date_key, right_on="d_date_sk")
-        .join(avg_discount, how="cross")
+        .join(avg_discount, left_on=item_key, right_on="avg_item_sk")
         .filter(
             (col("i_manufact_id") == lit(manufact_id))
             & (col("d_date") >= lit(start_date))
@@ -413,22 +416,22 @@ def _excess_discount_pandas(
 
     manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     start_date, end_date = _sales_date_window(query_id, sales_date_default, days=90)
-    manufact_id = get_parameters(query_id).get("manufact_id", manufact_id)
     sales = ctx.get_table(sales_table)
     date_dim = ctx.get_table("date_dim").copy()
     if len(date_dim) > 0 and hasattr(date_dim["d_date"].iloc[0], "date"):
         date_dim["d_date"] = pd.to_datetime(date_dim["d_date"]).dt.date
+    # The SQL's subquery is correlated on the item: compare each sale with its own item's average discount.
     merged_for_avg = sales.merge(date_dim, left_on=date_key, right_on="d_date_sk")
-    avg_discount = merged_for_avg[(merged_for_avg["d_date"] >= start_date) & (merged_for_avg["d_date"] <= end_date)][
-        discount_col
-    ].mean()
+    in_window = merged_for_avg[(merged_for_avg["d_date"] >= start_date) & (merged_for_avg["d_date"] <= end_date)]
+    avg_discount = in_window.groupby(item_key)[discount_col].mean().rename("avg_discount").reset_index()
     merged = sales.merge(ctx.get_table("item"), left_on=item_key, right_on="i_item_sk")
     merged = merged.merge(date_dim, left_on=date_key, right_on="d_date_sk")
+    merged = merged.merge(avg_discount, on=item_key)
     filtered = merged[
         (merged["i_manufact_id"] == manufact_id)
         & (merged["d_date"] >= start_date)
         & (merged["d_date"] <= end_date)
-        & (merged[discount_col] > 1.3 * avg_discount)
+        & (merged[discount_col] > 1.3 * merged["avg_discount"])
     ]
     # SQL SUM() over an empty set is NULL (not 0.0): preserve the NULL row.
     if len(filtered) == 0:

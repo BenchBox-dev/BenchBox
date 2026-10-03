@@ -60,6 +60,35 @@ def _listed(values: Mapping[str, str], name: str, first: int = 1, last: int | No
     return [value for number, value in numbered if number >= first and (last is None or number <= last)]
 
 
+def _demographics(values: Mapping[str, str]) -> dict[str, Any]:
+    return {
+        "year": int(values["YEAR.01"]),
+        "gender": values["GEN.01"],
+        "marital_status": values["MS.01"],
+        "education": values["ES.01"],
+    }
+
+
+def _dms(values: Mapping[str, str]) -> dict[str, Any]:
+    # Q65, Q67 and Q70 all test d_month_seq between DMS and DMS+11; the implementations add the 11.
+    return {"dms": int(values["DMS.01"])}
+
+
+def _dms_value(values: Mapping[str, str]) -> int:
+    # The SQL spans [DMS] through [DMS]+11 (to +23 for Q59); the implementations add the offsets.
+    return int(values["DMS.01"])
+
+
+def _dms_window(values: Mapping[str, str]) -> dict[str, Any]:
+    # Q51, Q53, Q62 and Q63 take one month sequence and read it as ``dms``.
+    return {"dms": _dms_value(values)}
+
+
+def _month_seq(values: Mapping[str, str]) -> dict[str, Any]:
+    # Q86, Q87, Q97 and Q99 filter d_month_seq to DMS through DMS + 11; the implementations add the 11.
+    return {"dms": int(values["DMS.01"])}
+
+
 def _q1(values: Mapping[str, str]) -> dict[str, Any]:
     # STATE is derived from COUNTY inside the template; only the state reaches the SQL.
     return {
@@ -126,6 +155,8 @@ def _q14(values: Mapping[str, str]) -> dict[str, Any]:
 def _q17(values: Mapping[str, str]) -> dict[str, Any]:
     # The quarters are fixed in the template (Q1 to Q3); only the year is drawn.
     return {"year": int(values["YEAR.01"]), "quarter": 1}
+
+
 def _q18(values: Mapping[str, str]) -> dict[str, Any]:
     return {
         "year": int(values["YEAR.01"]),
@@ -159,15 +190,6 @@ def _q23(values: Mapping[str, str]) -> dict[str, Any]:
 
 def _q25(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": int(values["YEAR.01"]), "agg": values["AGG.01"]}
-
-
-def _demographics(values: Mapping[str, str]) -> dict[str, Any]:
-    return {
-        "year": int(values["YEAR.01"]),
-        "gender": values["GEN.01"],
-        "marital_status": values["MS.01"],
-        "education": values["ES.01"],
-    }
 
 
 def _q26(values: Mapping[str, str]) -> dict[str, Any]:
@@ -238,12 +260,12 @@ def _q39(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": year, "months": [month, month + 1]}
 
 
-def _q44(values: Mapping[str, str]) -> dict[str, Any]:
-    return {"store_sk": int(values["STORE.01"]), "null_col": values["NULLCOLSS.01"]}
-
-
 def _q40(values: Mapping[str, str]) -> dict[str, Any]:
     return {"sales_date": values["SALES_DATE.01"]}
+
+
+def _q44(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"store_sk": int(values["STORE.01"]), "null_col": values["NULLCOLSS.01"]}
 
 
 def _q45(values: Mapping[str, str]) -> dict[str, Any]:
@@ -256,9 +278,29 @@ def _q49(values: Mapping[str, str]) -> dict[str, Any]:
 
 
 def _q50(values: Mapping[str, str]) -> dict[str, Any]:
-def _dms(values: Mapping[str, str]) -> dict[str, Any]:
-    # Q65, Q67 and Q70 all test d_month_seq between DMS and DMS+11; the implementations add the 11.
-    return {"dms": int(values["DMS.01"])}
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month}
+
+
+def _q54(values: Mapping[str, str]) -> dict[str, Any]:
+    # CINDX only picks CATEGORY and CLASS from the categories distribution; the SQL receives the names.
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "category": values["CATEGORY.01"], "class": values["CLASS.01"]}
+
+
+def _q58(values: Mapping[str, str]) -> dict[str, Any]:
+    # YEAR only bounds the draw of SALES_DATE; the SQL receives the date.
+    return {"sales_date": values["SALES_DATE.01"]}
+
+
+def _q59(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"d_month_seq": _dms_value(values)}
+
+
+def _q60(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    # GMT is a whole number of hours in the fips_county distribution; the SQL compares it with a decimal column.
+    return {"year": year, "month": month, "category": values["CATEGORY.01"], "gmt_offset": int(values["GMT.01"])}
 
 
 def _q65(values: Mapping[str, str]) -> dict[str, Any]:
@@ -292,35 +334,6 @@ def _q71(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": year, "month": month}
 
 
-def _dms(values: Mapping[str, str]) -> int:
-    # The SQL spans [DMS] through [DMS]+11 (to +23 for Q59); the implementations add the offsets.
-    return int(values["DMS.01"])
-
-
-def _dms_window(values: Mapping[str, str]) -> dict[str, Any]:
-    # Q51, Q53, Q62 and Q63 take one month sequence and read it as ``dms``.
-    return {"dms": _dms(values)}
-
-
-def _q54(values: Mapping[str, str]) -> dict[str, Any]:
-    # CINDX only picks CATEGORY and CLASS from the categories distribution; the SQL receives the names.
-    year, month = _year_and_month(values)
-    return {"year": year, "month": month, "category": values["CATEGORY.01"], "class": values["CLASS.01"]}
-
-
-def _q58(values: Mapping[str, str]) -> dict[str, Any]:
-    # YEAR only bounds the draw of SALES_DATE; the SQL receives the date.
-    return {"sales_date": values["SALES_DATE.01"]}
-
-
-def _q59(values: Mapping[str, str]) -> dict[str, Any]:
-    return {"d_month_seq": _dms(values)}
-
-
-def _q60(values: Mapping[str, str]) -> dict[str, Any]:
-    year, month = _year_and_month(values)
-    # GMT is a whole number of hours in the fips_county distribution; the SQL compares it with a decimal column.
-    return {"year": year, "month": month, "category": values["CATEGORY.01"], "gmt_offset": int(values["GMT.01"])}
 def _q76(values: Mapping[str, str]) -> dict[str, Any]:
     return {
         "null_col_ss": values["NULLCOLSS.01"],
@@ -355,76 +368,9 @@ def _q83(values: Mapping[str, str]) -> dict[str, Any]:
     return {"dates": [values["RETURNED_DATE_ONE.01"], values["RETURNED_DATE_TWO.01"], values["RETURNED_DATE_THREE.01"]]}
 
 
-def _q93(values: Mapping[str, str]) -> dict[str, Any]:
-    return {"reason": values["REASON.01"]}
-
-
-ADAPTERS: dict[int, Adapter] = {
-    1: _q1,
-    3: _q3,
-    7: _q7,
-    8: _q8,
-    10: _q10,
-    12: _q12,
-    13: _q13,
-    14: _q14,
-    17: _q17,
-    18: _q18,
-    20: _q20,
-    21: _q21,
-    22: _q22,
-    23: _q23,
-    25: _q25,
-    26: _q26,
-    27: _q27,
-    31: _q31,
-    39: _q39,
-    44: _q44,
-    32: _q32,
-    33: _q33,
-    34: _q34,
-    35: _q35,
-    36: _q36,
-    37: _q37,
-    38: _q38,
-    39: _q39,
-    40: _q40,
-    44: _q44,
-    45: _q45,
-    49: _q49,
-    39: _q39,
-    44: _q44,
-    49: _q49,
-    50: _q50,
-    51: _dms_window,
-    53: _dms_window,
-    54: _q54,
-    58: _q58,
-    59: _q59,
-    60: _q60,
-    62: _dms_window,
-    63: _dms_window,
-    39: _q39,
-    44: _q44,
-    49: _q49,
-    65: _q65,
-    66: _q66,
-    67: _q67,
-    70: _q70,
-    71: _q71,
-    76: _q76,
-    79: _q79,
-    82: _q82,
-    83: _q83,
-    93: _q93,
 def _q84(values: Mapping[str, str]) -> dict[str, Any]:
     # The SQL bounds the income band at INCOME and INCOME + 50000; the implementation adds the 50000.
     return {"city": values["CITY.01"], "income_band": int(values["INCOME.01"])}
-
-
-def _month_seq(values: Mapping[str, str]) -> dict[str, Any]:
-    # Q86, Q87, Q97 and Q99 filter d_month_seq to DMS through DMS + 11; the implementations add the 11.
-    return {"dms": int(values["DMS.01"])}
 
 
 def _q90(values: Mapping[str, str]) -> dict[str, Any]:
@@ -451,15 +397,64 @@ def _q92(values: Mapping[str, str]) -> dict[str, Any]:
     return {"manufact_id": int(values["IMID.01"]), "sales_date": values["WSDATE.01"]}
 
 
+def _q93(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"reason": values["REASON.01"]}
+
+
 def _q98(values: Mapping[str, str]) -> dict[str, Any]:
     # YEAR only bounds the draw of SDATE; the SQL uses the three categories and the date.
     return {"categories": _listed(values, "CATEGORY"), "sales_date": values["SDATE.01"]}
 
 
 ADAPTERS: dict[int, Adapter] = {
+    1: _q1,
+    3: _q3,
+    7: _q7,
+    8: _q8,
+    10: _q10,
+    12: _q12,
+    13: _q13,
+    14: _q14,
+    17: _q17,
+    18: _q18,
+    20: _q20,
+    21: _q21,
+    22: _q22,
+    23: _q23,
+    25: _q25,
+    26: _q26,
+    27: _q27,
+    31: _q31,
+    32: _q32,
+    33: _q33,
+    34: _q34,
+    35: _q35,
+    36: _q36,
+    37: _q37,
+    38: _q38,
     39: _q39,
+    40: _q40,
     44: _q44,
+    45: _q45,
     49: _q49,
+    50: _q50,
+    51: _dms_window,
+    53: _dms_window,
+    54: _q54,
+    58: _q58,
+    59: _q59,
+    60: _q60,
+    62: _dms_window,
+    63: _dms_window,
+    65: _q65,
+    66: _q66,
+    67: _q67,
+    70: _q70,
+    71: _q71,
+    76: _q76,
+    79: _q79,
+    82: _q82,
+    83: _q83,
     84: _q84,
     86: _month_seq,
     87: _month_seq,
