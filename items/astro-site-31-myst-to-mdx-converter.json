@@ -6,7 +6,7 @@
     "MDX used only where a component is present (counted in build output)",
     "No committed generated content; docs/ unchanged by the build"
   ],
-  "context": "Prepared locally in worktree BenchBox.wt-astro-31 (branch wip/astro-31), not yet in a PR: remark-based converter under website/src/converter with handlers for tags + generated tag pages (166 Sphinx _tags URLs), toctrees/sidebar, admonitions -> Starlight Aside via Callout.astro, deflist, list-table, images (/_images/), raw-html placeholders, eval-rst (hyperlink-list subset only), postlist, labels, {doc}/{ref}, links; index pages routed to .../index.html via docsIndex collection + inde[x].astro routes (docs and blog); sitemap and pagefind record .html URLs. Full make site-build passes (1782 pages, 18 MDX). Deviation to record at review: {mermaid} renders client-side with pinned mermaid@12.1.0 and a <pre class=\"mermaid\"> no-JS fallback instead of a build-time SVG, to keep a headless browser out of the build; audit:high clean. Open at this point: golden tests 3 of 5 more, Cobalt2-equivalent highlighting, site_inventory diff on website/dist (zero broken links / lost ids).",
+  "context": "Prepared locally in worktree BenchBox.wt-astro-31 (uncommitted; vitest 171/171 green), to ship with astro-site-34 after PR #2597 merges. Converter complete per acceptance except the open independent-review findings (round 1 FAIL): H1 links.ts passes unresolved relative non-.md targets inside docs/ (real case docs/advanced/performance-optimization.md:806 '../reference/python-api/platforms/') and does not validate .md#fragment targets; H2 directive arguments/unused accepted options silently dropped (admonition argument should become first body line; list-table caption; toctree reversed/numbered/titlesonly/includehidden/name accepted but unapplied; MyST YAML option blocks in directive bodies); M1 visible toctrees count maxdepth by nested docs instead of section levels (root index 434 vs 262 items); M2 label/heading same-slug id order differs from Sphinx (driver-version-management#id1 vs #driver-version-management; test handlers.test.ts:97 locks current order); M3 golden fixtures copy real docs pages (must read docs/ directly). Lows: e2e/verify.mjs samples a removed API page; stale examples/ entries in known-broken-links.json; @astrojs/mdx unused direct dep; shiki transitive-only import in a test; drift tests for TAG_CATEGORIES and exclude lists; id-parity.ts unwired; inde[x].astro route test. Fix agents were stopped part-way (weekly model limit) — re-check each finding against the worktree before continuing. Mermaid deviation: client-side render with pinned mermaid@12.1.0 + <pre> fallback instead of build-time SVG. Reviewer scripts: scratchpad/rev31/.",
   "description": "Write a converter that runs inside site-build and reads docs/**/*.md as the canonical source (guardrail G-b). It writes Astro content-collection entries to a gitignored build directory.\n\nOutput format: plain Markdown by default. MDX is emitted only for a page that needs a component (callout, mermaid, embed), so authoring and parsing constraints stay minimal.\n\nConstructs to handle, with counts re-measured after astro-site-30:\n- {tags} (219) → frontmatter tags and tag pages\n- toctrees (16 MyST + those converted from 39 RST) → sidebar config and section order\n- admonitions (26) → Callout\n- {doc}/{ref} and converted :doc: roles (236 before astro-site-30) → resolved relative links\n- {mermaid} (6) → build-time SVG\n- labels and explicit anchors kept as the same fragment ids; tables, images, Cobalt2-equivalent code highlighting\n\nAny directive, role or syntax it does not know is a hard build error naming file and line. Output is idempotent: a byte-identical rebuild from the same input.",
   "links": [
     "docs/conf.py",
@@ -36,6 +36,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "e236142982154811af1df18fa708997f",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T22:40:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "33a193e049234f52ae5efff6546cf1f8",
       "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
