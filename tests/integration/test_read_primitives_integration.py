@@ -36,7 +36,7 @@ class TestPrimitivesIntegration:
     """Test integration between different Primitives components."""
 
     def test_end_to_end_small_dataset(self):
-        """Test end-to-end functionality with small dataset."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             # Initialize primitives_benchmark
             primitives_benchmark = ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=temp_dir)
@@ -59,7 +59,7 @@ class TestPrimitivesIntegration:
             assert len(schema) == 8
 
     def test_query_sql_validity(self):
-        """Test that generated queries have valid SQL structure."""
+
         primitives_benchmark = ReadPrimitivesBenchmark()
         queries = primitives_benchmark.get_queries()
 
@@ -99,7 +99,7 @@ class TestReadPrimitivesBenchmarkExtended:
             return ReadPrimitivesBenchmark(scale_factor=0.01, output_dir=temp_dir)
 
     def test_execute_query_direct_connection(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test execute_query with direct database connection."""
+
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("result1",), ("result2",)]
@@ -116,7 +116,7 @@ class TestReadPrimitivesBenchmarkExtended:
             assert result == [("result1",), ("result2",)]
 
     def test_execute_query_cursor_connection(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test execute_query with cursor-based connection."""
+
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("result1",), ("result2",)]
@@ -135,7 +135,7 @@ class TestReadPrimitivesBenchmarkExtended:
             assert result == [("result1",), ("result2",)]
 
     def test_execute_query_unsupported_connection(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test execute_query with unsupported connection type."""
+
         mock_connection = Mock()
         del mock_connection.execute
         del mock_connection.cursor
@@ -147,7 +147,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 primitives_benchmark.execute_query("aggregation_simple", mock_connection)
 
     def test_load_data_to_database_executescript_path(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test load_data_to_database with executescript support."""
+
         # Set up mock data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
@@ -172,7 +172,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 mock_connection.commit.assert_called_once()
 
     def test_load_data_to_database_cursor_mode(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test load_data_to_database with cursor mode."""
+
         # Set up mock data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
@@ -216,7 +216,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 primitives_benchmark.load_data_to_database(mock_connection)
 
     def test_run_benchmark_with_categories(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test run_benchmark with specific categories."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:
@@ -232,7 +232,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 assert "aggregation_simple" in result["queries"]
 
     def test_run_benchmark_timing_and_results(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test run_benchmark timing calculations and result handling."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:
@@ -253,7 +253,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 assert query_result["iterations"][1]["rows"] == 3
 
     def test_run_benchmark_with_errors(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test run_benchmark handling exceptions during execution."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:
@@ -267,7 +267,7 @@ class TestReadPrimitivesBenchmarkExtended:
             assert query_result["avg_time"] == 0
 
     def test_run_category_benchmark(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test run_category_benchmark method."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "run_benchmark") as mock_run:
@@ -279,7 +279,7 @@ class TestReadPrimitivesBenchmarkExtended:
             assert result == {"results": "test"}
 
     def test_get_benchmark_info(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test get_benchmark_info method."""
+
         with patch.object(primitives_benchmark.query_manager, "get_all_queries") as mock_get_all:
             mock_get_all.return_value = {"q1": "SELECT ...", "q2": "SELECT ..."}
             with patch.object(primitives_benchmark, "get_query_categories") as mock_get_cats:
@@ -296,7 +296,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 assert len(info["tables"]) == 8
 
     def test_sqlite_integration_with_real_data(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test actual SQLite integration with real data loading."""
+
         # Generate some test data
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
@@ -331,7 +331,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 conn.close()
 
     def test_load_data_batch_processing(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test load_data_to_database with batch processing."""
+
         # Set up mock data with many rows to test batching
         with tempfile.TemporaryDirectory() as temp_dir:
             csv_file = Path(temp_dir) / "region.csv"
@@ -361,7 +361,7 @@ class TestReadPrimitivesBenchmarkExtended:
                 assert data[4] == ["4", "REGION_4", "comment for region 4"]
 
     def test_run_benchmark_query_category_extraction(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test query category extraction in run_tpch_benchmark."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:
@@ -373,7 +373,7 @@ class TestReadPrimitivesBenchmarkExtended:
             assert query_result["category"] == "window"
 
     def test_run_benchmark_unknown_category(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test run_benchmark with query that has unknown category."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:
@@ -385,7 +385,7 @@ class TestReadPrimitivesBenchmarkExtended:
             assert query_result["category"] == "unknown"
 
     def test_run_benchmark_inf_min_time_handling(self, primitives_benchmark: ReadPrimitivesBenchmark):
-        """Test run_benchmark handles inf min_time correctly when all iterations fail."""
+
         mock_connection = Mock()
 
         with patch.object(primitives_benchmark, "execute_query") as mock_execute:

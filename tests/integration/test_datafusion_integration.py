@@ -85,7 +85,7 @@ class TestDataFusionIntegration:
         }
 
     def test_connection_creation(self, datafusion_adapter):
-        """Test that DataFusion connection can be created successfully."""
+
         connection = datafusion_adapter.create_connection()
         assert connection is not None
 
@@ -96,7 +96,7 @@ class TestDataFusionIntegration:
         assert int(result[0].column(0)[0]) == 1
 
     def test_platform_info(self, datafusion_adapter):
-        """Test platform information retrieval."""
+
         info = datafusion_adapter.get_platform_info()
 
         assert info["platform_type"] == "datafusion"
@@ -107,8 +107,7 @@ class TestDataFusionIntegration:
         assert info["configuration"]["data_format"] == "csv"
 
     def test_csv_data_loading(self, datafusion_adapter, datafusion_connection, sample_csv_data, temp_working_dir):
-        """Test loading data from CSV files."""
-        # Load customer table
+
         row_count = datafusion_adapter._load_table_csv(
             datafusion_connection,
             "customer",
@@ -125,8 +124,7 @@ class TestDataFusionIntegration:
         assert count == 3
 
     def test_query_execution_simple(self, datafusion_adapter, datafusion_connection, sample_csv_data, temp_working_dir):
-        """Test simple query execution."""
-        # Load data
+
         datafusion_adapter._load_table_csv(
             datafusion_connection,
             "customer",
@@ -134,7 +132,6 @@ class TestDataFusionIntegration:
             temp_working_dir,
         )
 
-        # Execute simple query
         result = datafusion_adapter.execute_query(
             datafusion_connection,
             "SELECT COUNT(*) as total FROM customer",
@@ -150,8 +147,7 @@ class TestDataFusionIntegration:
     def test_query_execution_with_filter(
         self, datafusion_adapter, datafusion_connection, sample_csv_data, temp_working_dir
     ):
-        """Test query execution with WHERE clause."""
-        # Load data
+
         datafusion_adapter._load_table_csv(
             datafusion_connection,
             "customer",
@@ -176,7 +172,7 @@ class TestDataFusionIntegration:
         assert result["execution_time_seconds"] >= 0
 
     def test_query_execution_join(self, datafusion_adapter, datafusion_connection, sample_csv_data, temp_working_dir):
-        """Test query execution with JOIN."""
+
         # Load both tables
         datafusion_adapter._load_table_csv(
             datafusion_connection,
@@ -211,8 +207,7 @@ class TestDataFusionIntegration:
     def test_query_execution_aggregation(
         self, datafusion_adapter, datafusion_connection, sample_csv_data, temp_working_dir
     ):
-        """Test query execution with aggregation."""
-        # Load data
+
         datafusion_adapter._load_table_csv(
             datafusion_connection,
             "orders",
@@ -241,7 +236,7 @@ class TestDataFusionIntegration:
         assert result["execution_time_seconds"] >= 0
 
     def test_query_execution_failure(self, datafusion_adapter, datafusion_connection):
-        """Test query execution with invalid SQL."""
+
         result = datafusion_adapter.execute_query(
             datafusion_connection,
             "SELECT * FROM nonexistent_table",
@@ -270,7 +265,7 @@ class TestDataFusionIntegration:
         assert result["dry_run"] is True
 
     def test_parquet_data_loading(self, temp_working_dir):
-        """Test loading data with Parquet format."""
+
         # Create adapter configured for Parquet
         adapter = DataFusionAdapter(
             working_dir=str(temp_working_dir),
@@ -309,14 +304,14 @@ class TestDataFusionIntegration:
         datafusion_adapter.configure_for_benchmark(datafusion_connection, "tpch")
 
     def test_validate_platform_capabilities(self, datafusion_adapter):
-        """Test platform capability validation."""
+
         result = datafusion_adapter.validate_platform_capabilities("tpch")
 
         assert result.is_valid
         assert len(result.errors) == 0
 
     def test_from_config(self, temp_working_dir):
-        """Test adapter creation from configuration dictionary."""
+
         config = {
             "benchmark": "tpch",
             "scale_factor": 1.0,
@@ -334,7 +329,7 @@ class TestDataFusionIntegration:
         assert adapter.platform_name == "DataFusion"
 
     def test_drop_database(self, temp_working_dir):
-        """Test database dropping."""
+
         working_dir = temp_working_dir / "datafusion_test"
         working_dir.mkdir()
         (working_dir / "test_file.txt").touch()
@@ -352,20 +347,20 @@ class TestDataFusionSmoke:
     """Quick smoke tests for DataFusion adapter."""
 
     def test_adapter_import(self):
-        """Test that DataFusion adapter can be imported."""
+
         from benchbox.platforms.datafusion import DataFusionAdapter
 
         assert callable(DataFusionAdapter)
 
     def test_adapter_creation(self):
-        """Test that DataFusion adapter can be instantiated."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = DataFusionAdapter(working_dir=tmpdir)
             assert adapter.platform_name == "DataFusion"
             assert adapter.get_target_dialect() == "datafusion"
 
     def test_basic_query_execution(self):
-        """Test basic query execution."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             adapter = DataFusionAdapter(working_dir=tmpdir)
             connection = adapter.create_connection()

@@ -65,7 +65,7 @@ class TestLiveDorisConnection:
     """Test basic Doris connectivity via Docker."""
 
     def test_connection(self, doris_adapter):
-        """Verify we can connect to Doris and run a trivial query."""
+
         connection = doris_adapter.create_connection()
         try:
             assert hasattr(connection, "cursor")
@@ -73,7 +73,7 @@ class TestLiveDorisConnection:
             doris_adapter.close_connection(connection)
 
     def test_platform_info(self, doris_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = doris_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "doris"
@@ -93,7 +93,7 @@ class TestLiveDorisQueryExecution:
     """Test query execution against a live Doris instance."""
 
     def test_create_schema(self, doris_adapter):
-        """Verify we can create a database."""
+
         connection = doris_adapter.create_connection()
         try:
             doris_adapter.execute_query(

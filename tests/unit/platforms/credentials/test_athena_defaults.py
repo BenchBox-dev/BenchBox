@@ -38,7 +38,7 @@ class TestAthenaCredentialDefaults:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test that existing credential values are shown as defaults in prompts."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -86,7 +86,7 @@ class TestAthenaCredentialDefaults:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test that setup works when no existing credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -127,7 +127,7 @@ class TestAthenaCredentialDefaults:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test that access key authentication shows existing values."""
+
         # Setup: existing credentials with access keys
         mock_manager = Mock()
         existing_creds = {
@@ -218,7 +218,7 @@ class TestAthenaCredentialDefaults:
         mock_validate,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when credentials already exist."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -265,7 +265,7 @@ class TestAthenaCredentialDefaults:
         mock_validate,
         mock_auto_detect,
     ):
-        """Test that auto-detection is offered when no credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -296,7 +296,7 @@ class TestAthenaValidation:
     """Test Athena credential validation."""
 
     def test_validation_fails_without_credentials(self):
-        """Test validation fails when no credentials exist."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
@@ -323,7 +323,7 @@ class TestAthenaValidation:
     @patch("benchbox.platforms.credentials.athena.os.path.exists")
     @patch("benchbox.platforms.credentials.athena.os.environ.get")
     def test_validation_fails_without_aws_auth(self, mock_environ_get, mock_path_exists):
-        """Test validation fails without AWS authentication."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {
             "region": "us-east-1",
@@ -344,7 +344,7 @@ class TestAthenaValidation:
 
     @patch("benchbox.platforms.credentials.athena.athena_connect", create=True)
     def test_validation_succeeds_with_valid_connection(self, mock_connect):
-        """Test validation succeeds with valid connection."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {
             "region": "us-east-1",
@@ -379,7 +379,7 @@ class TestAthenaValidation:
 
     @patch("benchbox.platforms.credentials.athena.athena_connect", create=True)
     def test_validation_handles_access_denied(self, mock_connect):
-        """Test validation provides helpful error for access denied."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {
             "region": "us-east-1",
@@ -418,7 +418,7 @@ class TestAthenaAutoDetection:
         },
     )
     def test_auto_detect_from_env_vars(self):
-        """Test auto-detection finds values from environment variables."""
+
         console = Mock()
 
         result = _auto_detect_athena(console)
@@ -438,7 +438,7 @@ class TestAthenaAutoDetection:
         },
     )
     def test_auto_detect_alternative_env_vars(self):
-        """Test auto-detection uses alternative environment variable names."""
+
         console = Mock()
 
         result = _auto_detect_athena(console)
@@ -470,7 +470,7 @@ class TestAthenaAutoDetection:
     )
     @patch("os.path.exists")
     def test_auto_detect_returns_none_without_auth(self, mock_exists):
-        """Test auto-detection returns None when AWS auth is missing."""
+
         mock_exists.return_value = False  # No ~/.aws/credentials
         console = Mock()
 
@@ -488,7 +488,7 @@ class TestAthenaAutoDetection:
     )
     @patch("os.path.exists")
     def test_auto_detect_uses_aws_credentials_file(self, mock_exists):
-        """Test auto-detection succeeds when ~/.aws/credentials exists."""
+
         mock_exists.return_value = True  # ~/.aws/credentials exists
         console = Mock()
 
@@ -516,7 +516,7 @@ class TestAthenaCredentialStorage:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test credentials are saved when validation succeeds."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
@@ -551,7 +551,7 @@ class TestAthenaCredentialStorage:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test credentials are marked invalid when validation fails."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
@@ -588,7 +588,7 @@ class TestAthenaCredentialStorage:
         mock_prompt_secure,
         mock_validate,
     ):
-        """Test that secret access key is not logged in console output."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 

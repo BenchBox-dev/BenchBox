@@ -130,7 +130,7 @@ class TestScaleFactorHandling:
         assert q2_result.scale_independent is False
 
     def test_all_tpcds_queries_scale_dependent(self):
-        """Test that TPC-DS queries are marked as scale-dependent."""
+
         results = get_tpcds_expected_results(scale_factor=1.0)
 
         # TPC-DS queries are scale-dependent (most of them)
@@ -141,7 +141,7 @@ class TestScaleFactorHandling:
                 assert query_result.scale_independent is False
 
     def test_validation_error_message_mentions_sf(self):
-        """Test that validation skip messages mention scale factor."""
+
         validator = QueryValidator()
 
         result = validator.validate_query_result(
@@ -177,7 +177,7 @@ class TestScaleFactorHandling:
         assert result is None
 
     def test_multiple_scale_factors_cached_independently(self):
-        """Test that different scale factors are cached independently."""
+
         from benchbox.core.expected_results.registry import get_registry
 
         registry = get_registry()
@@ -194,7 +194,7 @@ class TestScaleFactorHandling:
         assert result_sf1.expected_row_count == result_sf10.expected_row_count
 
     def test_provider_not_registered_returns_none(self):
-        """Test that unregistered benchmarks return None gracefully."""
+
         from benchbox.core.expected_results.registry import get_registry
 
         registry = get_registry()
@@ -203,7 +203,7 @@ class TestScaleFactorHandling:
         assert result is None
 
     def test_provider_registration_status_check(self):
-        """Test checking which providers are registered."""
+
         from benchbox.core.expected_results.registry import get_registry
 
         registry = get_registry()
@@ -214,12 +214,11 @@ class TestScaleFactorHandling:
         assert "tpcds" in benchmarks
 
     def test_clear_cache_allows_reload(self):
-        """Test that clearing cache allows reloading of results."""
+
         from benchbox.core.expected_results.registry import get_registry
 
         registry = get_registry()
 
-        # Load results
         result1 = registry.get_expected_result("tpch", "1", scale_factor=1.0)
         assert result1 is not None
 
@@ -234,7 +233,7 @@ class TestScaleFactorHandling:
         assert result1.expected_row_count == result2.expected_row_count
 
     def test_validation_with_fractional_scale_factors(self):
-        """Test validation with fractional scale factors."""
+
         validator = QueryValidator()
 
         # SF=0.01 should skip (no provider results)

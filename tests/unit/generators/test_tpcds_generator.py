@@ -42,7 +42,7 @@ class TestTPCDSDataGenerator:
     """Test TPC-DS data generator basic functionality."""
 
     def test_generator_initialization(self, temp_dir):
-        """Test generator initialization with different parameters."""
+
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
 
         assert generator.scale_factor == 1.0
@@ -50,7 +50,7 @@ class TestTPCDSDataGenerator:
         assert hasattr(generator, "generate")
 
     def test_generator_initialization_with_custom_params(self, temp_dir):
-        """Test generator initialization with custom parameters."""
+
         generator = TPCDSDataGenerator(scale_factor=10.0, output_dir=temp_dir, verbose=True, parallel=4)
 
         assert generator.scale_factor == 10.0
@@ -59,7 +59,7 @@ class TestTPCDSDataGenerator:
         assert generator.parallel == 4
 
     def test_scale_factor_validation(self, temp_dir):
-        """Test that scale factor is properly handled."""
+
         # Unofficial subscale factors are allowed for development use.
         generator_small = TPCDSDataGenerator(scale_factor=0.01, output_dir=temp_dir)
         assert generator_small.scale_factor == 0.01
@@ -76,7 +76,7 @@ class TestTPCDSDataGenerator:
         assert generator_large.scale_factor == 100.0
 
     def test_output_directory_handling(self, temp_dir):
-        """Test output directory creation and validation."""
+
         # Test with existing directory
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
         assert generator.output_dir.exists()
@@ -88,7 +88,7 @@ class TestTPCDSDataGenerator:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_dsdgen_tool_detection(self, mock_find_dsdgen, temp_dir):
-        """Test detection and building of dsdgen tool."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
@@ -97,7 +97,7 @@ class TestTPCDSDataGenerator:
         mock_find_dsdgen.assert_called_once()
 
     def test_get_table_names(self, temp_dir):
-        """Test retrieval of TPC-DS table names."""
+
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
 
         # TPC-DS has standard table names
@@ -128,7 +128,7 @@ class TestTPCDSDataGenerator:
     @patch("subprocess.run")
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_data_generation_workflow(self, mock_find_dsdgen, mock_subprocess, temp_dir):
-        """Test the complete data generation workflow."""
+
         # Create mock dsdgen binary so it passes exists() check
         mock_dsdgen = temp_dir / "dsdgen"
         mock_dsdgen.write_text("#!/bin/sh\n")  # Create the file
@@ -167,7 +167,7 @@ class TestTPCDSDataGenerator:
                 assert isinstance(table, str)
 
     def test_error_handling_missing_dsdgen(self, temp_dir):
-        """Test error handling when dsdgen binary is not found."""
+
         with patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen") as mock_find:
             # Simulate binary not found by raising exception
             mock_find.side_effect = FileNotFoundError("dsdgen binary not found")
@@ -183,7 +183,7 @@ class TestTPCDSDataGenerator:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_parallel_generation_params(self, mock_find_dsdgen, temp_dir):
-        """Test parallel processing parameters."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir, parallel=8)
@@ -198,7 +198,7 @@ class TestGeneratorExtended:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_data_file_size_calculation(self, mock_find_dsdgen, temp_dir):
-        """Test data file size calculations based on scale factor."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         # Different scale factors should affect data generation
@@ -209,7 +209,7 @@ class TestGeneratorExtended:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_table_dependency_handling(self, mock_find_dsdgen, temp_dir):
-        """Test handling of table dependencies in TPC-DS."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
@@ -229,7 +229,7 @@ class TestGeneratorExtended:
     @patch("subprocess.run")
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_command_line_generation(self, mock_find_dsdgen, mock_subprocess, temp_dir):
-        """Test command line argument generation for dsdgen."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
         mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
@@ -243,7 +243,7 @@ class TestGeneratorExtended:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_file_format_handling(self, mock_find_dsdgen, temp_dir):
-        """Test different file format handling options."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
@@ -262,7 +262,7 @@ class TestGeneratorExtended:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_memory_and_performance_settings(self, mock_find_dsdgen, temp_dir):
-        """Test memory and performance related settings."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         generator = TPCDSDataGenerator(
@@ -285,7 +285,7 @@ class TestGeneratorExtended:
 
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_incremental_generation_support(self, mock_find_dsdgen, temp_dir):
-        """Test support for incremental or partial generation."""
+
         mock_find_dsdgen.return_value = temp_dir / "dsdgen"
 
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir)
@@ -367,7 +367,7 @@ class TestGeneratorExtended:
     @patch("subprocess.run")
     @patch("benchbox.core.tpcds.generator.TPCDSDataGenerator._find_or_build_dsdgen")
     def test_file_format_consistency_without_compression(self, mock_find_dsdgen, mock_subprocess, temp_dir):
-        """Test that data generation produces consistent file formats when compression is disabled."""
+
         # Create mock dsdgen binary so it passes exists() check
         mock_dsdgen = temp_dir / "dsdgen"
         mock_dsdgen.write_text("#!/bin/sh\n")

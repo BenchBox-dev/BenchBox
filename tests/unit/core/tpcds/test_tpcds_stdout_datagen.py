@@ -198,7 +198,7 @@ class TestDsdgenFilterFlag:
         assert "|" in first_row, f"Data not pipe-delimited: {first_row}"
 
     def test_filter_does_not_create_file(self, dsdgen_path: Path, tools_dir: Path) -> None:
-        """Test: dsdgen -FILTER Y does not create .dat file."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Copy required distribution files to temp directory
             for dist_file in ["tpcds.dst", "tpcds.idx"]:
@@ -288,7 +288,7 @@ class TestStdoutDataEquivalence:
         return path
 
     def test_stdout_matches_file_output(self, dsdgen_path: Path, tools_dir: Path) -> None:
-        """Test: stdout output exactly matches file output for same seed."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Copy required distribution files
             for dist_file in ["tpcds.dst", "tpcds.idx"]:
@@ -296,7 +296,6 @@ class TestStdoutDataEquivalence:
                 if src.exists():
                     shutil.copy(src, tmpdir)
 
-            # Generate via stdout
             stdout_result = subprocess.run(
                 [
                     str(dsdgen_path),
@@ -316,7 +315,6 @@ class TestStdoutDataEquivalence:
                 text=True,
             )
 
-            # Generate via file
             subprocess.run(
                 [
                     str(dsdgen_path),
@@ -373,7 +371,7 @@ class TestStreamingCompression:
         return path
 
     def test_stdout_pipes_to_gzip(self, dsdgen_path: Path, tools_dir: Path) -> None:
-        """Test: stdout output can be piped to gzip."""
+
         import gzip
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -407,7 +405,6 @@ class TestStreamingCompression:
 
             dsdgen_proc.wait()
 
-            # Verify gzip file
             assert output_file.exists(), "Gzip file not created"
             with gzip.open(output_file, "rt") as f:
                 lines = [line for line in f.read().strip().split("\n") if line]
@@ -418,7 +415,7 @@ class TestStreamingCompression:
         reason="zstd not available",
     )
     def test_stdout_pipes_to_zstd(self, dsdgen_path: Path, tools_dir: Path) -> None:
-        """Test: stdout output can be piped to zstd."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_file = Path(tmpdir) / "ship_mode.dat.zst"
 
@@ -453,7 +450,6 @@ class TestStreamingCompression:
             zstd_proc.wait()
             dsdgen_proc.wait()
 
-            # Verify zstd file
             assert output_file.exists(), "Zstd file not created"
 
             # Decompress and verify

@@ -23,7 +23,7 @@ class TestTPCHBenchmarkIntegration:
     """Test TPCHBenchmark integration with ultra-simplified query manager."""
 
     def test_benchmark_initialization(self):
-        """Test TPCHBenchmark initializes correctly with new query manager."""
+
         benchmark = TPCHBenchmark()
 
         assert benchmark.query_manager is not None
@@ -31,7 +31,7 @@ class TestTPCHBenchmarkIntegration:
         assert hasattr(benchmark.query_manager, "get_all_queries")
 
     def test_benchmark_query_generation(self):
-        """Test query generation through TPCHBenchmark class."""
+
         benchmark = TPCHBenchmark()
 
         # Test basic query generation
@@ -40,7 +40,7 @@ class TestTPCHBenchmarkIntegration:
         assert "select" in sql.lower() or "with" in sql.lower()
 
     def test_benchmark_query_generation_with_parameters(self):
-        """Test query generation with seed and scale factor parameters."""
+
         benchmark = TPCHBenchmark()
 
         # Test with seed
@@ -58,7 +58,7 @@ class TestTPCHBenchmarkIntegration:
         assert len(sql_sf) > 50
 
     def test_benchmark_scale_factor_inheritance(self):
-        """Test that benchmark scale factor is used when not specified."""
+
         # Create benchmark with specific scale factor
         benchmark = TPCHBenchmark(scale_factor=2.0)
 
@@ -73,7 +73,7 @@ class TestTPCHBenchmarkIntegration:
         assert len(sql_override) > 50
 
     def test_benchmark_get_parameterized_query_compatibility(self):
-        """Test get_parameterized_query method compatibility."""
+
         benchmark = TPCHBenchmark()
 
         # Test old-style call with params=None
@@ -92,7 +92,7 @@ class TestTPCHBenchmarkIntegration:
         assert len(sql_mixed) > 50
 
     def test_benchmark_get_queries_batch(self):
-        """Test get_queries method returns all queries."""
+
         benchmark = TPCHBenchmark()
 
         queries = benchmark.get_queries()
@@ -119,7 +119,7 @@ class TestTPCHBenchmarkIntegration:
             assert f"Query {query_id} failed", f"Query {query_id} should generate successfully"
 
     def test_benchmark_error_handling(self):
-        """Test error handling through benchmark interface."""
+
         benchmark = TPCHBenchmark()
 
         # Invalid query ID should raise ValueError
@@ -132,7 +132,7 @@ class TestTPCHBenchmarkIntegration:
             benchmark.get_query(0)
 
     def test_benchmark_with_different_scale_factors(self):
-        """Test benchmark behavior with different scale factors."""
+
         scale_factors = [0.01, 0.1, 1.0, 2.0]
 
         for sf in scale_factors:
@@ -146,14 +146,14 @@ class TestTopLevelTPCHIntegration:
     """Test top-level TPCH class integration."""
 
     def test_tpch_initialization(self):
-        """Test TPCH class initializes correctly."""
+
         tpch = TPCH()
 
         assert tpch._impl is not None
         assert hasattr(tpch._impl, "query_manager")
 
     def test_tpch_query_generation(self):
-        """Test query generation through top-level TPCH class."""
+
         tpch = TPCH()
 
         # Test basic query generation
@@ -167,7 +167,7 @@ class TestTopLevelTPCHIntegration:
         assert len(sql_with_seed) > 50
 
     def test_tpch_parameterized_query_compatibility(self):
-        """Test get_parameterized_query compatibility."""
+
         tpch = TPCH()
 
         # Test old-style call
@@ -181,7 +181,7 @@ class TestTopLevelTPCHIntegration:
         assert len(sql_new) > 50
 
     def test_tpch_get_queries_batch(self):
-        """Test get_queries method through top-level TPCH."""
+
         tpch = TPCH()
 
         queries = tpch.get_queries()
@@ -194,7 +194,7 @@ class TestTopLevelTPCHIntegration:
             assert len(sql) > 50
 
     def test_tpch_scale_factor_inheritance(self):
-        """Test scale factor inheritance in top-level TPCH."""
+
         tpch = TPCH(scale_factor=0.5)
 
         # Should use inherited scale factor
@@ -208,7 +208,7 @@ class TestTopLevelTPCHIntegration:
         assert len(sql_override) > 50
 
     def test_tpch_all_queries_integration(self):
-        """Test that all queries work through top-level TPCH."""
+
         tpch = TPCH()
 
         # Test subset of queries for performance
@@ -219,7 +219,7 @@ class TestTopLevelTPCHIntegration:
             assert ":1" not in sql  # No parameter placeholders
 
     def test_tpch_deterministic_behavior(self):
-        """Test deterministic behavior through top-level TPCH."""
+
         tpch = TPCH()
 
         # Same seed should produce same results
@@ -232,7 +232,7 @@ class TestTopLevelTPCHIntegration:
         assert sql1 != sql3
 
     def test_tpch_error_propagation(self):
-        """Test error propagation through top-level TPCH."""
+
         tpch = TPCH()
 
         with pytest.raises(ValueError) as exc_info:
@@ -244,7 +244,7 @@ class TestCrossComponentIntegration:
     """Test integration across multiple components."""
 
     def test_query_consistency_across_interfaces(self):
-        """Test that same query generates consistently across interfaces."""
+
         # Initialize all interfaces
         TPCH().get_queries()
         benchmark = TPCHBenchmark()
@@ -261,7 +261,7 @@ class TestCrossComponentIntegration:
         assert sql_benchmark == sql_tpch
 
     def test_parameter_inheritance_consistency(self):
-        """Test parameter inheritance works consistently."""
+
         sf = 0.75
         benchmark = TPCHBenchmark(scale_factor=sf)
         tpch = TPCH(scale_factor=sf)
@@ -276,7 +276,7 @@ class TestCrossComponentIntegration:
         assert len(sql_tpch) > 50
 
     def test_error_handling_consistency(self):
-        """Test error handling is consistent across interfaces."""
+
         benchmark = TPCHBenchmark()
         tpch = TPCH()
 
@@ -288,7 +288,7 @@ class TestCrossComponentIntegration:
             tpch.get_query(0)
 
     def test_api_signature_consistency(self):
-        """Test API signatures work consistently across interfaces."""
+
         benchmark = TPCHBenchmark()
         tpch = TPCH()
 

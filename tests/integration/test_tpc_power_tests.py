@@ -23,7 +23,7 @@ class TestTPCTestRouting:
     """Test TPC test routing functionality in platform adapters."""
 
     def test_platform_adapter_has_tpc_methods(self):
-        """Test that platform adapter has all TPC test methods."""
+
         adapter = DuckDBAdapter()
 
         # Check that all required TPC test methods exist
@@ -38,7 +38,7 @@ class TestTPCTestRouting:
         assert hasattr(adapter, "_execute_tpcds_maintenance_test")
 
     def test_benchmark_name_detection_tpch(self):
-        """Test TPC-H benchmark name detection."""
+
         DuckDBAdapter()
 
         # Mock TPC-H benchmark
@@ -58,7 +58,7 @@ class TestTPCTestRouting:
         assert "tpch" in benchmark_name.lower()
 
     def test_benchmark_name_detection_tpcds(self):
-        """Test TPC-DS benchmark name detection."""
+
         DuckDBAdapter()
 
         # Mock TPC-DS benchmark
@@ -78,7 +78,7 @@ class TestTPCTestRouting:
         assert "tpcds" in benchmark_name.lower()
 
     def test_queries_by_type_routing(self):
-        """Test that queries are routed by test execution type."""
+
         adapter = DuckDBAdapter()
 
         # Test different execution types route to different methods
@@ -113,7 +113,7 @@ class TestTPCTestRouting:
         adapter._execute_combined_test.assert_called_once()
 
     def test_tpch_power_test_method_structure(self):
-        """Test TPC-H power test method returns proper structure."""
+
         adapter = DuckDBAdapter()
 
         # Mock dependencies
@@ -121,7 +121,6 @@ class TestTPCTestRouting:
         mock_benchmark.__class__.__name__ = "TPCHBenchmark"
         mock_connection = Mock()
 
-        # Mock query execution
         adapter.execute_query = Mock(
             return_value={
                 "query_id": 1,
@@ -161,7 +160,6 @@ class TestTPCTestRouting:
                 ]
             ]
 
-            # Mock benchmark.get_query
             mock_benchmark.get_query = Mock(return_value="SELECT 1")
 
             run_config = {
@@ -175,7 +173,6 @@ class TestTPCTestRouting:
 
             result = adapter._execute_tpch_power_test(mock_benchmark, mock_connection, run_config)
 
-            # Check result structure
             assert isinstance(result, list)
             assert len(result) == 22  # TPC-H has 22 queries (1 iteration)
 
@@ -190,7 +187,7 @@ class TestTPCTestRouting:
                 assert "position" in query_result
 
     def test_unsupported_benchmark_fallback(self):
-        """Test that unsupported benchmarks fall back to standard execution."""
+
         adapter = DuckDBAdapter()
 
         mock_benchmark = Mock()
@@ -358,7 +355,7 @@ class TestTPCTestIntegration:
 
     @patch("rich.console.Console")
     def test_tpch_power_test_execution_flow(self, mock_console, tpch_mock_benchmark):
-        """Test TPC-H power test execution flow."""
+
         adapter = DuckDBAdapter()
 
         # Mock the connection properly
@@ -418,7 +415,7 @@ class TestTPCTestIntegration:
 
     @patch("rich.console.Console")
     def test_tpcds_power_test_with_limited_queries(self, mock_console, tpcds_mock_benchmark):
-        """Test TPC-DS power test with limited query set."""
+
         adapter = DuckDBAdapter()
 
         # Mock the connection properly
@@ -452,7 +449,7 @@ class TestTPCTestIntegration:
 
     @patch("rich.console.Console")
     def test_error_handling_in_power_test(self, mock_console, tpch_mock_benchmark):
-        """Test error handling in TPC power test."""
+
         adapter = DuckDBAdapter()
 
         # Mock the connection properly
@@ -481,7 +478,7 @@ class TestTPCTestIntegration:
 
     @patch("rich.console.Console")
     def test_maintenance_test_basic_operations(self, mock_console):
-        """Test TPC-DS maintenance test basic operations."""
+
         adapter = DuckDBAdapter()
 
         # Mock the connection properly

@@ -45,14 +45,14 @@ class TestDuckDBConnection:
     """Test DuckDB connection and configuration functionality."""
 
     def test_memory_database_connection(self, duckdb_memory_db: Any) -> None:
-        """Test basic in-memory DuckDB connection."""
+
         # Test basic connection
         result = duckdb_memory_db.execute("SELECT 1 as test_value").fetchall()
         assert len(result) == 1
         assert result[0][0] == 1
 
     def test_database_configuration(self, configured_duckdb: Any, database_config: dict[str, Any]) -> None:
-        """Test database configuration settings."""
+
         # Test that configuration is applied
         # Note: Some settings might not be readable back, so we test basic functionality
         result = configured_duckdb.execute("SELECT 1 as configured_test").fetchall()
@@ -60,14 +60,14 @@ class TestDuckDBConnection:
         assert result[0][0] == 1
 
     def test_extensions_setup(self, duckdb_with_extensions: Any) -> None:
-        """Test that DuckDB extensions are properly set up."""
+
         # Test basic functionality with extensions
         result = duckdb_with_extensions.execute("SELECT 1 as extension_test").fetchall()
         assert len(result) == 1
         assert result[0][0] == 1
 
     def test_connection_persistence(self, duckdb_memory_db: Any) -> None:
-        """Test that connection persists across multiple queries."""
+
         # Create a temporary table
         duckdb_memory_db.execute("CREATE TABLE test_persistence (id INTEGER, value TEXT)")
         duckdb_memory_db.execute("INSERT INTO test_persistence VALUES (1, 'test')")
@@ -358,7 +358,7 @@ class TestDuckDBOLAPFeatures:
             assert row[3] >= 0  # order_count
 
     def test_grouping_sets(self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
-        """Test GROUPING SETS functionality."""
+
         query = """
         SELECT
             c_nationkey,
@@ -389,7 +389,7 @@ class TestDuckDBOLAPFeatures:
             assert row[2] > 0  # customer_count
 
     def test_rollup(self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
-        """Test ROLLUP functionality."""
+
         query = """
         SELECT
             c_nationkey,
@@ -414,7 +414,7 @@ class TestDuckDBOLAPFeatures:
         assert len(null_segments) > 0  # Should have segment-level rollups
 
     def test_cube(self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
-        """Test CUBE functionality."""
+
         query = """
         SELECT
             c_nationkey,
@@ -439,7 +439,7 @@ class TestDuckDBOLAPFeatures:
     def test_filter_clause_in_aggregation(
         self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test FILTER clause in aggregate functions."""
+
         query = """
         SELECT
             c_nationkey,
@@ -472,7 +472,7 @@ class TestDuckDBOLAPFeatures:
     def test_advanced_analytical_query(
         self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test complex analytical query combining multiple OLAP features."""
+
         query = """
         WITH customer_metrics AS (
             SELECT
@@ -530,7 +530,6 @@ class TestDuckDBOLAPFeatures:
         assert all(cat in ["Above Average", "Below Average"] for cat in categories)
 
     def test_olap_with_joins(self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
-        """Test OLAP operations combined with complex joins."""
 
         query = """
         SELECT
@@ -563,7 +562,7 @@ class TestDuckDBOLAPFeatures:
             assert row[8] >= 1  # region_order_rank
 
     def test_olap_null_handling(self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
-        """Test OLAP operations with NULL value handling."""
+
         query = """
         SELECT
             c.c_custkey,
@@ -624,7 +623,7 @@ class TestBenchmarkExecution:
     def test_primitives_aggregation_queries(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test execution of primitive aggregation queries."""
+
         # Test specific aggregation queries
         aggregation_queries = [
             "aggregation_distinct",
@@ -669,7 +668,7 @@ class TestBenchmarkExecution:
     def test_primitives_join_queries(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test execution of primitive join queries."""
+
         # Test join queries by executing some complex queries that involve joins
         join_queries = [
             """
@@ -746,7 +745,7 @@ class TestBenchmarkExecution:
     def test_primitives_filter_queries(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test execution of primitive filter queries."""
+
         # Test filter queries with various predicate types
         filter_queries = [
             """
@@ -813,7 +812,7 @@ class TestBenchmarkExecution:
     def test_primitives_window_queries(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test execution of primitive window function queries."""
+
         # Test window function queries
         window_queries = [
             """
@@ -886,7 +885,7 @@ class TestBenchmarkExecution:
     def test_benchmark_run_integration(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test full benchmark run integration with DuckDB."""
+
         # Run a subset of queries to test the full benchmark workflow
         test_queries = ["aggregation_distinct", "aggregation_groupby_small"]
 
@@ -895,7 +894,6 @@ class TestBenchmarkExecution:
         result = benchmark_with_full_data.run_benchmark(duckdb_memory_db, queries=test_queries, iterations=2)
         end_time = time.time()
 
-        # Verify benchmark results structure
         assert "benchmark" in result
         assert "scale_factor" in result
         assert "iterations" in result
@@ -928,7 +926,7 @@ class TestBenchmarkExecution:
     def test_error_handling_and_recovery(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test error handling and recovery during benchmark execution."""
+
         # Test with invalid queries
         invalid_queries = [
             "SELECT * FROM nonexistent_table",
@@ -954,7 +952,7 @@ class TestBenchmarkExecution:
     def test_concurrent_execution(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test concurrent query execution against DuckDB."""
+
         # Note: DuckDB's Python API might not support true concurrency
         # This test checks basic thread safety
 
@@ -997,7 +995,7 @@ class TestBenchmarkExecution:
     def test_large_result_set_handling(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test handling of large result sets."""
+
         # Generate a query that returns a larger result set
         large_query = """
         SELECT
@@ -1037,7 +1035,7 @@ class TestBenchmarkExecution:
     def test_benchmark_category_execution(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test benchmark execution by category."""
+
         # Test running benchmark by category
         try:
             result = benchmark_with_full_data.run_category_benchmark(duckdb_memory_db, "aggregation", iterations=1)
@@ -1061,7 +1059,7 @@ class TestBenchmarkExecution:
                 raise e
 
     def test_data_type_handling(self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
-        """Test handling of different data types in DuckDB."""
+
         # Test query with various data types
         data_type_query = """
         SELECT
@@ -1112,11 +1110,10 @@ class TestBenchmarkExecution:
     def test_benchmark_info_integration(
         self, benchmark_with_full_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test benchmark info integration with DuckDB execution."""
+
         # Get benchmark info
         info = benchmark_with_full_data.get_benchmark_info()
 
-        # Verify basic info
         assert info["name"] == "Read Primitives Benchmark"
         assert info["scale_factor"] == 0.01
         assert info["schema"] == "TPC-H"
@@ -1217,7 +1214,7 @@ class TestPerformanceValidation:
     def test_performance_validation(
         self, benchmark_with_simple_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test performance validation and timing accuracy."""
+
         # Test with a simple query that should be fast
         simple_query = "SELECT COUNT(*) FROM customer"
 
@@ -1248,7 +1245,7 @@ class TestPerformanceValidation:
     def test_memory_usage_monitoring(
         self, benchmark_with_simple_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test memory usage during benchmark execution."""
+
         # Get initial memory usage
         process = psutil.Process(os.getpid())
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
@@ -1274,7 +1271,7 @@ class TestPerformanceValidation:
     def test_olap_performance_characteristics(
         self, benchmark_with_simple_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any
     ) -> None:
-        """Test that OLAP operations complete within reasonable time."""
+
         # Complex query with multiple window functions
         query = """
         SELECT

@@ -38,7 +38,7 @@ class TestDbgenStdoutSupport:
             pytest.skip("dbgen binary not available")
 
     def test_dbgen_help_shows_z_flag(self, dbgen_exe: Path):
-        """Verify -z flag appears in dbgen help output."""
+
         result = subprocess.run(
             [str(dbgen_exe), "-h"],
             capture_output=True,
@@ -49,7 +49,7 @@ class TestDbgenStdoutSupport:
         assert "-z" in result.stderr or "-z" in result.stdout, "dbgen binary does not support -z flag for stdout output"
 
     def test_dbgen_z_flag_produces_output(self, dbgen_exe: Path):
-        """Verify -z flag produces data to stdout."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Copy dists.dss if needed
             generator = TPCHDataGenerator(scale_factor=0.01)
@@ -80,7 +80,7 @@ class TestDbgenStdoutSupport:
 
     @pytest.mark.parametrize("table_name,table_code", list(_TPCH_TABLE_CODES.items()))
     def test_dbgen_z_flag_all_tables(self, dbgen_exe: Path, table_name: str, table_code: str):
-        """Verify -z flag works for all TPC-H tables."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Copy dists.dss if needed
             generator = TPCHDataGenerator(scale_factor=0.01)
@@ -114,7 +114,7 @@ class TestStdoutMatchesFileOutput:
             pytest.skip("dbgen binary not available")
 
     def test_stdout_matches_file_output_region(self, dbgen_exe: Path):
-        """Verify -z output matches file output for region table."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
@@ -126,7 +126,6 @@ class TestStdoutMatchesFileOutput:
 
                 shutil.copy2(dists_file, tmpdir_path / "dists.dss")
 
-            # Generate via stdout
             stdout_result = subprocess.run(
                 [str(dbgen_exe), "-z", "-s", "0.01", "-T", "r", "-q"],
                 capture_output=True,
@@ -135,7 +134,6 @@ class TestStdoutMatchesFileOutput:
             )
             assert stdout_result.returncode == 0
 
-            # Generate via file
             subprocess.run(
                 [str(dbgen_exe), "-s", "0.01", "-T", "r", "-f", "-q"],
                 capture_output=True,
@@ -148,7 +146,7 @@ class TestStdoutMatchesFileOutput:
             assert stdout_result.stdout == file_output, "stdout output does not match file output for region table"
 
     def test_stdout_matches_file_output_customer(self, dbgen_exe: Path):
-        """Verify -z output matches file output for customer table."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
@@ -160,7 +158,6 @@ class TestStdoutMatchesFileOutput:
 
                 shutil.copy2(dists_file, tmpdir_path / "dists.dss")
 
-            # Generate via stdout
             stdout_result = subprocess.run(
                 [str(dbgen_exe), "-z", "-s", "0.01", "-T", "c", "-q"],
                 capture_output=True,
@@ -169,7 +166,6 @@ class TestStdoutMatchesFileOutput:
             )
             assert stdout_result.returncode == 0
 
-            # Generate via file
             subprocess.run(
                 [str(dbgen_exe), "-s", "0.01", "-T", "c", "-f", "-q"],
                 capture_output=True,
@@ -186,7 +182,7 @@ class TestGeneratorStdoutDetection:
     """Tests for TPCHDataGenerator stdout support detection."""
 
     def test_check_stdout_support_returns_bool(self):
-        """Verify _check_stdout_support returns a boolean."""
+
         try:
             generator = TPCHDataGenerator(scale_factor=0.01)
             result = generator._check_stdout_support()
@@ -195,7 +191,7 @@ class TestGeneratorStdoutDetection:
             pytest.skip("dbgen binary not available")
 
     def test_check_stdout_support_is_cached(self):
-        """Verify _check_stdout_support caches its result."""
+
         try:
             generator = TPCHDataGenerator(scale_factor=0.01)
             # First call
@@ -209,7 +205,7 @@ class TestGeneratorStdoutDetection:
             pytest.skip("dbgen binary not available")
 
     def test_updated_binary_supports_z_flag(self):
-        """Verify the updated dbgen binary supports -z flag."""
+
         try:
             generator = TPCHDataGenerator(scale_factor=0.01)
             assert generator._check_stdout_support(), "dbgen binary should support -z flag after patches are applied"
@@ -251,7 +247,7 @@ class TestBackwardCompatibility:
             assert (tmpdir_path / "region.tbl").stat().st_size > 0, "region.tbl is empty"
 
     def test_file_mode_creates_correct_format(self):
-        """Verify file-based generation produces correct TPC-H format."""
+
         try:
             generator = TPCHDataGenerator(scale_factor=0.01)
             dbgen_exe = generator.dbgen_exe

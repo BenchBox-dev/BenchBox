@@ -118,7 +118,7 @@ class TestThroughputTestConfig:
     """Test throughput test configuration."""
 
     def test_default_config(self):
-        """Test default configuration values."""
+
         config = TPCDSThroughputTestConfig()
 
         assert config.num_streams == 4  # Default from TPCDSThroughputTestConfig
@@ -135,7 +135,7 @@ class TestThroughputTestConfig:
         assert config.cancel_on_timeout is False
 
     def test_custom_config(self):
-        """Test custom configuration values."""
+
         config = TPCDSThroughputTestConfig(
             num_streams=4,
             scale_factor=10.0,
@@ -155,7 +155,7 @@ class TestThroughputTest:
     """Test TPC-DS throughput test implementation."""
 
     def test_throughput_test_initialization(self, throughput_test_config, tpcds_benchmark):
-        """Test throughput test initialization."""
+
         test = TPCDSThroughputTest(
             benchmark=tpcds_benchmark,
             scale_factor=throughput_test_config.scale_factor,
@@ -170,7 +170,7 @@ class TestThroughputTest:
         assert test.logger is not None
 
     def test_stream_config_generation(self, throughput_test_config, tpcds_benchmark):
-        """Test stream configuration generation."""
+
         test = TPCDSThroughputTest(
             benchmark=tpcds_benchmark,
             scale_factor=throughput_test_config.scale_factor,
@@ -184,7 +184,7 @@ class TestThroughputTest:
         assert test.config.base_seed == 42  # Default base seed
 
     def test_throughput_at_size_calculation(self, throughput_test_config, tpcds_benchmark):
-        """Test Throughput@Size calculation."""
+
         test = TPCDSThroughputTest(
             benchmark=tpcds_benchmark,
             scale_factor=throughput_test_config.scale_factor,
@@ -202,7 +202,7 @@ class TestThroughputTest:
         assert test.config.scale_factor == throughput_test_config.scale_factor
 
     def test_throughput_at_size_zero_duration(self, throughput_test_config, tpcds_benchmark):
-        """Test Throughput@Size calculation with zero duration."""
+
         test = TPCDSThroughputTest(
             benchmark=tpcds_benchmark,
             scale_factor=throughput_test_config.scale_factor,
@@ -221,7 +221,7 @@ class TestThroughputTest:
         mock_connection_factory,
         tpcds_benchmark,
     ):
-        """Test successful throughput test execution."""
+
         # Create test with minimal configuration
         test = TPCDSThroughputTest(
             benchmark=tpcds_benchmark,
@@ -231,10 +231,8 @@ class TestThroughputTest:
             verbose=False,
         )
 
-        # Run test
         result = test.run()
 
-        # Verify results structure
         assert result.config.scale_factor == throughput_test_config.scale_factor
         assert result.config.num_streams == 1
         assert result.streams_executed >= 0
@@ -242,10 +240,9 @@ class TestThroughputTest:
         assert result.throughput_at_size >= 0
 
     def test_result_validation_success(self, throughput_test_config):
-        """Test result validation with successful results."""
+
         test = TPCDSThroughputTest(throughput_test_config)
 
-        # Create successful result
         result = TPCDSThroughputTestResult(
             config=throughput_test_config,
             start_time="2023-01-01T00:00:00",
@@ -285,7 +282,7 @@ class TestThroughputTest:
         assert validation is True
 
     def test_result_validation_failures(self, throughput_test_config):
-        """Test result validation with failures."""
+
         test = TPCDSThroughputTest(throughput_test_config)
 
         # Create result with failures
@@ -347,8 +344,7 @@ class TestThroughputTest:
         assert test.validate_results(result) is False
 
     def test_result_structure(self, throughput_test_config, temp_output_dir):
-        """Test TPCDSThroughputTestResult structure and properties."""
-        # Create test result
+
         result = TPCDSThroughputTestResult(
             config=throughput_test_config,
             start_time="2023-01-01T00:00:00",
@@ -384,7 +380,6 @@ class TestThroughputTest:
             success=True,
         )
 
-        # Verify result structure
         assert result.config == throughput_test_config
         assert result.start_time == "2023-01-01T00:00:00"
         assert result.end_time == "2023-01-01T00:01:40"
@@ -592,7 +587,7 @@ class TestBenchmarkIntegration:
     """Test integration with TPC-DS benchmark class."""
 
     def test_benchmark_run_throughput_test(self, tpcds_benchmark, mock_connection_factory):
-        """Test benchmark throughput test integration."""
+
         # This test verifies that run_throughput_test exists and can be called
         # The actual throughput test implementation is tested in other test classes
 
@@ -614,7 +609,7 @@ class TestBenchmarkIntegration:
         assert "base_seed" in param_names
 
     def test_benchmark_throughput_test_validation(self, tpcds_benchmark, mock_connection_factory):
-        """Test parameter validation in benchmark throughput test."""
+
         # Test invalid num_streams
         with pytest.raises(ValueError, match="num_streams must be positive"):
             tpcds_benchmark.run_throughput_test(mock_connection_factory, num_streams=0)
@@ -631,7 +626,7 @@ class TestEndToEndThroughputTest:
     """End-to-end throughput test scenarios."""
 
     def test_minimal_throughput_test(self, temp_output_dir):
-        """Test minimal throughput test execution."""
+
         # Create minimal config
         config = TPCDSThroughputTestConfig(
             num_streams=1,
@@ -675,15 +670,13 @@ class TestEndToEndThroughputTest:
             )
             result = test.run(config)
 
-            # Verify basic result structure
             assert result.config == config
             assert result.total_time > 0
             assert result.streams_executed == 1
             assert result.throughput_at_size >= 0
 
     def test_concurrent_streams_execution(self, temp_output_dir):
-        """Test concurrent stream execution."""
-        # Create config with multiple streams
+
         config = TPCDSThroughputTestConfig(
             num_streams=3,
             scale_factor=1.0,
@@ -728,7 +721,6 @@ class TestEndToEndThroughputTest:
             )
             result = test.run(config)
 
-            # Verify results
             assert result.streams_executed == 3
             assert len(result.stream_results) == 3
             assert all(sr.stream_id in [0, 1, 2] for sr in result.stream_results)

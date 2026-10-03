@@ -30,7 +30,7 @@ class TestPrimitivesTpchManifestIsolation:
     """Test that Primitives doesn't corrupt TPC-H manifest."""
 
     def test_primitives_does_not_rewrite_tpch_manifest(self, temp_dir, small_scale_factor):
-        """Test that Primitives generation does not modify TPC-H manifest."""
+
         # Create shared output directory
         shared_dir = temp_dir / "shared_tpch_data"
         shared_dir.mkdir()
@@ -69,7 +69,7 @@ class TestPrimitivesTpchManifestIsolation:
         assert after_manifest["tables"] == original_manifest["tables"], "Tables must not change"
 
     def test_tpch_then_primitives_then_tpch(self, temp_dir, small_scale_factor):
-        """Test that TPC-H → Primitives → TPC-H sequence preserves manifest."""
+
         shared_dir = temp_dir / "shared_data"
         shared_dir.mkdir()
 
@@ -104,7 +104,7 @@ class TestPrimitivesTpchManifestIsolation:
         assert tpch_manifest_2["scale_factor"] == small_scale_factor
 
     def test_primitives_benchmark_uses_tpch_path(self, temp_dir):
-        """Test that Primitives benchmark defaults to TPC-H path."""
+
         # Create Primitives benchmark without explicit output_dir
         benchmark = ReadPrimitivesBenchmark(scale_factor=1.0)
 
@@ -114,7 +114,7 @@ class TestPrimitivesTpchManifestIsolation:
         assert "primitives_sf" not in output_path, f"Should not have primitives_sf in path: {output_path}"
 
     def test_primitives_with_custom_path(self, temp_dir):
-        """Test that Primitives still respects custom paths."""
+
         custom_path = temp_dir / "custom_primitives"
 
         # Create Primitives benchmark with custom path

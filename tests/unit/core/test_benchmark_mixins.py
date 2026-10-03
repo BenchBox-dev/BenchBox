@@ -80,7 +80,6 @@ class TestCursorValidationMixinMRO:
     """Guard against MRO-shadowing regressions (see commit f2ca27e5)."""
 
     def test_required_methods_resolve_to_parent_not_mixin(self):
-        """Verify log_verbose and friends resolve past the mixin to the parent."""
 
         class ConcreteAdapter(CursorValidationQueryExecutionMixin, _FakeParent):
             pass

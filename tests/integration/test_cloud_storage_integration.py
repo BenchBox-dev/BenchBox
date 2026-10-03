@@ -80,7 +80,7 @@ class TestCloudStorageIntegration:
     """
 
     def test_create_path_handler_with_local_path(self, temp_dir):
-        """Test create_path_handler with local paths."""
+
         local_path = temp_dir / "test"
         handler = create_path_handler(str(local_path))
         assert isinstance(handler, Path)
@@ -88,7 +88,7 @@ class TestCloudStorageIntegration:
 
     @pytest.mark.skipif(not CLOUDPATHLIB_AVAILABLE, reason="cloudpathlib not installed")
     def test_create_path_handler_with_cloud_path(self):
-        """Test create_path_handler with cloud paths."""
+
         with patch("benchbox.utils.cloud_storage.CloudPath") as mock_cloudpath:
             cloud_path = "s3://test-bucket/test-path"
             create_path_handler(cloud_path)
@@ -112,13 +112,12 @@ class TestCloudStorageIntegration:
         ],
     )
     def test_generator_local_path_handling(self, generator_class, init_kwargs, temp_dir):
-        """Test that all generators properly handle local paths."""
+
         output_dir = temp_dir / "local_test"
 
         # Initialize generator with local path
         generator = generator_class(output_dir=output_dir, **init_kwargs)
 
-        # Verify output_dir is set correctly
         assert generator.output_dir == output_dir
 
         # Test that _is_cloud_output correctly identifies local paths
@@ -149,7 +148,7 @@ class TestCloudStorageIntegration:
     )
     @pytest.mark.skipif(not CLOUDPATHLIB_AVAILABLE, reason="cloudpathlib not installed")
     def test_generator_cloud_path_detection(self, generator_class, init_kwargs, generate_method, mock_cloud_path):
-        """Test that all generators properly detect cloud paths."""
+
         cloud_output = "s3://test-bucket/test-path"
 
         with patch("benchbox.utils.cloud_storage.CloudPath") as mock_cloudpath:
@@ -228,7 +227,7 @@ class TestCloudStorageIntegration:
             assert not generator._is_cloud_output("/tmp/local/path")
 
     def test_cloud_storage_mixin_methods(self, temp_dir):
-        """Test CloudStorageGeneratorMixin methods directly."""
+
         # Use TPC-H generator as a test case
         generator = TPCHDataGenerator(scale_factor=0.01, verbose=False)
 
@@ -272,7 +271,7 @@ class TestCloudStorageIntegration:
             assert not generator._is_cloud_output("http://not-cloud-storage/path")
 
     def test_all_generators_inherit_mixin(self):
-        """Test that all generators inherit from CloudStorageGeneratorMixin."""
+
         from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin
 
         generators = [
@@ -294,7 +293,7 @@ class TestCloudStorageIntegration:
             )
 
     def test_tpcds_subscale_factor_handling(self, temp_dir):
-        """Test that TPC-DS data generator accepts unofficial subscale factors."""
+
         generator = TPCDSDataGenerator(scale_factor=1.0, output_dir=temp_dir, verbose=False)
 
         # Generator should accept the minimum valid official scale factor

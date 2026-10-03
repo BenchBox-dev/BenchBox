@@ -28,7 +28,7 @@ class TestNumberedSelectPrompt:
     """Tests for NumberedSelectPrompt class."""
 
     def test_process_response_number_selection(self):
-        """Test selecting option by number."""
+
         options = [
             ("enable", "Enable platform"),
             ("disable", "Disable platform"),
@@ -41,7 +41,7 @@ class TestNumberedSelectPrompt:
         assert prompt.process_response("3") == "done"
 
     def test_process_response_name_selection(self):
-        """Test selecting option by name."""
+
         options = [
             ("enable", "Enable platform"),
             ("disable", "Disable platform"),
@@ -54,7 +54,7 @@ class TestNumberedSelectPrompt:
         assert prompt.process_response("done") == "done"
 
     def test_process_response_case_insensitive(self):
-        """Test that name selection is case-insensitive."""
+
         options = [
             ("enable", "Enable platform"),
             ("disable", "Disable platform"),
@@ -66,7 +66,7 @@ class TestNumberedSelectPrompt:
         assert prompt.process_response("eNaBlE") == "enable"
 
     def test_process_response_default_on_empty(self):
-        """Test that empty input returns default."""
+
         options = [
             ("enable", "Enable platform"),
             ("done", "Done"),
@@ -77,7 +77,7 @@ class TestNumberedSelectPrompt:
         assert prompt.process_response("  ") == "done"
 
     def test_process_response_invalid_number(self):
-        """Test that invalid number raises InvalidResponse."""
+
         from rich.prompt import InvalidResponse
 
         options = [
@@ -96,7 +96,7 @@ class TestNumberedSelectPrompt:
             prompt.process_response("99")
 
     def test_process_response_invalid_name(self):
-        """Test that invalid name raises InvalidResponse."""
+
         from rich.prompt import InvalidResponse
 
         options = [
@@ -112,7 +112,7 @@ class TestNumberedSelectPrompt:
             prompt.process_response("enab")
 
     def test_process_response_whitespace_handling(self):
-        """Test that whitespace is trimmed from input."""
+
         options = [
             ("enable", "Enable platform"),
             ("disable", "Disable platform"),
@@ -123,7 +123,7 @@ class TestNumberedSelectPrompt:
         assert prompt.process_response("  enable  ") == "enable"
 
     def test_value_to_number_mapping(self):
-        """Test internal value-to-number mapping."""
+
         options = [
             ("enable", "Enable platform"),
             ("disable", "Disable platform"),
@@ -136,7 +136,7 @@ class TestNumberedSelectPrompt:
         assert prompt._value_to_number["done"] == 3
 
     def test_number_to_value_mapping(self):
-        """Test internal number-to-value mapping."""
+
         options = [
             ("enable", "Enable platform"),
             ("disable", "Disable platform"),
@@ -169,7 +169,7 @@ class TestNumberedPlatformSelect:
         )
 
     def test_returns_none_for_empty_platforms(self):
-        """Test that empty platforms dict returns None."""
+
         mock_console = MagicMock()
         result = numbered_platform_select(
             "Select",
@@ -180,7 +180,7 @@ class TestNumberedPlatformSelect:
         mock_console.print.assert_called()
 
     def test_returns_none_when_filter_excludes_all(self):
-        """Test that filter excluding all platforms returns None."""
+
         platforms = {
             "duckdb": self._create_platform_info("duckdb", "DuckDB", available=True),
             "sqlite": self._create_platform_info("sqlite", "SQLite", available=True),
@@ -196,7 +196,7 @@ class TestNumberedPlatformSelect:
 
     @patch("benchbox.cli.platform.Prompt.ask")
     def test_select_by_number(self, mock_ask):
-        """Test selecting platform by number."""
+
         platforms = {
             "duckdb": self._create_platform_info("duckdb", "DuckDB"),
             "sqlite": self._create_platform_info("sqlite", "SQLite"),
@@ -216,7 +216,7 @@ class TestNumberedPlatformSelect:
 
     @patch("benchbox.cli.platform.Prompt.ask")
     def test_select_by_name(self, mock_ask):
-        """Test selecting platform by name."""
+
         platforms = {
             "duckdb": self._create_platform_info("duckdb", "DuckDB"),
             "sqlite": self._create_platform_info("sqlite", "SQLite"),
@@ -235,7 +235,7 @@ class TestNumberedPlatformSelect:
 
     @patch("benchbox.cli.platform.Prompt.ask")
     def test_select_by_alias(self, mock_ask):
-        """Test selecting platform by alias."""
+
         platforms = {
             "postgresql": self._create_platform_info("postgresql", "PostgreSQL"),
             "duckdb": self._create_platform_info("duckdb", "DuckDB"),
@@ -254,7 +254,7 @@ class TestNumberedPlatformSelect:
 
     @patch("benchbox.cli.platform.Prompt.ask")
     def test_filter_function_applied(self, mock_ask):
-        """Test that filter function is applied correctly."""
+
         platforms = {
             "duckdb": self._create_platform_info("duckdb", "DuckDB", available=True),
             "missing": self._create_platform_info("missing", "Missing", available=False),
@@ -274,7 +274,7 @@ class TestNumberedPlatformSelect:
 
     @patch("benchbox.cli.platform.Prompt.ask")
     def test_returns_none_on_empty_input(self, mock_ask):
-        """Test that empty input returns None."""
+
         platforms = {
             "duckdb": self._create_platform_info("duckdb", "DuckDB"),
         }
@@ -292,7 +292,7 @@ class TestNumberedPlatformSelect:
 
     @patch("benchbox.cli.platform.Prompt.ask")
     def test_grouped_by_status_displays_sections(self, mock_ask):
-        """Test that platforms are grouped by status when group_by_status=True."""
+
         platforms = {
             "enabled1": self._create_platform_info("enabled1", "Enabled1", available=True, enabled=True),
             "available1": self._create_platform_info("available1", "Available1", available=True, enabled=False),
@@ -322,7 +322,7 @@ class TestSetupWizardIntegration:
     @patch("benchbox.cli.platform.get_platform_manager")
     @patch("benchbox.cli.platform.NumberedSelectPrompt.ask")
     def test_setup_wizard_uses_numbered_prompt(self, mock_ask, mock_get_manager):
-        """Test that setup wizard uses NumberedSelectPrompt for action selection."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.platform import setup_platforms

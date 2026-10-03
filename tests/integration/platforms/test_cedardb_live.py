@@ -30,7 +30,7 @@ class TestLiveCedarDBConnection:
     """Test basic CedarDB connectivity via Docker."""
 
     def test_connection(self, live_cedardb_adapter):
-        """Verify we can connect to CedarDB and run a trivial query."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -41,7 +41,7 @@ class TestLiveCedarDBConnection:
             live_cedardb_adapter.close_connection(connection)
 
     def test_platform_info(self, live_cedardb_adapter):
-        """Verify platform info reports CedarDB metadata."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             info = live_cedardb_adapter.get_platform_info(connection=connection)
@@ -68,7 +68,7 @@ class TestLiveCedarDBQueryExecution:
     """Test query execution against a live CedarDB instance."""
 
     def test_execute_select(self, live_cedardb_adapter):
-        """Verify basic SELECT execution via adapter."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             result = live_cedardb_adapter.execute_query(
@@ -145,7 +145,7 @@ class TestLiveCedarDBConstraints:
     """Test primary key and foreign key support (CedarDB-supported tuning types)."""
 
     def test_primary_key_constraint(self, live_cedardb_adapter):
-        """Verify primary key constraints are enforced."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()

@@ -81,7 +81,7 @@ class TestPlatformRegistry:
             os.chdir(original_cwd)
 
     def test_get_all_platform_metadata(self):
-        """Test getting all platform metadata."""
+
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         assert isinstance(metadata, dict)
@@ -184,7 +184,7 @@ class TestPlatformRegistry:
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_detect_library_success(self, mock_import):
-        """Test successful library detection."""
+
         mock_module = Mock()
         mock_module.__version__ = "1.2.3"
         mock_import.return_value = mock_module
@@ -200,7 +200,7 @@ class TestPlatformRegistry:
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_detect_library_failure(self, mock_import):
-        """Test library detection failure."""
+
         mock_import.side_effect = ImportError("No module named 'missing_lib'")
 
         lib_spec = {"name": "missing_lib", "required": True}
@@ -214,7 +214,7 @@ class TestPlatformRegistry:
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_detect_library_with_import_name(self, mock_import):
-        """Test library detection with custom import name."""
+
         mock_module = Mock()
         mock_module.__version__ = "2.0.0"
         mock_import.return_value = mock_module
@@ -229,7 +229,7 @@ class TestPlatformRegistry:
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_detect_library_no_version(self, mock_import):
-        """Test library detection when module has no __version__."""
+
         mock_module = Mock()
         del mock_module.__version__  # Remove __version__ attribute
         mock_import.return_value = mock_module
@@ -243,7 +243,7 @@ class TestPlatformRegistry:
         assert lib_info.import_error is None
 
     def test_platform_boundary_separation(self):
-        """Test that platform boundaries are properly separated."""
+
         # The CLI should only access public methods, not private ones
         metadata = PlatformRegistry.get_all_platform_metadata()
 
@@ -266,7 +266,7 @@ class TestPlatformRegistry:
                 assert "required" in lib_spec
 
     def test_metadata_consistency_with_get_platform_info(self):
-        """Test that get_all_platform_metadata is consistent with get_platform_info."""
+
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         for platform_name in metadata:
@@ -282,7 +282,7 @@ class TestPlatformRegistry:
                 assert platform_info.category == metadata[platform_name]["category"]
 
     def test_platform_categories(self):
-        """Test that platforms are properly categorized."""
+
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         # Verify base platforms are correctly categorized
@@ -295,7 +295,7 @@ class TestPlatformRegistry:
             assert metadata[platform_name]["category"] == expected_category
 
     def test_adoption_tiers(self):
-        """Test that adoption tiers are properly assigned."""
+
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         expected_tiers = {
@@ -345,7 +345,7 @@ class TestPlatformRegistry:
                     )
 
     def test_library_requirements_format(self):
-        """Test that library requirements are properly formatted."""
+
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         for platform_name, platform_spec in metadata.items():
@@ -364,7 +364,7 @@ class TestPlatformRegistry:
                     assert isinstance(lib_spec["import_name"], str)
 
     def test_installation_commands_exist(self):
-        """Test that all platforms have installation commands."""
+
         metadata = PlatformRegistry.get_all_platform_metadata()
 
         for platform_name, platform_spec in metadata.items():
@@ -557,7 +557,7 @@ class TestPlatformRegistry:
         assert platform_marker in comparison_matrix
 
     def test_requires_cloud_storage_for_cloud_platforms(self):
-        """Test that cloud platforms are correctly identified as requiring cloud storage."""
+
         # Cloud platforms that require cloud storage
         cloud_platforms = ["databricks", "bigquery", "snowflake", "redshift"]
 
@@ -567,7 +567,7 @@ class TestPlatformRegistry:
             )
 
     def test_requires_cloud_storage_for_local_platforms(self):
-        """Test that local platforms do not require cloud storage."""
+
         # Local platforms that don't require cloud storage
         local_platforms = ["duckdb", "sqlite", "clickhouse"]
 
@@ -577,7 +577,7 @@ class TestPlatformRegistry:
             )
 
     def test_requires_cloud_storage_case_insensitive(self):
-        """Test that requires_cloud_storage is case-insensitive."""
+
         assert PlatformRegistry.requires_cloud_storage("databricks")
         assert PlatformRegistry.requires_cloud_storage("Databricks")
         assert PlatformRegistry.requires_cloud_storage("DATABRICKS")
@@ -588,7 +588,7 @@ class TestPlatformRegistry:
         assert not PlatformRegistry.requires_cloud_storage("nonexistent")
 
     def test_get_cloud_path_examples_databricks(self):
-        """Test cloud path examples for Databricks."""
+
         examples = PlatformRegistry.get_cloud_path_examples("databricks")
 
         assert isinstance(examples, list)
@@ -600,7 +600,7 @@ class TestPlatformRegistry:
         assert any("s3://" in prefix for prefix in path_prefixes), "Should include S3 examples"
 
     def test_get_cloud_path_examples_bigquery(self):
-        """Test cloud path examples for BigQuery."""
+
         examples = PlatformRegistry.get_cloud_path_examples("bigquery")
 
         assert isinstance(examples, list)
@@ -610,7 +610,7 @@ class TestPlatformRegistry:
         assert all("gs://" in example for example in examples), "BigQuery examples should all use gs://"
 
     def test_get_cloud_path_examples_snowflake(self):
-        """Test cloud path examples for Snowflake."""
+
         examples = PlatformRegistry.get_cloud_path_examples("snowflake")
 
         assert isinstance(examples, list)
@@ -622,7 +622,7 @@ class TestPlatformRegistry:
         assert "azure://" in path_strings or "gcs://" in path_strings, "Should include other cloud providers"
 
     def test_get_cloud_path_examples_redshift(self):
-        """Test cloud path examples for Redshift."""
+
         examples = PlatformRegistry.get_cloud_path_examples("redshift")
 
         assert isinstance(examples, list)
@@ -632,7 +632,7 @@ class TestPlatformRegistry:
         assert all("s3://" in example for example in examples), "Redshift examples should all use s3://"
 
     def test_get_cloud_path_examples_case_insensitive(self):
-        """Test that get_cloud_path_examples is case-insensitive."""
+
         examples_lower = PlatformRegistry.get_cloud_path_examples("databricks")
         examples_upper = PlatformRegistry.get_cloud_path_examples("DATABRICKS")
         examples_mixed = PlatformRegistry.get_cloud_path_examples("Databricks")
@@ -641,13 +641,13 @@ class TestPlatformRegistry:
         assert examples_lower == examples_mixed
 
     def test_get_cloud_path_examples_local_platform(self):
-        """Test that local platforms return empty list for cloud path examples."""
+
         assert PlatformRegistry.get_cloud_path_examples("duckdb") == []
         assert PlatformRegistry.get_cloud_path_examples("sqlite") == []
         assert PlatformRegistry.get_cloud_path_examples("clickhouse") == []
 
     def test_get_cloud_path_examples_unknown_platform(self):
-        """Test that unknown platforms return empty list."""
+
         assert PlatformRegistry.get_cloud_path_examples("unknown_platform") == []
         assert PlatformRegistry.get_cloud_path_examples("nonexistent") == []
 
@@ -714,7 +714,7 @@ class TestPlatformRegistryBoundaries:
             assert not lib_info.installed
 
     def test_platform_metadata_completeness(self):
-        """Test that platform metadata contains everything CLI needs."""
+
         from benchbox.cli.platform import PlatformManager
 
         manager = PlatformManager()

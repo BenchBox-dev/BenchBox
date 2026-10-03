@@ -144,7 +144,7 @@ queries:
         assert "USING SAMPLE" not in queries["query_with_multiple_variants"]
 
     def test_get_queries_skip_on_case_insensitive(self, mock_catalog_with_variants):
-        """Test skip_on matching is case-insensitive."""
+
         benchmark = ReadPrimitivesBenchmark()
 
         queries_lower = benchmark.get_queries(dialect="duckdb")
@@ -160,7 +160,7 @@ queries:
         assert len(queries_lower) == len(queries_upper) == len(queries_mixed) == 4
 
     def test_get_queries_keeps_clickhouse_variant_verbatim(self, mock_catalog_with_variants):
-        """Test ClickHouse variants bypass SQLGlot re-translation."""
+
         benchmark = ReadPrimitivesBenchmark()
 
         queries = benchmark.get_queries(dialect="clickhouse")
@@ -355,7 +355,7 @@ class TestBenchmarkWithActualCatalog:
         assert "MATCH_CONDITION" in queries_snowflake["asof_join_basic"].upper()
 
     def test_get_queries_with_duckdb_translates_correctly(self):
-        """Test DuckDB dialect translation works."""
+
         benchmark = ReadPrimitivesBenchmark()
 
         queries = benchmark.get_queries(dialect="duckdb")
@@ -374,7 +374,7 @@ class TestModernSQLFeatures:
     """Test the modern SQL features added in December 2025."""
 
     def test_catalog_has_any_value_queries(self):
-        """Test that ANY_VALUE aggregate function queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -383,7 +383,7 @@ class TestModernSQLFeatures:
         assert "ANY_VALUE" in queries["any_value_simple"].upper()
 
     def test_catalog_has_group_by_all_queries(self):
-        """Test that GROUP BY ALL queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -392,7 +392,7 @@ class TestModernSQLFeatures:
         assert "GROUP BY ALL" in queries["groupby_all_simple"].upper()
 
     def test_catalog_has_order_by_all_queries(self):
-        """Test that ORDER BY ALL queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -401,7 +401,7 @@ class TestModernSQLFeatures:
         assert "ORDER BY ALL" in queries["orderby_all_simple"].upper()
 
     def test_duckdb_translation_preserves_group_order_by_all_keyword(self):
-        """Test DuckDB translation does not quote GROUP/ORDER BY ALL as identifiers."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries(dialect="duckdb")
 
@@ -417,7 +417,7 @@ class TestModernSQLFeatures:
         assert 'ORDER BY "ALL"' not in orderby_sql
 
     def test_catalog_has_array_queries(self):
-        """Test that ARRAY type operation queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -436,7 +436,7 @@ class TestModernSQLFeatures:
             assert qid in queries, f"Missing array query: {qid}"
 
     def test_catalog_has_struct_queries(self):
-        """Test that STRUCT type operation queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -445,7 +445,7 @@ class TestModernSQLFeatures:
             assert qid in queries, f"Missing struct query: {qid}"
 
     def test_catalog_has_map_queries(self):
-        """Test that MAP type operation queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -463,7 +463,7 @@ class TestModernSQLFeatures:
             assert qid in queries, f"Missing lambda query: {qid}"
 
     def test_catalog_has_asof_join_query(self):
-        """Test that ASOF JOIN query exists."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -471,7 +471,7 @@ class TestModernSQLFeatures:
         assert "ASOF JOIN" in queries["asof_join_basic"].upper()
 
     def test_catalog_has_pivot_queries(self):
-        """Test that PIVOT/UNPIVOT queries exist."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 
@@ -481,7 +481,7 @@ class TestModernSQLFeatures:
         assert "UNPIVOT" in queries["unpivot_basic"].upper()
 
     def test_bigquery_skips_unsupported_queries(self):
-        """Test that BigQuery dialect skips unsupported modern SQL features."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries_bigquery = benchmark.get_queries(dialect="bigquery")
 
@@ -505,7 +505,7 @@ class TestModernSQLFeatures:
             assert qid not in queries_bigquery, f"BigQuery should skip: {qid}"
 
     def test_clickhouse_skips_pivot_queries(self):
-        """Test that ClickHouse dialect skips PIVOT/UNPIVOT queries."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries_clickhouse = benchmark.get_queries(dialect="clickhouse")
 
@@ -539,7 +539,7 @@ class TestModernSQLFeatures:
         assert "any_value_with_filter" not in queries_datafusion
 
     def test_duckdb_uses_list_functions_for_arrays(self):
-        """Test that DuckDB dialect uses list_* functions for array operations."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries_duckdb = benchmark.get_queries(dialect="duckdb")
 
@@ -667,7 +667,7 @@ class TestModernSQLFeatures:
         assert "ROW(" in struct_sql
 
     def test_new_categories_exist(self):
-        """Test that new categories are properly indexed."""
+
         from benchbox.core.read_primitives.catalog.loader import load_primitives_catalog
 
         catalog = load_primitives_catalog()
@@ -679,7 +679,7 @@ class TestModernSQLFeatures:
             assert cat in categories, f"Missing category: {cat}"
 
     def test_all_new_queries_have_valid_sql(self):
-        """Test that all new queries have valid SQL structure."""
+
         benchmark = ReadPrimitivesBenchmark()
         queries = benchmark.get_queries()
 

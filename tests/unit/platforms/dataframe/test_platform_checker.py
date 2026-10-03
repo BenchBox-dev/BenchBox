@@ -35,11 +35,11 @@ class TestDataFrameFamily:
     """Tests for DataFrameFamily enum."""
 
     def test_pandas_family_value(self):
-        """Test Pandas family enum value."""
+
         assert DataFrameFamily.PANDAS.value == "pandas"
 
     def test_expression_family_value(self):
-        """Test Expression family enum value."""
+
         assert DataFrameFamily.EXPRESSION.value == "expression"
 
 
@@ -47,7 +47,7 @@ class TestPlatformInfo:
     """Tests for PlatformInfo dataclass."""
 
     def test_platform_info_creation(self):
-        """Test creating PlatformInfo."""
+
         info = PlatformInfo(
             name="TestPlatform",
             family=DataFrameFamily.PANDAS,
@@ -63,7 +63,7 @@ class TestPlatformInfo:
         assert info.extra_name == "test-extra"
 
     def test_platform_info_with_versions(self):
-        """Test PlatformInfo with version constraints."""
+
         info = PlatformInfo(
             name="TestPlatform",
             family=DataFrameFamily.EXPRESSION,
@@ -83,31 +83,31 @@ class TestDataFramePlatforms:
     """Tests for DATAFRAME_PLATFORMS registry."""
 
     def test_pandas_registered(self):
-        """Test that Pandas is in the registry."""
+
         assert "pandas" in DATAFRAME_PLATFORMS
         info = DATAFRAME_PLATFORMS["pandas"]
         assert info.family == DataFrameFamily.PANDAS
 
     def test_polars_registered(self):
-        """Test that Polars is in the registry."""
+
         assert "polars" in DATAFRAME_PLATFORMS
         info = DATAFRAME_PLATFORMS["polars"]
         assert info.family == DataFrameFamily.EXPRESSION
 
     def test_dask_registered(self):
-        """Test that Dask is in the registry."""
+
         assert "dask" in DATAFRAME_PLATFORMS
         info = DATAFRAME_PLATFORMS["dask"]
         assert info.family == DataFrameFamily.PANDAS
 
     def test_pyspark_registered(self):
-        """Test that PySpark is in the registry."""
+
         assert "pyspark" in DATAFRAME_PLATFORMS
         info = DATAFRAME_PLATFORMS["pyspark"]
         assert info.family == DataFrameFamily.EXPRESSION
 
     def test_datafusion_registered(self):
-        """Test that DataFusion is in the registry."""
+
         assert "datafusion" in DATAFRAME_PLATFORMS
         info = DATAFRAME_PLATFORMS["datafusion"]
         assert info.family == DataFrameFamily.EXPRESSION
@@ -135,22 +135,22 @@ class TestDataFramePlatformChecker:
         assert DataFramePlatformChecker.is_available("pandas")
 
     def test_unknown_platform_not_available(self):
-        """Test that unknown platform returns False."""
+
         assert not DataFramePlatformChecker.is_available("nonexistent_platform")
 
     def test_get_version_polars(self):
-        """Test getting Polars version."""
+
         version = DataFramePlatformChecker.get_version("polars")
         assert version is not None
         assert "." in version  # Version has dots
 
     def test_get_version_unknown_platform(self):
-        """Test getting version of unknown platform."""
+
         version = DataFramePlatformChecker.get_version("nonexistent")
         assert version is None
 
     def test_check_platform_polars(self):
-        """Test checking Polars status."""
+
         status = DataFramePlatformChecker.check_platform("polars")
 
         assert isinstance(status, PlatformStatus)
@@ -160,28 +160,28 @@ class TestDataFramePlatformChecker:
         assert status.error is None
 
     def test_check_platform_unknown(self):
-        """Test checking unknown platform status."""
+
         status = DataFramePlatformChecker.check_platform("nonexistent")
 
         assert status.available is False
         assert "Unknown DataFrame platform" in status.error
 
     def test_get_available_platforms(self):
-        """Test getting list of available platforms."""
+
         available = DataFramePlatformChecker.get_available_platforms()
 
         assert isinstance(available, list)
         assert "polars" in available  # Core dependency
 
     def test_get_available_by_family_expression(self):
-        """Test getting available expression family platforms."""
+
         available = DataFramePlatformChecker.get_available_by_family(DataFrameFamily.EXPRESSION)
 
         assert isinstance(available, list)
         assert "polars" in available  # Core dependency
 
     def test_get_all_platforms(self):
-        """Test getting all platform info."""
+
         platforms = DataFramePlatformChecker.get_all_platforms()
 
         assert isinstance(platforms, dict)
@@ -190,7 +190,7 @@ class TestDataFramePlatformChecker:
         assert all(isinstance(v, PlatformInfo) for v in platforms.values())
 
     def test_check_all_platforms(self):
-        """Test checking all platform statuses."""
+
         statuses = DataFramePlatformChecker.check_all_platforms()
 
         assert isinstance(statuses, dict)
@@ -203,7 +203,7 @@ class TestInstallationSuggestion:
     """Tests for installation suggestion generation."""
 
     def test_suggestion_for_pandas(self):
-        """Test installation suggestion for Pandas."""
+
         suggestion = get_installation_suggestion("pandas")
 
         assert "benchbox[pandas]" in suggestion or "--extra pandas" in suggestion
@@ -216,7 +216,7 @@ class TestInstallationSuggestion:
         assert "core dependency" in suggestion
 
     def test_suggestion_for_unknown_platform(self):
-        """Test suggestion for unknown platform."""
+
         suggestion = get_installation_suggestion("nonexistent")
 
         assert "Unknown" in suggestion
@@ -226,13 +226,13 @@ class TestPlatformErrorMessage:
     """Tests for platform error message generation."""
 
     def test_error_for_available_platform(self):
-        """Test error message for available platform."""
+
         message = get_platform_error_message("polars")
 
         assert "available" in message.lower()
 
     def test_error_for_unknown_platform(self):
-        """Test error message for unknown platform."""
+
         message = get_platform_error_message("nonexistent")
 
         assert "Unknown" in message
@@ -249,7 +249,7 @@ class TestRequirePlatform:
         assert hasattr(module, "__version__")
 
     def test_require_unknown_raises(self):
-        """Test requiring unknown platform raises ImportError."""
+
         with pytest.raises(ImportError, match="Unknown"):
             require_platform("nonexistent_platform")
 
@@ -258,7 +258,7 @@ class TestFormatPlatformStatusTable:
     """Tests for status table formatting."""
 
     def test_table_format(self):
-        """Test that status table is properly formatted."""
+
         table = format_platform_status_table()
 
         assert "DataFrame Platform Status" in table
@@ -268,14 +268,14 @@ class TestFormatPlatformStatusTable:
         assert "Version" in table
 
     def test_table_shows_polars(self):
-        """Test that table shows Polars status."""
+
         table = format_platform_status_table()
 
         assert "Polars" in table
         assert "expression" in table
 
     def test_table_shows_count(self):
-        """Test that table shows available count."""
+
         table = format_platform_status_table()
 
         assert "Available:" in table

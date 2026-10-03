@@ -47,7 +47,7 @@ class TestSchemaMapper:
     """Tests for SchemaMapper class."""
 
     def test_get_column_names(self):
-        """Test extracting column names from a Table schema."""
+
         try:
             from benchbox.core.tpch.schema import CUSTOMER
 
@@ -61,7 +61,7 @@ class TestSchemaMapper:
             pytest.skip("TPC-H schema not available")
 
     def test_get_polars_schema(self):
-        """Test Polars schema conversion."""
+
         try:
             from benchbox.core.tpch.schema import LINEITEM
 
@@ -75,7 +75,7 @@ class TestSchemaMapper:
             pytest.skip("TPC-H schema not available")
 
     def test_get_pandas_schema(self):
-        """Test Pandas schema conversion."""
+
         try:
             from benchbox.core.tpch.schema import ORDERS
 
@@ -89,7 +89,7 @@ class TestSchemaMapper:
             pytest.skip("TPC-H schema not available")
 
     def test_get_pyarrow_schema(self):
-        """Test PyArrow schema conversion."""
+
         try:
             from benchbox.core.tpch.schema import SUPPLIER
 
@@ -106,7 +106,7 @@ class TestFormatConverter:
     """Tests for FormatConverter class."""
 
     def test_convert_csv_to_parquet_basic(self):
-        """Test basic CSV to Parquet conversion."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -214,7 +214,7 @@ class TestFormatConverter:
             assert str(table.schema.field("note").type) in {"string", "large_string"}
 
     def test_convert_tbl_file(self):
-        """Test TBL file conversion with pipe delimiter."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -236,7 +236,7 @@ class TestFormatConverter:
             assert row_count == 2
 
     def test_convert_tbl_file_without_trailing_delimiter(self):
-        """Test TBL file conversion without trailing delimiter."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -257,7 +257,7 @@ class TestFormatConverter:
             assert row_count == 2
 
     def test_convert_compressed_tbl_file(self):
-        """Test compressed TBL file conversion with pipe delimiter."""
+
         zstd = pytest.importorskip("zstandard")
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -284,7 +284,7 @@ class TestFormatConverter:
             assert row_count == 2
 
     def test_convert_creates_parent_dirs(self):
-        """Test that conversion creates parent directories."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -304,7 +304,7 @@ class TestFormatConverter:
             assert parquet_path.exists()
 
     def test_convert_nonexistent_file(self):
-        """Test conversion of non-existent file fails gracefully."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -639,7 +639,7 @@ class TestCacheManifest:
     """Tests for CacheManifest dataclass."""
 
     def test_to_dict(self):
-        """Test manifest serialization."""
+
         manifest = CacheManifest(
             benchmark="tpch",
             scale_factor=1.0,
@@ -657,7 +657,7 @@ class TestCacheManifest:
         assert data["tables"]["customer"]["row_count"] == 150000
 
     def test_from_dict(self):
-        """Test manifest deserialization."""
+
         data = {
             "benchmark": "tpcds",
             "scale_factor": 10.0,
@@ -674,7 +674,7 @@ class TestCacheManifest:
         assert "store" in manifest.tables
 
     def test_roundtrip(self):
-        """Test serialization roundtrip."""
+
         original = CacheManifest(
             benchmark="tpch",
             scale_factor=0.01,
@@ -714,7 +714,7 @@ class TestDataCache:
             assert cache.cache_dir == tmp_path / "benchmark_runs" / "datagen"
 
     def test_get_cache_path(self):
-        """Test cache path generation."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -725,7 +725,7 @@ class TestDataCache:
             assert DATAFRAME_CACHE_VERSION in str(path)
 
     def test_get_manifest_path(self):
-        """Test manifest path generation."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -758,14 +758,14 @@ class TestDataCache:
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is False
 
     def test_has_cached_data_empty(self):
-        """Test cache check on empty cache."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is False
 
     def test_has_cached_data_valid(self):
-        """Test cache check with valid cached data."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -777,7 +777,6 @@ class TestDataCache:
             (cache_path / "customer.parquet").touch()
             (cache_path / "orders.parquet").touch()
 
-            # Create manifest
             manifest = {
                 "benchmark": "tpch",
                 "scale_factor": 1.0,
@@ -796,7 +795,7 @@ class TestDataCache:
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is True
 
     def test_has_cached_data_missing_file(self):
-        """Test cache check with missing file."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -824,7 +823,7 @@ class TestDataCache:
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET) is False
 
     def test_has_cached_data_hash_mismatch(self):
-        """Test cache check with hash mismatch."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -849,7 +848,7 @@ class TestDataCache:
             assert cache.has_cached_data("tpch", 1.0, DataFormat.PARQUET, source_hash="new_hash") is False
 
     def test_get_cached_files(self):
-        """Test retrieving cached file paths."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -879,7 +878,7 @@ class TestDataCache:
             assert files["customer"].name == "customer.parquet"
 
     def test_save_manifest(self):
-        """Test saving a manifest."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -902,7 +901,7 @@ class TestDataCache:
             assert data["tables"]["lineitem"]["row_count"] == 60000
 
     def test_clear_cache_specific(self):
-        """Test clearing specific cache entries."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             cache = DataCache(Path(tmpdir))
 
@@ -922,7 +921,7 @@ class TestDataFrameDataLoader:
     """Tests for DataFrameDataLoader class."""
 
     def test_init_default(self):
-        """Test default initialization."""
+
         loader = DataFrameDataLoader()
 
         assert loader.platform == "polars"
@@ -930,13 +929,13 @@ class TestDataFrameDataLoader:
         assert loader.force_regenerate is False
 
     def test_init_with_platform(self):
-        """Test initialization with platform."""
+
         loader = DataFrameDataLoader(platform="pandas-df")
 
         assert loader.platform == "pandas"
 
     def test_get_optimal_format_parquet(self):
-        """Test optimal format selection prefers Parquet."""
+
         loader = DataFrameDataLoader(platform="polars")
 
         format = loader.get_optimal_format(scale_factor=1.0)
@@ -944,7 +943,7 @@ class TestDataFrameDataLoader:
         assert format == DataFormat.PARQUET
 
     def test_get_optimal_format_csv(self):
-        """Test optimal format when Parquet disabled."""
+
         loader = DataFrameDataLoader(platform="polars", prefer_parquet=False)
 
         format = loader.get_optimal_format(scale_factor=1.0)
@@ -952,7 +951,7 @@ class TestDataFrameDataLoader:
         assert format == DataFormat.CSV
 
     def test_discover_files(self):
-        """Test file discovery in data directory."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -969,7 +968,7 @@ class TestDataFrameDataLoader:
             assert "lineitem" in files
 
     def test_detect_source_format_tbl(self):
-        """Test source format detection for TBL files."""
+
         loader = DataFrameDataLoader()
 
         files = {"customer": Path("customer.tbl")}
@@ -978,7 +977,7 @@ class TestDataFrameDataLoader:
         assert format == DataFormat.CSV
 
     def test_detect_source_format_parquet(self):
-        """Test source format detection for Parquet files."""
+
         loader = DataFrameDataLoader()
 
         files = {"customer": Path("customer.parquet")}
@@ -1021,7 +1020,7 @@ class TestDataFrameDataLoader:
         assert pyarrow_types["trips"]["pickup_datetime"] == "timestamp[us]"
 
     def test_get_source_files_from_benchmark(self):
-        """Test getting source files from benchmark.tables."""
+
         loader = DataFrameDataLoader()
 
         benchmark = MagicMock()
@@ -1037,7 +1036,7 @@ class TestDataFrameDataLoader:
         assert files["customer"] == [Path("/data/customer.tbl")]
 
     def test_get_source_files_rejects_directory_path(self):
-        """Test that _get_source_files raises when benchmark.tables contains a directory."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             # Create a directory where a file is expected (contamination scenario)
@@ -1051,7 +1050,7 @@ class TestDataFrameDataLoader:
                 loader._get_source_files(benchmark, None)
 
     def test_get_source_files_rejects_directory_in_list(self):
-        """Test that _get_source_files raises when a sharded path list contains a directory."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             good_file = tmpdir / "orders.tbl.1"
@@ -1067,7 +1066,7 @@ class TestDataFrameDataLoader:
                 loader._get_source_files(benchmark, None)
 
     def test_get_source_files_from_data_dir(self):
-        """Test getting source files from data directory."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1086,7 +1085,7 @@ class TestDataFrameDataLoader:
             assert files["nation"] == [tmpdir / "nation.tbl"]
 
     def test_prepare_benchmark_data_cached(self):
-        """Test prepare_benchmark_data uses cache when available."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             cache_dir = tmpdir / "cache"
@@ -1112,7 +1111,6 @@ class TestDataFrameDataLoader:
             with open(cache_path / "_manifest.json", "w", encoding="utf-8") as f:
                 json.dump(manifest, f)
 
-            # Setup benchmark
             benchmark = MagicMock()
             benchmark.name = "tpch"
             benchmark.tables = {"customer": Path(tmpdir / "customer.tbl")}
@@ -1120,7 +1118,6 @@ class TestDataFrameDataLoader:
             # Create source file
             (tmpdir / "customer.tbl").touch()
 
-            # Mock has_cached_data to return True
             with (
                 patch.object(loader.cache, "has_cached_data", return_value=True),
                 patch.object(
@@ -1134,7 +1131,7 @@ class TestDataFrameDataLoader:
             assert "customer" in paths
 
     def test_prepare_benchmark_data_preserves_shards(self):
-        """Test prepare_benchmark_data preserves all shard paths."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1157,7 +1154,7 @@ class TestLoadedTable:
     """Tests for LoadedTable dataclass."""
 
     def test_creation(self):
-        """Test LoadedTable creation."""
+
         table = LoadedTable(
             table_name="customer",
             file_path=Path("/data/customer.parquet"),
@@ -1175,7 +1172,7 @@ class TestDataLoadResult:
     """Tests for DataLoadResult dataclass."""
 
     def test_success_with_tables(self):
-        """Test success property with tables."""
+
         result = DataLoadResult(
             tables={"customer": LoadedTable("customer", Path("c.parquet"), DataFormat.PARQUET)},
         )
@@ -1183,7 +1180,7 @@ class TestDataLoadResult:
         assert result.success is True
 
     def test_failure_with_errors(self):
-        """Test success property with errors."""
+
         result = DataLoadResult(
             tables={"customer": LoadedTable("customer", Path("c.parquet"), DataFormat.PARQUET)},
             errors=["Something went wrong"],
@@ -1192,7 +1189,7 @@ class TestDataLoadResult:
         assert result.success is False
 
     def test_failure_no_tables(self):
-        """Test success property with no tables."""
+
         result = DataLoadResult()
 
         assert result.success is False
@@ -1202,7 +1199,7 @@ class TestSourceHash:
     """Tests for source hash computation."""
 
     def test_compute_source_hash(self):
-        """Test source hash computation."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1227,7 +1224,7 @@ class TestSourceHash:
             assert hash3 != hash1
 
     def test_compute_source_hash_stable_order(self):
-        """Test that hash is stable regardless of dict order."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1245,7 +1242,7 @@ class TestGetTPCHColumnNames:
     """Tests for get_tpch_column_names function."""
 
     def test_returns_all_tables(self):
-        """Test that all TPC-H tables are returned."""
+
         columns = get_tpch_column_names()
 
         assert "lineitem" in columns
@@ -1258,7 +1255,7 @@ class TestGetTPCHColumnNames:
         assert "region" in columns
 
     def test_lineitem_columns(self):
-        """Test lineitem table columns."""
+
         columns = get_tpch_column_names()
 
         assert "l_orderkey" in columns["lineitem"]
@@ -1266,7 +1263,7 @@ class TestGetTPCHColumnNames:
         assert "l_shipdate" in columns["lineitem"]
 
     def test_orders_columns(self):
-        """Test orders table columns."""
+
         columns = get_tpch_column_names()
 
         assert "o_orderkey" in columns["orders"]
@@ -1278,7 +1275,7 @@ class TestEnvironmentOverride:
     """Tests for environment variable overrides."""
 
     def test_cache_dir_env_override(self):
-        """Test that BENCHBOX_CACHE_DIR environment variable is respected."""
+
         with tempfile.TemporaryDirectory() as tmpdir, patch.dict("os.environ", {"BENCHBOX_CACHE_DIR": tmpdir}):
             cache = DataCache()  # No explicit cache_dir
 
@@ -1289,7 +1286,7 @@ class TestFormatConverterWithWriteConfig:
     """Tests for FormatConverter with DataFrameWriteConfiguration."""
 
     def test_convert_with_sort_by(self):
-        """Test CSV conversion with sorting."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1321,7 +1318,7 @@ class TestFormatConverterWithWriteConfig:
             assert ids == [1, 2, 3], f"Expected [1, 2, 3], got {ids}"
 
     def test_convert_with_sort_by_descending(self):
-        """Test CSV conversion with descending sort."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1348,7 +1345,7 @@ class TestFormatConverterWithWriteConfig:
             assert ids == [3, 2, 1], f"Expected [3, 2, 1], got {ids}"
 
     def test_convert_with_row_group_size(self):
-        """Test CSV conversion with row_group_size."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1379,7 +1376,7 @@ class TestFormatConverterWithWriteConfig:
             assert meta.num_row_groups >= 2
 
     def test_convert_with_compression(self):
-        """Test CSV conversion with different compression."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1401,7 +1398,7 @@ class TestFormatConverterWithWriteConfig:
             assert parquet_path.exists()
 
     def test_convert_with_compression_level(self):
-        """Test CSV conversion with compression level."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1451,7 +1448,7 @@ class TestFormatConverterWithWriteConfig:
             assert row_count == 2
 
     def test_build_write_kwargs_data_page_version(self):
-        """Test _build_write_kwargs includes data_page_version only when set."""
+
         import pyarrow as pa
 
         table = pa.table({"id": [1, 2], "value": ["a", "b"]})
@@ -1472,7 +1469,7 @@ class TestFormatConverterWithWriteConfig:
         assert kwargs["data_page_version"] == "2.0"
 
     def test_convert_skips_invalid_sort_column(self):
-        """Test that non-existent sort columns are skipped."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
@@ -1526,7 +1523,7 @@ class TestDataFrameDataLoaderWithWriteConfig:
     """Tests for DataFrameDataLoader with write configuration."""
 
     def test_init_with_write_config(self):
-        """Test initialization with write config."""
+
         write_config = DataFrameWriteConfiguration(sort_by=[SortColumn(name="id", order="asc")])
         loader = DataFrameDataLoader(write_config=write_config)
 
@@ -1534,7 +1531,7 @@ class TestDataFrameDataLoaderWithWriteConfig:
         assert len(loader.write_config.sort_by) == 1
 
     def test_get_table_write_config_filters_columns(self):
-        """Test that write config is filtered for table columns."""
+
         loader = DataFrameDataLoader()
 
         base_config = DataFrameWriteConfiguration(
@@ -1562,14 +1559,14 @@ class TestDataFrameDataLoaderWithWriteConfig:
         assert filtered.row_group_size == 1000000
 
     def test_get_table_write_config_returns_none_for_none(self):
-        """Test that None config returns None."""
+
         loader = DataFrameDataLoader()
 
         result = loader._get_table_write_config(None, "table", ["col1"])
         assert result is None
 
     def test_get_table_write_config_returns_default_unchanged(self):
-        """Test that default config is returned unchanged."""
+
         loader = DataFrameDataLoader()
 
         default_config = DataFrameWriteConfiguration()

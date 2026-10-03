@@ -60,7 +60,7 @@ class TestPolarsMaintenanceAvailability:
     """Test Polars maintenance operations availability."""
 
     def test_get_maintenance_operations_returns_polars(self):
-        """Test that get_maintenance_operations_for_platform returns Polars impl."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         assert ops is not None
@@ -72,12 +72,12 @@ class TestPolarsMaintenanceAvailability:
         assert isinstance(ops, PolarsMaintenanceOperations)
 
     def test_get_maintenance_operations_polars_alias(self):
-        """Test that 'polars' alias works."""
+
         ops = get_maintenance_operations_for_platform("polars")
         assert ops is not None
 
     def test_capabilities(self):
-        """Test Polars maintenance capabilities."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
         caps = ops.get_capabilities()
 
@@ -97,7 +97,7 @@ class TestPolarsInsert:
     """Test Polars INSERT operations."""
 
     def test_insert_new_rows(self, temp_table_dir: Path, sample_df):
-        """Test inserting rows into an empty table."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         result = ops.insert_rows(temp_table_dir, sample_df, mode="append")
@@ -111,7 +111,7 @@ class TestPolarsInsert:
         assert written.height == 5
 
     def test_insert_append_mode(self, existing_table: Path, sample_df):
-        """Test appending rows to existing table."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         new_df = pl.DataFrame(
@@ -132,7 +132,7 @@ class TestPolarsInsert:
         assert all_data.height == 7
 
     def test_insert_overwrite_mode(self, existing_table: Path, sample_df):
-        """Test overwriting existing table."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         new_df = pl.DataFrame(
@@ -150,7 +150,7 @@ class TestPolarsInsert:
         assert set(all_data["id"].to_list()) == {10, 11}
 
     def test_insert_lazy_frame(self, temp_table_dir: Path):
-        """Test inserting from a LazyFrame."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         lazy_df = pl.LazyFrame({"id": [1, 2, 3], "value": ["a", "b", "c"]})
@@ -172,7 +172,7 @@ class TestPolarsInsert:
         assert result.rows_affected == 0
 
     def test_insert_creates_directory(self, tmp_path: Path):
-        """Test that insert creates table directory if it doesn't exist."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
         table_path = tmp_path / "new_table"
 
@@ -183,7 +183,7 @@ class TestPolarsInsert:
         assert table_path.exists()
 
     def test_insert_with_partitioning(self, temp_table_dir: Path):
-        """Test partitioned write."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         df = pl.DataFrame({"id": [1, 2, 3, 4], "region": ["US", "US", "EU", "EU"], "value": [10, 20, 30, 40]})
@@ -202,7 +202,7 @@ class TestPolarsDelete:
     """Test Polars DELETE operations (partition-level)."""
 
     def test_delete_with_condition(self, existing_table: Path):
-        """Test deleting rows matching a condition."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Delete rows where amount > 200
@@ -217,7 +217,7 @@ class TestPolarsDelete:
         assert all(amt <= 200 for amt in remaining["amount"].to_list())
 
     def test_delete_string_condition(self, existing_table: Path):
-        """Test deleting with string equality condition."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         result = ops.delete_rows(existing_table, "region = 'US'")
@@ -230,7 +230,7 @@ class TestPolarsDelete:
         assert "US" not in remaining["region"].to_list()
 
     def test_delete_no_matches(self, existing_table: Path):
-        """Test delete when no rows match condition."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         result = ops.delete_rows(existing_table, "amount > 1000")
@@ -243,7 +243,7 @@ class TestPolarsDelete:
         assert remaining.height == 5
 
     def test_delete_all_rows(self, existing_table: Path):
-        """Test deleting all rows."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         result = ops.delete_rows(existing_table, "id > 0")
@@ -257,7 +257,7 @@ class TestPolarsDelete:
         assert len(parquet_files) == 0
 
     def test_delete_nonexistent_table(self, tmp_path: Path):
-        """Test delete on non-existent table."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         result = ops.delete_rows(tmp_path / "nonexistent", "id > 0")
@@ -266,7 +266,7 @@ class TestPolarsDelete:
         assert result.rows_affected == 0
 
     def test_delete_compound_condition(self, existing_table: Path):
-        """Test delete with compound condition."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Data: Alice(100,US), Bob(200,EU), Charlie(150,US), Diana(300,EU), Eve(250,APAC)
@@ -281,7 +281,7 @@ class TestPolarsUpdate:
     """Test UPDATE operations via read-modify-write pattern."""
 
     def test_update_single_column(self, existing_table: Path):
-        """Test updating a single column."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Update name where id = 1
@@ -296,7 +296,7 @@ class TestPolarsUpdate:
         assert updated_row["name"][0] == "Updated"
 
     def test_update_multiple_rows(self, existing_table: Path):
-        """Test updating multiple rows."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Update all rows in EU region
@@ -311,7 +311,7 @@ class TestPolarsUpdate:
         assert eu_rows["amount"].to_list() == [0, 0]
 
     def test_update_no_matching_rows(self, existing_table: Path):
-        """Test update when no rows match condition."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         result = ops.update_rows(existing_table, "id = 999", {"name": "'NoMatch'"})
@@ -320,7 +320,7 @@ class TestPolarsUpdate:
         assert result.rows_affected == 0
 
     def test_update_with_expression(self, existing_table: Path):
-        """Test update with arithmetic expression."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Double the amount for high-value rows
@@ -341,7 +341,7 @@ class TestPolarsMerge:
     """Test MERGE (upsert) operations via read-join-write pattern."""
 
     def test_merge_update_existing(self, existing_table: Path):
-        """Test merge that updates existing rows."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Source data with updated values for existing ids
@@ -372,7 +372,7 @@ class TestPolarsMerge:
         assert alice["amount"][0] == 999.0
 
     def test_merge_insert_new(self, existing_table: Path):
-        """Test merge that inserts new rows."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Source data with new ids only
@@ -403,7 +403,7 @@ class TestPolarsMerge:
         assert new_rows.height == 2
 
     def test_merge_upsert(self, existing_table: Path):
-        """Test merge with both update and insert."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         # Source data: id=1 exists (update), id=100 is new (insert)
@@ -466,7 +466,7 @@ class TestPolarsMaintenanceResult:
     """Test MaintenanceResult properties."""
 
     def test_result_timing(self, temp_table_dir: Path):
-        """Test that result includes timing information."""
+
         ops = get_maintenance_operations_for_platform("polars-df")
 
         df = pl.DataFrame({"id": list(range(1000)), "value": list(range(1000))})

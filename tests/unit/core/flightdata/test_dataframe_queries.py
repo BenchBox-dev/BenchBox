@@ -364,7 +364,7 @@ class TestPandasImplExecute:
         assert "total_flights" in result.columns
 
     def test_date_range_filtering(self, pandas_ctx):
-        """Verify date range filter is applied."""
+
         from benchbox.core.flightdata.dataframe_queries import (
             improvement_trend_pandas_impl,
             set_parameter_overrides,

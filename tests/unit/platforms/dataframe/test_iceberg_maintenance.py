@@ -47,7 +47,7 @@ class TestIcebergMaintenanceAvailability:
     """Tests for Iceberg maintenance availability."""
 
     def test_get_maintenance_operations_returns_iceberg(self):
-        """Test that iceberg platform returns IcebergMaintenanceOperations."""
+
         from benchbox.core.dataframe.maintenance_interface import (
             get_maintenance_operations_for_platform,
         )
@@ -62,7 +62,7 @@ class TestIcebergMaintenanceAvailability:
         assert isinstance(result, IcebergMaintenanceOperations)
 
     def test_capabilities(self):
-        """Test Iceberg capabilities are correct."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import (
             IcebergMaintenanceOperations,
         )
@@ -79,7 +79,7 @@ class TestIcebergMaintenanceAvailability:
         assert caps.supports_time_travel is True
 
     def test_tpc_compliance(self):
-        """Test that Iceberg is TPC compliant."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import (
             IcebergMaintenanceOperations,
         )
@@ -102,7 +102,7 @@ class TestIcebergInsert:
     """
 
     def test_insert_new_rows(self, tmp_path):
-        """Test inserting new rows to an Iceberg table."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import (
             IcebergMaintenanceOperations,
         )
@@ -126,7 +126,7 @@ class TestIcebergInsert:
         assert result.operation_type.value == "insert"
 
     def test_insert_empty_dataframe(self, tmp_path):
-        """Test inserting empty dataframe."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import (
             IcebergMaintenanceOperations,
         )
@@ -168,7 +168,7 @@ class TestIcebergMaintenanceResult:
     """Tests for Iceberg maintenance result timing."""
 
     def test_result_timing(self, tmp_path):
-        """Test that results include timing information."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import (
             IcebergMaintenanceOperations,
         )
@@ -194,7 +194,7 @@ class TestIcebergDataFrameConversion:
     """Tests for DataFrame type conversion."""
 
     def test_convert_polars_dataframe(self, tmp_path):
-        """Test converting Polars DataFrame to PyArrow."""
+
         pytest.importorskip("polars")
         import polars as pl
 
@@ -219,7 +219,7 @@ class TestIcebergDataFrameConversion:
         assert result.rows_affected == 3
 
     def test_convert_pandas_dataframe(self, tmp_path):
-        """Test converting Pandas DataFrame to PyArrow."""
+
         pytest.importorskip("pandas")
         import pandas as pd
 

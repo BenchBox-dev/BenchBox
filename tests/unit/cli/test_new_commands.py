@@ -42,7 +42,7 @@ class TestDatagenCommand:
     """Test the datagen CLI command."""
 
     def test_datagen_command_exists(self):
-        """Test that the datagen command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -50,7 +50,7 @@ class TestDatagenCommand:
         assert "datagen" in result.output
 
     def test_datagen_help(self):
-        """Test the datagen help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["datagen", "--help"])
 
@@ -62,7 +62,7 @@ class TestDatagenCommand:
         assert "--seed" in result.output
 
     def test_datagen_requires_benchmark_and_scale(self):
-        """Test that datagen requires benchmark and scale."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["datagen"])
 
@@ -74,7 +74,7 @@ class TestAggregateCommand:
     """Test the aggregate CLI command."""
 
     def test_aggregate_command_exists(self):
-        """Test that the aggregate command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -82,7 +82,7 @@ class TestAggregateCommand:
         assert "aggregate" in result.output
 
     def test_aggregate_help(self):
-        """Test the aggregate help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["aggregate", "--help"])
 
@@ -94,7 +94,7 @@ class TestAggregateCommand:
         assert "--platform" in result.output
 
     def test_aggregate_requires_input_and_output(self):
-        """Test that aggregate requires input-dir and output-file."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["aggregate"])
 
@@ -102,7 +102,7 @@ class TestAggregateCommand:
         assert "Missing option" in result.output or "required" in result.output.lower()
 
     def test_aggregate_with_empty_directory(self):
-        """Test aggregate with directory containing no JSON files."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -114,7 +114,7 @@ class TestAggregateCommand:
             assert "No JSON result files found" in result.output
 
     def test_aggregate_success(self):
-        """Test successful aggregation of result files."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -156,7 +156,7 @@ class TestShellCommand:
     """Test the shell CLI command."""
 
     def test_shell_command_exists(self):
-        """Test that the shell command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -164,7 +164,7 @@ class TestShellCommand:
         assert "shell" in result.output
 
     def test_shell_help(self):
-        """Test the shell help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["shell", "--help"])
 
@@ -179,7 +179,7 @@ class TestShellCommand:
         assert "--output" in result.output
 
     def test_shell_no_databases_found(self):
-        """Test shell with no databases available."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -189,7 +189,7 @@ class TestShellCommand:
             assert "No databases found" in result.output
 
     def test_shell_list_flag(self):
-        """Test shell --list flag lists databases without connecting."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -206,7 +206,7 @@ class TestShellCommand:
             assert "tpch" in result.output.lower() or "Available" in result.output
 
     def test_shell_direct_database_path(self):
-        """Test shell with direct database path."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -223,7 +223,7 @@ class TestShellCommand:
                 mock_launch.assert_called_once()
 
     def test_shell_platform_autodetect(self):
-        """Test shell auto-detects platform from file extension."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -239,7 +239,7 @@ class TestShellCommand:
                 mock_launch.assert_called_once()
 
     def test_shell_sqlite_autodetect(self):
-        """Test shell auto-detects SQLite from .sqlite extension."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -255,7 +255,7 @@ class TestShellCommand:
                 mock_launch.assert_called_once()
 
     def test_shell_unsupported_platform_explicit(self):
-        """Test shell with explicitly unsupported platform."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -268,7 +268,7 @@ class TestShellCommand:
             assert "not supported" in result.output.lower()
 
     def test_shell_benchmark_filter(self):
-        """Test shell with --benchmark filter."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -290,7 +290,7 @@ class TestShellCommand:
             # This is a basic test that the flag is accepted
 
     def test_shell_scale_filter(self):
-        """Test shell with --scale filter."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -311,7 +311,7 @@ class TestShellCommand:
             # Should filter to scale 1.0 but implementation may vary
 
     def test_shell_discovers_databases_in_multiple_locations(self):
-        """Test that shell finds databases in both datagen/ and databases/ directories."""
+
         from benchbox.cli.config import DirectoryManager
 
         runner = CliRunner()
@@ -342,7 +342,7 @@ class TestMetricsCommand:
     """Test the metrics CLI command group."""
 
     def test_metrics_command_exists(self):
-        """Test that the metrics command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -350,7 +350,7 @@ class TestMetricsCommand:
         assert "metrics" in result.output
 
     def test_metrics_help(self):
-        """Test the metrics help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["metrics", "--help"])
 
@@ -359,7 +359,7 @@ class TestMetricsCommand:
         assert "qphh" in result.output
 
     def test_metrics_qphh_help(self):
-        """Test the metrics qphh help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["metrics", "qphh", "--help"])
 
@@ -370,7 +370,7 @@ class TestMetricsCommand:
         assert "--scale-factor" in result.output
 
     def test_metrics_qphh_requires_both_results(self):
-        """Test that metrics qphh requires power and throughput results."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["metrics", "qphh"])
 
@@ -378,7 +378,7 @@ class TestMetricsCommand:
         assert "Missing option" in result.output or "required" in result.output.lower()
 
     def test_metrics_qphh_success(self):
-        """Test successful QphH calculation via metrics command."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -418,7 +418,7 @@ class TestCalculateQphhCommand:
     """Test the calculate-qphh CLI command (deprecated)."""
 
     def test_calculate_qphh_hidden_from_help(self):
-        """Test that calculate-qphh is hidden from main help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -427,7 +427,7 @@ class TestCalculateQphhCommand:
         assert "calculate-qphh" not in result.output
 
     def test_calculate_qphh_help(self):
-        """Test the calculate-qphh help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["calculate-qphh", "--help"])
 
@@ -438,7 +438,7 @@ class TestCalculateQphhCommand:
         assert "--scale-factor" in result.output
 
     def test_calculate_qphh_requires_both_results(self):
-        """Test that calculate-qphh requires power and throughput results."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["calculate-qphh"])
 
@@ -446,7 +446,7 @@ class TestCalculateQphhCommand:
         assert "Missing option" in result.output or "required" in result.output.lower()
 
     def test_calculate_qphh_shows_deprecation_warning(self):
-        """Test calculate-qphh shows deprecation warning when executed."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -489,7 +489,7 @@ class TestRunOfficialFlag:
     """Test the run --official flag."""
 
     def test_run_official_flag_in_help(self):
-        """Test that --official flag is shown in run help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "--help"])
 
@@ -498,7 +498,7 @@ class TestRunOfficialFlag:
         assert "TPC-compliant" in result.output
 
     def test_run_official_invalid_scale_factor(self):
-        """Test run --official rejects non-TPC scale factors."""
+
         runner = CliRunner()
         result = runner.invoke(
             cli,
@@ -509,7 +509,7 @@ class TestRunOfficialFlag:
         assert "not TPC-compliant" in result.output
 
     def test_run_official_warns_on_missing_seed(self):
-        """Test run --official warns when seed is not provided."""
+
         runner = CliRunner()
 
         # The official mode validation runs before any benchmark execution,
@@ -540,7 +540,7 @@ class TestRunOfficialCommand:
     """Test the run-official CLI command (deprecated)."""
 
     def test_run_official_hidden_from_help(self):
-        """Test that run-official is hidden from main help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -563,7 +563,7 @@ class TestRunOfficialCommand:
         assert "--quiet" in result.output
 
     def test_run_official_shows_deprecation_warning(self):
-        """Test run-official shows deprecation warning when executed."""
+
         runner = CliRunner()
         result = runner.invoke(
             cli, ["run-official", "tpch", "--platform", "duckdb", "--scale", "0.5", "--phases", "power"]
@@ -573,7 +573,7 @@ class TestRunOfficialCommand:
         assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
 
     def test_run_official_invalid_scale_factor(self):
-        """Test run-official still rejects non-TPC scale factors."""
+
         runner = CliRunner()
         result = runner.invoke(
             cli, ["run-official", "tpch", "--platform", "duckdb", "--scale", "0.5", "--phases", "power"]

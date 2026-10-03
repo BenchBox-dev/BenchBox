@@ -66,7 +66,7 @@ class TestTPCHOfficialBenchmark:
         return factory
 
     def test_official_benchmark_initialization(self, temp_dir):
-        """Test initialization of TPCHOfficialBenchmark."""
+
         benchmark = TPCHOfficialBenchmark(scale_factor=0.01, output_dir=temp_dir, verbose=True, num_streams=2)
 
         assert benchmark.config.scale_factor == 0.01
@@ -77,7 +77,7 @@ class TestTPCHOfficialBenchmark:
         assert temp_dir.exists()
 
     def test_benchmark_result_initialization(self):
-        """Test TPCHOfficialBenchmarkResult initialization."""
+
         config = TPCHOfficialBenchmarkConfig(scale_factor=0.01)
         result = TPCHOfficialBenchmarkResult(
             config=config,
@@ -102,7 +102,7 @@ class TestTPCHOfficialBenchmark:
         assert result.errors == []
 
     def test_config_initialization(self):
-        """Test configuration initialization."""
+
         config = TPCHOfficialBenchmarkConfig(
             scale_factor=0.01,
             num_streams=8,
@@ -124,16 +124,14 @@ class TestTPCHOfficialBenchmark:
         assert config.verbose is True
 
     def test_run_official_benchmark_basic(self, benchmark_instance, mock_connection_factory):
-        """Test basic official benchmark execution."""
+
         # Create mock methods on the benchmark instance (which official_benchmark.py expects)
         benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 100.0})
         benchmark_instance.benchmark.run_throughput_test = Mock(return_value={"throughput_at_size": 200.0})
         benchmark_instance.benchmark.run_maintenance_test = Mock(return_value=Mock(success=True))
 
-        # Run benchmark
         result = benchmark_instance.run_official_benchmark(mock_connection_factory)
 
-        # Verify results
         assert isinstance(result, TPCHOfficialBenchmarkResult)
         assert result.success is True
         assert result.start_time is not None
@@ -145,7 +143,7 @@ class TestTPCHOfficialBenchmark:
         assert abs(result.qphh_at_size - 141.42) < 0.01
 
     def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory):
-        """Test official benchmark with custom configuration."""
+
         custom_config = TPCHOfficialBenchmarkConfig(
             scale_factor=0.01,
             num_streams=2,
@@ -166,7 +164,7 @@ class TestTPCHOfficialBenchmark:
         assert result.qphh_at_size == 0.0  # Cannot calculate without both
 
     def test_validate_compliance(self, benchmark_instance):
-        """Test compliance validation."""
+
         # Valid result
         valid_result = TPCHOfficialBenchmarkResult(
             config=TPCHOfficialBenchmarkConfig(),
@@ -204,7 +202,7 @@ class TestTPCHOfficialBenchmark:
         assert benchmark_instance.validate_compliance(invalid_result) is False
 
     def test_generate_audit_trail(self, benchmark_instance, temp_dir):
-        """Test audit trail generation."""
+
         result = TPCHOfficialBenchmarkResult(
             config=TPCHOfficialBenchmarkConfig(scale_factor=0.01, num_streams=2),
             start_time="2023-01-01T00:00:00",
@@ -244,7 +242,7 @@ class TestTPCHOfficialBenchmark:
                 os.unlink(audit_file)
 
     def test_error_handling_during_execution(self):
-        """Test error handling during benchmark execution."""
+
         config = TPCHOfficialBenchmarkConfig(scale_factor=0.01, verbose=False)
 
         result = TPCHOfficialBenchmarkResult(
@@ -277,7 +275,7 @@ class TestTPCHOfficialBenchmark:
         assert "Database connection failed" in result.errors[0]
 
     def test_qphh_calculation_accuracy(self, benchmark_instance, mock_connection_factory):
-        """Test QphH@Size calculation accuracy with various values."""
+
         test_cases = [
             (100.0, 400.0, 200.0),  # sqrt(100*400) = 200
             (360.0, 480.0, 415.69),  # sqrt(360*480) ≈ 415.69
@@ -295,7 +293,7 @@ class TestTPCHOfficialBenchmark:
             assert abs(result.qphh_at_size - expected_qphh) < 0.01
 
     def test_partial_failure_handling(self, benchmark_instance, mock_connection_factory):
-        """Test handling when some phases fail."""
+
         # Power test succeeds
         benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 100.0})
         # Throughput test fails
@@ -313,7 +311,7 @@ class TestTPCHOfficialBenchmark:
         assert result.qphh_at_size == 0.0  # Cannot calculate
 
     def test_timing_metrics(self, benchmark_instance, mock_connection_factory):
-        """Test that timing metrics are properly recorded."""
+
         # Create mock methods
         benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 100.0})
         benchmark_instance.benchmark.run_throughput_test = Mock(return_value={"throughput_at_size": 200.0})
@@ -328,7 +326,7 @@ class TestTPCHOfficialBenchmark:
         assert result.start_time < result.end_time
 
     def test_all_phases_enabled(self, benchmark_instance, mock_connection_factory):
-        """Test benchmark execution with all three phases enabled."""
+
         # Create mock methods
         mock_power = Mock(return_value={"power_at_size": 500.0})
         mock_throughput = Mock(return_value={"throughput_at_size": 800.0})
@@ -364,7 +362,7 @@ class TestTPCHOfficialBenchmark:
         assert result.qphh_at_size == 0.0  # Cannot calculate geometric mean with zero
 
     def test_integration_with_base_benchmark(self, temp_dir):
-        """Test integration with main TPCHBenchmark class."""
+
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 
         # Create base benchmark

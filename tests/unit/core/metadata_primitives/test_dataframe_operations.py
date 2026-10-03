@@ -49,7 +49,7 @@ class TestDataFrameMetadataCapabilities:
     """Test DataFrameMetadataCapabilities functionality."""
 
     def test_polars_capabilities(self):
-        """Test Polars platform capabilities."""
+
         caps = POLARS_METADATA_CAPABILITIES
         assert caps.platform_name == "polars-df"
         assert caps.supports_schema_introspection is True
@@ -58,7 +58,7 @@ class TestDataFrameMetadataCapabilities:
         assert caps.supports_delta_lake is False
 
     def test_pandas_capabilities(self):
-        """Test Pandas platform capabilities."""
+
         caps = PANDAS_METADATA_CAPABILITIES
         assert caps.platform_name == "pandas-df"
         assert caps.supports_schema_introspection is True
@@ -67,7 +67,7 @@ class TestDataFrameMetadataCapabilities:
         assert caps.supports_complex_types is False
 
     def test_pyspark_capabilities(self):
-        """Test PySpark platform capabilities."""
+
         caps = PYSPARK_METADATA_CAPABILITIES
         assert caps.platform_name == "pyspark-df"
         assert caps.supports_schema_introspection is True
@@ -75,14 +75,14 @@ class TestDataFrameMetadataCapabilities:
         assert caps.supports_partitions is True
 
     def test_datafusion_capabilities(self):
-        """Test DataFusion platform capabilities."""
+
         caps = DATAFUSION_METADATA_CAPABILITIES
         assert caps.platform_name == "datafusion-df"
         assert caps.supports_schema_introspection is True
         assert caps.supports_catalog is False
 
     def test_supports_operation_schema(self):
-        """Test schema operation support checking."""
+
         caps = POLARS_METADATA_CAPABILITIES
 
         # Schema ops should be supported
@@ -92,7 +92,7 @@ class TestDataFrameMetadataCapabilities:
         assert caps.supports_operation(MetadataOperationType.ROW_COUNT) is True
 
     def test_supports_operation_catalog(self):
-        """Test catalog operation support checking."""
+
         polars_caps = POLARS_METADATA_CAPABILITIES
         pyspark_caps = PYSPARK_METADATA_CAPABILITIES
 
@@ -105,7 +105,7 @@ class TestDataFrameMetadataCapabilities:
         assert pyspark_caps.supports_operation(MetadataOperationType.LIST_TABLES) is True
 
     def test_supports_operation_lakehouse(self):
-        """Test lakehouse operation support checking."""
+
         caps = POLARS_METADATA_CAPABILITIES
 
         # Polars doesn't support Delta Lake ops by default
@@ -113,7 +113,7 @@ class TestDataFrameMetadataCapabilities:
         assert caps.supports_operation(MetadataOperationType.TABLE_DETAIL) is False
 
     def test_get_supported_operations(self):
-        """Test getting list of supported operations."""
+
         caps = POLARS_METADATA_CAPABILITIES
         supported = caps.get_supported_operations()
 
@@ -122,7 +122,7 @@ class TestDataFrameMetadataCapabilities:
         assert MetadataOperationType.LIST_DATABASES not in supported
 
     def test_get_unsupported_operations(self):
-        """Test getting list of unsupported operations."""
+
         caps = POLARS_METADATA_CAPABILITIES
         unsupported = caps.get_unsupported_operations()
 
@@ -131,7 +131,7 @@ class TestDataFrameMetadataCapabilities:
         assert MetadataOperationType.LIST_COLUMNS not in unsupported
 
     def test_get_supported_categories(self):
-        """Test getting supported operation categories."""
+
         polars_caps = POLARS_METADATA_CAPABILITIES
         pyspark_caps = PYSPARK_METADATA_CAPABILITIES
 
@@ -152,30 +152,30 @@ class TestGetPlatformCapabilities:
     """Test get_platform_capabilities function."""
 
     def test_get_polars_capabilities(self):
-        """Test getting Polars capabilities."""
+
         caps = get_platform_capabilities("polars-df")
         assert caps.supports_schema_introspection is True
         assert caps.supports_catalog is False
 
     def test_get_pandas_capabilities(self):
-        """Test getting Pandas capabilities."""
+
         caps = get_platform_capabilities("pandas-df")
         assert caps.supports_schema_introspection is True
         assert caps.supports_complex_types is False
 
     def test_get_pyspark_capabilities(self):
-        """Test getting PySpark capabilities."""
+
         caps = get_platform_capabilities("pyspark-df")
         assert caps.supports_catalog is True
 
     def test_get_unknown_platform(self):
-        """Test getting capabilities for unknown platform."""
+
         caps = get_platform_capabilities("unknown-platform")
         assert caps.supports_schema_introspection is True  # Basic support assumed
         assert caps.supports_catalog is False
 
     def test_get_capabilities_with_overrides(self):
-        """Test getting capabilities with custom overrides."""
+
         caps = get_platform_capabilities(
             "pyspark-df",
             supports_delta_lake=True,
@@ -190,7 +190,7 @@ class TestDataFrameMetadataResult:
     """Test DataFrameMetadataResult dataclass."""
 
     def test_success_result_creation(self):
-        """Test creating a successful result."""
+
         start_time = time.time()
         result = DataFrameMetadataResult.success_result(
             operation_type=MetadataOperationType.LIST_COLUMNS,
@@ -207,7 +207,7 @@ class TestDataFrameMetadataResult:
         assert result.duration_ms >= 0
 
     def test_failure_result_creation(self):
-        """Test creating a failure result."""
+
         result = DataFrameMetadataResult.failure_result(
             operation_type=MetadataOperationType.LIST_DATABASES,
             error_message="Catalog not configured",
@@ -219,7 +219,7 @@ class TestDataFrameMetadataResult:
         assert result.result_count == 0
 
     def test_failure_result_with_start_time(self):
-        """Test creating a failure result with explicit start time."""
+
         start_time = time.time() - 0.1  # 100ms ago
         result = DataFrameMetadataResult.failure_result(
             operation_type=MetadataOperationType.TABLE_HISTORY,
@@ -232,7 +232,7 @@ class TestDataFrameMetadataResult:
         assert result.duration_ms >= 99  # Approximately 100ms
 
     def test_result_metrics(self):
-        """Test result with custom metrics."""
+
         start_time = time.time()
         result = DataFrameMetadataResult.success_result(
             operation_type=MetadataOperationType.ROW_COUNT,
@@ -251,7 +251,7 @@ class TestOperationCategories:
     """Test operation category mapping."""
 
     def test_schema_operations_category(self):
-        """Test that schema operations map to schema category."""
+
         schema_ops = [
             MetadataOperationType.LIST_COLUMNS,
             MetadataOperationType.GET_DTYPES,
@@ -265,7 +265,7 @@ class TestOperationCategories:
             assert OPERATION_CATEGORIES[op] == MetadataOperationCategory.SCHEMA
 
     def test_catalog_operations_category(self):
-        """Test that catalog operations map to catalog category."""
+
         catalog_ops = [
             MetadataOperationType.LIST_DATABASES,
             MetadataOperationType.LIST_TABLES,
@@ -278,7 +278,7 @@ class TestOperationCategories:
             assert OPERATION_CATEGORIES[op] == MetadataOperationCategory.CATALOG
 
     def test_lakehouse_operations_category(self):
-        """Test that lakehouse operations map to lakehouse category."""
+
         lakehouse_ops = [
             MetadataOperationType.TABLE_HISTORY,
             MetadataOperationType.TABLE_DETAIL,
@@ -296,7 +296,7 @@ class TestUnsupportedOperationError:
     """Test UnsupportedOperationError exception."""
 
     def test_error_message(self):
-        """Test error message formatting."""
+
         error = UnsupportedOperationError(
             operation=MetadataOperationType.LIST_DATABASES,
             platform_name="polars-df",
@@ -306,7 +306,7 @@ class TestUnsupportedOperationError:
         assert "list_databases" in str(error)
 
     def test_error_with_suggestion(self):
-        """Test error message with suggestion."""
+
         error = UnsupportedOperationError(
             operation=MetadataOperationType.LIST_DATABASES,
             platform_name="polars-df",
@@ -321,7 +321,7 @@ class TestGetUnsupportedMessage:
     """Test get_unsupported_message function."""
 
     def test_catalog_operation_message(self):
-        """Test message for unsupported catalog operation."""
+
         message = get_unsupported_message(MetadataOperationType.LIST_DATABASES, "polars-df")
 
         assert "catalog operations" in message.lower()
@@ -329,14 +329,14 @@ class TestGetUnsupportedMessage:
         assert "schema introspection" in message.lower()
 
     def test_lakehouse_delta_message(self):
-        """Test message for unsupported Delta Lake operation."""
+
         message = get_unsupported_message(MetadataOperationType.TABLE_HISTORY, "polars-df")
 
         assert "delta lake" in message.lower()
         assert "pyspark-df" in message.lower() or "polars" in message.lower()
 
     def test_lakehouse_iceberg_message(self):
-        """Test message for unsupported Iceberg operation."""
+
         message = get_unsupported_message(MetadataOperationType.SNAPSHOT_INFO, "polars-df")
 
         assert "iceberg" in message.lower()
@@ -347,7 +347,7 @@ class TestDataFrameMetadataOperationsManager:
     """Test DataFrameMetadataOperationsManager class."""
 
     def test_manager_initialization_polars(self):
-        """Test manager initialization for Polars."""
+
         manager = DataFrameMetadataOperationsManager("polars-df")
         assert manager.platform_name == "polars-df"
 
@@ -356,12 +356,12 @@ class TestDataFrameMetadataOperationsManager:
         assert caps.supports_catalog is False
 
     def test_manager_initialization_pandas(self):
-        """Test manager initialization for Pandas."""
+
         manager = DataFrameMetadataOperationsManager("pandas-df")
         assert manager.platform_name == "pandas-df"
 
     def test_manager_initialization_pyspark_no_session(self):
-        """Test manager initialization for PySpark without session."""
+
         manager = DataFrameMetadataOperationsManager("pyspark-df")
         assert manager.spark_session is None
 
@@ -369,14 +369,14 @@ class TestDataFrameMetadataOperationsManager:
         assert caps.supports_catalog is True
 
     def test_supports_operation(self):
-        """Test supports_operation method."""
+
         manager = DataFrameMetadataOperationsManager("polars-df")
 
         assert manager.supports_operation(MetadataOperationType.LIST_COLUMNS) is True
         assert manager.supports_operation(MetadataOperationType.LIST_DATABASES) is False
 
     def test_get_supported_operations(self):
-        """Test get_supported_operations method."""
+
         manager = DataFrameMetadataOperationsManager("polars-df")
         supported = manager.get_supported_operations()
 
@@ -391,7 +391,7 @@ class TestDataFrameMetadataOperationsManager:
         manager.validate_operation(MetadataOperationType.LIST_COLUMNS)
 
     def test_validate_operation_failure(self):
-        """Test validate_operation for unsupported operation."""
+
         manager = DataFrameMetadataOperationsManager("polars-df")
 
         with pytest.raises(UnsupportedOperationError) as exc_info:
@@ -406,19 +406,19 @@ class TestGetDataFrameMetadataManager:
     """Test get_dataframe_metadata_manager factory function."""
 
     def test_get_polars_manager(self):
-        """Test getting Polars manager."""
+
         manager = get_dataframe_metadata_manager("polars-df")
         assert manager is not None
         assert manager.platform_name == "polars-df"
 
     def test_get_pandas_manager(self):
-        """Test getting Pandas manager."""
+
         manager = get_dataframe_metadata_manager("pandas-df")
         assert manager is not None
         assert manager.platform_name == "pandas-df"
 
     def test_get_non_dataframe_platform(self):
-        """Test getting manager for non-DataFrame platform returns None."""
+
         manager = get_dataframe_metadata_manager("duckdb")
         assert manager is None
 
@@ -453,7 +453,7 @@ class TestPolarsMetadataOperations:
         return DataFrameMetadataOperationsManager("polars-df")
 
     def test_execute_list_columns(self, polars_manager, sample_polars_df):
-        """Test listing columns from Polars DataFrame."""
+
         result = polars_manager.execute_list_columns(sample_polars_df)
 
         assert result.success is True
@@ -462,7 +462,7 @@ class TestPolarsMetadataOperations:
         assert result.duration_ms >= 0
 
     def test_execute_get_dtypes(self, polars_manager, sample_polars_df):
-        """Test getting dtypes from Polars DataFrame."""
+
         result = polars_manager.execute_get_dtypes(sample_polars_df)
 
         assert result.success is True
@@ -471,7 +471,7 @@ class TestPolarsMetadataOperations:
         assert "name" in result.result_data
 
     def test_execute_get_schema(self, polars_manager, sample_polars_df):
-        """Test getting full schema from Polars DataFrame."""
+
         result = polars_manager.execute_get_schema(sample_polars_df)
 
         assert result.success is True
@@ -485,14 +485,14 @@ class TestPolarsMetadataOperations:
         assert all("nullable" in col for col in schema)
 
     def test_execute_describe_stats(self, polars_manager, sample_polars_df):
-        """Test getting summary statistics from Polars DataFrame."""
+
         result = polars_manager.execute_describe_stats(sample_polars_df)
 
         assert result.success is True
         assert result.result_count > 0
 
     def test_execute_row_count(self, polars_manager, sample_polars_df):
-        """Test getting row count from Polars DataFrame."""
+
         result = polars_manager.execute_row_count(sample_polars_df)
 
         assert result.success is True
@@ -500,7 +500,7 @@ class TestPolarsMetadataOperations:
         assert result.metrics.get("row_count") == 5
 
     def test_execute_column_count(self, polars_manager, sample_polars_df):
-        """Test getting column count from Polars DataFrame."""
+
         result = polars_manager.execute_column_count(sample_polars_df)
 
         assert result.success is True
@@ -508,7 +508,7 @@ class TestPolarsMetadataOperations:
         assert result.metrics.get("column_count") == 4
 
     def test_catalog_operations_fail_on_polars(self, polars_manager):
-        """Test that catalog operations raise appropriate errors on Polars."""
+
         with pytest.raises(UnsupportedOperationError):
             polars_manager.execute_list_databases()
 
@@ -540,7 +540,7 @@ class TestPandasMetadataOperations:
         return DataFrameMetadataOperationsManager("pandas-df")
 
     def test_execute_list_columns(self, pandas_manager, sample_pandas_df):
-        """Test listing columns from Pandas DataFrame."""
+
         result = pandas_manager.execute_list_columns(sample_pandas_df)
 
         assert result.success is True
@@ -548,7 +548,7 @@ class TestPandasMetadataOperations:
         assert result.result_data == ["id", "name", "age", "salary"]
 
     def test_execute_get_dtypes(self, pandas_manager, sample_pandas_df):
-        """Test getting dtypes from Pandas DataFrame."""
+
         result = pandas_manager.execute_get_dtypes(sample_pandas_df)
 
         assert result.success is True
@@ -556,7 +556,7 @@ class TestPandasMetadataOperations:
         assert "id" in result.result_data
 
     def test_execute_get_schema(self, pandas_manager, sample_pandas_df):
-        """Test getting full schema from Pandas DataFrame."""
+
         result = pandas_manager.execute_get_schema(sample_pandas_df)
 
         assert result.success is True
@@ -567,14 +567,14 @@ class TestPandasMetadataOperations:
         assert all("nullable" in col for col in schema)
 
     def test_execute_row_count(self, pandas_manager, sample_pandas_df):
-        """Test getting row count from Pandas DataFrame."""
+
         result = pandas_manager.execute_row_count(sample_pandas_df)
 
         assert result.success is True
         assert result.result_data == 5
 
     def test_execute_column_count(self, pandas_manager, sample_pandas_df):
-        """Test getting column count from Pandas DataFrame."""
+
         result = pandas_manager.execute_column_count(sample_pandas_df)
 
         assert result.success is True
@@ -938,7 +938,7 @@ class TestComplexityOperations:
         return DataFrameMetadataOperationsManager("polars-df")
 
     def test_execute_wide_table_schema(self, polars_manager, wide_polars_df):
-        """Test wide table schema introspection."""
+
         result = polars_manager.execute_wide_table_schema(wide_polars_df)
 
         assert result.success is True
@@ -948,7 +948,7 @@ class TestComplexityOperations:
         assert len(result.result_data) == 150
 
     def test_execute_complex_type_introspection(self, polars_manager, complex_polars_df):
-        """Test complex type introspection."""
+
         result = polars_manager.execute_complex_type_introspection(complex_polars_df)
 
         assert result.success is True
@@ -956,7 +956,7 @@ class TestComplexityOperations:
         assert result.metrics["complex_column_count"] >= 2
 
     def test_wide_table_schema_pandas(self):
-        """Test wide table schema introspection with Pandas."""
+
         try:
             import pandas as pd
         except ImportError:
@@ -974,7 +974,7 @@ class TestComplexityOperations:
         assert result.metrics["is_wide_table"] is True
 
     def test_large_catalog_list_requires_spark(self):
-        """Test that large catalog list requires SparkSession."""
+
         manager = DataFrameMetadataOperationsManager("polars-df")
 
         with pytest.raises(UnsupportedOperationError):
@@ -986,7 +986,7 @@ class TestBenchmarkDataFrameIntegration:
     """Test MetadataPrimitivesBenchmark DataFrame integration."""
 
     def test_supports_dataframe_mode(self):
-        """Test that benchmark reports DataFrame mode support."""
+
         from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -1000,7 +1000,7 @@ class TestBenchmarkDataFrameIntegration:
         assert benchmark.skip_dataframe_data_loading() is True
 
     def test_get_dataframe_operations(self):
-        """Test getting DataFrame operations from benchmark."""
+
         from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -1010,7 +1010,7 @@ class TestBenchmarkDataFrameIntegration:
         assert isinstance(ops, DataFrameMetadataOperationsManager)
 
     def test_get_dataframe_operations_invalid_platform(self):
-        """Test error for invalid platform."""
+
         from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -1019,7 +1019,7 @@ class TestBenchmarkDataFrameIntegration:
             benchmark.get_dataframe_operations("duckdb")
 
     def test_get_dataframe_capabilities(self):
-        """Test getting DataFrame capabilities from benchmark."""
+
         from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 
         benchmark = MetadataPrimitivesBenchmark()
@@ -1040,7 +1040,7 @@ class TestBenchmarkDataFrameIntegration:
         assert "DataFrame mode runs platform-specific metadata operation subsets" in metadata["query_description"]
 
     def test_run_dataframe_benchmark_polars(self):
-        """Test running DataFrame benchmark with Polars."""
+
         try:
             import polars as pl
         except ImportError:

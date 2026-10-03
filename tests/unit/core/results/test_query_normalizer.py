@@ -37,40 +37,40 @@ class TestNormalizeQueryId:
     """Tests for normalize_query_id function."""
 
     def test_normalize_with_q_prefix(self) -> None:
-        """Test normalizing query ID with Q prefix."""
+
         assert normalize_query_id("Q1") == "1"
         assert normalize_query_id("Q21") == "21"
         assert normalize_query_id("Q99") == "99"
 
     def test_normalize_lowercase_q_prefix(self) -> None:
-        """Test normalizing query ID with lowercase q prefix."""
+
         assert normalize_query_id("q1") == "1"
         assert normalize_query_id("q21") == "21"
 
     def test_normalize_without_prefix(self) -> None:
-        """Test normalizing query ID without prefix."""
+
         assert normalize_query_id("1") == "1"
         assert normalize_query_id("21") == "21"
         assert normalize_query_id("99") == "99"
 
     def test_normalize_query_prefix(self) -> None:
-        """Test normalizing query ID with QUERY prefix."""
+
         assert normalize_query_id("QUERY_1") == "1"
         assert normalize_query_id("query_21") == "21"
         assert normalize_query_id("QUERY1") == "1"
 
     def test_normalize_integer_input(self) -> None:
-        """Test normalizing integer input."""
+
         assert normalize_query_id(1) == "1"
         assert normalize_query_id(21) == "21"
 
     def test_normalize_with_whitespace(self) -> None:
-        """Test normalizing query ID with whitespace."""
+
         assert normalize_query_id("  Q1  ") == "1"
         assert normalize_query_id("Q21 ") == "21"
 
     def test_normalize_with_suffix(self) -> None:
-        """Test normalizing query ID with suffixes."""
+
         assert normalize_query_id("Q1.sql") == "1"
         assert normalize_query_id("query_12.txt") == "12"
 
@@ -118,18 +118,18 @@ class TestFormatQueryId:
     """Tests for format_query_id function."""
 
     def test_format_with_prefix(self) -> None:
-        """Test formatting query ID with Q prefix."""
+
         assert format_query_id("1") == "Q1"
         assert format_query_id("21") == "Q21"
         assert format_query_id("Q1") == "Q1"  # Already has prefix
 
     def test_format_without_prefix(self) -> None:
-        """Test formatting query ID without prefix."""
+
         assert format_query_id("1", with_prefix=False) == "1"
         assert format_query_id("Q1", with_prefix=False) == "1"
 
     def test_format_integer_input(self) -> None:
-        """Test formatting integer input."""
+
         assert format_query_id(1) == "Q1"
         assert format_query_id(21) == "Q21"
 
@@ -138,7 +138,7 @@ class TestNormalizeQueryResult:
     """Tests for normalize_query_result function."""
 
     def test_normalize_basic_result(self) -> None:
-        """Test normalizing a basic query result."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 1.5,
@@ -156,7 +156,7 @@ class TestNormalizeQueryResult:
         assert result.run_type == "measurement"
 
     def test_normalize_with_iteration_and_stream(self) -> None:
-        """Test normalizing result with iteration and stream info."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 1.5,
@@ -203,7 +203,7 @@ class TestNormalizeQueryResult:
         assert result.run_type == "warmup"
 
     def test_normalize_execution_time_from_ms(self) -> None:
-        """Test normalizing execution time from milliseconds."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_ms": 1500,
@@ -215,7 +215,7 @@ class TestNormalizeQueryResult:
         assert result.execution_time_seconds == 1.5
 
     def test_normalize_alternative_field_names(self) -> None:
-        """Test normalizing with alternative field names."""
+
         raw = {
             "id": "Q1",
             "execution_time_ms": 1500,
@@ -268,7 +268,7 @@ class TestNormalizeQueryResult:
         assert result.rows_returned == 0
 
     def test_normalize_failed_result(self) -> None:
-        """Test normalizing a failed query result."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 0.0,
@@ -282,7 +282,7 @@ class TestNormalizeQueryResult:
         assert result.error_message == "Timeout occurred"
 
     def test_normalize_with_cost(self) -> None:
-        """Test normalizing result with cost information."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 1.5,
@@ -295,7 +295,7 @@ class TestNormalizeQueryResult:
         assert result.cost == 0.05
 
     def test_normalize_with_row_count_validation(self) -> None:
-        """Test normalizing result with row count validation."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 1.5,
@@ -333,7 +333,7 @@ class TestNormalizeQueryResult:
         assert result.plan_capture_error is None
 
     def test_normalize_with_defaults(self) -> None:
-        """Test normalizing with custom defaults."""
+
         raw = {
             "query_id": "Q1",
             "execution_time_seconds": 1.5,
@@ -378,7 +378,7 @@ class TestNormalizeQueryResults:
     """Tests for normalize_query_results function."""
 
     def test_normalize_multiple_results(self) -> None:
-        """Test normalizing multiple query results."""
+
         raw_results = [
             {"query_id": "Q1", "execution_time_seconds": 1.0, "status": "SUCCESS"},
             {"query_id": "Q2", "execution_time_seconds": 2.0, "status": "SUCCESS"},
@@ -393,12 +393,12 @@ class TestNormalizeQueryResults:
         assert results[2].query_id == "3"
 
     def test_normalize_empty_list(self) -> None:
-        """Test normalizing empty results list."""
+
         results = normalize_query_results([])
         assert results == []
 
     def test_normalize_with_default_stream_id(self) -> None:
-        """Test normalizing with default stream ID."""
+
         raw_results = [
             {"query_id": "Q1", "execution_time_seconds": 1.0, "status": "SUCCESS"},
         ]
@@ -407,7 +407,7 @@ class TestNormalizeQueryResults:
         assert results[0].stream_id == 5
 
     def test_normalize_preserves_explicit_iteration(self) -> None:
-        """Test that explicit iteration values are preserved."""
+
         raw_results = [
             {"query_id": "Q1", "execution_time_seconds": 1.0, "status": "SUCCESS", "iteration": 3},
         ]
@@ -420,7 +420,7 @@ class TestQueryResultInput:
     """Tests for QueryResultInput dataclass."""
 
     def test_create_basic(self) -> None:
-        """Test creating a basic QueryResultInput."""
+
         result = QueryResultInput(
             query_id="1",
             execution_time_seconds=1.5,
@@ -437,7 +437,7 @@ class TestQueryResultInput:
         assert result.error_message is None
 
     def test_create_with_all_fields(self) -> None:
-        """Test creating QueryResultInput with all fields."""
+
         result = QueryResultInput(
             query_id="21",
             execution_time_seconds=2.5,

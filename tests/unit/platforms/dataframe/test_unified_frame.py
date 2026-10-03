@@ -55,7 +55,6 @@ class TestUnifiedExprStringConcat:
         unified_lazy_frame_cls = _get_unified_lazy_frame()
         mock_adapter = _create_mock_adapter()
 
-        # Create a simple Polars DataFrame
         df = polars.DataFrame({"name": ["Alice", "Bob"], "id": [1, 2]}).lazy()
         return {
             "polars": polars,
@@ -63,7 +62,7 @@ class TestUnifiedExprStringConcat:
         }
 
     def test_polars_string_concat_with_plus(self, polars_context):
-        """Test that Polars string concatenation works with + operator."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -80,7 +79,7 @@ class TestUnifiedExprStringConcat:
         assert result["greeting"].to_list() == ["Hello, Alice", "Hello, Bob"]
 
     def test_polars_concat_str_method(self, polars_context):
-        """Test the explicit concat_str method for Polars."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -114,7 +113,7 @@ class TestUnifiedExprBitwiseAnd:
         }
 
     def test_polars_bitwise_and_with_int(self, polars_context):
-        """Test bitwise AND with integer operand in Polars."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -128,7 +127,7 @@ class TestUnifiedExprBitwiseAnd:
         assert result["bit0"].to_list() == [0, 1, 0, 1, 1]
 
     def test_polars_bitwise_and_with_mask(self, polars_context):
-        """Test bitwise AND with larger mask in Polars."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -160,7 +159,7 @@ class TestUnifiedExprMathMethods:
         }
 
     def test_round_method(self, polars_context):
-        """Test round method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -172,7 +171,7 @@ class TestUnifiedExprMathMethods:
         assert result["rounded"].to_list() == [1.23, -5.68, 10.0, -0.1]
 
     def test_abs_method(self, polars_context):
-        """Test abs method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -220,7 +219,7 @@ class TestUnifiedLazyFrameJoins:
         }
 
     def test_inner_join_on_column(self, polars_dfs):
-        """Test simple inner join on column name."""
+
         left = polars_dfs["left"]
         right = polars_dfs["right"]
 
@@ -231,7 +230,7 @@ class TestUnifiedLazyFrameJoins:
         assert set(result["id"].to_list()) == {2, 3}
 
     def test_left_join_with_suffix(self, polars_dfs):
-        """Test left join applies suffix to duplicate columns."""
+
         pl = polars_dfs["polars"]
         left = polars_dfs["left"]
         mock_adapter = polars_dfs["mock_adapter"]
@@ -255,7 +254,7 @@ class TestUnifiedLazyFrameJoins:
         assert "name_r" in result.columns
 
     def test_cross_join(self, polars_dfs):
-        """Test cross join produces cartesian product."""
+
         pl = polars_dfs["polars"]
         mock_adapter = polars_dfs["mock_adapter"]
 
@@ -288,7 +287,7 @@ class TestUnifiedLazyFrameWithColumns:
         }
 
     def test_with_columns_adds_column(self, polars_df):
-        """Test with_columns adds a new column."""
+
         pl = polars_df["polars"]
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
@@ -301,7 +300,7 @@ class TestUnifiedLazyFrameWithColumns:
         assert result["z"].to_list() == [11, 22, 33]
 
     def test_with_columns_replaces_existing(self, polars_df):
-        """Test with_columns replaces existing column with same name."""
+
         pl = polars_df["polars"]
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
@@ -333,7 +332,7 @@ class TestUnifiedStrExpr:
         }
 
     def test_starts_with(self, polars_context):
-        """Test starts_with method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -345,7 +344,7 @@ class TestUnifiedStrExpr:
         assert result["starts"].to_list() == [True, False, False, False]
 
     def test_ends_with(self, polars_context):
-        """Test ends_with method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -357,7 +356,7 @@ class TestUnifiedStrExpr:
         assert result["ends"].to_list() == [True, False, False, False]
 
     def test_contains(self, polars_context):
-        """Test contains method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -395,7 +394,7 @@ class TestUnifiedStrExpr:
         assert _unwrap_unified_expr(column_expr) is native_expr
 
     def test_slice(self, polars_context):
-        """Test slice method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -437,7 +436,7 @@ class TestUnifiedDtExpr:
         }
 
     def test_year(self, polars_context):
-        """Test year extraction."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -449,7 +448,7 @@ class TestUnifiedDtExpr:
         assert result["year"].to_list() == [2023, 2024, 2025]
 
     def test_month(self, polars_context):
-        """Test month extraction."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -461,7 +460,7 @@ class TestUnifiedDtExpr:
         assert result["month"].to_list() == [1, 6, 12]
 
     def test_day(self, polars_context):
-        """Test day extraction."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -491,7 +490,7 @@ class TestUnifiedExprArithmetic:
         }
 
     def test_subtraction(self, polars_context):
-        """Test subtraction operator."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -502,7 +501,7 @@ class TestUnifiedExprArithmetic:
         assert result["diff"].to_list() == [8, 16, 25]
 
     def test_multiplication(self, polars_context):
-        """Test multiplication operator."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -513,7 +512,7 @@ class TestUnifiedExprArithmetic:
         assert result["prod"].to_list() == [20, 80, 150]
 
     def test_division(self, polars_context):
-        """Test division operator."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -562,7 +561,7 @@ class TestUnifiedExprComparison:
         }
 
     def test_equal(self, polars_context):
-        """Test equality comparison."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -572,7 +571,7 @@ class TestUnifiedExprComparison:
         assert result["eq"].to_list() == [False, True, False]
 
     def test_not_equal(self, polars_context):
-        """Test inequality comparison."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -582,7 +581,7 @@ class TestUnifiedExprComparison:
         assert result["ne"].to_list() == [True, False, True]
 
     def test_less_than(self, polars_context):
-        """Test less than comparison."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -592,7 +591,7 @@ class TestUnifiedExprComparison:
         assert result["lt"].to_list() == [True, False, False]
 
     def test_less_than_or_equal(self, polars_context):
-        """Test less than or equal comparison."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -602,7 +601,7 @@ class TestUnifiedExprComparison:
         assert result["le"].to_list() == [True, True, False]
 
     def test_greater_than(self, polars_context):
-        """Test greater than comparison."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -612,7 +611,7 @@ class TestUnifiedExprComparison:
         assert result["gt"].to_list() == [False, False, True]
 
     def test_greater_than_or_equal(self, polars_context):
-        """Test greater than or equal comparison."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -640,7 +639,7 @@ class TestUnifiedExprAggregations:
         }
 
     def test_sum(self, polars_context):
-        """Test sum aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -650,7 +649,7 @@ class TestUnifiedExprAggregations:
         assert result["total"].to_list() == [30, 70]
 
     def test_mean(self, polars_context):
-        """Test mean aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -670,7 +669,7 @@ class TestUnifiedExprAggregations:
         assert result["avg"].to_list() == [15.0, 35.0]
 
     def test_count(self, polars_context):
-        """Test count aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -680,7 +679,7 @@ class TestUnifiedExprAggregations:
         assert result["cnt"].to_list() == [2, 2]
 
     def test_min(self, polars_context):
-        """Test min aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -690,7 +689,7 @@ class TestUnifiedExprAggregations:
         assert result["minimum"].to_list() == [10, 30]
 
     def test_max(self, polars_context):
-        """Test max aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -700,7 +699,7 @@ class TestUnifiedExprAggregations:
         assert result["maximum"].to_list() == [20, 40]
 
     def test_first(self, polars_context):
-        """Test first aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -711,7 +710,7 @@ class TestUnifiedExprAggregations:
         assert result["first"].to_list() == [10, 30]
 
     def test_last(self, polars_context):
-        """Test last aggregation."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -740,7 +739,7 @@ class TestUnifiedExprNullHandling:
         }
 
     def test_is_null(self, polars_context):
-        """Test is_null method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -750,7 +749,7 @@ class TestUnifiedExprNullHandling:
         assert result["isnull"].to_list() == [False, True, False, True, False]
 
     def test_is_not_null(self, polars_context):
-        """Test is_not_null method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -760,7 +759,7 @@ class TestUnifiedExprNullHandling:
         assert result["isnotnull"].to_list() == [True, False, True, False, True]
 
     def test_fill_null(self, polars_context):
-        """Test fill_null method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -788,7 +787,7 @@ class TestUnifiedExprMembership:
         }
 
     def test_is_in(self, polars_context):
-        """Test is_in method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -798,7 +797,7 @@ class TestUnifiedExprMembership:
         assert result["in_list"].to_list() == [True, True, False, False, True]
 
     def test_is_between(self, polars_context):
-        """Test is_between method."""
+
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()
@@ -861,7 +860,7 @@ class TestUnifiedExprCasting:
         assert result["as_int64"].to_list() == [1, 2, 3]
 
     def test_cast_string(self, polars_context):
-        """Test cast_string method."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -895,7 +894,7 @@ class TestUnifiedLazyFrameOperations:
         }
 
     def test_filter(self, polars_df):
-        """Test filter method."""
+
         pl = polars_df["polars"]
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
@@ -906,7 +905,7 @@ class TestUnifiedLazyFrameOperations:
         assert result["id"].to_list() == [1, 3, 5]
 
     def test_select(self, polars_df):
-        """Test select method."""
+
         pl = polars_df["polars"]
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
@@ -918,14 +917,14 @@ class TestUnifiedLazyFrameOperations:
         assert len(result) == 5
 
     def test_sort(self, polars_df):
-        """Test sort method."""
+
         df = polars_df["df"]
 
         result = df.sort("value", descending=True).collect()
         assert result["value"].to_list() == [50, 40, 30, 20, 10]
 
     def test_limit(self, polars_df):
-        """Test limit method."""
+
         df = polars_df["df"]
 
         result = df.limit(3).collect()
@@ -940,19 +939,19 @@ class TestUnifiedLazyFrameOperations:
         assert len(result) == 2
 
     def test_unique(self, polars_df):
-        """Test unique method."""
+
         df = polars_df["df"]
 
         result = df.select("category").unique().sort("category").collect()
         assert result["category"].to_list() == ["A", "B"]
 
     def test_columns_property(self, polars_df):
-        """Test columns property returns column names."""
+
         df = polars_df["df"]
         assert df.columns == ["id", "category", "value"]
 
     def test_native_property(self, polars_df):
-        """Test native property returns underlying DataFrame."""
+
         polars = pytest.importorskip("polars")
         df = polars_df["df"]
         native = df.native
@@ -961,7 +960,7 @@ class TestUnifiedLazyFrameOperations:
     # NOTE: drop_nulls test skipped - method not yet implemented in UnifiedLazyFrame
 
     def test_rename(self, polars_df):
-        """Test rename method."""
+
         df = polars_df["df"]
 
         result = df.rename({"id": "identifier", "value": "amount"}).collect()
@@ -970,7 +969,7 @@ class TestUnifiedLazyFrameOperations:
         assert "id" not in result.columns
 
     def test_group_by_with_list_agg(self, polars_df):
-        """Test group_by with list passed to agg."""
+
         pl = polars_df["polars"]
         df = polars_df["df"]
         unified_expr_cls = _get_unified_expr()
@@ -985,7 +984,7 @@ class TestUnifiedExprRepr:
     """Tests for UnifiedExpr representation."""
 
     def test_repr(self):
-        """Test __repr__ method."""
+
         polars = pytest.importorskip("polars")
         unified_expr_cls = _get_unified_expr()
 
@@ -1012,7 +1011,7 @@ class TestUnifiedExprLogical:
         }
 
     def test_or_operator(self, polars_context):
-        """Test OR operator."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -1023,7 +1022,7 @@ class TestUnifiedExprLogical:
         assert result["or_result"].to_list() == [True, True, True, False]
 
     def test_invert_operator(self, polars_context):
-        """Test NOT operator."""
+
         pl = polars_context["polars"]
         df = polars_context["df"]
         unified_expr_cls = _get_unified_expr()
@@ -1037,7 +1036,7 @@ class TestUnifiedExprNUnique:
     """Tests for n_unique method in UnifiedExpr."""
 
     def test_n_unique(self):
-        """Test n_unique aggregation."""
+
         polars = pytest.importorskip("polars")
 
         unified_lazy_frame_cls = _get_unified_lazy_frame()

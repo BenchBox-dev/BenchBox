@@ -61,7 +61,7 @@ class TestLiveStarburstConnection:
     """Test basic Starburst Galaxy connectivity."""
 
     def test_connection(self, live_starburst_adapter):
-        """Verify we can connect to Starburst Galaxy and run a trivial query."""
+
         connection = live_starburst_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -72,7 +72,7 @@ class TestLiveStarburstConnection:
             live_starburst_adapter.close_connection(connection)
 
     def test_platform_info(self, live_starburst_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = live_starburst_adapter.get_platform_info()
         assert info is not None
         assert info.get("platform_type") == "starburst"
@@ -202,7 +202,7 @@ class TestLiveStarburstSpecificFeatures:
     """Test Starburst Galaxy-specific features."""
 
     def test_show_catalogs(self, live_starburst_adapter):
-        """Verify we can list catalogs."""
+
         connection = live_starburst_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -213,7 +213,7 @@ class TestLiveStarburstSpecificFeatures:
             live_starburst_adapter.close_connection(connection)
 
     def test_information_schema(self, live_starburst_adapter):
-        """Verify information_schema is accessible on the default catalog."""
+
         connection = live_starburst_adapter.create_connection()
         try:
             cursor = connection.cursor()

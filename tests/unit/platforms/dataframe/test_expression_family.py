@@ -176,7 +176,7 @@ class TestExpressionFamilyContext:
     """Tests for ExpressionFamilyContext."""
 
     def test_context_creation(self):
-        """Test creating a context from an adapter."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -233,7 +233,7 @@ class TestExpressionFamilyContext:
         assert result == "cast_string(col(number))"
 
     def test_context_table_registration(self):
-        """Test table registration in context."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -247,7 +247,7 @@ class TestExpressionFamilyContext:
         assert result.native == test_df
 
     def test_context_list_tables(self):
-        """Test listing tables in context."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -263,7 +263,7 @@ class TestExpressionFamilyAdapter:
     """Tests for ExpressionFamilyAdapter abstract class."""
 
     def test_adapter_initialization(self):
-        """Test adapter initialization."""
+
         adapter = MockExpressionAdapter()
 
         assert adapter.platform_name == "MockExpression"
@@ -273,7 +273,7 @@ class TestExpressionFamilyAdapter:
         assert adapter.platform_config == {}
 
     def test_adapter_initialization_with_options(self):
-        """Test adapter initialization with options."""
+
         adapter = MockExpressionAdapter(
             working_dir="/tmp/test",
             verbose=True,
@@ -285,14 +285,14 @@ class TestExpressionFamilyAdapter:
         assert adapter.very_verbose is True
 
     def test_create_context(self):
-        """Test context creation."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
         assert isinstance(ctx, ExpressionFamilyContext)
 
     def test_get_context_creates_if_missing(self):
-        """Test that get_context creates context if missing."""
+
         adapter = MockExpressionAdapter()
 
         ctx = adapter.get_context()
@@ -301,7 +301,7 @@ class TestExpressionFamilyAdapter:
         assert adapter._context == ctx
 
     def test_get_context_returns_existing(self):
-        """Test that get_context returns existing context."""
+
         adapter = MockExpressionAdapter()
 
         ctx1 = adapter.create_context()
@@ -310,32 +310,31 @@ class TestExpressionFamilyAdapter:
         assert ctx1 is ctx2
 
     def test_detect_format_parquet(self):
-        """Test format detection for Parquet files."""
+
         adapter = MockExpressionAdapter()
 
         assert adapter._detect_format(Path("data.parquet")) == "parquet"
         assert adapter._detect_format(Path("/path/to/file.parquet")) == "parquet"
 
     def test_detect_format_tbl(self):
-        """Test format detection for TBL files."""
+
         adapter = MockExpressionAdapter()
 
         assert adapter._detect_format(Path("lineitem.tbl")) == "tbl"
         assert adapter._detect_format(Path("/tpch/orders.tbl")) == "tbl"
 
     def test_detect_format_csv(self):
-        """Test format detection for CSV files."""
+
         adapter = MockExpressionAdapter()
 
         assert adapter._detect_format(Path("data.csv")) == "csv"
         assert adapter._detect_format(Path("file.txt")) == "csv"  # default
 
     def test_execute_query_success(self):
-        """Test successful query execution."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
-        # Register a test table
         ctx.register_table("orders", {"rows": 100})
 
         def expression_impl(ctx):
@@ -385,7 +384,7 @@ class TestExpressionFamilyAdapter:
         assert result["execution_time_seconds"] >= 0.0
 
     def test_execute_query_failure(self):
-        """Test query execution failure handling."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -406,7 +405,7 @@ class TestExpressionFamilyAdapter:
         assert "Test error" in result["error"]
 
     def test_execute_query_no_impl(self):
-        """Test error when query has no expression implementation."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -426,11 +425,10 @@ class TestExpressionFamilyAdapter:
         assert "no expression implementation" in result["error"]
 
     def test_load_table_with_parquet(self, tmp_path):
-        """Test loading table from Parquet file."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
-        # Create a mock parquet file path
         parquet_file = tmp_path / "orders.parquet"
         parquet_file.touch()
 
@@ -440,7 +438,7 @@ class TestExpressionFamilyAdapter:
         assert row_count == 10  # Mock returns 10
 
     def test_load_table_no_files_raises(self):
-        """Test that loading with no files raises error."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
@@ -489,11 +487,10 @@ class TestQueryIntegration:
     """Integration tests for query execution."""
 
     def test_query_with_table_access(self):
-        """Test query that accesses registered tables."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 
-        # Register test data
         ctx.register_table("orders", {"rows": 50, "data": "test"})
         ctx.register_table("customers", {"rows": 10, "data": "cust"})
 
@@ -517,7 +514,7 @@ class TestQueryIntegration:
         assert result["rows_returned"] == 50
 
     def test_query_with_expression_helpers(self):
-        """Test query that uses expression helpers."""
+
         adapter = MockExpressionAdapter()
         ctx = adapter.create_context()
 

@@ -63,7 +63,7 @@ class TestLiveFireboltConnection:
     """Test basic Firebolt Cloud connectivity."""
 
     def test_connection(self, live_firebolt_adapter):
-        """Verify we can connect to Firebolt and run a trivial query."""
+
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -74,7 +74,7 @@ class TestLiveFireboltConnection:
             live_firebolt_adapter.close_connection(connection)
 
     def test_platform_info(self, live_firebolt_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = live_firebolt_adapter.get_platform_info()
         assert info is not None
         assert info.get("platform_type") == "firebolt"
@@ -161,7 +161,7 @@ class TestLiveFireboltDataLoading:
     """Test TPC-H data loading on Firebolt."""
 
     def test_tpch_data_load(self, tpch_data):
-        """Verify TPC-H data was loaded with non-zero row counts in every table."""
+
         _tpch, stats = tpch_data
         assert len(stats) > 0, "No tables loaded"
         assert all(count > 0 for count in stats.values()), "Some tables have zero rows"
@@ -171,7 +171,7 @@ class TestLiveFireboltSpecificFeatures:
     """Test Firebolt-specific features."""
 
     def test_result_cache_control(self, live_firebolt_adapter):
-        """Verify result cache can be disabled for accurate benchmarking."""
+
         connection = live_firebolt_adapter.create_connection()
         try:
             cursor = connection.cursor()

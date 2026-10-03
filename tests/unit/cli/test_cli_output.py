@@ -122,7 +122,7 @@ class TestConsoleResultFormatter:
 
     @patch("benchbox.cli.output.console")
     def test_display_cli_result_basic(self, mock_console):
-        """Test basic CLI result display."""
+
         result = self.create_cli_result()
 
         ConsoleResultFormatter.display_benchmark_summary(result, verbose=False)
@@ -138,7 +138,7 @@ class TestConsoleResultFormatter:
 
     @patch("benchbox.cli.output.console")
     def test_display_cli_result_verbose(self, mock_console):
-        """Test verbose CLI result display."""
+
         result = self.create_cli_result()
 
         ConsoleResultFormatter.display_benchmark_summary(result, verbose=True)
@@ -235,12 +235,11 @@ class TestConsoleResultFormatter:
 
     @patch("benchbox.cli.output.console")
     def test_display_platform_result_basic(self, mock_console):
-        """Test basic platform result display."""
+
         result = self.create_platform_result()
 
         ConsoleResultFormatter.display_benchmark_summary(result, verbose=False)
 
-        # Verify console.print was called
         assert mock_console.print.called
         calls = [str(call) for call in mock_console.print.call_args_list]
 
@@ -249,7 +248,7 @@ class TestConsoleResultFormatter:
         assert any("20/22" in call for call in calls)  # Success rate
 
     def test_format_execution_statistics_cli_result(self):
-        """Test formatting execution statistics for CLI results."""
+
         result = self.create_cli_result()
 
         stats = ConsoleResultFormatter.format_execution_statistics(result)
@@ -261,7 +260,7 @@ class TestConsoleResultFormatter:
         assert stats["power_at_size"] == "123.45"
 
     def test_format_execution_statistics_platform_result(self):
-        """Test formatting execution statistics for platform results."""
+
         result = self.create_platform_result()
 
         stats = ConsoleResultFormatter.format_execution_statistics(result)
@@ -511,7 +510,7 @@ class TestResultExporter:
         )
 
     def test_exporter_initialization(self):
-        """Test ResultExporter initialization."""
+
         exporter = ResultExporter(output_dir=Path(self.temp_dir))
         assert exporter.output_dir == Path(self.temp_dir)
         assert exporter.anonymize is True  # Default
@@ -524,7 +523,7 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_export_json_cli_result(self, mock_console):
-        """Test JSON export for CLI results."""
+
         result = self.create_cli_result()
 
         exported = self.exporter.export_result(result, formats=["json"])
@@ -556,7 +555,7 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_export_json_platform_result(self, mock_console):
-        """Test JSON export for platform results."""
+
         result = self.create_platform_result()
 
         exported = self.exporter.export_result(result, formats=["json"])
@@ -580,7 +579,7 @@ class TestResultExporter:
         assert summary_queries["passed"] == 2
 
     def test_export_csv_cli_result(self):
-        """Test CSV export of CLI result."""
+
         # Create test result
         query_results = [
             {
@@ -614,7 +613,6 @@ class TestResultExporter:
         # Export to CSV
         exported = self.exporter.export_result(result, ["csv"])
 
-        # Verify CSV was exported
         assert "csv" in exported
         csv_path = exported["csv"]
 
@@ -636,7 +634,6 @@ class TestResultExporter:
         ]
         assert headers == expected_headers
 
-        # Check data rows
         assert len(rows) == 3
         assert rows[0][0] == "q1"  # query_id
         assert rows[0][1] == "100.0"  # execution_time_ms
@@ -646,7 +643,7 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_export_html_cli_result(self, mock_console):
-        """Test HTML export for CLI results."""
+
         query_results = [
             {
                 "query_id": "Q1",
@@ -683,7 +680,7 @@ class TestResultExporter:
         assert "SUCCESS" in html_content
 
     def test_export_multiple_formats(self):
-        """Test exporting to multiple formats simultaneously."""
+
         # Create test result
         query_results = [
             {
@@ -745,12 +742,12 @@ class TestResultExporter:
             assert "machine_id" not in client_host
 
     def test_list_results_empty(self):
-        """Test listing results when no results exist."""
+
         results = self.exporter.list_results()
         assert results == []
 
     def test_list_results_with_files(self):
-        """Test listing results with existing files."""
+
         # Create a test result file
         result = self.create_cli_result()
         self.exporter.export_result(result, formats=["json"])
@@ -766,7 +763,7 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_show_results_summary_empty(self, mock_console):
-        """Test showing results summary when no results exist."""
+
         self.exporter.show_results_summary()
 
         # Should print "No exported results found"
@@ -776,8 +773,7 @@ class TestResultExporter:
 
     @patch("benchbox.cli.output.console")
     def test_show_results_summary_with_results(self, mock_console):
-        """Test showing results summary with existing results."""
-        # Create test results
+
         result = self.create_cli_result()
         self.exporter.export_result(result, formats=["json"])
 
@@ -789,7 +785,7 @@ class TestResultExporter:
         assert any("Exported Results" in call for call in calls)
 
     def test_load_result_from_file_success(self):
-        """Test loading result from file successfully."""
+
         # Create and export a result
         result = self.create_cli_result()
         exported = self.exporter.export_result(result, formats=["json"])
@@ -801,7 +797,7 @@ class TestResultExporter:
         assert loaded["data"]["benchmark"]["id"] == "tpch"
 
     def test_load_result_from_file_not_found(self):
-        """Test loading result from non-existent file."""
+
         non_existent_path = Path(self.temp_dir) / "non_existent.json"
 
         loaded = self.exporter.load_result_from_file(non_existent_path)
@@ -809,8 +805,7 @@ class TestResultExporter:
         assert loaded is None
 
     def test_compare_results_success(self):
-        """Test successful result comparison."""
-        # Create baseline result
+
         baseline_result = self.create_cli_result()
         baseline_result.query_results[0].execution_time_ms = 1000.0  # Q1: 1000ms
         baseline_result.query_results[0].execution_time_seconds = 1.0
@@ -863,7 +858,7 @@ class TestResultExporter:
         assert local["current_file"] == str(current_path)
 
     def test_compare_results_file_not_found(self):
-        """Test comparison with non-existent files."""
+
         non_existent1 = Path(self.temp_dir) / "baseline.json"
         non_existent2 = Path(self.temp_dir) / "current.json"
 
@@ -894,8 +889,7 @@ class TestResultExporter:
         assert comparison["current_version"] == "2.2"
 
     def test_export_comparison_report(self):
-        """Test exporting comparison report."""
-        # Create comparison data
+
         comparison = {
             "baseline_file": "baseline.json",
             "current_file": "current.json",
@@ -968,7 +962,7 @@ class TestResultExporter:
         assert "&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;" in html_content
 
     def test_assess_performance_change(self):
-        """Test performance change assessment."""
+
         # Significant improvement
         changes = {
             "total_execution_time": {"change_percent": -15.0},
@@ -1012,7 +1006,7 @@ class TestResultExporterErrorHandling:
 
     @patch("benchbox.cli.output.console")
     def test_export_invalid_format(self, mock_console):
-        """Test export with invalid format."""
+
         result = make_benchmark_results(
             benchmark_name="Test",
             scale_factor=1.0,
@@ -1044,7 +1038,7 @@ class TestResultExporterErrorHandling:
             ResultExporter(output_dir=blocker / "sub")
 
     def test_list_results_with_corrupted_json(self):
-        """Test listing results with corrupted JSON files."""
+
         # Create a corrupted JSON file
         corrupted_file = Path(self.temp_dir) / "corrupted.json"
         with open(corrupted_file, "w", encoding="utf-8") as f:

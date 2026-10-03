@@ -33,7 +33,7 @@ class TestDatabricksCredentialDefaults:
         mock_output_location,
         mock_validate,
     ):
-        """Test that existing credential values are shown as defaults in prompts."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -83,7 +83,7 @@ class TestDatabricksCredentialDefaults:
         mock_output_location,
         mock_validate,
     ):
-        """Test that setup works when no existing credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -126,7 +126,7 @@ class TestDatabricksCredentialDefaults:
         mock_output_location,
         mock_validate,
     ):
-        """Test that existing access token is preserved when user enters empty input."""
+
         # Setup: existing credentials with token
         mock_manager = Mock()
         existing_creds = {
@@ -170,7 +170,7 @@ class TestDatabricksCredentialDefaults:
         mock_validate,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when existing credentials are present."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -212,7 +212,7 @@ class TestDatabricksCredentialDefaults:
         mock_validate,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when credentials already exist."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -258,7 +258,7 @@ class TestDatabricksCredentialDefaults:
         mock_validate,
         mock_auto_detect,
     ):
-        """Test that auto-detection is offered when no credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -297,7 +297,7 @@ class TestDatabricksCredentialDefaults:
         mock_output_location,
         mock_validate,
     ):
-        """Test handling of partial existing credentials."""
+
         # Setup: only some credentials exist
         mock_manager = Mock()
         existing_creds = {

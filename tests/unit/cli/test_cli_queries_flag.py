@@ -20,7 +20,7 @@ class TestQueriesFlagBasic:
     """Basic functionality tests for --queries flag."""
 
     def test_queries_flag_parsing_single(self):
-        """Test that single query is parsed correctly."""
+
         runner = CliRunner()
         # Use --check-platforms to fail early without actually running benchmark
         result = runner.invoke(
@@ -33,7 +33,7 @@ class TestQueriesFlagBasic:
         assert "❌" not in result.output or "query" not in result.output.lower()
 
     def test_queries_flag_parsing_multiple(self):
-        """Test that multiple queries are parsed correctly."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -45,7 +45,7 @@ class TestQueriesFlagBasic:
         assert "❌" not in result.output or "query" not in result.output.lower()
 
     def test_queries_flag_preserves_order(self):
-        """Test that query order is preserved as specified."""
+
         runner = CliRunner()
         # Order: 17, 6, 1 (reverse)
         result = runner.invoke(
@@ -62,7 +62,7 @@ class TestQueriesFlagEdgeCases:
     """Edge case tests for --queries flag."""
 
     def test_queries_flag_empty_string(self):
-        """Test that empty string is rejected."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -74,7 +74,7 @@ class TestQueriesFlagEdgeCases:
         assert "no valid query IDs found" in result.output
 
     def test_queries_flag_whitespace_handling(self):
-        """Test that whitespace around query IDs is handled correctly."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -86,7 +86,7 @@ class TestQueriesFlagEdgeCases:
         assert "Invalid query ID format" not in result.output
 
     def test_queries_flag_trailing_comma(self):
-        """Test that trailing comma is handled gracefully."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -129,7 +129,7 @@ class TestQueriesFlagValidation:
         assert "max 100" in result.output
 
     def test_query_id_too_long(self):
-        """Test that query IDs exceeding MAX_QUERY_ID_LENGTH chars are rejected."""
+
         from benchbox.utils.input_validation import MAX_QUERY_ID_LENGTH
 
         runner = CliRunner()
@@ -145,7 +145,7 @@ class TestQueriesFlagValidation:
         assert f"max {MAX_QUERY_ID_LENGTH} chars" in result.output
 
     def test_invalid_format_special_chars(self):
-        """Test that special characters are rejected."""
+
         runner = CliRunner()
         invalid_cases = [
             "1;DROP TABLE",  # SQL injection attempt
@@ -166,7 +166,7 @@ class TestQueriesFlagValidation:
             assert "Invalid query ID format" in result.output, f"Should show format error for: {invalid_query}"
 
     def test_valid_format_alphanumeric(self):
-        """Test that valid alphanumeric formats are accepted."""
+
         runner = CliRunner()
         valid_cases = [
             "1",
@@ -216,7 +216,7 @@ class TestQueriesFlagPhaseInteraction:
         assert "only works with power/standard" not in result.output
 
     def test_queries_with_warmup_only_errors(self):
-        """Test that --queries with ONLY warmup phase errors."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -228,7 +228,7 @@ class TestQueriesFlagPhaseInteraction:
         assert "--queries only works with power/standard phases" in result.output
 
     def test_queries_with_mixed_phases_warns(self):
-        """Test that --queries with compatible+incompatible phases warns."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -253,7 +253,7 @@ class TestQueriesFlagPhaseInteraction:
         # But should still allow execution (would fail at validation)
 
     def test_queries_with_throughput_only_errors(self):
-        """Test that --queries with ONLY throughput phase errors."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -265,7 +265,7 @@ class TestQueriesFlagPhaseInteraction:
         assert "--queries only works with power/standard phases" in result.output
 
     def test_queries_with_maintenance_only_errors(self):
-        """Test that --queries with ONLY maintenance phase errors."""
+
         runner = CliRunner()
         result = runner.invoke(
             run,
@@ -282,7 +282,7 @@ class TestQueriesFlagHelp:
     """Tests for --queries help text and documentation."""
 
     def test_help_text_includes_constraints(self):
-        """Test that help text mentions important constraints."""
+
         runner = CliRunner()
         result = runner.invoke(run, ["--help"])
         assert result.exit_code == 0

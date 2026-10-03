@@ -136,7 +136,7 @@ def test_validate_remote_files_exist_reports_missing(monkeypatch):
 
 
 def test_manifest_comparison_scale_factor_mismatch():
-    """Test that scale factor mismatch is detected."""
+
     local = make_manifest()
     remote = json.loads(json.dumps(local))
     remote["scale_factor"] = 10.0  # Different scale factor
@@ -148,7 +148,7 @@ def test_manifest_comparison_scale_factor_mismatch():
 
 
 def test_manifest_comparison_benchmark_mismatch():
-    """Test that benchmark type mismatch is detected."""
+
     local = make_manifest()
     remote = json.loads(json.dumps(local))
     remote["benchmark"] = "tpcds"  # Different benchmark
@@ -160,7 +160,7 @@ def test_manifest_comparison_benchmark_mismatch():
 
 
 def test_manifest_comparison_compression_mismatch():
-    """Test that compression mismatch is detected."""
+
     local = make_manifest()
     remote = json.loads(json.dumps(local))
     remote["compression"] = {"enabled": True, "type": "zstd", "level": 3}  # Different compression
@@ -172,7 +172,7 @@ def test_manifest_comparison_compression_mismatch():
 
 
 def test_manifest_comparison_table_count_mismatch():
-    """Test that table count mismatch is detected."""
+
     local = make_manifest(
         tables={
             "a": {"formats": {"tbl": [{}]}},
@@ -201,7 +201,7 @@ def test_manifest_comparison_file_count_mismatch():
 
 
 def test_manifest_comparison_int_float_tolerance():
-    """Test that int and float scale factors are treated as equivalent."""
+
     local = make_manifest(scale_factor=1)  # int
     remote = json.loads(json.dumps(local))
     remote["scale_factor"] = 1.0  # float, but same value
@@ -212,7 +212,7 @@ def test_manifest_comparison_int_float_tolerance():
 
 
 def test_force_upload_always_uploads():
-    """Test that force_upload=True always triggers upload regardless of validation."""
+
     remote_root = "dbfs:/Volumes/workspace/schema/vol"
     fs = FakeRemoteFS()
 
@@ -245,7 +245,7 @@ def test_force_upload_always_uploads():
 
 
 def test_should_upload_when_manifest_corrupted():
-    """Test that corrupted remote manifest triggers upload."""
+
     remote_root = "dbfs:/Volumes/workspace/schema/vol"
     fs = FakeRemoteFS()
 
@@ -272,7 +272,7 @@ def test_should_upload_when_manifest_corrupted():
 
 
 def test_remote_manifest_attached_to_validation_result():
-    """Test that remote_manifest is properly attached to ValidationResult."""
+
     remote_root = "dbfs:/Volumes/workspace/schema/vol"
     fs = FakeRemoteFS()
 
@@ -305,7 +305,7 @@ def test_remote_manifest_attached_to_validation_result():
 
 
 def test_print_validation_report_with_valid_manifest(caplog):
-    """Test that validation report prints expected messages."""
+
     import logging
 
     from benchbox.core.validation.engines import ValidationResult
@@ -335,7 +335,7 @@ def test_print_validation_report_with_valid_manifest(caplog):
 
 
 def test_print_validation_report_verbose_mode(caplog):
-    """Test that verbose mode shows detailed information."""
+
     import logging
 
     from benchbox.core.validation.engines import ValidationResult
@@ -392,7 +392,7 @@ def test_print_validation_report_skips_invalid_results():
 
 
 def test_print_validation_report_skips_missing_manifest(caplog):
-    """Test that print_validation_report does nothing when remote_manifest is missing."""
+
     import logging
 
     from benchbox.core.validation.engines import ValidationResult
@@ -414,7 +414,7 @@ def test_print_validation_report_skips_missing_manifest(caplog):
 
 
 def test_should_upload_data_logs_validation_messages(caplog):
-    """Test that should_upload_data triggers validation messages when data is valid."""
+
     import logging
 
     caplog.set_level(logging.INFO, logger="benchbox.core.upload_validation")
@@ -454,7 +454,7 @@ def test_should_upload_data_logs_validation_messages(caplog):
 
 
 def test_print_validation_report_zero_tables_edge_case(caplog):
-    """Test that zero tables in manifest triggers warning and early return."""
+
     import logging
 
     from benchbox.core.validation.engines import ValidationResult
@@ -482,7 +482,7 @@ def test_print_validation_report_zero_tables_edge_case(caplog):
 
 
 def test_print_validation_report_missing_scale_factor(caplog):
-    """Test that missing scale_factor is handled gracefully."""
+
     import logging
 
     from benchbox.core.validation.engines import ValidationResult
@@ -507,7 +507,7 @@ def test_print_validation_report_missing_scale_factor(caplog):
 
 
 def test_print_validation_report_malformed_compression(caplog):
-    """Test that malformed compression dict is handled gracefully."""
+
     import logging
 
     from benchbox.core.validation.engines import ValidationResult

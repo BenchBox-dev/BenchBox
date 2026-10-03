@@ -23,7 +23,7 @@ class TestTPCHExamples:
     """Test that example scripts work with ultra-simplified implementation."""
 
     def test_example_api_usage_patterns(self):
-        """Test key API usage patterns from examples."""
+
         from benchbox import TPCH
 
         # Test patterns that examples typically use
@@ -45,7 +45,7 @@ class TestTPCHExamples:
         assert len(queries) == 22
 
     def test_example_parameter_usage(self):
-        """Test parameter usage patterns from examples."""
+
         from benchbox import TPCH
 
         tpch = TPCH()
@@ -61,7 +61,7 @@ class TestTPCHExamples:
         assert len(sql_sf) > 50
 
     def test_example_dialect_handling(self):
-        """Test dialect handling patterns used in examples."""
+
         from benchbox import TPCH
 
         tpch = TPCH()
@@ -86,7 +86,7 @@ class TestTPCHExamples:
         assert "Query ID must be 1-22" in str(exc_info.value)
 
     def test_benchmark_example_patterns(self):
-        """Test benchmark usage patterns from examples."""
+
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 
         benchmark = TPCHBenchmark()
@@ -104,7 +104,7 @@ class TestTPCHExamples:
 
     @patch("duckdb.connect")
     def test_duckdb_integration_pattern(self, mock_connect):
-        """Test DuckDB integration pattern used in examples."""
+
         # Mock DuckDB connection for testing
         mock_conn = MagicMock()
         mock_connect.return_value = mock_conn
@@ -128,7 +128,7 @@ class TestTPCHExamples:
             pytest.skip("DuckDB not available for integration test")
 
     def test_multi_scale_example_pattern(self):
-        """Test multi-scale benchmarking pattern used in examples."""
+
         from benchbox import TPCH
 
         scale_factors = [0.01, 0.1, 1.0]
@@ -146,7 +146,7 @@ class TestTPCHExamples:
             assert isinstance(sql_override, str)
 
     def test_example_query_iteration_pattern(self):
-        """Test query iteration pattern used in examples."""
+
         from benchbox import TPCH
 
         tpch = TPCH()
@@ -169,7 +169,7 @@ class TestTPCHExamples:
                     assert sql1 != sql2
 
     def test_example_deterministic_testing_pattern(self):
-        """Test deterministic testing pattern used in examples."""
+
         from benchbox import TPCH
 
         tpch = TPCH()
@@ -185,7 +185,7 @@ class TestTPCHExamples:
         assert queries_run1 == queries_run2
 
     def test_example_performance_measurement_pattern(self):
-        """Test performance measurement pattern used in examples."""
+
         import time
 
         from benchbox import TPCH
@@ -202,7 +202,7 @@ class TestTPCHExamples:
         assert generation_time < 1.0  # Should be fast with qgen
 
     def test_example_batch_generation_pattern(self):
-        """Test batch generation pattern used in examples."""
+
         from benchbox import TPCH
 
         tpch = TPCH()
@@ -240,7 +240,7 @@ class TestTPCHExamples:
         assert len(sql) > 50
 
     def test_example_configuration_pattern(self):
-        """Test configuration pattern used in examples."""
+
         from benchbox import TPCH
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 

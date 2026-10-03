@@ -64,7 +64,7 @@ class TestLiveMotherDuckConnection:
     """Test basic MotherDuck connectivity."""
 
     def test_connection(self, live_motherduck_adapter):
-        """Verify we can connect to MotherDuck and run a trivial query."""
+
         connection = live_motherduck_adapter.create_connection()
         try:
             result = connection.execute("SELECT 1").fetchone()
@@ -73,7 +73,7 @@ class TestLiveMotherDuckConnection:
             live_motherduck_adapter.close_connection(connection)
 
     def test_platform_info(self, live_motherduck_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = live_motherduck_adapter.get_platform_info()
         assert info is not None
         assert info.get("platform_type") == "motherduck"
@@ -158,7 +158,7 @@ class TestLiveMotherDuckDataLoading:
     """Test TPC-H data loading on MotherDuck."""
 
     def test_tpch_data_load(self, live_motherduck_adapter, tpch_data):
-        """Verify TPC-H data was loaded with non-zero row counts in every table."""
+
         _tpch, stats, schema = tpch_data
         assert len(stats) > 0, "No tables loaded"
         assert all(count > 0 for count in stats.values()), "Some tables have zero rows"
@@ -174,7 +174,7 @@ class TestLiveMotherDuckSpecificFeatures:
     """Test MotherDuck-specific features."""
 
     def test_duckdb_extensions(self, live_motherduck_adapter):
-        """Verify DuckDB extensions are accessible via MotherDuck."""
+
         connection = live_motherduck_adapter.create_connection()
         try:
             result = connection.execute(
@@ -185,7 +185,7 @@ class TestLiveMotherDuckSpecificFeatures:
             live_motherduck_adapter.close_connection(connection)
 
     def test_cloud_databases(self, live_motherduck_adapter):
-        """Verify MotherDuck cloud databases are visible."""
+
         connection = live_motherduck_adapter.create_connection()
         try:
             result = connection.execute("SHOW DATABASES").fetchall()

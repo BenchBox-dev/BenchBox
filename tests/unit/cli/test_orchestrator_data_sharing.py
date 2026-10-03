@@ -38,7 +38,7 @@ class TestOrchestratorDataSharing:
     """Test orchestrator data sharing logic."""
 
     def test_primitives_uses_tpch_path(self):
-        """Test that orchestrator respects Primitives' TPC-H data sharing."""
+
         orchestrator = BenchmarkOrchestrator()
 
         # Create benchmark config for Primitives
@@ -50,7 +50,6 @@ class TestOrchestratorDataSharing:
             compression_type="none",
         )
 
-        # Create benchmark instance
         benchmark = orchestrator._get_benchmark_instance(config, None)
 
         # Check that benchmark declares TPC-H as data source
@@ -61,7 +60,7 @@ class TestOrchestratorDataSharing:
         _assert_tpch_default_path(Path(benchmark.output_dir), 1.0)
 
     def test_orchestrator_detects_data_sharing(self):
-        """Test that orchestrator correctly detects data-sharing benchmarks."""
+
         orchestrator = BenchmarkOrchestrator()
 
         # Create a benchmark that shares data
@@ -87,7 +86,7 @@ class TestOrchestratorDataSharing:
         assert output_root is None, "Orchestrator should not override path for data-sharing benchmarks"
 
     def test_orchestrator_does_not_interfere_with_regular_benchmarks(self):
-        """Test that orchestrator still manages paths for non-sharing benchmarks."""
+
         BenchmarkOrchestrator()
 
         # Create a mock benchmark that does NOT share data
@@ -109,7 +108,7 @@ class TestOrchestratorDataSharing:
         assert "benchmark_runs/datagen" in output_root
 
     def test_custom_output_overrides_data_sharing(self):
-        """Test that custom --output paths override data sharing."""
+
         orchestrator = BenchmarkOrchestrator()
         custom_path = "/custom/data/path"
         orchestrator.set_custom_output_dir(custom_path)

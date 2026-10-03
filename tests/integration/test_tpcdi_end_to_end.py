@@ -70,7 +70,7 @@ class TestTPCDIEndToEndWorkflow:
         """Create a clean workspace for ETL testing."""
         workspace = Path(tempfile.mkdtemp())
         yield workspace
-        # Cleanup
+
         shutil.rmtree(workspace, ignore_errors=True)
 
     @pytest.fixture
@@ -233,21 +233,18 @@ class TestTPCDIEndToEndWorkflow:
 
     @pytest.mark.skipif(not DUCKDB_AVAILABLE, reason="DuckDB not available")
     def test_complete_etl_workflow_duckdb(self, tpcdi_etl_benchmark: TPCDI, duckdb_database):
-        """Test complete ETL workflow with DuckDB database."""
+
         start_time = time.time()
 
-        # Generate source data
         tpcdi_etl_benchmark.generate_source_data(
             formats=["csv", "xml"],  # Fewer formats for faster execution
             batch_types=["historical"],
         )
 
-        # Run ETL pipeline
         etl_results = tpcdi_etl_benchmark.run_etl_pipeline(
             connection=duckdb_database, batch_type="historical", validate_data=True
         )
 
-        # Verify success
         assert etl_results["success"] is True, f"ETL pipeline failed: {etl_results.get('error')}"
 
         # Verify data in DuckDB
@@ -280,7 +277,6 @@ class TestTPCDIEndToEndWorkflow:
                 batch_types=[batch_type],
             )
 
-            # Run ETL pipeline
             etl_results = tpcdi_etl_benchmark.run_etl_pipeline(
                 connection=duckdb_database_file,
                 batch_type=batch_type,
@@ -332,7 +328,7 @@ class TestTPCDIEndToEndWorkflow:
         tpcdi_etl_benchmark: TPCDI,
         duckdb_database_file: duckdb.DuckDBPyConnection,
     ):
-        """Test comprehensive data quality validation after ETL."""
+
         # Run ETL pipeline
         tpcdi_etl_benchmark.generate_source_data(formats=["csv"], batch_types=["historical"])
 
@@ -382,7 +378,7 @@ class TestTPCDIEndToEndWorkflow:
         tpcdi_performance_benchmark: TPCDI,
         duckdb_database_file: duckdb.DuckDBPyConnection,
     ):
-        """Test ETL performance with larger scale factor."""
+
         start_time = time.time()
 
         # Generate source data with larger scale
@@ -401,7 +397,6 @@ class TestTPCDIEndToEndWorkflow:
 
         total_time = time.time() - start_time
 
-        # Verify success
         assert etl_results["success"] is True, f"Performance test failed: {etl_results.get('error')}"
 
         # Performance assertions for larger scale
@@ -427,7 +422,6 @@ class TestTPCDIEndToEndWorkflow:
         assert final_count == records_loaded, "Loaded record count should match database count"
 
     def test_concurrent_batch_processing(self, etl_workspace: Path):
-        """Test concurrent processing of multiple batches."""
 
         def process_batch(batch_type: str, workspace_subdir: str) -> dict[str, Any]:
             """Process a single batch in a separate thread."""
@@ -447,10 +441,8 @@ class TestTPCDIEndToEndWorkflow:
             try:
                 start_time = time.time()
 
-                # Generate source data
                 benchmark.generate_source_data(formats=["csv"], batch_types=[batch_type])
 
-                # Run ETL pipeline
                 etl_results = benchmark.run_etl_pipeline(connection=conn, batch_type=batch_type, validate_data=False)
 
                 duration = time.time() - start_time
@@ -503,7 +495,6 @@ class TestTPCDIEndToEndWorkflow:
         tpcdi_etl_benchmark: TPCDI,
         duckdb_database_file: duckdb.DuckDBPyConnection,
     ):
-        """Test error recovery and rollback scenarios."""
 
         # First, run a successful ETL to establish baseline
         tpcdi_etl_benchmark.generate_source_data(formats=["csv"], batch_types=["historical"])
@@ -577,7 +568,6 @@ class TestTPCDIEndToEndWorkflow:
     def test_realistic_data_volumes_and_patterns(
         self, etl_workspace: Path, duckdb_database_file: duckdb.DuckDBPyConnection
     ):
-        """Test with realistic TPC-DI data volumes and patterns."""
 
         # Use moderate scale factor for realistic testing
         realistic_benchmark = TPCDI(scale_factor=0.01, output_dir=etl_workspace)
@@ -639,7 +629,6 @@ class TestTPCDIEndToEndWorkflow:
         tpcdi_etl_benchmark: TPCDI,
         duckdb_database_file: duckdb.DuckDBPyConnection,
     ):
-        """Test ETL status monitoring and metrics collection."""
 
         # Check initial ETL status
         initial_status = tpcdi_etl_benchmark.get_etl_status()
@@ -660,7 +649,6 @@ class TestTPCDIEndToEndWorkflow:
         updated_status = tpcdi_etl_benchmark.get_etl_status()
         updated_stats = updated_status["simple_stats"]
 
-        # Verify simple_stats were updated
         assert updated_stats["batches_processed"] == initial_batches_processed + 1, "Should increment batches processed"
         assert updated_stats["total_processing_time"] > 0, "Should track processing time"
         # Note: avg_processing_time might not be available in simple_stats
@@ -673,14 +661,12 @@ class TestTPCDIEndToEndWorkflow:
         assert historical_status["status"] == "completed", "Historical batch should be completed"
         # Note: detailed metrics like records, start_time, end_time are not implemented in simple_stats
 
-        # Verify directory structure
         assert Path(updated_status["source_directory"]).exists(), "Source directory should exist"
         assert Path(updated_status["staging_directory"]).exists(), "Staging directory should exist"
         assert Path(updated_status["warehouse_directory"]).exists(), "Warehouse directory should exist"
 
     @pytest.mark.parametrize("scale_factor", [0.001, 0.01])
     def test_scalability_across_sizes(self, etl_workspace: Path, scale_factor: float):
-        """Test ETL scalability across different scale factors."""
 
         benchmark = TPCDI(
             scale_factor=scale_factor,
@@ -705,7 +691,6 @@ class TestTPCDIEndToEndWorkflow:
 
             duration = time.time() - start_time
 
-            # Verify success
             assert etl_results["success"] is True, f"ETL failed for scale {scale_factor}"
 
             # Check record counts scale appropriately
@@ -845,11 +830,9 @@ class TestTPCDIPerformanceValidation:
             # Baseline
             memory_samples.append(("start", process.memory_info().rss / 1024 / 1024))
 
-            # Generate source data
             benchmark.generate_source_data(formats=["csv", "json"], batch_types=["historical"])
             memory_samples.append(("after_generation", process.memory_info().rss / 1024 / 1024))
 
-            # Run ETL
             etl_results = benchmark.run_etl_pipeline(connection=conn, batch_type="historical", validate_data=True)
             memory_samples.append(("after_etl", process.memory_info().rss / 1024 / 1024))
 
@@ -885,7 +868,7 @@ class TestTPCDIExtendedScenarios:
         shutil.rmtree(workspace, ignore_errors=True)
 
     def test_cross_database_robustness(self, extended_workspace: Path):
-        """Test ETL robustness across different database engines."""
+
         databases = [
             ("sqlite", self._create_sqlite_db),
         ]
@@ -962,7 +945,7 @@ class TestTPCDIExtendedScenarios:
             assert max(customer_counts) - min(customer_counts) <= 10, "Cross-database inconsistency detected"
 
     def test_transaction_consistency_and_isolation(self, extended_workspace: Path):
-        """Test transaction consistency and isolation during ETL."""
+
         benchmark = TPCDI(
             scale_factor=0.01,
             output_dir=extended_workspace,
@@ -1017,7 +1000,7 @@ class TestTPCDIExtendedScenarios:
             conn.close()
 
     def test_data_lineage_and_audit_trail(self, extended_workspace: Path):
-        """Test data lineage tracking and audit trail functionality."""
+
         benchmark = TPCDI(
             scale_factor=0.01,
             output_dir=extended_workspace,
@@ -1089,7 +1072,7 @@ class TestTPCDIExtendedScenarios:
             conn.close()
 
     def test_advanced_failure_recovery_scenarios(self, extended_workspace: Path):
-        """Test advanced failure recovery and partial processing scenarios."""
+
         benchmark = TPCDI(
             scale_factor=0.01,
             output_dir=extended_workspace,
@@ -1170,7 +1153,6 @@ class TestTPCDIExtendedScenarios:
 
     @pytest.mark.stress
     def test_stress_testing_large_datasets(self, extended_workspace: Path):
-        """Test ETL pipeline with stress scenarios and large datasets."""
 
         # Use larger scale factor for stress testing
         stress_benchmark = TPCDI(

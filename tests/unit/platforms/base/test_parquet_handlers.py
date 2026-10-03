@@ -31,7 +31,7 @@ class TestParquetFileHandler:
     @pytest.fixture
     def temp_parquet_file(self, tmp_path):
         """Create a temporary Parquet file for testing."""
-        # Create test data
+
         data = {
             "id": [1, 2, 3],
             "name": ["Alice", "Bob", "Charlie"],
@@ -46,12 +46,11 @@ class TestParquetFileHandler:
         return parquet_file
 
     def test_get_delimiter(self, handler):
-        """Test that Parquet handler returns empty delimiter."""
+
         assert handler.get_delimiter() == ""
 
     def test_load_table_basic(self, handler, temp_parquet_file):
-        """Test loading a basic Parquet file."""
-        # Mock connection
+
         connection = Mock()
         connection.executemany = Mock()
 
@@ -59,7 +58,6 @@ class TestParquetFileHandler:
         logger = Mock()
         benchmark = Mock()
 
-        # Load table
         row_count = handler.load_table(
             "test_table",
             temp_parquet_file,
@@ -68,10 +66,8 @@ class TestParquetFileHandler:
             logger,
         )
 
-        # Verify row count
         assert row_count == 3
 
-        # Verify executemany was called
         assert connection.executemany.called
 
         # Check the INSERT statement
@@ -89,19 +85,17 @@ class TestParquetFileHandler:
         assert data_tuples[2] == (3, "Charlie", 300.00)
 
     def test_load_table_empty_file(self, handler, tmp_path):
-        """Test loading an empty Parquet file."""
+
         # Create empty Parquet file
         empty_data = {"id": [], "name": []}
         table = pa.table(empty_data)
         parquet_file = tmp_path / "empty.parquet"
         pq.write_table(table, parquet_file)
 
-        # Mock connection
         connection = Mock()
         logger = Mock()
         benchmark = Mock()
 
-        # Load table
         row_count = handler.load_table(
             "test_table",
             parquet_file,
@@ -115,7 +109,7 @@ class TestParquetFileHandler:
         assert not connection.executemany.called
 
     def test_load_table_large_file(self, handler, tmp_path):
-        """Test loading a large Parquet file with batching."""
+
         # Create large dataset (2500 rows to test batching with batch_size=1000)
         data = {
             "id": list(range(2500)),
@@ -125,13 +119,11 @@ class TestParquetFileHandler:
         parquet_file = tmp_path / "large.parquet"
         pq.write_table(table, parquet_file)
 
-        # Mock connection
         connection = Mock()
         connection.executemany = Mock()
         logger = Mock()
         benchmark = Mock()
 
-        # Load table
         row_count = handler.load_table(
             "test_table",
             parquet_file,
@@ -140,7 +132,6 @@ class TestParquetFileHandler:
             logger,
         )
 
-        # Verify row count
         assert row_count == 2500
 
         # Verify batching - should be called 3 times (1000 + 1000 + 500)
@@ -153,7 +144,7 @@ class TestParquetFileHandler:
         assert len(calls[2][0][1]) == 500  # Last batch
 
     def test_load_table_pyarrow_not_installed(self, handler, tmp_path, monkeypatch):
-        """Test error handling when PyArrow is not installed."""
+
         real_import = builtins.__import__
 
         def mock_import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -191,11 +182,11 @@ class TestDuckDBParquetHandler:
         return DuckDBParquetHandler(adapter)
 
     def test_get_delimiter(self, handler):
-        """Test that DuckDB Parquet handler returns empty delimiter."""
+
         assert handler.get_delimiter() == ""
 
     def test_load_table_normal_mode(self, handler, tmp_path):
-        """Test loading Parquet file in normal mode."""
+
         parquet_file = tmp_path / "test.parquet"
         parquet_file.touch()
 
@@ -213,7 +204,6 @@ class TestDuckDBParquetHandler:
         logger = Mock()
         benchmark = Mock()
 
-        # Load table
         row_count = handler.load_table(
             "customer",
             parquet_file,
@@ -222,7 +212,6 @@ class TestDuckDBParquetHandler:
             logger,
         )
 
-        # Verify row count
         assert row_count == 1000
 
         # Verify execute was called with correct SQL (COUNT before + INSERT + COUNT after)
@@ -235,19 +224,17 @@ class TestDuckDBParquetHandler:
         assert f"read_parquet('{parquet_file}')" in insert_sql
 
     def test_load_table_dry_run_mode(self, handler, adapter, tmp_path):
-        """Test loading Parquet file in dry-run mode."""
+
         adapter.dry_run_mode = True
         adapter.capture_sql = Mock()
 
         parquet_file = tmp_path / "test.parquet"
         parquet_file.touch()
 
-        # Mock connection
         connection = Mock()
         logger = Mock()
         benchmark = Mock()
 
-        # Load table
         row_count = handler.load_table(
             "customer",
             parquet_file,
@@ -345,13 +332,13 @@ class TestFileFormatRegistry:
     """Tests for Parquet format registration."""
 
     def test_parquet_format_registered(self):
-        """Test that .parquet extension is registered."""
+
         handler = FileFormatRegistry.get_handler(Path("test.parquet"))
         assert handler is not None
         assert isinstance(handler, ParquetFileHandler)
 
     def test_get_base_data_extension_parquet(self):
-        """Test base extension detection for Parquet files."""
+
         # Simple parquet file
         assert FileFormatRegistry.get_base_data_extension(Path("customer.parquet")) == ".parquet"
 
@@ -360,7 +347,7 @@ class TestFileFormatRegistry:
         assert FileFormatRegistry.get_base_data_extension(Path("customer.parquet")) == ".parquet"
 
     def test_parquet_handler_returned_for_parquet_files(self):
-        """Test that ParquetFileHandler is returned for .parquet files."""
+
         handler = FileFormatRegistry.get_handler(Path("/data/customer.parquet"))
         assert isinstance(handler, ParquetFileHandler)
         assert handler.get_delimiter() == ""
@@ -370,7 +357,7 @@ class TestParquetIntegration:
     """Integration tests for Parquet loading."""
 
     def test_end_to_end_parquet_loading(self, tmp_path):
-        """Test complete flow from Parquet file to database."""
+
         # Create test Parquet file
         data = {
             "c_custkey": [1, 2, 3, 4, 5],
@@ -385,13 +372,11 @@ class TestParquetIntegration:
         handler = FileFormatRegistry.get_handler(parquet_file)
         assert isinstance(handler, ParquetFileHandler)
 
-        # Mock connection
         connection = Mock()
         connection.executemany = Mock()
         logger = Mock()
         benchmark = Mock()
 
-        # Load table
         row_count = handler.load_table(
             "customer",
             parquet_file,
@@ -400,7 +385,6 @@ class TestParquetIntegration:
             logger,
         )
 
-        # Verify results
         assert row_count == 5
         assert connection.executemany.called
 

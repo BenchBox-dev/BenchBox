@@ -26,7 +26,7 @@ class TestCheckAndSetupPlatformCredentials:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_true_when_credentials_exist(self, mock_cred_manager_class):
-        """Test that function returns True when credentials already exist."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {"account": "test"}
         mock_cred_manager_class.return_value = mock_manager
@@ -42,7 +42,7 @@ class TestCheckAndSetupPlatformCredentials:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_false_when_credentials_missing_non_interactive(self, mock_cred_manager_class):
-        """Test that function returns False in non-interactive mode when credentials missing."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -59,7 +59,7 @@ class TestCheckAndSetupPlatformCredentials:
     @patch("rich.prompt.Confirm.ask")
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_offers_setup_when_credentials_missing_interactive(self, mock_cred_manager_class, mock_confirm, mock_setup):
-        """Test that function offers setup when credentials missing in interactive mode."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -81,7 +81,7 @@ class TestCheckAndSetupPlatformCredentials:
     @patch("rich.prompt.Confirm.ask")
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_false_when_user_declines_setup(self, mock_cred_manager_class, mock_confirm, mock_setup):
-        """Test that function returns False when user declines credential setup."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -100,7 +100,7 @@ class TestCheckAndSetupPlatformCredentials:
     @patch("rich.prompt.Confirm.ask")
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_false_when_setup_fails(self, mock_cred_manager_class, mock_confirm, mock_setup):
-        """Test that function returns False when credential setup fails."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -117,7 +117,7 @@ class TestCheckAndSetupPlatformCredentials:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_capitalizes_platform_name_in_messages(self, mock_cred_manager_class):
-        """Test that platform name is properly capitalized in user-facing messages."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -141,7 +141,7 @@ class TestCheckAndSetupPlatformCredentials:
     @patch("rich.prompt.Confirm.ask")
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_shows_setup_command_when_user_declines(self, mock_cred_manager_class, mock_confirm, mock_setup):
-        """Test that setup command hint is shown when user declines."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -163,7 +163,7 @@ class TestCheckPlatformCredentialStatus:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_missing_when_no_credentials(self, mock_cred_manager_class):
-        """Test that function returns MISSING status when no credentials exist."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
         mock_cred_manager_class.return_value = mock_manager
@@ -175,7 +175,7 @@ class TestCheckPlatformCredentialStatus:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_not_validated_when_credentials_exist_without_validation(self, mock_cred_manager_class):
-        """Test that function returns NOT_VALIDATED when credentials exist but haven't been validated."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {"account": "test"}
         mock_manager.get_credential_status.return_value = CredentialStatus.NOT_VALIDATED
@@ -188,7 +188,7 @@ class TestCheckPlatformCredentialStatus:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_valid_status_from_validation_metadata(self, mock_cred_manager_class):
-        """Test that function returns VALID status from validation metadata."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {"account": "test"}
         mock_manager.get_credential_status.return_value = CredentialStatus.VALID
@@ -201,7 +201,7 @@ class TestCheckPlatformCredentialStatus:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_returns_invalid_status_from_validation_metadata(self, mock_cred_manager_class):
-        """Test that function returns INVALID status from validation metadata."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {"account": "test"}
         mock_manager.get_credential_status.return_value = CredentialStatus.INVALID
@@ -214,7 +214,7 @@ class TestCheckPlatformCredentialStatus:
 
     @patch("benchbox.cli.platform_checks.CredentialManager")
     def test_handles_unknown_status_gracefully(self, mock_cred_manager_class):
-        """Test that function handles unknown status values gracefully."""
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = {"account": "test"}
         mock_manager.get_credential_status.return_value = CredentialStatus.NOT_VALIDATED

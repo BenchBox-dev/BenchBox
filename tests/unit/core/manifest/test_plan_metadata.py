@@ -67,7 +67,7 @@ class TestPlanMetadataDataclass:
     """Tests for PlanMetadata dataclass."""
 
     def test_default_values(self) -> None:
-        """Test PlanMetadata default values."""
+
         metadata = PlanMetadata()
 
         assert metadata.plan_fingerprints == {}
@@ -77,13 +77,13 @@ class TestPlanMetadataDataclass:
         assert metadata.platform_version is None
 
     def test_to_dict_empty(self) -> None:
-        """Test to_dict with empty metadata."""
+
         metadata = PlanMetadata()
         result = metadata.to_dict()
         assert result == {}
 
     def test_to_dict_with_values(self) -> None:
-        """Test to_dict with populated metadata."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={"q1": 1, "q2": 2},
@@ -101,7 +101,7 @@ class TestPlanMetadataDataclass:
         assert result["platform_version"] == "0.9.0"
 
     def test_from_dict(self) -> None:
-        """Test from_dict creates correct PlanMetadata."""
+
         data = {
             "plan_fingerprints": {"q1": "a" * 64},
             "plan_versions": {"q1": 1},
@@ -117,7 +117,7 @@ class TestPlanMetadataDataclass:
         assert metadata.platform == "duckdb"
 
     def test_from_dict_empty(self) -> None:
-        """Test from_dict with empty data."""
+
         metadata = PlanMetadata.from_dict({})
 
         assert metadata.plan_fingerprints == {}
@@ -154,7 +154,7 @@ class TestManifestV2PlanMetadata:
         assert manifest.plan_metadata is None
 
     def test_write_and_load_manifest_with_plan_metadata(self) -> None:
-        """Test round-trip of manifest with plan metadata."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={"q1": 1, "q2": 2},
@@ -180,7 +180,6 @@ class TestManifestV2PlanMetadata:
             assert data["plan_metadata"]["plan_fingerprints"]["q1"] == "a" * 64
             assert data["plan_metadata"]["platform"] == "duckdb"
 
-            # Load back
             loaded = load_manifest(path)
 
             assert isinstance(loaded, ManifestV2)
@@ -190,7 +189,7 @@ class TestManifestV2PlanMetadata:
             assert loaded.plan_metadata.platform == "duckdb"
 
     def test_load_manifest_without_plan_metadata(self) -> None:
-        """Test loading manifest without plan metadata."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpch",
@@ -213,7 +212,7 @@ class TestCreatePlanMetadataFromResults:
     """Tests for create_plan_metadata_from_results function."""
 
     def test_creates_metadata_from_results(self) -> None:
-        """Test creating plan metadata from benchmark results."""
+
         plan1 = _create_plan_with_fingerprint("q1", "a" * 64)
         plan2 = _create_plan_with_fingerprint("q2", "b" * 64)
 
@@ -240,7 +239,7 @@ class TestCreatePlanMetadataFromResults:
         }
 
     def test_skips_executions_without_plans(self) -> None:
-        """Test that executions without plans are skipped."""
+
         plan1 = _create_plan_with_fingerprint("q1", "a" * 64)
 
         results = MockBenchmarkResults(
@@ -256,7 +255,7 @@ class TestCreatePlanMetadataFromResults:
         assert "q2" not in metadata.plan_fingerprints
 
     def test_handles_empty_results(self) -> None:
-        """Test handling results with no executions."""
+
         results = MockBenchmarkResults(query_results=[])
 
         metadata = create_plan_metadata_from_results(results)
@@ -280,7 +279,7 @@ class TestUpdatePlanVersions:
         assert current.plan_versions == {"q1": 1, "q2": 1}
 
     def test_unchanged_plans_keep_version(self) -> None:
-        """Test that unchanged plans keep same version."""
+
         prev = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 3},
@@ -295,7 +294,7 @@ class TestUpdatePlanVersions:
         assert current.plan_versions["q1"] == 3
 
     def test_changed_plans_increment_version(self) -> None:
-        """Test that changed plans get incremented version."""
+
         prev = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 3},
@@ -392,7 +391,7 @@ class TestValidatePlanMetadata:
     """Tests for validate_plan_metadata function."""
 
     def test_valid_metadata(self) -> None:
-        """Test validation passes for valid metadata."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={"q1": 1, "q2": 2},
@@ -403,7 +402,7 @@ class TestValidatePlanMetadata:
         assert errors == []
 
     def test_invalid_fingerprint_length(self) -> None:
-        """Test validation catches invalid fingerprint length."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "toolshort"},
             plan_versions={"q1": 1},
@@ -415,7 +414,7 @@ class TestValidatePlanMetadata:
         assert "Invalid fingerprint" in errors[0]
 
     def test_invalid_fingerprint_characters(self) -> None:
-        """Test validation catches invalid fingerprint characters."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "g" * 64},  # 'g' is not hex
             plan_versions={"q1": 1},
@@ -427,7 +426,7 @@ class TestValidatePlanMetadata:
         assert "Invalid fingerprint" in errors[0]
 
     def test_invalid_version(self) -> None:
-        """Test validation catches invalid versions."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 0},  # Version must be >= 1
@@ -439,7 +438,7 @@ class TestValidatePlanMetadata:
         assert "Invalid version" in errors[0]
 
     def test_mismatched_keys(self) -> None:
-        """Test validation catches mismatched fingerprint/version keys."""
+
         metadata = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64, "q2": "b" * 64},
             plan_versions={"q1": 1},  # Missing q2
@@ -455,7 +454,7 @@ class TestMergePlanMetadata:
     """Tests for merge_plan_metadata function."""
 
     def test_merge_basic(self) -> None:
-        """Test basic merge of two metadata objects."""
+
         base = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 1},
@@ -473,7 +472,7 @@ class TestMergePlanMetadata:
         assert merged.platform == "duckdb"
 
     def test_overlay_takes_precedence(self) -> None:
-        """Test that overlay values take precedence."""
+
         base = PlanMetadata(
             plan_fingerprints={"q1": "a" * 64},
             plan_versions={"q1": 1},

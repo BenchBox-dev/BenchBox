@@ -30,21 +30,21 @@ class TestCSVSourceFormat:
     """Test CSV source format generator."""
 
     def test_initialization(self) -> None:
-        """Test CSV format initialization."""
+
         csv_format = CSVSourceFormat()
         assert csv_format.delimiter == ","
         assert csv_format.quote_char == '"'
         assert csv_format.encoding == "utf-8"
 
     def test_initialization_with_custom_params(self) -> None:
-        """Test CSV format initialization with custom parameters."""
+
         csv_format = CSVSourceFormat(delimiter="|", quote_char="'", encoding="latin1")
         assert csv_format.delimiter == "|"
         assert csv_format.quote_char == "'"
         assert csv_format.encoding == "latin1"
 
     def test_generate_data_returns_string(self) -> None:
-        """Test that generate_data returns a file path string."""
+
         csv_format = CSVSourceFormat()
         with tempfile.TemporaryDirectory() as tmpdir:
             result = csv_format.generate_data(
@@ -56,7 +56,7 @@ class TestCSVSourceFormat:
             assert isinstance(result, str)
 
     def test_write_to_file(self) -> None:
-        """Test writing dataframe to CSV file."""
+
         csv_format = CSVSourceFormat()
         test_data = pd.DataFrame(
             {
@@ -76,7 +76,7 @@ class TestCSVSourceFormat:
             pd.testing.assert_frame_equal(loaded_data, test_data)
 
     def test_write_to_file_with_custom_delimiter(self) -> None:
-        """Test writing dataframe with custom delimiter."""
+
         csv_format = CSVSourceFormat(delimiter="|")
         test_data = pd.DataFrame(
             {
@@ -100,19 +100,19 @@ class TestXMLSourceFormat:
     """Test XML source format generator."""
 
     def test_initialization(self) -> None:
-        """Test XML format initialization."""
+
         xml_format = XMLSourceFormat()
         assert xml_format.root_element == "data"
         assert xml_format.record_element == "record"
 
     def test_initialization_with_custom_params(self) -> None:
-        """Test XML format initialization with custom parameters."""
+
         xml_format = XMLSourceFormat(root_element="employees", record_element="employee")
         assert xml_format.root_element == "employees"
         assert xml_format.record_element == "employee"
 
     def test_generate_data_returns_string(self) -> None:
-        """Test that generate_data returns a file path string."""
+
         xml_format = XMLSourceFormat()
         with tempfile.TemporaryDirectory() as tmpdir:
             result = xml_format.generate_data(
@@ -124,7 +124,7 @@ class TestXMLSourceFormat:
             assert isinstance(result, str)
 
     def test_write_to_file(self) -> None:
-        """Test writing dataframe to XML file."""
+
         xml_format = XMLSourceFormat(root_element="employees", record_element="employee")
         test_data = pd.DataFrame(
             {
@@ -152,19 +152,19 @@ class TestFixedWidthSourceFormat:
     """Test fixed-width source format generator."""
 
     def test_initialization(self) -> None:
-        """Test fixed-width format initialization."""
+
         field_widths = {"id": 10, "name": 20, "amount": 15}
         fw_format = FixedWidthSourceFormat(field_widths=field_widths)
         assert fw_format.field_widths == field_widths
         assert fw_format.fill_char == " "
 
     def test_initialization_with_custom_fill_char(self) -> None:
-        """Test fixed-width format initialization with custom fill character."""
+
         fw_format = FixedWidthSourceFormat(field_widths={}, fill_char="0")
         assert fw_format.fill_char == "0"
 
     def test_generate_data_returns_string(self) -> None:
-        """Test that generate_data returns a file path string."""
+
         fw_format = FixedWidthSourceFormat(field_widths={})
         with tempfile.TemporaryDirectory() as tmpdir:
             result = fw_format.generate_data(
@@ -176,7 +176,7 @@ class TestFixedWidthSourceFormat:
             assert isinstance(result, str)
 
     def test_write_to_file(self) -> None:
-        """Test writing dataframe to fixed-width file."""
+
         field_widths = {"id": 5, "name": 10, "amount": 8}
         fw_format = FixedWidthSourceFormat(field_widths=field_widths)
         test_data = pd.DataFrame(
@@ -203,7 +203,7 @@ class TestFixedWidthSourceFormat:
                     assert len(line.rstrip("\n")) == expected_length
 
     def test_write_to_file_with_custom_fill_char(self) -> None:
-        """Test writing fixed-width file with custom fill character."""
+
         field_widths = {"col1": 10}
         fw_format = FixedWidthSourceFormat(field_widths=field_widths, fill_char="_")
         test_data = pd.DataFrame({"col1": ["test"]})
@@ -221,20 +221,20 @@ class TestPipeDelimitedSourceFormat:
     """Test pipe-delimited source format generator."""
 
     def test_initialization(self) -> None:
-        """Test pipe-delimited format initialization."""
+
         pipe_format = PipeDelimitedSourceFormat()
         assert pipe_format.delimiter == "|"
         assert pipe_format.escape_char == "\\"
         assert pipe_format.null_representation == ""
 
     def test_initialization_with_custom_params(self) -> None:
-        """Test pipe-delimited format initialization with custom parameters."""
+
         pipe_format = PipeDelimitedSourceFormat(escape_char="^", null_representation="NULL")
         assert pipe_format.escape_char == "^"
         assert pipe_format.null_representation == "NULL"
 
     def test_generate_data_returns_string(self) -> None:
-        """Test that generate_data returns a file path string."""
+
         pipe_format = PipeDelimitedSourceFormat()
         with tempfile.TemporaryDirectory() as tmpdir:
             result = pipe_format.generate_data(
@@ -246,7 +246,7 @@ class TestPipeDelimitedSourceFormat:
             assert isinstance(result, str)
 
     def test_write_to_file(self) -> None:
-        """Test writing dataframe to pipe-delimited file."""
+
         pipe_format = PipeDelimitedSourceFormat()
         test_data = pd.DataFrame(
             {
@@ -268,7 +268,7 @@ class TestPipeDelimitedSourceFormat:
                 assert "|" in content
 
     def test_write_to_file_handles_null_values(self) -> None:
-        """Test writing pipe-delimited file with null values."""
+
         pipe_format = PipeDelimitedSourceFormat(null_representation="NULL")
         test_data = pd.DataFrame(
             {
@@ -290,14 +290,14 @@ class TestSourceDataGenerator:
     """Test main source data generator."""
 
     def test_initialization(self) -> None:
-        """Test source data generator initialization."""
+
         generator = SourceDataGenerator(scale_factor=2.0, seed=42)
         assert generator.scale_factor == 2.0
         assert generator.seed == 42
         assert len(generator.formats) == 4  # csv, xml, fixed_width, pipe
 
     def test_default_formats_registered(self) -> None:
-        """Test that default formats are registered."""
+
         generator = SourceDataGenerator()
         assert "csv" in generator.formats
         assert "xml" in generator.formats
@@ -305,7 +305,7 @@ class TestSourceDataGenerator:
         assert "pipe" in generator.formats
 
     def test_register_format(self) -> None:
-        """Test registering a new format."""
+
         generator = SourceDataGenerator()
         custom_format = CSVSourceFormat(delimiter=";")
         generator.register_format("custom_csv", custom_format)
@@ -324,7 +324,7 @@ class TestSourceDataGenerator:
                 assert isinstance(path, Path)
 
     def test_generate_incremental_data(self) -> None:
-        """Test generating incremental data."""
+
         generator = SourceDataGenerator(scale_factor=0.01)
         with tempfile.TemporaryDirectory() as tmpdir:
             result = generator.generate_incremental_data("csv", Path(tmpdir), batch_number=2)
@@ -335,31 +335,30 @@ class TestSourceDataGenerator:
                 assert "batch2" in key
 
     def test_generate_customer_management_data(self) -> None:
-        """Test generating customer management data."""
+
         generator = SourceDataGenerator(scale_factor=0.01)
         with tempfile.TemporaryDirectory() as tmpdir:
             result = generator.generate_customer_management_data("csv", Path(tmpdir), batch_number=1)
             assert isinstance(result, Path)
 
     def test_generate_daily_market_data(self) -> None:
-        """Test generating daily market data."""
+
         generator = SourceDataGenerator(scale_factor=0.01)
         with tempfile.TemporaryDirectory() as tmpdir:
             result = generator.generate_daily_market_data("csv", Path(tmpdir), batch_date="2023-01-15")
             assert isinstance(result, Path)
 
     def test_get_data_statistics_before_generation(self) -> None:
-        """Test getting statistics before data generation."""
+
         generator = SourceDataGenerator(scale_factor=1.5, seed=123)
         stats = generator.get_data_statistics()
         assert stats["scale_factor"] == 1.5
         assert stats["status"] == "not_generated"
 
     def test_get_data_statistics_after_generation(self) -> None:
-        """Test getting statistics after data generation."""
+
         generator = SourceDataGenerator(scale_factor=0.01)
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Generate some data
             generator.generate_historical_data("csv", Path(tmpdir))
             stats = generator.get_data_statistics()
             assert stats["scale_factor"] == 0.01

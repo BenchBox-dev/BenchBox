@@ -48,7 +48,7 @@ class TestLivePrestoConnection:
     """Test basic Presto connectivity via Docker."""
 
     def test_connection(self, presto_adapter):
-        """Verify we can connect to Presto and run a trivial query."""
+
         connection = presto_adapter.create_connection()
         try:
             assert connection is not None
@@ -56,7 +56,7 @@ class TestLivePrestoConnection:
             presto_adapter.close_connection(connection)
 
     def test_platform_info(self, presto_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = presto_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "presto"
@@ -66,7 +66,7 @@ class TestLivePrestoQueryExecution:
     """Test query execution against a live Presto instance."""
 
     def test_create_schema(self, presto_adapter):
-        """Verify we can create a schema in the memory catalog."""
+
         connection = presto_adapter.create_connection()
         try:
             presto_adapter.execute_query(

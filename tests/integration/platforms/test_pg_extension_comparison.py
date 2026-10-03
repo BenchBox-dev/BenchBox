@@ -201,7 +201,7 @@ class TestPgExtensionComparisonOrchestration:
     """Test that multi-extension comparison orchestration works."""
 
     def test_all_extensions_produce_results(self, comparison_results, available_extensions):
-        """Verify each available extension produced benchmark results."""
+
         for platform in available_extensions:
             assert platform in comparison_results, f"Missing results for {platform}"
             result = comparison_results[platform]
@@ -209,7 +209,7 @@ class TestPgExtensionComparisonOrchestration:
             assert result.get("successful_queries", 0) > 0
 
     def test_results_are_comparable(self, comparison_results):
-        """Verify results have matching structure for comparison."""
+
         platforms = list(comparison_results.keys())
         first = comparison_results[platforms[0]]
 

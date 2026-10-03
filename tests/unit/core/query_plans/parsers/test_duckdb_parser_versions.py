@@ -66,7 +66,7 @@ class TestDuckDBVersionCompatibility:
         VERSION_FIXTURES,
     )
     def test_correct_operators_detected(self, version: str, format: str, fixture_name: str, fixture_value: str) -> None:
-        """Test correct operators are detected for each fixture."""
+
         parser = DuckDBQueryPlanParser()
         plan = parser.parse_explain_output(f"q_{fixture_name}", fixture_value)
 
@@ -270,7 +270,7 @@ class TestVersionBasedParserSelection:
     """Test that registry selects appropriate parser by version."""
 
     def test_registry_returns_parser_for_any_version(self) -> None:
-        """Test registry returns DuckDB parser for various versions."""
+
         # All versions should work since we have a 0.0.0 base registration
         for version in ["0.9.0", "0.10.0", "1.0.0", "1.1.0", "2.0.0"]:
             parser = get_parser_for_platform("duckdb", version)
@@ -278,7 +278,7 @@ class TestVersionBasedParserSelection:
             assert parser.platform_name == "duckdb"
 
     def test_parser_from_registry_parses_text_format(self) -> None:
-        """Test registry parser can parse text format."""
+
         parser = get_parser_for_platform("duckdb", "0.9.0")
         plan = parser.parse_explain_output("q01", DUCKDB_0_9_SIMPLE_SCAN)
 
@@ -286,7 +286,7 @@ class TestVersionBasedParserSelection:
         assert plan.logical_root is not None
 
     def test_parser_from_registry_parses_json_format(self) -> None:
-        """Test registry parser can parse JSON format."""
+
         parser = get_parser_for_platform("duckdb", "1.0.0")
         plan = parser.parse_explain_output("q01", DUCKDB_1_0_JSON_SIMPLE_SCAN)
 
@@ -298,7 +298,7 @@ class TestFingerprintConsistencyAcrossVersions:
     """Test that semantically similar plans have consistent fingerprints."""
 
     def test_same_structure_same_fingerprint_base(self) -> None:
-        """Test that same JSON structure produces consistent fingerprint."""
+
         parser = DuckDBQueryPlanParser()
         plan1 = parser.parse_explain_output("q01", DUCKDB_1_0_JSON_SIMPLE_SCAN)
         plan2 = parser.parse_explain_output("q02", DUCKDB_1_0_JSON_SIMPLE_SCAN)
@@ -308,7 +308,7 @@ class TestFingerprintConsistencyAcrossVersions:
         # (fingerprints based on logical structure, not query_id)
 
     def test_different_structure_different_fingerprint(self) -> None:
-        """Test that different structures produce different fingerprints."""
+
         parser = DuckDBQueryPlanParser()
         plan1 = parser.parse_explain_output("q01", DUCKDB_1_0_JSON_SIMPLE_SCAN)
         plan2 = parser.parse_explain_output("q02", DUCKDB_1_0_JSON_FILTER_SCAN)

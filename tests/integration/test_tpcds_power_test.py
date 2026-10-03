@@ -40,7 +40,7 @@ class TestDatabaseConnection:
     """Test database connection wrapper functionality."""
 
     def test_sqlite_connection(self):
-        """Test SQLite database connection."""
+
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
 
@@ -70,7 +70,7 @@ class TestDatabaseConnection:
             Path(db_path).unlink(missing_ok=True)
 
     def test_connection_without_prefix(self):
-        """Test database connection without URL prefix."""
+
         with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
             db_path = tmp.name
 
@@ -93,7 +93,7 @@ class TestDatabaseConnection:
             Path(db_path).unlink(missing_ok=True)
 
     def test_duckdb_connection(self):
-        """Test DuckDB connection if available."""
+
         try:
             import os
 
@@ -128,7 +128,7 @@ class TestDatabaseConnection:
             pytest.skip("DuckDB not available")
 
     def test_connection_error_handling(self):
-        """Test error handling in database connections."""
+
         with pytest.raises(ValueError, match="Connection object must have either"):
             DatabaseConnection("invalid://connection/string")
 
@@ -137,7 +137,7 @@ class TestPowerTestResult:
     """Test PowerTestResult data structure."""
 
     def test_power_test_result_creation(self):
-        """Test PowerTestResult creation and basic functionality."""
+
         from benchbox.core.tpcds.power_test import TPCDSPowerTestConfig
 
         config = TPCDSPowerTestConfig(scale_factor=1.0)
@@ -161,7 +161,7 @@ class TestPowerTestResult:
         assert result.errors == []
 
     def test_power_test_result_to_dict(self):
-        """Test PowerTestResult serialization to dictionary."""
+
         from benchbox.core.tpcds.power_test import TPCDSPowerTestConfig
 
         config = TPCDSPowerTestConfig(scale_factor=1.0)
@@ -220,7 +220,7 @@ class TestTPCDSPowerTest:
         return mock_benchmark
 
     def test_power_test_initialization(self):
-        """Test Power Test initialization with various parameters."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         # Test basic initialization - use connection_factory instead of connection_string
@@ -252,7 +252,7 @@ class TestTPCDSPowerTest:
         assert power_test_custom.config.timeout == 30.0
 
     def test_power_test_initialization_validation(self):
-        """Test Power Test initialization parameter validation."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         # Test invalid scale factor
@@ -271,7 +271,7 @@ class TestTPCDSPowerTest:
             )
 
     def test_power_at_size_calculation(self):
-        """Test Power@Size metric calculation."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(
@@ -296,7 +296,7 @@ class TestTPCDSPowerTest:
         assert power_at_size == 0.0
 
     def test_query_sequence_building(self):
-        """Test that Power Test builds correct query sequence with variants."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
@@ -322,7 +322,7 @@ class TestTPCDSPowerTest:
         assert len(query_sequence) == 107
 
     def test_status_tracking(self):
-        """Test Power Test status tracking."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
@@ -346,7 +346,7 @@ class TestTPCDSPowerTest:
 
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_database_connection_lifecycle(self, mock_db_connection):
-        """Test database connection establishment and cleanup."""
+
         mock_benchmark = self.create_mock_benchmark()
         mock_connection = Mock()
         mock_db_connection.return_value = mock_connection
@@ -366,7 +366,7 @@ class TestTPCDSPowerTest:
 
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_warm_up_procedure(self, mock_db_connection):
-        """Test database warm-up procedure."""
+
         mock_benchmark = self.create_mock_benchmark()
         mock_connection = Mock()
         mock_db_connection.return_value = mock_connection
@@ -383,7 +383,7 @@ class TestTPCDSPowerTest:
 
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_query_execution(self, mock_db_connection):
-        """Test individual query execution and timing."""
+
         mock_benchmark = self.create_mock_benchmark()
         mock_connection = Mock()
         mock_cursor = Mock()
@@ -648,7 +648,7 @@ class TestTPCDSPowerTest:
 
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_query_execution_error_handling(self, mock_db_connection):
-        """Test error handling during query execution."""
+
         mock_benchmark = self.create_mock_benchmark()
         mock_connection = Mock()
         mock_connection.execute.side_effect = Exception("Database error")
@@ -669,7 +669,7 @@ class TestTPCDSPowerTest:
         assert "Database error" in result["error"]
 
     def test_result_validation(self):
-        """Test Power Test result validation."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(
@@ -736,7 +736,7 @@ class TestTPCDSPowerTest:
         assert len(invalid_result.errors) > 0
 
     def test_result_validation_disabled(self):
-        """Test Power Test with validation disabled."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(
@@ -765,7 +765,7 @@ class TestTPCDSPowerTest:
         assert power_test._validate_results(invalid_result)
 
     def test_database_info_collection(self):
-        """Test database information collection."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
@@ -787,7 +787,7 @@ class TestTPCDSPowerTest:
         assert db_info["dialect"] == "standard"
 
     def test_result_export(self):
-        """Test Power Test result export functionality."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
@@ -848,7 +848,7 @@ class TestTPCDSPowerTest:
             Path(output_file).unlink(missing_ok=True)
 
     def test_result_comparison(self):
-        """Test Power Test result comparison functionality."""
+
         mock_benchmark = self.create_mock_benchmark()
 
         power_test = TPCDSPowerTest(benchmark=mock_benchmark, connection_string="sqlite::memory:")
@@ -990,7 +990,6 @@ class TestTPCDSPowerTestIntegration:
             )
         """)
 
-        # Insert test data
         cursor.execute(
             "INSERT INTO call_center VALUES (1, 'CC001', 'Call Center 1', 'medium', 100, 10000, '8AM-8PM', 'Manager 1', 1, 'market', 'Market 1', 'Market Manager 1', 1, 'Division 1', 1, 'Company 1', '123', 'Main St', 'Street', 'Suite 1', 'City', 'County', 'State', '12345', 'Country', -5.0, 0.08)"
         )
@@ -1003,11 +1002,10 @@ class TestTPCDSPowerTestIntegration:
 
         yield db_path
 
-        # Cleanup
         Path(db_path).unlink(missing_ok=True)
 
     def test_power_test_integration_with_sqlite(self, sqlite_db):
-        """Test Power Test integration with actual SQLite database."""
+
         # a mock benchmark with simple queries
         mock_benchmark = Mock()
         mock_benchmark.scale_factor = 1.0
@@ -1047,10 +1045,8 @@ class TestTPCDSPowerTestIntegration:
         # Override the query sequence to use only a few queries for testing
         power_test._query_sequence = [1, 2, "14a", 3]
 
-        # Execute the test
         result = power_test.run()
 
-        # Verify results
         assert result.config.scale_factor == 1.0
         assert result.total_time > 0
         assert result.power_at_size > 0
@@ -1069,7 +1065,7 @@ class TestTPCDSPowerTestIntegration:
             assert success or status == "success"
 
     def test_power_test_with_failing_queries(self, sqlite_db):
-        """Test Power Test behavior with failing queries."""
+
         mock_benchmark = Mock()
         mock_benchmark.scale_factor = 1.0
 
@@ -1122,7 +1118,7 @@ class TestTPCDSBenchmarkIntegration:
 
     @patch("benchbox.core.tpcds.power_test.DatabaseConnection")
     def test_benchmark_run_power_test_method(self, mock_db_connection):
-        """Test the run_power_test method added to TPCDSBenchmark."""
+
         # a real TPCDSBenchmark instance
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
@@ -1166,7 +1162,7 @@ class TestTPCDSBenchmarkIntegration:
                 assert "status" in query_result
 
     def test_benchmark_run_power_test_parameter_validation(self):
-        """Test parameter validation in benchmark's run_power_test method."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
         # Mock the query method to avoid query issues
@@ -1191,7 +1187,7 @@ class TestTPCDSPowerTestPerformance:
 
     @pytest.mark.slow
     def test_power_test_performance_measurement(self):
-        """Test that Power Test accurately measures performance."""
+
         mock_benchmark = Mock()
         mock_benchmark.scale_factor = 1.0
 
@@ -1241,7 +1237,7 @@ class TestTPCDSPowerTestPerformance:
 
     @pytest.mark.slow
     def test_power_test_timeout_handling(self):
-        """Test timeout handling in Power Test."""
+
         mock_benchmark = Mock()
         mock_benchmark.scale_factor = 1.0
         mock_benchmark.get_query = lambda query_id, **kwargs: f"SELECT {query_id}"

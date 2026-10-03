@@ -225,7 +225,7 @@ class TestQueryFunctionsCentralized:
             assert len(params) > 0, f"Q{qid} returned empty params"
 
     def test_tpcds_get_parameters_for_all_queries(self):
-        """Verify get_parameters works for all TPC-DS queries with defaults."""
+
         for qid in TPCDS_DEFAULT_PARAMS:
             params = get_parameters(qid)
             assert params.query_id == qid

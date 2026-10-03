@@ -16,7 +16,7 @@ class TestSuppressWindowExecWarning:
     """Tests for suppress_window_exec_warning()."""
 
     def test_suppresses_via_logger_object_call_shape(self):
-        """Verify the logger-object Configurator.setLevel overload is used."""
+
         mock_spark = MagicMock()
         mock_jvm = mock_spark.sparkContext._jvm
         mock_logger = MagicMock()

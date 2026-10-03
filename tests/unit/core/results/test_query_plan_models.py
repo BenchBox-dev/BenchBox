@@ -267,7 +267,7 @@ class TestPhysicalOperator:
     """Test PhysicalOperator dataclass."""
 
     def test_basic_instantiation(self) -> None:
-        """Test creating a basic physical operator."""
+
         op = PhysicalOperator(
             operator_type="SeqScan",
             operator_id="scan_1",
@@ -281,14 +281,14 @@ class TestPhysicalOperator:
         assert op.platform_metadata["table_oid"] == 12345
 
     def test_default_properties(self) -> None:
-        """Test that properties and metadata default to empty dicts."""
+
         op = PhysicalOperator(operator_type="HashJoin", operator_id="join_1")
 
         assert op.properties == {}
         assert op.platform_metadata == {}
 
     def test_to_dict(self) -> None:
-        """Test serialization to dictionary."""
+
         op = PhysicalOperator(
             operator_type="IndexScan",
             operator_id="idx_1",
@@ -306,7 +306,7 @@ class TestPhysicalOperator:
         }
 
     def test_from_dict(self) -> None:
-        """Test deserialization from dictionary."""
+
         data = {
             "operator_type": "HashAggregate",
             "operator_id": "agg_1",
@@ -322,7 +322,7 @@ class TestPhysicalOperator:
         assert op.platform_metadata == {"parallel_workers": 4}
 
     def test_round_trip_serialization(self) -> None:
-        """Test that to_dict -> from_dict preserves all data."""
+
         original = PhysicalOperator(
             operator_type="MergeJoin",
             operator_id="join_2",
@@ -343,7 +343,7 @@ class TestLogicalOperator:
     """Test LogicalOperator dataclass."""
 
     def test_basic_scan_operator(self) -> None:
-        """Test creating a simple Scan operator."""
+
         op = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -356,7 +356,7 @@ class TestLogicalOperator:
         assert op.children == []
 
     def test_join_operator(self) -> None:
-        """Test creating a Join operator with children."""
+
         left_scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -382,7 +382,7 @@ class TestLogicalOperator:
         assert join.children[1].table_name == "customer"
 
     def test_aggregate_operator(self) -> None:
-        """Test Aggregate operator with aggregation functions."""
+
         scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -402,7 +402,7 @@ class TestLogicalOperator:
         assert len(agg.children) == 1
 
     def test_sort_operator(self) -> None:
-        """Test Sort operator with sort keys."""
+
         scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -424,7 +424,7 @@ class TestLogicalOperator:
         assert sort.sort_keys[0]["direction"] == "DESC"
 
     def test_filter_operator(self) -> None:
-        """Test Filter operator with predicates."""
+
         scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -442,7 +442,7 @@ class TestLogicalOperator:
         assert "l_shipdate" in filter_op.filter_expressions[0]
 
     def test_limit_offset_operator(self) -> None:
-        """Test Limit operator with offset."""
+
         scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -461,7 +461,7 @@ class TestLogicalOperator:
         assert limit.offset_count == 50
 
     def test_operator_with_physical_layer(self) -> None:
-        """Test logical operator linked to physical operator."""
+
         physical = PhysicalOperator(
             operator_type="HashAggregate",
             operator_id="phys_agg_1",
@@ -478,7 +478,7 @@ class TestLogicalOperator:
         assert logical.physical_operator.properties["cost"] == 500.0
 
     def test_to_dict_simple(self) -> None:
-        """Test serialization of simple operator."""
+
         op = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -493,7 +493,7 @@ class TestLogicalOperator:
         assert result["children"] == []
 
     def test_to_dict_with_tree(self) -> None:
-        """Test serialization of operator tree."""
+
         scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -515,7 +515,7 @@ class TestLogicalOperator:
         assert result["children"][0]["table_name"] == "lineitem"
 
     def test_from_dict_simple(self) -> None:
-        """Test deserialization of simple operator."""
+
         data = {
             "operator_type": "Scan",
             "operator_id": "scan_1",
@@ -540,7 +540,7 @@ class TestLogicalOperator:
         assert op.table_name == "customer"
 
     def test_from_dict_with_tree(self) -> None:
-        """Test deserialization of operator tree."""
+
         data = {
             "operator_type": "Join",
             "operator_id": "join_1",
@@ -603,7 +603,7 @@ class TestLogicalOperator:
         assert op.children[1].table_name == "customer"
 
     def test_round_trip_serialization_complex(self) -> None:
-        """Test that complex tree survives to_dict -> from_dict."""
+
         # Build: Filter(l_shipdate > X) -> Join(orders, lineitem) -> [Scan(orders), Scan(lineitem)]
         scan_orders = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
@@ -644,7 +644,7 @@ class TestLogicalOperator:
         assert len(join_child.children) == 2
 
     def test_structural_signature_simple(self) -> None:
-        """Test structural signature for simple operator."""
+
         op = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -660,7 +660,7 @@ class TestLogicalOperator:
         assert parsed["table"] == "orders"
 
     def test_structural_signature_excludes_non_structural(self) -> None:
-        """Test that structural signature excludes costs, IDs, etc."""
+
         op1 = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",  # Different ID
@@ -678,7 +678,7 @@ class TestLogicalOperator:
         assert op1.get_structural_signature() == op2.get_structural_signature()
 
     def test_structural_signature_includes_join_type(self) -> None:
-        """Test that structural signature includes join type."""
+
         left_scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -713,7 +713,7 @@ class TestQueryPlanDAG:
     """Test QueryPlanDAG container."""
 
     def test_basic_instantiation(self) -> None:
-        """Test creating a basic query plan."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -734,7 +734,7 @@ class TestQueryPlanDAG:
         assert plan.estimated_rows == 1000
 
     def test_automatic_fingerprint_computation(self) -> None:
-        """Test that fingerprint is computed automatically on init."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -748,7 +748,7 @@ class TestQueryPlanDAG:
         assert len(plan.plan_fingerprint) == 64  # SHA256 hex length
 
     def test_explicit_fingerprint_preserved(self) -> None:
-        """Test that explicit fingerprint is not overwritten."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -765,7 +765,7 @@ class TestQueryPlanDAG:
         assert plan.plan_fingerprint == explicit_fp
 
     def test_fingerprint_deterministic(self) -> None:
-        """Test that same plan produces same fingerprint."""
+
         root1 = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -783,7 +783,7 @@ class TestQueryPlanDAG:
         assert plan1.plan_fingerprint == plan2.plan_fingerprint
 
     def test_fingerprint_different_for_different_plans(self) -> None:
-        """Test that different plans produce different fingerprints."""
+
         root1 = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -801,7 +801,7 @@ class TestQueryPlanDAG:
         assert plan1.plan_fingerprint != plan2.plan_fingerprint
 
     def test_fingerprint_ignores_cost_changes(self) -> None:
-        """Test that fingerprint is stable across cost changes."""
+
         root1 = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -832,7 +832,7 @@ class TestQueryPlanDAG:
         assert plan1.plan_fingerprint == plan2.plan_fingerprint
 
     def test_to_dict(self) -> None:
-        """Test serialization to dictionary."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -856,7 +856,7 @@ class TestQueryPlanDAG:
         assert result["logical_root"]["table_name"] == "orders"
 
     def test_from_dict(self) -> None:
-        """Test deserialization from dictionary."""
+
         data = {
             "query_id": "q05",
             "platform": "postgres",
@@ -891,7 +891,7 @@ class TestQueryPlanDAG:
         assert plan.logical_root.table_name == "customer"
 
     def test_round_trip_serialization(self) -> None:
-        """Test that to_dict -> from_dict preserves all data."""
+
         # Build complex plan
         scan_orders = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
@@ -924,7 +924,6 @@ class TestQueryPlanDAG:
         serialized = original.to_dict()
         deserialized = QueryPlanDAG.from_dict(serialized)
 
-        # Verify
         assert deserialized.query_id == original.query_id
         assert deserialized.platform == original.platform
         assert deserialized.estimated_cost == original.estimated_cost
@@ -934,7 +933,7 @@ class TestQueryPlanDAG:
         assert len(deserialized.logical_root.children) == 2
 
     def test_to_json(self) -> None:
-        """Test JSON string serialization."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -951,7 +950,7 @@ class TestQueryPlanDAG:
         assert parsed["logical_root"]["table_name"] == "lineitem"
 
     def test_from_json(self) -> None:
-        """Test JSON string deserialization."""
+
         json_str = """
         {
             "query_id": "q17",
@@ -988,7 +987,7 @@ class TestQueryPlanDAG:
         assert plan.logical_root.table_name == "part"
 
     def test_json_round_trip(self) -> None:
-        """Test that to_json -> from_json preserves data."""
+
         scan = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -1021,7 +1020,7 @@ class TestStandaloneFingerprintFunction:
     """Test the standalone compute_plan_fingerprint function."""
 
     def test_standalone_fingerprint_matches_method(self) -> None:
-        """Test that standalone function matches QueryPlanDAG method."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -1037,7 +1036,7 @@ class TestStandaloneFingerprintFunction:
         assert standalone_fp == plan.plan_fingerprint
 
     def test_standalone_fingerprint_deterministic(self) -> None:
-        """Test that standalone function is deterministic."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -1055,21 +1054,21 @@ class TestEnumTypes:
     """Test enum types for operator classification."""
 
     def test_logical_operator_type_enum(self) -> None:
-        """Test LogicalOperatorType enum values."""
+
         assert LogicalOperatorType.SCAN.value == "Scan"
         assert LogicalOperatorType.JOIN.value == "Join"
         assert LogicalOperatorType.FILTER.value == "Filter"
         assert LogicalOperatorType.AGGREGATE.value == "Aggregate"
 
     def test_join_type_enum(self) -> None:
-        """Test JoinType enum values."""
+
         assert JoinType.INNER.value == "inner"
         assert JoinType.LEFT.value == "left"
         assert JoinType.RIGHT.value == "right"
         assert JoinType.FULL.value == "full"
 
     def test_aggregate_function_enum(self) -> None:
-        """Test AggregateFunction enum values."""
+
         assert AggregateFunction.COUNT.value == "count"
         assert AggregateFunction.SUM.value == "sum"
         assert AggregateFunction.AVG.value == "avg"
@@ -1079,7 +1078,7 @@ class TestEdgeCases:
     """Test edge cases and error conditions."""
 
     def test_empty_operator_tree(self) -> None:
-        """Test operator with no children."""
+
         op = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -1092,7 +1091,7 @@ class TestEdgeCases:
         assert "Scan" in signature
 
     def test_deep_operator_tree(self) -> None:
-        """Test deeply nested operator tree."""
+
         # Build: Limit -> Sort -> Aggregate -> Filter -> Join -> [Scan, Scan]
         scan1 = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
@@ -1150,7 +1149,7 @@ class TestEdgeCases:
         assert depth == 5  # 5 levels deep
 
     def test_plan_with_no_cost_estimates(self) -> None:
-        """Test plan with None cost/row estimates."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -1170,7 +1169,7 @@ class TestEdgeCases:
         assert plan.plan_fingerprint is not None
 
     def test_operator_with_string_type_instead_of_enum(self) -> None:
-        """Test that operators accept string types for flexibility."""
+
         op = LogicalOperator(
             operator_type="CustomScan",  # String instead of enum
             operator_id="custom_1",
@@ -1186,7 +1185,7 @@ class TestFingerprintCoverage:
     """Test that fingerprints include all semantically significant fields."""
 
     def test_fingerprint_includes_join_conditions(self) -> None:
-        """Test that different join conditions produce different fingerprints."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         plan1 = QueryPlanDAG(
@@ -1223,7 +1222,7 @@ class TestFingerprintCoverage:
         assert plan1.fingerprint_integrity == FingerprintIntegrity.VERIFIED
 
     def test_fingerprint_includes_group_by_keys(self) -> None:
-        """Test that different group by keys produce different fingerprints."""
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -1253,7 +1252,7 @@ class TestFingerprintCoverage:
         assert plan1.plan_fingerprint != plan2.plan_fingerprint
 
     def test_fingerprint_includes_projection_expressions(self) -> None:
-        """Test that different projections produce different fingerprints."""
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -1283,7 +1282,7 @@ class TestFingerprintCoverage:
         assert plan1.plan_fingerprint != plan2.plan_fingerprint
 
     def test_fingerprint_includes_limit_count(self) -> None:
-        """Test that different limit counts produce different fingerprints."""
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -1313,7 +1312,7 @@ class TestFingerprintCoverage:
         assert plan1.plan_fingerprint != plan2.plan_fingerprint
 
     def test_fingerprint_includes_offset_count(self) -> None:
-        """Test that different offset counts produce different fingerprints."""
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -1499,7 +1498,7 @@ class TestFingerprintVerification:
     """Test fingerprint verification and integrity tracking."""
 
     def test_from_dict_verifies_fingerprint(self) -> None:
-        """Test that from_dict verifies fingerprint by default."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         # Create a plan and serialize it
@@ -1520,7 +1519,7 @@ class TestFingerprintVerification:
         assert loaded.is_fingerprint_trusted()
 
     def test_from_dict_detects_stale_fingerprint(self) -> None:
-        """Test that from_dict detects tampered fingerprints."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         # Create and serialize a plan
@@ -1544,7 +1543,7 @@ class TestFingerprintVerification:
         assert not loaded.is_fingerprint_trusted()
 
     def test_from_dict_refresh_on_mismatch(self) -> None:
-        """Test that from_dict can recompute fingerprint on mismatch."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         # Create and serialize a plan
@@ -1570,7 +1569,7 @@ class TestFingerprintVerification:
         assert loaded.plan_fingerprint == correct_fingerprint
 
     def test_from_dict_skip_verification(self) -> None:
-        """Test that from_dict can skip verification."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         # Create and serialize a plan
@@ -1595,7 +1594,7 @@ class TestFingerprintVerification:
         assert loaded.plan_fingerprint == "invalid_fingerprint"  # Kept as-is
 
     def test_verify_fingerprint_method(self) -> None:
-        """Test the verify_fingerprint method."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         plan = QueryPlanDAG(
@@ -1618,7 +1617,7 @@ class TestFingerprintVerification:
         assert plan.fingerprint_integrity == FingerprintIntegrity.STALE
 
     def test_refresh_fingerprint_method(self) -> None:
-        """Test the refresh_fingerprint method."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         plan = QueryPlanDAG(
@@ -1644,7 +1643,7 @@ class TestHelperFunctions:
     """Test helper functions for safe operator type handling."""
 
     def test_get_operator_type_str_with_enum(self) -> None:
-        """Test get_operator_type_str with enum value."""
+
         from benchbox.core.results.query_plan_models import get_operator_type_str
 
         result = get_operator_type_str(LogicalOperatorType.SCAN)
@@ -1654,7 +1653,7 @@ class TestHelperFunctions:
         assert result == "Join"
 
     def test_get_operator_type_str_with_string(self) -> None:
-        """Test get_operator_type_str with string value."""
+
         from benchbox.core.results.query_plan_models import get_operator_type_str
 
         result = get_operator_type_str("CustomScan")
@@ -1664,7 +1663,7 @@ class TestHelperFunctions:
         assert result == "IndexSeek"
 
     def test_get_join_type_str_with_enum(self) -> None:
-        """Test get_join_type_str with enum value."""
+
         from benchbox.core.results.query_plan_models import get_join_type_str
 
         result = get_join_type_str(JoinType.INNER)
@@ -1674,28 +1673,28 @@ class TestHelperFunctions:
         assert result == "left"
 
     def test_get_join_type_str_with_string(self) -> None:
-        """Test get_join_type_str with string value."""
+
         from benchbox.core.results.query_plan_models import get_join_type_str
 
         result = get_join_type_str("parallel_hash")
         assert result == "parallel_hash"
 
     def test_get_join_type_str_with_none(self) -> None:
-        """Test get_join_type_str with None value."""
+
         from benchbox.core.results.query_plan_models import get_join_type_str
 
         result = get_join_type_str(None)
         assert result is None
 
     def test_normalize_operator_type_with_enum(self) -> None:
-        """Test normalize_operator_type returns enum as-is."""
+
         from benchbox.core.results.query_plan_models import normalize_operator_type
 
         result = normalize_operator_type(LogicalOperatorType.SCAN)
         assert result == LogicalOperatorType.SCAN
 
     def test_normalize_operator_type_with_matching_string(self) -> None:
-        """Test normalize_operator_type converts matching string to enum."""
+
         from benchbox.core.results.query_plan_models import normalize_operator_type
 
         result = normalize_operator_type("Scan")
@@ -1705,28 +1704,28 @@ class TestHelperFunctions:
         assert result == LogicalOperatorType.JOIN
 
     def test_normalize_operator_type_with_unknown_string(self) -> None:
-        """Test normalize_operator_type returns unknown string as-is."""
+
         from benchbox.core.results.query_plan_models import normalize_operator_type
 
         result = normalize_operator_type("CustomScan")
         assert result == "CustomScan"
 
     def test_is_operator_type_match_same_enum(self) -> None:
-        """Test is_operator_type_match with same enum values."""
+
         from benchbox.core.results.query_plan_models import is_operator_type_match
 
         result = is_operator_type_match(LogicalOperatorType.SCAN, LogicalOperatorType.SCAN)
         assert result is True
 
     def test_is_operator_type_match_different_enum(self) -> None:
-        """Test is_operator_type_match with different enum values."""
+
         from benchbox.core.results.query_plan_models import is_operator_type_match
 
         result = is_operator_type_match(LogicalOperatorType.SCAN, LogicalOperatorType.JOIN)
         assert result is False
 
     def test_is_operator_type_match_enum_and_matching_string(self) -> None:
-        """Test is_operator_type_match with enum and matching string."""
+
         from benchbox.core.results.query_plan_models import is_operator_type_match
 
         result = is_operator_type_match(LogicalOperatorType.SCAN, "Scan")
@@ -1736,14 +1735,14 @@ class TestHelperFunctions:
         assert result is True
 
     def test_is_operator_type_match_same_string(self) -> None:
-        """Test is_operator_type_match with same string values."""
+
         from benchbox.core.results.query_plan_models import is_operator_type_match
 
         result = is_operator_type_match("CustomScan", "CustomScan")
         assert result is True
 
     def test_is_operator_type_match_different_string(self) -> None:
-        """Test is_operator_type_match with different string values."""
+
         from benchbox.core.results.query_plan_models import is_operator_type_match
 
         result = is_operator_type_match("CustomScan", "IndexScan")
@@ -1754,7 +1753,7 @@ class TestUnknownTypeWarnings:
     """Test warning behavior for unknown operator and join types."""
 
     def test_unknown_operator_type_logs_warning(self, caplog) -> None:
-        """Test that unknown operator types log a warning."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1773,7 +1772,7 @@ class TestUnknownTypeWarnings:
         assert "Consider adding a mapping" in caplog.text
 
     def test_known_string_operator_type_no_warning(self, caplog) -> None:
-        """Test that known enum value as string doesn't log a warning."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1790,7 +1789,7 @@ class TestUnknownTypeWarnings:
         assert "Unknown operator type" not in caplog.text
 
     def test_unknown_operator_type_warning_logged_once(self, caplog) -> None:
-        """Test that unknown operator types are only logged once per unique type."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1810,7 +1809,7 @@ class TestUnknownTypeWarnings:
         assert caplog.text.count("Unknown operator type 'RepeatedUnknownType'") == 1
 
     def test_multiple_unknown_operator_types_each_warned(self, caplog) -> None:
-        """Test that different unknown operator types each get their own warning."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1828,7 +1827,7 @@ class TestUnknownTypeWarnings:
         assert "Unknown operator type 'UnknownTypeB'" in caplog.text
 
     def test_warn_unknown_parameter(self, caplog) -> None:
-        """Test that warn_unknown=False suppresses warnings."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1845,7 +1844,7 @@ class TestUnknownTypeWarnings:
         assert "Unknown operator type 'SilentUnknownType'" not in caplog.text
 
     def test_unknown_join_type_logs_warning(self, caplog) -> None:
-        """Test that unknown join types log a warning."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1863,7 +1862,7 @@ class TestUnknownTypeWarnings:
         assert "Consider adding a mapping" in caplog.text
 
     def test_known_string_join_type_no_warning(self, caplog) -> None:
-        """Test that known enum value as string doesn't log a warning."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1880,7 +1879,7 @@ class TestUnknownTypeWarnings:
         assert "Unknown join type" not in caplog.text
 
     def test_unknown_join_type_warning_logged_once(self, caplog) -> None:
-        """Test that unknown join types are only logged once per unique type."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1897,7 +1896,7 @@ class TestUnknownTypeWarnings:
         assert caplog.text.count("Unknown join type 'repeated_custom_join'") == 1
 
     def test_clear_unknown_type_warnings_resets_state(self, caplog) -> None:
-        """Test that clear_unknown_type_warnings resets warning state."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (
@@ -1919,7 +1918,7 @@ class TestUnknownTypeWarnings:
         assert "Unknown operator type 'ClearTestType'" in caplog.text
 
     def test_is_operator_type_match_does_not_warn(self, caplog) -> None:
-        """Test that is_operator_type_match doesn't trigger warnings."""
+
         import logging
 
         from benchbox.core.results.query_plan_models import (

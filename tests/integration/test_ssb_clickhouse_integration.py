@@ -28,7 +28,7 @@ class TestSSBClickHouseIntegration:
     """Test SSB ClickHouse integration functionality."""
 
     def test_ssb_csv_loading_configuration(self):
-        """Test that SSB benchmark provides CSV configuration for ClickHouse."""
+
         # Use compression_type="none" to avoid zstd dependency
         benchmark = SSBBenchmark(scale_factor=0.01, compress_data=False, compression_type="none")
 
@@ -45,7 +45,7 @@ class TestSSBClickHouseIntegration:
         assert any("|" in item for item in delimiter_configs)
 
     def test_clickhouse_tuning_configuration_override(self):
-        """Test that ClickHouse adapter creates proper tuning configuration."""
+
         adapter = ClickHouseAdapter(deployment_mode="local")
 
         # Should create effective tuning config even when none provided
@@ -59,7 +59,7 @@ class TestSSBClickHouseIntegration:
         assert config.foreign_keys.enabled is False
 
     def test_clickhouse_constraint_configuration(self):
-        """Test ClickHouse constraint configuration override."""
+
         adapter = ClickHouseAdapter(deployment_mode="local")
 
         # ClickHouse should always enable primary keys
@@ -69,7 +69,7 @@ class TestSSBClickHouseIntegration:
         assert enable_foreign_keys is False  # Should follow tuning config
 
     def test_ssb_schema_creation_without_engine(self):
-        """Test that SSB tables can be created in ClickHouse without explicit ENGINE clauses."""
+
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
         # chDB pins one EmbeddedServer path per worker process. Use the default
@@ -101,7 +101,7 @@ class TestSSBClickHouseIntegration:
             client.close()
 
     def test_ssb_data_loading_with_clickhouse(self):
-        """Test complete SSB data generation and loading with ClickHouse."""
+
         from benchbox.platforms.clickhouse import ClickHouseLocalClient
 
         data_dir = Path(tempfile.mkdtemp(prefix="ssb-data-"))
@@ -116,12 +116,10 @@ class TestSSBClickHouseIntegration:
                 compression_type="none",
             )
 
-            # Generate data
             benchmark.generate_data()
             assert benchmark.tables
             assert len(benchmark.tables) == 5
 
-            # Create schema
             adapter.create_schema(benchmark, client)
 
             # Load data (test a subset of tables to keep test fast)
@@ -131,7 +129,6 @@ class TestSSBClickHouseIntegration:
                 data_file = Path(benchmark.tables[table_name])
                 assert data_file.exists(), f"Data file for {table_name} should exist"
 
-                # Load data using adapter
                 table_stats, load_time, _ = adapter.load_data(benchmark, client, data_file.parent)
                 assert table_name in table_stats
                 assert table_stats[table_name] > 0, f"Should have loaded rows into {table_name}"

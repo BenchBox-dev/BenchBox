@@ -325,7 +325,7 @@ class TestDuckDBHNSWIndex:
     """Tests for HNSW approximate nearest neighbour search via DuckDB VSS."""
 
     def test_index_exists_in_catalog(self, vector_db_with_hnsw):
-        """Verify HNSW index appears in DuckDB's index catalog."""
+
         conn = vector_db_with_hnsw["conn"]
         rows = conn.execute("SELECT index_name FROM duckdb_indexes() WHERE table_name = 'vectors'").fetchall()
         index_names = [r[0] for r in rows]

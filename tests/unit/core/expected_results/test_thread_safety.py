@@ -35,7 +35,7 @@ class TestThreadSafety:
         return ExpectedResultsRegistry()
 
     def test_concurrent_provider_registration(self, fresh_registry):
-        """Test that concurrent provider registration doesn't cause races."""
+
         registration_results = []
 
         def register_provider(thread_id):
@@ -80,7 +80,6 @@ class TestThreadSafety:
         assert len(benchmarks) == 10
 
     def test_concurrent_cache_access(self, fresh_registry):
-        """Test that concurrent cache access is thread-safe."""
 
         # Register a provider that simulates slow loading
         def slow_provider(sf):
@@ -126,7 +125,7 @@ class TestThreadSafety:
         # (This is implicitly tested by the thread safety working correctly)
 
     def test_concurrent_validations(self):
-        """Test that concurrent query validations are thread-safe."""
+
         validator = QueryValidator()
         validation_results = []
 
@@ -159,7 +158,6 @@ class TestThreadSafety:
         assert all(r[2] is True for r in q1_validations)
 
     def test_cache_clear_thread_safety(self, fresh_registry):
-        """Test that cache clearing is thread-safe."""
 
         def provider(sf):
             return BenchmarkExpectedResults(
@@ -212,7 +210,6 @@ class TestThreadSafety:
         assert all("success" in str(r[1]) or r[1] is True for r in clear_results + access_results)
 
     def test_list_benchmarks_thread_safety(self, fresh_registry):
-        """Test that listing benchmarks is thread-safe."""
 
         def provider(sf):
             return BenchmarkExpectedResults(
@@ -252,7 +249,7 @@ class TestThreadSafety:
         assert all(r[1] >= 1 for r in list_results)  # At least test_benchmark
 
     def test_cache_prevents_redundant_provider_calls(self, fresh_registry):
-        """Test that caching prevents redundant provider calls in sequential access."""
+
         call_count = {"count": 0}
 
         def counting_provider(sf):
@@ -277,7 +274,6 @@ class TestThreadSafety:
         assert call_count["count"] == 1
 
     def test_provider_exception_thread_safety(self, fresh_registry):
-        """Test that provider exceptions don't break thread safety."""
 
         def failing_provider(sf):
             """Provider that raises an exception."""

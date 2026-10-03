@@ -342,7 +342,7 @@ class TestJoinColumnNaming:
     """
 
     def test_polars_drops_right_join_key(self, polars_ctx):
-        """Verify Polars join behavior: right join key is dropped from result."""
+
         partsupp = polars_ctx.get_table("partsupp")
         part = polars_ctx.get_table("part")
 

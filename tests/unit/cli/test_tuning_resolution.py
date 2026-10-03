@@ -58,7 +58,7 @@ class TestTuningMode:
     """Test TuningMode enum."""
 
     def test_tuning_mode_values(self):
-        """Test that TuningMode has expected values."""
+
         assert TuningMode.TUNED.value == "tuned"
         assert TuningMode.NOTUNING.value == "notuning"
         assert TuningMode.AUTO.value == "auto"
@@ -70,7 +70,7 @@ class TestTuningSource:
     """Test TuningSource enum."""
 
     def test_tuning_source_values(self):
-        """Test that TuningSource has expected values."""
+
         assert TuningSource.EXPLICIT_FILE.value == "explicit_file"
         assert TuningSource.AUTO_DISCOVERED.value == "auto_discovered"
         assert TuningSource.PACKAGED_RESOURCE.value == "packaged_resource"
@@ -85,7 +85,7 @@ class TestTuningResolution:
     """Test TuningResolution dataclass."""
 
     def test_resolution_defaults(self):
-        """Test TuningResolution default values."""
+
         resolution = TuningResolution(
             mode=TuningMode.NOTUNING,
             source=TuningSource.BASELINE,
@@ -106,7 +106,7 @@ class TestTuningResolution:
         assert "Baseline mode" in resolution.source_description
 
     def test_resolution_source_description_explicit_file(self):
-        """Test source description for explicit file."""
+
         config_path = Path("/path/to/config.yaml")
         resolution = TuningResolution(
             mode=TuningMode.CUSTOM_FILE,
@@ -118,7 +118,7 @@ class TestTuningResolution:
         assert config_path.as_posix() in resolution.source_description.replace("\\", "/")
 
     def test_resolution_source_description_auto_discovered(self):
-        """Test source description for auto-discovered template."""
+
         resolution = TuningResolution(
             mode=TuningMode.TUNED,
             source=TuningSource.AUTO_DISCOVERED,
@@ -154,7 +154,7 @@ class TestGetTuningTemplatePaths:
     """Test get_tuning_template_paths function."""
 
     def test_basic_paths(self):
-        """Test basic path generation without env var."""
+
         paths = get_tuning_template_paths("duckdb", "tpch")
 
         # Should have at least the standard path (use as_posix for cross-platform)
@@ -162,7 +162,7 @@ class TestGetTuningTemplatePaths:
         assert any("examples/tunings/duckdb/tpch_tuned.yaml" in p for p in path_strs)
 
     def test_env_var_path(self):
-        """Test that BENCHBOX_TUNING_PATH is respected."""
+
         with patch.dict(os.environ, {"BENCHBOX_TUNING_PATH": "/custom/path"}):
             paths = get_tuning_template_paths("duckdb", "tpch")
 
@@ -170,7 +170,7 @@ class TestGetTuningTemplatePaths:
             assert "/custom/path/duckdb/tpch_tuned.yaml" in paths[0].as_posix()
 
     def test_lowercase_platform_benchmark(self):
-        """Test that platform and benchmark are lowercased."""
+
         paths = get_tuning_template_paths("DuckDB", "TPCH")
 
         path_strs = [p.as_posix() for p in paths]
@@ -198,7 +198,7 @@ class TestListAvailableTuningTemplates:
     """Test list_available_tuning_templates function."""
 
     def test_list_all_templates(self):
-        """Test listing all templates."""
+
         templates = list_available_tuning_templates()
 
         # Should find templates in examples/tunings
@@ -207,7 +207,7 @@ class TestListAvailableTuningTemplates:
         assert "duckdb" in templates
 
     def test_filter_by_platform(self):
-        """Test filtering by platform."""
+
         templates = list_available_tuning_templates(platform="duckdb")
 
         # Should only have duckdb
@@ -215,7 +215,7 @@ class TestListAvailableTuningTemplates:
         assert "duckdb" in templates
 
     def test_filter_by_benchmark(self):
-        """Test filtering by benchmark."""
+
         templates = list_available_tuning_templates(benchmark="tpch")
 
         # All templates should be tpch-related
@@ -224,7 +224,7 @@ class TestListAvailableTuningTemplates:
                 assert "tpch" in f.stem.lower()
 
     def test_filter_by_both(self):
-        """Test filtering by both platform and benchmark."""
+
         templates = list_available_tuning_templates(platform="duckdb", benchmark="tpch")
 
         # Should only have duckdb tpch templates
@@ -234,7 +234,7 @@ class TestListAvailableTuningTemplates:
             assert "tpch" in f.stem.lower()
 
     def test_nonexistent_platform(self):
-        """Test filtering by nonexistent platform."""
+
         templates = list_available_tuning_templates(platform="nonexistent")
 
         assert len(templates) == 0
@@ -245,7 +245,7 @@ class TestResolveTuning:
     """Test resolve_tuning function."""
 
     def test_notuning_mode(self, mock_console, config_manager):
-        """Test notuning mode resolution."""
+
         resolution = resolve_tuning(
             tuning_arg="notuning",
             platform="duckdb",
@@ -260,7 +260,7 @@ class TestResolveTuning:
         assert resolution.config_file is None
 
     def test_auto_mode(self, mock_console, config_manager):
-        """Test auto mode resolution."""
+
         resolution = resolve_tuning(
             tuning_arg="auto",
             platform="duckdb",
@@ -274,7 +274,7 @@ class TestResolveTuning:
         assert resolution.enabled
 
     def test_explicit_file_path(self, mock_console, config_manager):
-        """Test explicit file path resolution."""
+
         # Use an existing tuning file
         file_path = "examples/tunings/duckdb/tpch_tuned.yaml"
 
@@ -293,7 +293,7 @@ class TestResolveTuning:
         assert "tpch_tuned.yaml" in str(resolution.config_file)
 
     def test_tuned_mode_with_template(self, mock_console, config_manager):
-        """Test tuned mode with existing template."""
+
         resolution = resolve_tuning(
             tuning_arg="tuned",
             platform="duckdb",
@@ -309,7 +309,7 @@ class TestResolveTuning:
         assert "tpch_tuned.yaml" in str(resolution.config_file)
 
     def test_tuned_mode_without_template(self, mock_console, config_manager):
-        """Test tuned mode when no template exists."""
+
         resolution = resolve_tuning(
             tuning_arg="tuned",
             platform="duckdb",
@@ -325,7 +325,7 @@ class TestResolveTuning:
         assert len(resolution.warnings) > 0
 
     def test_tuned_mode_without_platform(self, mock_console, config_manager):
-        """Test tuned mode without platform specified."""
+
         resolution = resolve_tuning(
             tuning_arg="tuned",
             platform=None,
@@ -339,7 +339,7 @@ class TestResolveTuning:
         assert len(resolution.warnings) > 0
 
     def test_invalid_keyword(self, mock_console, config_manager):
-        """Test invalid keyword raises ValueError."""
+
         with pytest.raises(ValueError) as exc_info:
             resolve_tuning(
                 tuning_arg="invalidkeyword",
@@ -356,7 +356,7 @@ class TestResolveTuning:
         assert "--tuning list" not in message
 
     def test_file_not_found(self, mock_console, config_manager):
-        """Test file not found raises ValueError."""
+
         with pytest.raises(ValueError) as exc_info:
             resolve_tuning(
                 tuning_arg="/nonexistent/path.yaml",
@@ -372,7 +372,7 @@ class TestResolveTuning:
         assert "--tuning list" not in message
 
     def test_case_insensitive_keywords(self, mock_console, config_manager):
-        """Test that keywords are case-insensitive."""
+
         for keyword in ["NOTUNING", "NoTuning", "noTuning"]:
             resolution = resolve_tuning(
                 tuning_arg=keyword,
@@ -440,7 +440,7 @@ class TestDisplayFunctions:
         assert mock_console.print.called
 
     def test_display_tuning_resolution_with_warnings(self, mock_console):
-        """Test display for resolution with warnings."""
+
         resolution = TuningResolution(
             mode=TuningMode.TUNED,
             source=TuningSource.FALLBACK,
@@ -455,7 +455,7 @@ class TestDisplayFunctions:
         assert mock_console.print.called
 
     def test_display_tuning_resolution_verbose(self, mock_console):
-        """Test verbose display shows searched paths."""
+
         resolution = TuningResolution(
             mode=TuningMode.TUNED,
             source=TuningSource.FALLBACK,
@@ -470,14 +470,14 @@ class TestDisplayFunctions:
         assert mock_console.print.call_count >= 2
 
     def test_display_tuning_list(self, mock_console):
-        """Test display_tuning_list shows templates."""
+
         display_tuning_list(mock_console)
 
         # Should have printed the table
         assert mock_console.print.called
 
     def test_display_tuning_list_filtered(self, mock_console):
-        """Test display_tuning_list with filters."""
+
         display_tuning_list(mock_console, platform="duckdb")
 
         assert mock_console.print.called
@@ -548,7 +548,7 @@ class TestWarnSqlAutoMode:
         assert logger.debug.called
 
     def test_display_tuning_list_no_results(self, mock_console):
-        """Test display_tuning_list with no matching templates."""
+
         display_tuning_list(mock_console, platform="nonexistent")
 
         # Should print "no templates found" message
@@ -560,7 +560,7 @@ class TestEnvironmentVariableSupport:
     """Test BENCHBOX_TUNING_PATH environment variable support."""
 
     def test_env_var_adds_search_path(self):
-        """Test that BENCHBOX_TUNING_PATH adds to search paths."""
+
         with patch.dict(os.environ, {"BENCHBOX_TUNING_PATH": "/custom/tuning"}):
             paths = get_tuning_template_paths("postgres", "tpch")
 
@@ -569,7 +569,7 @@ class TestEnvironmentVariableSupport:
             assert first_path.startswith("/custom/tuning")
 
     def test_env_var_takes_priority(self, mock_console, config_manager):
-        """Test that BENCHBOX_TUNING_PATH takes priority over standard paths."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a custom tuning directory structure
             custom_path = Path(tmpdir)
@@ -623,7 +623,7 @@ class TestMockedFilesystem:
                 assert resolution.enabled
 
     def test_resolve_tuning_fallback_with_all_paths_missing(self, mock_console):
-        """Test fallback when all template paths are missing."""
+
         mock_config = MagicMock()
         mock_config.get.return_value = None
 
@@ -646,7 +646,6 @@ class TestMockedFilesystem:
         with tempfile.TemporaryDirectory() as tmpdir:
             base = Path(tmpdir)
 
-            # Create mock structure
             (base / "platform1").mkdir()
             (base / "platform1" / "bench_tuned.yaml").touch()
             (base / "platform1" / "other_tuned.yaml").touch()
@@ -661,7 +660,7 @@ class TestMockedFilesystem:
             assert len(templates["platform2"]) == 1
 
     def test_config_default_takes_priority(self, mock_console):
-        """Test that config file default takes priority over template discovery."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a default config file
             default_file = Path(tmpdir) / "default_tuning.yaml"
@@ -683,7 +682,7 @@ class TestMockedFilesystem:
             assert "default config from benchbox.yaml" in resolution.info_messages[0]
 
     def test_config_default_missing_warns(self, mock_console):
-        """Test that missing config file default generates a warning."""
+
         mock_config = MagicMock()
         mock_config.get.return_value = "/nonexistent/default.yaml"
 
@@ -706,7 +705,7 @@ class TestDisplayTuningShowNullSafety:
     """Test display_tuning_show handles None config correctly."""
 
     def test_display_with_none_config(self, mock_console):
-        """Test that display_tuning_show handles None config gracefully."""
+
         from benchbox.cli.tuning_resolver import display_tuning_show
 
         resolution = TuningResolution(
@@ -722,7 +721,7 @@ class TestDisplayTuningShowNullSafety:
         assert mock_console.print.called
 
     def test_display_with_valid_config(self, mock_console):
-        """Test that display_tuning_show shows config when provided."""
+
         from benchbox.cli.tuning_resolver import display_tuning_show
 
         resolution = TuningResolution(

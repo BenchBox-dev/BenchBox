@@ -82,7 +82,7 @@ class TestLakeSailDataFrameAdapterMocked:
             pass
 
     def test_platform_name(self, mock_pyspark_env):
-        """Test platform name is 'LakeSail'."""
+
         # We need to test with real import since the module checks PYSPARK_AVAILABLE at import time
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
@@ -105,21 +105,21 @@ class TestLakeSailDataFrameAdapterReal:
     """
 
     def test_initialization(self):
-        """Test adapter initialization with default settings."""
+
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
         assert adapter.platform_name == "LakeSail"
 
     def test_platform_name_value(self):
-        """Test the platform_name property returns 'LakeSail'."""
+
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
         assert adapter.platform_name == "LakeSail"
 
     def test_type_aliases_defined(self):
-        """Test that LakeSail type aliases are defined."""
+
         # When PySpark is available, these should be real PySpark types
         from pyspark.sql import DataFrame
         from pyspark.sql.column import Column
@@ -135,13 +135,13 @@ class TestLakeSailDataFrameAdapterReal:
         assert LakeSailExpr is Column
 
     def test_adapter_class_exists_in_dataframe_package(self):
-        """Test that LakeSailDataFrameAdapter is exported from dataframe package."""
+
         from benchbox.platforms.dataframe import LakeSailDataFrameAdapter
 
         assert LakeSailDataFrameAdapter is not None
 
     def test_family_is_expression(self):
-        """Test that the adapter family is 'expression'."""
+
         from benchbox.platforms.dataframe.lakesail_df import LakeSailDataFrameAdapter
 
         adapter = LakeSailDataFrameAdapter.__new__(LakeSailDataFrameAdapter)
@@ -152,7 +152,7 @@ class TestLakeSailDataFrameAdapterConfig:
     """Tests for LakeSail DataFrame adapter configuration handling."""
 
     def test_default_endpoint(self):
-        """Test default Spark Connect endpoint."""
+
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
 
@@ -164,7 +164,7 @@ class TestLakeSailDataFrameAdapterConfig:
         assert adapter._endpoint == "sc://localhost:50051"
 
     def test_custom_endpoint(self):
-        """Test custom Spark Connect endpoint configuration."""
+
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
 
@@ -175,7 +175,7 @@ class TestLakeSailDataFrameAdapterConfig:
         assert adapter._endpoint == "sc://sail-cluster:50051"
 
     def test_get_platform_info_structure(self):
-        """Test platform info has expected keys."""
+
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not available")
 

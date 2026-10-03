@@ -28,7 +28,7 @@ class TestTPCDSBenchmarkMinimal:
     """Test minimal TPC-DS benchmark implementation."""
 
     def test_benchmark_initialization_basic(self) -> None:
-        """Test benchmark initializes with C tools."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
         assert benchmark.c_tools is not None
@@ -37,7 +37,7 @@ class TestTPCDSBenchmarkMinimal:
         assert benchmark.scale_factor == 1.0
 
     def test_benchmark_initialization_with_params(self) -> None:
-        """Test benchmark initialization with various parameters."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0, custom_param="test")
 
         assert benchmark.scale_factor == 1.0
@@ -45,7 +45,7 @@ class TestTPCDSBenchmarkMinimal:
 
     @patch("benchbox.core.tpcds.queries.TPCDSQueryManager.get_all_queries")
     def test_get_queries_interface(self, mock_get_all) -> None:
-        """Test queries interface returns templates."""
+
         # Mock the get_all_queries to return a sample set of queries
         mock_queries = {
             1: "SELECT * FROM customer WHERE c_customer_id = 1;",
@@ -73,7 +73,6 @@ class TestTPCDSBenchmarkMinimal:
 
     @patch("benchbox.core.tpcds.c_tools.DSQGenBinary.generate")
     def test_get_query_interface(self, mock_generate) -> None:
-        """Test single query interface."""
 
         # Mock different queries for different IDs
         def mock_query_gen(query_id, **kwargs):
@@ -96,7 +95,7 @@ class TestTPCDSBenchmarkMinimal:
         assert query != query2
 
     def test_get_query_error_handling(self) -> None:
-        """Test query interface error handling."""
+
         benchmark = TPCDSBenchmark()
 
         # Test invalid query IDs
@@ -108,7 +107,7 @@ class TestTPCDSBenchmarkMinimal:
 
     @patch("benchbox.core.tpcds.benchmark.TPCDSBenchmark.generate_table_data")
     def test_generate_data_interface(self, mock_generate_table_data) -> None:
-        """Test data generation interface."""
+
         # Mock data generation to return sample CSV data
         mock_generate_table_data.return_value = iter(
             [
@@ -147,7 +146,7 @@ class TestTPCDSBenchmarkMinimal:
             pass
 
     def test_get_available_tables_interface(self) -> None:
-        """Test available tables interface."""
+
         benchmark = TPCDSBenchmark()
         tables = benchmark.get_available_tables()
 
@@ -160,7 +159,7 @@ class TestTPCDSBenchmarkMinimal:
             assert table in tables
 
     def test_get_available_queries_interface(self) -> None:
-        """Test available queries interface."""
+
         benchmark = TPCDSBenchmark()
         queries = benchmark.get_available_queries()
 
@@ -172,7 +171,7 @@ class TestTPCDSBenchmarkMinimal:
             assert i in queries
 
     def test_get_schema_interface(self) -> None:
-        """Test schema interface."""
+
         benchmark = TPCDSBenchmark()
         schema = benchmark.get_schema()
 
@@ -187,7 +186,7 @@ class TestTPCDSBenchmarkMinimal:
             assert schema[table]["name"] == table
 
     def test_get_benchmark_info_interface(self) -> None:
-        """Test benchmark info interface."""
+
         benchmark = TPCDSBenchmark(scale_factor=2.0)
         info = benchmark.get_benchmark_info()
 
@@ -198,13 +197,12 @@ class TestTPCDSBenchmarkMinimal:
         assert "available_queries" in info
         assert "c_tools_info" in info
 
-        # Check structure
         assert isinstance(info["available_tables"], list)
         assert isinstance(info["available_queries"], list)
         assert isinstance(info["c_tools_info"], dict)
 
     def test_benchmark_consistency(self) -> None:
-        """Test benchmark interface consistency."""
+
         benchmark = TPCDSBenchmark()
 
         # Multiple calls should return consistent results
@@ -224,7 +222,7 @@ class TestTPCDSBenchmarkMinimal:
             assert query1_call1 == query1_call2
 
     def test_benchmark_independence(self) -> None:
-        """Test benchmark instances work independently."""
+
         benchmark1 = TPCDSBenchmark(scale_factor=1.0)
         benchmark2 = TPCDSBenchmark(scale_factor=2.0)
 
@@ -246,7 +244,7 @@ class TestTPCDSInterfaceCompatibility:
     """Test TPC-DS interface compatibility with old API."""
 
     def test_tpcds_wrapper_initialization(self) -> None:
-        """Test TPCDS wrapper initialization."""
+
         # Test with default parameters
         tpcds = TPCDS()
         assert tpcds.scale_factor == 1.0
@@ -260,7 +258,7 @@ class TestTPCDSInterfaceCompatibility:
 
     @patch("benchbox.core.tpcds.queries.TPCDSQueryManager.get_all_queries")
     def test_tpcds_wrapper_queries_interface(self, mock_get_all) -> None:
-        """Test TPCDS wrapper queries interface."""
+
         # Mock the get_all_queries to return a sample set of queries
         mock_queries = {
             1: "SELECT * FROM customer WHERE c_customer_id = 1;",
@@ -279,7 +277,7 @@ class TestTPCDSInterfaceCompatibility:
         assert len(queries) > 0
 
     def test_tpcds_wrapper_data_generation(self) -> None:
-        """Test TPCDS wrapper data generation."""
+
         tpcds = TPCDS(scale_factor=1.0)
 
         # Should have _impl property with data_generator
@@ -290,7 +288,7 @@ class TestTPCDSInterfaceCompatibility:
         assert callable(tpcds._impl.generate_table_data)
 
     def test_tpcds_wrapper_schema_access(self) -> None:
-        """Test TPCDS wrapper schema access."""
+
         tpcds = TPCDS()
 
         # Should be able to get schema - now returns dict[str, dict]
@@ -299,7 +297,7 @@ class TestTPCDSInterfaceCompatibility:
         assert len(schema) > 0
 
     def test_tpcds_wrapper_benchmark_info(self) -> None:
-        """Test TPCDS wrapper benchmark info."""
+
         tpcds = TPCDS(scale_factor=1.0)
 
         # Should be able to get benchmark info
@@ -314,7 +312,7 @@ class TestTPCDSErrorHandling:
     """Test TPC-DS error handling."""
 
     def test_c_tools_initialization_error(self) -> None:
-        """Test C tools initialization error handling."""
+
         with patch("benchbox.core.tpcds.c_tools.DSQGenBinary._find_dsqgen_or_fail") as mock_find:
             mock_find.side_effect = RuntimeError("dsqgen binary not found")
 
@@ -322,7 +320,7 @@ class TestTPCDSErrorHandling:
                 TPCDSBenchmark()
 
     def test_query_error_handling(self) -> None:
-        """Test query error handling."""
+
         benchmark = TPCDSBenchmark()
 
         # Invalid query IDs
@@ -333,7 +331,7 @@ class TestTPCDSErrorHandling:
             benchmark.get_query(999)
 
     def test_data_generation_error_handling(self) -> None:
-        """Test data generation error handling."""
+
         benchmark = TPCDSBenchmark()
 
         # Test that the method exists
@@ -342,7 +340,7 @@ class TestTPCDSErrorHandling:
 
     @patch("benchbox.core.tpcds.queries.TPCDSQueryManager.get_all_queries")
     def test_graceful_degradation(self, mock_get_all) -> None:
-        """Test graceful degradation when possible."""
+
         # Mock queries so test passes regardless of C tool availability
         mock_get_all.return_value = {
             1: "SELECT * FROM customer WHERE c_customer_id = 1;",
@@ -366,7 +364,7 @@ class TestTPCDSIntegration:
 
     @patch("benchbox.core.tpcds.queries.TPCDSQueryManager.get_all_queries")
     def test_end_to_end_workflow(self, mock_get_all) -> None:
-        """Test complete TPC-DS workflow."""
+
         # Mock queries so test passes regardless of C tool availability
         mock_get_all.return_value = {
             1: "SELECT * FROM customer WHERE c_customer_id = 1;",
@@ -396,7 +394,7 @@ class TestTPCDSIntegration:
         assert "c_tools_info" in info
 
     def test_c_tools_integration(self) -> None:
-        """Test C tools integration works."""
+
         benchmark = TPCDSBenchmark()
 
         # C tools should be initialized
@@ -412,7 +410,7 @@ class TestTPCDSIntegration:
         assert len(tables) > 0
 
     def test_queries_c_tools_integration(self) -> None:
-        """Test queries integration with C tools."""
+
         benchmark = TPCDSBenchmark()
 
         # Query manager should use C tools
@@ -430,7 +428,7 @@ class TestTPCDSIntegration:
             assert len(query) > 0
 
     def test_generator_c_tools_integration(self) -> None:
-        """Test generator integration with C tools."""
+
         benchmark = TPCDSBenchmark()
 
         # Data generator should be available

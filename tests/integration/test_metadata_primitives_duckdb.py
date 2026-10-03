@@ -72,7 +72,7 @@ class TestMetadataPrimitivesQueryExecution:
     """Test metadata query execution against DuckDB."""
 
     def test_schema_list_schemata(self, duckdb_connection):
-        """Test listing schemas."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("schema_list_schemata", dialect="duckdb")
 
@@ -84,7 +84,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert "main" in schema_names
 
     def test_schema_list_tables(self, duckdb_connection):
-        """Test listing tables."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("schema_list_tables", dialect="duckdb")
 
@@ -97,7 +97,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert "products" in table_names
 
     def test_schema_list_views(self, duckdb_connection):
-        """Test listing views with DuckDB-specific syntax."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("schema_list_views", dialect="duckdb")
 
@@ -107,7 +107,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert "active_orders" in view_names
 
     def test_schema_table_count(self, duckdb_connection):
-        """Test counting tables."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("schema_table_count", dialect="duckdb")
 
@@ -117,7 +117,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert count >= 3  # At least our 3 tables
 
     def test_column_list_all(self, duckdb_connection):
-        """Test listing all columns."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("column_list_all", dialect="duckdb")
 
@@ -130,7 +130,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert "order_id" in column_names
 
     def test_column_data_types(self, duckdb_connection):
-        """Test data type distribution."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("column_data_types", dialect="duckdb")
 
@@ -146,7 +146,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert has_integer or has_varchar
 
     def test_stats_column_count_summary(self, duckdb_connection):
-        """Test column count summary statistics."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("stats_column_count_summary", dialect="duckdb")
 
@@ -159,7 +159,7 @@ class TestMetadataPrimitivesQueryExecution:
         assert avg_columns > 0
 
     def test_query_explain_simple(self, duckdb_connection):
-        """Test EXPLAIN query."""
+
         manager = MetadataPrimitivesQueryManager()
         sql = manager.get_query("query_explain_simple", dialect="duckdb")
 
@@ -172,7 +172,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
     """Test full benchmark execution with DuckDB."""
 
     def test_execute_single_query(self, duckdb_connection):
-        """Test executing a single metadata query."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.execute_query(
@@ -188,7 +188,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
         assert result.row_count >= 0
 
     def test_execute_query_with_error(self, duckdb_connection):
-        """Test executing a query that fails gracefully."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         # Force an error by passing invalid dialect (to trigger skip_on)
@@ -202,7 +202,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
         assert result.error is not None
 
     def test_run_benchmark_all_queries(self, duckdb_connection):
-        """Test running full benchmark."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_benchmark(
@@ -218,7 +218,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
         assert len(result.category_summary) > 0
 
     def test_run_benchmark_by_category(self, duckdb_connection):
-        """Test running benchmark filtered by category."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_benchmark(
@@ -233,7 +233,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
             assert qr.category == "schema"
 
     def test_run_benchmark_specific_queries(self, duckdb_connection):
-        """Test running benchmark with specific query IDs."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_benchmark(
@@ -248,7 +248,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
         assert "column_list_all" in query_ids
 
     def test_run_benchmark_with_iterations(self, duckdb_connection):
-        """Test running benchmark with multiple iterations."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_benchmark(
@@ -263,7 +263,7 @@ class TestMetadataPrimitivesBenchmarkExecution:
         assert all(r.query_id == "schema_list_tables" for r in result.results)
 
     def test_category_summary(self, duckdb_connection):
-        """Test that category summary is correctly computed."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_benchmark(
@@ -347,7 +347,7 @@ class TestBenchmarkLoaderIntegration:
     """Test benchmark loader integration."""
 
     def test_benchmark_loads_from_loader(self):
-        """Test that benchmark can be loaded via the benchmark loader."""
+
         from benchbox.core.benchmark_loader import get_benchmark_class
 
         benchmark_class = get_benchmark_class("metadata_primitives")

@@ -79,13 +79,13 @@ class TestWritePrimitivesBenchmarkDataFrameSupport:
     """Test DataFrame mode support in WritePrimitivesBenchmark."""
 
     def test_supports_dataframe_mode(self):
-        """Test that WritePrimitivesBenchmark reports DataFrame support."""
+
         benchmark = WritePrimitivesBenchmark()
         assert benchmark.supports_dataframe_mode() is True
         assert benchmark.skip_dataframe_data_loading() is True
 
     def test_get_dataframe_operations_polars(self):
-        """Test getting DataFrame operations for Polars."""
+
         benchmark = WritePrimitivesBenchmark()
         manager = benchmark.get_dataframe_operations("polars-df")
 
@@ -97,13 +97,13 @@ class TestWritePrimitivesBenchmarkDataFrameSupport:
             assert manager is not None
 
     def test_get_dataframe_operations_unknown_platform(self):
-        """Test that unknown platform returns None."""
+
         benchmark = WritePrimitivesBenchmark()
         manager = benchmark.get_dataframe_operations("sqlite")
         assert manager is None
 
     def test_get_dataframe_capabilities(self):
-        """Test getting DataFrame capabilities."""
+
         benchmark = WritePrimitivesBenchmark()
         caps = benchmark.get_dataframe_capabilities("polars-df")
 
@@ -150,7 +150,7 @@ class TestWriteOperationType:
     """Tests for WriteOperationType enum."""
 
     def test_all_operation_types(self):
-        """Test all operation type values."""
+
         assert WriteOperationType.INSERT.value == "insert"
         assert WriteOperationType.UPDATE.value == "update"
         assert WriteOperationType.DELETE.value == "delete"
@@ -163,7 +163,7 @@ class TestDataFrameWriteCapabilities:
     """Tests for DataFrameWriteCapabilities."""
 
     def test_supports_operation_bulk_load(self):
-        """Test BULK_LOAD capability check."""
+
         caps = DataFrameWriteCapabilities(
             platform_name="test",
             supports_bulk_load=True,
@@ -177,7 +177,7 @@ class TestDataFrameWriteCapabilities:
         assert caps_no.supports_operation(WriteOperationType.BULK_LOAD) is False
 
     def test_supports_operation_without_maintenance_caps(self):
-        """Test operations without maintenance capabilities."""
+
         caps = DataFrameWriteCapabilities(
             platform_name="test",
             maintenance_caps=None,
@@ -189,7 +189,7 @@ class TestDataFrameWriteCapabilities:
         assert caps.supports_operation(WriteOperationType.MERGE) is False
 
     def test_get_unsupported_operations(self):
-        """Test getting list of unsupported operations."""
+
         caps = DataFrameWriteCapabilities(
             platform_name="test",
             maintenance_caps=None,  # No row-level operations
@@ -207,7 +207,7 @@ class TestDataFrameWriteResult:
     """Tests for DataFrameWriteResult."""
 
     def test_failure_factory(self):
-        """Test creating a failure result."""
+
         result = DataFrameWriteResult.failure(
             WriteOperationType.INSERT,
             "Table not found",
@@ -220,7 +220,7 @@ class TestDataFrameWriteResult:
         assert result.validation_passed is False
 
     def test_failure_with_start_time(self):
-        """Test failure factory with explicit start time."""
+
         import time
 
         start = time.time() - 2.0  # 2 seconds ago
@@ -239,7 +239,7 @@ class TestGetDataFrameWriteManager:
     """Tests for get_dataframe_write_manager function."""
 
     def test_polars_manager(self):
-        """Test getting Polars manager."""
+
         manager = get_dataframe_write_manager("polars-df")
         if POLARS_AVAILABLE:
             assert manager is not None
@@ -249,14 +249,14 @@ class TestGetDataFrameWriteManager:
             assert manager is not None
 
     def test_pandas_manager(self):
-        """Test getting Pandas manager."""
+
         manager = get_dataframe_write_manager("pandas-df")
         if PANDAS_AVAILABLE:
             assert manager is not None
             assert "pandas" in manager.platform_name
 
     def test_unknown_platform_returns_none(self):
-        """Test that non-DataFrame platforms return None."""
+
         manager = get_dataframe_write_manager("duckdb")
         assert manager is None
 
@@ -264,7 +264,7 @@ class TestGetDataFrameWriteManager:
         assert manager is None
 
     def test_case_insensitive(self):
-        """Test platform name is case-insensitive."""
+
         manager1 = get_dataframe_write_manager("Polars-DF")
         manager2 = get_dataframe_write_manager("POLARS-DF")
         # Both should return managers (or both None if Polars not installed)
@@ -306,7 +306,7 @@ class TestPolarsWriteOperations:
         return get_dataframe_write_manager("polars-df")
 
     def test_polars_capabilities(self, manager):
-        """Test Polars capabilities are correctly set."""
+
         caps = manager.get_capabilities()
 
         assert caps.platform_name == "polars-df"
@@ -320,7 +320,7 @@ class TestPolarsWriteOperations:
         assert caps.supports_operation(WriteOperationType.TRANSACTION) is False
 
     def test_insert_new_rows(self, manager, temp_table_dir: Path, sample_df):
-        """Test INSERT operation."""
+
         result = manager.execute_insert(temp_table_dir, sample_df, mode="append")
 
         assert result.success is True
@@ -332,7 +332,7 @@ class TestPolarsWriteOperations:
         assert written.height == 5
 
     def test_insert_append_mode(self, manager, existing_table: Path, sample_df):
-        """Test appending rows to existing table."""
+
         new_df = pl.DataFrame(
             {"id": [6, 7], "name": ["Frank", "Grace"], "amount": [400.0, 500.0], "region": ["US", "EU"]}
         )
@@ -347,7 +347,7 @@ class TestPolarsWriteOperations:
         assert all_data.height == 7
 
     def test_update_rows(self, manager, existing_table: Path):
-        """Test UPDATE operation."""
+
         result = manager.execute_update(
             existing_table,
             "region = 'EU'",
@@ -363,7 +363,7 @@ class TestPolarsWriteOperations:
         assert eu_rows["amount"].to_list() == [0, 0]
 
     def test_delete_rows(self, manager, existing_table: Path):
-        """Test DELETE operation."""
+
         result = manager.execute_delete(existing_table, "amount > 200")
 
         assert result.success is True
@@ -441,7 +441,7 @@ class TestPolarsBulkLoad:
         return get_dataframe_write_manager("polars-df")
 
     def test_bulk_load_csv(self, manager, source_csv: Path, tmp_path: Path):
-        """Test loading from CSV."""
+
         target_path = tmp_path / "target_table"
 
         result = manager.execute_bulk_load(
@@ -464,7 +464,7 @@ class TestPolarsBulkLoad:
         assert loaded.height == 3
 
     def test_bulk_load_parquet(self, manager, source_parquet: Path, tmp_path: Path):
-        """Test loading from Parquet."""
+
         target_path = tmp_path / "target_table"
 
         result = manager.execute_bulk_load(
@@ -480,7 +480,7 @@ class TestPolarsBulkLoad:
         assert result.compression == "snappy"
 
     def test_bulk_load_with_sorting(self, manager, source_parquet: Path, tmp_path: Path):
-        """Test bulk load with sorting."""
+
         target_path = tmp_path / "target_table"
 
         result = manager.execute_bulk_load(
@@ -498,7 +498,7 @@ class TestPolarsBulkLoad:
         assert amounts == sorted(amounts)
 
     def test_bulk_load_with_partitioning(self, manager, tmp_path: Path):
-        """Test bulk load with partitioning."""
+
         # Create source with partition column
         source_path = tmp_path / "source.parquet"
         df = pl.DataFrame(
@@ -538,7 +538,7 @@ class TestPandasWriteOperations:
         return get_dataframe_write_manager("pandas-df")
 
     def test_pandas_capabilities(self, manager):
-        """Test Pandas capabilities are correctly limited."""
+
         caps = manager.get_capabilities()
 
         assert caps.platform_name == "pandas-df"
@@ -550,7 +550,7 @@ class TestPandasWriteOperations:
         assert caps.supports_operation(WriteOperationType.MERGE) is False
 
     def test_unsupported_operation_message(self, manager):
-        """Test helpful error message for unsupported operations."""
+
         result = manager.execute_update(
             "/some/path",
             "id = 1",
@@ -561,7 +561,7 @@ class TestPandasWriteOperations:
         assert "polars-df" in result.error_message.lower() or "pyspark-df" in result.error_message.lower()
 
     def test_bulk_load_parquet(self, manager, tmp_path: Path):
-        """Test Pandas bulk load from Parquet."""
+
         # Create source
         source_path = tmp_path / "source.parquet"
         df = pd.DataFrame(
@@ -594,7 +594,7 @@ class TestPySparkCapabilities:
     """Test PySpark capability profiles for Delta vs Parquet."""
 
     def test_delta_capabilities_full_acid(self):
-        """Test that Delta capabilities declare full ACID support."""
+
         caps = PYSPARK_DELTA_CAPABILITIES
 
         assert caps.platform_name == "pyspark-delta"
@@ -607,7 +607,7 @@ class TestPySparkCapabilities:
         assert caps.supports_time_travel is True
 
     def test_parquet_capabilities_limited(self):
-        """Test that Parquet capabilities only support INSERT/BULK_LOAD."""
+
         caps = PYSPARK_PARQUET_CAPABILITIES
 
         assert caps.platform_name == "pyspark-parquet"
@@ -625,12 +625,12 @@ class TestPySparkMaintenanceInit:
     """Test PySparkMaintenanceOperations initialization."""
 
     def test_requires_spark_session(self):
-        """Test that None spark_session raises ValueError."""
+
         with pytest.raises(ValueError, match="spark_session is required"):
             PySparkMaintenanceOperations(spark_session=None)
 
     def test_factory_returns_none_without_session(self):
-        """Test that factory function returns None without SparkSession."""
+
         result = get_pyspark_maintenance_operations(spark_session=None)
         assert result is None
 
@@ -660,7 +660,6 @@ class TestPySparkInsertWithMock:
 
         ops = PySparkMaintenanceOperations(spark_session=mock_spark, prefer_delta=False)
 
-        # Execute insert
         with patch.object(ops, "_convert_to_spark_df", return_value=mock_df):
             with patch.object(ops, "is_delta_table", return_value=False):
                 result = ops._do_insert(
@@ -715,7 +714,6 @@ class TestPySparkBulkLoadWithMock:
 
         ops = PySparkMaintenanceOperations(spark_session=mock_spark)
 
-        # Execute bulk load
         result = ops.execute_bulk_load(
             source_path="/tmp/source.parquet",
             target_path="/tmp/target",
@@ -889,7 +887,7 @@ class TestPySparkParquetLimitations:
     """Test that row-level operations raise NotImplementedError for plain Parquet."""
 
     def test_delete_raises_for_parquet(self):
-        """Test DELETE raises NotImplementedError for non-Delta tables."""
+
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -903,7 +901,7 @@ class TestPySparkParquetLimitations:
                 ops._do_delete("/tmp/parquet_table", "id > 100")
 
     def test_update_raises_for_parquet(self):
-        """Test UPDATE raises NotImplementedError for non-Delta tables."""
+
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 
@@ -917,7 +915,7 @@ class TestPySparkParquetLimitations:
                 ops._do_update("/tmp/parquet_table", "status = 'x'", {"status": "'y'"})
 
     def test_merge_raises_for_parquet(self):
-        """Test MERGE raises NotImplementedError for non-Delta tables."""
+
         if not PYSPARK_AVAILABLE:
             pytest.skip("PySpark not installed")
 

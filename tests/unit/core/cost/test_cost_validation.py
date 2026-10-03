@@ -14,7 +14,7 @@ class TestResourceUsageValidation:
     """Tests for validate_resource_usage function."""
 
     def test_snowflake_valid(self):
-        """Test Snowflake resource_usage passes validation."""
+
         resource_usage = {"credits_used": 0.5}
         is_valid, warnings = validate_resource_usage("snowflake", resource_usage)
 
@@ -31,7 +31,7 @@ class TestResourceUsageValidation:
         assert "credits_used" in warnings[0]
 
     def test_snowflake_with_optional_fields(self):
-        """Test Snowflake validation allows optional fields."""
+
         resource_usage = {
             "credits_used": 0.5,
             "bytes_scanned": 1000,
@@ -44,7 +44,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_snowflake_unexpected_fields(self):
-        """Test Snowflake validation warns on unexpected fields."""
+
         resource_usage = {
             "credits_used": 0.5,
             "unknown_field": 123,
@@ -58,7 +58,7 @@ class TestResourceUsageValidation:
         assert "unknown_field" in warnings[0]
 
     def test_bigquery_valid_with_bytes_billed(self):
-        """Test BigQuery validation with bytes_billed."""
+
         resource_usage = {"bytes_billed": 1024**4}
         is_valid, warnings = validate_resource_usage("bigquery", resource_usage)
 
@@ -66,7 +66,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_bigquery_valid_with_bytes_processed(self):
-        """Test BigQuery validation with bytes_processed."""
+
         resource_usage = {"bytes_processed": 1024**4}
         is_valid, warnings = validate_resource_usage("bigquery", resource_usage)
 
@@ -74,7 +74,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_bigquery_missing_requires_one_of(self):
-        """Test BigQuery validation catches missing requires_one_of."""
+
         resource_usage = {"slot_ms": 1000}  # Missing both bytes_billed and bytes_processed
         is_valid, warnings = validate_resource_usage("bigquery", resource_usage)
 
@@ -83,7 +83,7 @@ class TestResourceUsageValidation:
         assert any("bytes_billed" in w or "bytes_processed" in w for w in warnings)
 
     def test_redshift_valid(self):
-        """Test Redshift resource_usage passes validation."""
+
         resource_usage = {"execution_time_seconds": 3600}
         is_valid, warnings = validate_resource_usage("redshift", resource_usage)
 
@@ -100,7 +100,7 @@ class TestResourceUsageValidation:
         assert "execution_time_seconds" in warnings[0]
 
     def test_databricks_valid_with_dbu_consumed(self):
-        """Test Databricks validation with dbu_consumed."""
+
         resource_usage = {"dbu_consumed": 0.5}
         is_valid, warnings = validate_resource_usage("databricks", resource_usage)
 
@@ -108,7 +108,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_databricks_valid_with_execution_time(self):
-        """Test Databricks validation with execution_time_seconds."""
+
         resource_usage = {"execution_time_seconds": 1800}
         is_valid, warnings = validate_resource_usage("databricks", resource_usage)
 
@@ -116,7 +116,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_databricks_missing_requires_one_of(self):
-        """Test Databricks validation catches missing requires_one_of."""
+
         resource_usage = {}
         is_valid, warnings = validate_resource_usage("databricks", resource_usage)
 
@@ -133,7 +133,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_duckdb_valid_with_optional(self):
-        """Test DuckDB validation with optional fields."""
+
         resource_usage = {
             "execution_time_seconds": 10,
             "memory_usage": 1024,
@@ -145,7 +145,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_clickhouse_valid(self):
-        """Test ClickHouse validation."""
+
         resource_usage = {"execution_time_seconds": 5, "bytes_read": 1024**3}
         is_valid, warnings = validate_resource_usage("clickhouse", resource_usage)
 
@@ -153,7 +153,7 @@ class TestResourceUsageValidation:
         assert len(warnings) == 0
 
     def test_unknown_platform(self):
-        """Test unknown platform is considered valid with warning."""
+
         resource_usage = {"some_field": 123}
         is_valid, warnings = validate_resource_usage("postgres", resource_usage)
 
@@ -162,7 +162,7 @@ class TestResourceUsageValidation:
         assert "No validation schema" in warnings[0]
 
     def test_case_insensitive_platform(self):
-        """Test platform names are case-insensitive."""
+
         resource_usage = {"credits_used": 0.5}
 
         is_valid1, _ = validate_resource_usage("SNOWFLAKE", resource_usage)
@@ -178,7 +178,7 @@ class TestCostCalculatorWithValidation:
     """Tests for CostCalculator with validation enabled."""
 
     def test_calculate_with_validation_warnings(self, caplog):
-        """Test that validation warnings are logged."""
+
         calculator = CostCalculator()
 
         resource_usage = {"bytes_scanned": 1000}  # Missing credits_used
@@ -193,7 +193,7 @@ class TestCostCalculatorWithValidation:
         assert cost is None
 
     def test_calculate_with_validation_disabled(self):
-        """Test that validation can be disabled."""
+
         calculator = CostCalculator()
 
         # Missing required field but validation disabled
@@ -209,7 +209,7 @@ class TestValidationEdgeCases:
     """Tests for edge cases in validation."""
 
     def test_empty_resource_usage_dict(self):
-        """Test validation with empty dict."""
+
         is_valid, warnings = validate_resource_usage("snowflake", {})
 
         assert is_valid is False
@@ -217,7 +217,7 @@ class TestValidationEdgeCases:
         assert "credits_used" in warnings[0]
 
     def test_none_values_in_resource_usage(self):
-        """Test validation with None values."""
+
         resource_usage = {"credits_used": None}
         is_valid, warnings = validate_resource_usage("snowflake", resource_usage)
 
@@ -226,7 +226,7 @@ class TestValidationEdgeCases:
         assert len(warnings) == 0
 
     def test_multiple_missing_fields(self):
-        """Test validation with multiple issues."""
+
         resource_usage = {"unknown_field": 123}
         is_valid, warnings = validate_resource_usage("snowflake", resource_usage)
 
@@ -236,7 +236,7 @@ class TestValidationEdgeCases:
         assert any("Unexpected fields" in w for w in warnings)
 
     def test_all_platforms_have_schema(self):
-        """Test that all major platforms have validation schemas defined."""
+
         from benchbox.core.cost.calculator import RESOURCE_USAGE_SCHEMA
 
         expected_platforms = ["snowflake", "bigquery", "redshift", "databricks", "duckdb", "clickhouse"]

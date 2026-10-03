@@ -63,11 +63,11 @@ class TestNormalizeBenchmarkId:
         ],
     )
     def test_normalize_benchmark_id(self, input_name: str, expected_id: str) -> None:
-        """Test benchmark ID normalization for various inputs."""
+
         assert normalize_benchmark_id(input_name) == expected_id
 
     def test_normalize_removes_double_underscores(self) -> None:
-        """Test that double underscores are collapsed."""
+
         assert normalize_benchmark_id("my__test") == "my_test"
         assert normalize_benchmark_id("my - - test") == "my_test"
 
@@ -85,7 +85,7 @@ class TestBenchmarkInfoInput:
     """Tests for BenchmarkInfoInput dataclass."""
 
     def test_create_basic(self) -> None:
-        """Test creating basic BenchmarkInfoInput."""
+
         info = BenchmarkInfoInput(name="TPC-H", scale_factor=1.0)
 
         assert info.name == "TPC-H"
@@ -94,7 +94,7 @@ class TestBenchmarkInfoInput:
         assert info.display_name is None
 
     def test_create_with_all_fields(self) -> None:
-        """Test creating BenchmarkInfoInput with all fields."""
+
         info = BenchmarkInfoInput(
             name="TPC-H",
             scale_factor=10.0,
@@ -140,7 +140,7 @@ class TestResultBuilder:
         )
 
     def test_build_empty_results(self) -> None:
-        """Test building results with no queries."""
+
         builder = self.create_builder()
         result = builder.build()
 
@@ -152,7 +152,7 @@ class TestResultBuilder:
         assert result.failed_queries == 0
 
     def test_build_with_query_results(self) -> None:
-        """Test building results with query results."""
+
         builder = self.create_builder()
         builder.add_query_result(self.create_query_result("1", 1.0, 100))
         builder.add_query_result(self.create_query_result("2", 2.0, 200))
@@ -166,7 +166,7 @@ class TestResultBuilder:
         assert len(result.query_results) == 3
 
     def test_build_with_failed_queries(self) -> None:
-        """Test building results with failed queries."""
+
         builder = self.create_builder()
         builder.add_query_result(self.create_query_result("1", 1.0, 100, "SUCCESS"))
         builder.add_query_result(self.create_query_result("2", 0.0, 0, "FAILED"))
@@ -221,7 +221,7 @@ class TestResultBuilder:
             assert result.power_at_size is None
 
     def test_build_calculates_tpc_metrics(self) -> None:
-        """Test that TPC metrics are calculated."""
+
         builder = self.create_builder(scale_factor=1.0)
 
         # Add 4 queries with 1 second each (geom mean = 1)
@@ -238,7 +238,7 @@ class TestResultBuilder:
         assert abs(result.geometric_mean_execution_time - 1.0) < 0.0001
 
     def test_build_with_table_stats(self) -> None:
-        """Test building results with table loading statistics."""
+
         builder = self.create_builder()
         builder.add_table_stats("lineitem", 6001215, load_time_ms=1000)
         builder.add_table_stats("orders", 1500000, load_time_ms=500)
@@ -252,7 +252,7 @@ class TestResultBuilder:
         assert result.table_statistics["lineitem"] == {"rows": 6001215, "load_time_ms": 1000}
 
     def test_build_with_execution_phases(self) -> None:
-        """Test that execution phases are built correctly."""
+
         builder = self.create_builder()
         builder.add_table_stats("lineitem", 1000, load_time_ms=100)
         builder.set_loading_time(100.0)
@@ -266,7 +266,7 @@ class TestResultBuilder:
         assert result.execution_phases.power_test is not None
 
     def test_build_dataframe_platform_display(self) -> None:
-        """Test that DataFrame platforms get correct display name."""
+
         builder = self.create_builder(
             platform_name="Polars",
             execution_mode="dataframe",
@@ -276,7 +276,7 @@ class TestResultBuilder:
         assert result.platform == "Polars"
 
     def test_build_with_timestamps(self) -> None:
-        """Test building results with explicit timestamps."""
+
         builder = self.create_builder()
         start = datetime(2024, 1, 1, 12, 0, 0)
         end = datetime(2024, 1, 1, 12, 0, 30)
@@ -289,7 +289,7 @@ class TestResultBuilder:
         assert result.duration_seconds == 30.0
 
     def test_build_with_mark_timestamps(self) -> None:
-        """Test building results with mark_started/mark_completed."""
+
         builder = self.create_builder()
         builder.mark_started()
         # Simulate some time passing
@@ -301,7 +301,7 @@ class TestResultBuilder:
         assert result.duration_seconds >= 0
 
     def test_build_with_validation_status(self) -> None:
-        """Test building results with explicit validation status."""
+
         builder = self.create_builder()
         builder.set_validation_status("FAILED", {"error": "Test error", "phase": "load"})
 
@@ -311,7 +311,7 @@ class TestResultBuilder:
         assert result.validation_details == {"error": "Test error", "phase": "load"}
 
     def test_build_with_execution_metadata(self) -> None:
-        """Test building results with execution metadata."""
+
         builder = self.create_builder()
         builder.set_execution_metadata({"custom_key": "value"})
         builder.add_execution_metadata("another_key", "another_value")
@@ -323,7 +323,7 @@ class TestResultBuilder:
         assert result.execution_metadata["another_key"] == "another_value"
 
     def test_build_with_system_profile(self) -> None:
-        """Test building results with system profile."""
+
         builder = self.create_builder()
         profile = {"cpu": "Apple M1", "memory": "16GB"}
         builder.set_system_profile(profile)
@@ -333,7 +333,7 @@ class TestResultBuilder:
         assert result.system_profile == profile
 
     def test_build_with_tuning_info(self) -> None:
-        """Test building results with tuning information."""
+
         builder = self.create_builder()
         builder.set_tuning_info(
             tunings_applied={"memory": "8GB"},
@@ -389,7 +389,7 @@ class TestResultBuilder:
         assert result.tuning_validation_status == "not_validated"
 
     def test_build_with_cost_summary(self) -> None:
-        """Test building results with cost summary."""
+
         builder = self.create_builder()
         builder.set_cost_summary({"total_cost": 1.50, "currency": "USD"})
 
@@ -413,7 +413,7 @@ class TestResultBuilder:
         assert len(result.plan_capture_errors) == 1
 
     def test_add_query_results_batch(self) -> None:
-        """Test adding multiple query results at once."""
+
         builder = self.create_builder()
         results = [
             self.create_query_result("1", 1.0, 100),
@@ -426,7 +426,7 @@ class TestResultBuilder:
         assert result.total_queries == 2
 
     def test_query_results_format(self) -> None:
-        """Test that query results are formatted correctly."""
+
         builder = self.create_builder()
         builder.add_query_result(
             QueryResultInput(
@@ -479,7 +479,7 @@ class TestResultBuilder:
         assert "plan_capture_error" not in qr
 
     def test_platform_info_dict_format(self) -> None:
-        """Test that platform_info dict is formatted correctly."""
+
         builder = ResultBuilder(
             benchmark=BenchmarkInfoInput(name="TPC-H", scale_factor=1.0),
             platform=PlatformInfoInput(
@@ -543,7 +543,7 @@ class TestBuildBenchmarkResults:
     """Tests for build_benchmark_results convenience function."""
 
     def test_basic_usage(self) -> None:
-        """Test basic usage of convenience function."""
+
         query_results = [
             QueryResultInput(
                 query_id="1",
@@ -566,7 +566,7 @@ class TestBuildBenchmarkResults:
         assert result.total_queries == 1
 
     def test_with_all_options(self) -> None:
-        """Test convenience function with all options."""
+
         start = datetime(2024, 1, 1, 12, 0, 0)
         end = datetime(2024, 1, 1, 12, 0, 30)
         query_results = [
@@ -599,7 +599,7 @@ class TestBuildBenchmarkResults:
         assert result.duration_seconds == 30.0
 
     def test_dataframe_mode(self) -> None:
-        """Test convenience function with DataFrame mode."""
+
         query_results = [
             QueryResultInput(
                 query_id="1",

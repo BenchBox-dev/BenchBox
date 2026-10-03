@@ -59,7 +59,7 @@ class TestLakeSailSQLSmoke:
             pass
 
     def test_connection(self, adapter):
-        """Test that we can connect to the Sail server."""
+
         assert adapter.test_connection() is True
 
     def test_select_one(self, adapter):
@@ -71,7 +71,7 @@ class TestLakeSailSQLSmoke:
         adapter.close_connection(connection)
 
     def test_platform_info(self, adapter):
-        """Test platform info collection with live connection."""
+
         connection = adapter.create_connection()
         info = adapter.get_platform_info(connection=connection)
         assert info["platform_type"] == "lakesail"
@@ -95,13 +95,13 @@ class TestLakeSailDataFrameSmoke:
         adapter.close()
 
     def test_platform_info(self, adapter):
-        """Test platform info collection."""
+
         info = adapter.get_platform_info()
         assert info["platform"] == "LakeSail"
         assert info["family"] == "expression"
 
     def test_create_context(self, adapter):
-        """Test context creation connects to Sail server."""
+
         ctx = adapter.create_context()
         assert ctx is not None
         assert ctx.platform == "LakeSail"

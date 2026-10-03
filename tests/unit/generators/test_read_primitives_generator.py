@@ -23,7 +23,7 @@ class TestReadPrimitivesDataGenerator:
     """Test Primitives data generator functionality."""
 
     def test_generator_initialization(self, temp_dir):
-        """Test generator initializes correctly."""
+
         generator = ReadPrimitivesDataGenerator(scale_factor=0.01, output_dir=temp_dir)
         assert generator.scale_factor == 0.01
         assert generator.output_dir == temp_dir
@@ -82,7 +82,6 @@ class TestReadPrimitivesDataGenerator:
         assert (output_dir / "region.tbl.zst").exists()
 
     def test_cloud_generation_delegates_to_upload_helper(self, monkeypatch, tmp_path):
-        """Verify cloud paths trigger the cloud upload helper."""
 
         class FakeCloudPath:
             def __init__(self, value: str) -> None:

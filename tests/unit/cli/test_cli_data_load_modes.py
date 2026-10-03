@@ -106,7 +106,7 @@ class TestCLIDataLoadModes:
         self.runner = CliRunner()
 
     def test_data_only_no_database_required(self):
-        """Test that data-only mode doesn't require database parameter."""
+
         with _mock_run_command_components() as mocks:
             # Test data-only without database parameter
             result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "generate"])
@@ -119,7 +119,7 @@ class TestCLIDataLoadModes:
             assert call_args[2] is None  # database_config should be None
 
     def test_data_only_ignores_database_parameter(self):
-        """Test that data-only mode ignores database parameter if provided."""
+
         with _mock_run_command_components():
             # Test data-only with database parameter (should be ignored)
             result = self.runner.invoke(
@@ -140,13 +140,13 @@ class TestCLIDataLoadModes:
             assert "Data generation completed" in result.output or "Benchmark completed" in result.output
 
     def test_load_only_requires_database(self):
-        """Test that load-only mode requires database parameter."""
+
         result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "load"])
         assert result.exit_code != 0
         assert "Error: --platform parameter is required for --phases load" in result.output
 
     def test_load_only_with_database(self):
-        """Test load-only mode with database parameter."""
+
         with _mock_run_command_components(include_db_manager=True) as mocks:
             # Setup mocks
             mock_db_config = Mock()
@@ -182,7 +182,7 @@ class TestCLIDataLoadModes:
             assert call_args[2] is not None  # database_config should not be None
 
     def test_benchmark_config_test_execution_type(self):
-        """Test that benchmark config gets correct test_execution_type."""
+
         with _mock_run_command_components() as mocks:
             # Test data-only mode
             result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "generate"])
@@ -748,7 +748,7 @@ class TestCLIDataLoadModesDryRun:
         self.runner = CliRunner()
 
     def test_dry_run_data_only_no_database_required(self):
-        """Test dry-run with data-only doesn't require database."""
+
         with (
             patch("benchbox.cli.dryrun.DryRunExecutor") as mock_executor,
             patch("benchbox.cli.main.BenchmarkManager") as mock_bench_mgr,
@@ -786,7 +786,7 @@ class TestCLIDataLoadModesDryRun:
             assert call_args[2] is None  # database_config should be None
 
     def test_dry_run_data_only_ignores_database(self):
-        """Test dry-run with data-only ignores database parameter."""
+
         with (
             patch("benchbox.cli.dryrun.DryRunExecutor") as mock_executor,
             patch("benchbox.cli.main.BenchmarkManager") as mock_bench_mgr,
@@ -822,7 +822,7 @@ class TestCLIDataLoadModesDryRun:
             assert "Platform parameter ignored in data-only dry run" in result.output
 
     def test_dry_run_load_only_requires_database(self):
-        """Test dry-run with load-only requires database."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -841,7 +841,7 @@ class TestCLIDataLoadModesDryRun:
         assert "Dry run mode requires --platform and --benchmark parameters" in result.output
 
     def test_dry_run_missing_benchmark_data_only(self):
-        """Test dry-run data-only requires benchmark parameter."""
+
         result = self.runner.invoke(cli, ["run", "--phases", "generate", "--dry-run", "/tmp"])
         assert result.exit_code != 0
         assert "Dry run with --phases generate requires --benchmark parameter" in result.output
@@ -853,11 +853,10 @@ class TestOrchestratorDataLoadModes:
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch("benchbox.cli.orchestrator.console")
     def test_execute_benchmark_data_only_skips_platform_adapter(self, mock_console, mock_get_adapter):
-        """Test that data-only mode skips platform adapter creation."""
+
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
         from benchbox.cli.system import SystemProfile
 
-        # Create test config with data_only execution type
         config = BenchmarkConfig(
             name="test",
             display_name="Test",
@@ -870,7 +869,6 @@ class TestOrchestratorDataLoadModes:
 
         orchestrator = BenchmarkOrchestrator()
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "test"
         mock_benchmark.scale_factor = 0.01
@@ -931,7 +929,7 @@ class TestDryRunDataLoadModes:
     """Test dry-run executor support for data-only and load-only modes."""
 
     def test_execute_dry_run_with_none_database_config(self):
-        """Test execute_dry_run with None database_config."""
+
         from datetime import datetime
 
         from benchbox.cli.dryrun import DryRunExecutor
@@ -953,7 +951,6 @@ class TestDryRunDataLoadModes:
             timestamp=datetime.now(),
         )
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "test"
         mock_benchmark.get_query_list.return_value = ["Q1", "Q2"]
@@ -962,12 +959,11 @@ class TestDryRunDataLoadModes:
         with patch.object(executor, "_get_benchmark_instance", return_value=mock_benchmark):
             result = executor.execute_dry_run(config, system_profile, None)
 
-        # Verify result structure
         assert result.database_config["type"] == "data_only"
         assert result.platform_config == {"data_only": True}
 
     def test_get_platform_config_with_none(self):
-        """Test _get_platform_config with None database_config."""
+
         from benchbox.cli.dryrun import DryRunExecutor
         from benchbox.cli.system import SystemProfile
 

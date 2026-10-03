@@ -52,7 +52,7 @@ class TestSchemaMapperTypeMaps:
     """Tests for SchemaMapper static type map dictionaries."""
 
     def test_polars_type_map_keys(self):
-        """Verify all expected SQL types are mapped to Polars types."""
+
         expected_sql_types = {"INTEGER", "DECIMAL(15,2)", "VARCHAR", "CHAR", "DATE", "TIMESTAMP", "TIME"}
         assert set(SchemaMapper.POLARS_TYPE_MAP.keys()) == expected_sql_types
 

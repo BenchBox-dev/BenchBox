@@ -152,7 +152,7 @@ def test_fk_constraint_is_still_enforced_after_ctas_sort(tpch_fk_and_sort_duckdb
 
 
 def test_table_data_is_physically_sorted_after_ctas_sort(tpch_fk_and_sort_duckdb):
-    """Verify that rows in sorted tables are actually stored in sort order."""
+
     _adapter, _bench, conn, _table_stats = tpch_fk_and_sort_duckdb
 
     # Check supplier order

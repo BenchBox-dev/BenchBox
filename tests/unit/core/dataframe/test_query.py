@@ -42,7 +42,7 @@ class TestQueryCategory:
     """Tests for QueryCategory enum."""
 
     def test_all_categories_exist(self):
-        """Test that all expected categories are defined."""
+
         expected = {
             "scan",
             "projection",
@@ -72,7 +72,7 @@ class TestDataFrameQuery:
     """Tests for DataFrameQuery dataclass."""
 
     def test_minimal_query_with_pandas_impl(self):
-        """Test creating a query with only Pandas implementation."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -86,7 +86,7 @@ class TestDataFrameQuery:
         assert not query.has_expression_impl()
 
     def test_minimal_query_with_expression_impl(self):
-        """Test creating a query with only Expression implementation."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -98,7 +98,7 @@ class TestDataFrameQuery:
         assert not query.has_pandas_impl()
 
     def test_query_with_both_implementations(self):
-        """Test creating a query with both implementations."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -140,7 +140,7 @@ class TestDataFrameQuery:
             )
 
     def test_query_with_categories(self):
-        """Test creating a query with categories."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Aggregation Query",
@@ -154,7 +154,7 @@ class TestDataFrameQuery:
         assert not query.in_category(QueryCategory.JOIN)
 
     def test_query_with_sql_equivalent(self):
-        """Test query with SQL equivalent for validation."""
+
         sql = "SELECT status, SUM(amount) FROM orders GROUP BY status"
         query = DataFrameQuery(
             query_id="Q1",
@@ -168,7 +168,7 @@ class TestDataFrameQuery:
         assert query.sql_equivalent == sql
 
     def test_query_with_expected_row_count(self):
-        """Test query with expected row count."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -182,7 +182,7 @@ class TestDataFrameQuery:
         assert not query.scale_factor_dependent
 
     def test_query_with_skip_platforms(self):
-        """Test query with skipped platforms."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -197,7 +197,7 @@ class TestDataFrameQuery:
         assert not query.supports_platform("vaex")
 
     def test_supports_platform_pandas_family(self):
-        """Test supports_platform for Pandas family platforms."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -216,7 +216,7 @@ class TestDataFrameQuery:
         assert not query.supports_platform("pyspark")
 
     def test_supports_platform_expression_family(self):
-        """Test supports_platform for Expression family platforms."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -234,7 +234,7 @@ class TestDataFrameQuery:
         assert not query.supports_platform("pandas")
 
     def test_get_impl_for_family(self):
-        """Test get_impl_for_family method."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -247,7 +247,7 @@ class TestDataFrameQuery:
         assert query.get_impl_for_family("expression") == sample_expression_impl
 
     def test_get_impl_for_family_invalid(self):
-        """Test get_impl_for_family with invalid family."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -259,7 +259,7 @@ class TestDataFrameQuery:
             query.get_impl_for_family("invalid")
 
     def test_execute_calls_correct_impl(self):
-        """Test that execute calls the correct implementation."""
+
         call_log = []
 
         def pandas_impl(ctx):
@@ -293,7 +293,7 @@ class TestDataFrameQuery:
         assert call_log == ["pandas", "expression"]
 
     def test_execute_raises_for_missing_impl(self):
-        """Test that execute raises for missing implementation."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -308,7 +308,7 @@ class TestDataFrameQuery:
             query.execute(MockContext(), "expression")
 
     def test_to_dict(self):
-        """Test serialization to dictionary."""
+
         query = DataFrameQuery(
             query_id="Q1",
             query_name="Test Query",
@@ -366,7 +366,7 @@ class TestQueryRegistry:
         ]
 
     def test_register_and_get(self):
-        """Test basic registration and retrieval."""
+
         registry = QueryRegistry(benchmark="Test")
 
         query = DataFrameQuery(
@@ -382,7 +382,7 @@ class TestQueryRegistry:
         assert registry.get("Q2") is None
 
     def test_register_many(self):
-        """Test registering multiple queries at once."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
 
@@ -394,7 +394,7 @@ class TestQueryRegistry:
         assert "Q3" in registry
 
     def test_register_duplicate_raises(self):
-        """Test that registering duplicate ID raises ValueError."""
+
         registry = QueryRegistry(benchmark="Test")
 
         query = DataFrameQuery(
@@ -410,7 +410,7 @@ class TestQueryRegistry:
             registry.register(query)
 
     def test_get_or_raise(self):
-        """Test get_or_raise method."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -422,7 +422,7 @@ class TestQueryRegistry:
             registry.get_or_raise("Q999")
 
     def test_get_all_queries_sorted(self):
-        """Test that get_all_queries returns sorted list."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -433,7 +433,7 @@ class TestQueryRegistry:
         assert [q.query_id for q in all_queries] == ["Q1", "Q2", "Q3"]
 
     def test_get_query_ids(self):
-        """Test get_query_ids returns sorted list."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -443,7 +443,7 @@ class TestQueryRegistry:
         assert ids == ["Q1", "Q2", "Q3"]
 
     def test_get_queries_by_category(self):
-        """Test filtering queries by category."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -464,7 +464,7 @@ class TestQueryRegistry:
         assert len(window_queries) == 0
 
     def test_get_queries_for_platform(self):
-        """Test filtering queries by platform support."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -478,7 +478,7 @@ class TestQueryRegistry:
         assert {q.query_id for q in polars_queries} == {"Q2", "Q3"}
 
     def test_get_queries_for_family(self):
-        """Test filtering queries by family."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -492,14 +492,14 @@ class TestQueryRegistry:
         assert {q.query_id for q in expression_family} == {"Q2", "Q3"}
 
     def test_get_queries_for_family_invalid(self):
-        """Test get_queries_for_family with invalid family."""
+
         registry = QueryRegistry(benchmark="Test")
 
         with pytest.raises(ValueError, match="Unknown family"):
             registry.get_queries_for_family("invalid")
 
     def test_len(self):
-        """Test __len__ method."""
+
         registry = QueryRegistry(benchmark="Test")
         assert len(registry) == 0
 
@@ -508,7 +508,7 @@ class TestQueryRegistry:
         assert len(registry) == 3
 
     def test_contains(self):
-        """Test __contains__ method."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -518,7 +518,7 @@ class TestQueryRegistry:
         assert "Q999" not in registry
 
     def test_iter(self):
-        """Test __iter__ method."""
+
         registry = QueryRegistry(benchmark="Test")
         queries = self.create_sample_queries()
         registry.register_many(queries)
@@ -527,6 +527,6 @@ class TestQueryRegistry:
         assert ids == ["Q1", "Q2", "Q3"]
 
     def test_benchmark_name_stored(self):
-        """Test that benchmark name is stored."""
+
         registry = QueryRegistry(benchmark="TPC-H")
         assert registry.benchmark == "TPC-H"

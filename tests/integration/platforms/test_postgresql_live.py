@@ -62,7 +62,7 @@ class TestLivePostgreSQLConnection:
     """Test basic PostgreSQL connectivity via Docker."""
 
     def test_connection(self, postgresql_adapter):
-        """Verify we can connect to PostgreSQL and run a trivial query."""
+
         connection = postgresql_adapter.create_connection()
         try:
             assert connection is not None
@@ -70,7 +70,7 @@ class TestLivePostgreSQLConnection:
             postgresql_adapter.close_connection(connection)
 
     def test_platform_info(self, postgresql_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = postgresql_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "postgresql"
@@ -80,7 +80,7 @@ class TestLivePostgreSQLQueryExecution:
     """Test query execution against a live PostgreSQL instance."""
 
     def test_create_schema(self, postgresql_adapter):
-        """Verify we can create a schema."""
+
         connection = postgresql_adapter.create_connection()
         try:
             postgresql_adapter.execute_query(

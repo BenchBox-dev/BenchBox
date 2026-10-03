@@ -41,7 +41,7 @@ class TestLivePgMooncakeConnection:
     """Test basic pg_mooncake connectivity via Docker."""
 
     def test_connection(self, live_pg_mooncake_adapter):
-        """Verify we can connect to PostgreSQL with pg_mooncake and run a trivial query."""
+
         connection = live_pg_mooncake_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -52,7 +52,7 @@ class TestLivePgMooncakeConnection:
             live_pg_mooncake_adapter.close_connection(connection)
 
     def test_extension_loaded(self, live_pg_mooncake_adapter):
-        """Verify pg_mooncake extension is installed and loaded."""
+
         connection = live_pg_mooncake_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -64,7 +64,7 @@ class TestLivePgMooncakeConnection:
             live_pg_mooncake_adapter.close_connection(connection)
 
     def test_platform_info(self, live_pg_mooncake_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = live_pg_mooncake_adapter.get_platform_info()
         assert info is not None
 
@@ -148,7 +148,7 @@ class TestLivePgMooncakeWALReplication:
     """Test WAL replication benchmarking capabilities (requires Docker with WAL config)."""
 
     def test_wal_level(self, live_pg_mooncake_adapter):
-        """Verify WAL level is set appropriately for replication testing."""
+
         connection = live_pg_mooncake_adapter.create_connection()
         try:
             cursor = connection.cursor()

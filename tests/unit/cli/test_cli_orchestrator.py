@@ -36,7 +36,7 @@ class TestBenchmarkOrchestrator:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_orchestrator_initialization(self, tmp_path: Path):
-        """Test BenchmarkOrchestrator initialization."""
+
         # Test with base directory
         base_dir = tmp_path / "benchmark-output"
         orchestrator = BenchmarkOrchestrator(base_dir=base_dir)
@@ -48,7 +48,7 @@ class TestBenchmarkOrchestrator:
         assert orchestrator_default.directory_manager.base_dir is not None
 
     def test_set_custom_output_dir(self):
-        """Test setting custom output directory."""
+
         test_dir = "/custom/output/path"
         self.orchestrator.set_custom_output_dir(test_dir)
         assert self.orchestrator.custom_output_dir == test_dir
@@ -57,16 +57,13 @@ class TestBenchmarkOrchestrator:
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch("benchbox.cli.orchestrator.console")
     def test_execute_benchmark_standard_mode(self, mock_console, mock_get_adapter, mock_lifecycle):
-        """Test standard benchmark execution."""
-        # Create test config
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
-        # Create test system profile
         system_profile = Mock(spec=SystemProfile)
         system_profile.cpu_cores_logical = 8
         system_profile.memory_total_gb = 16
 
-        # Create test database config
         database_config = Mock()
         database_config.type = "duckdb"
         database_config.name = "test_db"
@@ -80,7 +77,6 @@ class TestBenchmarkOrchestrator:
             "connection_params": {},
         }
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "tpch"
         mock_benchmark.scale_factor = 0.01
@@ -130,7 +126,6 @@ class TestBenchmarkOrchestrator:
             with patch.object(self.orchestrator, "_get_platform_config", return_value={}):
                 result = self.orchestrator.execute_benchmark(config, system_profile, database_config)
 
-        # Verify result
         assert isinstance(result, BenchmarkResults)
         assert result.benchmark_name == "TPC-H"
         assert result.validation_status == "PASSED"
@@ -199,8 +194,7 @@ class TestBenchmarkOrchestrator:
         assert result.execution_metadata["driver_auto_install_used"] is True
 
     def test_execute_benchmark_data_only_mode(self):
-        """Test data-only benchmark execution."""
-        # Create test config with data_only execution type
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -259,7 +253,6 @@ class TestBenchmarkOrchestrator:
             test_execution_type="data_only",
         )
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "tpch"
         mock_benchmark.scale_factor = 0.01
@@ -270,12 +263,11 @@ class TestBenchmarkOrchestrator:
             with patch("benchbox.cli.orchestrator.console"):
                 result = self.orchestrator.execute_benchmark(config, system_profile, None)
 
-        # Verify result structure
         assert isinstance(result, BenchmarkResults)
         assert result.benchmark_name == "TPC-H"
 
     def test_execute_benchmark_with_error(self):
-        """Test benchmark execution with error handling."""
+
         config = BenchmarkConfig(name="invalid", display_name="Invalid")
         system_profile = Mock(spec=SystemProfile)
         database_config = Mock()
@@ -291,7 +283,7 @@ class TestBenchmarkOrchestrator:
         assert "Unknown benchmark: invalid" in result.validation_details["error"]
 
     def test_get_benchmark_instance_success(self):
-        """Test successful benchmark instance creation."""
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
         system_profile = Mock()
         system_profile.cpu_cores_logical = 4
@@ -306,7 +298,7 @@ class TestBenchmarkOrchestrator:
             assert result == mock_instance
 
     def test_get_benchmark_instance_with_compression(self):
-        """Test benchmark instance creation with compression settings."""
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -336,7 +328,7 @@ class TestBenchmarkOrchestrator:
             assert called_kwargs["compression_level"] == 9
 
     def test_get_benchmark_instance_fallback_no_parallel(self):
-        """Test benchmark instance creation for benchmarks without parallel support."""
+
         config = BenchmarkConfig(name="read_primitives", display_name="Primitives", scale_factor=1.0)
         system_profile = Mock()
         system_profile.cpu_cores_logical = 4
@@ -368,7 +360,7 @@ class TestBenchmarkOrchestrator:
             assert "parallel" not in result.kwargs
 
     def test_get_benchmark_instance_unknown_benchmark(self):
-        """Test unknown benchmark handling."""
+
         config = BenchmarkConfig(name="unknown", display_name="Unknown")
         system_profile = Mock()
 
@@ -392,7 +384,7 @@ class TestBenchmarkOrchestrator:
             assert called_kwargs["quiet"] == self.orchestrator._verbosity.quiet
 
     def test_get_platform_config(self):
-        """Test platform configuration extraction."""
+
         database_config = Mock()
         database_config.type = "duckdb"
         database_config.name = "test_db"
@@ -502,7 +494,7 @@ class TestBenchmarkOrchestrator:
             assert runtime_only_key not in call_kwargs
 
     def test_prepare_run_config(self):
-        """Test run configuration preparation."""
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -525,7 +517,7 @@ class TestBenchmarkOrchestrator:
 
     @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     def test_execute_data_only_mode_success(self, mock_lifecycle):
-        """Test data-only mode execution success using lifecycle path."""
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
         system_profile = Mock(spec=SystemProfile)
 
@@ -555,7 +547,7 @@ class TestBenchmarkOrchestrator:
 
     @patch("benchbox.core.run_service.run_benchmark_lifecycle")
     def test_execute_data_only_mode_error(self, mock_lifecycle):
-        """Test data-only mode execution error using lifecycle path."""
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="data_only")
         system_profile = Mock(spec=SystemProfile)
 
@@ -618,7 +610,7 @@ class TestBenchmarkOrchestratorErrorHandling:
         )
 
     def test_platform_config_without_system_profile(self):
-        """Test platform config generation without system profile."""
+
         database_config = Mock()
         database_config.type = "duckdb"
         database_config.name = "test"
@@ -643,7 +635,7 @@ class TestBenchmarkOrchestratorErrorHandling:
         assert "thread_limit" not in config
 
     def test_platform_config_without_options(self):
-        """Test platform config generation without database options."""
+
         database_config = Mock()
         database_config.type = "sqlite"
         database_config.name = "test"
@@ -744,7 +736,7 @@ class TestBenchmarkOrchestratorErrorHandling:
         assert config["thread_limit"] == 2  # min(2, 8) = 2
 
     def test_prepare_run_config_minimal(self):
-        """Test run configuration preparation with minimal config."""
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0)
         database_config = Mock()
         database_config.type = "duckdb"

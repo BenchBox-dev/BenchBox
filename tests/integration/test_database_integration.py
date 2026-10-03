@@ -211,7 +211,7 @@ class TestDatabaseIntegration:
         return benchmark
 
     def test_duckdb_schema_creation(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test schema creation in DuckDB database."""
+
         # Create in-memory DuckDB database
         conn = duckdb.connect(":memory:")
 
@@ -254,11 +254,10 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_data_loading_with_relationships(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test loading data with proper foreign key relationships."""
+
         conn = duckdb.connect(":memory:")
 
         try:
-            # Load data to database
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation", "supplier", "customer"])
 
             cursor = conn.cursor()
@@ -307,7 +306,7 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_transaction_handling(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test transaction handling during data loading."""
+
         conn = duckdb.connect(":memory:")
 
         try:
@@ -352,7 +351,7 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_concurrent_database_access(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test concurrent database access patterns."""
+
         # Create a file-based database for concurrent access testing
         db_path = benchmark_instance.output_dir / "test_concurrent.db"
 
@@ -415,7 +414,6 @@ class TestDatabaseIntegration:
         for thread in threads:
             thread.join()
 
-        # Verify results
         assert len(errors) == 0, f"Concurrent access errors: {errors}"
         assert len(results) == 3, f"Expected 3 results, got {len(results)}"
 
@@ -426,7 +424,7 @@ class TestDatabaseIntegration:
             assert result["join_results"] == 5, f"Inconsistent join results: {result}"
 
     def test_database_connection_management(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test proper database connection management."""
+
         connections = []
 
         try:
@@ -467,11 +465,10 @@ class TestDatabaseIntegration:
                 conn.close()
 
     def test_data_type_validation(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test data type validation and conversion."""
+
         conn = duckdb.connect(":memory:")
 
         try:
-            # Load data
             benchmark_instance.load_data_to_database(conn, tables=["customer"])
 
             cursor = conn.cursor()
@@ -507,11 +504,10 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_query_performance_consistency(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test query performance consistency across multiple runs."""
+
         conn = duckdb.connect(":memory:")
 
         try:
-            # Load data
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation", "customer"])
 
             # Test query that should have consistent performance
@@ -561,7 +557,7 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_database_schema_validation(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test database schema validation and constraints."""
+
         conn = duckdb.connect(":memory:")
 
         try:
@@ -609,7 +605,7 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_error_recovery_and_cleanup(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test error recovery and proper cleanup."""
+
         conn = duckdb.connect(":memory:")
 
         try:
@@ -639,7 +635,6 @@ class TestDatabaseIntegration:
             except Exception:
                 error_occurred = True
 
-            # Verify that error occurred
             assert error_occurred, "Expected error did not occur"
 
             # Verify that existing data is still intact
@@ -665,7 +660,7 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_database_resource_management(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test proper resource management during database operations."""
+
         import gc
         import os
 
@@ -722,7 +717,6 @@ class TestDatabaseIntegration:
         conn = duckdb.connect(":memory:")
 
         try:
-            # Load test data
             benchmark_instance.load_data_to_database(conn, tables=["region", "nation", "customer"])
 
             # Test standard SQL patterns that should work across databases
@@ -808,7 +802,7 @@ class TestDatabaseIntegration:
         ],
     )
     def test_partial_data_loading(self, benchmark_instance: ReadPrimitivesBenchmark, table_subset: list[str]) -> None:
-        """Test loading different subsets of tables."""
+
         conn = duckdb.connect(":memory:")
 
         try:
@@ -840,7 +834,7 @@ class TestDatabaseIntegration:
             conn.close()
 
     def test_benchmark_query_execution_integration(self, benchmark_instance: ReadPrimitivesBenchmark) -> None:
-        """Test integration between benchmark queries and database execution."""
+
         conn = duckdb.connect(":memory:")
 
         try:

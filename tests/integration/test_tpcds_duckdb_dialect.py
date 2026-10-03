@@ -57,7 +57,7 @@ class TestTPCDSDuckDBDialectIntegration:
         return TPCDSBenchmark(scale_factor=1.0, output_dir=temp_dir)
 
     def test_tpcds_dialect_translation_end_to_end(self, duckdb_adapter, tpcds_benchmark):
-        """Test complete TPC-DS dialect translation workflow with DuckDB."""
+
         # Test that adapter provides correct dialect
         assert duckdb_adapter.get_target_dialect() == "duckdb"
 
@@ -82,7 +82,7 @@ class TestTPCDSDuckDBDialectIntegration:
         assert "TOP 100" not in translated, "Query should not contain TOP 100 after translation"
 
     def test_duckdb_query_syntax_validation(self, duckdb_adapter):
-        """Test that translated queries have valid DuckDB syntax."""
+
         # Create a benchmark for dialect translation testing
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
@@ -141,7 +141,7 @@ class TestTPCDSDuckDBDialectIntegration:
             conn.close()
 
     def test_top_level_tpcds_class_dialect_support(self):
-        """Test that top-level TPCDS class supports dialect parameter."""
+
         benchmark = TPCDS(scale_factor=1.0, verbose=False)
 
         # Test that get_queries accepts dialect parameter
@@ -153,7 +153,7 @@ class TestTPCDSDuckDBDialectIntegration:
         assert len(queries_no_dialect) == len(queries_with_dialect)
 
     def test_dialect_translation_preserves_query_structure(self):
-        """Test that dialect translation preserves overall query structure."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
         # Mock a complex query with multiple TOP clauses in SQL Server syntax
@@ -206,7 +206,7 @@ class TestTPCDSDuckDBDialectIntegration:
         )
 
     def test_dialect_error_handling_in_integration(self):
-        """Test that integration handles dialect translation errors gracefully."""
+
         # Use TPCDSBenchmark directly for access to translate_query_text
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
@@ -251,7 +251,7 @@ class TestTPCDSDuckDBDialectIntegration:
         assert outcomes[0].error_category == "translation_failed"
 
     def test_interval_syntax_normalization(self):
-        """Test that Netezza interval syntax is converted to standard SQL."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
         # Test addition: + N days
@@ -272,7 +272,7 @@ class TestTPCDSDuckDBDialectIntegration:
         assert "+ INTERVAL 14 DAY" in normalized_upper
 
     def test_interval_syntax_with_duckdb_execution(self, temp_dir):
-        """Test that normalized interval syntax executes successfully on DuckDB."""
+
         import duckdb
 
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
@@ -280,7 +280,6 @@ class TestTPCDSDuckDBDialectIntegration:
         # Create in-memory DuckDB connection
         conn = duckdb.connect(":memory:")
 
-        # Create test table
         conn.execute("CREATE TABLE test_dates (d DATE)")
         conn.execute("INSERT INTO test_dates VALUES ('2000-01-15'), ('2000-02-28')")
 
@@ -301,7 +300,7 @@ class TestTPCDSDuckDBDialectIntegration:
             conn.close()
 
     def test_interval_normalization_preserves_other_syntax(self):
-        """Test that interval normalization doesn't break other SQL syntax."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
         # Query with "days" in column name or string literal - should NOT be changed

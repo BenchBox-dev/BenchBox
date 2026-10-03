@@ -61,7 +61,7 @@ class TestPrimitiveQueryDataclass:
         assert query.result_contract is None
 
     def test_primitive_query_with_variants(self):
-        """Test PrimitiveQuery with dialect variants."""
+
         query = PrimitiveQuery(
             id="test_query",
             category="test",
@@ -71,12 +71,12 @@ class TestPrimitiveQueryDataclass:
         assert query.variants == {"duckdb": "SELECT 1 AS result", "bigquery": "SELECT 1 as result"}
 
     def test_primitive_query_with_skip_on(self):
-        """Test PrimitiveQuery with skip_on list."""
+
         query = PrimitiveQuery(id="test_query", category="test", sql="SELECT 1", skip_on=["duckdb", "sqlite"])
         assert query.skip_on == ["duckdb", "sqlite"]
 
     def test_primitive_query_with_all_fields(self):
-        """Test PrimitiveQuery with all fields populated."""
+
         query = PrimitiveQuery(
             id="test_query",
             category="test",
@@ -134,7 +134,7 @@ queries:
         )
 
     def test_result_contract_columns_must_be_non_empty_list(self, mock_catalog_yaml):
-        """Test result_contract.columns validation."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -167,7 +167,7 @@ queries:
             load_primitives_catalog()
 
     def test_result_contract_rejects_unknown_type_class(self, mock_catalog_yaml):
-        """Test type_class validation."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -189,7 +189,7 @@ class TestCatalogLoaderVariantParsing:
     """Test catalog loader parsing of variants from YAML."""
 
     def test_load_query_with_single_variant(self, monkeypatch, tmp_path):
-        """Test loading a query with a single dialect variant."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -229,7 +229,7 @@ queries:
         assert "USING SAMPLE" in query.variants["duckdb"]
 
     def test_load_query_with_multiple_variants(self, monkeypatch, tmp_path):
-        """Test loading a query with multiple dialect variants."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -268,7 +268,7 @@ queries:
         assert "snowflake" in query.variants
 
     def test_variant_dialect_normalized_to_lowercase(self, monkeypatch, tmp_path):
-        """Test that variant dialect names are normalized to lowercase."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -408,7 +408,7 @@ class TestCatalogLoaderSkipOnParsing:
     """Test catalog loader parsing of skip_on from YAML."""
 
     def test_load_query_with_single_skip_on(self, monkeypatch, tmp_path):
-        """Test loading a query with a single skip_on dialect."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -441,7 +441,7 @@ queries:
         assert query.skip_on == ["duckdb"]
 
     def test_load_query_with_multiple_skip_on(self, monkeypatch, tmp_path):
-        """Test loading a query with multiple skip_on dialects."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -477,7 +477,7 @@ queries:
         assert "mysql" in query.skip_on
 
     def test_skip_on_normalized_to_lowercase(self, monkeypatch, tmp_path):
-        """Test that skip_on dialect names are normalized to lowercase."""
+
         catalog_yaml = """
 version: 1
 queries:
@@ -581,7 +581,7 @@ class TestCatalogLoaderCombinedFeatures:
     """Test catalog loader with both variants and skip_on."""
 
     def test_query_with_both_variants_and_skip_on(self, monkeypatch, tmp_path):
-        """Test query can have both variants and skip_on."""
+
         catalog_yaml = """
 version: 1
 queries:

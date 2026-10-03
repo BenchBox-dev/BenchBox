@@ -52,7 +52,7 @@ class TestPhasesDataReuse:
     """Test data reuse across different execution phases."""
 
     def test_power_phase_reuses_existing_data(self, data_dir: Path, mock_system_profile: SystemProfile):
-        """Test that --phases power reuses existing data instead of regenerating."""
+
         # Create a minimal benchmark configuration
         # Use compression_type="none" to avoid zstd dependency
         config = BenchmarkConfig(
@@ -104,7 +104,7 @@ class TestPhasesDataReuse:
         benchmark.generate_data.assert_not_called()
 
     def test_power_phase_generates_if_no_manifest(self, data_dir: Path, mock_system_profile: SystemProfile):
-        """Test that --phases power generates data if no manifest exists."""
+
         # Use compression_type="none" to avoid zstd dependency
         config = BenchmarkConfig(
             name="tpch",
@@ -123,12 +123,11 @@ class TestPhasesDataReuse:
         # Call _ensure_data_generated when no manifest exists
         was_generated = _ensure_data_generated(benchmark, config)
 
-        # Verify data was generated
         assert was_generated == (True, False), "Data should be generated when no manifest exists"
         benchmark.generate_data.assert_called_once()
 
     def test_force_regenerate_ignores_manifest(self, data_dir: Path, mock_system_profile: SystemProfile):
-        """Test that --force-regenerate flag causes regeneration even with valid manifest."""
+
         # Use compression_type="none" to avoid zstd dependency
         config = BenchmarkConfig(
             name="tpch",
@@ -174,12 +173,11 @@ class TestPhasesDataReuse:
 
         was_generated = _ensure_data_generated(benchmark, config)
 
-        # Verify data was regenerated
         assert was_generated == (True, False), "Data should be regenerated with force_regenerate"
         benchmark.generate_data.assert_called_once()
 
     def test_no_regenerate_fails_without_manifest(self, data_dir: Path, mock_system_profile: SystemProfile):
-        """Test that --no-regenerate flag fails when no valid manifest exists."""
+
         # Use compression_type="none" to avoid zstd dependency
         config = BenchmarkConfig(
             name="tpch",
@@ -203,7 +201,7 @@ class TestPhasesDataReuse:
         benchmark.generate_data.assert_not_called()
 
     def test_lifecycle_ensures_data_for_power_test(self, data_dir: Path, mock_system_profile: SystemProfile):
-        """Test that run_benchmark_lifecycle ensures data exists for power test execution."""
+
         # Use compression_type="none" to avoid zstd dependency
         config = BenchmarkConfig(
             name="tpch",
@@ -244,7 +242,6 @@ class TestPhasesDataReuse:
         # Now run lifecycle with phases.generate=False (simulating --phases power)
         phases = LifecyclePhases(generate=False, load=False, execute=True)
 
-        # Create a benchmark instance
         benchmark = get_benchmark_instance(config, mock_system_profile)
         benchmark.output_dir = data_dir
 

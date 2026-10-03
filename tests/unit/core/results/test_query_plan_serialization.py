@@ -48,7 +48,7 @@ class TestQueryPlanInQueryExecution:
         assert qe.plan_fingerprint is None
 
     def test_query_execution_with_plan(self) -> None:
-        """Test QueryExecution with a query plan."""
+
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
             operator_id="scan_1",
@@ -144,7 +144,7 @@ class TestQueryPlanInBenchmarkResults:
         assert results.query_plans_captured == 15
 
     def test_benchmark_results_with_comparison_summary(self) -> None:
-        """Test BenchmarkResults with plan comparison summary."""
+
         results = make_benchmark_results(
             benchmark_name="tpch",
             platform="duckdb",
@@ -209,7 +209,7 @@ class TestSchemaV2ExportWithPlans:
         assert payload["queries"][0]["id"] == "01"
 
     def test_schema_v2_plans_companion_none_when_no_plans(self) -> None:
-        """Test that plans companion file returns None when no plans captured."""
+
         results = make_benchmark_results(
             benchmark_id="tpch",
             benchmark_name="tpch",
@@ -228,7 +228,7 @@ class TestSchemaV2ExportWithPlans:
         assert plans_payload is None
 
     def test_schema_v2_plans_companion_with_plans(self) -> None:
-        """Test plans companion file includes query plan data."""
+
         # Create a query plan
         root = LogicalOperator(
             operator_type=LogicalOperatorType.SCAN,
@@ -585,7 +585,7 @@ class TestBackwardCompatibility:
     """Test backward compatibility with existing code."""
 
     def test_existing_code_without_plans_still_works(self) -> None:
-        """Test that existing code not using plans continues to work."""
+
         # Simulate old code creating QueryExecution without plans
         qe = QueryExecution(
             query_id="q01",
@@ -670,7 +670,7 @@ class TestSchemaV2Validation:
     """Test schema v2.0 validation and edge cases."""
 
     def test_validator_rejects_missing_version(self) -> None:
-        """Test that validator rejects payload without version."""
+
         from benchbox.core.results.schema import SchemaV2ValidationError, SchemaV2Validator
 
         validator = SchemaV2Validator()
@@ -690,7 +690,7 @@ class TestSchemaV2Validation:
         assert "missing keys" in str(exc.value)
 
     def test_validator_rejects_wrong_version(self) -> None:
-        """Test that validator rejects payload with wrong version."""
+
         from benchbox.core.results.schema import SchemaV2ValidationError, SchemaV2Validator
 
         validator = SchemaV2Validator()
@@ -712,7 +712,7 @@ class TestSchemaV2Validation:
         assert "schema versions 2.0, 2.1, and 2.2" in str(exc.value)
 
     def test_validator_rejects_missing_run_fields(self) -> None:
-        """Test that validator rejects payload with missing run block fields."""
+
         from benchbox.core.results.schema import SchemaV2ValidationError, SchemaV2Validator
 
         validator = SchemaV2Validator()
@@ -733,7 +733,7 @@ class TestSchemaV2Validation:
         assert "run block missing keys" in str(exc.value)
 
     def test_validator_rejects_unexpected_keys(self) -> None:
-        """Test that validator rejects payload with unexpected top-level keys."""
+
         from benchbox.core.results.schema import SchemaV2ValidationError, SchemaV2Validator
 
         validator = SchemaV2Validator()
@@ -775,7 +775,7 @@ class TestSchemaV2Validation:
         validator.validate(payload)
 
     def test_empty_query_list_handled(self) -> None:
-        """Test that empty query results are handled correctly."""
+
         results = make_benchmark_results(
             benchmark_id="empty_test",
             benchmark_name="Empty Test",
@@ -847,7 +847,7 @@ class TestSchemaV2Validation:
         SchemaV2Validator().validate(payload)
 
     def test_driver_metadata_exported(self) -> None:
-        """Test that driver metadata is included in platform block."""
+
         results = make_benchmark_results(
             benchmark_id="driver_test",
             benchmark_name="Driver Test",

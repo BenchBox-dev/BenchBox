@@ -94,7 +94,6 @@ class TestCLIParameterConsistency:
             mock_platform_instance.is_platform_available.return_value = True
             mock_platform.return_value = mock_platform_instance
 
-            # Setup result exporter
             mock_exporter_instance = MagicMock()
             mock_exporter_instance.export_result.return_value = {"json": "test.json"}
             mock_exporter.return_value = mock_exporter_instance
@@ -109,7 +108,7 @@ class TestCLIParameterConsistency:
             }
 
     def test_phase_parameter_single(self, runner, mock_dependencies):
-        """Test --phases parameter with single phase."""
+
         result = runner.invoke(
             cli, ["run", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01", "--phases", "power"]
         )
@@ -124,7 +123,7 @@ class TestCLIParameterConsistency:
         assert phases_to_run == ["power"]
 
     def test_phase_parameter_multiple(self, runner, mock_dependencies):
-        """Test --phasess parameter with multiple phases."""
+
         result = runner.invoke(
             cli,
             [
@@ -147,14 +146,14 @@ class TestCLIParameterConsistency:
         assert set(phases_to_run) == {"generate", "load", "power"}
 
     def test_phase_parameter_invalid(self, runner, mock_dependencies):
-        """Test --phasess parameter with invalid phase."""
+
         result = runner.invoke(cli, ["run", "--platform", "duckdb", "--benchmark", "tpch", "--phases", "invalid_phase"])
 
         assert result.exit_code == 1
         assert "Invalid phases" in result.output
 
     def test_phase_parameter_deduplication(self, runner, mock_dependencies):
-        """Test --phasess parameter removes duplicates while preserving order."""
+
         result = runner.invoke(
             cli,
             [
@@ -176,7 +175,7 @@ class TestCLIParameterConsistency:
         assert phases_to_run == ["power", "load", "throughput"]  # No duplicates, order preserved
 
     def test_tuning_mode_tuned(self, runner, mock_dependencies):
-        """Test --tuning parameter with 'tuned'."""
+
         result = runner.invoke(
             cli,
             [
@@ -196,7 +195,7 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
 
     def test_tuning_mode_notuning(self, runner, mock_dependencies):
-        """Test --tuning parameter with 'notuning'."""
+
         result = runner.invoke(
             cli, ["run", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01", "--tuning", "notuning"]
         )
@@ -204,14 +203,14 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
 
     def test_tuning_mode_invalid(self, runner, mock_dependencies):
-        """Test --tuning parameter with invalid value."""
+
         result = runner.invoke(cli, ["run", "--platform", "duckdb", "--benchmark", "tpch", "--tuning", "invalid_mode"])
 
         assert result.exit_code == 1
         assert "Invalid tuning value" in result.output
 
     def test_force_parameter(self, runner, mock_dependencies):
-        """Test --force parameter with argument."""
+
         result = runner.invoke(
             cli, ["run", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01", "--force", "all"]
         )
@@ -219,14 +218,14 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
 
     def test_execution_type_mapping_data_only(self, runner, mock_dependencies):
-        """Test that generate-only phase maps to data_only execution type."""
+
         result = runner.invoke(cli, ["run", "--benchmark", "tpch", "--scale", "0.01", "--phases", "generate"])
 
         assert result.exit_code == 0
         # Should handle data-only execution without database
 
     def test_execution_type_mapping_load_only(self, runner, mock_dependencies):
-        """Test that load-only phase maps to load_only execution type."""
+
         result = runner.invoke(
             cli, ["run", "--platform", "duckdb", "--benchmark", "tpch", "--scale", "0.01", "--phases", "load"]
         )
@@ -234,7 +233,7 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
 
     def test_execution_type_mapping_combined(self, runner, mock_dependencies):
-        """Test that multiple query phases map to combined execution type."""
+
         result = runner.invoke(
             cli,
             [
@@ -253,7 +252,7 @@ class TestCLIParameterConsistency:
         assert result.exit_code == 0
 
     def test_phase_validation_order_independence(self, runner, mock_dependencies):
-        """Test that phase order doesn't matter for validation."""
+
         result = runner.invoke(
             cli,
             [
@@ -276,7 +275,7 @@ class TestCLIParameterConsistency:
         assert phases_to_run == ["throughput", "generate", "power"]
 
     def test_orchestrator_phase_integration(self, mock_dependencies):
-        """Test that orchestrator correctly handles phases_to_run parameter."""
+
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
         from benchbox.core.schemas import BenchmarkConfig
 
@@ -304,10 +303,8 @@ class TestCLIParameterConsistency:
                     name="tpch", display_name="TPC-H", scale_factor=0.01, test_execution_type="standard"
                 )
 
-                # Create mock system profile
                 mock_system_profile = MagicMock()
 
-                # Create mock database config
                 mock_database_config = MagicMock()
                 mock_database_config.type = "duckdb"
 
@@ -338,7 +335,7 @@ class TestCLIParameterConsistencyUnavailable:
     """Test graceful handling when CLI modules are unavailable."""
 
     def test_import_unavailable(self):
-        """Test that we handle import failures gracefully."""
+
         if IMPORTS_AVAILABLE:
             assert skip_reason is None
             return
@@ -358,7 +355,7 @@ class TestPhaseValidationLogic:
         assert "statistics" in valid_phases
 
     def test_phase_parsing(self):
-        """Test phase string parsing logic."""
+
         # Test comma separation
         phase_string = "generate,load,power"
         phases = [p.strip() for p in phase_string.split(",") if p.strip()]
@@ -375,7 +372,7 @@ class TestPhaseValidationLogic:
         assert phases == ["generate", "load", "power"]
 
     def test_execution_type_mapping(self):
-        """Test execution type mapping logic."""
+
         query_phases = {"power", "throughput", "maintenance"}
 
         # Test data-only

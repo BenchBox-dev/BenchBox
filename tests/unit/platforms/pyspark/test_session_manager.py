@@ -38,7 +38,7 @@ def reset_manager():
 
 
 def test_get_or_create_returns_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify manager creates one session per process configuration."""
+
     fake_session = SimpleNamespace(stop=lambda: None)
 
     monkeypatch.setattr(session_module, "PYSPARK_AVAILABLE", True)
@@ -94,7 +94,7 @@ def test_get_or_create_redacts_azure_sas_config_in_debug_log(
 
 
 def test_configuration_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify requesting a different configuration raises SparkConfigurationError."""
+
     fake_session = SimpleNamespace(stop=lambda: None)
 
     monkeypatch.setattr(session_module, "PYSPARK_AVAILABLE", True)
@@ -206,7 +206,7 @@ class TestSuppressWindowExecWarning:
     """
 
     def test_calls_configurator_with_logger_object(self) -> None:
-        """Verify suppress uses logger-object Configurator.setLevel overload."""
+
         mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=MagicMock()))
         mock_jvm = mock_spark.sparkContext._jvm
         mock_logger = MagicMock()

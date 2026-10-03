@@ -149,7 +149,6 @@ class TestWritePrimitivesDuckDBLifecycle:
         write_bench.setup(loaded_tpch_conn)
         assert write_bench.is_setup(loaded_tpch_conn) is True
 
-        # Teardown
         write_bench.teardown(loaded_tpch_conn)
 
         # Verify tables are gone
@@ -160,7 +159,7 @@ class TestWritePrimitivesDuckDBLifecycle:
 
     def test_reset_repopulates_data(self, write_bench, loaded_tpch_conn):
         """Test that reset() truncates and repopulates staging tables."""
-        # Setup
+
         write_bench.setup(loaded_tpch_conn)
         original_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM update_ops_orders").fetchone()[0]
 
@@ -228,7 +227,6 @@ class TestWritePrimitivesDuckDBExecution:
             )
         """)
 
-        # Insert test data
         conn.execute("""
             INSERT INTO orders VALUES
             (1, 100, 'O', 150.50, '2024-01-01', '1-URGENT', 'Clerk#001', 0, 'test order 1'),
@@ -265,17 +263,14 @@ class TestWritePrimitivesDuckDBExecution:
 
         yield write_bench, conn
 
-        # Cleanup
         conn.close()
 
     def test_execute_insert_single_row(self, setup_env):
-        """Test executing INSERT single row operation."""
+
         write_bench, conn = setup_env
 
-        # Execute operation
         result = write_bench.execute_operation("insert_single_row", conn, use_transaction=True)
 
-        # Verify result structure
         assert isinstance(result, OperationResult)
         assert result.operation_id == "insert_single_row"
         assert result.success is True
@@ -296,7 +291,7 @@ class TestWritePrimitivesDuckDBExecution:
         assert result.validation_passed is True
 
     def test_execute_insert_select(self, setup_env):
-        """Test executing INSERT...SELECT operation."""
+
         write_bench, conn = setup_env
 
         result = write_bench.execute_operation("insert_select_simple", conn, use_transaction=True)
@@ -314,7 +309,7 @@ class TestWritePrimitivesDuckDBExecution:
             assert result.rows_affected >= 0 or result.rows_affected == -1
 
     def test_execute_update_single_row_pk(self, setup_env):
-        """Test executing UPDATE single row by primary key."""
+
         write_bench, conn = setup_env
 
         result = write_bench.execute_operation("update_single_row_pk", conn, use_transaction=True)
@@ -335,7 +330,7 @@ class TestWritePrimitivesDuckDBExecution:
         assert result.rows_affected >= 1 or result.rows_affected == -1
 
     def test_execute_delete_single_row_pk(self, setup_env):
-        """Test executing DELETE single row by primary key."""
+
         write_bench, conn = setup_env
 
         result = write_bench.execute_operation("delete_single_row_pk", conn, use_transaction=True)
@@ -355,7 +350,7 @@ class TestWritePrimitivesDuckDBExecution:
         assert result.rows_affected >= 1 or result.rows_affected == -1
 
     def test_execute_ddl_create_table(self, setup_env):
-        """Test executing DDL CREATE TABLE operation."""
+
         write_bench, conn = setup_env
 
         result = write_bench.execute_operation("ddl_create_table_simple", conn, use_transaction=True)
@@ -372,7 +367,7 @@ class TestWritePrimitivesDuckDBExecution:
         assert len(tables) == 0
 
     def test_execute_ddl_truncate(self, setup_env):
-        """Test executing DDL TRUNCATE operation."""
+
         write_bench, conn = setup_env
 
         # Get initial count from ddl_truncate_target (the actual table being truncated)
@@ -393,7 +388,7 @@ class TestWritePrimitivesDuckDBExecution:
         write_bench.reset(conn)
 
     def test_execute_ddl_create_table_as_select(self, setup_env):
-        """Test executing DDL CREATE TABLE AS SELECT."""
+
         write_bench, conn = setup_env
 
         result = write_bench.execute_operation("ddl_create_table_as_select_simple", conn, use_transaction=True)
@@ -449,7 +444,6 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
             )
         """)
 
-        # Insert test data
         conn.execute("""
             INSERT INTO orders VALUES
             (1, 100, 'O', 150.50, '2024-01-01', '1-URGENT', 'Clerk#001', 0, 'test order 1'),
@@ -485,7 +479,7 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
         conn.close()
 
     def test_run_benchmark_all_operations(self, setup_env):
-        """Test running all operations in the benchmark."""
+
         write_bench, conn = setup_env
 
         # Run operations individually to avoid interference
@@ -524,10 +518,9 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
         assert len(merge_failures) > 0, "Expected some MERGE operations to fail on DuckDB"
 
     def test_run_benchmark_by_category(self, setup_env):
-        """Test running operations filtered by category."""
+
         write_bench, conn = setup_env
 
-        # Verify tables are set up
         assert write_bench.is_setup(conn), "Staging tables should be set up by fixture"
 
         # Get INSERT operations and execute them individually (like test_run_benchmark_all_operations does)
@@ -547,7 +540,7 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
             assert result.operation_id.startswith("insert")
 
     def test_run_benchmark_specific_operations(self, setup_env):
-        """Test running specific operations by ID."""
+
         write_bench, conn = setup_env
 
         operation_ids = ["insert_single_row", "update_single_row_pk", "delete_single_row_pk"]
@@ -560,7 +553,7 @@ class TestWritePrimitivesDuckDBBenchmarkRuns:
             assert op_id in result_ids
 
     def test_benchmark_handles_errors_gracefully(self, setup_env):
-        """Test error handling for invalid operations."""
+
         write_bench, conn = setup_env
 
         # Try to execute non-existent operation
@@ -672,7 +665,6 @@ class TestWritePrimitivesConsolidatedOperations:
         # Execute GDPR deletion operation
         result = write_bench.execute_operation("delete_gdpr_suppliers_1pct", conn, use_transaction=True)
 
-        # Verify result structure
         assert isinstance(result, OperationResult)
         assert result.operation_id == "delete_gdpr_suppliers_1pct"
         assert result.success is True, f"Operation failed: {result.error}"
@@ -699,7 +691,6 @@ class TestWritePrimitivesConsolidatedOperations:
         # Execute GDPR deletion operation
         result = write_bench.execute_operation("delete_gdpr_suppliers_5pct", conn, use_transaction=True)
 
-        # Verify result structure
         assert isinstance(result, OperationResult)
         assert result.operation_id == "delete_gdpr_suppliers_5pct"
         assert result.success is True, f"Operation failed: {result.error}"
@@ -727,10 +718,8 @@ class TestWritePrimitivesConsolidatedOperations:
         """
         write_bench, conn = setup_env
 
-        # Execute ETL aggregation MERGE operation
         result = write_bench.execute_operation("merge_etl_aggregation_pattern", conn, use_transaction=True)
 
-        # Verify result structure
         assert isinstance(result, OperationResult)
         assert result.operation_id == "merge_etl_aggregation_pattern"
 
@@ -767,10 +756,8 @@ class TestWritePrimitivesConsolidatedOperations:
         """
         write_bench, conn = setup_env
 
-        # Execute deduplication MERGE operation
         result = write_bench.execute_operation("merge_deduplication_window_function", conn, use_transaction=True)
 
-        # Verify result structure
         assert isinstance(result, OperationResult)
         assert result.operation_id == "merge_deduplication_window_function"
 
@@ -801,7 +788,7 @@ class TestWritePrimitivesConsolidatedOperations:
         assert verify_no_dups["actual_rows"] == 1
 
     def test_consolidated_operations_category_filtering(self, setup_env):
-        """Test that consolidated operations can be filtered by their correct categories."""
+
         write_bench, conn = setup_env
 
         # Get DELETE operations - should include 2 GDPR operations
@@ -821,7 +808,7 @@ class TestWritePrimitivesConsolidatedOperations:
         assert "delete_gdpr_suppliers_5pct" not in merge_op_ids
 
     def test_gdpr_deletions_are_data_dependent(self, setup_env):
-        """Test that GDPR deletions handle data-dependent row counts correctly."""
+
         write_bench, conn = setup_env
 
         # Get operation definitions
@@ -862,7 +849,7 @@ class TestWritePrimitivesBulkLoad:
         return WritePrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
     def test_bulk_load_operations_exist_in_catalog(self, write_bench):
-        """Test that BULK_LOAD operations are defined in the catalog."""
+
         # Get all BULK_LOAD operations
         bulk_load_ops = write_bench.get_operations_by_category("bulk_load")
 
@@ -870,7 +857,7 @@ class TestWritePrimitivesBulkLoad:
         assert len(bulk_load_ops) == 36, f"Expected 36 BULK_LOAD operations, got {len(bulk_load_ops)}"
 
     def test_bulk_load_csv_operations_defined(self, write_bench):
-        """Test that CSV bulk load operations are properly defined."""
+
         bulk_load_ops = write_bench.get_operations_by_category("bulk_load")
 
         # Check for CSV operations with different sizes and compressions
@@ -885,7 +872,7 @@ class TestWritePrimitivesBulkLoad:
         assert "bulk_load_csv_medium_uncompressed" in bulk_load_ops
 
     def test_bulk_load_parquet_operations_defined(self, write_bench):
-        """Test that Parquet bulk load operations are properly defined."""
+
         bulk_load_ops = write_bench.get_operations_by_category("bulk_load")
 
         # Check for Parquet operations
@@ -913,15 +900,13 @@ class TestWritePrimitivesBulkLoad:
         # Verify write_sql contains file placeholder
         assert "{file_path}" in operation.write_sql, "BULK_LOAD operation should use {file_path} placeholder"
 
-        # Verify validation queries exist
         assert operation.validation_queries is not None, "Operation should have validation queries"
         assert len(operation.validation_queries) > 0, "Should have at least one validation query"
 
-        # Verify cleanup SQL exists
         assert operation.cleanup_sql is not None, "Operation should have cleanup_sql"
 
     def test_bulk_load_special_operations_defined(self, write_bench):
-        """Test that special BULK_LOAD operations are defined."""
+
         bulk_load_ops = write_bench.get_operations_by_category("bulk_load")
 
         # Check for special operations beyond basic CSV/Parquet
@@ -936,7 +921,7 @@ class TestWritePrimitivesBulkLoad:
             assert op_id in bulk_load_ops, f"Special operation {op_id} should be defined"
 
     def test_bulk_load_file_path_placeholder_replacement(self, write_bench):
-        """Test that file path placeholder is correctly defined for replacement."""
+
         operation = write_bench.get_operation("bulk_load_csv_small_uncompressed")
 
         # Verify the placeholder format is correct
@@ -948,7 +933,7 @@ class TestWritePrimitivesBulkLoad:
         )
 
     def test_bulk_load_compression_variants(self, write_bench):
-        """Test that BULK_LOAD operations cover multiple compression formats."""
+
         bulk_load_ops = write_bench.get_operations_by_category("bulk_load")
 
         # Check for various compression formats
@@ -966,7 +951,7 @@ class TestWritePrimitivesBulkLoad:
         )
 
     def test_bulk_load_operation_categories_complete(self, write_bench):
-        """Test that all operation categories include expected BULK_LOAD operations."""
+
         all_categories = write_bench.get_operation_categories()
 
         # Verify bulk_load is listed as a category

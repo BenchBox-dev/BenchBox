@@ -76,7 +76,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert "Invalid S3 staging directory format" in str(exc_info.value)
 
     def test_validation_fails_with_invalid_region(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test that validation fails with invalid region format."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         with pytest.raises(ConfigurationError) as exc_info:
@@ -85,7 +85,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert "Invalid AWS region format" in str(exc_info.value)
 
     def test_validation_fails_with_invalid_workgroup(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test that validation fails with invalid workgroup name."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         with pytest.raises(ConfigurationError) as exc_info:
@@ -94,7 +94,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert "Invalid workgroup name" in str(exc_info.value)
 
     def test_validation_passes_with_explicit_credentials(self, mock_boto3, mock_pyathena, monkeypatch):
-        """Test that validation passes with explicit credentials."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         # Clear environment
@@ -111,7 +111,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert adapter.s3_bucket == "test-bucket"
 
     def test_validation_passes_with_aws_profile(self, mock_boto3, mock_pyathena, monkeypatch):
-        """Test that validation passes with AWS profile."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
@@ -125,7 +125,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert adapter.aws_profile == "my-profile"
 
     def test_validation_passes_with_env_credentials(self, mock_boto3, mock_pyathena, monkeypatch):
-        """Test that validation passes with environment credentials."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-key")
@@ -136,7 +136,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert adapter.s3_bucket == "test-bucket"
 
     def test_validation_error_includes_details(self, mock_boto3, mock_pyathena, monkeypatch):
-        """Test that validation error includes helpful details."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
@@ -151,7 +151,7 @@ class TestAthenaAdapterConfigurationValidation:
         assert "validation_errors" in error.details
 
     def test_validation_provides_fix_suggestions(self, mock_boto3, mock_pyathena, monkeypatch):
-        """Test that validation errors include fix suggestions."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         monkeypatch.delenv("AWS_ACCESS_KEY_ID", raising=False)
@@ -206,7 +206,7 @@ class TestAthenaAdapter:
         return creds_file
 
     def test_initialization_success(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test successful adapter initialization."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         config = {
@@ -226,7 +226,7 @@ class TestAthenaAdapter:
         assert adapter.s3_bucket == "test-bucket"
 
     def test_initialization_with_defaults(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test initialization with default values."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
@@ -258,14 +258,14 @@ class TestAthenaAdapter:
         assert adapter.s3_output_location == "s3://my-bucket/athena-results/"
 
     def test_get_target_dialect(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test that target dialect returns trino."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
         assert adapter.get_target_dialect() == "trino"
 
     def test_platform_info(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test platform info collection."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         config = {
@@ -367,7 +367,7 @@ class TestAthenaAdapter:
         assert metadata["platform_storage"]["collection_status"] == "partial"
 
     def test_cost_tracking(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test cost summary calculation."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
@@ -388,7 +388,7 @@ class TestAthenaAdapter:
         assert summary["average_cost_per_query_usd"] == pytest.approx(expected_tb * 5.0 / 10)
 
     def test_from_config(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test adapter creation from config."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         config = {
@@ -407,7 +407,7 @@ class TestAthenaAdapter:
         assert "tpch" in adapter.database.lower() or "benchmark" in adapter.database.lower()
 
     def test_supports_tuning_type(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test tuning type support."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
@@ -422,7 +422,7 @@ class TestAthenaAdapter:
             pass
 
     def test_test_connection_method_exists(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test that test_connection method exists and is callable."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(
@@ -448,7 +448,7 @@ class TestAthenaAdapter:
             AthenaAdapter(aws_profile="test-profile")  # Has creds but no S3
 
     def test_normalize_table_name(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test table name normalization."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
@@ -462,7 +462,7 @@ class TestAthenaAdapter:
         # Note: EXTERNAL is added by _convert_to_external_table, not this function
 
     def test_convert_to_external_table_parquet(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test conversion to external table with Parquet format."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(
@@ -530,7 +530,7 @@ class TestAthenaAdapter:
         assert "s3://test-bucket/data/test_db/lineitem/" in converted
 
     def test_convert_to_external_table_csv_format(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test conversion to external table with CSV format in text mode."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(
@@ -569,7 +569,7 @@ class TestAthenaAdapter:
         assert "s3://test-bucket/data/test_db/lineitem/" in converted
 
     def test_convert_to_external_table_staging(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test staging table creation for CTAS workflow."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(
@@ -1046,7 +1046,7 @@ class TestAthenaAdapterExecution:
         return creds_file
 
     def test_execute_query_success(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test successful query execution."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         _, mock_cursor = mock_pyathena
@@ -1066,7 +1066,7 @@ class TestAthenaAdapterExecution:
         assert result["rows_returned"] == 2
 
     def test_execute_query_failure(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test query execution failure."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         _, mock_cursor = mock_pyathena
@@ -1084,7 +1084,7 @@ class TestAthenaAdapterExecution:
         assert "Query failed" in result.get("error", "")
 
     def test_close_connection(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test connection closing."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         mock_connection = MagicMock()
@@ -1104,7 +1104,7 @@ class TestAthenaAdapterExecution:
         adapter.close_connection(None)
 
     def test_generate_tuning_clause_partitioning(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test tuning clause generation with partitioning."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
@@ -1125,7 +1125,7 @@ class TestAthenaAdapterExecution:
             assert "date_col" in clause
 
     def test_generate_tuning_clause_empty(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test tuning clause generation with no tuning."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         adapter = AthenaAdapter(s3_bucket="test-bucket")
@@ -1137,7 +1137,7 @@ class TestAthenaAdapterExecution:
         assert clause == ""
 
     def test_get_query_plan(self, mock_boto3, mock_pyathena, mock_aws_credentials):
-        """Test query plan retrieval."""
+
         from benchbox.platforms.athena import AthenaAdapter
 
         _, mock_cursor = mock_pyathena
@@ -1196,14 +1196,14 @@ class TestAthenaAdapterRegistration:
     """Tests for platform registration."""
 
     def test_athena_in_platform_list(self):
-        """Test that Athena is listed in available platforms."""
+
         from benchbox.platforms import list_available_platforms
 
         platforms = list_available_platforms()
         assert "athena" in platforms
 
     def test_athena_requirements(self):
-        """Test that Athena requirements are correct."""
+
         from benchbox.platforms import get_platform_requirements
 
         requirements = get_platform_requirements("athena")
@@ -1211,7 +1211,7 @@ class TestAthenaAdapterRegistration:
         assert "boto3" in requirements
 
     def test_athena_dependency_group(self):
-        """Test that Athena dependency group is defined."""
+
         from benchbox.utils.dependencies import DEPENDENCY_GROUPS
 
         assert "athena" in DEPENDENCY_GROUPS

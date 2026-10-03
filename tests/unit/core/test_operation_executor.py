@@ -64,7 +64,6 @@ class TestOperationExecutorInterface:
             IncompleteExecutor()
 
     def test_complete_implementation_can_be_instantiated(self):
-        """Test that complete implementation works."""
 
         class CompleteExecutor(OperationExecutor):
             def execute_operation(self, operation_id, connection, **kwargs):
@@ -81,7 +80,6 @@ class TestOperationExecutorInterface:
         assert isinstance(executor, OperationExecutor)
 
     def test_isinstance_check_works(self):
-        """Test that isinstance check properly identifies OperationExecutor implementations."""
 
         class MyExecutor(OperationExecutor):
             def execute_operation(self, operation_id, connection, **kwargs):
@@ -104,14 +102,14 @@ class TestOperationExecutorInterface:
         assert not isinstance(not_executor, OperationExecutor)
 
     def test_write_primitives_implements_interface(self):
-        """Test that WritePrimitives wrapper implements OperationExecutor."""
+
         from benchbox import WritePrimitives
 
         bench = WritePrimitives(scale_factor=0.01)
         assert isinstance(bench, OperationExecutor)
 
     def test_operation_executor_method_signatures(self):
-        """Test that OperationExecutor defines correct method signatures."""
+
         import inspect
 
         # Check execute_operation signature

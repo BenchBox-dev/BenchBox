@@ -40,28 +40,28 @@ class TestVersionParsing:
     """Tests for version parsing utilities."""
 
     def test_parse_simple_version(self) -> None:
-        """Test parsing simple version strings."""
+
         assert parse_version("0.10.0") == (0, 10, 0)
         assert parse_version("1.0.0") == (1, 0, 0)
         assert parse_version("0.9.2") == (0, 9, 2)
 
     def test_parse_version_with_v_prefix(self) -> None:
-        """Test parsing version with 'v' prefix."""
+
         assert parse_version("v0.10.0") == (0, 10, 0)
         assert parse_version("v1.2.3") == (1, 2, 3)
 
     def test_parse_dev_version(self) -> None:
-        """Test parsing dev versions."""
+
         assert parse_version("0.10.2-dev123") == (0, 10, 2)
         assert parse_version("1.0.0-alpha") == (1, 0, 0)
 
     def test_parse_invalid_version(self) -> None:
-        """Test handling of invalid version strings."""
+
         assert parse_version("invalid") == (0, 0, 0)
         assert parse_version("") == (0, 0, 0)
 
     def test_get_duckdb_version_returns_tuple(self) -> None:
-        """Test that get_duckdb_version returns a version tuple."""
+
         version = get_duckdb_version()
         assert isinstance(version, tuple)
         assert len(version) >= 3
@@ -79,12 +79,12 @@ class TestDuckDBDDLGenerator:
     """Tests for DuckDBDDLGenerator class."""
 
     def test_platform_name(self) -> None:
-        """Test platform name property."""
+
         generator = DuckDBDDLGenerator()
         assert generator.platform_name == "duckdb"
 
     def test_supported_tuning_types(self) -> None:
-        """Test supported tuning types."""
+
         generator = DuckDBDDLGenerator()
         assert generator.supports_tuning_type("sorting")
         assert generator.supports_tuning_type("partitioning")
@@ -92,7 +92,7 @@ class TestDuckDBDDLGenerator:
         assert not generator.supports_tuning_type("clustering")
 
     def test_generate_tuning_clauses_with_sorting(self) -> None:
-        """Test sort_by clause generation for CTAS patterns."""
+
         generator = DuckDBDDLGenerator()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -108,7 +108,7 @@ class TestDuckDBDDLGenerator:
         assert clauses.order_by is None
 
     def test_generate_tuning_clauses_respects_order(self) -> None:
-        """Test that columns are sorted by their order property."""
+
         generator = DuckDBDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -122,13 +122,13 @@ class TestDuckDBDDLGenerator:
         assert clauses.sort_by == "ORDER BY o_orderdate, o_custkey, o_orderkey"
 
     def test_generate_tuning_clauses_with_none(self) -> None:
-        """Test handling of None table_tuning."""
+
         generator = DuckDBDDLGenerator()
         clauses = generator.generate_tuning_clauses(None)
         assert clauses.is_empty()
 
     def test_generate_tuning_clauses_empty_tuning(self) -> None:
-        """Test handling of tuning with no sorting."""
+
         generator = DuckDBDDLGenerator()
         # TableTuning with partitioning but no sorting
         table_tuning = TableTuning(
@@ -140,7 +140,7 @@ class TestDuckDBDDLGenerator:
         assert clauses.order_by is None
 
     def test_distribution_warning_logged(self) -> None:
-        """Test that distribution columns trigger a warning."""
+
         generator = DuckDBDDLGenerator()
         table_tuning = TableTuning(
             table_name="test",
@@ -169,7 +169,7 @@ class TestDuckDBDDLGeneratorCreateTable:
     """Tests for CREATE TABLE DDL generation."""
 
     def test_basic_create_table(self) -> None:
-        """Test basic CREATE TABLE without tuning."""
+
         generator = DuckDBDDLGenerator()
         columns = [
             ColumnDefinition("id", "BIGINT", ColumnNullability.NOT_NULL),
@@ -205,14 +205,14 @@ class TestDuckDBDDLGeneratorCreateTable:
         assert tuning.sort_by == "ORDER BY order_date"
 
     def test_create_table_if_not_exists(self) -> None:
-        """Test CREATE TABLE IF NOT EXISTS."""
+
         generator = DuckDBDDLGenerator()
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = generator.generate_create_table_ddl("test", columns, if_not_exists=True)
         assert "CREATE TABLE IF NOT EXISTS test" in ddl
 
     def test_create_table_with_schema(self) -> None:
-        """Test CREATE TABLE with schema prefix."""
+
         generator = DuckDBDDLGenerator()
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = generator.generate_create_table_ddl("orders", columns, schema="sales")
@@ -223,7 +223,7 @@ class TestDuckDBCTAS:
     """Tests for CREATE TABLE AS (CTAS) DDL generation."""
 
     def test_basic_ctas(self) -> None:
-        """Test basic CTAS without sorting."""
+
         generator = DuckDBDDLGenerator()
         ddl = generator.generate_ctas_ddl(
             table_name="sorted_orders",
@@ -232,7 +232,7 @@ class TestDuckDBCTAS:
         assert ddl == "CREATE TABLE sorted_orders AS SELECT * FROM raw_orders;"
 
     def test_ctas_with_sorting(self) -> None:
-        """Test CTAS with sorting clause."""
+
         generator = DuckDBDDLGenerator()
         tuning = generator.generate_tuning_clauses(
             TableTuning(
@@ -263,7 +263,7 @@ class TestDuckDBCTAS:
         assert "CREATE OR REPLACE TABLE test" in ddl
 
     def test_ctas_with_schema(self) -> None:
-        """Test CTAS with schema prefix."""
+
         generator = DuckDBDDLGenerator()
         ddl = generator.generate_ctas_ddl(
             table_name="orders",
@@ -277,7 +277,7 @@ class TestDuckDBPartitionedExport:
     """Tests for partitioned COPY TO generation."""
 
     def test_generate_copy_to_partitioned(self) -> None:
-        """Test COPY TO with Hive-style partitioning."""
+
         generator = DuckDBDDLGenerator()
         sql = generator.generate_copy_to_partitioned(
             source_query="SELECT * FROM lineitem",
@@ -289,7 +289,7 @@ class TestDuckDBPartitionedExport:
         assert "PARTITION_BY (l_shipdate)" in sql
 
     def test_generate_copy_to_multiple_partitions(self) -> None:
-        """Test COPY TO with multiple partition columns."""
+
         generator = DuckDBDDLGenerator()
         sql = generator.generate_copy_to_partitioned(
             source_query="SELECT * FROM orders",
@@ -299,7 +299,7 @@ class TestDuckDBPartitionedExport:
         assert "PARTITION_BY (order_year, order_month)" in sql
 
     def test_generate_copy_to_csv_format(self) -> None:
-        """Test COPY TO with CSV format."""
+
         generator = DuckDBDDLGenerator()
         sql = generator.generate_copy_to_partitioned(
             source_query="SELECT * FROM data",
@@ -315,7 +315,7 @@ class TestDuckDBIntegration:
 
     @pytest.mark.integration
     def test_create_table_executes(self) -> None:
-        """Test that generated CREATE TABLE DDL executes successfully."""
+
         import duckdb
 
         generator = DuckDBDDLGenerator()
@@ -338,7 +338,7 @@ class TestDuckDBIntegration:
 
     @pytest.mark.integration
     def test_ctas_with_sorting_executes(self) -> None:
-        """Test that CTAS with ORDER BY executes successfully in DuckDB."""
+
         import duckdb
 
         generator = DuckDBDDLGenerator()
@@ -388,7 +388,7 @@ class TestDuckDBIntegration:
 
     @pytest.mark.integration
     def test_copy_to_partitioned_executes(self) -> None:
-        """Test that partitioned COPY TO works."""
+
         import tempfile
         from pathlib import Path
 

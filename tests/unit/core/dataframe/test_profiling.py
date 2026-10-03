@@ -44,7 +44,7 @@ class TestQueryExecutionProfile:
     """Tests for QueryExecutionProfile dataclass."""
 
     def test_basic_creation(self):
-        """Test creating a basic profile."""
+
         profile = QueryExecutionProfile(
             query_id="Q1",
             execution_time_ms=1000.0,
@@ -62,7 +62,7 @@ class TestQueryExecutionProfile:
         assert profile.metrics == {}
 
     def test_full_creation(self):
-        """Test creating a profile with all fields."""
+
         plan = QueryPlan(
             platform="polars",
             plan_type="optimized",
@@ -90,7 +90,7 @@ class TestQueryExecutionProfile:
         assert profile.lazy_evaluation is True
 
     def test_lazy_overhead_ms(self):
-        """Test lazy overhead calculation in ms."""
+
         profile = QueryExecutionProfile(
             query_id="Q1",
             execution_time_ms=1000.0,
@@ -101,7 +101,7 @@ class TestQueryExecutionProfile:
         assert profile.lazy_overhead_ms == 300.0
 
     def test_lazy_overhead_percent(self):
-        """Test lazy overhead as percentage."""
+
         profile = QueryExecutionProfile(
             query_id="Q1",
             execution_time_ms=1000.0,
@@ -112,7 +112,7 @@ class TestQueryExecutionProfile:
         assert profile.lazy_overhead_percent == 30.0
 
     def test_lazy_overhead_percent_zero_execution_time(self):
-        """Test lazy overhead when execution time is zero."""
+
         profile = QueryExecutionProfile(
             query_id="Q1",
             execution_time_ms=0.0,
@@ -127,7 +127,7 @@ class TestQueryPlan:
     """Tests for QueryPlan dataclass."""
 
     def test_basic_creation(self):
-        """Test creating a basic query plan."""
+
         plan = QueryPlan(
             platform="polars",
             plan_type="optimized",
@@ -141,7 +141,7 @@ class TestQueryPlan:
         assert plan.optimization_hints == []
 
     def test_str_method(self):
-        """Test string representation."""
+
         plan = QueryPlan(
             platform="polars",
             plan_type="optimized",
@@ -151,7 +151,7 @@ class TestQueryPlan:
         assert str(plan) == "FILTER -> GROUP BY -> SORT"
 
     def test_with_hints(self):
-        """Test plan with optimization hints."""
+
         plan = QueryPlan(
             platform="polars",
             plan_type="optimized",
@@ -166,7 +166,7 @@ class TestQueryProfileContext:
     """Tests for QueryProfileContext timing."""
 
     def test_basic_context(self):
-        """Test basic context usage."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -180,7 +180,7 @@ class TestQueryProfileContext:
         assert profile.execution_time_ms >= 10  # At least 10ms
 
     def test_planning_phase_timing(self):
-        """Test planning phase timing."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -194,7 +194,7 @@ class TestQueryProfileContext:
         assert profile.lazy_evaluation is True
 
     def test_collect_phase_timing(self):
-        """Test collect phase timing."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -207,7 +207,7 @@ class TestQueryProfileContext:
         assert profile.collect_time_ms >= 10
 
     def test_set_rows(self):
-        """Test setting row count."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -217,7 +217,7 @@ class TestQueryProfileContext:
         assert profile.rows_processed == 1000
 
     def test_set_query_plan(self):
-        """Test setting query plan."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -229,7 +229,7 @@ class TestQueryProfileContext:
         assert profile.query_plan.platform == "polars"
 
     def test_set_peak_memory(self):
-        """Test setting peak memory."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -239,7 +239,7 @@ class TestQueryProfileContext:
         assert profile.peak_memory_mb == 512.5
 
     def test_add_metric(self):
-        """Test adding custom metrics."""
+
         ctx = QueryProfileContext("Q1", "polars")
         ctx._start_time = time.perf_counter()
 
@@ -255,7 +255,7 @@ class TestMemoryTracker:
     """Tests for MemoryTracker runtime memory tracking."""
 
     def test_basic_tracking(self):
-        """Test basic memory tracking."""
+
         tracker = MemoryTracker(sample_interval_ms=10)
         tracker.start()
 
@@ -270,7 +270,7 @@ class TestMemoryTracker:
         del data  # cleanup
 
     def test_peak_memory_property(self):
-        """Test peak_memory_mb property."""
+
         tracker = MemoryTracker(sample_interval_ms=10)
         tracker.start()
         time.sleep(0.03)
@@ -279,7 +279,7 @@ class TestMemoryTracker:
         assert tracker.peak_memory_mb >= 0
 
     def test_samples_property(self):
-        """Test samples are collected."""
+
         tracker = MemoryTracker(sample_interval_ms=10)
         tracker.start()
         time.sleep(0.05)
@@ -289,7 +289,7 @@ class TestMemoryTracker:
         assert len(samples) >= 1  # At least baseline sample
 
     def test_get_statistics(self):
-        """Test get_statistics method."""
+
         tracker = MemoryTracker(sample_interval_ms=10)
         tracker.start()
         time.sleep(0.03)
@@ -305,7 +305,7 @@ class TestMemoryTracker:
         assert stats["sample_count"] >= 1
 
     def test_empty_statistics(self):
-        """Test statistics when no tracking done."""
+
         tracker = MemoryTracker()
         stats = tracker.get_statistics()
 
@@ -327,7 +327,7 @@ class TestTrackMemoryContextManager:
     """Tests for track_memory context manager."""
 
     def test_context_manager_usage(self):
-        """Test using track_memory as context manager."""
+
         with track_memory(sample_interval_ms=10) as tracker:
             # Allocate some memory
             data = [0] * 100000
@@ -341,7 +341,7 @@ class TestGetCurrentMemoryMb:
     """Tests for get_current_memory_mb function."""
 
     def test_returns_value(self):
-        """Test that function returns a value."""
+
         memory = get_current_memory_mb()
         assert memory >= 0  # May be 0 if psutil not available
 
@@ -350,7 +350,7 @@ class TestDataFrameProfiler:
     """Tests for DataFrameProfiler class."""
 
     def test_basic_profiling(self):
-        """Test basic profiler usage."""
+
         profiler = DataFrameProfiler(platform="polars")
 
         with profiler.profile_query("Q1") as ctx:
@@ -363,7 +363,7 @@ class TestDataFrameProfiler:
         assert profiles[0].rows_processed == 100
 
     def test_multiple_queries(self):
-        """Test profiling multiple queries."""
+
         profiler = DataFrameProfiler(platform="polars")
 
         for i in range(3):
@@ -375,7 +375,7 @@ class TestDataFrameProfiler:
         assert len(profiles) == 3
 
     def test_get_profile_by_id(self):
-        """Test getting specific profile by ID."""
+
         profiler = DataFrameProfiler(platform="polars")
 
         with profiler.profile_query("Q1") as ctx:
@@ -389,7 +389,7 @@ class TestDataFrameProfiler:
         assert profile.rows_processed == 200
 
     def test_get_statistics(self):
-        """Test aggregate statistics."""
+
         profiler = DataFrameProfiler(platform="polars")
 
         with profiler.profile_query("Q1") as ctx:
@@ -409,7 +409,7 @@ class TestDataFrameProfiler:
         assert stats["platform"] == "polars"
 
     def test_empty_statistics(self):
-        """Test statistics when no queries profiled."""
+
         profiler = DataFrameProfiler()
         stats = profiler.get_statistics()
 
@@ -417,7 +417,7 @@ class TestDataFrameProfiler:
         assert stats["total_execution_time_ms"] == 0
 
     def test_add_profile(self):
-        """Test adding externally created profile."""
+
         profiler = DataFrameProfiler()
 
         profile = QueryExecutionProfile(
@@ -432,7 +432,7 @@ class TestDataFrameProfiler:
         assert profiler.get_profile("Q1") is not None
 
     def test_clear(self):
-        """Test clearing profiles."""
+
         profiler = DataFrameProfiler()
 
         with profiler.profile_query("Q1") as ctx:
@@ -448,7 +448,6 @@ class TestProfileQueryExecution:
     """Tests for profile_query_execution helper function."""
 
     def test_basic_execution(self):
-        """Test basic profiled execution."""
 
         def query_fn():
             return [1, 2, 3]
@@ -466,7 +465,6 @@ class TestProfileQueryExecution:
         assert profile.execution_time_ms > 0
 
     def test_with_collect(self):
-        """Test profiled execution with collect function."""
 
         def query_fn():
             return range(100)
@@ -491,7 +489,6 @@ class TestProfileQueryExecution:
         assert profile.collect_time_ms > 0
 
     def test_with_memory_tracking(self):
-        """Test profiled execution with memory tracking."""
 
         def query_fn():
             return [0] * 100000
@@ -538,7 +535,7 @@ class TestProfiledExecutionResult:
     """Tests for ProfiledExecutionResult class."""
 
     def test_basic_creation(self):
-        """Test creating a ProfiledExecutionResult."""
+
         profile = QueryExecutionProfile(
             query_id="Q1",
             execution_time_ms=1000.0,
@@ -562,7 +559,7 @@ class TestComparisonResult:
     """Tests for ComparisonResult dataclass."""
 
     def test_dataframe_faster(self):
-        """Test when DataFrame is faster."""
+
         result = ComparisonResult(
             query_id="Q1",
             dataframe_time_ms=100.0,
@@ -573,7 +570,7 @@ class TestComparisonResult:
         assert result.winner == "dataframe"
 
     def test_sql_faster(self):
-        """Test when SQL is faster."""
+
         result = ComparisonResult(
             query_id="Q1",
             dataframe_time_ms=200.0,
@@ -584,7 +581,7 @@ class TestComparisonResult:
         assert result.winner == "sql"
 
     def test_no_sql_time(self):
-        """Test when SQL time not available."""
+
         result = ComparisonResult(
             query_id="Q1",
             dataframe_time_ms=100.0,
@@ -598,7 +595,7 @@ class TestCompareExecutionModes:
     """Tests for compare_execution_modes function."""
 
     def test_comparison(self):
-        """Test comparing profiles with SQL times."""
+
         profiles = [
             QueryExecutionProfile(query_id="Q1", execution_time_ms=100.0),
             QueryExecutionProfile(query_id="Q2", execution_time_ms=200.0),
@@ -621,12 +618,12 @@ class TestCaptureQueryPlan:
     """Tests for query plan capture functions."""
 
     def test_capture_query_plan_unknown_platform(self):
-        """Test capture_query_plan with unknown platform."""
+
         result = capture_query_plan({}, "unknown")
         assert result is None
 
     def test_capture_query_plan_polars_no_explain(self):
-        """Test capture_query_plan when object has no explain method."""
+
         mock_df = MagicMock()
         del mock_df.explain  # Remove explain method
 
@@ -638,7 +635,7 @@ class TestProfileMetricType:
     """Tests for ProfileMetricType enum."""
 
     def test_metric_types(self):
-        """Test all metric types exist."""
+
         assert ProfileMetricType.TIMING.value == "timing"
         assert ProfileMetricType.MEMORY.value == "memory"
         assert ProfileMetricType.ROWS.value == "rows"

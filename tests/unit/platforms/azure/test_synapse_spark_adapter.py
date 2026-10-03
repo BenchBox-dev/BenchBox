@@ -48,7 +48,7 @@ class TestSynapseSparkAdapterInitialization:
     """Test SynapseSparkAdapter initialization."""
 
     def test_missing_workspace_name_raises_error(self):
-        """Test error when workspace_name is not provided."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -64,7 +64,7 @@ class TestSynapseSparkAdapterInitialization:
                 )
 
     def test_missing_spark_pool_raises_error(self):
-        """Test error when spark_pool_name is not provided."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -80,7 +80,7 @@ class TestSynapseSparkAdapterInitialization:
                 )
 
     def test_missing_storage_account_raises_error(self):
-        """Test error when storage_account is not provided."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -96,7 +96,7 @@ class TestSynapseSparkAdapterInitialization:
                 )
 
     def test_missing_storage_container_raises_error(self):
-        """Test error when storage_container is not provided."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -138,7 +138,7 @@ class TestSynapseSparkAdapterInitialization:
             assert adapter.tenant_id == "tenant-123"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -210,7 +210,7 @@ class TestSynapseSparkAdapterPlatformInfo:
     """Test platform info methods."""
 
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -242,7 +242,7 @@ class TestSynapseSparkAdapterPlatformInfo:
             assert info["storage"] == "ADLS Gen2"
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -267,7 +267,7 @@ class TestSynapseSparkAdapterConnection:
     """Test connection and authentication."""
 
     def test_create_connection_success(self):
-        """Test successful Spark pool connection."""
+
         import requests as real_requests
 
         with (
@@ -278,7 +278,6 @@ class TestSynapseSparkAdapterConnection:
         ):
             mock_staging.from_uri.return_value = MagicMock()
 
-            # Setup mock credential
             mock_credential = MagicMock()
             mock_token = MagicMock()
             mock_token.token = "test-token"
@@ -289,7 +288,6 @@ class TestSynapseSparkAdapterConnection:
             with patch("benchbox.platforms.azure.synapse_spark_adapter.requests") as mock_requests:
                 mock_requests.exceptions = real_requests.exceptions
 
-                # Setup mock response
                 mock_response = MagicMock()
                 mock_response.status_code = 200
                 mock_response.json.return_value = {
@@ -316,7 +314,7 @@ class TestSynapseSparkAdapterConnection:
                 assert result["spark_version"] == "3.3"
 
     def test_create_connection_auth_failure(self):
-        """Test authentication failure handling."""
+
         import requests as real_requests
 
         with (
@@ -354,7 +352,7 @@ class TestSynapseSparkAdapterConnection:
                     adapter.create_connection()
 
     def test_create_connection_pool_not_found(self):
-        """Test Spark pool not found handling."""
+
         import requests as real_requests
 
         with (
@@ -396,7 +394,7 @@ class TestSynapseSparkAdapterTuning:
     """Test benchmark tuning configuration."""
 
     def test_configure_for_tpch(self):
-        """Test TPC-H benchmark configuration."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -426,7 +424,7 @@ class TestSynapseSparkAdapterTuning:
             mock_optimizer.for_tpch.assert_called_once()
 
     def test_configure_for_tpcds(self):
-        """Test TPC-DS benchmark configuration."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -460,7 +458,7 @@ class TestSynapseSparkAdapterCLI:
     """Test CLI argument handling."""
 
     def test_add_cli_arguments(self):
-        """Test CLI arguments are added correctly."""
+
         from argparse import ArgumentParser
 
         with (
@@ -500,7 +498,7 @@ class TestSynapseSparkAdapterCLI:
             assert args.timeout_minutes == 120
 
     def test_from_config(self):
-        """Test adapter creation from config dictionary."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -561,7 +559,7 @@ class TestSynapseSparkAdapterRegistry:
     """Test platform registry integration."""
 
     def test_platform_registered_in_registry(self):
-        """Test that synapse-spark is registered in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -574,7 +572,7 @@ class TestSynapseSparkAdapterRegistry:
         assert "azure-identity" in str(metadata.get("libraries", []))
 
     def test_platform_capabilities(self):
-        """Test that synapse-spark capabilities are correctly defined."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -589,7 +587,7 @@ class TestSynapseLivyStateConstants:
     """Test Livy session state constants."""
 
     def test_synapse_livy_session_states(self):
-        """Test SynapseLivySessionState constants are defined."""
+
         from benchbox.platforms.azure.synapse_spark_adapter import SynapseLivySessionState
 
         assert SynapseLivySessionState.NOT_STARTED == "not_started"
@@ -600,7 +598,7 @@ class TestSynapseLivyStateConstants:
         assert SynapseLivySessionState.DEAD == "dead"
 
     def test_table_format_default_parquet(self):
-        """Test table_format defaults to parquet."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -619,7 +617,7 @@ class TestSynapseLivyStateConstants:
             assert adapter.table_format == "parquet"
 
     def test_table_format_delta(self):
-        """Test table_format can be set to delta."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -639,7 +637,7 @@ class TestSynapseLivyStateConstants:
             assert adapter.table_format == "delta"
 
     def test_table_format_from_config(self):
-        """Test table_format is passed through from_config."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -661,7 +659,7 @@ class TestSynapseLivyStateConstants:
             assert adapter.table_format == "iceberg"
 
     def test_adaptive_enabled_from_config(self):
-        """Test adaptive_enabled is forwarded through from_config."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -693,7 +691,7 @@ class TestSynapseLivyStateConstants:
             assert defaulted.adaptive_enabled is True
 
     def test_session_config_delta_extensions(self):
-        """Test Delta Lake extensions are added to session config."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),
@@ -725,7 +723,7 @@ class TestSynapseLivyStateConstants:
             assert "DeltaCatalog" in session_conf["spark.sql.catalog.spark_catalog"]
 
     def test_session_config_iceberg_extensions(self):
-        """Test Iceberg extensions are added to session config."""
+
         with (
             patch("benchbox.platforms.azure.synapse_spark_adapter.AZURE_IDENTITY_AVAILABLE", True),
             patch("benchbox.platforms.azure.synapse_spark_adapter.DefaultAzureCredential", MagicMock()),

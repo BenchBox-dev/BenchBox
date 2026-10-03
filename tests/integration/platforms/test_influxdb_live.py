@@ -67,7 +67,7 @@ class TestLiveInfluxDBConnection:
     """Test basic InfluxDB connectivity via Docker."""
 
     def test_connection(self, influxdb_adapter):
-        """Verify we can connect to InfluxDB and query after seeding."""
+
         connection = influxdb_adapter.create_connection()
         try:
             assert connection is not None
@@ -75,7 +75,7 @@ class TestLiveInfluxDBConnection:
             influxdb_adapter.close_connection(connection)
 
     def test_platform_info(self, influxdb_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = influxdb_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "influxdb"
@@ -85,7 +85,7 @@ class TestLiveInfluxDBQueryExecution:
     """Test query execution against a live InfluxDB instance."""
 
     def test_execute_query(self, influxdb_adapter):
-        """Verify basic query execution against seeded data."""
+
         connection = influxdb_adapter.create_connection()
         try:
             # InfluxDB adapter returns (execution_time, row_count, error) tuple

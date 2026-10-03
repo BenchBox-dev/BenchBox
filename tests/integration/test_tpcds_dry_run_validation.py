@@ -36,7 +36,7 @@ class TestTPCDSDryRunValidation:
         self.benchmark_config.scale_factor = 0.01
 
     def test_dry_run_platform_adapter_integration(self):
-        """Test that dry-run mode properly integrates with platform adapter."""
+
         # Create platform adapter and enable dry-run mode
         platform_adapter = DuckDBAdapter()
         platform_adapter.enable_dry_run()
@@ -57,7 +57,7 @@ class TestTPCDSDryRunValidation:
         assert captured == {"1": "SELECT 1"}
 
     def test_platform_adapter_sql_capture_integration(self):
-        """Test integration between platform adapter dry-run mode and test execution."""
+
         # Create real platform adapter in dry-run mode
         platform_adapter = DuckDBAdapter()
         platform_adapter.enable_dry_run()
@@ -79,7 +79,7 @@ class TestTPCDSDryRunValidation:
         assert result["execution_time_seconds"] == 0.0, "Execution time should be 0 for dry-run"
 
     def test_dry_run_create_schema_sql_capture(self):
-        """Test that schema creation is captured in dry-run mode."""
+
         platform_adapter = DuckDBAdapter()
         platform_adapter.enable_dry_run()
 
@@ -104,7 +104,7 @@ class TestTPCDSDryRunValidation:
         assert "ID" in create_sql.upper() and "NAME" in create_sql.upper(), "Should contain column definitions"
 
     def test_query_consistency_between_runs(self):
-        """Test that dry-run produces consistent results for same parameters."""
+
         with patch("benchbox.tpcds") as mock_tpcds_class:
             mock_benchmark = Mock()
             mock_benchmark._name = "TPC-DS"

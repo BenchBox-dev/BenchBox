@@ -117,7 +117,6 @@ class TestDaskDataFrameIntegration:
         lineitem_path = data_dir / "lineitem.parquet"
         lineitem_df.to_parquet(lineitem_path)
 
-        # Create orders table
         orders_df = pd.DataFrame(
             {
                 "o_orderkey": [1, 2, 3],
@@ -134,7 +133,6 @@ class TestDaskDataFrameIntegration:
         orders_path = data_dir / "orders.parquet"
         orders_df.to_parquet(orders_path)
 
-        # Create customer table
         customer_df = pd.DataFrame(
             {
                 "c_custkey": [100, 101],
@@ -157,18 +155,18 @@ class TestDaskDataFrameIntegration:
         }
 
     def test_adapter_initialization(self, dask_adapter):
-        """Test that Dask adapter initializes correctly."""
+
         assert dask_adapter.platform_name == "Dask"
         assert dask_adapter.family == "pandas"
         assert dask_adapter.n_workers == 2
         assert dask_adapter.threads_per_worker == 1
 
     def test_dask_available_flag(self):
-        """Test that DASK_AVAILABLE flag is True when Dask is installed."""
+
         assert DASK_AVAILABLE is True
 
     def test_platform_info(self, dask_adapter):
-        """Test platform information retrieval."""
+
         info = dask_adapter.get_platform_info()
 
         assert info["platform"] == "Dask"
@@ -177,7 +175,7 @@ class TestDaskDataFrameIntegration:
         assert "version" in info
 
     def test_read_parquet(self, dask_adapter, sample_parquet_data):
-        """Test reading Parquet files into Dask DataFrame."""
+
         lineitem_path = sample_parquet_data["lineitem"][0]
         df = dask_adapter.read_parquet(lineitem_path)
 
@@ -191,7 +189,7 @@ class TestDaskDataFrameIntegration:
         assert "l_quantity" in result.columns
 
     def test_context_creation(self, dask_adapter):
-        """Test context creation from adapter."""
+
         ctx = dask_adapter.create_context()
 
         assert ctx is not None
@@ -199,7 +197,7 @@ class TestDaskDataFrameIntegration:
         assert ctx.family == "pandas"
 
     def test_table_loading(self, dask_adapter, sample_parquet_data):
-        """Test loading tables into context."""
+
         ctx = dask_adapter.create_context()
 
         row_count = dask_adapter.load_table(ctx, "lineitem", sample_parquet_data["lineitem"])
@@ -256,7 +254,7 @@ class TestDaskDataFrameIntegration:
         assert "count" in result_pd.columns
 
     def test_unified_pandas_frame_wrapper(self, dask_adapter, sample_parquet_data):
-        """Test that UnifiedPandasFrame properly wraps Dask DataFrames."""
+
         from benchbox.platforms.dataframe.unified_pandas_frame import UnifiedPandasFrame
 
         lineitem_path = sample_parquet_data["lineitem"][0]
@@ -277,7 +275,7 @@ class TestDaskDataFrameIntegration:
         assert len(result) == 5
 
     def test_lazy_evaluation(self, dask_adapter, sample_parquet_data):
-        """Test that Dask operations are lazy until compute is called."""
+
         lineitem_path = sample_parquet_data["lineitem"][0]
         df = dask_adapter.read_parquet(lineitem_path)
 
@@ -368,7 +366,6 @@ class TestDaskTPCHQueryExecution:
         if hasattr(result, "compute"):
             result = result.compute()
 
-        # Verify result structure
         assert "l_returnflag" in result.columns
         assert "l_linestatus" in result.columns
         assert "sum_qty" in result.columns

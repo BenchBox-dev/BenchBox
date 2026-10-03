@@ -58,7 +58,7 @@ class TestTPCDIFullBenchmarkIntegration:
         return TPCDIConfig(scale_factor=1.0, output_dir=temp_dir, enable_parallel=True, max_workers=8)
 
     def test_end_to_end_benchmark_execution_small_scale(self, small_scale_config, test_database):
-        """Test complete end-to-end benchmark execution with small scale factor."""
+
         benchmark = TPCDIBenchmark(config=small_scale_config)
 
         # Phase 1: Schema Creation
@@ -125,7 +125,7 @@ class TestTPCDIFullBenchmarkIntegration:
         assert successful_queries >= len(test_queries) // 2, "Too many query failures"
 
     def test_multi_scale_factor_progression(self, temp_dir, test_database):
-        """Test benchmark execution across multiple scale factors."""
+
         scale_factors = [0.001, 0.01, 0.1]
         results = {}
 
@@ -195,7 +195,7 @@ class TestTPCDIFullBenchmarkIntegration:
                 )
 
     def test_cross_platform_compatibility(self, small_scale_config):
-        """Test TPC-DI benchmark compatibility across different database platforms."""
+
         platforms_to_test = [
             ("sqlite", sqlite3.connect(":memory:")),
         ]
@@ -284,7 +284,7 @@ class TestTPCDIFullBenchmarkIntegration:
         # manually, run the test and copy the printed metrics if needed.
 
     def test_error_recovery_and_resilience(self, small_scale_config, test_database):
-        """Test error handling and recovery mechanisms across the benchmark."""
+
         benchmark = TPCDIBenchmark(config=small_scale_config)
 
         # Test schema creation error recovery
@@ -316,7 +316,7 @@ class TestTPCDIFullBenchmarkIntegration:
             assert severity is not None, f"Severity classification failed for: {error_msg}"
 
     def test_data_quality_validation_comprehensive(self, small_scale_config, test_database):
-        """Test comprehensive data quality validation across all TPC-DI tables."""
+
         benchmark = TPCDIBenchmark(config=small_scale_config)
 
         # Set up complete benchmark
@@ -524,10 +524,9 @@ class TestTPCDISpecificationValidation:
         return TPCDIConfig(scale_factor=0.01, output_dir=temp_dir, enable_parallel=True, max_workers=2)
 
     def test_schema_compliance_validation(self, spec_config, test_database):
-        """Test schema compliance against TPC-DI specification."""
+
         benchmark = TPCDIBenchmark(config=spec_config)
 
-        # Create schema
         benchmark.create_schema(test_database, "sqlite")
 
         # Get table information
@@ -571,7 +570,7 @@ class TestTPCDISpecificationValidation:
                 assert len(columns) > 0, f"Table {table} has no columns"
 
     def test_query_result_accuracy_validation(self, spec_config, test_database):
-        """Test query result accuracy against expected TPC-DI benchmark outputs."""
+
         benchmark = TPCDIBenchmark(config=spec_config)
 
         # Set up benchmark with data
@@ -620,7 +619,7 @@ class TestTPCDISpecificationValidation:
                 # Note: In a full implementation, you would validate against known expected results
 
     def test_etl_processing_compliance_validation(self, spec_config, test_database):
-        """Test ETL processing compliance with TPC-DI transformation rules."""
+
         benchmark = TPCDIBenchmark(config=spec_config)
         benchmark.create_schema(test_database, "sqlite")
         benchmark.generate_data()
@@ -660,7 +659,7 @@ class TestTPCDISpecificationValidation:
         assert test_database.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0] > 0
 
     def test_data_quality_business_rules_validation(self, spec_config, test_database):
-        """Test data quality validation against TPC-DI business rules."""
+
         benchmark = TPCDIBenchmark(config=spec_config)
 
         # Set up benchmark with data quality monitoring
@@ -742,7 +741,7 @@ class TestTPCDIPerformanceAndScalability:
         conn.close()
 
     def test_data_generation_performance_scaling(self, temp_dir, test_database):
-        """Test data generation performance across different scale factors."""
+
         scale_factors = [0.001, 0.01, 0.1]
         generation_metrics = {}
 
@@ -800,7 +799,7 @@ class TestTPCDIPerformanceAndScalability:
             )
 
     def test_etl_processing_performance_scaling(self, temp_dir, test_database):
-        """Test ETL processing performance with realistic data volumes."""
+
         scale_factors = [0.01, 0.1]  # Test with realistic but manageable scale factors
         etl_metrics = {}
 
@@ -815,7 +814,6 @@ class TestTPCDIPerformanceAndScalability:
 
             benchmark = TPCDIBenchmark(config=config)
 
-            # Set up benchmark
             benchmark.create_schema(test_database, "sqlite")
             benchmark.generate_data()
 
@@ -851,7 +849,7 @@ class TestTPCDIPerformanceAndScalability:
             assert metrics["phases_completed"] >= 3, f"Too few ETL phases completed at scale factor {scale_factor}"
 
     def test_query_execution_performance_optimization(self, temp_dir, test_database):
-        """Test query execution performance and identify optimization opportunities."""
+
         config = TPCDIConfig(scale_factor=0.1, output_dir=temp_dir, enable_parallel=True, max_workers=4)
 
         benchmark = TPCDIBenchmark(config=config)

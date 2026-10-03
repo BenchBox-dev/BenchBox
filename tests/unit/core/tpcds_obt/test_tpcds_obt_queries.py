@@ -140,7 +140,7 @@ def _extract_column_references(sql: str, valid_columns: set[str]) -> set[str]:
 
 
 def test_all_query_column_references_exist_in_schema() -> None:
-    """Verify all column references in queries exist in the OBT schema."""
+
     columns = get_obt_columns("full")
     column_names = {col.name for col in columns}
 
@@ -158,7 +158,7 @@ def test_all_query_column_references_exist_in_schema() -> None:
 
 
 def test_queries_parse_in_duckdb() -> None:
-    """Verify all queries are syntactically valid SQL using DuckDB's parser."""
+
     duckdb = pytest.importorskip("duckdb")
 
     manager = TPCDSOBTQueryManager()

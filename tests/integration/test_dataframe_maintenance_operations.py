@@ -106,7 +106,7 @@ class TestPolarsMaintenanceIntegration:
     """Integration tests for Polars maintenance operations."""
 
     def test_insert_and_query_workflow(self, tmp_path, sample_orders_data):
-        """Test inserting data and then querying it back."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations(working_dir=tmp_path)
@@ -117,12 +117,11 @@ class TestPolarsMaintenanceIntegration:
         assert result.success is True
         assert result.rows_affected == 5
 
-        # Read back and verify
         read_df = pl.read_parquet(table_path / "*.parquet")
         assert len(read_df) == 5
 
     def test_insert_append_preserves_existing_data(self, tmp_path, sample_orders_data):
-        """Test that append mode preserves existing data."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations(working_dir=tmp_path)
@@ -131,7 +130,6 @@ class TestPolarsMaintenanceIntegration:
         # Insert initial data
         ops.insert_rows(table_path=table_path, dataframe=sample_orders_data, mode="append")
 
-        # Insert more data
         new_orders = pl.DataFrame(
             {
                 "o_orderkey": [6, 7],
@@ -147,12 +145,11 @@ class TestPolarsMaintenanceIntegration:
         assert result.success is True
         assert result.rows_affected == 2
 
-        # Read back all data
         read_df = pl.read_parquet(table_path / "*.parquet")
         assert len(read_df) == 7  # 5 original + 2 new
 
     def test_delete_reduces_row_count(self, tmp_path, sample_orders_data):
-        """Test that delete reduces the row count correctly."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations(working_dir=tmp_path)
@@ -252,7 +249,7 @@ class TestPolarsMaintenanceIntegration:
         assert pending_count == 0
 
     def test_merge_upsert_workflow(self, tmp_path, sample_orders_data):
-        """Test merge/upsert workflow for dimension updates."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations(working_dir=tmp_path)
@@ -308,7 +305,7 @@ class TestDeltaLakeMaintenanceIntegration:
     """Integration tests for Delta Lake maintenance operations."""
 
     def test_insert_and_query_workflow(self, tmp_path, sample_orders_data):
-        """Test inserting data and then querying it back."""
+
         from deltalake import DeltaTable
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
@@ -327,7 +324,7 @@ class TestDeltaLakeMaintenanceIntegration:
         assert len(read_df) == 5
 
     def test_delete_with_acid_guarantees(self, tmp_path, sample_orders_data):
-        """Test that delete operation maintains ACID properties."""
+
         from deltalake import DeltaTable
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
@@ -351,7 +348,7 @@ class TestDeltaLakeMaintenanceIntegration:
         assert 200 not in read_df["o_custkey"].values
 
     def test_update_rows_acid(self, tmp_path, sample_orders_data):
-        """Test update operation with ACID guarantees."""
+
         from deltalake import DeltaTable
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
@@ -378,7 +375,7 @@ class TestDeltaLakeMaintenanceIntegration:
         assert pending_count == 0  # No more pending orders
 
     def test_merge_upsert_operation(self, tmp_path, sample_orders_data):
-        """Test merge/upsert operation."""
+
         from deltalake import DeltaTable
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
@@ -432,7 +429,7 @@ class TestDeltaLakeMaintenanceIntegration:
         assert len(order6) == 1
 
     def test_time_travel_capability(self, tmp_path, sample_orders_data):
-        """Test Delta Lake time travel capability after maintenance operations."""
+
         from deltalake import DeltaTable
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
@@ -469,7 +466,7 @@ class TestIcebergMaintenanceIntegration:
     """Integration tests for Apache Iceberg maintenance operations."""
 
     def test_insert_and_query_workflow(self, tmp_path, sample_orders_data):
-        """Test inserting data and then querying it back."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import IcebergMaintenanceOperations
 
         ops = IcebergMaintenanceOperations(working_dir=tmp_path)
@@ -485,7 +482,7 @@ class TestIcebergMaintenanceIntegration:
         assert read_table.num_rows == 5
 
     def test_insert_append_mode(self, tmp_path, sample_orders_data):
-        """Test appending data to existing Iceberg table."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import IcebergMaintenanceOperations
 
         ops = IcebergMaintenanceOperations(working_dir=tmp_path)
@@ -493,7 +490,6 @@ class TestIcebergMaintenanceIntegration:
         # Insert initial data
         ops.insert_rows(table_path="default.orders", dataframe=sample_orders_data, mode="append")
 
-        # Insert more data
         new_orders = pl.DataFrame(
             {
                 "o_orderkey": [6, 7],
@@ -526,7 +522,7 @@ class TestMaintenanceCapabilitiesConsistency:
 
     @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
     def test_polars_capabilities_match_spec(self):
-        """Verify Polars capabilities match expected specification."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations()
@@ -545,7 +541,7 @@ class TestMaintenanceCapabilitiesConsistency:
 
     @pytest.mark.skipif(not DELTA_LAKE_AVAILABLE, reason="Delta Lake not installed")
     def test_delta_lake_capabilities_match_spec(self):
-        """Verify Delta Lake capabilities match expected specification."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
 
         ops = DeltaLakeMaintenanceOperations()
@@ -561,7 +557,7 @@ class TestMaintenanceCapabilitiesConsistency:
 
     @pytest.mark.skipif(not ICEBERG_AVAILABLE, reason="Iceberg not installed")
     def test_iceberg_capabilities_match_spec(self):
-        """Verify Iceberg capabilities match expected specification."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import IcebergMaintenanceOperations
 
         ops = IcebergMaintenanceOperations()
@@ -587,7 +583,7 @@ class TestTPCComplianceValidation:
 
     @pytest.mark.skipif(not DELTA_LAKE_AVAILABLE, reason="Delta Lake not installed")
     def test_delta_lake_tpc_h_compliance(self):
-        """Verify Delta Lake meets TPC-H maintenance requirements."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import DeltaLakeMaintenanceOperations
 
         ops = DeltaLakeMaintenanceOperations()
@@ -600,7 +596,7 @@ class TestTPCComplianceValidation:
 
     @pytest.mark.skipif(not ICEBERG_AVAILABLE, reason="Iceberg not installed")
     def test_iceberg_tpc_h_compliance(self):
-        """Verify Iceberg meets TPC-H maintenance requirements."""
+
         from benchbox.platforms.dataframe.iceberg_maintenance import IcebergMaintenanceOperations
 
         ops = IcebergMaintenanceOperations()
@@ -613,7 +609,7 @@ class TestTPCComplianceValidation:
 
     @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")
     def test_polars_tpc_compliance(self):
-        """Verify Polars is TPC compliant via read-modify-write pattern."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations()
@@ -637,13 +633,12 @@ class TestMaintenanceMetricsCapture:
     """Tests that verify maintenance metrics are captured correctly."""
 
     def test_timing_metrics_captured(self, tmp_path, sample_orders_data):
-        """Verify that timing metrics are captured for all operations."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations(working_dir=tmp_path)
         table_path = tmp_path / "orders"
 
-        # Insert operation
         result = ops.insert_rows(table_path=table_path, dataframe=sample_orders_data, mode="append")
 
         assert result.start_time > 0
@@ -652,13 +647,12 @@ class TestMaintenanceMetricsCapture:
         assert result.duration == result.end_time - result.start_time
 
     def test_row_count_metrics_accurate(self, tmp_path, sample_orders_data):
-        """Verify that row count metrics are accurate."""
+
         from benchbox.platforms.dataframe.polars_maintenance import PolarsMaintenanceOperations
 
         ops = PolarsMaintenanceOperations(working_dir=tmp_path)
         table_path = tmp_path / "orders"
 
-        # Insert
         insert_result = ops.insert_rows(table_path=table_path, dataframe=sample_orders_data, mode="append")
         assert insert_result.rows_affected == 5
 

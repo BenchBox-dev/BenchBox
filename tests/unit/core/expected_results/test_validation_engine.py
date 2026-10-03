@@ -46,7 +46,7 @@ class TestQueryValidator:
         assert result.validation_mode == ValidationMode.EXACT
 
     def test_validate_tpch_query_mismatch(self):
-        """Test validation with row count mismatch."""
+
         validator = QueryValidator()
         result = validator.validate_query_result(
             benchmark_type="tpch",
@@ -61,7 +61,7 @@ class TestQueryValidator:
         assert result.error_message is not None
 
     def test_validate_unknown_benchmark(self):
-        """Test validation with unknown benchmark type."""
+
         validator = QueryValidator()
         result = validator.validate_query_result(
             benchmark_type="unknown_benchmark",
@@ -75,7 +75,7 @@ class TestQueryValidator:
         assert result.warning_message is not None
 
     def test_validate_unknown_query(self):
-        """Test validation with unknown query ID."""
+
         validator = QueryValidator()
         result = validator.validate_query_result(
             benchmark_type="tpch",

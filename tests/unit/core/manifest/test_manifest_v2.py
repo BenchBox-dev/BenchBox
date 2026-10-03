@@ -28,14 +28,14 @@ class TestManifestModels:
     """Test data models for manifest v1 and v2."""
 
     def test_file_entry_creation(self):
-        """Test creating basic FileEntry."""
+
         entry = FileEntry(path="customer.tbl", size_bytes=100, row_count=10)
         assert entry.path == "customer.tbl"
         assert entry.size_bytes == 100
         assert entry.row_count == 10
 
     def test_converted_file_entry_creation(self):
-        """Test creating ConvertedFileEntry with conversion metadata."""
+
         entry = ConvertedFileEntry(
             path="customer.parquet",
             size_bytes=50,
@@ -51,7 +51,7 @@ class TestManifestModels:
         assert entry.compression == "snappy"
 
     def test_table_formats_creation(self):
-        """Test TableFormats with multiple formats."""
+
         formats = TableFormats(
             formats={
                 "tbl": [ConvertedFileEntry(path="customer.tbl", size_bytes=100, row_count=10)],
@@ -127,7 +127,7 @@ class TestVersionDetection:
         assert detect_version(data) == 2
 
     def test_detect_empty_tables(self):
-        """Test version detection with empty tables dict."""
+
         data = {"benchmark": "tpch", "scale_factor": 0.01, "tables": {}}
         assert detect_version(data) == 1
 
@@ -185,7 +185,6 @@ class TestManifestIO:
         manifest_path = tmp_path / "manifest.json"
         write_manifest(manifest, manifest_path)
 
-        # Read back and verify
         with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
 
@@ -210,7 +209,6 @@ class TestManifestIO:
         manifest_path = tmp_path / "manifest.json"
         write_manifest(manifest, manifest_path)
 
-        # Read back and verify
         with open(manifest_path, encoding="utf-8") as f:
             data = json.load(f)
 
@@ -282,7 +280,7 @@ class TestManifestUpgrade:
         assert "tbl" in v2.format_preference
 
     def test_upgrade_preserves_metadata(self):
-        """Test upgrade preserves all metadata fields."""
+
         v1 = ManifestV1(
             benchmark="tpch",
             scale_factor=0.01,
@@ -301,7 +299,7 @@ class TestManifestUpgrade:
         assert v2.generator_version == "0.1.0"
 
     def test_upgrade_detects_parquet_format(self):
-        """Test upgrade correctly detects Parquet files."""
+
         v1 = ManifestV1(
             benchmark="tpch",
             scale_factor=0.01,
@@ -314,7 +312,7 @@ class TestManifestUpgrade:
         assert "parquet" in v2.format_preference
 
     def test_upgrade_detects_csv_format(self):
-        """Test upgrade correctly detects CSV files."""
+
         v1 = ManifestV1(
             benchmark="tpch",
             scale_factor=0.01,
@@ -353,7 +351,7 @@ class TestFormatPreferences:
         assert preferred == "parquet"
 
     def test_get_preferred_format_can_prefer_platform_defaults_when_requested(self):
-        """Test platform-native loaders can opt into platform-first selection."""
+
         manifest = ManifestV2(
             version=2,
             format_preference=["parquet", "tbl"],
@@ -376,7 +374,7 @@ class TestFormatPreferences:
         assert preferred == "tbl"
 
     def test_get_preferred_format_platform_preference_no_manifest_pref(self):
-        """Test format selection using platform preference when no manifest preference."""
+
         manifest = ManifestV2(
             version=2,
             format_preference=[],  # No manifest preference
@@ -395,7 +393,7 @@ class TestFormatPreferences:
         assert preferred == "tbl"
 
     def test_get_preferred_format_external_mode_uses_external_capabilities(self):
-        """Test external mode can select external-only formats without affecting native mode."""
+
         manifest = ManifestV2(
             version=2,
             format_preference=[],
@@ -426,7 +424,7 @@ class TestFormatPreferences:
         )
 
     def test_get_preferred_format_fallback(self):
-        """Test format selection falls back to first available."""
+
         manifest = ManifestV2(
             version=2,
             format_preference=[],
@@ -441,7 +439,7 @@ class TestFormatPreferences:
         assert preferred == "tbl"
 
     def test_get_preferred_format_unlisted_platform_falls_back_to_first_available(self):
-        """Test unlisted platforms do not blindly follow manifest preference."""
+
         manifest = ManifestV2(
             version=2,
             format_preference=["delta", "tbl"],
@@ -459,14 +457,14 @@ class TestFormatPreferences:
         assert preferred == "tbl"
 
     def test_get_preferred_format_missing_table(self):
-        """Test format selection returns None for missing table."""
+
         manifest = ManifestV2(version=2, tables={})
 
         preferred = get_preferred_format(manifest, "customer", "duckdb")
         assert preferred is None
 
     def test_get_files_for_format(self):
-        """Test retrieving file paths for specific format."""
+
         manifest = ManifestV2(
             version=2,
             tables={
@@ -488,7 +486,7 @@ class TestFormatPreferences:
         assert "customer_2.parquet" in files
 
     def test_get_files_for_missing_format(self):
-        """Test retrieving files for non-existent format returns empty list."""
+
         manifest = ManifestV2(
             version=2,
             tables={
@@ -502,7 +500,7 @@ class TestFormatPreferences:
         assert files == []
 
     def test_get_files_for_missing_table(self):
-        """Test retrieving files for non-existent table returns empty list."""
+
         manifest = ManifestV2(version=2, tables={})
 
         files = get_files_for_format(manifest, "customer", "tbl")

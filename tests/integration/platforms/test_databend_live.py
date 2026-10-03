@@ -48,7 +48,7 @@ class TestLiveDatabendConnection:
     """Test basic Databend connectivity via Docker."""
 
     def test_connection(self, databend_adapter):
-        """Verify we can connect to Databend and run a trivial query."""
+
         connection = databend_adapter.create_connection()
         try:
             assert connection is not None
@@ -56,7 +56,7 @@ class TestLiveDatabendConnection:
             databend_adapter.close_connection(connection)
 
     def test_platform_info(self, databend_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = databend_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "databend"
@@ -66,7 +66,7 @@ class TestLiveDatabendQueryExecution:
     """Test query execution against a live Databend instance."""
 
     def test_create_schema(self, databend_adapter):
-        """Verify we can create a database."""
+
         connection = databend_adapter.create_connection()
         try:
             databend_adapter.execute_query(

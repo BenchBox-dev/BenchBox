@@ -53,7 +53,7 @@ class TestTPCHavocDuckDBIntegration:
                 conn.execute(statement.strip())
 
     def test_variant_query_generation(self, tpchavoc):
-        """Test that TPC-Havoc can generate query variants."""
+
         # Get implemented queries
         implemented = tpchavoc.get_implemented_queries()
         assert len(implemented) > 0, "Should have at least one implemented query"
@@ -72,7 +72,7 @@ class TestTPCHavocDuckDBIntegration:
             assert "SELECT" in query_text.upper(), f"Variant {variant_id} should be a SELECT statement"
 
     def test_variant_descriptions(self, tpchavoc):
-        """Test that each variant has a meaningful description."""
+
         implemented = tpchavoc.get_implemented_queries()
         query_id = implemented[0]
 
@@ -108,7 +108,7 @@ class TestTPCHavocDuckDBIntegration:
         # be semantically identical
 
     def test_benchmark_info(self, tpchavoc):
-        """Test that benchmark info provides comprehensive metadata."""
+
         info = tpchavoc.get_benchmark_info()
 
         # Check required fields
@@ -134,7 +134,7 @@ class TestTPCHavocDuckDBIntegration:
         assert info["total_query_variants"] == expected_total
 
     def test_export_variant_queries(self, tpchavoc, temp_dir):
-        """Test exporting variant queries to files."""
+
         output_dir = temp_dir / "exported_queries"
 
         # Export all variants
@@ -154,7 +154,7 @@ class TestTPCHavocDuckDBIntegration:
             assert "TPC-Havoc" in content, f"Exported file {file_path} should have TPC-Havoc header"
 
     def test_schema_compatibility_with_tpch(self, tpchavoc, duckdb_conn):
-        """Test that TPC-Havoc uses the same schema as TPC-H."""
+
         # Get schema
         sql = tpchavoc.get_create_tables_sql()
 
@@ -188,7 +188,7 @@ class TestTPCHavocDuckDBIntegration:
             assert expected_table in table_names, f"TPC-H table {expected_table} not found"
 
     def test_variant_sql_syntax_validity(self, tpchavoc):
-        """Test that all variant queries have valid SQL syntax."""
+
         implemented = tpchavoc.get_implemented_queries()
 
         for query_id in implemented[:3]:  # Test first 3 to keep tests fast

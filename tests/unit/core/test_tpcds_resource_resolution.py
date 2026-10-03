@@ -29,7 +29,7 @@ def _require_precompiled_bundle() -> Path:
 
 
 def test_resource_resolver_prefers_precompiled_bundle() -> None:
-    """Verify that binaries come from precompiled bundle, templates from bundled package."""
+
     bundle_root = _require_precompiled_bundle()
 
     tools_path, templates_path = _resolve_tpcds_tool_and_template_paths()
@@ -43,7 +43,7 @@ def test_resource_resolver_prefers_precompiled_bundle() -> None:
 
 
 def test_tpcds_c_tools_uses_precompiled_bundle() -> None:
-    """Verify TPCDSCTools uses binaries from bundle, templates from bundled package."""
+
     bundle_root = _require_precompiled_bundle()
 
     tools = TPCDSCTools()
@@ -58,7 +58,7 @@ def test_tpcds_c_tools_uses_precompiled_bundle() -> None:
 
 
 def test_dsqgen_binary_uses_precompiled_bundle() -> None:
-    """Verify DSQGenBinary uses binary from bundle, templates from bundled package."""
+
     bundle_root = _require_precompiled_bundle()
 
     dsqgen = DSQGenBinary()
@@ -103,7 +103,6 @@ def test_template_separation_works_end_to_end() -> None:
     """
     bundle_root = _require_precompiled_bundle()
 
-    # Create DSQGenBinary instance
     dsqgen = DSQGenBinary()
 
     # Verify paths are separated

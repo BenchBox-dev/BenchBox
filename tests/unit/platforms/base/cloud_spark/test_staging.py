@@ -34,7 +34,7 @@ class TestCloudProvider:
     """Test CloudProvider enum."""
 
     def test_provider_values(self):
-        """Test all provider values are defined."""
+
         assert CloudProvider.AWS_S3.value == "s3"
         assert CloudProvider.GCS.value == "gs"
         assert CloudProvider.AZURE_ADLS.value == "abfss"
@@ -46,7 +46,7 @@ class TestUploadProgress:
     """Test UploadProgress dataclass."""
 
     def test_percent_complete(self):
-        """Test percentage calculation."""
+
         progress = UploadProgress(
             table_name="lineitem",
             file_name="lineitem.parquet",
@@ -58,7 +58,7 @@ class TestUploadProgress:
         assert progress.percent_complete == 50.0
 
     def test_percent_complete_zero_total(self):
-        """Test percentage with zero total bytes."""
+
         progress = UploadProgress(
             table_name="empty",
             file_name="empty.parquet",
@@ -90,14 +90,14 @@ class TestCloudSparkStagingFromUri:
         assert staging.config.provider == CloudProvider.AWS_S3
 
     def test_from_uri_gcs(self):
-        """Test GCS URI parsing."""
+
         result = CloudSparkStaging.from_uri("gs://my-bucket/data")
         assert isinstance(result, GCSStaging)
         assert result.config.provider == CloudProvider.GCS
         assert result.config.bucket == "my-bucket"
 
     def test_from_uri_azure_adls(self):
-        """Test Azure ADLS URI parsing."""
+
         uri = "abfss://container@account.dfs.core.windows.net/path"
         result = CloudSparkStaging.from_uri(uri)
         assert isinstance(result, AzureADLSStaging)
@@ -105,21 +105,21 @@ class TestCloudSparkStagingFromUri:
         assert "container@account" in result.config.bucket
 
     def test_from_uri_dbfs(self):
-        """Test DBFS URI parsing."""
+
         result = CloudSparkStaging.from_uri("dbfs:/Volumes/catalog/schema/volume/data")
         assert isinstance(result, DBFSStaging)
         assert result.config.provider == CloudProvider.DBFS
         assert "Volumes" in result.config.prefix
 
     def test_from_uri_local(self):
-        """Test local file URI parsing."""
+
         staging = CloudSparkStaging.from_uri("file:///tmp/data")
 
         assert isinstance(staging, LocalStaging)
         assert staging.config.provider == CloudProvider.LOCAL
 
     def test_from_uri_unsupported_scheme(self):
-        """Test unsupported URI scheme raises error."""
+
         with pytest.raises(ValueError, match="Unsupported URI scheme"):
             CloudSparkStaging.from_uri("hdfs://cluster/data")
 
@@ -138,7 +138,6 @@ class TestLocalStaging:
             test_file = source_dir / "test.parquet"
             test_file.write_text("test data")
 
-            # Create staging
             config = StagingConfig(
                 uri=f"file://{staging_dir}",
                 provider=CloudProvider.LOCAL,
@@ -154,7 +153,7 @@ class TestLocalStaging:
             assert (staging_dir / "table" / "test.parquet").exists()
 
     def test_file_exists(self):
-        """Test file existence check."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             staging_dir = Path(tmpdir)
             (staging_dir / "existing.txt").write_text("data")
@@ -171,7 +170,7 @@ class TestLocalStaging:
             assert not staging.file_exists("nonexistent.txt")
 
     def test_list_files(self):
-        """Test file listing."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             staging_dir = Path(tmpdir)
             table_dir = staging_dir / "lineitem"
@@ -193,7 +192,7 @@ class TestLocalStaging:
             assert any("part1.parquet" in f for f in files)
 
     def test_delete_path(self):
-        """Test file deletion."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             staging_dir = Path(tmpdir)
             test_file = staging_dir / "to_delete.txt"
@@ -212,7 +211,7 @@ class TestLocalStaging:
             assert not test_file.exists()
 
     def test_upload_tables(self):
-        """Test uploading multiple tables."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = Path(tmpdir) / "source"
             staging_dir = Path(tmpdir) / "staging"
@@ -305,7 +304,7 @@ class TestLocalStaging:
             assert (staging_dir / "orders" / "region=EUROPE" / "part-00000.parquet").read_text() == "europe orders"
 
     def test_tables_exist(self):
-        """Test checking if tables exist in staging."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             staging_dir = Path(tmpdir)
 
@@ -354,7 +353,7 @@ class TestLocalStaging:
             assert staging.tables_exist(["lineitem"])
 
     def test_get_table_uri(self):
-        """Test getting table URI."""
+
         config = StagingConfig(
             uri="file:///tmp/staging",
             provider=CloudProvider.LOCAL,
@@ -458,7 +457,7 @@ class TestStagingConfig:
     """Test StagingConfig dataclass."""
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         config = StagingConfig(
             uri="s3://bucket/path",
             provider=CloudProvider.AWS_S3,
@@ -472,7 +471,7 @@ class TestStagingConfig:
         assert config.region is None
 
     def test_custom_values(self):
-        """Test custom configuration values."""
+
         config = StagingConfig(
             uri="s3://bucket/path",
             provider=CloudProvider.AWS_S3,

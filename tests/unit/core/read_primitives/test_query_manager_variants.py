@@ -139,7 +139,7 @@ queries:
         assert "USING SAMPLE" in query1
 
     def test_get_query_skip_on_case_insensitive(self, mock_catalog_with_variants):
-        """Test skip_on matching is case-insensitive."""
+
         manager = ReadPrimitivesQueryManager()
 
         # All these should raise ValueError
@@ -169,7 +169,7 @@ queries:
         assert "Invalid query ID" in str(exc_info.value)
 
     def test_get_query_variant_with_skip_both_present(self, mock_catalog_with_variants):
-        """Test query can have both variant and skip_on."""
+
         manager = ReadPrimitivesQueryManager()
 
         # Should raise ValueError for sqlite (in skip_on)
@@ -189,7 +189,7 @@ class TestQueryManagerVariantIntegration:
     """Integration tests for query manager with actual catalog."""
 
     def test_actual_catalog_variant_lookup_works(self):
-        """Test that actual catalog supports dialect variant lookup."""
+
         manager = ReadPrimitivesQueryManager()
 
         for query_id in ["map_construction", "map_access", "map_keys_values"]:
@@ -262,7 +262,7 @@ class TestQueryManagerVariantIntegration:
                 manager.get_query(query_id, dialect="clickhouse")
 
     def test_query_manager_initialized_successfully(self):
-        """Test query manager initializes with actual catalog."""
+
         manager = ReadPrimitivesQueryManager()
 
         # Should have loaded catalog successfully

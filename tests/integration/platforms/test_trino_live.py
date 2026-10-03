@@ -48,7 +48,7 @@ class TestLiveTrinoConnection:
     """Test basic Trino connectivity via Docker."""
 
     def test_connection(self, trino_adapter):
-        """Verify we can connect to Trino and run a trivial query."""
+
         connection = trino_adapter.create_connection()
         try:
             assert hasattr(connection, "cursor")
@@ -56,7 +56,7 @@ class TestLiveTrinoConnection:
             trino_adapter.close_connection(connection)
 
     def test_platform_info(self, trino_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = trino_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "trino"
@@ -66,7 +66,7 @@ class TestLiveTrinoQueryExecution:
     """Test query execution against a live Trino instance."""
 
     def test_create_schema(self, trino_adapter):
-        """Verify we can create a schema in the memory catalog."""
+
         connection = trino_adapter.create_connection()
         try:
             trino_adapter.execute_query(

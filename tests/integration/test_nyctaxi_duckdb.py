@@ -44,13 +44,13 @@ class TestNYCTaxiDuckDBIntegration:
         conn.close()
 
     def test_benchmark_instantiation(self, nyctaxi):
-        """Test that NYC Taxi benchmark can be instantiated."""
+
         assert nyctaxi.scale_factor == 0.01
         assert nyctaxi.year == 2019
         assert nyctaxi._impl is not None
 
     def test_benchmark_info(self, nyctaxi):
-        """Test that benchmark info provides comprehensive metadata."""
+
         info = nyctaxi.get_benchmark_info()
 
         # Check required fields
@@ -71,7 +71,7 @@ class TestNYCTaxiDuckDBIntegration:
         assert "geographic" in info["query_categories"]
 
     def test_get_queries(self, nyctaxi):
-        """Test that all queries can be retrieved."""
+
         queries = nyctaxi.get_queries()
 
         # Should have 25 queries
@@ -84,7 +84,7 @@ class TestNYCTaxiDuckDBIntegration:
             assert "SELECT" in query_text.upper(), f"Query {query_id} should be a SELECT statement"
 
     def test_get_query_by_id(self, nyctaxi):
-        """Test retrieving individual queries."""
+
         # Test a known query ID
         query = nyctaxi.get_query("trips-per-hour")
         assert isinstance(query, str)
@@ -92,7 +92,7 @@ class TestNYCTaxiDuckDBIntegration:
         assert "trips" in query.lower()
 
     def test_get_queries_by_category(self, nyctaxi):
-        """Test filtering queries by category."""
+
         # Test temporal category
         temporal_queries = nyctaxi.get_queries_by_category("temporal")
         assert len(temporal_queries) > 0
@@ -107,7 +107,7 @@ class TestNYCTaxiDuckDBIntegration:
         assert len(financial_queries) > 0
 
     def test_query_info(self, nyctaxi):
-        """Test that query metadata is available."""
+
         info = nyctaxi.get_query_info("trips-per-hour")
 
         assert "name" in info
@@ -115,7 +115,7 @@ class TestNYCTaxiDuckDBIntegration:
         assert "description" in info or "query" in info
 
     def test_schema_creation(self, nyctaxi, duckdb_conn):
-        """Test that schema can be created in DuckDB."""
+
         # Get schema SQL
         sql = nyctaxi.get_create_tables_sql(dialect="duckdb")
 
@@ -139,10 +139,9 @@ class TestNYCTaxiDuckDBIntegration:
         assert "trips" in table_names, "trips table should exist"
 
     def test_schema_columns(self, nyctaxi):
-        """Test that schema has correct column definitions."""
+
         schema = nyctaxi.get_schema()
 
-        # Check taxi_zones table
         assert "taxi_zones" in schema
         zones_columns = schema["taxi_zones"]["columns"]
         assert "location_id" in zones_columns
@@ -150,7 +149,6 @@ class TestNYCTaxiDuckDBIntegration:
         assert "zone" in zones_columns
         assert "service_zone" in zones_columns
 
-        # Check trips table
         assert "trips" in schema
         trips_columns = schema["trips"]["columns"]
         assert "pickup_datetime" in trips_columns
@@ -161,7 +159,7 @@ class TestNYCTaxiDuckDBIntegration:
         assert "tip_amount" in trips_columns
 
     def test_query_sql_syntax_validity(self, nyctaxi):
-        """Test that all queries have valid SQL syntax."""
+
         queries = nyctaxi.get_queries()
 
         for query_id, query_text in queries.items():
@@ -174,7 +172,7 @@ class TestNYCTaxiDuckDBIntegration:
             assert query_text.count("(") == query_text.count(")"), f"Query {query_id} should have balanced parentheses"
 
     def test_year_validation(self, temp_dir):
-        """Test that invalid years are rejected."""
+
         with pytest.raises(ValueError, match="year must be in"):
             NYCTaxi(scale_factor=0.01, output_dir=temp_dir, year=2010)
 
@@ -182,7 +180,7 @@ class TestNYCTaxiDuckDBIntegration:
             NYCTaxi(scale_factor=0.01, output_dir=temp_dir, year=2030)
 
     def test_scale_factor_validation(self, temp_dir):
-        """Test that invalid scale factors are rejected."""
+
         with pytest.raises(ValueError, match="Scale factor must be positive"):
             NYCTaxi(scale_factor=0, output_dir=temp_dir)
 
@@ -190,7 +188,7 @@ class TestNYCTaxiDuckDBIntegration:
             NYCTaxi(scale_factor=-1.0, output_dir=temp_dir)
 
     def test_download_stats(self, nyctaxi):
-        """Test that download stats are available."""
+
         stats = nyctaxi.get_download_stats()
 
         assert "scale_factor" in stats
@@ -218,7 +216,7 @@ class TestNYCTaxiDataGeneration:
         return benchmark
 
     def test_data_generation_creates_files(self, nyctaxi_with_data):
-        """Test that data generation creates expected files."""
+
         tables = nyctaxi_with_data.tables
 
         assert "taxi_zones" in tables
@@ -250,7 +248,7 @@ class TestNYCTaxiDataGeneration:
         assert 265 in zone_ids  # Unknown
 
     def test_trips_data_structure(self, nyctaxi_with_data):
-        """Test that trips data has correct structure."""
+
         import csv
 
         trips_file = nyctaxi_with_data.tables["trips"]

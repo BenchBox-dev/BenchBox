@@ -46,7 +46,7 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 0
 
     def test_snowflake_with_optional_fields(self):
-        """Test Snowflake configuration with optional fields."""
+
         config = {
             "edition": "enterprise",
             "cloud": "azure",
@@ -86,7 +86,7 @@ class TestValidatePlatformConfig:
         assert any("region" in w for w in warnings)
 
     def test_snowflake_null_value_treated_as_missing(self):
-        """Test that None values are treated as missing."""
+
         config = {
             "edition": "standard",
             "cloud": "aws",
@@ -107,7 +107,7 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 0
 
     def test_bigquery_missing_location(self):
-        """Test BigQuery configuration missing location."""
+
         config = {}
         is_valid, warnings = validate_platform_config("bigquery", config)
 
@@ -155,7 +155,7 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 0
 
     def test_databricks_with_optional_warehouse_size(self):
-        """Test Databricks configuration with optional warehouse_size."""
+
         config = {
             "cloud": "azure",
             "tier": "standard",
@@ -213,7 +213,7 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 0
 
     def test_athena_requires_region(self):
-        """Test Athena configuration validation."""
+
         is_valid, warnings = validate_platform_config("athena", {"region": "us-east-1"})
 
         assert is_valid is True
@@ -252,7 +252,7 @@ class TestValidatePlatformConfig:
         assert "mode" in warnings[0]
 
     def test_fabric_dw_requires_region_and_sku(self):
-        """Test Fabric DW configuration validation."""
+
         config = {"region": "eastus", "sku": "f64"}
         is_valid, warnings = validate_platform_config("fabric_dw", config)
 
@@ -272,7 +272,7 @@ class TestValidatePlatformConfig:
         assert "region" in warnings[0]
 
     def test_firebolt_requires_node_type_and_node_count(self):
-        """Test Firebolt configuration validation."""
+
         config = {"node_type": "m", "node_count": 1}
         is_valid, warnings = validate_platform_config("firebolt", config)
 
@@ -292,7 +292,7 @@ class TestValidatePlatformConfig:
         assert "node_type" in warnings[0]
 
     def test_unknown_platform_always_valid(self):
-        """Test that unknown platforms are considered valid."""
+
         config = {}
         is_valid, warnings = validate_platform_config("postgres", config)
 
@@ -309,7 +309,7 @@ class TestValidatePlatformConfig:
         assert len(warnings) == 0
 
     def test_case_insensitive_platform_names(self):
-        """Test that platform names are case-insensitive."""
+
         config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 
         is_valid1, _ = validate_platform_config("SNOWFLAKE", config)
@@ -350,7 +350,7 @@ class TestConfigValidationIntegration:
     """Tests for configuration validation integrated with cost estimation."""
 
     def test_valid_config_no_warnings(self, caplog):
-        """Test that valid configuration doesn't produce warnings."""
+
         results = create_test_results(
             platform="snowflake",
             platform_info={
@@ -372,7 +372,7 @@ class TestConfigValidationIntegration:
         assert len(config_warnings) == 0
 
     def test_missing_config_field_logs_warning(self, caplog):
-        """Test that missing config field in override produces warning."""
+
         results = create_test_results(
             platform="snowflake",
             query_results=[
@@ -396,7 +396,7 @@ class TestConfigValidationIntegration:
         assert any("config validation" in w.lower() for w in warnings)
 
     def test_incomplete_config_logs_error(self, caplog):
-        """Test that incomplete config override also logs error."""
+
         results = create_test_results(
             platform="bigquery",
             query_results=[
@@ -416,7 +416,7 @@ class TestConfigValidationIntegration:
         assert any("bigquery" in e.lower() for e in errors)
 
     def test_config_override_bypasses_extraction(self, caplog):
-        """Test that providing config override bypasses extraction and validation."""
+
         results = create_test_results(
             platform="snowflake",
             platform_info=None,  # No platform_info
@@ -443,7 +443,7 @@ class TestConfigValidationIntegration:
         assert "cost" in updated_results.query_results[0]
 
     def test_invalid_config_override_produces_warning(self, caplog):
-        """Test that invalid config override produces warning."""
+
         results = create_test_results(
             platform="redshift",
             query_results=[
@@ -466,7 +466,7 @@ class TestConfigValidationIntegration:
         assert any("region" in w.lower() for w in warnings)
 
     def test_databricks_config_validation_with_warehouse_metadata(self):
-        """Test Databricks config validation with full warehouse metadata."""
+
         results = create_test_results(
             platform="databricks",
             platform_info={
@@ -556,7 +556,7 @@ class TestConfigValidationEdgeCases:
     """Tests for edge cases in configuration validation."""
 
     def test_empty_config_dict(self):
-        """Test validation with empty config dict."""
+
         config = {}
         is_valid, warnings = validate_platform_config("snowflake", config)
 
@@ -565,7 +565,7 @@ class TestConfigValidationEdgeCases:
         assert len(warnings) == 3  # edition, cloud, region
 
     def test_config_with_extra_fields(self):
-        """Test that extra fields don't affect validation."""
+
         config = {
             "edition": "standard",
             "cloud": "aws",
@@ -580,7 +580,7 @@ class TestConfigValidationEdgeCases:
         assert len(warnings) == 0
 
     def test_all_required_platforms_have_requirements(self):
-        """Test that all platforms in schema have proper structure."""
+
         for platform, requirements in PLATFORM_CONFIG_REQUIREMENTS.items():
             assert isinstance(requirements, dict), f"Requirements for {platform} should be a dict"
             assert "required" in requirements, f"Platform {platform} missing 'required' key"

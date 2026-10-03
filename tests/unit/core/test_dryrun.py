@@ -739,7 +739,7 @@ class TestDryRunBenchmarkIdentityContract:
         assert "1" in result and "RF1" in result
 
     def test_extract_queries_via_real_test_execution_uses_benchmark_queries(self):
-        """Test-mode extraction uses the same benchmark query definitions."""
+
         executor = DryRunExecutor()
         benchmark = MagicMock()
         benchmark.get_queries.return_value = {"Q1": "SELECT 1"}

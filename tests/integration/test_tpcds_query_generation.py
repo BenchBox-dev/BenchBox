@@ -80,7 +80,7 @@ class TestTPCDSIntegrationMinimal:
         assert len(query1) > 0
 
     def test_c_tool_integration_workflow(self):
-        """Test C tool integration workflow."""
+
         benchmark = TPCDSBenchmark()
 
         # Test C tools initialization
@@ -99,7 +99,7 @@ class TestTPCDSIntegrationMinimal:
         assert dsdgen_exists
 
     def test_query_template_integration(self):
-        """Test query template integration."""
+
         benchmark = TPCDSBenchmark()
 
         # Test query access through benchmark
@@ -128,7 +128,6 @@ class TestTPCDSIntegrationMinimal:
         self._assert_generated_files_exist(data_files)
 
     def test_scale_factor_integration(self, tpcds_benchmark):
-        """Test scale factor integration."""
 
         # Test that benchmark respects scale factor
         assert tpcds_benchmark.scale_factor == 1.0
@@ -136,7 +135,7 @@ class TestTPCDSIntegrationMinimal:
         assert info["scale_factor"] == 1.0
 
     def test_error_handling_integration(self):
-        """Test error handling integration."""
+
         benchmark = TPCDSBenchmark()
 
         # Test query error handling
@@ -155,7 +154,7 @@ class TestTPCDSIntegrationMinimal:
         assert len(query1) > 0
 
     def test_concurrent_access_integration(self):
-        """Test concurrent access to benchmark."""
+
         benchmark = TPCDSBenchmark()
 
         # Test multiple concurrent queries
@@ -174,7 +173,7 @@ class TestTPCDSIntegrationMinimal:
         assert query1 != query3
 
     def test_consistency_integration(self):
-        """Test consistency across calls."""
+
         benchmark = TPCDSBenchmark()
 
         # Multiple calls should return same results
@@ -223,7 +222,7 @@ class TestTPCDSIntegrationMinimal:
         assert isinstance(info2, dict)
 
     def test_performance_integration(self):
-        """Test performance integration."""
+
         benchmark = TPCDSBenchmark()
 
         # Test query access performance
@@ -254,7 +253,7 @@ class TestTPCDSWorkflowIntegration:
     """Test TPC-DS workflow integration scenarios."""
 
     def test_typical_benchmark_workflow(self):
-        """Test typical benchmark workflow."""
+
         from unittest.mock import patch
 
         # Step 1: Initialize benchmark
@@ -295,7 +294,7 @@ class TestTPCDSWorkflowIntegration:
         assert len(generated_data) == len(test_tables)
 
     def test_batch_query_generation_workflow(self):
-        """Test batch query generation workflow."""
+
         benchmark = TPCDSBenchmark()
 
         # Get all queries at once
@@ -314,7 +313,7 @@ class TestTPCDSWorkflowIntegration:
             assert len(query) > 0
 
     def test_data_pipeline_workflow(self):
-        """Test data pipeline workflow."""
+
         from unittest.mock import patch
 
         benchmark = TPCDSBenchmark(scale_factor=1.0)
@@ -332,14 +331,13 @@ class TestTPCDSWorkflowIntegration:
                 data_pipeline[table] = data
                 assert len(data) > 0
 
-        # Verify data pipeline
         assert len(data_pipeline) == 5
         for table, data in data_pipeline.items():
             assert len(data) > 0
             assert all(isinstance(row, str) for row in data)
 
     def test_mixed_operations_workflow(self):
-        """Test mixed operations workflow."""
+
         from unittest.mock import patch
 
         benchmark = TPCDSBenchmark(scale_factor=1.0)

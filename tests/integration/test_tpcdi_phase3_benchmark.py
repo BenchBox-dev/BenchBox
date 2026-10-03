@@ -82,14 +82,13 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert tpcdi_benchmark.error_recovery_manager is not None
 
     def test_enhanced_etl_status_reporting(self, tpcdi_benchmark, test_database):
-        """Test enhanced ETL status reporting functionality."""
+
         # Initialize systems
         tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
 
         # Get enhanced ETL status
         status = tpcdi_benchmark.get_enhanced_etl_status()
 
-        # Verify status structure
         assert "phase_3_components" in status
         assert "enhanced_features" in status
         assert "basic_etl_status" in status
@@ -115,7 +114,6 @@ class TestTPCDIPhase3BenchmarkIntegration:
         # Create basic schema for testing
         tpcdi_benchmark.create_schema(test_database, "sqlite")
 
-        # Run enhanced ETL pipeline
         results = tpcdi_benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
@@ -158,7 +156,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
         ).fetchone() == (100000000, "FirstName0")
 
     def test_enhanced_data_processing_phase(self, tpcdi_benchmark, test_database):
-        """Test enhanced data processing phase with FinWire and Customer Management."""
+
         # Ensure schema exists before processing
         tpcdi_benchmark.create_schema(test_database, "sqlite")
         tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
@@ -206,7 +204,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert results["changes_detected"] >= 0
 
     def test_incremental_data_loading_phase(self, tpcdi_benchmark, test_database):
-        """Test incremental data loading phase."""
+
         tpcdi_benchmark.create_schema(test_database, "sqlite")
         before = test_database.execute("SELECT COUNT(*) FROM DimCustomer").fetchone()[0]
 
@@ -238,7 +236,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
         }
 
     def test_data_quality_monitoring_phase(self, tpcdi_benchmark, test_database):
-        """Test data quality monitoring phase."""
+
         tpcdi_benchmark.create_schema(test_database, "sqlite")
         tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
         # Ensure base data exists for quality rules
@@ -259,7 +257,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert results["issues_detected"] >= 0
 
     def test_enhanced_pipeline_with_monitoring_disabled(self, tpcdi_benchmark, test_database):
-        """Test enhanced pipeline with data quality monitoring disabled."""
+
         tpcdi_benchmark.create_schema(test_database, "sqlite")
 
         # Run enhanced ETL pipeline with monitoring disabled
@@ -281,7 +279,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert "incremental_loading" in results["phases"]
 
     def test_error_recovery_integration(self, tpcdi_benchmark, test_database):
-        """Test error recovery integration in enhanced pipeline."""
+
         tpcdi_benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
 
         # Mock an error in one of the processing phases
@@ -348,10 +346,9 @@ class TestTPCDIPhase3BenchmarkIntegration:
         assert results["phases"][failed_phase]["success"] is False
 
     def test_enhanced_pipeline_performance_metrics(self, tpcdi_benchmark, test_database):
-        """Test performance metrics collection in enhanced pipeline."""
+
         tpcdi_benchmark.create_schema(test_database, "sqlite")
 
-        # Run enhanced ETL pipeline
         results = tpcdi_benchmark.run_enhanced_etl_pipeline(test_database, dialect="sqlite")
 
         # Verify timing metrics are collected
@@ -365,7 +362,7 @@ class TestTPCDIPhase3BenchmarkIntegration:
             assert phase_result["duration"] >= 0
 
     def test_component_configuration_integration(self, temp_dir):
-        """Test integration with different component configurations."""
+
         # Test with custom configuration
         custom_config = TPCDIConfig(
             scale_factor=0.005,
@@ -446,10 +443,8 @@ class TestTPCDIPhase3BenchmarkIntegration:
                 mock_report.return_value = Mock()
                 mock_export.return_value = {"score": 85.0}
 
-                # Run full benchmark
                 results = tpcdi_benchmark.run_full_benchmark(test_database, "sqlite")
 
-                # Verify results structure
                 assert results["success"] is True
                 assert "metrics" in results
                 assert "etl_result" in results
@@ -593,7 +588,7 @@ class TestTPCDIPhase3PerformanceIntegration:
         assert set(parallel_rows["EndDate"]) == {"9999-12-31"}
 
     def test_incremental_loading_performance(self, performance_benchmark):
-        """Test incremental loading performance characteristics."""
+
         with sqlite3.connect(":memory:") as conn:
             performance_benchmark.create_schema(conn, "sqlite")
             start_time = mono_time()
@@ -607,7 +602,7 @@ class TestTPCDIPhase3PerformanceIntegration:
             assert incremental_duration < 30
 
     def test_quality_monitoring_performance(self, performance_benchmark):
-        """Test data quality monitoring performance."""
+
         with sqlite3.connect(":memory:") as conn:
             performance_benchmark.create_schema(conn, "sqlite")
             performance_benchmark._initialize_connection_dependent_systems(conn, "sqlite")

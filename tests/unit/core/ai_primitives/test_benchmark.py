@@ -32,27 +32,27 @@ class TestAIPrimitivesBenchmark:
         return AIPrimitivesBenchmark(scale_factor=0.01)
 
     def test_benchmark_creation(self, ai_benchmark):
-        """Test benchmark initializes correctly."""
+
         assert ai_benchmark is not None
         assert ai_benchmark.scale_factor == 0.01
         assert ai_benchmark._name == "AI/ML Primitives Benchmark"
         assert ai_benchmark._version == "1.0"
 
     def test_benchmark_with_cost_limit(self):
-        """Test benchmark with cost limit."""
+
         bm = AIPrimitivesBenchmark(max_cost_usd=5.0)
 
         assert bm.max_cost_usd == 5.0
         assert bm.cost_tracker.budget_usd == 5.0
 
     def test_benchmark_dry_run_mode(self):
-        """Test benchmark in dry run mode."""
+
         bm = AIPrimitivesBenchmark(dry_run=True)
 
         assert bm.dry_run is True
 
     def test_get_data_source_benchmark(self, ai_benchmark):
-        """Test data source is TPC-H."""
+
         assert ai_benchmark.get_data_source_benchmark() == "tpch"
 
     def test_shared_tpch_schema_contract(self, ai_benchmark):
@@ -96,43 +96,43 @@ class TestAIPrimitivesBenchmark:
         ]
 
     def test_is_platform_supported_true(self, ai_benchmark):
-        """Test supported platforms are recognized."""
+
         for platform in SUPPORTED_PLATFORMS:
             assert ai_benchmark.is_platform_supported(platform) is True
 
     def test_is_platform_supported_false(self, ai_benchmark):
-        """Test unsupported platforms are recognized."""
+
         for platform in UNSUPPORTED_PLATFORMS:
             assert ai_benchmark.is_platform_supported(platform) is False
 
     def test_get_all_queries(self, ai_benchmark):
-        """Test getting all queries."""
+
         queries = ai_benchmark.get_all_queries()
 
         assert isinstance(queries, dict)
         assert len(queries) > 0
 
     def test_get_query(self, ai_benchmark):
-        """Test getting a specific query."""
+
         sql = ai_benchmark.get_query("generative_complete_simple")
 
         assert isinstance(sql, str)
         assert len(sql) > 0
 
     def test_get_query_with_params_raises(self, ai_benchmark):
-        """Test getting query with params raises error."""
+
         with pytest.raises(ValueError, match="don't accept parameters"):
             ai_benchmark.get_query("generative_complete_simple", params={"foo": "bar"})
 
     def test_get_queries_by_category(self, ai_benchmark):
-        """Test getting queries by category."""
+
         generative = ai_benchmark.get_queries_by_category("generative")
 
         assert isinstance(generative, dict)
         assert len(generative) > 0
 
     def test_get_query_categories(self, ai_benchmark):
-        """Test getting query categories."""
+
         categories = ai_benchmark.get_query_categories()
 
         assert "generative" in categories
@@ -141,20 +141,20 @@ class TestAIPrimitivesBenchmark:
         assert "embedding" in categories
 
     def test_get_supported_queries_supported_platform(self, ai_benchmark):
-        """Test getting supported queries for supported platform."""
+
         queries = ai_benchmark.get_supported_queries("snowflake")
 
         assert isinstance(queries, dict)
         assert len(queries) > 0
 
     def test_get_supported_queries_unsupported_platform(self, ai_benchmark):
-        """Test getting supported queries for unsupported platform."""
+
         queries = ai_benchmark.get_supported_queries("duckdb")
 
         assert queries == {}
 
     def test_get_benchmark_info(self, ai_benchmark):
-        """Test getting benchmark info."""
+
         info = ai_benchmark.get_benchmark_info()
 
         assert info["name"] == "AI/ML Primitives Benchmark"
@@ -172,21 +172,21 @@ class TestCostEstimation:
         return AIPrimitivesBenchmark()
 
     def test_estimate_cost_all_queries(self, ai_bm):
-        """Test estimating cost for all queries."""
+
         total_cost, estimates = ai_bm.estimate_cost("snowflake")
 
         assert total_cost > 0
         assert len(estimates) > 0
 
     def test_estimate_cost_specific_queries(self, ai_bm):
-        """Test estimating cost for specific queries."""
+
         queries = ["generative_complete_simple", "nlp_sentiment_single"]
         total_cost, estimates = ai_bm.estimate_cost("snowflake", queries=queries)
 
         assert len(estimates) == 2
 
     def test_estimate_cost_by_category(self, ai_bm):
-        """Test estimating cost by category."""
+
         total_cost, estimates = ai_bm.estimate_cost("snowflake", categories=["generative"])
 
         assert total_cost > 0
@@ -195,7 +195,7 @@ class TestCostEstimation:
             assert entry.category == "generative"
 
     def test_estimate_cost_unsupported_platform(self, ai_bm):
-        """Test estimating cost for unsupported platform."""
+
         total_cost, estimates = ai_bm.estimate_cost("duckdb")
 
         # All queries should be skipped
@@ -221,7 +221,7 @@ class TestQueryExecution:
         return connection
 
     def test_execute_query_success(self, ai_bm, mock_connection):
-        """Test successful query execution."""
+
         result = ai_bm.execute_query(
             "generative_complete_simple",
             mock_connection,
@@ -234,7 +234,7 @@ class TestQueryExecution:
         assert result.rows_processed == 2
 
     def test_execute_query_skipped_platform(self, ai_bm, mock_connection):
-        """Test query execution on skipped platform."""
+
         result = ai_bm.execute_query(
             "generative_complete_simple",
             mock_connection,
@@ -245,7 +245,7 @@ class TestQueryExecution:
         assert "not supported" in result.error
 
     def test_execute_query_failure(self, ai_bm):
-        """Test query execution handles errors."""
+
         connection = Mock()
         connection.execute.side_effect = Exception("Database error")
 
@@ -277,7 +277,7 @@ class TestBenchmarkRun:
         return connection
 
     def test_run_benchmark_dry_run(self, ai_bm, mock_connection):
-        """Test running benchmark in dry run mode."""
+
         result = ai_bm.run_benchmark(
             mock_connection,
             platform="snowflake",
@@ -291,7 +291,7 @@ class TestBenchmarkRun:
         mock_connection.execute.assert_not_called()
 
     def test_run_benchmark_unsupported_platform(self, ai_bm, mock_connection):
-        """Test running benchmark on unsupported platform."""
+
         result = ai_bm.run_benchmark(
             mock_connection,
             platform="duckdb",
@@ -301,7 +301,7 @@ class TestBenchmarkRun:
         mock_connection.execute.assert_not_called()
 
     def test_run_benchmark_specific_queries(self, ai_bm, mock_connection):
-        """Test running specific queries."""
+
         result = ai_bm.run_benchmark(
             mock_connection,
             platform="snowflake",
@@ -312,7 +312,7 @@ class TestBenchmarkRun:
         assert result.total_queries == 1
 
     def test_run_benchmark_by_category(self, ai_bm, mock_connection):
-        """Test running queries by category."""
+
         result = ai_bm.run_benchmark(
             mock_connection,
             platform="snowflake",
@@ -339,7 +339,7 @@ class TestAIQueryResult:
     """Tests for AIQueryResult dataclass."""
 
     def test_result_creation(self):
-        """Test creating a query result."""
+
         result = AIQueryResult(
             query_id="test",
             category="generative",
@@ -355,7 +355,7 @@ class TestAIQueryResult:
         assert result.rows_processed == 10
 
     def test_result_defaults(self):
-        """Test query result defaults."""
+
         result = AIQueryResult(
             query_id="test",
             category="nlp",
@@ -371,7 +371,7 @@ class TestAIBenchmarkResult:
     """Tests for AIBenchmarkResult dataclass."""
 
     def test_result_creation(self):
-        """Test creating a benchmark result."""
+
         result = AIBenchmarkResult(
             platform="snowflake",
             scale_factor=0.01,
@@ -386,7 +386,7 @@ class TestAIBenchmarkResult:
         assert result.failed_queries == 2
 
     def test_result_defaults(self):
-        """Test benchmark result defaults."""
+
         result = AIBenchmarkResult()
 
         assert result.benchmark == "AI Primitives"

@@ -63,7 +63,7 @@ class TestAdapterValidationConsistency:
         )
 
     def test_base_adapter_validation_passed(self, mock_validation_passed):
-        """Test base adapter helper correctly maps PASSED validation."""
+
         from benchbox.platforms.base.adapter import PlatformAdapter
 
         # Create a concrete mock adapter (PlatformAdapter is abstract)
@@ -93,7 +93,7 @@ class TestAdapterValidationConsistency:
         assert "warning" not in result["row_count_validation"]
 
     def test_base_adapter_validation_failed(self, mock_validation_failed):
-        """Test base adapter helper correctly maps FAILED validation."""
+
         from benchbox.platforms.base.adapter import PlatformAdapter
 
         # Create a concrete mock adapter (PlatformAdapter is abstract)
@@ -121,7 +121,7 @@ class TestAdapterValidationConsistency:
         assert "warning" not in result["row_count_validation"]
 
     def test_base_adapter_validation_skipped(self, mock_validation_skipped):
-        """Test base adapter helper correctly maps SKIPPED validation."""
+
         from benchbox.platforms.base.adapter import PlatformAdapter
 
         # Create a concrete mock adapter (PlatformAdapter is abstract)
@@ -181,7 +181,7 @@ class TestAdapterValidationConsistency:
         assert result["row_count_validation"]["error"] == invalid_skip.error_message
 
     def test_base_adapter_no_validation(self):
-        """Test base adapter helper with no validation result."""
+
         from benchbox.platforms.base.adapter import PlatformAdapter
 
         # Create a concrete mock adapter (PlatformAdapter is abstract)

@@ -22,7 +22,7 @@ class TestBenchmarkFiltering:
     """Test benchmark filtering functionality."""
 
     def test_filter_by_category(self):
-        """Test filtering benchmarks by category."""
+
         manager = BenchmarkManager()
 
         # Filter by TPC category
@@ -34,7 +34,7 @@ class TestBenchmarkFiltering:
         assert "clickbench" not in tpc_benchmarks
 
     def test_filter_by_search_term_name(self):
-        """Test filtering benchmarks by searching name."""
+
         manager = BenchmarkManager()
 
         # Search for "TPC"
@@ -44,7 +44,7 @@ class TestBenchmarkFiltering:
         assert "tpcdi" in tpc_results
 
     def test_filter_by_search_term_description(self):
-        """Test filtering benchmarks by searching description."""
+
         manager = BenchmarkManager()
 
         # Search for "decision"
@@ -53,7 +53,7 @@ class TestBenchmarkFiltering:
         assert "tpcds" in decision_results
 
     def test_filter_by_search_term_case_insensitive(self):
-        """Test that search is case-insensitive."""
+
         manager = BenchmarkManager()
 
         # Test case insensitive
@@ -64,7 +64,7 @@ class TestBenchmarkFiltering:
         assert lower_results == upper_results == mixed_results
 
     def test_filter_combined_category_and_search(self):
-        """Test filtering with both category and search term."""
+
         manager = BenchmarkManager()
 
         # Filter by Industry category and search for "click"
@@ -74,7 +74,7 @@ class TestBenchmarkFiltering:
         assert "ssb" not in results  # Doesn't contain "click"
 
     def test_filter_no_results(self):
-        """Test filtering that returns no results."""
+
         manager = BenchmarkManager()
 
         # Search for non-existent term
@@ -82,7 +82,7 @@ class TestBenchmarkFiltering:
         assert len(results) == 0
 
     def test_filter_no_filters_returns_all(self):
-        """Test that no filters returns all public benchmarks."""
+
         manager = BenchmarkManager()
 
         results = manager._filter_benchmarks()
@@ -114,7 +114,7 @@ class TestBenchmarkDisplay:
         assert mock_console.print.called
 
     def test_display_all_benchmarks_structure(self):
-        """Test that display returns all public benchmarks with proper structure."""
+
         manager = BenchmarkManager()
 
         # Capture display output
@@ -134,7 +134,7 @@ class TestBenchmarkDisplay:
             assert "estimated_time_range" in bench_info
 
     def test_display_with_category_filter(self):
-        """Test display with category filter."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console"):
@@ -146,7 +146,7 @@ class TestBenchmarkDisplay:
         assert "clickbench" not in displayed
 
     def test_display_with_search_filter(self):
-        """Test display with search filter."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console"):
@@ -157,7 +157,7 @@ class TestBenchmarkDisplay:
         assert len(displayed) > 0
 
     def test_display_empty_results(self):
-        """Test display with no matching results."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console") as mock_console:
@@ -174,7 +174,7 @@ class TestBenchmarkPreview:
     """Test benchmark preview functionality."""
 
     def test_show_benchmark_preview(self):
-        """Test showing preview for a benchmark."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console") as mock_console:
@@ -186,7 +186,7 @@ class TestBenchmarkPreview:
         assert len(mock_console.print.call_args_list) > 0
 
     def test_preview_includes_key_info(self):
-        """Test that preview includes essential information."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console") as mock_console:
@@ -261,7 +261,7 @@ class TestBenchmarkSelectionIntegration:
 
     @patch("benchbox.cli.benchmarks.Prompt")
     def test_select_benchmark_direct_numeric(self, mock_prompt):
-        """Test selecting a benchmark by direct numeric input."""
+
         manager = BenchmarkManager()
 
         # Mock user selecting option 1
@@ -286,7 +286,7 @@ class TestBenchmarkSelectionIntegration:
 
     @patch("benchbox.cli.benchmarks.Prompt")
     def test_select_benchmark_two_phase_tpc_category(self, mock_prompt):
-        """Test selecting a benchmark using two-phase flow: Category > Benchmark."""
+
         manager = BenchmarkManager()
 
         # Mock user interactions: '1' for TPC category, '1' for TPC-H (first in TPC)
@@ -381,7 +381,7 @@ class TestBenchmarkSelectionEdgeCases:
     """Test edge cases in benchmark selection."""
 
     def test_filter_with_empty_string(self):
-        """Test filtering with empty string."""
+
         manager = BenchmarkManager()
 
         results = manager._filter_benchmarks(search_term="")
@@ -389,7 +389,7 @@ class TestBenchmarkSelectionEdgeCases:
         assert len(results) == len(manager._get_public_benchmarks())
 
     def test_filter_with_whitespace(self):
-        """Test filtering with whitespace-only search."""
+
         manager = BenchmarkManager()
 
         # Whitespace search should be treated as empty and return all
@@ -399,7 +399,7 @@ class TestBenchmarkSelectionEdgeCases:
         assert isinstance(results, dict)
 
     def test_filter_with_special_characters(self):
-        """Test filtering with special characters."""
+
         manager = BenchmarkManager()
 
         # Should not crash with special regex characters
@@ -408,7 +408,7 @@ class TestBenchmarkSelectionEdgeCases:
         assert isinstance(results, dict)
 
     def test_display_single_benchmark_after_filter(self):
-        """Test display when filter results in single benchmark."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.console"):
@@ -431,7 +431,7 @@ class TestBackwardsCompatibility:
             manager._display_benchmark_categories()
 
     def test_old_select_category_still_works(self):
-        """Test that old category selection still works."""
+
         manager = BenchmarkManager()
 
         categories = ["TPC Standard", "Analytical"]
@@ -444,7 +444,7 @@ class TestBackwardsCompatibility:
         assert result in categories
 
     def test_old_select_specific_benchmark_still_works(self):
-        """Test that old specific benchmark selection still works."""
+
         manager = BenchmarkManager()
 
         available = {"tpch": manager.benchmarks["tpch"], "tpcds": manager.benchmarks["tpcds"]}
@@ -461,7 +461,7 @@ class TestTwoPhaseSelectionFlow:
     """Test the new two-phase Category > Benchmark selection flow."""
 
     def test_category_order_is_popularity_based(self):
-        """Test that CATEGORY_ORDER lists categories in popularity order."""
+
         manager = BenchmarkManager()
 
         expected_order = [
@@ -477,7 +477,7 @@ class TestTwoPhaseSelectionFlow:
         assert expected_order == manager.CATEGORY_ORDER
 
     def test_benchmark_order_defined_for_all_categories(self):
-        """Test that BENCHMARK_ORDER has entries for all categories."""
+
         manager = BenchmarkManager()
 
         # Get all categories from benchmarks
@@ -495,7 +495,7 @@ class TestTwoPhaseSelectionFlow:
         assert tpc_order == ["tpch", "tpcds", "tpcdi"]
 
     def test_primitives_benchmark_order(self):
-        """Test that Primitives benchmarks are ordered by popularity."""
+
         manager = BenchmarkManager()
 
         primitives_order = manager.BENCHMARK_ORDER["Primitives"]
@@ -508,7 +508,7 @@ class TestTwoPhaseSelectionFlow:
         ]
 
     def test_prompt_category_selection_returns_category(self):
-        """Test that _prompt_category_selection returns selected category."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.Prompt") as mock_prompt:
@@ -543,7 +543,7 @@ class TestTwoPhaseSelectionFlow:
         assert bench_info["display_name"] == "TPC-H"
 
     def test_prompt_benchmark_in_category_second_choice(self):
-        """Test selecting second benchmark in a category."""
+
         manager = BenchmarkManager()
 
         with patch("benchbox.cli.benchmarks.Prompt") as mock_prompt:
@@ -556,7 +556,7 @@ class TestTwoPhaseSelectionFlow:
         assert bench_info["display_name"] == "TPC-DS"
 
     def test_benchmarks_sorted_by_popularity_then_alpha(self):
-        """Test that benchmarks without popularity order fall back to alphabetical."""
+
         manager = BenchmarkManager()
 
         # Get sorted benchmarks for a category

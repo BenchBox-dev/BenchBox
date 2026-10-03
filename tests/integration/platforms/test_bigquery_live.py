@@ -42,10 +42,9 @@ class TestLiveBigQueryConnection:
     """Test basic BigQuery connectivity."""
 
     def test_bigquery_live_connection(self, live_bigquery_adapter):
-        """Verify BigQuery connection works and can execute simple query."""
+
         connection = live_bigquery_adapter.create_connection()
         try:
-            # Execute simple query to verify connection
             query_job = connection.query("SELECT 1 as test")
             results = list(query_job.result())
             assert len(results) == 1
@@ -55,7 +54,7 @@ class TestLiveBigQueryConnection:
             live_bigquery_adapter.close_connection(connection)
 
     def test_bigquery_live_version_info(self, live_bigquery_adapter):
-        """Verify we can get BigQuery version information."""
+
         connection = live_bigquery_adapter.create_connection()
         try:
             metadata = live_bigquery_adapter.get_platform_info(connection)
@@ -68,7 +67,7 @@ class TestLiveBigQueryConnection:
             live_bigquery_adapter.close_connection(connection)
 
     def test_bigquery_live_project_access(self, live_bigquery_adapter):
-        """Verify project and dataset access."""
+
         connection = live_bigquery_adapter.create_connection()
         try:
             # Get project info
@@ -122,7 +121,6 @@ class TestLiveBigQueryDataLoading:
         # Create TPC-H benchmark
         tpch = TPCH(scale_factor=test_scale_factor, output_dir=test_output_dir, verbose=False)
 
-        # Generate data
         data_files = tpch.generate_data()
         assert len(data_files) > 0, "No data files generated"
 
@@ -145,10 +143,8 @@ class TestLiveBigQueryDataLoading:
                     query_job = connection.query(qualified_statement)
                     query_job.result()  # Wait for completion
 
-            # Load data using adapter
             stats, errors, _ = live_bigquery_adapter.load_data(tpch, connection, test_output_dir)
 
-            # Verify data was loaded
             assert len(stats) > 0, "No tables loaded"
             assert all(count > 0 for count in stats.values()), "Some tables have zero rows"
 
@@ -214,7 +210,6 @@ class TestLiveBigQueryQueryExecution:
             query_job = connection.query(query1_bigquery)
             results = list(query_job.result())
 
-            # Verify we got results
             assert len(results) > 0, "Query 1 returned no results"
             print(f"Query 1 returned {len(results)} rows")
 
@@ -228,7 +223,7 @@ class TestLiveBigQuerySpecificFeatures:
     def test_bigquery_live_gcs_load(
         self, live_bigquery_adapter, unique_test_schema, test_output_dir, cleanup_test_schema
     ):
-        """Test GCS load workflow with staged files."""
+
         cleanup_test_schema(live_bigquery_adapter, unique_test_schema)
 
         connection = live_bigquery_adapter.create_connection()
@@ -269,7 +264,7 @@ class TestLiveBigQuerySpecificFeatures:
             live_bigquery_adapter.close_connection(connection)
 
     def test_bigquery_live_query_cost(self, live_bigquery_adapter):
-        """Verify query cost estimation works."""
+
         connection = live_bigquery_adapter.create_connection()
         try:
             from google.cloud import bigquery
@@ -289,7 +284,7 @@ class TestLiveBigQuerySpecificFeatures:
             live_bigquery_adapter.close_connection(connection)
 
     def test_bigquery_live_cleanup(self, live_bigquery_adapter, unique_test_schema):
-        """Verify cleanup works correctly."""
+
         connection = live_bigquery_adapter.create_connection()
         try:
             # Try to drop dataset (should work even if it doesn't exist)

@@ -50,7 +50,7 @@ class TestTPCHDataGeneratorBasic(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_default_initialization(self, mock_find_dbgen):
-        """Test default initialization parameters."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator()
@@ -63,7 +63,7 @@ class TestTPCHDataGeneratorBasic(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_default_output_directory(self, mock_find_dbgen):
-        """Test that default output directory is set correctly."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator()
@@ -72,7 +72,7 @@ class TestTPCHDataGeneratorBasic(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_string_output_directory_conversion(self, mock_find_dbgen):
-        """Test that string output directories are converted to Path objects."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir="/tmp/test_output")
@@ -82,7 +82,7 @@ class TestTPCHDataGeneratorBasic(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_verbose_flag_propagation(self, mock_find_dbgen):
-        """Test that verbose flag is stored correctly."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(verbose=True)
@@ -94,7 +94,7 @@ class TestTPCHDataGeneratorBasic(unittest.TestCase):
     @mock.patch("platform.system")
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_windows_executable_naming(self, mock_find_dbgen, mock_system):
-        """Test that Windows executable is correctly identified."""
+
         mock_system.return_value = "Windows"
 
         # Create a mock that simulates the _find_or_build_dbgen logic
@@ -118,7 +118,7 @@ class TestTPCHDataGeneratorParameterValidation(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_scale_factor_boundary_conditions(self, mock_find_dbgen):
-        """Test scale factor validation at boundary conditions."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Test exactly at boundaries
@@ -147,7 +147,7 @@ class TestTPCHDataGeneratorParameterValidation(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_processes_boundary_conditions(self, mock_find_dbgen):
-        """Test parallel processes validation at boundary conditions."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Test below minimum
@@ -193,7 +193,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
     @mock.patch("benchbox.core.tpch.generator.ensure_tpc_binaries")
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator.resolve_dbgen_path")
     def test_dbgen_not_found_error(self, mock_resolve, mock_ensure):
-        """Test error when dbgen source directory is not found."""
+
         from benchbox.utils.tpc_compilation import CompilationResult, CompilationStatus
 
         # Mock that dbgen path cannot be resolved (no sources)
@@ -218,7 +218,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
 
     @mock.patch("shutil.which")
     def test_missing_build_tools_error(self, mock_which):
-        """Test error when build tools are not available."""
+
         # Mock missing make
         mock_which.side_effect = lambda cmd: None if cmd == "make" else "/usr/bin/gcc"
 
@@ -238,7 +238,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
 
     @mock.patch("shutil.which")
     def test_missing_compiler_error(self, mock_which):
-        """Test error when C compiler is not available."""
+
         # Mock missing compiler
         mock_which.side_effect = lambda cmd: "/usr/bin/make" if cmd == "make" else None
 
@@ -260,7 +260,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
     @mock.patch("os.access")
     @mock.patch("benchbox.core.tpch.generator.Path.exists")
     def test_executable_permission_error(self, mock_exists, mock_access):
-        """Test error when dbgen executable exists but is not executable."""
+
         mock_exists.return_value = True
         mock_access.return_value = False
 
@@ -274,10 +274,9 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
     @mock.patch("subprocess.run")
     @mock.patch("shutil.which")
     def test_build_failure_error(self, mock_which, mock_run):
-        """Test error when dbgen build fails."""
+
         mock_which.return_value = "/usr/bin/make"  # build tools available
 
-        # Mock failed build
         mock_run.return_value = mock.Mock(returncode=1, stderr="Build failed", stdout="")
 
         # Create a mock generator object and test the method directly
@@ -296,7 +295,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_compile_dbgen_method_basic(self, mock_find_dbgen):
-        """Test the _compile_dbgen method with basic functionality."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator()
@@ -330,7 +329,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
     @mock.patch("platform.system")
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_compile_dbgen_platform_detection(self, mock_find_dbgen, mock_system):
-        """Test platform-specific compilation flags."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Test different platforms
@@ -364,7 +363,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_compile_dbgen_subprocess_error(self, mock_find_dbgen):
-        """Test handling of subprocess compilation errors."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator()
@@ -382,7 +381,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_compile_dbgen_missing_executable_after_build(self, mock_find_dbgen):
-        """Test error when executable is not found after successful compilation."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator()
@@ -402,7 +401,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
     @mock.patch("platform.system")
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_compile_dbgen_windows_executable_name(self, mock_find_dbgen, mock_system):
-        """Test that Windows executable name includes .exe extension."""
+
         mock_system.return_value = "Windows"
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
@@ -424,7 +423,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
     @mock.patch("shutil.which")
     @mock.patch("benchbox.core.tpch.generator.Path.exists")
     def test_platform_specific_build_flags(self, mock_exists, mock_which, mock_run, mock_system):
-        """Test platform-specific build flags are used correctly."""
+
         mock_exists.side_effect = lambda: False  # dbgen doesn't exist initially
         mock_which.return_value = "/usr/bin/make"
         mock_run.return_value = mock.Mock(returncode=0)
@@ -454,7 +453,7 @@ class TestTPCHDataGeneratorBuildSystem(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_simple_makefile_creation(self, mock_find_dbgen):
-        """Test the creation of a simple Makefile during build process."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # This test is more integration-focused but still uses mocks
@@ -504,7 +503,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_move_data_files_missing_files(self, mock_find_dbgen):
-        """Test behavior when some generated files are missing."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Create a mock dbgen directory
@@ -537,7 +536,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_move_data_files_all_present(self, mock_find_dbgen):
-        """Test move_data_files when all expected files are present."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.temp_dir)
@@ -574,7 +573,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_data_file_generation(self, mock_find_dbgen):
-        """Test that data files are generated correctly."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir)
@@ -585,7 +584,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_generator_initialization(self, mock_find_dbgen):
-        """Test generator initialization with different parameters."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.temp_dir)
@@ -596,7 +595,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_generator_properties(self, mock_find_dbgen):
-        """Test generator properties and configuration."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.temp_dir, scale_factor=0.1)
@@ -621,7 +620,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_output_directory_already_exists(self, mock_find_dbgen):
-        """Test behavior when output directory already exists."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Create the output directory first
@@ -635,7 +634,7 @@ class TestTPCHDataGeneratorFileOperations(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_table_file_name_mapping(self, mock_find_dbgen):
-        """Test that table name to file name mapping is correct."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.temp_dir)
@@ -711,7 +710,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_chunk_generation(self, mock_find_dbgen):
-        """Test parallel data generation with multiple chunks."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir, parallel=2)
@@ -729,7 +728,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_chunk_failure(self, mock_find_dbgen):
-        """Test error handling when a parallel chunk fails."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir, parallel=2)
@@ -749,7 +748,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_chunk_files_returned_directly(self, mock_find_dbgen):
-        """Test that parallel chunk files are returned directly without merging."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # No compression for this test to avoid confusion
@@ -791,7 +790,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_chunk_compression_handling(self, mock_find_dbgen):
-        """Test that compression works correctly with parallel chunk files."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(
@@ -838,7 +837,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_existing_chunk_files_discovery(self, mock_find_dbgen):
-        """Test discovery of existing chunk files when skipping regeneration."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir, parallel=2)
@@ -870,7 +869,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_execution_path_selection(self, mock_find_dbgen):
-        """Test that parallel vs single execution path is selected correctly."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(parallel=1, output_dir=self.temp_dir)
@@ -954,7 +953,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_run_dbgen_method_basic(self, mock_find_dbgen):
-        """Test the _run_dbgen method functionality."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(scale_factor=0.1, output_dir=self.temp_dir)
@@ -976,7 +975,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_run_dbgen_subprocess_error(self, mock_find_dbgen):
-        """Test handling of subprocess errors in _run_dbgen."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.temp_dir)
@@ -994,7 +993,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_verbose_output_handling(self, mock_find_dbgen):
-        """Test that verbose mode affects subprocess output handling."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Test verbose mode
@@ -1030,7 +1029,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_single_threaded_execution(self, mock_find_dbgen):
-        """Test single-threaded data generation."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir, parallel=1)
@@ -1050,7 +1049,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_execution_failure_with_verbose_output(self, mock_find_dbgen):
-        """Test error handling with verbose output enabled."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir, verbose=True)
@@ -1069,7 +1068,7 @@ class TestTPCHDataGeneratorParallelProcessing(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_execution_environment_variables(self, mock_find_dbgen):
-        """Test that DSS_PATH environment variable is set correctly."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(output_dir=self.output_dir)
@@ -1118,7 +1117,7 @@ class TestTPCHDataGeneratorIntegration(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_complete_generation_workflow(self, mock_find_dbgen):
-        """Test the complete data generation workflow."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         generator = TPCHDataGenerator(scale_factor=0.01, output_dir=self.output_dir, verbose=False)
@@ -1152,7 +1151,7 @@ class TestTPCHDataGeneratorIntegration(unittest.TestCase):
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_output_directory_creation(self, mock_find_dbgen):
-        """Test that output directory is created if it doesn't exist."""
+
         mock_find_dbgen.return_value = Path("/tmp/dbgen")
 
         # Use a nested directory that doesn't exist

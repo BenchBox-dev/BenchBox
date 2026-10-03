@@ -27,7 +27,7 @@ class TestSkewType:
     """Tests for SkewType enum."""
 
     def test_all_types_defined(self):
-        """Test all skew types are defined."""
+
         assert SkewType.ATTRIBUTE.value == "attribute"
         assert SkewType.JOIN.value == "join"
         assert SkewType.TEMPORAL.value == "temporal"
@@ -38,7 +38,7 @@ class TestSkewPreset:
     """Tests for SkewPreset enum."""
 
     def test_all_presets_defined(self):
-        """Test all presets are defined."""
+
         presets = [
             SkewPreset.NONE,
             SkewPreset.LIGHT,
@@ -50,7 +50,7 @@ class TestSkewPreset:
         assert len(presets) == 6
 
     def test_preset_values(self):
-        """Test preset values."""
+
         assert SkewPreset.NONE.value == "none"
         assert SkewPreset.LIGHT.value == "light"
         assert SkewPreset.MODERATE.value == "moderate"
@@ -63,7 +63,7 @@ class TestAttributeSkewConfig:
     """Tests for AttributeSkewConfig."""
 
     def test_default_values(self):
-        """Test default values are all zero."""
+
         config = AttributeSkewConfig()
         assert config.customer_nation_skew == 0.0
         assert config.customer_segment_skew == 0.0
@@ -71,7 +71,7 @@ class TestAttributeSkewConfig:
         assert config.shipmode_skew == 0.0
 
     def test_custom_values(self):
-        """Test custom values are set correctly."""
+
         config = AttributeSkewConfig(
             customer_nation_skew=0.5,
             part_brand_skew=0.8,
@@ -80,7 +80,7 @@ class TestAttributeSkewConfig:
         assert config.part_brand_skew == 0.8
 
     def test_get_active_skews(self):
-        """Test get_active_skews returns only non-zero values."""
+
         config = AttributeSkewConfig(
             customer_nation_skew=0.5,
             part_brand_skew=0.0,
@@ -96,14 +96,14 @@ class TestJoinSkewConfig:
     """Tests for JoinSkewConfig."""
 
     def test_default_values(self):
-        """Test default values are all zero."""
+
         config = JoinSkewConfig()
         assert config.customer_order_skew == 0.0
         assert config.part_popularity_skew == 0.0
         assert config.supplier_volume_skew == 0.0
 
     def test_custom_values(self):
-        """Test custom values are set correctly."""
+
         config = JoinSkewConfig(
             customer_order_skew=0.7,
             part_popularity_skew=0.9,
@@ -112,7 +112,7 @@ class TestJoinSkewConfig:
         assert config.part_popularity_skew == 0.9
 
     def test_get_active_skews(self):
-        """Test get_active_skews returns only non-zero values."""
+
         config = JoinSkewConfig(
             customer_order_skew=0.7,
             part_popularity_skew=0.0,
@@ -126,14 +126,14 @@ class TestTemporalSkewConfig:
     """Tests for TemporalSkewConfig."""
 
     def test_default_values(self):
-        """Test default values."""
+
         config = TemporalSkewConfig()
         assert config.order_date_skew == 0.0
         assert config.enable_hot_periods is False
         assert config.hot_period_intensity == 0.5
 
     def test_hot_periods_in_active_skews(self):
-        """Test hot periods appear in active skews when enabled."""
+
         config = TemporalSkewConfig(enable_hot_periods=True)
         active = config.get_active_skews()
         assert "enable_hot_periods" in active
@@ -143,7 +143,7 @@ class TestSkewConfiguration:
     """Tests for SkewConfiguration."""
 
     def test_default_configuration(self):
-        """Test default configuration values."""
+
         config = SkewConfiguration()
         assert config.skew_factor == 0.5
         assert config.distribution_type == "zipfian"
@@ -152,7 +152,7 @@ class TestSkewConfiguration:
         assert config.enable_temporal_skew is False
 
     def test_custom_configuration(self):
-        """Test custom configuration."""
+
         config = SkewConfiguration(
             skew_factor=0.8,
             distribution_type="normal",
@@ -163,7 +163,7 @@ class TestSkewConfiguration:
         assert config.enable_temporal_skew is True
 
     def test_get_skew_summary(self):
-        """Test get_skew_summary returns correct structure."""
+
         config = SkewConfiguration(skew_factor=0.6)
         summary = config.get_skew_summary()
 
@@ -175,25 +175,25 @@ class TestSkewConfiguration:
         assert summary["skew_factor"] == 0.6
 
     def test_validate_valid_config(self):
-        """Test validate returns empty list for valid config."""
+
         config = SkewConfiguration(skew_factor=0.5)
         warnings = config.validate()
         assert len(warnings) == 0
 
     def test_validate_invalid_skew_factor(self):
-        """Test validate catches invalid skew factor."""
+
         config = SkewConfiguration(skew_factor=1.5)
         warnings = config.validate()
         assert any("skew_factor" in w for w in warnings)
 
     def test_validate_unknown_distribution(self):
-        """Test validate catches unknown distribution."""
+
         config = SkewConfiguration(distribution_type="gamma")
         warnings = config.validate()
         assert any("distribution_type" in w for w in warnings)
 
     def test_validate_high_skew_warning(self):
-        """Test validate warns about very high skew values."""
+
         config = SkewConfiguration(attribute_skew=AttributeSkewConfig(customer_nation_skew=0.95))
         warnings = config.validate()
         assert any("high skew" in w.lower() for w in warnings)
@@ -203,7 +203,7 @@ class TestGetPresetConfig:
     """Tests for get_preset_config function."""
 
     def test_none_preset(self):
-        """Test NONE preset returns uniform config."""
+
         config = get_preset_config(SkewPreset.NONE)
         assert config.skew_factor == 0.0
         assert config.distribution_type == "uniform"
@@ -211,7 +211,7 @@ class TestGetPresetConfig:
         assert config.enable_join_skew is False
 
     def test_light_preset(self):
-        """Test LIGHT preset."""
+
         config = get_preset_config(SkewPreset.LIGHT)
         assert config.skew_factor == 0.2
         assert config.distribution_type == "zipfian"
@@ -219,21 +219,21 @@ class TestGetPresetConfig:
         assert config.join_skew.customer_order_skew == 0.2
 
     def test_moderate_preset(self):
-        """Test MODERATE preset."""
+
         config = get_preset_config(SkewPreset.MODERATE)
         assert config.skew_factor == 0.5
         assert config.attribute_skew.customer_nation_skew == 0.5
         assert config.join_skew.customer_order_skew == 0.5
 
     def test_heavy_preset(self):
-        """Test HEAVY preset."""
+
         config = get_preset_config(SkewPreset.HEAVY)
         assert config.skew_factor == 0.8
         assert config.enable_temporal_skew is True
         assert config.attribute_skew.customer_nation_skew == 0.8
 
     def test_extreme_preset(self):
-        """Test EXTREME preset."""
+
         config = get_preset_config(SkewPreset.EXTREME)
         assert config.skew_factor == 1.0
         assert config.attribute_skew.part_brand_skew == 1.0
@@ -241,7 +241,7 @@ class TestGetPresetConfig:
         assert config.temporal_skew.enable_hot_periods is True
 
     def test_realistic_preset(self):
-        """Test REALISTIC preset."""
+
         config = get_preset_config(SkewPreset.REALISTIC)
         assert config.skew_factor == 0.6
         # Should have temporal skew enabled
@@ -250,12 +250,12 @@ class TestGetPresetConfig:
         assert config.attribute_skew.part_brand_skew == 0.8
 
     def test_seed_propagation(self):
-        """Test seed is propagated to config."""
+
         config = get_preset_config(SkewPreset.MODERATE, seed=42)
         assert config.seed == 42
 
     def test_presets_valid(self):
-        """Test all presets produce valid configurations."""
+
         for preset in SkewPreset:
             config = get_preset_config(preset)
             warnings = config.validate()

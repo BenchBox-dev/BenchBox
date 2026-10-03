@@ -45,13 +45,13 @@ class TestTSBSDevOpsDuckDBIntegration:
         conn.close()
 
     def test_benchmark_instantiation(self, tsbs_benchmark):
-        """Test that TSBS DevOps benchmark can be instantiated."""
+
         assert tsbs_benchmark.scale_factor == 0.1
         assert tsbs_benchmark.num_hosts == 5
         assert tsbs_benchmark._impl is not None
 
     def test_benchmark_info(self, tsbs_benchmark):
-        """Test that benchmark info provides comprehensive metadata."""
+
         info = tsbs_benchmark.get_benchmark_info()
 
         # Check required fields
@@ -71,7 +71,7 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert info["num_queries"] == 18
 
     def test_get_queries(self, tsbs_benchmark):
-        """Test that all queries can be retrieved."""
+
         queries = tsbs_benchmark.get_queries()
 
         # Should have 18 queries
@@ -84,7 +84,7 @@ class TestTSBSDevOpsDuckDBIntegration:
             assert "SELECT" in query_text.upper(), f"Query {query_id} should be a SELECT statement"
 
     def test_get_query_by_id(self, tsbs_benchmark):
-        """Test retrieving individual queries."""
+
         # Test a known query ID
         query = tsbs_benchmark.get_query("single-host-12-hr")
         assert isinstance(query, str)
@@ -92,7 +92,7 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert "cpu" in query.lower()
 
     def test_get_queries_by_category(self, tsbs_benchmark):
-        """Test filtering queries by category."""
+
         # Test aggregation category
         aggregation_queries = tsbs_benchmark.get_queries_by_category("aggregation")
         assert len(aggregation_queries) > 0
@@ -106,7 +106,7 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert len(single_host_queries) > 0
 
     def test_query_info(self, tsbs_benchmark):
-        """Test that query metadata is available."""
+
         info = tsbs_benchmark.get_query_info("cpu-max-all-1-hr")
 
         assert "id" in info
@@ -115,7 +115,7 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert info["category"] == "aggregation"
 
     def test_schema_creation(self, tsbs_benchmark, duckdb_conn):
-        """Test that schema can be created in DuckDB."""
+
         # Get schema SQL
         sql = tsbs_benchmark.get_create_tables_sql(dialect="duckdb")
 
@@ -143,10 +143,9 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert "net" in table_names, "net table should exist"
 
     def test_schema_columns(self, tsbs_benchmark):
-        """Test that schema has correct column definitions."""
+
         schema = tsbs_benchmark.get_schema()
 
-        # Check tags table
         assert "tags" in schema
         tags_columns = schema["tags"]["columns"]
         assert "hostname" in tags_columns
@@ -154,7 +153,6 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert "datacenter" in tags_columns
         assert "service" in tags_columns
 
-        # Check cpu table
         assert "cpu" in schema
         cpu_columns = schema["cpu"]["columns"]
         assert "time" in cpu_columns
@@ -163,7 +161,6 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert "usage_system" in cpu_columns
         assert "usage_idle" in cpu_columns
 
-        # Check mem table
         assert "mem" in schema
         mem_columns = schema["mem"]["columns"]
         assert "time" in mem_columns
@@ -172,7 +169,7 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert "used" in mem_columns
 
     def test_query_sql_syntax_validity(self, tsbs_benchmark):
-        """Test that all queries have valid SQL syntax."""
+
         queries = tsbs_benchmark.get_queries()
 
         for query_id, query_text in queries.items():
@@ -206,7 +203,7 @@ class TestTSBSDevOpsDuckDBIntegration:
         assert rows == [("host_0", datetime(2024, 1, 1, 1, 0), 20.0, 5.0, 75.0)]
 
     def test_scale_factor_validation(self, temp_dir):
-        """Test that invalid scale factors are rejected."""
+
         with pytest.raises(ValueError, match="must be positive"):
             TSBSDevOps(scale_factor=0, output_dir=temp_dir)
 
@@ -214,7 +211,7 @@ class TestTSBSDevOpsDuckDBIntegration:
             TSBSDevOps(scale_factor=-1.0, output_dir=temp_dir)
 
     def test_generation_stats(self, tsbs_benchmark):
-        """Test that generation stats are available."""
+
         stats = tsbs_benchmark.get_generation_stats()
 
         assert "num_hosts" in stats
@@ -246,7 +243,7 @@ class TestTSBSDevOpsDataGeneration:
         return benchmark
 
     def test_data_generation_creates_files(self, tsbs_with_data):
-        """Test that data generation creates expected files."""
+
         tables = tsbs_with_data.tables
 
         assert "tags" in tables
@@ -261,7 +258,7 @@ class TestTSBSDevOpsDataGeneration:
             assert file_path.stat().st_size > 0, f"{table_name} data file should not be empty"
 
     def test_tags_data_structure(self, tsbs_with_data):
-        """Test that tags data has correct structure."""
+
         import csv
 
         tags_file = tsbs_with_data.tables["tags"]
@@ -290,7 +287,7 @@ class TestTSBSDevOpsDataGeneration:
             assert len(rows) == 3  # num_hosts = 3
 
     def test_cpu_data_structure(self, tsbs_with_data):
-        """Test that CPU data has correct structure."""
+
         import csv
 
         cpu_file = tsbs_with_data.tables["cpu"]
@@ -316,7 +313,7 @@ class TestTSBSDevOpsDataGeneration:
             assert len(first_row) == len(header)
 
     def test_data_load_to_duckdb(self, tsbs_with_data):
-        """Test that data can be loaded into DuckDB."""
+
         conn = duckdb.connect(":memory:")
 
         try:
@@ -348,7 +345,7 @@ class TestTSBSDevOpsDataGeneration:
             conn.close()
 
     def test_queries_execute_on_data(self, tsbs_with_data):
-        """Test that benchmark queries execute successfully on loaded data."""
+
         conn = duckdb.connect(":memory:")
 
         try:

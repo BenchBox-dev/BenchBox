@@ -36,14 +36,14 @@ class TestIsDaskDataFrame:
     """Tests for _is_dask_df helper function."""
 
     def test_pandas_dataframe_returns_false(self):
-        """Test that Pandas DataFrame returns False."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
         assert _is_dask_df(df) is False
 
     def test_dask_dataframe_returns_true(self):
-        """Test that Dask DataFrame returns True."""
+
         try:
             import dask.dataframe as dd
 
@@ -56,13 +56,13 @@ class TestIsDaskDataFrame:
             pytest.skip("Dask not installed")
 
     def test_mock_with_dask_module_returns_true(self):
-        """Test that mock with dask module name returns True."""
+
         mock_df = Mock()
         mock_df.__class__.__module__ = "dask.dataframe.core"
         assert _is_dask_df(mock_df) is True
 
     def test_mock_with_pandas_module_returns_false(self):
-        """Test that mock with pandas module name returns False."""
+
         mock_df = Mock()
         mock_df.__class__.__module__ = "pandas.core.frame"
         assert _is_dask_df(mock_df) is False
@@ -72,25 +72,25 @@ class TestIsDataFrame:
     """Tests for _is_dataframe helper function."""
 
     def test_pandas_dataframe_returns_true(self):
-        """Test that Pandas DataFrame returns True."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
         assert _is_dataframe(df) is True
 
     def test_pandas_series_returns_false(self):
-        """Test that Pandas Series returns False."""
+
         import pandas as pd
 
         series = pd.Series([1, 2, 3])
         assert _is_dataframe(series) is False
 
     def test_dict_returns_false(self):
-        """Test that dict returns False."""
+
         assert _is_dataframe({"a": 1}) is False
 
     def test_list_returns_false(self):
-        """Test that list returns False."""
+
         assert _is_dataframe([1, 2, 3]) is False
 
 
@@ -103,7 +103,7 @@ class TestUnifiedPandasFrameInit:
     """Tests for UnifiedPandasFrame initialization."""
 
     def test_init_stores_df_and_adapter(self):
-        """Test that init stores DataFrame and adapter."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -115,7 +115,7 @@ class TestUnifiedPandasFrameInit:
         assert wrapper._adapter is adapter
 
     def test_native_property_returns_underlying_df(self):
-        """Test that native property returns the underlying DataFrame."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -130,7 +130,7 @@ class TestUnifiedPandasFrameProperties:
     """Tests for UnifiedPandasFrame property access."""
 
     def test_columns_returns_df_columns(self):
-        """Test that columns property returns DataFrame columns."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1], "b": [2]})
@@ -139,7 +139,7 @@ class TestUnifiedPandasFrameProperties:
         assert list(wrapper.columns) == ["a", "b"]
 
     def test_dtypes_returns_df_dtypes(self):
-        """Test that dtypes property returns DataFrame dtypes."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1], "b": ["x"]})
@@ -150,7 +150,7 @@ class TestUnifiedPandasFrameProperties:
         assert "b" in dtypes.index
 
     def test_shape_returns_df_shape(self):
-        """Test that shape property returns DataFrame shape."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
@@ -163,7 +163,7 @@ class TestUnifiedPandasFrameItemAccess:
     """Tests for UnifiedPandasFrame item access."""
 
     def test_getitem_column_returns_series(self):
-        """Test that getitem with column name returns Series."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
@@ -173,7 +173,7 @@ class TestUnifiedPandasFrameItemAccess:
         assert list(result) == [1, 2, 3]
 
     def test_getitem_columns_returns_wrapper(self):
-        """Test that getitem with column list returns wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
@@ -184,7 +184,7 @@ class TestUnifiedPandasFrameItemAccess:
         assert list(result.columns) == ["a", "b"]
 
     def test_getitem_mask_returns_wrapper(self):
-        """Test that getitem with boolean mask returns wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -195,7 +195,7 @@ class TestUnifiedPandasFrameItemAccess:
         assert len(result) == 2
 
     def test_setitem_updates_column(self):
-        """Test that setitem updates column."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -209,7 +209,7 @@ class TestUnifiedPandasFrameCopy:
     """Tests for UnifiedPandasFrame copy operation."""
 
     def test_copy_returns_wrapper(self):
-        """Test that copy returns a new wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -220,7 +220,7 @@ class TestUnifiedPandasFrameCopy:
         assert result._df is not df  # Different DataFrame object
 
     def test_copy_with_dask_uses_shallow(self):
-        """Test that copy with Dask uses shallow copy."""
+
         try:
             import dask.dataframe as dd
             import pandas as pd
@@ -242,7 +242,7 @@ class TestUnifiedPandasFrameMerge:
     """Tests for UnifiedPandasFrame merge operation."""
 
     def test_merge_returns_wrapper(self):
-        """Test that merge returns a UnifiedPandasFrame."""
+
         import pandas as pd
 
         left = pd.DataFrame({"key": [1, 2], "a": ["x", "y"]})
@@ -259,7 +259,7 @@ class TestUnifiedPandasFrameMerge:
         assert "b" in result.columns
 
     def test_merge_with_native_df(self):
-        """Test that merge works with native DataFrame."""
+
         import pandas as pd
 
         left = pd.DataFrame({"key": [1, 2], "a": ["x", "y"]})
@@ -274,7 +274,7 @@ class TestUnifiedPandasFrameMerge:
         assert "b" in result.columns
 
     def test_merge_with_left_on_right_on(self):
-        """Test merge with left_on and right_on."""
+
         import pandas as pd
 
         left = pd.DataFrame({"l_key": [1, 2], "a": ["x", "y"]})
@@ -293,7 +293,7 @@ class TestUnifiedPandasFrameSort:
     """Tests for UnifiedPandasFrame sort operations."""
 
     def test_sort_values_returns_wrapper(self):
-        """Test that sort_values returns a wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [3, 1, 2]})
@@ -305,7 +305,7 @@ class TestUnifiedPandasFrameSort:
         assert list(result._df["a"]) == [1, 2, 3]
 
     def test_sort_values_descending(self):
-        """Test sort_values with descending order."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -320,7 +320,7 @@ class TestUnifiedPandasFrameHead:
     """Tests for UnifiedPandasFrame head/tail operations."""
 
     def test_head_returns_wrapper(self):
-        """Test that head returns a wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": range(10)})
@@ -332,7 +332,7 @@ class TestUnifiedPandasFrameHead:
         assert len(result) == 3
 
     def test_tail_returns_wrapper(self):
-        """Test that tail returns a wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": range(10)})
@@ -348,7 +348,7 @@ class TestUnifiedPandasFrameRename:
     """Tests for UnifiedPandasFrame rename operation."""
 
     def test_rename_returns_wrapper(self):
-        """Test that rename returns a wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"old_name": [1, 2, 3]})
@@ -365,7 +365,7 @@ class TestUnifiedPandasFrameDrop:
     """Tests for UnifiedPandasFrame drop operation."""
 
     def test_drop_columns_returns_wrapper(self):
-        """Test that drop with columns returns wrapper."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
@@ -382,7 +382,7 @@ class TestUnifiedPandasFrameCompute:
     """Tests for UnifiedPandasFrame compute operation."""
 
     def test_compute_on_pandas_returns_df(self):
-        """Test that compute on Pandas DataFrame returns the DataFrame."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -393,7 +393,7 @@ class TestUnifiedPandasFrameCompute:
         assert result is df
 
     def test_compute_on_dask_materializes(self):
-        """Test that compute on Dask DataFrame materializes."""
+
         try:
             import dask.dataframe as dd
             import pandas as pd
@@ -415,7 +415,7 @@ class TestUnifiedPandasFrameLen:
     """Tests for UnifiedPandasFrame length operation."""
 
     def test_len_returns_row_count(self):
-        """Test that len returns row count."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": range(5)})
@@ -428,7 +428,7 @@ class TestUnifiedPandasFrameRepr:
     """Tests for UnifiedPandasFrame string representation."""
 
     def test_repr_includes_type_name(self):
-        """Test that repr includes the DataFrame type name."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1]})
@@ -449,7 +449,7 @@ class TestUnifiedPandasGroupByInit:
     """Tests for UnifiedPandasGroupBy initialization."""
 
     def test_init_stores_parameters(self):
-        """Test that init stores all parameters."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 1, 2], "b": [10, 20, 30]})
@@ -475,7 +475,7 @@ class TestUnifiedPandasGroupByAgg:
     """Tests for UnifiedPandasGroupBy aggregation."""
 
     def test_agg_routes_to_adapter(self):
-        """Test that agg routes to adapter.groupby_agg."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 1, 2], "b": [10, 20, 30]})
@@ -496,7 +496,7 @@ class TestUnifiedPandasGroupByAgg:
         assert isinstance(result, UnifiedPandasFrame)
 
     def test_agg_with_dict_argument(self):
-        """Test agg with positional dict argument."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 1, 2], "b": [10, 20, 30]})
@@ -551,7 +551,7 @@ class TestUnifiedPandasGroupByGetattr:
     """Tests for UnifiedPandasGroupBy attribute proxy."""
 
     def test_getattr_proxies_to_native_groupby(self):
-        """Test that getattr proxies to native groupby."""
+
         import pandas as pd
 
         df = pd.DataFrame({"a": [1, 1, 2], "b": [10, 20, 30]})
@@ -575,7 +575,7 @@ class TestUnifiedPandasFrameIntegration:
     """Integration tests using real Pandas operations."""
 
     def test_chained_operations(self):
-        """Test chained operations maintain wrapper type."""
+
         import pandas as pd
 
         df = pd.DataFrame(
@@ -601,7 +601,7 @@ class TestUnifiedPandasFrameIntegration:
         assert len(result) == 2
 
     def test_groupby_with_pandas_adapter(self):
-        """Test groupby with a pandas-like adapter."""
+
         import pandas as pd
 
         df = pd.DataFrame(

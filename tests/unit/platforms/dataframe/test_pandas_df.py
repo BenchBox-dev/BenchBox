@@ -42,7 +42,7 @@ class TestPandasDataFrameAdapter:
     """Tests for PandasDataFrameAdapter."""
 
     def test_initialization(self):
-        """Test adapter initialization."""
+
         adapter = PandasDataFrameAdapter()
 
         assert adapter.platform_name == "Pandas"
@@ -50,7 +50,7 @@ class TestPandasDataFrameAdapter:
         assert adapter.dtype_backend == "numpy_nullable"
 
     def test_initialization_with_options(self):
-        """Test adapter initialization with custom options."""
+
         adapter = PandasDataFrameAdapter(
             working_dir="/tmp/pandas",
             verbose=True,
@@ -62,7 +62,7 @@ class TestPandasDataFrameAdapter:
         assert adapter.dtype_backend == "pyarrow"
 
     def test_initialization_with_copy_on_write(self):
-        """Test adapter initialization with copy-on-write option."""
+
         # Get Pandas version
         pandas_version = tuple(int(x) for x in pd.__version__.split(".")[:2])
 
@@ -80,7 +80,7 @@ class TestPandasDataFrameAdapter:
             assert adapter.copy_on_write is False
 
     def test_initialization_with_copy_on_write_disabled(self):
-        """Test adapter initialization with copy-on-write explicitly disabled."""
+
         pandas_version = tuple(int(x) for x in pd.__version__.split(".")[:2])
 
         adapter = PandasDataFrameAdapter(copy_on_write=False)
@@ -93,7 +93,7 @@ class TestPandasDataFrameAdapter:
             assert pd.options.mode.copy_on_write is False
 
     def test_platform_info(self):
-        """Test get_platform_info method."""
+
         adapter = PandasDataFrameAdapter()
 
         info = adapter.get_platform_info()
@@ -104,7 +104,7 @@ class TestPandasDataFrameAdapter:
         assert "copy_on_write" in info  # Should include CoW status
 
     def test_create_context(self):
-        """Test context creation."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -118,7 +118,7 @@ class TestPandasDataLoading:
     """Tests for Pandas data loading methods."""
 
     def test_read_csv_basic(self, tmp_path):
-        """Test reading a basic CSV file."""
+
         adapter = PandasDataFrameAdapter()
 
         # Create a test CSV file
@@ -132,7 +132,7 @@ class TestPandasDataLoading:
         assert list(df.columns) == ["id", "name", "amount"]
 
     def test_read_csv_with_delimiter(self, tmp_path):
-        """Test reading CSV with custom delimiter."""
+
         adapter = PandasDataFrameAdapter()
 
         # Create a pipe-delimited file
@@ -144,7 +144,7 @@ class TestPandasDataLoading:
         assert len(df) == 2
 
     def test_read_csv_with_column_names(self, tmp_path):
-        """Test reading CSV with explicit column names."""
+
         adapter = PandasDataFrameAdapter()
 
         # Create a headerless CSV
@@ -302,7 +302,7 @@ class TestPandasDataLoading:
         assert df["code"].dtype == object
 
     def test_read_parquet(self, tmp_path):
-        """Test reading a Parquet file."""
+
         adapter = PandasDataFrameAdapter()
 
         # Create a test Parquet file
@@ -322,7 +322,7 @@ class TestPandasDataLoading:
         assert len(df) == 3
 
     def test_concat_dataframes(self):
-        """Test concatenating DataFrames."""
+
         adapter = PandasDataFrameAdapter()
 
         df1 = pd.DataFrame({"a": [1, 2]})
@@ -333,7 +333,7 @@ class TestPandasDataLoading:
         assert len(combined) == 4
 
     def test_concat_single_dataframe(self):
-        """Test concat with single DataFrame."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -342,7 +342,7 @@ class TestPandasDataLoading:
         assert result is df
 
     def test_get_row_count(self):
-        """Test getting row count."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1, 2, 3, 4, 5]})
@@ -351,7 +351,7 @@ class TestPandasDataLoading:
         assert count == 5
 
     def test_get_first_row(self):
-        """Test getting first row."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
@@ -360,7 +360,7 @@ class TestPandasDataLoading:
         assert first == (1, "x")
 
     def test_get_first_row_empty(self):
-        """Test getting first row from empty DataFrame."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [], "b": []})
@@ -374,7 +374,7 @@ class TestPandasHelperMethods:
     """Tests for Pandas helper methods."""
 
     def test_to_datetime(self):
-        """Test to_datetime conversion."""
+
         adapter = PandasDataFrameAdapter()
 
         series = pd.Series(["2024-01-01", "2024-02-01"])
@@ -383,7 +383,7 @@ class TestPandasHelperMethods:
         assert pd.api.types.is_datetime64_any_dtype(result)
 
     def test_timedelta_days(self):
-        """Test timedelta creation."""
+
         adapter = PandasDataFrameAdapter()
 
         td = adapter.timedelta_days(7)
@@ -391,7 +391,7 @@ class TestPandasHelperMethods:
         assert td == pd.Timedelta(days=7)
 
     def test_merge(self):
-        """Test merge operation."""
+
         adapter = PandasDataFrameAdapter()
 
         left = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
@@ -404,7 +404,7 @@ class TestPandasHelperMethods:
         assert "value" in merged.columns
 
     def test_merge_left_join(self):
-        """Test left merge operation."""
+
         adapter = PandasDataFrameAdapter()
 
         left = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
@@ -415,7 +415,7 @@ class TestPandasHelperMethods:
         assert len(merged) == 3  # All left rows preserved
 
     def test_groupby_agg(self):
-        """Test grouped aggregation."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame(
@@ -432,7 +432,7 @@ class TestPandasHelperMethods:
         assert "amount" in result.columns
 
     def test_filter_rows_greater_than(self):
-        """Test row filtering with > operator."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [1, 5, 10, 15, 20]})
@@ -441,7 +441,7 @@ class TestPandasHelperMethods:
         assert len(filtered) == 2
 
     def test_filter_rows_less_than(self):
-        """Test row filtering with < operator."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [1, 5, 10, 15, 20]})
@@ -450,7 +450,7 @@ class TestPandasHelperMethods:
         assert len(filtered) == 2
 
     def test_filter_rows_equal(self):
-        """Test row filtering with == operator."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [1, 5, 10, 15, 20]})
@@ -459,7 +459,7 @@ class TestPandasHelperMethods:
         assert len(filtered) == 1
 
     def test_filter_rows_invalid_operator(self):
-        """Test row filtering with invalid operator."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [1, 2, 3]})
@@ -468,7 +468,7 @@ class TestPandasHelperMethods:
             adapter.filter_rows(df, "value", "invalid", 10)
 
     def test_sort_values(self):
-        """Test sorting values."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [3, 1, 2]})
@@ -477,7 +477,7 @@ class TestPandasHelperMethods:
         assert list(sorted_df["value"]) == [1, 2, 3]
 
     def test_sort_values_descending(self):
-        """Test sorting values descending."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [1, 3, 2]})
@@ -486,7 +486,7 @@ class TestPandasHelperMethods:
         assert list(sorted_df["value"]) == [3, 2, 1]
 
     def test_select_columns(self):
-        """Test column selection."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
@@ -495,7 +495,7 @@ class TestPandasHelperMethods:
         assert list(selected.columns) == ["a", "c"]
 
     def test_with_column(self):
-        """Test adding a column."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1, 2, 3]})
@@ -510,7 +510,7 @@ class TestPandasQueryExecution:
     """Tests for query execution with Pandas."""
 
     def test_simple_select_query(self):
-        """Test executing a simple select query."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -541,7 +541,7 @@ class TestPandasQueryExecution:
         assert result["rows_returned"] == 3
 
     def test_filter_query(self):
-        """Test executing a filter query."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -571,7 +571,7 @@ class TestPandasQueryExecution:
         assert result["rows_returned"] == 2  # 150 and 200
 
     def test_groupby_query(self):
-        """Test executing a group by query."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -601,7 +601,7 @@ class TestPandasQueryExecution:
         assert result["rows_returned"] == 2  # Two categories
 
     def test_join_query(self):
-        """Test executing a join query."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -642,7 +642,7 @@ class TestPandasQueryExecution:
         assert result["rows_returned"] == 3
 
     def test_query_with_context_helpers(self):
-        """Test query using context helpers."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -678,7 +678,7 @@ class TestPandasTableLoading:
     """Tests for table loading functionality."""
 
     def test_load_table_parquet(self, tmp_path):
-        """Test loading a table from Parquet."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -697,7 +697,7 @@ class TestPandasTableLoading:
         assert row_count == 3
 
     def test_load_table_csv(self, tmp_path):
-        """Test loading a table from CSV."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -711,7 +711,7 @@ class TestPandasTableLoading:
         assert row_count == 2
 
     def test_load_multiple_tables(self, tmp_path):
-        """Test loading multiple tables."""
+
         adapter = PandasDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -732,7 +732,7 @@ class TestPandasScalarExtraction:
     """Tests for Pandas scalar extraction optimization."""
 
     def test_scalar_single_value_dataframe(self):
-        """Test scalar extraction from single-value DataFrame."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [42]})
@@ -741,7 +741,7 @@ class TestPandasScalarExtraction:
         assert result == 42
 
     def test_scalar_with_column_name(self):
-        """Test scalar extraction with explicit column name."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"a": [1], "b": [2], "c": [3]})
@@ -750,7 +750,7 @@ class TestPandasScalarExtraction:
         assert result == 2
 
     def test_scalar_first_column_multicolumn_df(self):
-        """Test scalar extraction defaults to first column."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"first": [10], "second": [20]})
@@ -759,7 +759,7 @@ class TestPandasScalarExtraction:
         assert result == 10
 
     def test_scalar_empty_dataframe_raises(self):
-        """Test that scalar extraction on empty DataFrame raises ValueError."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": []})
@@ -768,7 +768,7 @@ class TestPandasScalarExtraction:
             adapter.scalar(df)
 
     def test_scalar_float_value(self):
-        """Test scalar extraction with float value."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [3.14159]})
@@ -777,7 +777,7 @@ class TestPandasScalarExtraction:
         assert result == pytest.approx(3.14159)
 
     def test_scalar_string_value(self):
-        """Test scalar extraction with string value."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": ["hello"]})
@@ -796,7 +796,7 @@ class TestPandasScalarExtraction:
         assert result == 999
 
     def test_scalar_multiple_rows_raises(self):
-        """Test that scalar extraction on multi-row DataFrame raises ValueError."""
+
         adapter = PandasDataFrameAdapter()
 
         df = pd.DataFrame({"value": [1, 2, 3]})
@@ -818,7 +818,7 @@ class TestPandasNotAvailable:
     """Tests for behavior when Pandas is not installed."""
 
     def test_pandas_available_flag(self):
-        """Test that PANDAS_AVAILABLE flag is set correctly."""
+
         from benchbox.platforms.dataframe.pandas_df import PANDAS_AVAILABLE
 
         # This just tests that the flag exists and is boolean

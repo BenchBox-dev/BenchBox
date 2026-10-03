@@ -53,7 +53,7 @@ class TestLibraryInfo:
     """Test LibraryInfo dataclass."""
 
     def test_library_info_installed(self):
-        """Test LibraryInfo for installed library."""
+
         lib = LibraryInfo(name="duckdb", version="0.9.0", installed=True)
         assert lib.name == "duckdb"
         assert lib.version == "0.9.0"
@@ -61,7 +61,7 @@ class TestLibraryInfo:
         assert lib.import_error is None
 
     def test_library_info_missing(self):
-        """Test LibraryInfo for missing library."""
+
         lib = LibraryInfo(
             name="nonexistent",
             version=None,
@@ -78,13 +78,13 @@ class TestPlatformNameNormalization:
     """Test platform name normalization and aliases."""
 
     def test_normalize_lowercase(self):
-        """Test that names are lowercased."""
+
         assert normalize_platform_name("DuckDB") == "duckdb"
         assert normalize_platform_name("PostgreSQL") == "postgresql"
         assert normalize_platform_name("CLICKHOUSE") == "clickhouse"
 
     def test_normalize_postgres_aliases(self):
-        """Test PostgreSQL aliases."""
+
         assert normalize_platform_name("postgres") == "postgresql"
         assert normalize_platform_name("pg") == "postgresql"
         assert normalize_platform_name("pgsql") == "postgresql"
@@ -92,7 +92,7 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("PG") == "postgresql"
 
     def test_normalize_trino_presto_aliases(self):
-        """Test Trino and Presto aliases."""
+
         assert normalize_platform_name("trinodb") == "trino"
         assert normalize_platform_name("TrinoDB") == "trino"
         assert normalize_platform_name("prestodb") == "presto"
@@ -108,13 +108,13 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("CH") == "clickhouse-local"
 
     def test_normalize_bigquery_aliases(self):
-        """Test BigQuery aliases."""
+
         assert normalize_platform_name("bq") == "bigquery"
         assert normalize_platform_name("gbq") == "bigquery"
         assert normalize_platform_name("BQ") == "bigquery"
 
     def test_normalize_other_aliases(self):
-        """Test other platform aliases."""
+
         assert normalize_platform_name("duck") == "duckdb"
         assert normalize_platform_name("dbx") == "databricks"
         assert normalize_platform_name("snow") == "snowflake"
@@ -124,7 +124,7 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("azuresynapse") == "synapse"
 
     def test_normalize_dataframe_platform_aliases(self):
-        """Test DataFrame platform CLI aliases."""
+
         assert normalize_platform_name("polars-df") == "polars"
         assert normalize_platform_name("pandas-df") == "pandas"
         assert normalize_platform_name("pyspark-df") == "pyspark"
@@ -143,7 +143,7 @@ class TestPlatformNameNormalization:
         assert normalize_platform_name("presto") == "presto"
 
     def test_platform_aliases_dict_exists(self):
-        """Test that PLATFORM_ALIASES contains expected entries."""
+
         assert "postgres" in PLATFORM_ALIASES
         assert "pg" in PLATFORM_ALIASES
         assert "ch" in PLATFORM_ALIASES
@@ -155,7 +155,7 @@ class TestPlatformInfo:
     """Test PlatformInfo dataclass."""
 
     def test_platform_info_complete(self):
-        """Test PlatformInfo with all fields."""
+
         lib = LibraryInfo(name="duckdb", version="0.9.0", installed=True)
         platform = PlatformInfo(
             name="duckdb",
@@ -272,7 +272,7 @@ class TestPlatformManager:
         reset_platform_registry_test_state()
 
     def test_platform_registry_exists(self):
-        """Test that platform registry is properly initialized."""
+
         registry = self.manager.platform_registry
         assert isinstance(registry, dict)
         # Base platforms should always be present
@@ -282,7 +282,7 @@ class TestPlatformManager:
         # (clickhouse, bigquery, databricks, snowflake, redshift)
 
     def test_platform_registry_structure(self):
-        """Test platform registry has correct structure."""
+
         duckdb_spec = self.manager.platform_registry["duckdb"]
 
         required_keys = [
@@ -305,7 +305,7 @@ class TestPlatformManager:
         assert duckdb_spec["libraries"][0]["required"] is True
 
     def test_config_loading_new_file(self):
-        """Test config loading when file doesn't exist."""
+
         config = self.manager._config
         assert "enabled_platforms" in config
         assert isinstance(config["enabled_platforms"], list)
@@ -313,7 +313,7 @@ class TestPlatformManager:
         assert len(config["enabled_platforms"]) == len(self.manager.platform_registry)
 
     def test_config_save_and_load(self):
-        """Test saving and loading configuration."""
+
         # Modify config
         self.manager._config["enabled_platforms"] = ["duckdb", "sqlite"]
         self.manager._save_config()
@@ -324,7 +324,7 @@ class TestPlatformManager:
 
     @patch("importlib.import_module")
     def test_detect_library_success(self, mock_import):
-        """Test successful library detection."""
+
         mock_module = Mock()
         mock_module.__version__ = "1.0.0"
         mock_import.return_value = mock_module
@@ -339,7 +339,7 @@ class TestPlatformManager:
 
     @patch("importlib.import_module")
     def test_detect_library_failure(self, mock_import):
-        """Test library detection failure."""
+
         mock_import.side_effect = ImportError("No module named 'missing_lib'")
 
         lib_spec = {"name": "missing_lib", "required": True}
@@ -352,7 +352,7 @@ class TestPlatformManager:
 
     @patch.object(PlatformRegistry, "_detect_library")
     def test_detect_platforms_all_available(self, mock_detect_library):
-        """Test platform detection when all libraries are available."""
+
         mock_detect_library.side_effect = lambda spec: LibraryInfo(name=spec["name"], version="1.0.0", installed=True)
 
         platforms = self.manager.detect_platforms()
@@ -368,7 +368,6 @@ class TestPlatformManager:
 
     @patch.object(PlatformRegistry, "_detect_library")
     def test_detect_platforms_some_missing(self, mock_detect_library):
-        """Test platform detection when some libraries are missing."""
 
         def side_effect(spec):
             installed = spec["name"] in {"duckdb", "sqlite3"}
@@ -391,7 +390,7 @@ class TestPlatformManager:
         # In this test, only duckdb and sqlite dependencies are mocked as available
 
     def test_get_available_platforms(self):
-        """Test getting list of available platforms."""
+
         with patch.object(self.manager, "detect_platforms") as mock_detect:
             mock_platforms = {
                 "duckdb": PlatformInfo(
@@ -423,7 +422,7 @@ class TestPlatformManager:
             assert available == ["duckdb"]
 
     def test_get_enabled_platforms(self):
-        """Test getting list of enabled platforms."""
+
         with patch.object(self.manager, "detect_platforms") as mock_detect:
             mock_platforms = {
                 "duckdb": PlatformInfo(
@@ -455,7 +454,7 @@ class TestPlatformManager:
             assert enabled == ["duckdb"]
 
     def test_enable_platform_success(self):
-        """Test successfully enabling a platform."""
+
         # Set up config with only duckdb enabled
         self.manager._config["enabled_platforms"] = ["duckdb"]
 
@@ -480,7 +479,7 @@ class TestPlatformManager:
             assert "sqlite" in self.manager._config["enabled_platforms"]
 
     def test_enable_platform_not_available(self):
-        """Test enabling a platform that's not available."""
+
         with patch.object(self.manager, "detect_platforms") as mock_detect:
             mock_platforms = {
                 "missing": PlatformInfo(
@@ -501,13 +500,12 @@ class TestPlatformManager:
             assert result is False
 
     def test_enable_platform_unknown(self):
-        """Test enabling an unknown platform."""
+
         result = self.manager.enable_platform("nonexistent")
         assert result is False
 
     def test_disable_platform_success(self):
-        """Test successfully disabling a platform."""
-        # Set up config with platforms enabled
+
         self.manager._config["enabled_platforms"] = ["duckdb", "sqlite"]
 
         result = self.manager.disable_platform("sqlite")
@@ -516,12 +514,12 @@ class TestPlatformManager:
         assert "duckdb" in self.manager._config["enabled_platforms"]
 
     def test_disable_platform_unknown(self):
-        """Test disabling an unknown platform."""
+
         result = self.manager.disable_platform("nonexistent")
         assert result is False
 
     def test_is_platform_available(self):
-        """Test platform availability checking."""
+
         with patch.object(self.manager, "detect_platforms") as mock_detect:
             mock_platforms = {
                 "duckdb": PlatformInfo(
@@ -554,7 +552,7 @@ class TestPlatformManager:
             assert self.manager.is_platform_available("nonexistent") is False
 
     def test_get_installation_guide(self):
-        """Test getting installation guide for a platform."""
+
         # Use real platform from registry
         guide = self.manager.get_installation_guide("duckdb")
 
@@ -567,7 +565,7 @@ class TestPlatformManager:
         assert isinstance(guide["missing_libraries"], list)
 
     def test_get_installation_guide_unknown_platform(self):
-        """Test getting installation guide for unknown platform."""
+
         guide = self.manager.get_installation_guide("nonexistent")
         assert guide is None
 
@@ -736,7 +734,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_list_platforms_table_format(self, mock_get_manager):
-        """Test list platforms command with table format."""
+
         mock_manager = Mock()
         mock_get_manager.return_value = mock_manager
 
@@ -747,7 +745,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_list_platforms_simple_format(self, mock_get_manager):
-        """Test list platforms command with simple format."""
+
         mock_manager = Mock()
         mock_get_manager.return_value = mock_manager
 
@@ -770,7 +768,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_list_platforms_show_deployments(self, mock_get_manager):
-        """Test list platforms command with deployment mode output."""
+
         mock_manager = Mock()
         mock_get_manager.return_value = mock_manager
 
@@ -782,7 +780,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_all(self, mock_get_manager):
-        """Test platform status command for all platforms."""
+
         mock_manager = Mock()
         mock_get_manager.return_value = mock_manager
 
@@ -793,7 +791,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_specific(self, mock_get_manager):
-        """Test platform status command for specific platform."""
+
         mock_manager = Mock()
         mock_lib = LibraryInfo(name="duckdb", version="1.0.0", installed=True)
         mock_platforms = {
@@ -893,7 +891,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_platform_status_unknown(self, mock_get_manager):
-        """Test platform status command for unknown platform."""
+
         mock_manager = Mock()
         mock_manager.detect_platforms.return_value = {}
         mock_get_manager.return_value = mock_manager
@@ -905,7 +903,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_enable_platform_success(self, mock_get_manager):
-        """Test enabling platform successfully."""
+
         mock_manager = Mock()
         mock_platforms = {
             "duckdb": PlatformInfo(
@@ -932,7 +930,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_enable_platform_already_enabled(self, mock_get_manager):
-        """Test enabling platform that's already enabled."""
+
         mock_manager = Mock()
         mock_platforms = {
             "duckdb": PlatformInfo(
@@ -957,7 +955,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_enable_platform_not_available(self, mock_get_manager):
-        """Test enabling platform that's not available."""
+
         mock_manager = Mock()
         mock_platforms = {
             "missing": PlatformInfo(
@@ -1011,7 +1009,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_disable_platform_success(self, mock_get_manager):
-        """Test disabling platform successfully."""
+
         mock_manager = Mock()
         mock_platforms = {
             "duckdb": PlatformInfo(
@@ -1064,7 +1062,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_install_platform_available(self, mock_get_manager):
-        """Test install command for already available platform."""
+
         mock_manager = Mock()
         mock_guide = {
             "platform": "DuckDB",
@@ -1085,7 +1083,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_install_platform_missing(self, mock_get_manager):
-        """Test install command for missing platform."""
+
         mock_manager = Mock()
         mock_guide = {
             "platform": "ClickHouse",
@@ -1129,7 +1127,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_check_platforms_all_ready(self, mock_get_manager):
-        """Test check platforms command when all are ready."""
+
         mock_manager = Mock()
         mock_platforms = {
             "duckdb": PlatformInfo(
@@ -1156,7 +1154,7 @@ class TestCLICommands:
 
     @patch("benchbox.cli.platform.get_platform_manager")
     def test_check_platforms_some_missing(self, mock_get_manager):
-        """Test check platforms command when some have issues."""
+
         mock_manager = Mock()
         mock_platforms = {
             "duckdb": PlatformInfo(
@@ -1292,13 +1290,13 @@ class TestGlobalPlatformManager:
     """Test global platform manager function."""
 
     def test_get_platform_manager_singleton(self):
-        """Test that get_platform_manager returns same instance."""
+
         manager1 = get_platform_manager()
         manager2 = get_platform_manager()
         assert manager1 is manager2
 
     def test_get_platform_manager_returns_platform_manager(self):
-        """Test that get_platform_manager returns PlatformManager instance."""
+
         manager = get_platform_manager()
         assert isinstance(manager, PlatformManager)
 

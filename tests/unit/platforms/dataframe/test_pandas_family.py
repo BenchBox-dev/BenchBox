@@ -72,7 +72,7 @@ class TestPandasFamilyContext:
     """Tests for PandasFamilyContext."""
 
     def test_context_creation(self):
-        """Test creating a context from an adapter."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -136,7 +136,7 @@ class TestPandasFamilyContext:
         assert result["column"] == "int_col"
 
     def test_context_table_registration(self):
-        """Test table registration in context."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -149,7 +149,7 @@ class TestPandasFamilyContext:
         assert result.native == test_df
 
     def test_context_list_tables(self):
-        """Test listing tables in context."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -165,7 +165,7 @@ class TestPandasFamilyAdapter:
     """Tests for PandasFamilyAdapter abstract class."""
 
     def test_adapter_initialization(self):
-        """Test adapter initialization."""
+
         adapter = MockPandasAdapter()
 
         assert adapter.platform_name == "MockPandas"
@@ -175,7 +175,7 @@ class TestPandasFamilyAdapter:
         assert adapter.platform_config == {}
 
     def test_adapter_initialization_with_options(self):
-        """Test adapter initialization with options."""
+
         adapter = MockPandasAdapter(
             working_dir="/tmp/test",
             verbose=True,
@@ -187,14 +187,14 @@ class TestPandasFamilyAdapter:
         assert adapter.very_verbose is True
 
     def test_create_context(self):
-        """Test context creation."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
         assert isinstance(ctx, PandasFamilyContext)
 
     def test_get_context_creates_if_missing(self):
-        """Test that get_context creates context if missing."""
+
         adapter = MockPandasAdapter()
 
         ctx = adapter.get_context()
@@ -203,7 +203,7 @@ class TestPandasFamilyAdapter:
         assert adapter._context == ctx
 
     def test_get_context_returns_existing(self):
-        """Test that get_context returns existing context."""
+
         adapter = MockPandasAdapter()
 
         ctx1 = adapter.create_context()
@@ -212,26 +212,26 @@ class TestPandasFamilyAdapter:
         assert ctx1 is ctx2
 
     def test_detect_format_parquet(self):
-        """Test format detection for Parquet files."""
+
         adapter = MockPandasAdapter()
 
         assert adapter._detect_format(Path("data.parquet")) == "parquet"
 
     def test_detect_format_tbl(self):
-        """Test format detection for TBL files."""
+
         adapter = MockPandasAdapter()
 
         assert adapter._detect_format(Path("lineitem.tbl")) == "tbl"
 
     def test_detect_format_csv(self):
-        """Test format detection for CSV files."""
+
         adapter = MockPandasAdapter()
 
         assert adapter._detect_format(Path("data.csv")) == "csv"
         assert adapter._detect_format(Path("file.txt")) == "csv"  # default
 
     def test_date_sub_returns_descriptor(self):
-        """Test date_sub operation descriptor."""
+
         adapter = MockPandasAdapter()
 
         result = adapter.date_sub("date", 7)
@@ -239,7 +239,7 @@ class TestPandasFamilyAdapter:
         assert result == {"op": "date_sub", "column": "date", "days": 7}
 
     def test_date_add_returns_descriptor(self):
-        """Test date_add operation descriptor."""
+
         adapter = MockPandasAdapter()
 
         result = adapter.date_add("date", 30)
@@ -247,7 +247,7 @@ class TestPandasFamilyAdapter:
         assert result == {"op": "date_add", "column": "date", "days": 30}
 
     def test_timedelta_days(self):
-        """Test timedelta creation."""
+
         adapter = MockPandasAdapter()
 
         td = adapter.timedelta_days(7)
@@ -255,11 +255,10 @@ class TestPandasFamilyAdapter:
         assert td == timedelta(days=7)
 
     def test_execute_query_success(self):
-        """Test successful query execution."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
-        # Register a test table
         ctx.register_table("orders", {"rows": 100})
 
         def pandas_impl(ctx):
@@ -309,7 +308,7 @@ class TestPandasFamilyAdapter:
         assert result["execution_time_seconds"] >= 0.0
 
     def test_execute_query_failure(self):
-        """Test query execution failure handling."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -330,7 +329,7 @@ class TestPandasFamilyAdapter:
         assert "Test error" in result["error"]
 
     def test_execute_query_no_impl(self):
-        """Test error when query has no pandas implementation."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -350,11 +349,10 @@ class TestPandasFamilyAdapter:
         assert "no pandas implementation" in result["error"]
 
     def test_load_table_with_parquet(self, tmp_path):
-        """Test loading table from Parquet file."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
-        # Create a mock parquet file path
         parquet_file = tmp_path / "orders.parquet"
         parquet_file.touch()
 
@@ -364,7 +362,7 @@ class TestPandasFamilyAdapter:
         assert row_count == 10  # Mock returns 10
 
     def test_load_table_no_files_raises(self):
-        """Test that loading with no files raises error."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
@@ -413,11 +411,10 @@ class TestQueryIntegration:
     """Integration tests for query execution."""
 
     def test_query_with_table_access(self):
-        """Test query that accesses registered tables."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 
-        # Register test data
         ctx.register_table("orders", {"rows": 50, "data": "test"})
         ctx.register_table("customers", {"rows": 10, "data": "cust"})
 
@@ -440,7 +437,7 @@ class TestQueryIntegration:
         assert result["rows_returned"] == 50
 
     def test_query_with_column_access(self):
-        """Test query that uses column access helpers."""
+
         adapter = MockPandasAdapter()
         ctx = adapter.create_context()
 

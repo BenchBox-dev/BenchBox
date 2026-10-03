@@ -42,7 +42,7 @@ class TestDeltaLakeMaintenanceAvailability:
     """Tests for Delta Lake maintenance availability."""
 
     def test_get_maintenance_operations_returns_delta_lake(self):
-        """Test that delta-lake platform returns DeltaLakeMaintenanceOperations."""
+
         from benchbox.core.dataframe.maintenance_interface import (
             get_maintenance_operations_for_platform,
         )
@@ -57,7 +57,7 @@ class TestDeltaLakeMaintenanceAvailability:
         assert isinstance(result, DeltaLakeMaintenanceOperations)
 
     def test_capabilities(self):
-        """Test Delta Lake capabilities are correct."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
             DeltaLakeMaintenanceOperations,
         )
@@ -74,7 +74,7 @@ class TestDeltaLakeMaintenanceAvailability:
         assert caps.supports_time_travel is True
 
     def test_tpc_compliance(self):
-        """Test that Delta Lake is TPC compliant."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
             DeltaLakeMaintenanceOperations,
         )
@@ -91,7 +91,7 @@ class TestDeltaLakeInsert:
     """Tests for Delta Lake insert operations."""
 
     def test_insert_new_rows(self, tmp_path):
-        """Test inserting new rows to a Delta table."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
             DeltaLakeMaintenanceOperations,
         )
@@ -115,7 +115,7 @@ class TestDeltaLakeInsert:
         assert result.operation_type.value == "insert"
 
     def test_insert_append_mode(self, tmp_path):
-        """Test appending rows to existing Delta table."""
+
         from deltalake import DeltaTable, write_deltalake
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -142,7 +142,7 @@ class TestDeltaLakeInsert:
         assert total_rows == 4
 
     def test_insert_overwrite_mode(self, tmp_path):
-        """Test overwriting Delta table."""
+
         from deltalake import DeltaTable, write_deltalake
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -169,7 +169,7 @@ class TestDeltaLakeInsert:
         assert total_rows == 2
 
     def test_insert_empty_dataframe(self, tmp_path):
-        """Test inserting empty dataframe."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
             DeltaLakeMaintenanceOperations,
         )
@@ -190,7 +190,7 @@ class TestDeltaLakeDelete:
     """Tests for Delta Lake delete operations."""
 
     def test_delete_with_condition(self, tmp_path):
-        """Test deleting rows with a condition."""
+
         from deltalake import DeltaTable, write_deltalake
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -222,7 +222,7 @@ class TestDeltaLakeDelete:
         assert remaining == 3
 
     def test_delete_no_matches(self, tmp_path):
-        """Test delete when no rows match condition."""
+
         from deltalake import DeltaTable, write_deltalake
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -267,7 +267,7 @@ class TestDeltaLakeUpdate:
     """Tests for Delta Lake update operations."""
 
     def test_update_rows(self, tmp_path):
-        """Test updating rows with a condition."""
+
         from deltalake import DeltaTable, write_deltalake
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -309,7 +309,7 @@ class TestDeltaLakeMerge:
     """Tests for Delta Lake merge (upsert) operations."""
 
     def test_merge_upsert(self, tmp_path):
-        """Test merge operation for upsert."""
+
         from deltalake import DeltaTable, write_deltalake
 
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
@@ -351,7 +351,7 @@ class TestDeltaLakeMaintenanceResult:
     """Tests for Delta Lake maintenance result timing."""
 
     def test_result_timing(self, tmp_path):
-        """Test that results include timing information."""
+
         from benchbox.platforms.dataframe.delta_lake_maintenance import (
             DeltaLakeMaintenanceOperations,
         )
@@ -371,7 +371,7 @@ class TestDeltaLakeDataFrameConversion:
     """Tests for DataFrame type conversion."""
 
     def test_convert_polars_dataframe(self, tmp_path):
-        """Test converting Polars DataFrame to PyArrow."""
+
         pytest.importorskip("polars")
         import polars as pl
 
@@ -391,7 +391,7 @@ class TestDeltaLakeDataFrameConversion:
         assert result.rows_affected == 3
 
     def test_convert_pandas_dataframe(self, tmp_path):
-        """Test converting Pandas DataFrame to PyArrow."""
+
         pytest.importorskip("pandas")
         import pandas as pd
 

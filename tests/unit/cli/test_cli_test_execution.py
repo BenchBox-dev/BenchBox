@@ -30,7 +30,7 @@ class TestCLITestExecution:
         self.runner = CliRunner()
 
     def test_power_phase_validation(self, cli_benchmark_mocks):
-        """Test that power phase works correctly."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -51,7 +51,7 @@ class TestCLITestExecution:
         assert "running tpch on duckdb" in result.output.lower() or "power test execution" in result.output.lower()
 
     def test_throughput_phase_validation(self, cli_benchmark_mocks):
-        """Test that throughput phase works correctly."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -72,7 +72,7 @@ class TestCLITestExecution:
         assert "running tpch on duckdb" in result.output.lower() or "throughput test execution" in result.output.lower()
 
     def test_maintenance_phase_validation(self, cli_benchmark_mocks):
-        """Test that maintenance phase works correctly."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -95,7 +95,7 @@ class TestCLITestExecution:
         )
 
     def test_combined_phases_validation(self, cli_benchmark_mocks):
-        """Test that combined phases work correctly."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -122,7 +122,7 @@ class TestCLITestExecution:
         assert "benchmark" in result.output.lower() or "required" in result.output.lower()
 
     def test_benchmark_config_test_execution_type_setting(self):
-        """Test that BenchmarkConfig gets correct test execution type."""
+
         # Test power test
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", test_execution_type="power")
         assert config.test_execution_type == "power"
@@ -144,7 +144,7 @@ class TestCLITestExecution:
         assert config.test_execution_type == "standard"
 
     def test_no_tuning_disables_constraints(self, cli_benchmark_mocks):
-        """Test that `--tuning notuning` properly disables constraints."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -176,7 +176,7 @@ class TestCLIOrchestrator:
 
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     def test_orchestrator_power_test_delegation(self, mock_get_adapter):
-        """Test that orchestrator delegates power test correctly via run_benchmark."""
+
         from benchbox.cli.benchmarks import BenchmarkConfig
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
 
@@ -193,7 +193,7 @@ class TestCLIOrchestrator:
             name="test",
             options={},
         )
-        # Mock benchmark instance
+
         with patch.object(BenchmarkOrchestrator, "_get_benchmark_instance") as mock_bench:
             from pathlib import Path
 
@@ -202,10 +202,10 @@ class TestCLIOrchestrator:
             mock_bench.return_value.tables = {"customer": Path("customer.tbl")}
             mock_bench.return_value.generate_data = Mock(return_value={"customer": Path("customer.tbl")})
             mock_bench.return_value.get_data_source_benchmark.return_value = None
-            # Mock directory manager
+
             orchestrator.directory_manager.get_datagen_path = Mock(return_value=Path("/tmp/test_datagen"))
             orchestrator.directory_manager.get_database_path = Mock(return_value=Path("/tmp/test_db.duckdb"))
-            # Mock adapter and result
+
             mock_adapter = Mock()
             mock_adapter.run_benchmark.return_value = make_benchmark_results(
                 benchmark_name="TPC-H",
@@ -228,7 +228,7 @@ class TestCLIOrchestrator:
 
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     def test_orchestrator_throughput_test_delegation(self, mock_get_adapter):
-        """Test that orchestrator delegates throughput test correctly via run_benchmark."""
+
         from benchbox.cli.benchmarks import BenchmarkConfig
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
 
@@ -252,7 +252,7 @@ class TestCLIOrchestrator:
             mock_bench.return_value.tables = {"orders": Path("orders.tbl")}
             mock_bench.return_value.generate_data = Mock(return_value={"orders": Path("orders.tbl")})
             mock_bench.return_value.get_data_source_benchmark.return_value = None
-            # Mock directory manager
+
             orchestrator.directory_manager.get_datagen_path = Mock(return_value=Path("/tmp/test_datagen"))
             orchestrator.directory_manager.get_database_path = Mock(return_value=Path("/tmp/test_db.duckdb"))
             mock_adapter = Mock()
@@ -277,7 +277,7 @@ class TestCLIOrchestrator:
 
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     def test_orchestrator_maintenance_test_delegation(self, mock_get_adapter):
-        """Test that orchestrator delegates maintenance test correctly via run_benchmark."""
+
         from benchbox.cli.benchmarks import BenchmarkConfig
         from benchbox.cli.orchestrator import BenchmarkOrchestrator
 
@@ -301,7 +301,7 @@ class TestCLIOrchestrator:
             mock_bench.return_value.tables = {"lineitem": Path("lineitem.tbl")}
             mock_bench.return_value.generate_data = Mock(return_value={"lineitem": Path("lineitem.tbl")})
             mock_bench.return_value.get_data_source_benchmark.return_value = None
-            # Mock directory manager
+
             orchestrator.directory_manager.get_datagen_path = Mock(return_value=Path("/tmp/test_datagen"))
             orchestrator.directory_manager.get_database_path = Mock(return_value=Path("/tmp/test_db.duckdb"))
             mock_adapter = Mock()
@@ -324,7 +324,7 @@ class TestCLIOrchestrator:
         assert result.test_execution_type == "maintenance"
 
     def test_tpc_metrics_passthrough(self):
-        """Verify TPC metrics are adapter-provided and passed through in platform results."""
+
         res = make_benchmark_results(
             benchmark_name="TPC-H",
             platform="duckdb",
@@ -366,7 +366,7 @@ class TestResultHandling:
     """Test TPC result handling and metrics."""
 
     def test_benchmark_results_tpc_fields(self):
-        """Test that BenchmarkResults includes TPC fields."""
+
         result = make_benchmark_results(
             benchmark_name="TPC-H",
             platform="duckdb",
@@ -394,7 +394,7 @@ class TestResultHandling:
         assert result.geometric_mean_execution_time == 18.5
 
     def test_cli_benchmark_results_tpc_fields(self):
-        """Test that CLI BenchmarkResults includes TPC fields."""
+
         from benchbox.core.results.models import BenchmarkResults
 
         result = make_benchmark_results(

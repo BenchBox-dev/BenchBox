@@ -50,7 +50,7 @@ class TestMetadataGeneratorDuckDB:
     """Integration tests for MetadataGenerator with DuckDB."""
 
     def test_setup_minimal_config(self, duckdb_connection):
-        """Test generator setup with minimal configuration."""
+
         config = MetadataComplexityConfig(
             width_factor=10,
             view_depth=0,
@@ -63,11 +63,10 @@ class TestMetadataGeneratorDuckDB:
         assert len(generated.tables) > 0
         assert generated.total_objects > 0
 
-        # Cleanup
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_setup_wide_table(self, duckdb_connection):
-        """Test creating a wide table."""
+
         config = MetadataComplexityConfig(
             width_factor=100,
             view_depth=0,
@@ -86,7 +85,7 @@ class TestMetadataGeneratorDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_setup_catalog_tables(self, duckdb_connection):
-        """Test creating multiple catalog tables."""
+
         config = MetadataComplexityConfig(
             width_factor=10,
             view_depth=0,
@@ -105,7 +104,7 @@ class TestMetadataGeneratorDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_setup_view_hierarchy(self, duckdb_connection):
-        """Test creating view hierarchy."""
+
         config = MetadataComplexityConfig(
             width_factor=20,
             view_depth=3,
@@ -129,7 +128,7 @@ class TestMetadataGeneratorDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_setup_complex_types_basic(self, duckdb_connection):
-        """Test creating tables with basic complex types."""
+
         config = MetadataComplexityConfig(
             width_factor=20,
             view_depth=0,
@@ -149,7 +148,7 @@ class TestMetadataGeneratorDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_setup_complex_types_nested(self, duckdb_connection):
-        """Test creating tables with nested complex types."""
+
         config = MetadataComplexityConfig(
             width_factor=20,
             view_depth=0,
@@ -169,7 +168,7 @@ class TestMetadataGeneratorDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_setup_fk_tables(self, duckdb_connection):
-        """Test creating tables with foreign key relationships."""
+
         config = MetadataComplexityConfig(
             width_factor=10,
             view_depth=0,
@@ -189,7 +188,7 @@ class TestMetadataGeneratorDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_teardown_cleans_up(self, duckdb_connection):
-        """Test that teardown removes all created objects."""
+
         config = MetadataComplexityConfig(
             width_factor=20,
             view_depth=2,
@@ -205,7 +204,6 @@ class TestMetadataGeneratorDuckDB:
         ).fetchone()
         assert result_before[0] > 0
 
-        # Teardown
         generator.teardown(duckdb_connection, "duckdb", generated)
 
         # Verify objects are gone
@@ -215,7 +213,7 @@ class TestMetadataGeneratorDuckDB:
         assert result_after[0] == 0
 
     def test_cleanup_all(self, duckdb_connection):
-        """Test cleanup_all removes all matching objects."""
+
         generator = MetadataGenerator()
 
         # Create some objects manually
@@ -223,7 +221,6 @@ class TestMetadataGeneratorDuckDB:
         duckdb_connection.execute("CREATE TABLE benchbox_test2 (id INT)")
         duckdb_connection.execute("CREATE VIEW benchbox_test_view AS SELECT 1")
 
-        # Cleanup all
         dropped = generator.cleanup_all(duckdb_connection, "duckdb", "benchbox_")
         assert dropped >= 3
 
@@ -244,7 +241,7 @@ class TestComplexityBenchmarkDuckDB:
     """Integration tests for complexity benchmark with DuckDB."""
 
     def test_run_complexity_benchmark_minimal(self, duckdb_connection):
-        """Test running complexity benchmark with minimal preset."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_complexity_benchmark(
@@ -261,7 +258,7 @@ class TestComplexityBenchmarkDuckDB:
         assert result.benchmark_result.total_queries > 0
 
     def test_run_complexity_benchmark_wide_tables(self, duckdb_connection):
-        """Test complexity benchmark with wide_tables preset."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_complexity_benchmark(
@@ -278,7 +275,7 @@ class TestComplexityBenchmarkDuckDB:
         assert "wide_table" in result.benchmark_result.category_summary
 
     def test_run_complexity_benchmark_deep_views(self, duckdb_connection):
-        """Test complexity benchmark with deep_views preset."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_complexity_benchmark(
@@ -294,7 +291,7 @@ class TestComplexityBenchmarkDuckDB:
         assert "view_hierarchy" in result.benchmark_result.category_summary
 
     def test_run_complexity_benchmark_complex_types(self, duckdb_connection):
-        """Test complexity benchmark with complex_types preset."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_complexity_benchmark(
@@ -310,7 +307,7 @@ class TestComplexityBenchmarkDuckDB:
         assert "complex_type" in result.benchmark_result.category_summary
 
     def test_run_complexity_benchmark_large_catalog(self, duckdb_connection):
-        """Test complexity benchmark with large_catalog preset."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_complexity_benchmark(
@@ -326,7 +323,7 @@ class TestComplexityBenchmarkDuckDB:
         assert "large_catalog" in result.benchmark_result.category_summary
 
     def test_run_complexity_benchmark_full(self, duckdb_connection):
-        """Test complexity benchmark with full preset."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         result = benchmark.run_complexity_benchmark(
@@ -342,10 +339,9 @@ class TestComplexityBenchmarkDuckDB:
         assert len(result.benchmark_result.category_summary) > 1
 
     def test_setup_teardown_lifecycle(self, duckdb_connection):
-        """Test manual setup/teardown lifecycle."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
-        # Setup
         generated = benchmark.setup_complexity(duckdb_connection, "duckdb", "baseline")
         assert generated.total_objects > 0
 
@@ -363,7 +359,6 @@ class TestComplexityBenchmarkDuckDB:
         )
         assert benchmark_result.total_queries > 0
 
-        # Teardown
         benchmark.teardown_complexity(duckdb_connection, "duckdb", generated)
 
         # Verify cleanup
@@ -396,7 +391,7 @@ class TestWideTableQueriesDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_wide_table_column_list_query(self, duckdb_connection, setup_wide_tables):
-        """Test wide_table_column_list query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("wide_table_column_list", duckdb_connection, dialect="duckdb")
 
@@ -404,7 +399,7 @@ class TestWideTableQueriesDuckDB:
         assert result.row_count == 100
 
     def test_wide_table_column_count_query(self, duckdb_connection, setup_wide_tables):
-        """Test wide_table_column_count query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("wide_table_column_count", duckdb_connection, dialect="duckdb")
 
@@ -412,7 +407,7 @@ class TestWideTableQueriesDuckDB:
         assert result.row_count >= 1
 
     def test_wide_table_type_distribution_query(self, duckdb_connection, setup_wide_tables):
-        """Test wide_table_type_distribution query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("wide_table_type_distribution", duckdb_connection, dialect="duckdb")
 
@@ -443,7 +438,7 @@ class TestViewHierarchyQueriesDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_view_hierarchy_list_query(self, duckdb_connection, setup_view_hierarchy):
-        """Test view_hierarchy_list query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("view_hierarchy_list", duckdb_connection, dialect="duckdb")
 
@@ -451,7 +446,7 @@ class TestViewHierarchyQueriesDuckDB:
         assert result.row_count == 3  # 3 views in hierarchy
 
     def test_view_hierarchy_depth_analysis_query(self, duckdb_connection, setup_view_hierarchy):
-        """Test view_hierarchy_depth_analysis query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("view_hierarchy_depth_analysis", duckdb_connection, dialect="duckdb")
 
@@ -482,7 +477,7 @@ class TestLargeCatalogQueriesDuckDB:
         generator.teardown(duckdb_connection, "duckdb", generated)
 
     def test_large_catalog_table_list_query(self, duckdb_connection, setup_large_catalog):
-        """Test large_catalog_table_list query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("large_catalog_table_list", duckdb_connection, dialect="duckdb")
 
@@ -490,7 +485,7 @@ class TestLargeCatalogQueriesDuckDB:
         assert result.row_count == 50
 
     def test_large_catalog_table_count_query(self, duckdb_connection, setup_large_catalog):
-        """Test large_catalog_table_count query execution."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.execute_query("large_catalog_table_count", duckdb_connection, dialect="duckdb")
 
@@ -508,7 +503,7 @@ class TestComplexityErrorHandling:
     """Test error handling in complexity testing."""
 
     def test_cleanup_on_manual_objects(self, duckdb_connection):
-        """Test that cleanup_all can handle manually created objects."""
+
         # This test verifies that cleanup_all properly removes
         # objects that match the prefix pattern
 

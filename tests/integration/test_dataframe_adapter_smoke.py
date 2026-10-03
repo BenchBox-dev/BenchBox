@@ -268,7 +268,7 @@ class TestPolarsSmoke:
     """Smoke tests for Polars DataFrame adapter."""
 
     def test_join_left_on_right_on(self, polars_adapter):
-        """Test join with left_on/right_on parameters."""
+
         ctx = polars_adapter.create_context()
         data = create_test_data_polars()
         for name, df in data.items():
@@ -284,7 +284,7 @@ class TestPolarsSmoke:
         assert "c_name" in collected.columns
 
     def test_group_by_with_aggregations(self, polars_adapter):
-        """Test group_by with sum, mean, count aggregations."""
+
         ctx = polars_adapter.create_context()
         data = create_test_data_polars()
         ctx.register_table("orders", data["orders"])
@@ -302,7 +302,7 @@ class TestPolarsSmoke:
         assert polars_adapter.get_row_count(collected) == 3  # 3 unique customers
 
     def test_filter_with_expressions(self, polars_adapter):
-        """Test filter with comparison expressions."""
+
         ctx = polars_adapter.create_context()
         data = create_test_data_polars()
         ctx.register_table("orders", data["orders"])
@@ -321,7 +321,7 @@ class TestPolarsSmoke:
         assert polars_adapter.get_row_count(collected2) == 4  # 2000, 1500, 2500, 3000
 
     def test_sort_multiple_columns(self, polars_adapter):
-        """Test sort with multiple columns and descending flags."""
+
         ctx = polars_adapter.create_context()
         data = create_test_data_polars()
         ctx.register_table("orders", data["orders"])
@@ -339,7 +339,7 @@ class TestPolarsSmoke:
         assert polars_adapter.get_row_count(collected2) == 5
 
     def test_unique(self, polars_adapter):
-        """Test unique/distinct operation."""
+
         ctx = polars_adapter.create_context()
         data = create_test_data_polars()
         ctx.register_table("orders", data["orders"])
@@ -376,7 +376,7 @@ class TestPySparkSmoke:
     """Smoke tests for PySpark DataFrame adapter."""
 
     def test_join_left_on_right_on(self, pyspark_adapter):
-        """Test join with left_on/right_on parameters."""
+
         ctx = pyspark_adapter.create_context()
         data = create_test_data_pyspark(pyspark_adapter.spark)
         for name, df in data.items():
@@ -392,7 +392,7 @@ class TestPySparkSmoke:
         assert "c_name" in collected.columns
 
     def test_group_by_with_aggregations(self, pyspark_adapter):
-        """Test group_by with sum, mean, count aggregations."""
+
         ctx = pyspark_adapter.create_context()
         data = create_test_data_pyspark(pyspark_adapter.spark)
         ctx.register_table("orders", data["orders"])
@@ -410,7 +410,7 @@ class TestPySparkSmoke:
         assert pyspark_adapter.get_row_count(collected) == 3  # 3 unique customers
 
     def test_filter_with_expressions(self, pyspark_adapter):
-        """Test filter with comparison expressions."""
+
         ctx = pyspark_adapter.create_context()
         data = create_test_data_pyspark(pyspark_adapter.spark)
         ctx.register_table("orders", data["orders"])
@@ -424,7 +424,7 @@ class TestPySparkSmoke:
         assert pyspark_adapter.get_row_count(collected) == 4  # 2000, 1500, 2500, 3000
 
     def test_sort_multiple_columns(self, pyspark_adapter):
-        """Test sort with multiple columns and descending flags."""
+
         ctx = pyspark_adapter.create_context()
         data = create_test_data_pyspark(pyspark_adapter.spark)
         ctx.register_table("orders", data["orders"])
@@ -442,7 +442,7 @@ class TestPySparkSmoke:
         assert pyspark_adapter.get_row_count(collected2) == 5
 
     def test_unique(self, pyspark_adapter):
-        """Test unique/distinct operation."""
+
         ctx = pyspark_adapter.create_context()
         data = create_test_data_pyspark(pyspark_adapter.spark)
         ctx.register_table("orders", data["orders"])
@@ -513,12 +513,12 @@ class TestDataFusionSmoke:
     """
 
     def test_adapter_creation(self, datafusion_adapter):
-        """Test that DataFusion adapter can be created."""
+
         assert datafusion_adapter is not None
         assert datafusion_adapter.platform_name == "DataFusion"
 
     def test_context_creation(self, datafusion_adapter):
-        """Test that DataFusion context can be created."""
+
         ctx = datafusion_adapter.create_context()
         assert ctx is not None
         assert ctx.platform == "DataFusion"
@@ -535,7 +535,7 @@ class TestCrossPlatformConsistency:
 
     @pytest.mark.skipif(not (POLARS_AVAILABLE and PYSPARK_AVAILABLE), reason="Both Polars and PySpark required")
     def test_join_produces_same_row_count(self, polars_adapter, pyspark_adapter):
-        """Verify that joins produce the same row count on both platforms."""
+
         # Polars
         polars_ctx = polars_adapter.create_context()
         polars_data = create_test_data_polars()
@@ -562,7 +562,7 @@ class TestCrossPlatformConsistency:
 
     @pytest.mark.skipif(not (POLARS_AVAILABLE and PYSPARK_AVAILABLE), reason="Both Polars and PySpark required")
     def test_group_by_produces_same_row_count(self, polars_adapter, pyspark_adapter):
-        """Verify that group_by produces the same row count on both platforms."""
+
         # Polars
         polars_ctx = polars_adapter.create_context()
         polars_data = create_test_data_polars()
@@ -589,7 +589,7 @@ class TestCrossPlatformConsistency:
 
     @pytest.mark.skipif(not (POLARS_AVAILABLE and PYSPARK_AVAILABLE), reason="Both Polars and PySpark required")
     def test_filter_produces_same_row_count(self, polars_adapter, pyspark_adapter):
-        """Verify that filter produces the same row count on both platforms."""
+
         # Polars
         polars_ctx = polars_adapter.create_context()
         polars_data = create_test_data_polars()

@@ -66,7 +66,7 @@ class TestLiveStarRocksConnection:
     """Test basic StarRocks connectivity via Docker."""
 
     def test_connection(self, starrocks_adapter):
-        """Verify we can connect to StarRocks and run a trivial query."""
+
         connection = starrocks_adapter.create_connection()
         try:
             assert connection is not None
@@ -74,7 +74,7 @@ class TestLiveStarRocksConnection:
             starrocks_adapter.close_connection(connection)
 
     def test_platform_info(self, starrocks_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = starrocks_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "starrocks"
@@ -84,7 +84,7 @@ class TestLiveStarRocksQueryExecution:
     """Test query execution against a live StarRocks instance."""
 
     def test_create_schema(self, starrocks_adapter):
-        """Verify we can create a database."""
+
         connection = starrocks_adapter.create_connection()
         try:
             starrocks_adapter.execute_query(

@@ -83,7 +83,7 @@ class TestPlanComparisonSummary:
     """Tests for PlanComparisonSummary dataclass."""
 
     def test_to_dict_basic(self) -> None:
-        """Test basic to_dict conversion."""
+
         summary = PlanComparisonSummary(
             baseline_run_id="run1",
             current_run_id="run2",
@@ -105,7 +105,7 @@ class TestPlanComparisonSummary:
         assert result["performance_correlations"] == []
 
     def test_to_dict_with_differences(self) -> None:
-        """Test to_dict with structural differences."""
+
         summary = PlanComparisonSummary(
             baseline_run_id="run1",
             current_run_id="run2",
@@ -149,7 +149,7 @@ class TestGeneratePlanComparisonSummary:
     """Tests for generate_plan_comparison_summary function."""
 
     def test_identical_plans(self) -> None:
-        """Test comparison when all plans are identical."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q1", "orders")
 
@@ -171,7 +171,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_changed == 0
 
     def test_different_plans(self) -> None:
-        """Test comparison when plans differ."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q1", "customers")
 
@@ -220,7 +220,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.structural_differences[0].change_type == "unchanged"
 
     def test_multiple_queries(self) -> None:
-        """Test comparison with multiple queries."""
+
         plan1a = _create_simple_plan("q1", "orders")
         plan1b = _create_simple_plan("q1", "orders")  # Same
         plan2a = _create_simple_plan("q2", "customers")
@@ -242,7 +242,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_changed == 1
 
     def test_regression_detection(self) -> None:
-        """Test regression detection with performance degradation."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_join_plan("q1")
 
@@ -269,7 +269,7 @@ class TestGeneratePlanComparisonSummary:
         assert corr.is_regression is True
 
     def test_no_regression_if_plan_unchanged(self) -> None:
-        """Test that unchanged plans don't count as regressions even if slower."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q1", "orders")  # Same plan
 
@@ -292,7 +292,7 @@ class TestGeneratePlanComparisonSummary:
         assert corr.is_regression is False
 
     def test_custom_regression_threshold(self) -> None:
-        """Test custom regression threshold."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_join_plan("q1")
 
@@ -315,7 +315,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary10.performance_correlations[0].is_regression is True
 
     def test_missing_plans_skipped(self) -> None:
-        """Test that queries without plans are skipped."""
+
         plan = _create_simple_plan("q1", "orders")
 
         baseline = make_benchmark_results(
@@ -332,7 +332,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_compared == 1  # Only q1 with plans
 
     def test_non_common_queries_skipped(self) -> None:
-        """Test that queries not in both runs are skipped."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q2", "customers")
 
@@ -350,7 +350,7 @@ class TestGeneratePlanComparisonSummary:
         assert summary.plans_compared == 0  # No common queries
 
     def test_multiple_phases(self) -> None:
-        """Test that all queries in query_results are collected regardless of phase."""
+
         plan1 = _create_simple_plan("q1", "orders")
         plan2 = _create_simple_plan("q2", "customers")
 
@@ -372,7 +372,7 @@ class TestQueryPlanChange:
     """Tests for QueryPlanChange dataclass."""
 
     def test_creation(self) -> None:
-        """Test QueryPlanChange creation."""
+
         change = QueryPlanChange(
             query_id="q1",
             change_type="structure_change",
@@ -390,7 +390,7 @@ class TestPerformanceCorrelation:
     """Tests for PerformanceCorrelation dataclass."""
 
     def test_creation(self) -> None:
-        """Test PerformanceCorrelation creation."""
+
         corr = PerformanceCorrelation(
             query_id="q1",
             plan_changed=True,

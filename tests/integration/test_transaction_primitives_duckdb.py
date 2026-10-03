@@ -138,10 +138,9 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert txn_customer_count == 3
 
     def test_execute_transaction_commit_small(self, txn_bench, loaded_tpch_conn):
-        """Test execution of a small transaction commit operation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Execute the operation
         result = txn_bench.execute_operation("transaction_commit_small", loaded_tpch_conn)
 
         assert isinstance(result, OperationResult)
@@ -151,10 +150,9 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert result.write_duration_ms > 0
 
     def test_execute_transaction_rollback_small(self, txn_bench, loaded_tpch_conn):
-        """Test execution of a small transaction rollback operation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Execute the operation
         result = txn_bench.execute_operation("transaction_rollback_small", loaded_tpch_conn)
 
         assert isinstance(result, OperationResult)
@@ -166,7 +164,7 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert count_value == 0
 
     def test_get_operation_categories(self, txn_bench):
-        """Test that we can get list of operation categories."""
+
         categories = txn_bench.get_operation_categories()
 
         assert "overhead" in categories
@@ -176,7 +174,7 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert "advanced" in categories
 
     def test_get_operations_by_category(self, txn_bench):
-        """Test getting operations filtered by category."""
+
         overhead_ops = txn_bench.get_operations_by_category("overhead")
         assert len(overhead_ops) >= 5  # At least 5 overhead operations
 
@@ -241,13 +239,13 @@ class TestTransactionPrimitivesQuickSanity:
         conn.close()
 
     def test_import_and_instantiate(self):
-        """Test that we can import and instantiate Transaction Primitives."""
+
         txn_bench = TransactionPrimitives(scale_factor=0.01, quiet=True)
         assert txn_bench is not None
         assert txn_bench.get_benchmark_info()["name"] == "Transaction Primitives Benchmark"
 
     def test_get_schema(self):
-        """Test that we can get the schema."""
+
         txn_bench = TransactionPrimitives(scale_factor=0.01, quiet=True)
         schema = txn_bench.get_schema()
 
@@ -256,7 +254,7 @@ class TestTransactionPrimitivesQuickSanity:
         assert "txn_customer" in schema
 
     def test_operation_count(self):
-        """Test that we have the expected number of operations."""
+
         txn_bench = TransactionPrimitives(scale_factor=0.01, quiet=True)
         all_ops = txn_bench.get_all_operations()
 
@@ -363,7 +361,7 @@ class TestTransactionPrimitivesMultiStatement:
         return TransactionPrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
     def test_execute_mixed_dml_small(self, txn_bench, loaded_tpch_conn):
-        """Test mixed INSERT/UPDATE/DELETE within single transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_mixed_dml_small", loaded_tpch_conn)
@@ -375,7 +373,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.validation_results[0]["actual_rows"] == 2
 
     def test_execute_insert_update_chain(self, txn_bench, loaded_tpch_conn):
-        """Test dependent INSERT then UPDATE on same rows within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_insert_update_chain", loaded_tpch_conn)
@@ -387,7 +385,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.validation_results[0]["actual_rows"] == 2
 
     def test_execute_delete_insert_same_key(self, txn_bench, loaded_tpch_conn):
-        """Test DELETE then re-INSERT of same primary key within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_delete_insert_same_key", loaded_tpch_conn)
@@ -402,7 +400,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert row_data[1] == "replaced"  # o_comment should be 'replaced'
 
     def test_execute_read_your_writes(self, txn_bench, loaded_tpch_conn):
-        """Test that transaction sees its own uncommitted changes."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_read_your_writes", loaded_tpch_conn)
@@ -416,7 +414,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert price == 2000.0
 
     def test_execute_insert_with_subquery(self, txn_bench, loaded_tpch_conn):
-        """Test INSERT...SELECT from same table within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_insert_with_subquery", loaded_tpch_conn)
@@ -428,7 +426,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.validation_results[0]["actual_rows"] == 2
 
     def test_execute_multi_table_writes(self, txn_bench, loaded_tpch_conn):
-        """Test writes to multiple tables within single transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_multi_table_writes", loaded_tpch_conn)
@@ -442,7 +440,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert count == 2
 
     def test_run_all_multi_statement_operations(self, txn_bench, loaded_tpch_conn):
-        """Test running all multi-statement operations in the category."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         # Get all multi-statement operations (returns dict: {op_id: operation})
@@ -646,7 +644,7 @@ class TestTransactionPrimitivesAdvanced:
         return TransactionPrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
     def test_execute_truncate_in_transaction(self, txn_bench, loaded_tpch_conn):
-        """Test TRUNCATE within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         # Note: This resets txn_orders, so we need to verify it works
@@ -664,7 +662,7 @@ class TestTransactionPrimitivesAdvanced:
         txn_bench.reset(loaded_tpch_conn)
 
     def test_execute_create_temp_table(self, txn_bench, loaded_tpch_conn):
-        """Test transaction-scoped temporary table creation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_create_temp_table", loaded_tpch_conn)
@@ -678,7 +676,7 @@ class TestTransactionPrimitivesAdvanced:
         assert count == 1
 
     def test_execute_with_cte(self, txn_bench, loaded_tpch_conn):
-        """Test complex CTE within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_with_cte", loaded_tpch_conn)
@@ -695,7 +693,7 @@ class TestTransactionPrimitivesAdvanced:
         assert total == 110000.0
 
     def test_execute_nested_subquery_updates(self, txn_bench, loaded_tpch_conn):
-        """Test UPDATE with nested subqueries within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_nested_subquery_updates", loaded_tpch_conn)
@@ -709,7 +707,7 @@ class TestTransactionPrimitivesAdvanced:
         assert distinct_prices == 1
 
     def test_execute_rollback_after_error(self, txn_bench, loaded_tpch_conn):
-        """Test automatic rollback behavior after constraint violation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         # This operation just does a simple commit (no actual error in the test)

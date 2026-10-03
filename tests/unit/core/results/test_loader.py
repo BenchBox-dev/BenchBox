@@ -31,17 +31,17 @@ class TestFindLatestResult:
     """Tests for find_latest_result() function."""
 
     def test_find_latest_result_empty_directory(self, tmp_path):
-        """Test finding latest result in empty directory returns None."""
+
         result = find_latest_result(tmp_path)
         assert result is None
 
     def test_find_latest_result_nonexistent_directory(self):
-        """Test finding latest result in nonexistent directory returns None."""
+
         result = find_latest_result(Path("/nonexistent/directory"))
         assert result is None
 
     def test_find_latest_result_returns_most_recent(self, tmp_path):
-        """Test that find_latest_result returns the most recent file."""
+
         older_result = tmp_path / "result1.json"
         newer_result = tmp_path / "result2.json"
 
@@ -52,7 +52,7 @@ class TestFindLatestResult:
         assert result == newer_result
 
     def test_find_latest_result_with_benchmark_filter(self, tmp_path):
-        """Test filtering by benchmark name."""
+
         tpch_result = tmp_path / "tpch.json"
         tpcds_result = tmp_path / "tpcds.json"
 
@@ -71,7 +71,7 @@ class TestFindLatestResult:
         assert result == tpcds_result
 
     def test_find_latest_result_with_platform_filter(self, tmp_path):
-        """Test filtering by platform name."""
+
         duckdb_result = tmp_path / "duckdb.json"
         databricks_result = tmp_path / "databricks.json"
 
@@ -95,7 +95,7 @@ class TestFindLatestResult:
         assert result == databricks_result
 
     def test_find_latest_result_with_both_filters(self, tmp_path):
-        """Test filtering by both benchmark and platform."""
+
         matching_result = tmp_path / "match.json"
         non_matching_result = tmp_path / "nomatch.json"
 
@@ -117,7 +117,7 @@ class TestFindLatestResult:
         assert result == matching_result
 
     def test_find_latest_result_skips_corrupted_files(self, tmp_path):
-        """Test that corrupted JSON files are skipped gracefully."""
+
         good_result = tmp_path / "good.json"
         bad_result = tmp_path / "bad.json"
 
@@ -130,7 +130,7 @@ class TestFindLatestResult:
         assert result == good_result
 
     def test_find_latest_result_no_matching_filters(self, tmp_path):
-        """Test that no match returns None when filters don't match."""
+
         result_file = tmp_path / "result.json"
         write_v2_result_file(result_file, version="2.0")
 
@@ -255,7 +255,7 @@ class TestLoadResultFile:
         assert result.query_results[0]["plan_fingerprint"] == "a" * 64
 
     def test_load_result_file_not_found(self):
-        """Test loading nonexistent file raises FileNotFoundError."""
+
         with pytest.raises(FileNotFoundError):
             load_result_file(Path("/nonexistent/file.json"))
 
@@ -298,7 +298,7 @@ class TestLoadResultFile:
         assert result.plans_load_error is None
 
     def test_load_result_file_invalid_json(self, tmp_path):
-        """Test loading invalid JSON raises ResultLoadError."""
+
         result_file = tmp_path / "invalid.json"
 
         with open(result_file, "w", encoding="utf-8") as f:
@@ -324,7 +324,7 @@ class TestLoadResultFile:
             load_result_file(result_file)
 
     def test_load_result_file_unsupported_schema_unknown(self, tmp_path):
-        """Test loading unknown schema version raises UnsupportedSchemaError."""
+
         result_file = tmp_path / "future_schema.json"
 
         data = {
@@ -426,7 +426,7 @@ class TestReconstructBenchmarkResults:
         assert result.scale_factor == 1.0
 
     def test_reconstruct_complete_result(self):
-        """Test reconstructing result with all fields populated."""
+
         data = make_v2_result_dict(
             version="2.0",
             benchmark_name="TPC-H Benchmark",
@@ -505,7 +505,7 @@ class TestReconstructBenchmarkResults:
         assert result.test_execution_type == "power_test"
 
     def test_reconstruct_handles_missing_optional_fields(self):
-        """Test that reconstruction handles missing optional fields gracefully."""
+
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -532,7 +532,7 @@ class TestReconstructBenchmarkResults:
         assert result.total_execution_time == 0.0
 
     def test_reconstruct_timestamp_parsing(self):
-        """Test that timestamp is properly parsed."""
+
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -607,7 +607,7 @@ class TestReconstructBenchmarkResults:
         assert abs(reimported.geometric_mean_execution_time - 0.2134) < 0.01
 
     def test_reconstruct_query_results_with_iteration(self):
-        """Test that iteration field is properly reconstructed."""
+
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -637,7 +637,7 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[2]["iteration"] == 3
 
     def test_reconstruct_query_results_with_stream(self):
-        """Test that stream field is properly reconstructed."""
+
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",
@@ -780,7 +780,7 @@ class TestReconstructBenchmarkResults:
         assert result.query_results[0]["plan_fingerprint"] == "c" * 64
 
     def test_reconstruct_with_errors(self):
-        """Test that errors array is properly reconstructed."""
+
         data = make_v2_result_dict(
             version="2.0",
             benchmark_id="test",

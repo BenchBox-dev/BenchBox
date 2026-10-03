@@ -45,7 +45,7 @@ class TestLiveSnowflakeConnection:
     """Test basic Snowflake connectivity."""
 
     def test_snowflake_live_connection(self, live_snowflake_adapter):
-        """Verify Snowflake connection works and can execute simple query."""
+
         connection = live_snowflake_adapter.create_connection()
         try:
             # Execute simple query to verify connection
@@ -58,7 +58,7 @@ class TestLiveSnowflakeConnection:
             live_snowflake_adapter.close_connection(connection)
 
     def test_snowflake_live_version_info(self, live_snowflake_adapter):
-        """Verify we can get Snowflake version information."""
+
         connection = live_snowflake_adapter.create_connection()
         try:
             metadata = live_snowflake_adapter.get_platform_info(connection)
@@ -71,7 +71,7 @@ class TestLiveSnowflakeConnection:
             live_snowflake_adapter.close_connection(connection)
 
     def test_snowflake_live_warehouse_access(self, live_snowflake_adapter):
-        """Verify warehouse and database access."""
+
         connection = live_snowflake_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -99,7 +99,6 @@ class TestLiveSnowflakeSchemaManagement:
         try:
             cursor = connection.cursor()
 
-            # Create schema
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {unique_test_schema}")
 
             # Verify schema exists
@@ -123,7 +122,6 @@ class TestLiveSnowflakeDataLoading:
         # Create TPC-H benchmark
         tpch = TPCH(scale_factor=test_scale_factor, output_dir=test_output_dir, verbose=False)
 
-        # Generate data
         data_files = tpch.generate_data()
         assert len(data_files) > 0, "No data files generated"
 
@@ -131,7 +129,6 @@ class TestLiveSnowflakeDataLoading:
         try:
             cursor = connection.cursor()
 
-            # Create schema
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {unique_test_schema}")
             cursor.execute(f"USE SCHEMA {unique_test_schema}")
 
@@ -141,10 +138,8 @@ class TestLiveSnowflakeDataLoading:
                 if statement.strip():
                     cursor.execute(statement)
 
-            # Load data using adapter
             stats, errors, _ = live_snowflake_adapter.load_data(tpch, connection, test_output_dir)
 
-            # Verify data was loaded
             assert len(stats) > 0, "No tables loaded"
             assert all(count > 0 for count in stats.values()), "Some tables have zero rows"
 
@@ -207,7 +202,6 @@ class TestLiveSnowflakeQueryExecution:
             cursor.execute(query1_snowflake)
             results = cursor.fetchall()
 
-            # Verify we got results
             assert len(results) > 0, "Query 1 returned no results"
             print(f"Query 1 returned {len(results)} rows")
 
@@ -221,7 +215,7 @@ class TestLiveSnowflakeSpecificFeatures:
     def test_snowflake_live_put_copy(
         self, live_snowflake_adapter, unique_test_schema, test_output_dir, cleanup_test_schema
     ):
-        """Test PUT + COPY INTO workflow with staged files."""
+
         cleanup_test_schema(live_snowflake_adapter, unique_test_schema)
 
         connection = live_snowflake_adapter.create_connection()
@@ -255,7 +249,7 @@ class TestLiveSnowflakeSpecificFeatures:
             live_snowflake_adapter.close_connection(connection)
 
     def test_snowflake_live_cleanup(self, live_snowflake_adapter, unique_test_schema):
-        """Verify cleanup works correctly."""
+
         connection = live_snowflake_adapter.create_connection()
         try:
             cursor = connection.cursor()

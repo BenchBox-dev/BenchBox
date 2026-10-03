@@ -352,7 +352,7 @@ class TestTPCHContextSetup:
         assert sorted(tables) == expected
 
     def test_table_access(self, tpch_context):
-        """Test that tables can be accessed and collected."""
+
         lineitem = tpch_context.get_table("lineitem")
         assert lineitem is not None
         df = _collect_result(lineitem)

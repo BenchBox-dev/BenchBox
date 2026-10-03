@@ -53,7 +53,7 @@ class TestTPCHInterface:
             return TPCH(scale_factor=small_scale_factor, output_dir=temp_dir, parallel=1)
 
     def test_generate_data(self, tpch: TPCH) -> None:
-        """Test that data generation produces expected files."""
+
         # Mock the data generation to avoid actual dbgen compilation
         expected_tables = [
             "customer",
@@ -78,7 +78,7 @@ class TestTPCHInterface:
                 assert any(table in str(path) for path in data_paths), f"Table {table} not found in generated data"
 
     def test_get_queries(self, tpch: TPCH) -> None:
-        """Test that all benchmark queries can be retrieved."""
+
         queries = tpch.get_queries()
 
         # TPC-H has queries numbered 1 to 22
@@ -99,7 +99,7 @@ class TestTPCHInterface:
                 assert "lineitem" in queries[query_id].lower()
 
     def test_get_query(self, tpch: TPCH) -> None:
-        """Test retrieving a specific query."""
+
         query1 = tpch.get_query(1)
         assert isinstance(query1, str)
         assert "SELECT" in query1.upper()
@@ -112,7 +112,7 @@ class TestTPCHInterface:
         assert "ORDERS" in query3.upper()
 
     def test_translate_query(self, tpch: TPCH, sql_dialect: str) -> None:
-        """Test translating a query to different SQL dialects."""
+
         tpch.get_query(1)
         translated_query = tpch.translate_query(1, dialect=sql_dialect)
 
@@ -120,12 +120,12 @@ class TestTPCHInterface:
         assert "SELECT" in translated_query.upper()
 
     def test_invalid_query_number(self, tpch: TPCH) -> None:
-        """Test that requesting an invalid query raises an exception."""
+
         with pytest.raises(ValueError):
             tpch.get_query(99)  # TPC-H only has 22 queries
 
     def test_get_query_harmonized_parameters(self, tpch: TPCH) -> None:
-        """Test that harmonized parameters work correctly."""
+
         # Test with default parameters
         param_query = tpch.get_query(1)
         assert isinstance(param_query, str)
@@ -158,7 +158,7 @@ class TestTPCHInterface:
         assert "SELECT" in query_combined.upper()
 
     def test_get_schema(self, tpch: TPCH) -> None:
-        """Test retrieving the TPC-H schema."""
+
         schema = tpch.get_schema()
 
         # Check that all tables are present - schema is now dict[str, dict]
@@ -196,7 +196,7 @@ class TestTPCHInterface:
             assert column in column_names
 
     def test_get_create_tables_sql(self, tpch: TPCH) -> None:
-        """Test retrieving SQL to create TPC-H tables."""
+
         sql = tpch.get_create_tables_sql()
 
         assert isinstance(sql, str)
@@ -218,7 +218,7 @@ class TestTPCHInterface:
             assert f"CREATE TABLE {table}" in sql
 
     def test_parameter_validation(self, temp_dir: Path) -> None:
-        """Test that invalid parameters raise appropriate errors."""
+
         # Test negative scale factor
         with pytest.raises(ValueError, match="Scale factor must be positive"):
             TPCH(scale_factor=-1, output_dir=temp_dir)
@@ -240,7 +240,7 @@ class TestTPCHInterface:
             TPCH(scale_factor=1, output_dir=temp_dir, parallel="4")
 
     def test_get_query_parameter_validation(self, tpch: TPCH) -> None:
-        """Test that get_query validates harmonized parameters correctly."""
+
         # Test invalid query_id type
         with pytest.raises(TypeError, match="query_id must be an integer"):
             tpch.get_query("1")
@@ -266,7 +266,7 @@ class TestTPCHInterface:
 
     @mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen")
     def test_parallel_parameter_support(self, mock_find_dbgen, small_scale_factor: float, temp_dir: Path) -> None:
-        """Test that parallel parameter is properly passed through."""
+
         # Mock the executable path
         mock_find_dbgen.return_value = temp_dir / "dbgen"
 
@@ -291,7 +291,7 @@ class TestTPCHInterface:
     def test_executable_permission_error(
         self, mock_exists, mock_access, small_scale_factor: float, temp_dir: Path
     ) -> None:
-        """Test error handling when dbgen executable is not executable."""
+
         mock_exists.return_value = True
         mock_access.return_value = False
 
@@ -306,7 +306,7 @@ class TestTPCHInterface:
     # Integration tests cover the actual delegation behavior
 
     def test_compatibility_with_base_benchmark(self, tpch: TPCH) -> None:
-        """Test compatibility with the BaseBenchmark interface."""
+
         # The generate_data method should return a list
         with mock.patch.object(tpch._impl, "generate_data") as mock_gen:
             mock_gen.return_value = [Path("/tmp/test.csv")]
@@ -348,7 +348,7 @@ class TestTPCHSchemaDefinition(unittest.TestCase):
         self.assertEqual(table_names, expected_names, "Table names do not match TPC-H specification")
 
     def test_column_definitions(self) -> None:
-        """Test that key tables have the correct column definitions."""
+
         # Check CUSTOMER table columns
         customer_cols = {col.name for col in CUSTOMER.columns}
         expected_customer_cols = {
@@ -394,7 +394,7 @@ class TestTPCHSchemaDefinition(unittest.TestCase):
         )
 
     def test_foreign_key_relationships(self) -> None:
-        """Test that foreign key relationships are correctly defined."""
+
         # Check CUSTOMER to NATION relationship
         customer_fks = CUSTOMER.get_foreign_keys()
         self.assertIn("c_nationkey", customer_fks, "c_nationkey should be a foreign key")
@@ -414,7 +414,7 @@ class TestTPCHSchemaDefinition(unittest.TestCase):
         )
 
     def test_create_table_sql(self) -> None:
-        """Test that CREATE TABLE SQL is correctly generated."""
+
         # Test REGION table SQL
         region_sql = REGION.get_create_table_sql()
         self.assertIn("CREATE TABLE region", region_sql)
@@ -446,7 +446,7 @@ class TestTPCHQueryManager(unittest.TestCase):
             self.assertIn(query_id, queries, f"Query {query_id} should be loaded")
 
     def test_query_content(self) -> None:
-        """Test that query content is correctly loaded."""
+
         # Check Query 1
         query1 = self.query_manager.get_query(1)
         self.assertIn("l_returnflag", query1)
@@ -460,7 +460,7 @@ class TestTPCHQueryManager(unittest.TestCase):
         self.assertIn("lineitem", query3)
 
     def test_parameter_substitution(self) -> None:
-        """Test parameter substitution in queries."""
+
         # The simplified interface uses seed-based parameter generation
         # Test Query 1 with a specific seed to get consistent parameters
         query1 = self.query_manager.get_query(1, seed=42)
@@ -477,7 +477,7 @@ class TestTPCHQueryManager(unittest.TestCase):
         self.assertEqual(query1, query1_repeat)
 
     def test_random_parameter_generation(self) -> None:
-        """Test that random parameters are correctly generated."""
+
         # The simplified interface doesn't expose _generate_random_params
         # Instead, test that queries can be generated with random parameters
         for query_id in range(1, 3):  # Test just a few queries
@@ -499,13 +499,13 @@ class TestTPCHBenchmark:
             return TPCHBenchmark(scale_factor=small_scale_factor, output_dir=temp_dir)
 
     def test_initialization(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that the benchmark initializes correctly."""
+
         assert tpch_benchmark.scale_factor == tpch_benchmark.scale_factor
         assert hasattr(tpch_benchmark, "query_manager")
         assert hasattr(tpch_benchmark, "data_generator")
 
     def test_init_with_verbose_and_parallel(self, temp_dir: Path) -> None:
-        """Test benchmark initialization with verbose and parallel options."""
+
         with mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen") as mock_build:
             mock_build.return_value = temp_dir / "dbgen"
             benchmark = TPCHBenchmark(scale_factor=0.5, output_dir=temp_dir, verbose=True, parallel=4)
@@ -515,7 +515,7 @@ class TestTPCHBenchmark:
             assert benchmark.streams_manager is None
 
     def test_get_queries(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that queries can be retrieved."""
+
         queries = tpch_benchmark.get_queries()
         assert len(queries) == 22, "Should return all 22 TPC-H queries"
 
@@ -529,7 +529,7 @@ class TestTPCHBenchmark:
         assert "l_returnflag" in param_query
 
     def test_get_schema(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that schema information can be retrieved."""
+
         schema = tpch_benchmark.get_schema()
         assert len(schema) == 8, "Should return 8 TPC-H tables"
 
@@ -553,7 +553,7 @@ class TestTPCHBenchmark:
             assert col in customer_cols
 
     def test_get_create_tables_sql(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that CREATE TABLE SQL can be retrieved."""
+
         sql = tpch_benchmark.get_create_tables_sql()
         assert isinstance(sql, str)
 
@@ -571,20 +571,20 @@ class TestTPCHBenchmark:
             assert f"CREATE TABLE {table}" in sql
 
     def test_benchmark_properties(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test benchmark basic properties."""
+
         assert tpch_benchmark.scale_factor == 1.0
         assert isinstance(tpch_benchmark.output_dir, Path)
         assert hasattr(tpch_benchmark, "query_manager")
         assert hasattr(tpch_benchmark, "data_generator")
 
     def test_benchmark_initialization_custom_params(self) -> None:
-        """Test benchmark initialization with custom parameters."""
+
         custom_benchmark = TPCHBenchmark(scale_factor=0.1, output_dir=Path("/tmp/custom"), seed=12345)
         assert custom_benchmark.scale_factor == 0.1
         assert custom_benchmark.output_dir == Path("/tmp/custom")
 
     def test_data_generator_initialization(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that data generator is properly initialized."""
+
         generator = tpch_benchmark.data_generator
         assert generator is not None
         assert hasattr(generator, "scale_factor")
@@ -592,7 +592,7 @@ class TestTPCHBenchmark:
         assert generator.scale_factor >= tpch_benchmark.scale_factor
 
     def test_query_manager_initialization(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that query manager is properly initialized."""
+
         query_manager = tpch_benchmark.query_manager
         assert query_manager is not None
         assert hasattr(query_manager, "get_query")
@@ -625,7 +625,7 @@ class TestTPCHBenchmark:
             assert tpch_benchmark.tables == mock_data
 
     def test_generate_data_directory_creation(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test generate_data creates output directory."""
+
         mock_data = {"customer": Path("/path/to/customer.csv")}
 
         with patch.object(tpch_benchmark.data_generator, "generate", return_value=mock_data):
@@ -636,7 +636,7 @@ class TestTPCHBenchmark:
                 mock_mkdir.assert_called()
 
     def test_get_query_with_params(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test get_query with custom parameters."""
+
         custom_params = {"1": 90, "2": "TRUCK"}
 
         with patch.object(tpch_benchmark.query_manager, "get_query") as mock_get_query:
@@ -658,14 +658,14 @@ class TestTPCHBenchmark:
             assert "1998-06-15" in result
 
     def test_run_benchmark_result_structure(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test run_benchmark accepts parameters and returns a result dict."""
+
         with patch.object(tpch_benchmark, "generate_data", return_value=["table1.tbl", "table2.tbl"]):
             with patch.object(tpch_benchmark, "setup_database"):
                 result = tpch_benchmark.run_benchmark("connection_string", query_ids=[1, 2])
         assert isinstance(result, dict), f"Expected dict result, got {type(result)}"
 
     def test_run_query_parameter_handling(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test run_query parameter handling before NotImplementedError."""
+
         # Test standard dialect path
         with patch.object(tpch_benchmark, "get_query") as mock_get_query:
             mock_get_query.return_value = "SELECT * FROM customer"
@@ -676,7 +676,6 @@ class TestTPCHBenchmark:
             except NotImplementedError:
                 pass  # Expected
 
-            # Verify get_query was called correctly
             mock_get_query.assert_called_once_with(1, params={"1": 90})
 
         # Test query translation functionality
@@ -689,7 +688,7 @@ class TestTPCHBenchmark:
             mock_translate.assert_called_once_with(1, "mysql")
 
     def test_streams_module_exists(self, tpch_benchmark: TPCHBenchmark) -> None:
-        """Test that TPC-H streams module functionality exists."""
+
         # Test that streams functionality can be imported
         from benchbox.core.tpch.streams import TPCHStreamRunner, TPCHStreams
 
@@ -702,7 +701,7 @@ class TestTPCHCompliance:
     """Tests for compliance with the BaseBenchmark abstract class."""
 
     def test_tpch_implements_base_benchmark(self) -> None:
-        """Test that TPCH implements the BaseBenchmark interface."""
+
         from benchbox.base import BaseBenchmark
 
         assert issubclass(TPCH, BaseBenchmark)
@@ -735,7 +734,7 @@ class TestTPCHDataGeneratorIntegration:
             yield mock_build
 
     def test_generator_initialization(self, temp_dir) -> None:
-        """Test that the generator initializes correctly."""
+
         generator = TPCHDataGenerator(
             scale_factor=0.01,  # Very small scale for testing
             output_dir=temp_dir,
@@ -779,7 +778,6 @@ class TestTPCHDataGeneratorIntegration:
         with mock.patch.object(generator, "_run_dbgen_native"):
             # Mock the _generate_local method to return our mock file paths
             with mock.patch.object(generator, "_generate_local", return_value=mock_table_paths):
-                # Generate data
                 table_paths = generator.generate()
 
         # Verify that all tables were generated
@@ -790,7 +788,7 @@ class TestTPCHDataGeneratorIntegration:
             assert table_paths[table].suffix == ".csv", f"{table} should be in CSV format"
 
     def test_compile_dbgen_mock(self, temp_dir) -> None:
-        """Test dbgen compilation with mocks."""
+
         generator = TPCHDataGenerator(scale_factor=0.01, output_dir=temp_dir)
 
         # Test that the generator was initialized properly
@@ -842,7 +840,7 @@ class TestTPCHDatabaseIntegration:
         return tpch
 
     def test_create_tables(self, sqlite_db, tiny_tpch) -> None:
-        """Test creating TPC-H tables in a database."""
+
         cursor = sqlite_db.cursor()
 
         # Get the SQL and adapt it for SQLite
@@ -850,7 +848,6 @@ class TestTPCHDatabaseIntegration:
         sql = sql.replace("DECIMAL(15,2)", "REAL")
         sql = sql.replace("DATE", "TEXT")
 
-        # Execute the SQL
         cursor.executescript(sql)
 
         # Verify that tables were created (lowercase per TPC spec)
@@ -870,7 +867,7 @@ class TestTPCHDatabaseIntegration:
             assert table in tables
 
     def test_simple_query_execution(self, sqlite_db, tiny_tpch) -> None:
-        """Test executing a simple query against the database."""
+
         cursor = sqlite_db.cursor()
 
         # Create the NATION table (simplified schema)
@@ -901,11 +898,9 @@ class TestTPCHDatabaseIntegration:
         WHERE N_REGIONKEY = 1
         """
 
-        # Execute the query
         cursor.execute(query)
         results = cursor.fetchall()
 
-        # Verify the results
         assert len(results) == 3  # Argentina, Brazil, Canada
         assert (1, "ARGENTINA") in results
         assert (2, "BRAZIL") in results

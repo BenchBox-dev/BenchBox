@@ -32,7 +32,7 @@ class TestDuckDBTuningConfigFlow:
     """Tests for tuning config flow from YAML to DDL."""
 
     def test_tuning_config_generates_sorted_ddl(self):
-        """Test that sorting configuration generates correct DDL."""
+
         # Create table tuning with sorting
         # order is position (1-based), sort_order is ASC/DESC
         table_tuning = TableTuning(
@@ -53,11 +53,10 @@ class TestDuckDBTuningConfigFlow:
         assert "l_orderkey" in clauses.sort_by
 
     def test_tuning_config_executes_in_duckdb(self):
-        """Test that generated DDL executes successfully in DuckDB."""
+
         pytest.importorskip("duckdb")
         import duckdb
 
-        # Create table tuning
         table_tuning = TableTuning(
             table_name="test_table",
             sorting=[
@@ -90,7 +89,7 @@ class TestDuckDBTuningConfigFlow:
                 conn.close()
 
     def test_unified_config_to_table_tuning(self):
-        """Test that UnifiedTuningConfiguration produces correct table tunings."""
+
         config = UnifiedTuningConfiguration()
 
         # Add table tuning using the table_tunings dict
@@ -109,12 +108,11 @@ class TestDuckDBTuningConfigFlow:
         assert retrieved.sorting[0].name == "o_orderdate"
 
     def test_duckdb_parquet_sorting_post_load(self):
-        """Test that post-load sorting operations work with Parquet."""
+
         pytest.importorskip("duckdb")
 
         generator = DuckDBDDLGenerator()
 
-        # Create table tuning with sorting
         table_tuning = TableTuning(
             table_name="lineitem",
             sorting=[
@@ -144,7 +142,7 @@ class TestDuckDBDDLGeneratorIntegration:
         conn.close()
 
     def test_create_table_with_sorting(self, duckdb_conn):
-        """Test creating a table with sorting clauses."""
+
         generator = DuckDBDDLGenerator()
 
         table_tuning = TableTuning(
@@ -161,7 +159,6 @@ class TestDuckDBDDLGeneratorIntegration:
         clauses = generator.generate_tuning_clauses(table_tuning)
         ddl = generator.generate_create_table_ddl("test_sorted", columns, clauses)
 
-        # Execute DDL
         duckdb_conn.execute(ddl)
 
         # Verify table exists with correct structure
@@ -176,7 +173,7 @@ class TestDuckDBDDLGeneratorIntegration:
         assert result[2][0] == "data"
 
     def test_insert_and_query_sorted_table(self, duckdb_conn):
-        """Test that sorted table works correctly for inserts and queries."""
+
         generator = DuckDBDDLGenerator()
 
         table_tuning = TableTuning(
@@ -195,7 +192,6 @@ class TestDuckDBDDLGeneratorIntegration:
 
         duckdb_conn.execute(ddl)
 
-        # Insert data
         duckdb_conn.execute(
             "INSERT INTO events VALUES "
             "(1, '2024-01-01 10:00:00', 'click'), "
@@ -212,7 +208,7 @@ class TestTuningConfigIntegration:
     """Tests for tuning configuration integration."""
 
     def test_config_serialization_roundtrip(self):
-        """Test that tuning config serializes and deserializes correctly."""
+
         config = UnifiedTuningConfiguration()
 
         # Configure constraints
@@ -234,7 +230,6 @@ class TestTuningConfigIntegration:
         # Deserialize
         restored = UnifiedTuningConfiguration.from_dict(config_dict)
 
-        # Verify
         assert restored.primary_keys.enabled is True
         assert restored.foreign_keys.enabled is False
 
@@ -243,7 +238,7 @@ class TestTuningConfigIntegration:
         assert len(lineitem_tuning.sorting) == 2
 
     def test_multiple_table_tunings(self):
-        """Test configuration with multiple table tunings."""
+
         config = UnifiedTuningConfiguration()
 
         # Add tunings for multiple tables using dict

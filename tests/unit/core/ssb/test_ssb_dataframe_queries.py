@@ -105,7 +105,7 @@ class TestSSBQueryRegistry:
     """Tests for SSB DataFrame query registry."""
 
     def test_registry_imports_successfully(self):
-        """Test that the registry can be imported."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         assert SSB_DATAFRAME_QUERIES is not None
@@ -118,13 +118,13 @@ class TestSSBQueryRegistry:
         assert len(queries) == 13
 
     def test_registry_benchmark_name(self):
-        """Test that registry has correct benchmark name."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         assert SSB_DATAFRAME_QUERIES.benchmark == "ssb"
 
     def test_get_query_by_id(self):
-        """Test getting a query by ID."""
+
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
@@ -132,14 +132,14 @@ class TestSSBQueryRegistry:
         assert query.query_id == "Q1.1"
 
     def test_get_nonexistent_query(self):
-        """Test getting a query that doesn't exist."""
+
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q99")
         assert query is None
 
     def test_list_queries(self):
-        """Test listing all queries."""
+
         from benchbox.core.ssb.dataframe_queries import list_ssb_queries
 
         queries = list_ssb_queries()
@@ -147,14 +147,14 @@ class TestSSBQueryRegistry:
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     def test_all_queries_registered(self, query_id):
-        """Test that each SSB query is registered."""
+
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query(query_id)
         assert query is not None, f"Query {query_id} should be registered"
 
     def test_queries_have_both_implementations(self):
-        """Test that all queries have both expression and pandas implementations."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -162,7 +162,7 @@ class TestSSBQueryRegistry:
             assert query.pandas_impl is not None, f"{query.query_id} missing pandas impl"
 
     def test_all_queries_callable(self):
-        """Test that all query implementations are callable."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -170,7 +170,7 @@ class TestSSBQueryRegistry:
             assert callable(query.pandas_impl), f"{query.query_id} pandas_impl not callable"
 
     def test_query_descriptions_not_empty(self):
-        """Test that all queries have descriptions."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -178,7 +178,7 @@ class TestSSBQueryRegistry:
             assert len(query.description) > 10, f"{query.query_id} description too short"
 
     def test_query_names_not_empty(self):
-        """Test that all queries have names."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -259,7 +259,7 @@ class TestSSBParameters:
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     def test_all_queries_have_parameters(self, query_id):
-        """Test that all queries have parameter definitions."""
+
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters(query_id)
@@ -267,7 +267,7 @@ class TestSSBParameters:
         assert len(params.params) > 0, f"{query_id} should have at least one parameter"
 
     def test_parameter_get_with_default(self):
-        """Test getting parameter with default value."""
+
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters("Q1.1")
@@ -278,7 +278,7 @@ class TestSSBBenchmarkRegistry:
     """Tests for SSB DataFrame support in benchmark registry."""
 
     def test_ssb_supports_dataframe(self):
-        """Test that SSB is marked as supporting DataFrames."""
+
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 
         meta = get_benchmark_metadata("ssb")

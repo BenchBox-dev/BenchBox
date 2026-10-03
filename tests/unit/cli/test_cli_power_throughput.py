@@ -32,7 +32,7 @@ class TestCLIPowerThroughputExecution:
         self.runner = CliRunner()
 
     def test_power_phase_validation(self):
-        """Test that --phases power is properly validated."""
+
         result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--phases", "power"])
 
         # Should fail because no database is specified
@@ -40,7 +40,7 @@ class TestCLIPowerThroughputExecution:
         assert "database" in result.output.lower() or "error" in result.output.lower()
 
     def test_throughput_phase_validation(self):
-        """Test that --phases throughput is properly validated."""
+
         result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--phases", "throughput"])
 
         # Should fail because no database is specified
@@ -48,7 +48,7 @@ class TestCLIPowerThroughputExecution:
         assert "database" in result.output.lower() or "error" in result.output.lower()
 
     def test_maintenance_phase_validation(self):
-        """Test that --phases maintenance is properly validated."""
+
         result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--phases", "maintenance"])
 
         # Should fail because no database is specified
@@ -56,7 +56,7 @@ class TestCLIPowerThroughputExecution:
         assert "database" in result.output.lower() or "error" in result.output.lower()
 
     def test_combined_phases_validation(self):
-        """Test that combined phases are properly validated when missing database."""
+
         result = self.runner.invoke(cli, ["run", "--benchmark", "tpch", "--phases", "power,throughput"])
 
         # Should fail because no database is specified
@@ -72,7 +72,7 @@ class TestCLIPowerThroughputExecution:
         assert result.exit_code == 0
 
     def test_invalid_tuning_mode_value(self):
-        """Test that an invalid tuning mode string surfaces a helpful error."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -89,7 +89,7 @@ class TestCLIPowerThroughputExecution:
         assert "invalid tuning value" in result.output.lower()
 
     def test_tuning_mode_accepts_config_file(self):
-        """Test that passing a config path via --tuning succeeds."""
+
         with self.runner.isolated_filesystem():
             config_path = "test_tuning.yaml"
             with open(config_path, "w", encoding="utf-8") as f:
@@ -130,8 +130,7 @@ class TestBenchmarkOrchestratorPowerThroughput:
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch.object(BenchmarkOrchestrator, "_get_benchmark_instance")
     def test_power_test_execution_type(self, mock_get_benchmark, mock_get_platform, mock_lifecycle):
-        """Test that power test execution type properly delegates to platform adapter."""
-        # Create test config with power test execution type
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -139,7 +138,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
             test_execution_type="power",
         )
 
-        # Mock system profile
         system_profile = Mock(spec=SystemProfile)
         system_profile.cpu_cores_logical = 4
         system_profile.memory_total_gb = 8
@@ -151,7 +149,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
             options={},
         )
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "tpch"
         mock_benchmark.scale_factor = 0.01
@@ -201,7 +198,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
         # Mock the lifecycle runner to return our result
         mock_lifecycle.return_value = mock_enhanced_result
 
-        # Execute benchmark
         result = self.orchestrator.execute_benchmark(config, system_profile, database_config)
 
         # Verify lifecycle was called with correct test execution type
@@ -216,8 +212,7 @@ class TestBenchmarkOrchestratorPowerThroughput:
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch.object(BenchmarkOrchestrator, "_get_benchmark_instance")
     def test_throughput_test_execution_type(self, mock_get_benchmark, mock_get_platform, mock_lifecycle):
-        """Test that throughput test execution type properly delegates to platform adapter."""
-        # Create test config with throughput test execution type
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -225,7 +220,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
             test_execution_type="throughput",
         )
 
-        # Mock system profile
         system_profile = Mock(spec=SystemProfile)
         system_profile.cpu_cores_logical = 4
         system_profile.memory_total_gb = 8
@@ -237,7 +231,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
             options={},
         )
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "tpch"
         mock_benchmark.scale_factor = 0.01
@@ -287,7 +280,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
         # Mock the lifecycle runner to return our result
         mock_lifecycle.return_value = mock_enhanced_result
 
-        # Execute benchmark
         result = self.orchestrator.execute_benchmark(config, system_profile, database_config)
 
         # Verify lifecycle was called with correct test execution type
@@ -301,8 +293,7 @@ class TestBenchmarkOrchestratorPowerThroughput:
     @patch("benchbox.cli.orchestrator.get_platform_adapter")
     @patch.object(BenchmarkOrchestrator, "_get_benchmark_instance")
     def test_combined_test_execution_type(self, mock_get_benchmark, mock_get_platform, mock_lifecycle):
-        """Test that combined test execution type calls both power and throughput tests."""
-        # Create test config with combined test execution type
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -310,7 +301,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
             test_execution_type="combined",
         )
 
-        # Mock system profile
         system_profile = Mock(spec=SystemProfile)
         system_profile.cpu_cores_logical = 4
         system_profile.memory_total_gb = 8
@@ -322,7 +312,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
             options={},
         )
 
-        # Mock benchmark instance
         mock_benchmark = Mock()
         mock_benchmark._name = "tpch"
         mock_benchmark.scale_factor = 0.01
@@ -374,7 +363,6 @@ class TestBenchmarkOrchestratorPowerThroughput:
         # Mock the lifecycle runner to return our result
         mock_lifecycle.return_value = mock_enhanced_result
 
-        # Execute benchmark
         result = self.orchestrator.execute_benchmark(config, system_profile, database_config)
 
         # Verify lifecycle was called with correct test execution type
@@ -460,7 +448,7 @@ class TestNoTuningValidation:
         self.orchestrator = BenchmarkOrchestrator()
 
     def test_no_tuning_config_creation(self):
-        """Test that the explicit no-tuning mode creates proper configuration."""
+
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
         # Simulate --no-tuning configuration
@@ -472,7 +460,7 @@ class TestNoTuningValidation:
         assert config.foreign_keys.enabled is False
 
     def test_cli_no_tuning_flag_processing(self, cli_benchmark_mocks, cli_runner):
-        """Test that CLI properly processes `--tuning notuning`."""
+
         result = cli_runner.invoke(
             cli,
             ["run", "--platform", "duckdb", "--benchmark", "tpch", "--tuning", "notuning", "--non-interactive"],

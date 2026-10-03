@@ -22,7 +22,7 @@ class TestCostCalculator:
     """Tests for the CostCalculator class."""
 
     def test_snowflake_cost_calculation(self):
-        """Test Snowflake cost calculation with credits_used."""
+
         calculator = CostCalculator()
 
         resource_usage = {"credits_used": 0.5}
@@ -43,7 +43,7 @@ class TestCostCalculator:
         assert cost.pricing_details["price_per_credit"] == price_per_credit
 
     def test_bigquery_cost_calculation(self):
-        """Test BigQuery cost calculation with bytes_processed."""
+
         calculator = CostCalculator()
 
         # 1 TiB = 1024^4 bytes (BigQuery bills per tebibyte)
@@ -93,7 +93,7 @@ class TestCostCalculator:
         assert any("data_scanned_bytes" in warning for warning in warnings)
 
     def test_redshift_cost_calculation(self):
-        """Test Redshift cost calculation with execution time."""
+
         calculator = CostCalculator()
 
         resource_usage = {"execution_time_seconds": 3600}  # 1 hour
@@ -112,7 +112,7 @@ class TestCostCalculator:
         assert cost.pricing_details["node_count"] == 2
 
     def test_databricks_cost_calculation(self):
-        """Test Databricks cost calculation with execution time."""
+
         calculator = CostCalculator()
 
         resource_usage = {"execution_time_seconds": 1800}  # 30 minutes
@@ -145,7 +145,7 @@ class TestCostCalculator:
         assert "Local execution" in cost.pricing_details["note"]
 
     def test_missing_resource_usage(self):
-        """Test that missing resource usage returns None."""
+
         calculator = CostCalculator()
 
         # Snowflake with no credits_used
@@ -157,7 +157,7 @@ class TestCostCalculator:
         assert cost is None
 
     def test_phase_cost_calculation(self):
-        """Test phase cost aggregation."""
+
         calculator = CostCalculator()
 
         query_costs = [
@@ -174,7 +174,7 @@ class TestCostCalculator:
         assert phase_cost.currency == "USD"
 
     def test_benchmark_cost_from_phases(self):
-        """Test benchmark cost calculation from phase costs."""
+
         calculator = CostCalculator()
 
         phase_costs = [

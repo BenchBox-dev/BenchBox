@@ -38,7 +38,7 @@ class TestTimingMeasurementAccuracy:
     """Validate that Total Test Time (TTT) is measured correctly."""
 
     def test_tpch_ttt_excludes_setup_overhead(self):
-        """Test that TPC-H TTT measures only concurrent execution time."""
+
         # Create a benchmark that tracks when queries actually execute
         execution_times = []
         execution_lock = Lock()
@@ -86,7 +86,6 @@ class TestTimingMeasurementAccuracy:
         result = test.run(config)
         test_end = time.time()
 
-        # Verify test succeeded
         assert result.success
         assert result.streams_executed == 2
         assert len(result.stream_results) == 2
@@ -109,7 +108,7 @@ class TestTimingMeasurementAccuracy:
         assert abs(measured_ttt - max_stream_duration) < 0.5  # 500ms tolerance
 
     def test_tpcds_ttt_excludes_setup_overhead(self):
-        """Test that TPC-DS TTT measures only concurrent execution time."""
+
         # Similar structure to TPC-H test
         execution_times = []
         execution_lock = Lock()
@@ -128,7 +127,6 @@ class TestTimingMeasurementAccuracy:
             conn.commit.return_value = None
             return conn
 
-        # Create mock benchmark
         benchmark = Mock()
         benchmark.get_query = mock_get_query
         benchmark.get_queries.return_value = {"1": "SELECT 1", "2": "SELECT 2"}
@@ -313,7 +311,7 @@ class TestConnectionCleanup:
     """Validate connection cleanup on failures."""
 
     def test_tpch_connection_closed_on_query_failure(self):
-        """Test that TPC-H closes connections even when queries fail."""
+
         connections_created = []
         connections_closed = []
         creation_lock = Lock()
@@ -382,7 +380,7 @@ class TestConnectionCleanup:
         assert set(connections_created) == set(connections_closed)
 
     def test_tpcds_connection_closed_on_stream_failure(self):
-        """Test that TPC-DS closes connections even when streams fail."""
+
         connections_created = []
         connections_closed = []
         creation_lock = Lock()

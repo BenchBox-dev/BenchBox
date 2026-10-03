@@ -76,12 +76,12 @@ class TestPySparkDataFrameAdapter:
         adapter.close()
 
     def test_initialization(self, adapter):
-        """Test adapter initialization."""
+
         assert adapter.platform_name == "PySpark"
         assert adapter.family == "expression"
 
     def test_initialization_with_options(self):
-        """Test adapter initialization with custom options."""
+
         adapter = PySparkDataFrameAdapter(
             working_dir="/tmp/pyspark",
             verbose=True,
@@ -103,7 +103,7 @@ class TestPySparkDataFrameAdapter:
         adapter.close()
 
     def test_platform_info(self, adapter):
-        """Test get_platform_info method."""
+
         info = adapter.get_platform_info()
 
         assert info["platform"] == "PySpark"
@@ -113,14 +113,14 @@ class TestPySparkDataFrameAdapter:
         assert "shuffle_partitions" in info
 
     def test_create_context(self, adapter):
-        """Test context creation."""
+
         ctx = adapter.create_context()
 
         assert ctx.platform == "PySpark"
         assert ctx.family == "expression"
 
     def test_session_lifecycle(self, pyspark_test_environment):
-        """Test SparkSession lifecycle management."""
+
         adapter = PySparkDataFrameAdapter(
             master="local[1]",
             driver_memory="512m",
@@ -139,7 +139,7 @@ class TestPySparkDataFrameAdapter:
         assert adapter._spark is None
 
     def test_context_manager(self, pyspark_test_environment):
-        """Test context manager protocol for automatic cleanup."""
+
         with PySparkDataFrameAdapter(
             master="local[1]",
             driver_memory="512m",
@@ -153,7 +153,7 @@ class TestPySparkDataFrameAdapter:
         assert adapter._spark is None
 
     def test_version_without_session(self):
-        """Test that version is available without creating SparkSession."""
+
         adapter = PySparkDataFrameAdapter(
             master="local[1]",
             driver_memory="512m",
@@ -392,7 +392,7 @@ class TestPySparkAggregationMethods:
         assert expr.alias("combined") is not None
 
     def test_aggregation_in_groupby(self, adapter):
-        """Test aggregation methods work in group_by operations."""
+
         test_df = adapter.spark.createDataFrame(
             [("A", 10), ("A", 20), ("B", 30), ("B", 40)],
             ["category", "value"],
@@ -430,7 +430,7 @@ class TestPySparkDataLoading:
         adapter.close()
 
     def test_read_csv_basic(self, adapter, tmp_path):
-        """Test reading a basic CSV file."""
+
         # Create a test CSV file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id,name,amount\n1,Alice,100\n2,Bob,200\n")
@@ -443,7 +443,7 @@ class TestPySparkDataLoading:
         assert len(df.columns) == 3
 
     def test_read_csv_with_delimiter(self, adapter, tmp_path):
-        """Test reading CSV with custom delimiter."""
+
         # Create a pipe-delimited file
         csv_path = tmp_path / "test.csv"
         csv_path.write_text("id|name|amount\n1|Alice|100\n2|Bob|200\n")
@@ -454,7 +454,7 @@ class TestPySparkDataLoading:
         assert count == 2
 
     def test_read_parquet(self, adapter, tmp_path):
-        """Test reading a Parquet file."""
+
         # Create a test Parquet file using Spark itself
         parquet_path = tmp_path / "test.parquet"
 
@@ -471,7 +471,7 @@ class TestPySparkDataLoading:
         assert count == 3
 
     def test_collect_dataframe(self, adapter):
-        """Test collecting a DataFrame."""
+
         # Create a test DataFrame
         test_df = adapter.spark.createDataFrame(
             [(1, "A"), (2, "B"), (3, "C")],
@@ -484,7 +484,7 @@ class TestPySparkDataLoading:
         assert adapter.get_row_count(result) == 3
 
     def test_get_row_count(self, adapter):
-        """Test getting row count from DataFrame."""
+
         test_df = adapter.spark.createDataFrame(
             [(i,) for i in range(5)],
             ["value"],
@@ -523,7 +523,7 @@ class TestPySparkWindowFunctions:
         )
 
     def test_window_row_number(self, adapter, test_df):
-        """Test row_number window function returns valid expression."""
+
         expr = adapter.window_row_number(
             order_by=[("value", True)],
             partition_by=["category"],
@@ -541,7 +541,7 @@ class TestPySparkWindowFunctions:
         assert "rn" in result.columns
 
     def test_window_rank(self, adapter, test_df):
-        """Test rank window function returns valid expression."""
+
         expr = adapter.window_rank(
             order_by=[("value", True)],
             partition_by=["category"],
@@ -555,7 +555,7 @@ class TestPySparkWindowFunctions:
         assert "rnk" in result.columns
 
     def test_window_dense_rank(self, adapter, test_df):
-        """Test dense_rank window function returns valid expression."""
+
         expr = adapter.window_dense_rank(
             order_by=[("value", True)],
             partition_by=["category"],
@@ -569,7 +569,7 @@ class TestPySparkWindowFunctions:
         assert "drnk" in result.columns
 
     def test_window_sum(self, adapter, test_df):
-        """Test window sum function returns valid expression."""
+
         expr = adapter.window_sum(
             column="value",
             partition_by=["category"],
@@ -588,7 +588,7 @@ class TestPySparkWindowFunctions:
         assert totals["B"] == 70
 
     def test_window_avg(self, adapter, test_df):
-        """Test window avg function returns valid expression."""
+
         expr = adapter.window_avg(
             column="value",
             partition_by=["category"],
@@ -602,7 +602,7 @@ class TestPySparkWindowFunctions:
         assert "avg_val" in result.columns
 
     def test_window_count(self, adapter, test_df):
-        """Test window count function returns valid expression."""
+
         expr = adapter.window_count(
             column="value",
             partition_by=["category"],
@@ -616,7 +616,7 @@ class TestPySparkWindowFunctions:
         assert "cnt" in result.columns
 
     def test_window_lag(self, adapter, test_df):
-        """Test lag window function offsets within each partition."""
+
         expr = adapter.window_lag(
             column="value",
             offset=1,
@@ -636,7 +636,7 @@ class TestPySparkWindowFunctions:
         assert rows[("B", 40)] == 30
 
     def test_window_lead(self, adapter, test_df):
-        """Test lead window function offsets within each partition."""
+
         expr = adapter.window_lead(
             column="value",
             offset=1,
@@ -656,7 +656,7 @@ class TestPySparkWindowFunctions:
         assert rows[("B", 40)] is None
 
     def test_window_ntile(self, adapter, test_df):
-        """Test ntile window function buckets rows within each partition."""
+
         expr = adapter.window_ntile(
             n=2,
             order_by=[("value", True)],
@@ -834,7 +834,7 @@ class TestPySparkDataFrameOperations:
         adapter.close()
 
     def test_union_all(self, adapter):
-        """Test union_all operation."""
+
         df1 = adapter.spark.createDataFrame([(1,), (2,)], ["a"])
         df2 = adapter.spark.createDataFrame([(3,), (4,)], ["a"])
 
@@ -844,7 +844,7 @@ class TestPySparkDataFrameOperations:
         assert count == 4
 
     def test_union_all_single(self, adapter):
-        """Test union_all with single DataFrame."""
+
         df1 = adapter.spark.createDataFrame([(1,), (2,)], ["a"])
 
         result = adapter.union_all(df1)
@@ -852,12 +852,12 @@ class TestPySparkDataFrameOperations:
         assert result is df1
 
     def test_union_all_empty_raises(self, adapter):
-        """Test union_all with no DataFrames raises error."""
+
         with pytest.raises(ValueError, match="At least one DataFrame"):
             adapter.union_all()
 
     def test_rename_columns(self, adapter):
-        """Test rename_columns operation."""
+
         df = adapter.spark.createDataFrame([(1, 2, 3)], ["old_a", "old_b", "old_c"])
 
         renamed = adapter.rename_columns(df, {"old_a": "new_a", "old_b": "new_b"})
@@ -884,7 +884,7 @@ class TestPySparkQueryExecution:
         adapter.close()
 
     def test_simple_select_query(self, adapter):
-        """Test executing a simple select query."""
+
         ctx = adapter.create_context()
 
         # Create and register test data
@@ -911,7 +911,7 @@ class TestPySparkQueryExecution:
         assert result["rows_returned"] == 3
 
     def test_filter_query(self, adapter):
-        """Test executing a filter query."""
+
         ctx = adapter.create_context()
 
         test_df = adapter.spark.createDataFrame(
@@ -953,7 +953,7 @@ class TestPySparkTableLoading:
         adapter.close()
 
     def test_load_table_parquet(self, adapter, tmp_path):
-        """Test loading a table from Parquet."""
+
         ctx = adapter.create_context()
 
         # Create test data using Spark
@@ -970,7 +970,7 @@ class TestPySparkTableLoading:
         assert row_count == 3
 
     def test_load_table_csv(self, adapter, tmp_path):
-        """Test loading a table from CSV."""
+
         ctx = adapter.create_context()
 
         # Create test data
@@ -998,7 +998,7 @@ class TestPySparkSpecificFeatures:
         adapter.close()
 
     def test_sql_execution(self, adapter):
-        """Test SQL execution via Spark."""
+
         # Create and register test data
         test_df = adapter.spark.createDataFrame(
             [(1, 10), (2, 20), (3, 30)],
@@ -1012,7 +1012,7 @@ class TestPySparkSpecificFeatures:
         assert count == 2
 
     def test_register_table(self, adapter):
-        """Test registering a DataFrame as temp view."""
+
         test_df = adapter.spark.createDataFrame([(1,), (2,), (3,)], ["x"])
         adapter.register_table("my_table", test_df)
 
@@ -1023,7 +1023,7 @@ class TestPySparkSpecificFeatures:
         assert count == 3
 
     def test_explain(self, adapter):
-        """Test query plan explanation."""
+
         test_df = adapter.spark.createDataFrame(
             [(1, "A"), (2, "B")],
             ["id", "name"],
@@ -1037,7 +1037,7 @@ class TestPySparkSpecificFeatures:
         assert "Filter" in plan or "filter" in plan.lower()
 
     def test_get_query_plan(self, adapter):
-        """Test getting both logical and physical plans."""
+
         test_df = adapter.spark.createDataFrame([(1,), (2,)], ["a"])
 
         plans = adapter.get_query_plan(test_df)
@@ -1048,7 +1048,7 @@ class TestPySparkSpecificFeatures:
         assert len(plans["physical"]) > 0
 
     def test_to_pandas(self, adapter):
-        """Test conversion to pandas DataFrame."""
+
         test_df = adapter.spark.createDataFrame(
             [(1, "A"), (2, "B"), (3, "C")],
             ["id", "name"],
@@ -1061,7 +1061,7 @@ class TestPySparkSpecificFeatures:
         assert "name" in pandas_df.columns
 
     def test_get_first_row(self, adapter):
-        """Test getting first row."""
+
         test_df = adapter.spark.createDataFrame(
             [(1, "Alice"), (2, "Bob")],
             ["id", "name"],
@@ -1073,7 +1073,7 @@ class TestPySparkSpecificFeatures:
         assert first[0] == 1
 
     def test_get_first_row_empty(self, adapter):
-        """Test getting first row from empty DataFrame."""
+
         empty_df = adapter.spark.createDataFrame([], "id INT, name STRING")
 
         first = adapter._get_first_row(empty_df)
@@ -1081,7 +1081,7 @@ class TestPySparkSpecificFeatures:
         assert first is None
 
     def test_to_polars(self, adapter):
-        """Test conversion to Polars DataFrame."""
+
         try:
             import polars as pl
         except ImportError:
@@ -1100,7 +1100,7 @@ class TestPySparkSpecificFeatures:
         assert "name" in polars_df.columns
 
     def test_get_tuning_summary(self, adapter):
-        """Test getting tuning summary."""
+
         summary = adapter.get_tuning_summary()
 
         assert "platform" in summary
@@ -1130,7 +1130,7 @@ class TestPySparkScalarExtraction:
         adapter.close()
 
     def test_scalar_single_value_dataframe(self, spark_adapter):
-        """Test scalar extraction from single-value DataFrame."""
+
         spark = spark_adapter.spark
         df = spark.createDataFrame([(42,)], ["value"])
         result = spark_adapter.scalar(df)
@@ -1138,7 +1138,7 @@ class TestPySparkScalarExtraction:
         assert result == 42
 
     def test_scalar_with_column_name(self, spark_adapter):
-        """Test scalar extraction with explicit column name."""
+
         spark = spark_adapter.spark
         df = spark.createDataFrame([(1, 2, 3)], ["a", "b", "c"])
         result = spark_adapter.scalar(df, column="b")
@@ -1146,7 +1146,7 @@ class TestPySparkScalarExtraction:
         assert result == 2
 
     def test_scalar_first_column_multicolumn_df(self, spark_adapter):
-        """Test scalar extraction defaults to first column."""
+
         spark = spark_adapter.spark
         df = spark.createDataFrame([(10, 20)], ["first", "second"])
         result = spark_adapter.scalar(df)
@@ -1154,7 +1154,7 @@ class TestPySparkScalarExtraction:
         assert result == 10
 
     def test_scalar_empty_dataframe_raises(self, spark_adapter):
-        """Test that scalar extraction on empty DataFrame raises ValueError."""
+
         spark = spark_adapter.spark
         # Create empty DataFrame with schema
         from pyspark.sql.types import IntegerType, StructField, StructType
@@ -1166,7 +1166,7 @@ class TestPySparkScalarExtraction:
             spark_adapter.scalar(df)
 
     def test_scalar_float_value(self, spark_adapter):
-        """Test scalar extraction with float value."""
+
         spark = spark_adapter.spark
         df = spark.createDataFrame([(3.14159,)], ["value"])
         result = spark_adapter.scalar(df)
@@ -1174,7 +1174,7 @@ class TestPySparkScalarExtraction:
         assert result == pytest.approx(3.14159)
 
     def test_scalar_string_value(self, spark_adapter):
-        """Test scalar extraction with string value."""
+
         spark = spark_adapter.spark
         df = spark.createDataFrame([("hello",)], ["value"])
         result = spark_adapter.scalar(df)
@@ -1191,7 +1191,7 @@ class TestPySparkScalarExtraction:
         assert result == 999
 
     def test_scalar_multiple_rows_raises(self, spark_adapter):
-        """Test that scalar extraction on multi-row DataFrame raises ValueError."""
+
         spark = spark_adapter.spark
         df = spark.createDataFrame([(1,), (2,), (3,)], ["value"])
 
@@ -1211,14 +1211,14 @@ class TestPySparkNotAvailable:
     """Tests for behavior when PySpark is not installed."""
 
     def test_pyspark_available_flag(self):
-        """Test that PYSPARK_AVAILABLE flag is set correctly."""
+
         from benchbox.platforms.dataframe.pyspark_df import PYSPARK_AVAILABLE
 
         # This just tests that the flag exists and is boolean
         assert isinstance(PYSPARK_AVAILABLE, bool)
 
     def test_pyspark_version_constant(self):
-        """Test that PYSPARK_VERSION constant is exported."""
+
         from benchbox.platforms.dataframe.pyspark_df import PYSPARK_VERSION
 
         # If PySpark is installed, version should be a string
@@ -1230,7 +1230,7 @@ class TestPySparkNotAvailable:
             assert PYSPARK_VERSION is None
 
     def test_adapter_import_error_when_not_available(self):
-        """Test that adapter raises ImportError when PySpark not installed."""
+
         from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 
         if PYSPARK_AVAILABLE:

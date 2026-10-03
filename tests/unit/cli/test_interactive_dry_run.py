@@ -51,7 +51,7 @@ class TestGenerateCLICommand:
         assert "--scale" not in cmd  # Default value omitted
 
     def test_non_default_scale(self):
-        """Test that non-default scale factor is included."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -60,7 +60,7 @@ class TestGenerateCLICommand:
         assert "--scale 0.1" in cmd
 
     def test_phases_included(self):
-        """Test that phases are included when not default."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -80,7 +80,7 @@ class TestGenerateCLICommand:
         assert "--phases" not in cmd
 
     def test_queries_included(self):
-        """Test that query subset is included."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -90,7 +90,7 @@ class TestGenerateCLICommand:
         assert "--queries Q1,Q6,Q17" in cmd
 
     def test_tuning_included(self):
-        """Test that tuning mode is included when not default."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -110,7 +110,7 @@ class TestGenerateCLICommand:
         assert "--tuning" not in cmd
 
     def test_seed_included(self):
-        """Test that seed is included when specified."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -120,7 +120,7 @@ class TestGenerateCLICommand:
         assert "--seed 42" in cmd
 
     def test_output_included(self):
-        """Test that output directory is included."""
+
         cmd = generate_cli_command(
             platform="snowflake",
             benchmark="tpch",
@@ -130,7 +130,7 @@ class TestGenerateCLICommand:
         assert "--output s3://bucket/path" in cmd
 
     def test_table_format_included(self):
-        """Test that table format is included."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -140,7 +140,7 @@ class TestGenerateCLICommand:
         assert "--table-format iceberg" in cmd
 
     def test_compression_included(self):
-        """Test that compression is included."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -150,7 +150,7 @@ class TestGenerateCLICommand:
         assert "--compression zstd:9" in cmd
 
     def test_mode_included(self):
-        """Test that execution mode is included."""
+
         cmd = generate_cli_command(
             platform="polars",
             benchmark="tpch",
@@ -160,7 +160,7 @@ class TestGenerateCLICommand:
         assert "--mode dataframe" in cmd
 
     def test_table_mode_included(self):
-        """Test that table mode is included when specified."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -180,7 +180,7 @@ class TestGenerateCLICommand:
         assert "--table-mode" not in cmd
 
     def test_force_included(self):
-        """Test that force mode is included."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -190,7 +190,7 @@ class TestGenerateCLICommand:
         assert "--force datagen" in cmd
 
     def test_official_flag(self):
-        """Test that official flag is included."""
+
         cmd = generate_cli_command(
             platform="snowflake",
             benchmark="tpch",
@@ -210,7 +210,7 @@ class TestGenerateCLICommand:
         assert "--capture-plans" in cmd
 
     def test_validation_included(self):
-        """Test that validation mode is included."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -220,7 +220,7 @@ class TestGenerateCLICommand:
         assert "--validation full" in cmd
 
     def test_full_command_with_all_options(self):
-        """Test command generation with all options specified."""
+
         cmd = generate_cli_command(
             platform="snowflake",
             benchmark="tpcds",
@@ -255,7 +255,7 @@ class TestGenerateCLICommand:
         assert "--validation full" in cmd
 
     def test_multiline_formatting(self):
-        """Test that command uses proper multiline formatting."""
+
         cmd = generate_cli_command(
             platform="duckdb",
             benchmark="tpch",
@@ -305,7 +305,7 @@ class TestDisplayInteractivePreview:
         return config
 
     def test_basic_preview_output(self):
-        """Test that basic preview shows expected elements."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
@@ -329,7 +329,7 @@ class TestDisplayInteractivePreview:
         assert "benchbox run" in result
 
     def test_preview_with_all_options(self):
-        """Test preview with all options specified."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
@@ -362,7 +362,7 @@ class TestDisplayInteractivePreview:
         assert "30-60 minutes" in result
 
     def test_preview_shows_cli_command(self):
-        """Test that preview shows equivalent CLI command."""
+
         import re
 
         output = StringIO()
@@ -410,7 +410,7 @@ class TestDisplayInteractivePreview:
         assert "--table-mode external" in result
 
     def test_preview_with_query_subset(self):
-        """Test preview with query subset specified."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
@@ -430,7 +430,7 @@ class TestDisplayInteractivePreview:
         assert "3 selected" in result
 
     def test_preview_with_compression(self):
-        """Test preview with compression settings."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
@@ -452,7 +452,7 @@ class TestDisplayInteractivePreview:
         assert "zstd:9" in result
 
     def test_preview_with_execution_mode(self):
-        """Test preview shows execution mode."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=True, width=120)
 
@@ -797,7 +797,7 @@ class TestPromptPhases:
         ],
     )
     def test_prompt_phases_mappings(self, monkeypatch, responses, expected):
-        """Test preset and custom phase mappings."""
+
         response_iter = iter(responses)
         monkeypatch.setattr("benchbox.cli.benchmarks.Prompt.ask", lambda *_args, **_kwargs: next(response_iter))
         assert prompt_phases() == expected
@@ -864,7 +864,7 @@ class TestPromptQuerySubset:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_run_all_queries(self, mock_confirm):
-        """Test running all queries."""
+
         mock_confirm.return_value = True
         result = prompt_query_subset("tpch", 22)
         assert result is None
@@ -872,7 +872,7 @@ class TestPromptQuerySubset:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_query_subset(self, mock_confirm, mock_prompt):
-        """Test selecting a query subset."""
+
         mock_confirm.return_value = False
         mock_prompt.return_value = "Q1,Q6,Q17"
         result = prompt_query_subset("tpch", 22)
@@ -881,7 +881,7 @@ class TestPromptQuerySubset:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_query_subset_with_numbers(self, mock_confirm, mock_prompt):
-        """Test selecting queries using numbers."""
+
         mock_confirm.return_value = False
         mock_prompt.return_value = "1,6,17"
         result = prompt_query_subset("tpch", 22)
@@ -901,14 +901,14 @@ class TestPromptOfficialMode:
     """Tests for prompt_official_mode function."""
 
     def test_non_tpc_benchmark_returns_false(self):
-        """Test that non-TPC benchmarks return False."""
+
         result, adjusted_scale = prompt_official_mode("ssb", 0.1)
         assert result is False
         assert adjusted_scale is None
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_official_mode(self, mock_confirm):
-        """Test declining official mode."""
+
         mock_confirm.return_value = False
         result, adjusted_scale = prompt_official_mode("tpch", 0.1)
         assert result is False
@@ -916,7 +916,7 @@ class TestPromptOfficialMode:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_enable_with_compliant_scale(self, mock_confirm):
-        """Test enabling official mode with compliant scale factor."""
+
         mock_confirm.return_value = True
         result, adjusted_scale = prompt_official_mode("tpch", 10.0)
         assert result is True
@@ -924,7 +924,7 @@ class TestPromptOfficialMode:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_non_compliant_scale_adjusts_to_nearest(self, mock_confirm):
-        """Test non-compliant scale factor is adjusted to nearest."""
+
         mock_confirm.side_effect = [True, True]  # Enable official, accept nearest
         result, adjusted_scale = prompt_official_mode("tpch", 0.1)
         assert result is True
@@ -933,7 +933,7 @@ class TestPromptOfficialMode:
     @patch("benchbox.cli.benchmarks.FloatPrompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_non_compliant_scale_custom_entry(self, mock_confirm, mock_float):
-        """Test entering custom TPC-compliant scale factor."""
+
         mock_confirm.side_effect = [True, False]  # Enable official, decline nearest
         mock_float.return_value = 100.0  # Enter TPC-compliant scale
         result, adjusted_scale = prompt_official_mode("tpch", 0.1)
@@ -946,7 +946,7 @@ class TestPromptSeed:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_no_seed_selected(self, mock_confirm):
-        """Test declining to set a seed."""
+
         mock_confirm.return_value = False
         result = prompt_seed()
         assert result is None
@@ -954,7 +954,7 @@ class TestPromptSeed:
     @patch("benchbox.cli.benchmarks.IntPrompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_seed_selected(self, mock_confirm, mock_int_prompt):
-        """Test setting a specific seed."""
+
         mock_confirm.return_value = True
         mock_int_prompt.return_value = 42
         result = prompt_seed()
@@ -963,7 +963,7 @@ class TestPromptSeed:
     @patch("benchbox.cli.benchmarks.IntPrompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_custom_seed_value(self, mock_confirm, mock_int_prompt):
-        """Test entering a custom seed value."""
+
         mock_confirm.return_value = True
         mock_int_prompt.return_value = 12345
         result = prompt_seed()
@@ -975,7 +975,7 @@ class TestPromptForceRegeneration:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_force_regeneration(self, mock_confirm):
-        """Test declining force regeneration returns None."""
+
         mock_confirm.return_value = False
         result = prompt_force_regeneration()
         assert result is None
@@ -983,7 +983,7 @@ class TestPromptForceRegeneration:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_force_all(self, mock_confirm, mock_prompt):
-        """Test selecting force all option."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "1"
         result = prompt_force_regeneration()
@@ -992,7 +992,7 @@ class TestPromptForceRegeneration:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_force_datagen(self, mock_confirm, mock_prompt):
-        """Test selecting force datagen option."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "2"
         result = prompt_force_regeneration()
@@ -1001,7 +1001,7 @@ class TestPromptForceRegeneration:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_force_upload(self, mock_confirm, mock_prompt):
-        """Test selecting force upload option."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "3"
         result = prompt_force_regeneration()
@@ -1013,7 +1013,7 @@ class TestPromptValidationMode:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_validation_config(self, mock_confirm):
-        """Test declining validation configuration returns None."""
+
         mock_confirm.return_value = False
         result = prompt_validation_mode()
         assert result is None
@@ -1021,7 +1021,7 @@ class TestPromptValidationMode:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_exact_validation(self, mock_confirm, mock_prompt):
-        """Test selecting exact validation mode."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "1"
         result = prompt_validation_mode()
@@ -1030,7 +1030,7 @@ class TestPromptValidationMode:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_loose_validation(self, mock_confirm, mock_prompt):
-        """Test selecting loose validation mode."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "2"
         result = prompt_validation_mode()
@@ -1039,7 +1039,7 @@ class TestPromptValidationMode:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_range_validation(self, mock_confirm, mock_prompt):
-        """Test selecting range validation mode."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "3"
         result = prompt_validation_mode()
@@ -1048,7 +1048,7 @@ class TestPromptValidationMode:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_disabled_validation(self, mock_confirm, mock_prompt):
-        """Test selecting disabled validation mode."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "4"
         result = prompt_validation_mode()
@@ -1057,7 +1057,7 @@ class TestPromptValidationMode:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_full_validation(self, mock_confirm, mock_prompt):
-        """Test selecting full validation mode."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "5"
         result = prompt_validation_mode()
@@ -1068,7 +1068,7 @@ class TestPromptCapturePlans:
     """Tests for prompt_capture_plans function."""
 
     def test_unsupported_platform_returns_false(self):
-        """Test unsupported platform returns False without prompting."""
+
         # Snowflake doesn't support plan capture
         result = prompt_capture_plans("snowflake")
         assert result is False
@@ -1094,21 +1094,21 @@ class TestPromptCapturePlans:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_postgresql_supported(self, mock_confirm):
-        """Test PostgreSQL is supported."""
+
         mock_confirm.return_value = True
         result = prompt_capture_plans("postgresql")
         assert result is True
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_datafusion_supported(self, mock_confirm):
-        """Test DataFusion is supported."""
+
         mock_confirm.return_value = True
         result = prompt_capture_plans("datafusion")
         assert result is True
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_case_insensitive(self, mock_confirm):
-        """Test platform name is case insensitive."""
+
         mock_confirm.return_value = True
         result = prompt_capture_plans("DuckDB")
         assert result is True
@@ -1119,7 +1119,7 @@ class TestPromptOutputLocation:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_custom_output(self, mock_confirm):
-        """Test declining custom output returns None."""
+
         mock_confirm.return_value = False
         result = prompt_output_location()
         assert result is None
@@ -1127,7 +1127,7 @@ class TestPromptOutputLocation:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_empty_path_returns_none(self, mock_confirm, mock_prompt):
-        """Test empty path input returns None."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = ""
         result = prompt_output_location()
@@ -1136,7 +1136,7 @@ class TestPromptOutputLocation:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_valid_existing_path(self, mock_confirm, mock_prompt):
-        """Test valid existing path is returned."""
+
         from pathlib import Path
 
         mock_confirm.return_value = True
@@ -1160,7 +1160,7 @@ class TestPromptOutputLocation:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_path_with_subdirectory(self, mock_confirm, mock_prompt):
-        """Test path with subdirectory under existing parent."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "/tmp/benchbox_test_output"
         result = prompt_output_location()
@@ -1170,7 +1170,7 @@ class TestPromptOutputLocation:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_nonexistent_parent_declined(self, mock_confirm, mock_prompt):
-        """Test declining to create nonexistent parent returns None."""
+
         mock_confirm.side_effect = [True, False]  # Yes to custom, No to create
         mock_prompt.return_value = "/nonexistent_parent_xyz/output"
         result = prompt_output_location()
@@ -1181,42 +1181,42 @@ class TestGetPlatformFormatRecommendation:
     """Tests for get_platform_format_recommendation function."""
 
     def test_databricks_recommends_delta(self):
-        """Test Databricks recommends Delta Lake."""
+
         fmt, reason = get_platform_format_recommendation("databricks")
         assert fmt == "delta"
         assert "Delta" in reason
 
     def test_snowflake_recommends_iceberg(self):
-        """Test Snowflake recommends Iceberg."""
+
         fmt, reason = get_platform_format_recommendation("snowflake")
         assert fmt == "iceberg"
         assert "Iceberg" in reason
 
     def test_duckdb_recommends_parquet(self):
-        """Test DuckDB recommends Parquet."""
+
         fmt, reason = get_platform_format_recommendation("duckdb")
         assert fmt == "parquet"
         assert "Parquet" in reason
 
     def test_postgresql_no_format_support(self):
-        """Test PostgreSQL returns no format recommendation."""
+
         fmt, reason = get_platform_format_recommendation("postgresql")
         assert fmt is None
         assert "native" in reason.lower()
 
     def test_sqlite_no_format_support(self):
-        """Test SQLite returns no format recommendation."""
+
         fmt, reason = get_platform_format_recommendation("sqlite")
         assert fmt is None
 
     def test_case_insensitive(self):
-        """Test platform name is case insensitive."""
+
         fmt1, _ = get_platform_format_recommendation("DuckDB")
         fmt2, _ = get_platform_format_recommendation("duckdb")
         assert fmt1 == fmt2 == "parquet"
 
     def test_unknown_platform_defaults_to_parquet(self):
-        """Test unknown platform defaults to Parquet."""
+
         fmt, reason = get_platform_format_recommendation("unknown_platform")
         assert fmt == "parquet"
         assert "widely compatible" in reason
@@ -1226,13 +1226,13 @@ class TestPromptTableFormat:
     """Tests for prompt_table_format function."""
 
     def test_unsupported_platform_returns_none(self):
-        """Test unsupported platform returns None without prompting."""
+
         result = prompt_table_format("postgresql")
         assert result == (None, None)
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_configure_format(self, mock_confirm):
-        """Test declining format configuration returns None."""
+
         mock_confirm.return_value = False
         result = prompt_table_format("duckdb")
         assert result == (None, None)
@@ -1240,7 +1240,7 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_csv(self, mock_confirm, mock_prompt):
-        """Test selecting CSV format."""
+
         mock_confirm.return_value = True
         mock_prompt.return_value = "1"  # CSV
         fmt, compression = prompt_table_format("duckdb")
@@ -1250,7 +1250,7 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_parquet_with_compression(self, mock_confirm, mock_prompt):
-        """Test selecting Parquet with compression."""
+
         mock_confirm.return_value = True
         # Parquet=2, zstd=2 (parquet options: snappy=1, zstd=2, gzip=3, none=4)
         mock_prompt.side_effect = ["2", "2"]
@@ -1261,7 +1261,7 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_vortex(self, mock_confirm, mock_prompt):
-        """Test selecting Vortex."""
+
         mock_confirm.return_value = True
         # Vortex=3, zstd=1 (vortex options: zstd=1, lz4=2, none=3)
         mock_prompt.side_effect = ["3", "1"]
@@ -1272,7 +1272,7 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_delta(self, mock_confirm, mock_prompt):
-        """Test selecting Delta Lake."""
+
         mock_confirm.return_value = True
         # Delta=4, snappy=1 (delta options: snappy=1, zstd=2, none=3)
         mock_prompt.side_effect = ["4", "1"]
@@ -1283,7 +1283,7 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_select_iceberg(self, mock_confirm, mock_prompt):
-        """Test selecting Iceberg."""
+
         mock_confirm.return_value = True
         # Iceberg=5, zstd=1 (iceberg options: zstd=1, snappy=2, gzip=3, none=4)
         mock_prompt.side_effect = ["5", "1"]
@@ -1294,7 +1294,7 @@ class TestPromptTableFormat:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_no_compression(self, mock_confirm, mock_prompt):
-        """Test selecting format with no compression."""
+
         mock_confirm.return_value = True
         # Parquet=2, none=4 (parquet options: snappy=1, zstd=2, gzip=3, none=4)
         mock_prompt.side_effect = ["2", "4"]
@@ -1368,14 +1368,14 @@ class TestPromptPlatformOptions:
     """Tests for prompt_platform_options function."""
 
     def test_unknown_platform_returns_empty(self):
-        """Test unknown platform with no registered options returns empty dict."""
+
         # Use a platform name that definitely has no options
         result = prompt_platform_options("unknown_platform_xyz")
         assert result == {}
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_decline_configure(self, mock_confirm):
-        """Test declining configuration returns empty dict."""
+
         mock_confirm.return_value = False
         result = prompt_platform_options("duckdb")
         assert result == {}
@@ -1383,7 +1383,7 @@ class TestPromptPlatformOptions:
     @patch("benchbox.cli.benchmarks.Prompt.ask")
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_duckdb_memory_limit(self, mock_confirm, mock_prompt):
-        """Test configuring DuckDB memory limit."""
+
         mock_confirm.return_value = True
         # DuckDB has: memory_limit, plan_capture_timeout_seconds,
         # plan_max_depth, temp_directory, threads (sorted alphabetically)
@@ -1401,7 +1401,7 @@ class TestPromptPlatformOptions:
 
     @patch("benchbox.cli.benchmarks.Confirm.ask")
     def test_case_insensitive_platform(self, mock_confirm):
-        """Test platform name is case insensitive."""
+
         mock_confirm.return_value = False
         # Should not raise even with mixed case
         result = prompt_platform_options("DuckDB")
@@ -1413,7 +1413,7 @@ class TestExecutionModeSelection:
 
     @patch("benchbox.cli.database.Prompt.ask")
     def test_sql_mode_selection(self, mock_ask):
-        """Test selecting SQL mode."""
+
         from benchbox.cli.database import DatabaseManager
 
         manager = DatabaseManager()
@@ -1423,7 +1423,7 @@ class TestExecutionModeSelection:
 
     @patch("benchbox.cli.database.Prompt.ask")
     def test_dataframe_mode_selection(self, mock_ask):
-        """Test selecting DataFrame mode."""
+
         from benchbox.cli.database import DatabaseManager
 
         manager = DatabaseManager()
@@ -1433,7 +1433,7 @@ class TestExecutionModeSelection:
 
     @patch("benchbox.cli.database.Prompt.ask")
     def test_default_mode_used(self, mock_ask):
-        """Test that default mode is correctly passed."""
+
         from benchbox.cli.database import DatabaseManager
 
         manager = DatabaseManager()
@@ -1451,7 +1451,7 @@ class TestRunCommandImportIntegrity:
     """
 
     def test_composite_param_classes_accessible(self):
-        """Verify all composite param classes are accessible at module level."""
+
         from benchbox.cli.commands.run import (
             CompressionConfig,
             ForceConfig,
@@ -1478,7 +1478,7 @@ class TestRunCommandImportIntegrity:
         assert validation.mode == "exact"
 
     def test_run_function_importable(self):
-        """Verify run function can be imported without errors."""
+
         from benchbox.cli.commands.run import run
 
         # Verify it's a click command

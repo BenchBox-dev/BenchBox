@@ -62,7 +62,7 @@ class TestTPCDSOfficialBenchmark:
         return factory
 
     def test_official_benchmark_initialization(self, temp_dir):
-        """Test initialization of TPCDSOfficialBenchmark."""
+
         benchmark = TPCDSOfficialBenchmark(scale_factor=1.0, output_dir=temp_dir, verbose=True, num_streams=2)
 
         assert benchmark.config.scale_factor == 1.0
@@ -73,7 +73,7 @@ class TestTPCDSOfficialBenchmark:
         assert temp_dir.exists()
 
     def test_benchmark_result_initialization(self):
-        """Test BenchmarkResult initialization."""
+
         config = TPCDSOfficialBenchmarkConfig(scale_factor=1.0)
         result = TPCDSOfficialBenchmarkResult(
             config=config,
@@ -98,7 +98,7 @@ class TestTPCDSOfficialBenchmark:
         assert result.errors == []
 
     def test_query_result_initialization(self):
-        """Test QueryResult initialization."""
+
         result = QueryResult(
             query_id=1,
             execution_time=1.5,
@@ -110,7 +110,7 @@ class TestTPCDSOfficialBenchmark:
         assert result.success is True
 
     def test_config_initialization(self):
-        """Test configuration initialization."""
+
         config = TPCDSOfficialBenchmarkConfig(
             scale_factor=2.0,
             num_streams=8,
@@ -132,7 +132,7 @@ class TestTPCDSOfficialBenchmark:
         assert config.verbose is True
 
     def test_run_official_benchmark_basic(self, benchmark_instance, mock_connection_factory):
-        """Test basic official benchmark execution."""
+
         # Mock the internal components that would be used
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power_test,
@@ -152,10 +152,8 @@ class TestTPCDSOfficialBenchmark:
             mock_maintenance_instance.run.return_value = {"success": True}
             mock_maintenance_test.return_value = mock_maintenance_instance
 
-            # Run benchmark
             result = benchmark_instance.run_official_benchmark(mock_connection_factory)
 
-            # Verify results
             assert isinstance(result, TPCDSOfficialBenchmarkResult)
             assert result.success is True
             assert result.start_time is not None
@@ -163,7 +161,7 @@ class TestTPCDSOfficialBenchmark:
             assert result.total_time > 0
 
     def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory):
-        """Test official benchmark with custom configuration."""
+
         custom_config = TPCDSOfficialBenchmarkConfig(
             scale_factor=1.0,
             num_streams=2,
@@ -186,7 +184,7 @@ class TestTPCDSOfficialBenchmark:
             assert result.qphds_at_size == 0.0  # Cannot calculate without both
 
     def test_validate_compliance(self, benchmark_instance):
-        """Test compliance validation."""
+
         # Valid result
         valid_result = TPCDSOfficialBenchmarkResult(
             config=TPCDSOfficialBenchmarkConfig(),
@@ -224,7 +222,7 @@ class TestTPCDSOfficialBenchmark:
         assert benchmark_instance.validate_compliance(invalid_result) is False
 
     def test_generate_audit_trail(self, benchmark_instance, temp_dir):
-        """Test audit trail generation."""
+
         result = TPCDSOfficialBenchmarkResult(
             config=TPCDSOfficialBenchmarkConfig(scale_factor=1.0, num_streams=4),
             start_time="2023-01-01T00:00:00",
@@ -267,8 +265,7 @@ class TestTPCDSOfficialBenchmark:
                 os.unlink(audit_file)
 
     def test_integration_with_base_benchmark(self, temp_dir):
-        """Test integration with base TPCDSBenchmark."""
-        # Create base benchmark
+
         base_benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=temp_dir, verbose=False)
 
         # Test that run_official_benchmark method exists
@@ -276,7 +273,7 @@ class TestTPCDSOfficialBenchmark:
         assert callable(base_benchmark.run_official_benchmark)
 
     def test_error_handling_during_execution(self):
-        """Test error handling during benchmark execution."""
+
         # Create a minimal mock-based test that directly tests the error handling logic
         # without expensive TPC binary initialization
 
@@ -321,7 +318,7 @@ class TestTPCDSOfficialBenchmark:
         assert "Database connection failed" in result.errors[0]
 
     def test_query_result_attributes(self):
-        """Test QueryResult with all attributes."""
+
         result = QueryResult(query_id=5, execution_time=2.5, success=True)
 
         assert result.query_id == 5
@@ -329,7 +326,7 @@ class TestTPCDSOfficialBenchmark:
         assert result.success is True
 
     def test_benchmark_phases_enum(self):
-        """Test BenchmarkPhase enum."""
+
         assert BenchmarkPhase.POWER == "power"
         assert BenchmarkPhase.THROUGHPUT == "throughput"
         assert BenchmarkPhase.MAINTENANCE == "maintenance"
@@ -341,7 +338,7 @@ class TestTPCDSIntegration:
     """Integration tests with real TPC-DS components."""
 
     def test_integration_with_query_manager(self):
-        """Test integration with TPCDSQueryManager."""
+
         from benchbox.core.tpcds.queries import TPCDSQueryManager
 
         # This would require dsqgen binary to be available
@@ -351,7 +348,7 @@ class TestTPCDSIntegration:
         assert hasattr(query_manager, "available")
 
     def test_integration_with_stream_manager(self):
-        """Test integration with TPCDSStreamManager."""
+
         from benchbox.core.tpcds.queries import TPCDSQueryManager
         from benchbox.core.tpcds.streams import TPCDSStreamManager
 
@@ -362,7 +359,7 @@ class TestTPCDSIntegration:
         assert stream_manager.query_manager is query_manager
 
     def test_integration_with_base_benchmark(self):
-        """Test integration with TPCDSBenchmark."""
+
         from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)

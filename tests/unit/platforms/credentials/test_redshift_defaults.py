@@ -35,7 +35,7 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that existing credential values are shown as defaults in prompts."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -89,7 +89,7 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that setup works when no existing credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -140,7 +140,7 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that existing password is preserved when user enters empty input."""
+
         # Setup: existing credentials with password
         mock_manager = Mock()
         existing_creds = {
@@ -312,7 +312,7 @@ class TestRedshiftCredentialDefaults:
         mock_output_location,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when existing credentials are present."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -362,7 +362,7 @@ class TestRedshiftCredentialDefaults:
         mock_output_location,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when credentials already exist."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -414,7 +414,7 @@ class TestRedshiftCredentialDefaults:
         mock_output_location,
         mock_auto_detect,
     ):
-        """Test that auto-detection is offered when no credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -539,7 +539,7 @@ class TestAutoDetectRedshift:
         assert result["iam_role"] == "arn:aws:iam::123456789:role/RedshiftS3Access"
 
     def test_auto_detect_prints_success_message(self):
-        """Test that _auto_detect_redshift prints a success message when all vars are present."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _auto_detect_redshift
@@ -682,7 +682,7 @@ class TestDiagnoseRedshiftConnectivity:
     """Tests for _diagnose_redshift_connectivity."""
 
     def test_provisioned_cluster_path(self):
-        """Test provisioned cluster describe_clusters path."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
@@ -715,7 +715,7 @@ class TestDiagnoseRedshiftConnectivity:
         assert "sg-111" in result["security_group_ids"]
 
     def test_serverless_workgroup_path(self):
-        """Test serverless workgroup describe path."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
@@ -746,7 +746,7 @@ class TestDiagnoseRedshiftConnectivity:
         assert "sg-222" in result["security_group_ids"]
 
     def test_access_denied_returns_diagnostic_error_not_exception(self):
-        """Test that AWS AccessDenied causes graceful degradation with error key."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
@@ -770,7 +770,7 @@ class TestDiagnoseRedshiftConnectivity:
         assert result.get("error") is not None
 
     def test_unknown_endpoint_format_returns_error(self):
-        """Test that unrecognized endpoint format returns error key."""
+
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
 
         result = _diagnose_redshift_connectivity(
@@ -793,7 +793,7 @@ class TestFormatRemediationSteps:
     """Tests for _format_remediation_steps display logic."""
 
     def test_publicly_accessible_false_includes_enable_public_access_step(self):
-        """Test that 'Enable public access' step appears when publicly_accessible=False."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _format_remediation_steps
@@ -814,7 +814,7 @@ class TestFormatRemediationSteps:
         assert "public" in output.lower() or "Enable" in output
 
     def test_publicly_accessible_true_omits_enable_public_access_step(self):
-        """Test that 'Enable public access' step is absent when publicly_accessible=True."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _format_remediation_steps
@@ -838,7 +838,7 @@ class TestFormatRemediationSteps:
         assert "Troubleshooting" in output or "security" in output.lower() or "Configure" in output
 
     def test_publicly_not_accessible_provisioned_cluster_step(self):
-        """Test remediation step for provisioned cluster with public access disabled."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _format_remediation_steps

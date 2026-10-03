@@ -45,7 +45,7 @@ class TestCompressionCLI:
     def test_cli_compression_options(
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_orchestrator, mock_get_cfg
     ):
-        """Test CLI compression options are properly parsed and used."""
+
         # Mock config manager
         cfg = MagicMock()
         cfg.get.side_effect = lambda key, default=None: {"export_formats": ["json"]}.get(key, default)
@@ -102,7 +102,6 @@ class TestCompressionCLI:
         # Check that command executed without errors
         assert result.exit_code == 0
 
-        # Verify orchestrator was called
         mock_orchestrator_instance.execute_benchmark.assert_called_once()
 
         # Get the benchmark config that was passed
@@ -123,7 +122,7 @@ class TestCompressionCLI:
     def test_cli_compression_defaults(
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_orchestrator, mock_get_cfg
     ):
-        """Test CLI compression defaults."""
+
         # Mock config manager
         cfg = MagicMock()
         cfg.get.side_effect = lambda key, default=None: {"export_formats": ["json"]}.get(key, default)
@@ -180,7 +179,7 @@ class TestCompressionCLI:
         assert benchmark_config.compression_level is None
 
     def test_cli_help_includes_compression_options(self):
-        """Test that CLI --help-topic all includes compression options."""
+
         result = self.runner.invoke(cli, ["run", "--help-topic", "all"])
 
         assert result.exit_code == 0
@@ -188,7 +187,7 @@ class TestCompressionCLI:
         assert "--compression" in result.output
 
     def test_cli_compression_examples_in_help(self):
-        """Test that compression option is shown in --help-topic all."""
+
         result = self.runner.invoke(cli, ["run", "--help-topic", "all"])
 
         assert result.exit_code == 0
@@ -196,7 +195,7 @@ class TestCompressionCLI:
         assert "--compression" in result.output
 
     def test_invalid_compression_type_validation(self):
-        """Test that invalid compression types are rejected."""
+
         result = self.runner.invoke(
             cli,
             [
@@ -222,7 +221,7 @@ class TestCompressionCLI:
     def test_dry_run_with_compression_options(
         self, mock_profiler, mock_bench_manager, mock_db_manager, mock_dry_run, mock_get_cfg
     ):
-        """Test that dry run mode includes compression parameters."""
+
         # Mock config manager
         cfg = MagicMock()
         cfg.get.side_effect = lambda key, default=None: {"export_formats": ["json"]}.get(key, default)
@@ -293,7 +292,7 @@ class TestBenchmarkConfig:
     """Test BenchmarkConfig with compression parameters."""
 
     def test_benchmark_config_defaults(self):
-        """Test BenchmarkConfig compression defaults."""
+
         config = BenchmarkConfig(name="test", display_name="Test")
 
         # BenchmarkConfig may not set compression defaults - that's handled by the mixin
@@ -303,7 +302,7 @@ class TestBenchmarkConfig:
         assert hasattr(config, "compression_level")
 
     def test_benchmark_config_compression_settings(self):
-        """Test BenchmarkConfig with compression settings."""
+
         config = BenchmarkConfig(
             name="test",
             display_name="Test",
@@ -317,7 +316,7 @@ class TestBenchmarkConfig:
         assert config.compression_level == 5
 
     def test_benchmark_config_post_init(self):
-        """Test BenchmarkConfig post_init behavior."""
+
         config = BenchmarkConfig(name="test", display_name="Test")
 
         # Options should be initialized as empty dict

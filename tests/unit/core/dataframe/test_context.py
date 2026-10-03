@@ -191,12 +191,12 @@ class TestDataFrameContextProtocol:
     """Tests for DataFrameContext protocol."""
 
     def test_protocol_is_runtime_checkable(self):
-        """Test that DataFrameContext is runtime checkable."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
         assert isinstance(ctx, DataFrameContext)
 
     def test_concrete_implementation_satisfies_protocol(self):
-        """Test that ConcreteContext satisfies the protocol."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         # Check all required methods exist and are callable
@@ -216,7 +216,7 @@ class TestDataFrameContextImpl:
     """Tests for DataFrameContextImpl base class."""
 
     def test_initialization(self):
-        """Test context initialization."""
+
         ctx = ConcreteContext(platform="pandas", family="pandas")
 
         assert ctx.platform == "pandas"
@@ -224,7 +224,7 @@ class TestDataFrameContextImpl:
         assert ctx.list_tables() == []
 
     def test_register_table(self):
-        """Test table registration."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         table_data = {"id": [1, 2, 3], "name": ["a", "b", "c"]}
@@ -234,7 +234,7 @@ class TestDataFrameContextImpl:
         assert ctx.get_table("users") == table_data
 
     def test_register_table_lowercase(self):
-        """Test that table names are lowercased."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         table_data = {"id": [1, 2, 3]}
@@ -245,7 +245,7 @@ class TestDataFrameContextImpl:
         assert ctx.table_exists("Users")
 
     def test_get_table_case_insensitive(self):
-        """Test that get_table is case-insensitive."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         table_data = {"id": [1, 2, 3]}
@@ -256,14 +256,14 @@ class TestDataFrameContextImpl:
         assert ctx.get_table("Orders") == table_data
 
     def test_get_table_not_found(self):
-        """Test get_table raises KeyError for missing table."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         with pytest.raises(KeyError, match="not found"):
             ctx.get_table("missing")
 
     def test_get_table_error_shows_available(self):
-        """Test that KeyError message shows available tables."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
         ctx.register_table("users", {})
         ctx.register_table("orders", {})
@@ -272,7 +272,7 @@ class TestDataFrameContextImpl:
             ctx.get_table("products")
 
     def test_list_tables_sorted(self):
-        """Test that list_tables returns sorted list."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         ctx.register_table("orders", {})
@@ -283,7 +283,7 @@ class TestDataFrameContextImpl:
         assert tables == ["orders", "products", "users"]
 
     def test_table_exists(self):
-        """Test table_exists method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         ctx.register_table("users", {})
@@ -292,7 +292,7 @@ class TestDataFrameContextImpl:
         assert ctx.table_exists("orders") is False
 
     def test_unregister_table(self):
-        """Test table unregistration."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         ctx.register_table("users", {})
@@ -303,14 +303,14 @@ class TestDataFrameContextImpl:
         assert not ctx.table_exists("users")
 
     def test_unregister_table_not_found(self):
-        """Test unregister returns False for missing table."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.unregister_table("missing")
         assert result is False
 
     def test_clear_tables(self):
-        """Test clearing all tables."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         ctx.register_table("users", {})
@@ -323,14 +323,14 @@ class TestDataFrameContextImpl:
         assert len(ctx.list_tables()) == 0
 
     def test_col_method(self):
-        """Test col method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.col("amount")
         assert result == "amount"
 
     def test_lit_method(self):
-        """Test lit method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         assert ctx.lit(100) == 100
@@ -338,7 +338,7 @@ class TestDataFrameContextImpl:
         assert ctx.lit(3.14) == 3.14
 
     def test_date_sub_method(self):
-        """Test date_sub method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.date_sub("date_col", 7)
@@ -348,7 +348,7 @@ class TestDataFrameContextImpl:
         assert result["days"] == 7
 
     def test_date_add_method(self):
-        """Test date_add method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.date_add("date_col", 30)
@@ -358,7 +358,7 @@ class TestDataFrameContextImpl:
         assert result["days"] == 30
 
     def test_cast_date_method(self):
-        """Test cast_date method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.cast_date("string_col")
@@ -367,7 +367,7 @@ class TestDataFrameContextImpl:
         assert result["column"] == "string_col"
 
     def test_cast_string_method(self):
-        """Test cast_string method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.cast_string("int_col")
@@ -376,7 +376,7 @@ class TestDataFrameContextImpl:
         assert result["column"] == "int_col"
 
     def test_to_date_from_string(self):
-        """Test to_date with string input."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.to_date("2024-03-15")
@@ -387,7 +387,7 @@ class TestDataFrameContextImpl:
         assert result.day == 15
 
     def test_to_date_from_date(self):
-        """Test to_date with date input."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         input_date = date(2024, 3, 15)
@@ -396,7 +396,7 @@ class TestDataFrameContextImpl:
         assert result == input_date
 
     def test_to_date_from_datetime(self):
-        """Test to_date with datetime input."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         input_dt = datetime(2024, 3, 15, 12, 30, 45)
@@ -406,14 +406,14 @@ class TestDataFrameContextImpl:
         assert result == date(2024, 3, 15)
 
     def test_to_date_invalid_type(self):
-        """Test to_date with invalid input type."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         with pytest.raises(TypeError, match="Cannot convert"):
             ctx.to_date(12345)
 
     def test_days_method(self):
-        """Test days helper method."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.days(7)
@@ -422,7 +422,7 @@ class TestDataFrameContextImpl:
         assert result.days == 7
 
     def test_days_negative(self):
-        """Test days with negative value."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         result = ctx.days(-5)
@@ -434,7 +434,7 @@ class TestDataFrameContextMultipleRegistrations:
     """Tests for complex table registration scenarios."""
 
     def test_overwrite_table(self):
-        """Test that re-registering a table overwrites it."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         ctx.register_table("users", {"version": 1})
@@ -444,7 +444,7 @@ class TestDataFrameContextMultipleRegistrations:
         assert ctx.get_table("users") == {"version": 2}
 
     def test_register_multiple_tables(self):
-        """Test registering many tables."""
+
         ctx = ConcreteContext(platform="test", family="pandas")
 
         tables = {
@@ -471,21 +471,21 @@ class TestDataFrameContextFamily:
     """Tests for family-specific behavior."""
 
     def test_pandas_family(self):
-        """Test context with pandas family."""
+
         ctx = ConcreteContext(platform="pandas", family="pandas")
 
         assert ctx.family == "pandas"
         assert ctx.platform == "pandas"
 
     def test_expression_family(self):
-        """Test context with expression family."""
+
         ctx = ConcreteContext(platform="polars", family="expression")
 
         assert ctx.family == "expression"
         assert ctx.platform == "polars"
 
     def test_different_platforms_same_family(self):
-        """Test different platforms in same family."""
+
         pandas_ctx = ConcreteContext(platform="pandas", family="pandas")
         dask_ctx = ConcreteContext(platform="dask", family="pandas")
 

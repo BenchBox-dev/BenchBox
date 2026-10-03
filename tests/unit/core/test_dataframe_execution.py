@@ -414,7 +414,7 @@ class TestH2ODBCrossFamilyComparison:
 
     @pytest.mark.parametrize("query_id", H2ODB_QUERY_IDS)
     def test_expression_vs_pandas(self, query_id: str):
-        """Verify expression and pandas implementations return equivalent results."""
+
         from benchbox.core.h2odb.dataframe_queries import get_h2odb_query
 
         query = get_h2odb_query(query_id)

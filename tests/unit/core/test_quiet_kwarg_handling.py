@@ -176,7 +176,7 @@ class TestQuietKwargHandling:
         assert benchmark.quiet is True
 
     def test_quiet_propagates_to_data_generator(self, tmp_path):
-        """Test that quiet flag propagates correctly to data generators."""
+
         from benchbox.core.tpch import TPCHBenchmark
 
         benchmark = TPCHBenchmark(
@@ -192,7 +192,7 @@ class TestQuietKwargHandling:
         assert benchmark.data_generator.quiet is True
 
     def test_quiet_false_by_default(self, tmp_path):
-        """Test that quiet defaults to False when not specified."""
+
         from benchbox.core.tpch import TPCHBenchmark
 
         benchmark = TPCHBenchmark(
@@ -203,7 +203,7 @@ class TestQuietKwargHandling:
         assert benchmark.quiet is False
 
     def test_multiple_benchmarks_with_quiet(self, tmp_path):
-        """Test that multiple benchmarks can be instantiated with quiet=True."""
+
         from benchbox.core.h2odb import H2OBenchmark
         from benchbox.core.ssb import SSBBenchmark
         from benchbox.core.tpch import TPCHBenchmark
@@ -225,7 +225,7 @@ class TestQuietKwargHandling:
         assert h2o.quiet is True
 
     def test_quiet_with_other_kwargs(self, tmp_path):
-        """Test that quiet works correctly when combined with other kwargs."""
+
         from benchbox.core.tpch import TPCHBenchmark
 
         benchmark = TPCHBenchmark(

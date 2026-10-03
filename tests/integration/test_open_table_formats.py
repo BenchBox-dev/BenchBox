@@ -124,7 +124,7 @@ class TestParquetFormatSmoke:
     def test_parquet_conversion_and_duckdb_query(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
-        """Test TBL → Parquet conversion and verify DuckDB can query the result."""
+
         converter = ParquetConverter()
         result = converter.convert(
             source_files=[tpch_customer_tbl],
@@ -166,7 +166,7 @@ class TestParquetFormatSmoke:
         conn.close()
 
     def test_parquet_snappy_compression(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test Parquet conversion with snappy compression."""
+
         converter = ParquetConverter()
         result = converter.convert(
             source_files=[tpch_customer_tbl],
@@ -189,7 +189,7 @@ class TestParquetFormatSmoke:
         conn.close()
 
     def test_parquet_gzip_compression(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test Parquet conversion with gzip compression."""
+
         converter = ParquetConverter()
         result = converter.convert(
             source_files=[tpch_customer_tbl],
@@ -208,7 +208,7 @@ class TestParquetFormatSmoke:
         conn.close()
 
     def test_parquet_zstd_compression(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test Parquet conversion with zstd compression."""
+
         converter = ParquetConverter()
         result = converter.convert(
             source_files=[tpch_customer_tbl],
@@ -229,7 +229,7 @@ class TestParquetFormatSmoke:
     def test_parquet_hive_partitioned_duckdb_query(
         self, tmp_path: Path, tpch_lineitem_tbl: Path, tpch_lineitem_schema: dict
     ):
-        """Test Hive-partitioned Parquet can be read by DuckDB as a dataset."""
+
         converter = ParquetConverter()
         result = converter.convert(
             source_files=[tpch_lineitem_tbl],
@@ -304,7 +304,7 @@ class TestDeltaLakeFormatSmoke:
     """Smoke tests for Delta Lake format conversion."""
 
     def test_delta_conversion_and_structure(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test TBL → Delta Lake conversion and verify table structure."""
+
         from benchbox.utils.format_converters.delta_converter import DeltaConverter
 
         converter = DeltaConverter()
@@ -331,7 +331,7 @@ class TestDeltaLakeFormatSmoke:
     def test_delta_duckdb_query_via_delta_scan(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
-        """Test that DuckDB can query Delta Lake tables using delta extension."""
+
         from benchbox.utils.format_converters.delta_converter import DeltaConverter
 
         converter = DeltaConverter()
@@ -364,7 +364,7 @@ class TestDeltaLakeFormatSmoke:
         conn.close()
 
     def test_delta_transaction_log_metadata(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test Delta Lake transaction log contains correct metadata."""
+
         import json
 
         from benchbox.utils.format_converters.delta_converter import DeltaConverter
@@ -502,7 +502,7 @@ class TestIcebergFormatSmoke:
     def test_iceberg_conversion_and_structure(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
-        """Test TBL → Iceberg conversion and verify table structure."""
+
         from benchbox.utils.format_converters.iceberg_converter import IcebergConverter
 
         converter = IcebergConverter()
@@ -528,7 +528,7 @@ class TestIcebergFormatSmoke:
         assert len(metadata_files) >= 1
 
     def test_iceberg_metadata_structure(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test Iceberg metadata contains expected structure."""
+
         import json
 
         from benchbox.utils.format_converters.iceberg_converter import IcebergConverter
@@ -622,7 +622,7 @@ class TestCLIConvertIntegration:
     """
 
     def test_cli_convert_help(self):
-        """Test that CLI convert help is available and shows expected options."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.commands.convert import convert
@@ -639,7 +639,7 @@ class TestCLIConvertIntegration:
         assert "iceberg" in result.output
 
     def test_cli_convert_missing_input_error(self):
-        """Test that CLI reports clear error when --input is missing."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.commands.convert import convert
@@ -651,7 +651,7 @@ class TestCLIConvertIntegration:
         assert "Missing option '--input'" in result.output
 
     def test_cli_convert_missing_format_error(self, tpch_data_dir_with_manifest: Path):
-        """Test that CLI reports clear error when --format is missing."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.commands.convert import convert
@@ -663,7 +663,7 @@ class TestCLIConvertIntegration:
         assert "Missing option '--format'" in result.output
 
     def test_cli_convert_invalid_format_error(self, tpch_data_dir_with_manifest: Path):
-        """Test that CLI reports clear error for invalid format."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.commands.convert import convert
@@ -683,7 +683,7 @@ class TestCLIConvertIntegration:
         assert "Invalid value for '--format'" in result.output
 
     def test_cli_convert_missing_manifest_error(self, tmp_path_factory):
-        """Test that CLI reports clear error when manifest is missing."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.commands.convert import convert
@@ -700,7 +700,7 @@ class TestCLIConvertIntegration:
         assert "Manifest not found" in result.output
 
     def test_cli_convert_compression_options_accepted(self):
-        """Test that all compression options are shown in help."""
+
         from click.testing import CliRunner
 
         from benchbox.cli.commands.convert import convert
@@ -738,7 +738,7 @@ class TestDuckLakeFormatSmoke:
     def test_ducklake_conversion_and_structure(
         self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict
     ):
-        """Test TBL → DuckLake conversion and verify table structure."""
+
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
         converter = DuckLakeConverter()
@@ -764,7 +764,7 @@ class TestDuckLakeFormatSmoke:
         assert (ducklake_dir / "data").is_dir()
 
     def test_ducklake_duckdb_query(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test that DuckDB can query DuckLake tables natively."""
+
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
         converter = DuckLakeConverter()
@@ -807,7 +807,7 @@ class TestDuckLakeFormatSmoke:
         conn.close()
 
     def test_ducklake_metadata(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test DuckLake conversion result includes proper metadata."""
+
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
         converter = DuckLakeConverter()
@@ -820,7 +820,6 @@ class TestDuckLakeFormatSmoke:
 
         assert result.success
 
-        # Check metadata
         assert result.metadata["format"] == "ducklake"
         assert "table_path" in result.metadata
         assert "metadata_path" in result.metadata
@@ -832,7 +831,7 @@ class TestDuckLakeFormatSmoke:
         assert result.output_size_bytes > 0
 
     def test_ducklake_sharded_files(self, tmp_path: Path, tpch_customer_schema: dict):
-        """Test DuckLake conversion with sharded input files."""
+
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
         # Create sharded TBL files
@@ -895,7 +894,7 @@ class TestDuckLakeMaintenanceOperations:
         return tmp_path / "customer"
 
     def test_ducklake_insert_rows(self, ducklake_customer_table: Path):
-        """Test inserting new rows into DuckLake table."""
+
         import pyarrow as pa
 
         from benchbox.platforms.dataframe.ducklake_maintenance import DuckLakeMaintenanceOperations
@@ -916,7 +915,6 @@ class TestDuckLakeMaintenanceOperations:
             }
         )
 
-        # Insert rows
         result = ops.insert_rows(
             table_path=ducklake_customer_table,
             dataframe=new_data,
@@ -939,7 +937,7 @@ class TestDuckLakeMaintenanceOperations:
         conn.close()
 
     def test_ducklake_delete_rows(self, ducklake_customer_table: Path):
-        """Test deleting rows from DuckLake table with predicate."""
+
         from benchbox.platforms.dataframe.ducklake_maintenance import DuckLakeMaintenanceOperations
 
         ops = DuckLakeMaintenanceOperations()
@@ -971,7 +969,7 @@ class TestDuckLakeMaintenanceOperations:
         conn.close()
 
     def test_ducklake_update_rows(self, ducklake_customer_table: Path):
-        """Test updating rows in DuckLake table."""
+
         from benchbox.platforms.dataframe.ducklake_maintenance import DuckLakeMaintenanceOperations
 
         ops = DuckLakeMaintenanceOperations()
@@ -1004,7 +1002,7 @@ class TestDuckLakeMaintenanceOperations:
         conn.close()
 
     def test_ducklake_capabilities(self):
-        """Test DuckLake reports correct maintenance capabilities."""
+
         from benchbox.platforms.dataframe.ducklake_maintenance import (
             DUCKLAKE_CAPABILITIES,
             DuckLakeMaintenanceOperations,
@@ -1032,7 +1030,7 @@ class TestDuckLakeDataLoadingHandlers:
     """Integration tests for DuckLake data loading handlers."""
 
     def test_ducklake_file_handler_detection(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test that FileFormatRegistry correctly detects DuckLake directories."""
+
         from benchbox.platforms.base.data_loading import FileFormatRegistry
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
@@ -1054,7 +1052,7 @@ class TestDuckLakeDataLoadingHandlers:
         assert handler.__class__.__name__ == "DuckLakeFileHandler"
 
     def test_duckdb_ducklake_handler_load(self, tmp_path: Path, tpch_customer_tbl: Path, tpch_customer_schema: dict):
-        """Test DuckDBDuckLakeHandler can load data from DuckLake tables."""
+
         from benchbox.platforms.base.data_loading import DuckDBDuckLakeHandler
         from benchbox.utils.format_converters.ducklake_converter import DuckLakeConverter
 
@@ -1091,7 +1089,6 @@ class TestDuckLakeDataLoadingHandlers:
 
         handler = DuckDBDuckLakeHandler(MockAdapter())
 
-        # Load data
         row_count = handler.load_table(
             table_name="customer",
             file_path=ducklake_dir,

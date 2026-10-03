@@ -59,7 +59,7 @@ class TestTPCHSkewDuckDBIntegration:
         conn.close()
 
     def test_create_schema(self, tpch_skew, duckdb_conn):
-        """Test creating the TPC-H schema in DuckDB."""
+
         # Get the SQL schema
         sql = tpch_skew.get_create_tables_sql()
 
@@ -96,7 +96,7 @@ class TestTPCHSkewDuckDBIntegration:
             )
 
     def test_skew_info_accessible(self, tpch_skew):
-        """Test that skew configuration is properly accessible."""
+
         info = tpch_skew.get_skew_info()
 
         assert "preset" in info
@@ -106,7 +106,7 @@ class TestTPCHSkewDuckDBIntegration:
         assert info["skew_factor"] == 0.5
 
     def test_benchmark_info_includes_skew(self, tpch_skew):
-        """Test benchmark info includes skew details."""
+
         info = tpch_skew.get_benchmark_info()
 
         assert "name" in info
@@ -126,7 +126,7 @@ class TestTPCHSkewDuckDBIntegration:
             assert "SELECT" in query.upper()
 
     def test_different_presets_have_different_configs(self, small_scale_factor, temp_dir):
-        """Test that different presets produce different configurations."""
+
         with mock.patch("benchbox.core.tpch.generator.TPCHDataGenerator._find_or_build_dbgen") as mock_build:
             mock_build.return_value = temp_dir / "dbgen"
 
@@ -170,7 +170,7 @@ class TestTPCHSkewDataGeneration:
         )
 
     def test_generate_data_creates_files(self, tpch_skew_impl):
-        """Test that generate_data creates the expected data files."""
+
         try:
             # Generate skewed data
             data_paths = tpch_skew_impl.generate_data()
@@ -188,9 +188,8 @@ class TestTPCHSkewDataGeneration:
             raise
 
     def test_generated_data_is_loadable(self, tpch_skew_impl):
-        """Test that generated data can be loaded into DuckDB."""
+
         try:
-            # Generate data
             tpch_skew_impl.generate_data()
         except OSError as e:
             if "No space left on device" in str(e):
@@ -276,7 +275,7 @@ class TestTPCHSkewQueryExecution:
         conn.close()
 
     def test_query_execution(self, loaded_benchmark):
-        """Test that TPC-H queries execute successfully on skewed data."""
+
         benchmark, conn = loaded_benchmark
 
         # Get DuckDB-compatible queries
@@ -296,7 +295,7 @@ class TestTPCHSkewQueryExecution:
                     pytest.fail(f"Query {query_id} failed: {e}")
 
     def test_referential_integrity(self, loaded_benchmark):
-        """Test that skewed data maintains referential integrity."""
+
         benchmark, conn = loaded_benchmark
 
         # Check that all order customer keys exist in customer table

@@ -47,7 +47,7 @@ class TestWritePrimitivesSchema:
             assert table_name in STAGING_TABLES, f"Missing staging table: {table_name}"
 
     def test_get_table_schema(self):
-        """Test retrieving table schema."""
+
         schema = get_table_schema("insert_ops_lineitem")
         assert schema is not None
         assert schema["name"] == "insert_ops_lineitem"
@@ -55,12 +55,12 @@ class TestWritePrimitivesSchema:
         assert len(schema["columns"]) > 0
 
     def test_get_table_schema_invalid(self):
-        """Test that invalid table name raises ValueError."""
+
         with pytest.raises(ValueError, match="Unknown table"):
             get_table_schema("nonexistent_table")
 
     def test_get_create_table_sql(self):
-        """Test CREATE TABLE SQL generation."""
+
         sql = get_create_table_sql("insert_ops_lineitem")
         assert "CREATE TABLE insert_ops_lineitem" in sql
         assert "l_orderkey" in sql
@@ -73,12 +73,12 @@ class TestWritePrimitivesSchema:
         assert "PRIMARY KEY" not in sql
 
     def test_get_create_table_sql_invalid(self):
-        """Test that invalid table raises ValueError."""
+
         with pytest.raises(ValueError, match="Unknown staging table"):
             get_create_table_sql("invalid_table")
 
     def test_get_all_staging_tables_sql(self):
-        """Test generating SQL for all staging tables."""
+
         sql = get_all_staging_tables_sql()
         assert "CREATE TABLE" in sql
         assert "insert_ops_lineitem" in sql
@@ -97,7 +97,7 @@ class TestWritePrimitivesCatalog:
     """Test operation catalog loading and validation."""
 
     def test_load_catalog(self):
-        """Test loading operations catalog."""
+
         catalog = load_write_primitives_catalog()
         assert catalog is not None
         assert catalog.version == 2
@@ -124,7 +124,7 @@ class TestWritePrimitivesCatalog:
                 assert len(operation.write_sql) > 0, f"SQL op '{op_id}' missing write_sql"
 
     def test_catalog_validation_queries(self):
-        """Test that validation queries are properly structured."""
+
         catalog = load_write_primitives_catalog()
 
         for operation in catalog.operations.values():
@@ -134,7 +134,7 @@ class TestWritePrimitivesCatalog:
                 assert len(val_query.sql) > 0
 
     def test_catalog_categories(self):
-        """Test that operations are categorized correctly."""
+
         catalog = load_write_primitives_catalog()
 
         categories = set()
@@ -147,7 +147,7 @@ class TestWritePrimitivesCatalog:
         assert categories == expected_categories
 
     def test_catalog_operation_count(self):
-        """Test that catalog contains expected operations."""
+
         catalog = load_write_primitives_catalog()
         # Just verify we have operations, don't hardcode count
         assert len(catalog.operations) > 100, f"Expected >100 operations, got {len(catalog.operations)}"
@@ -165,7 +165,7 @@ class TestWritePrimitivesCatalog:
         assert "BETWEEN 9001000 AND 9001999" in (batch_1000.cleanup_sql or "")
 
     def test_all_operations_have_validation_or_cleanup(self):
-        """Test that all operations have either validation queries or cleanup SQL."""
+
         catalog = load_write_primitives_catalog()
 
         for op_id, operation in catalog.operations.items():
@@ -177,7 +177,7 @@ class TestWritePrimitivesCatalog:
             assert has_validation or has_cleanup, f"Operation '{op_id}' has neither validation queries nor cleanup SQL"
 
     def test_bulk_load_operations_have_file_dependencies(self):
-        """Test that BULK_LOAD operations declare file dependencies."""
+
         catalog = load_write_primitives_catalog()
 
         for op_id, operation in catalog.operations.items():
@@ -194,13 +194,13 @@ class TestWriteOperationsManager:
     """Test write operations manager."""
 
     def test_manager_initialization(self):
-        """Test manager loads catalog correctly."""
+
         manager = WriteOperationsManager()
         assert manager.catalog_version == 2
         assert manager.get_operation_count() > 0
 
     def test_get_operation(self):
-        """Test retrieving specific operation."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("insert_single_row")
 
@@ -210,14 +210,14 @@ class TestWriteOperationsManager:
         assert len(operation.description) > 0
 
     def test_get_operation_invalid(self):
-        """Test that invalid operation raises ValueError."""
+
         manager = WriteOperationsManager()
 
         with pytest.raises(ValueError, match="Invalid operation ID"):
             manager.get_operation("nonexistent_operation")
 
     def test_get_all_operations(self):
-        """Test retrieving all operations."""
+
         manager = WriteOperationsManager()
         operations = manager.get_all_operations()
 
@@ -225,7 +225,7 @@ class TestWriteOperationsManager:
         assert "insert_single_row" in operations
 
     def test_get_operations_by_category(self):
-        """Test filtering operations by category."""
+
         manager = WriteOperationsManager()
         insert_ops = manager.get_operations_by_category("insert")
 
@@ -234,7 +234,7 @@ class TestWriteOperationsManager:
             assert operation.category == "insert"
 
     def test_get_operation_categories(self):
-        """Test retrieving list of categories."""
+
         manager = WriteOperationsManager()
         categories = manager.get_operation_categories()
 
@@ -245,7 +245,7 @@ class TestWriteOperationsManager:
         assert categories == sorted(categories)
 
     def test_get_category_count(self):
-        """Test counting operations in category."""
+
         manager = WriteOperationsManager()
         insert_count = manager.get_category_count("insert")
 
@@ -257,7 +257,7 @@ class TestWritePrimitivesBenchmark:
     """Test Write Primitives benchmark class."""
 
     def test_benchmark_initialization(self):
-        """Test benchmark initializes correctly."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
 
         assert benchmark.scale_factor == 1.0
@@ -265,12 +265,12 @@ class TestWritePrimitivesBenchmark:
         assert benchmark._version == "2.0"
 
     def test_get_data_source_benchmark(self):
-        """Test that benchmark declares TPC-H data source."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         assert benchmark.get_data_source_benchmark() == "tpch"
 
     def test_get_operation(self):
-        """Test retrieving operation through benchmark."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         operation = benchmark.get_operation("insert_single_row")
 
@@ -278,21 +278,21 @@ class TestWritePrimitivesBenchmark:
         assert operation.id == "insert_single_row"
 
     def test_get_all_operations(self):
-        """Test retrieving all operations."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         operations = benchmark.get_all_operations()
 
         assert len(operations) > 0
 
     def test_get_operations_by_category(self):
-        """Test filtering by category."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         insert_ops = benchmark.get_operations_by_category("insert")
 
         assert len(insert_ops) > 0
 
     def test_get_operation_categories(self):
-        """Test getting categories."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         categories = benchmark.get_operation_categories()
 
@@ -300,7 +300,7 @@ class TestWritePrimitivesBenchmark:
         assert "insert" in categories
 
     def test_get_schema(self):
-        """Test retrieving schema."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         schema = benchmark.get_schema()
 
@@ -308,7 +308,7 @@ class TestWritePrimitivesBenchmark:
         assert "insert_ops_lineitem" in schema
 
     def test_get_create_tables_sql(self):
-        """Test SQL generation."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         sql = benchmark.get_create_tables_sql()
 
@@ -316,7 +316,7 @@ class TestWritePrimitivesBenchmark:
         assert len(sql) > 0
 
     def test_get_benchmark_info(self):
-        """Test benchmark metadata."""
+
         benchmark = WritePrimitivesBenchmark(scale_factor=1.0)
         info = benchmark.get_benchmark_info()
 
@@ -361,7 +361,7 @@ class TestConsolidatedOperations:
         assert "5%" in operation.description
 
     def test_gdpr_deletions_use_delete_statements(self):
-        """Test that GDPR operations use DELETE SQL statements, not MERGE."""
+
         manager = WriteOperationsManager()
 
         op_1pct = manager.get_operation("delete_gdpr_suppliers_1pct")
@@ -375,7 +375,7 @@ class TestConsolidatedOperations:
         assert "MERGE" not in op_5pct.write_sql.upper()
 
     def test_gdpr_deletions_are_data_dependent(self):
-        """Test that GDPR deletions are marked as data-dependent operations."""
+
         manager = WriteOperationsManager()
 
         op_1pct = manager.get_operation("delete_gdpr_suppliers_1pct")
@@ -386,7 +386,7 @@ class TestConsolidatedOperations:
         assert op_5pct.expected_rows_affected is None, "5% GDPR deletion should be data-dependent"
 
     def test_gdpr_deletions_have_strengthened_validation(self):
-        """Test that GDPR deletions use CASE expressions for validation."""
+
         manager = WriteOperationsManager()
 
         op_1pct = manager.get_operation("delete_gdpr_suppliers_1pct")
@@ -404,7 +404,7 @@ class TestConsolidatedOperations:
             assert "CASE" in val_query.sql.upper(), "Validation should use CASE expression"
 
     def test_etl_aggregation_exists_in_merge_category(self):
-        """Test that merge_etl_aggregation_pattern is in MERGE category."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_etl_aggregation_pattern")
 
@@ -414,7 +414,7 @@ class TestConsolidatedOperations:
         assert "ETL" in operation.description or "aggregation" in operation.description.lower()
 
     def test_etl_aggregation_uses_merge_statement(self):
-        """Test that ETL aggregation uses MERGE SQL statement."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_etl_aggregation_pattern")
 
@@ -422,7 +422,7 @@ class TestConsolidatedOperations:
         assert "WHEN MATCHED" in operation.write_sql.upper()
 
     def test_etl_aggregation_has_multiple_validations(self):
-        """Test that ETL aggregation has multiple validation queries."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_etl_aggregation_pattern")
 
@@ -434,14 +434,14 @@ class TestConsolidatedOperations:
         assert has_case_validation, "Should have CASE expression in at least one validation query"
 
     def test_etl_aggregation_is_data_dependent(self):
-        """Test that ETL aggregation is marked as data-dependent."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_etl_aggregation_pattern")
 
         assert operation.expected_rows_affected is None, "ETL aggregation should be data-dependent"
 
     def test_deduplication_exists_in_merge_category(self):
-        """Test that merge_deduplication_window_function is in MERGE category."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_deduplication_window_function")
 
@@ -451,7 +451,7 @@ class TestConsolidatedOperations:
         assert "deduplication" in operation.description.lower() or "window" in operation.description.lower()
 
     def test_deduplication_uses_window_function(self):
-        """Test that deduplication uses ROW_NUMBER window function."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_deduplication_window_function")
 
@@ -459,7 +459,7 @@ class TestConsolidatedOperations:
         assert "MERGE INTO" in operation.write_sql.upper() or "MERGE" in operation.write_sql.upper()
 
     def test_deduplication_has_explicit_column_list(self):
-        """Test that deduplication INSERT uses explicit column list for portability."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_deduplication_window_function")
 
@@ -469,7 +469,7 @@ class TestConsolidatedOperations:
         assert "source.o_orderkey" in operation.write_sql, "Should specify source column names explicitly"
 
     def test_deduplication_has_multiple_validations(self):
-        """Test that deduplication has multiple validation queries."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_deduplication_window_function")
 
@@ -482,7 +482,7 @@ class TestConsolidatedOperations:
         assert "verify_no_duplicates" in val_ids
 
     def test_deduplication_validates_no_duplicates(self):
-        """Test that deduplication validation checks for no duplicates."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_deduplication_window_function")
 
@@ -499,14 +499,14 @@ class TestConsolidatedOperations:
         assert "MAX(" in verify_no_dups.sql.upper() or "COUNT(*)" in verify_no_dups.sql.upper()
 
     def test_deduplication_is_data_dependent(self):
-        """Test that deduplication is marked as data-dependent."""
+
         manager = WriteOperationsManager()
         operation = manager.get_operation("merge_deduplication_window_function")
 
         assert operation.expected_rows_affected is None, "Deduplication should be data-dependent"
 
     def test_consolidated_operations_not_in_wrong_categories(self):
-        """Test that GDPR operations are not in MERGE category."""
+
         manager = WriteOperationsManager()
 
         # Get all MERGE operations
@@ -522,7 +522,7 @@ class TestConsolidatedOperations:
         assert "merge_deduplication_window_function" in merge_op_ids
 
     def test_all_consolidated_operations_have_cleanup(self):
-        """Test that all consolidated operations have cleanup SQL."""
+
         manager = WriteOperationsManager()
 
         op_ids = [

@@ -36,7 +36,7 @@ class TestLivePgDuckDBConnection:
     """Test basic pg_duckdb connectivity via Docker."""
 
     def test_connection(self, live_pg_duckdb_adapter):
-        """Verify we can connect to PostgreSQL with pg_duckdb and run a trivial query."""
+
         connection = live_pg_duckdb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -47,7 +47,7 @@ class TestLivePgDuckDBConnection:
             live_pg_duckdb_adapter.close_connection(connection)
 
     def test_extension_loaded(self, live_pg_duckdb_adapter):
-        """Verify pg_duckdb extension is installed and loaded."""
+
         connection = live_pg_duckdb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -59,7 +59,7 @@ class TestLivePgDuckDBConnection:
             live_pg_duckdb_adapter.close_connection(connection)
 
     def test_platform_info(self, live_pg_duckdb_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = live_pg_duckdb_adapter.get_platform_info()
         assert info is not None
         assert info.get("platform_type") == "pg_duckdb"
@@ -71,7 +71,7 @@ class TestLivePgDuckDBQueryExecution:
     """Test query execution against a live pg_duckdb instance."""
 
     def test_duckdb_execution(self, live_pg_duckdb_adapter):
-        """Verify DuckDB execution path works via pg_duckdb."""
+
         connection = live_pg_duckdb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -132,7 +132,7 @@ class TestLivePgDuckDBMotherDuckMode:
         yield adapter
 
     def test_motherduck_connection(self, motherduck_pg_duckdb_adapter):
-        """Verify pg_duckdb can connect in MotherDuck hybrid mode."""
+
         connection = motherduck_pg_duckdb_adapter.create_connection()
         try:
             cursor = connection.cursor()

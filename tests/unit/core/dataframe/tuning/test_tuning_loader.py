@@ -28,7 +28,7 @@ class TestDataFrameTuningLoader:
     """Tests for DataFrameTuningLoader class."""
 
     def test_load_config_yaml(self, tmp_path):
-        """Test loading configuration from YAML file."""
+
         config_path = tmp_path / "config.yaml"
         config_content = {
             "parallelism": {"thread_count": 8},
@@ -44,7 +44,7 @@ class TestDataFrameTuningLoader:
         assert config.execution.streaming_mode is True
 
     def test_load_config_json(self, tmp_path):
-        """Test loading configuration from JSON file."""
+
         import json
 
         config_path = tmp_path / "config.json"
@@ -60,13 +60,13 @@ class TestDataFrameTuningLoader:
         assert config.parallelism.worker_count == 4
 
     def test_load_config_file_not_found(self):
-        """Test that FileNotFoundError is raised for missing file."""
+
         loader = DataFrameTuningLoader()
         with pytest.raises(FileNotFoundError, match="not found"):
             loader.load_config("/nonexistent/path/config.yaml")
 
     def test_load_config_invalid_yaml(self, tmp_path):
-        """Test that invalid YAML raises error."""
+
         config_path = tmp_path / "invalid.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             f.write("invalid: yaml: content: [")
@@ -76,7 +76,7 @@ class TestDataFrameTuningLoader:
             loader.load_config(config_path)
 
     def test_save_config_yaml(self, tmp_path):
-        """Test saving configuration to YAML file."""
+
         config_path = tmp_path / "output.yaml"
         config = DataFrameTuningConfiguration(
             parallelism=ParallelismConfiguration(thread_count=8),
@@ -91,7 +91,7 @@ class TestDataFrameTuningLoader:
         assert data["parallelism"]["thread_count"] == 8
 
     def test_save_config_json(self, tmp_path):
-        """Test saving configuration to JSON file."""
+
         import json
 
         config_path = tmp_path / "output.json"
@@ -173,7 +173,7 @@ class TestConfigWithMetadata:
     """Tests for configuration with metadata."""
 
     def test_load_config_with_metadata(self, tmp_path):
-        """Test loading configuration with _metadata section."""
+
         config_path = tmp_path / "config.yaml"
         config_content = {
             "_metadata": {
@@ -192,7 +192,7 @@ class TestConfigWithMetadata:
         assert config.metadata.description == "Test configuration"
 
     def test_save_config_with_metadata(self, tmp_path):
-        """Test saving configuration preserves metadata."""
+
         from benchbox.core.dataframe.tuning import TuningMetadata
 
         config_path = tmp_path / "config.yaml"

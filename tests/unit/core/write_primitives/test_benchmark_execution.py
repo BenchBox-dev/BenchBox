@@ -30,7 +30,7 @@ class TestOperationResult:
     """Tests for OperationResult dataclass."""
 
     def test_operation_result_creation(self):
-        """Test creating an OperationResult instance."""
+
         result = OperationResult(
             operation_id="INSERT_001",
             success=True,
@@ -53,7 +53,7 @@ class TestOperationResult:
         assert result.cleanup_warning is None
 
     def test_operation_result_with_error(self):
-        """Test creating an OperationResult with error."""
+
         result = OperationResult(
             operation_id="FAILED_OP",
             success=False,
@@ -77,7 +77,7 @@ class TestWritePrimitivesBenchmarkInit:
     """Tests for WritePrimitivesBenchmark initialization."""
 
     def test_default_initialization(self, tmp_path):
-        """Test benchmark initializes with defaults."""
+
         with patch("benchbox.core.write_primitives.benchmark.get_benchmark_runs_datagen_path") as mock_path:
             mock_path.return_value = tmp_path
             wp_benchmark = WritePrimitivesBenchmark()
@@ -88,7 +88,7 @@ class TestWritePrimitivesBenchmarkInit:
             assert wp_benchmark.tables == {}
 
     def test_custom_scale_factor(self, tmp_path):
-        """Test benchmark with custom scale factor."""
+
         with patch("benchbox.core.write_primitives.benchmark.get_benchmark_runs_datagen_path") as mock_path:
             mock_path.return_value = tmp_path
             wp_benchmark = WritePrimitivesBenchmark(scale_factor=0.1)
@@ -96,14 +96,14 @@ class TestWritePrimitivesBenchmarkInit:
             assert wp_benchmark.scale_factor == 0.1
 
     def test_custom_output_dir(self, tmp_path):
-        """Test benchmark with custom output directory."""
+
         wp_benchmark = WritePrimitivesBenchmark(output_dir=tmp_path)
 
         # output_dir property should return a path-like object
         assert str(wp_benchmark.output_dir) == str(tmp_path)
 
     def test_data_source_benchmark(self, tmp_path):
-        """Test get_data_source_benchmark returns tpch."""
+
         wp_benchmark = WritePrimitivesBenchmark(output_dir=tmp_path)
         assert wp_benchmark.get_data_source_benchmark() == "tpch"
 
@@ -117,7 +117,7 @@ class TestQuoteIdentifier:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_valid_identifier(self, wp_benchmark):
-        """Test quoting valid identifiers."""
+
         assert wp_benchmark._quote_identifier("table_name") == '"table_name"'
         assert wp_benchmark._quote_identifier("Orders") == '"Orders"'
         assert wp_benchmark._quote_identifier("_private") == '"_private"'
@@ -131,27 +131,27 @@ class TestQuoteIdentifier:
         assert quote_identifier_for_dialect("orders", "standard") == '"orders"'
 
     def test_identifier_with_numbers(self, wp_benchmark):
-        """Test quoting identifiers with numbers."""
+
         assert wp_benchmark._quote_identifier("table123") == '"table123"'
         assert wp_benchmark._quote_identifier("t1") == '"t1"'
 
     def test_invalid_identifier_with_spaces(self, wp_benchmark):
-        """Test that identifiers with spaces raise ValueError."""
+
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
             wp_benchmark._quote_identifier("table name")
 
     def test_invalid_identifier_with_semicolon(self, wp_benchmark):
-        """Test that identifiers with semicolons raise ValueError."""
+
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
             wp_benchmark._quote_identifier("table;DROP TABLE users")
 
     def test_invalid_identifier_starting_with_number(self, wp_benchmark):
-        """Test that identifiers starting with numbers raise ValueError."""
+
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
             wp_benchmark._quote_identifier("123table")
 
     def test_invalid_identifier_with_special_chars(self, wp_benchmark):
-        """Test that identifiers with special characters raise ValueError."""
+
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
             wp_benchmark._quote_identifier("table-name")
         with pytest.raises(ValueError, match="Invalid SQL identifier"):
@@ -665,7 +665,7 @@ class TestReplacePlaceholders:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_file_path_placeholder(self, wp_benchmark):
-        """Test replacing {file_path} placeholder."""
+
         sql = "COPY table FROM '{file_path}/data.csv'"
         result = wp_benchmark._replace_placeholders(sql)
 
@@ -673,7 +673,7 @@ class TestReplacePlaceholders:
         assert "write_primitives_auxiliary" in result
 
     def test_no_placeholder(self, wp_benchmark):
-        """Test SQL without placeholders passes through unchanged."""
+
         sql = "SELECT * FROM orders"
         result = wp_benchmark._replace_placeholders(sql)
         assert result == sql
@@ -688,7 +688,7 @@ class TestTableExists:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_table_exists_success(self, wp_benchmark):
-        """Test that existing table returns True."""
+
         mock_conn = Mock()
         mock_conn.execute.return_value = None  # Query succeeds
 
@@ -696,7 +696,7 @@ class TestTableExists:
         assert result is True
 
     def test_table_does_not_exist(self, wp_benchmark):
-        """Test that nonexistent table returns False."""
+
         mock_conn = Mock()
         mock_conn.execute.side_effect = Exception("Table 'test' does not exist")
 
@@ -704,7 +704,7 @@ class TestTableExists:
         assert result is False
 
     def test_table_exists_invalid_name(self, wp_benchmark):
-        """Test that invalid table name returns False."""
+
         mock_conn = Mock()
 
         result = wp_benchmark._table_exists(mock_conn, "invalid;DROP TABLE")
@@ -712,7 +712,7 @@ class TestTableExists:
         mock_conn.execute.assert_not_called()
 
     def test_table_exists_unexpected_error(self, wp_benchmark):
-        """Test that unexpected errors return False."""
+
         mock_conn = Mock()
         mock_conn.execute.side_effect = Exception("Connection timeout")
 
@@ -744,7 +744,7 @@ class TestOperationManagement:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_get_operation_categories(self, wp_benchmark):
-        """Test getting operation categories."""
+
         categories = wp_benchmark.get_operation_categories()
 
         assert isinstance(categories, list)
@@ -753,14 +753,14 @@ class TestOperationManagement:
         assert "insert" in categories or "INSERT" in [c.upper() for c in categories]
 
     def test_get_all_operations(self, wp_benchmark):
-        """Test getting all operations."""
+
         operations = wp_benchmark.get_all_operations()
 
         assert isinstance(operations, dict)
         assert len(operations) > 0
 
     def test_get_operation(self, wp_benchmark):
-        """Test getting a specific operation."""
+
         operations = wp_benchmark.get_all_operations()
         if operations:
             first_op_id = next(iter(operations.keys()))
@@ -769,12 +769,12 @@ class TestOperationManagement:
             assert hasattr(operation, "write_sql")
 
     def test_get_operation_invalid_id(self, wp_benchmark):
-        """Test getting operation with invalid ID raises error."""
+
         with pytest.raises((ValueError, KeyError)):
             wp_benchmark.get_operation("NONEXISTENT_OPERATION_12345")
 
     def test_get_queries(self, wp_benchmark):
-        """Test getting all queries."""
+
         queries = wp_benchmark.get_queries()
 
         assert isinstance(queries, dict)
@@ -783,7 +783,7 @@ class TestOperationManagement:
             assert isinstance(sql, str)
 
     def test_get_queries_by_category(self, wp_benchmark):
-        """Test getting queries by category."""
+
         categories = wp_benchmark.get_operation_categories()
         if categories:
             category = categories[0]
@@ -800,7 +800,7 @@ class TestBenchmarkInfo:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_get_benchmark_info(self, wp_benchmark):
-        """Test getting benchmark information."""
+
         info = wp_benchmark.get_benchmark_info()
 
         assert isinstance(info, dict)
@@ -813,14 +813,14 @@ class TestBenchmarkInfo:
         assert info["data_source"] == "tpch"
 
     def test_get_schema(self, wp_benchmark):
-        """Test getting schema definitions."""
+
         schema = wp_benchmark.get_schema()
 
         assert isinstance(schema, dict)
         assert len(schema) > 0
 
     def test_get_create_tables_sql(self, wp_benchmark):
-        """Test getting CREATE TABLE SQL."""
+
         sql = wp_benchmark.get_create_tables_sql()
 
         assert isinstance(sql, str)
@@ -829,7 +829,7 @@ class TestBenchmarkInfo:
         assert "Write Primitives Staging Tables" in sql
 
     def test_get_create_tables_sql_with_tuning(self, wp_benchmark):
-        """Test getting CREATE TABLE SQL with tuning config."""
+
         mock_tuning = Mock()
         mock_tuning.primary_keys = Mock(enabled=True)
         mock_tuning.foreign_keys = Mock(enabled=False)
@@ -840,7 +840,7 @@ class TestBenchmarkInfo:
         assert "CREATE TABLE" in sql
 
     def test_get_query(self, wp_benchmark):
-        """Test getting a single query."""
+
         operations = wp_benchmark.get_all_operations()
         if operations:
             first_op_id = next(iter(operations.keys()))
@@ -857,12 +857,12 @@ class TestExecuteOperation:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_execute_operation_no_connection(self, wp_benchmark):
-        """Test that None connection raises ValueError."""
+
         with pytest.raises(ValueError, match="Connection is None"):
             wp_benchmark.execute_operation("INSERT_001", None)
 
     def test_execute_operation_invalid_connection(self, wp_benchmark):
-        """Test that invalid connection type raises ValueError."""
+
         invalid_conn = "not a connection"
         with pytest.raises(ValueError, match="Invalid connection type"):
             wp_benchmark.execute_operation("INSERT_001", invalid_conn)
@@ -1108,7 +1108,7 @@ class TestRunBenchmark:
                 assert results[0].success is True
 
     def test_run_benchmark_by_category(self, wp_benchmark):
-        """Test run_benchmark filtered by category."""
+
         mock_conn = Mock()
         mock_conn.execute.return_value = Mock(rowcount=10)
 
@@ -1141,7 +1141,7 @@ class TestSetupAndTeardown:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_teardown_drops_tables(self, wp_benchmark):
-        """Test that teardown drops staging tables."""
+
         mock_conn = Mock()
 
         wp_benchmark.teardown(mock_conn)
@@ -1153,7 +1153,7 @@ class TestSetupAndTeardown:
         assert len(drop_calls) > 0
 
     def test_is_setup_false_when_tables_missing(self, wp_benchmark):
-        """Test is_setup returns False when tables are missing."""
+
         mock_conn = Mock()
         mock_conn.execute.side_effect = Exception("Table not found")
 
@@ -1161,7 +1161,7 @@ class TestSetupAndTeardown:
         assert result is False
 
     def test_is_setup_false_when_tables_empty(self, wp_benchmark):
-        """Test is_setup returns False when tables are empty."""
+
         mock_conn = Mock()
         # Return 0 rows
         mock_conn.execute.return_value.fetchone.return_value = (0,)
@@ -1215,7 +1215,7 @@ class TestCleanupAuxiliaryFiles:
         return WritePrimitivesBenchmark(output_dir=tmp_path)
 
     def test_cleanup_removes_directory(self, wp_benchmark, tmp_path):
-        """Test that cleanup_auxiliary_files removes the directory."""
+
         # Create the auxiliary directory
         aux_dir = tmp_path / "write_primitives_auxiliary"
         aux_dir.mkdir()

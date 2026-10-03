@@ -44,7 +44,7 @@ class TestBenchboxCLIErrors:
     """Test CLI exception hierarchy."""
 
     def test_base_cli_error(self):
-        """Test base CLI error."""
+
         error = BenchboxCLIError("Test error", {"key": "value"})
 
         assert str(error) == "Test error"
@@ -53,7 +53,7 @@ class TestBenchboxCLIErrors:
         _assert_version_metadata(error.details)
 
     def test_configuration_error(self):
-        """Test configuration error."""
+
         error = ConfigurationError("Invalid configuration", {"config": "test"})
 
         assert isinstance(error, BenchboxCLIError)
@@ -62,7 +62,7 @@ class TestBenchboxCLIErrors:
         _assert_version_metadata(error.details)
 
     def test_database_error(self):
-        """Test database error."""
+
         error = DatabaseError("Connection failed")
 
         assert isinstance(error, BenchboxCLIError)
@@ -70,7 +70,7 @@ class TestBenchboxCLIErrors:
         _assert_version_metadata(error.details)
 
     def test_execution_error(self):
-        """Test execution error."""
+
         error = ExecutionError("Benchmark failed", {"stage": "execution"})
 
         assert isinstance(error, BenchboxCLIError)
@@ -79,7 +79,7 @@ class TestBenchboxCLIErrors:
         _assert_version_metadata(error.details)
 
     def test_validation_error(self):
-        """Test validation error."""
+
         error = ValidationError("Invalid input", {"field": "scale_factor"})
 
         assert isinstance(error, BenchboxCLIError)
@@ -88,7 +88,7 @@ class TestBenchboxCLIErrors:
         _assert_version_metadata(error.details)
 
     def test_cloud_storage_error(self):
-        """Test cloud storage error."""
+
         error = CloudStorageError("Credentials invalid", {"provider": "s3"})
 
         assert isinstance(error, BenchboxCLIError)
@@ -97,7 +97,7 @@ class TestBenchboxCLIErrors:
         _assert_version_metadata(error.details)
 
     def test_platform_error(self):
-        """Test platform error."""
+
         error = PlatformError("Platform unavailable", {"platform": "duckdb"})
 
         assert isinstance(error, BenchboxCLIError)
@@ -110,7 +110,7 @@ class TestErrorContext:
     """Test ErrorContext dataclass."""
 
     def test_error_context_creation(self):
-        """Test creating ErrorContext."""
+
         context = ErrorContext(
             operation="test_operation",
             stage="validation",
@@ -129,7 +129,7 @@ class TestErrorContext:
         _assert_version_metadata(context.system_info)
 
     def test_error_context_minimal(self):
-        """Test ErrorContext with minimal information."""
+
         context = ErrorContext(operation="test_operation", stage="execution")
 
         assert context.operation == "test_operation"
@@ -145,7 +145,7 @@ class TestErrorHandler:
     """Test ErrorHandler functionality."""
 
     def test_error_handler_creation(self):
-        """Test creating ErrorHandler."""
+
         console = Console(file=StringIO(), force_terminal=True)
         handler = ErrorHandler(console)
 
@@ -153,7 +153,7 @@ class TestErrorHandler:
         assert handler.logger is not None
 
     def test_handle_configuration_error(self):
-        """Test handling configuration error."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=False)
         handler = ErrorHandler(console)
@@ -169,7 +169,7 @@ class TestErrorHandler:
         assert "Configuration Help" in output_text
 
     def test_handle_database_error(self):
-        """Test handling database error."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=False)
         handler = ErrorHandler(console)
@@ -186,7 +186,7 @@ class TestErrorHandler:
         assert "postgresql" in output_text
 
     def test_handle_cloud_storage_error(self):
-        """Test handling cloud storage error."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=False)
         handler = ErrorHandler(console)
@@ -203,7 +203,7 @@ class TestErrorHandler:
         assert "AWS S3" in output_text
 
     def test_handle_generic_error(self):
-        """Test handling generic Python exception."""
+
         output = StringIO()
         console = Console(file=output, force_terminal=False)
         handler = ErrorHandler(console)
@@ -220,7 +220,7 @@ class TestErrorHandler:
         assert f"Release Tag: v{benchbox.__version__}" in output_text
 
     def test_create_error_handler_factory(self):
-        """Test error handler factory function."""
+
         console = Console()
         handler = create_error_handler(console)
 
@@ -239,7 +239,7 @@ class TestValidationRules:
         ValidationRules.validate_scale_factor(10.0)
 
     def test_validate_scale_factor_zero(self):
-        """Test scale factor validation with zero."""
+
         with pytest.raises(ValidationError) as exc_info:
             ValidationRules.validate_scale_factor(0.0)
 
@@ -247,7 +247,7 @@ class TestValidationRules:
         assert exc_info.value.details["provided_value"] == 0.0
 
     def test_validate_scale_factor_negative(self):
-        """Test scale factor validation with negative value."""
+
         with pytest.raises(ValidationError) as exc_info:
             ValidationRules.validate_scale_factor(-1.0)
 
@@ -255,7 +255,7 @@ class TestValidationRules:
         assert exc_info.value.details["provided_value"] == -1.0
 
     def test_validate_scale_factor_large(self):
-        """Test scale factor validation with very large value."""
+
         with pytest.raises(ValidationError) as exc_info:
             ValidationRules.validate_scale_factor(200.0)
 
@@ -273,14 +273,14 @@ class TestValidationRules:
         ValidationRules.validate_benchmark_name("TpcDs", available)
 
     def test_validate_benchmark_name_empty(self):
-        """Test benchmark name validation with empty name."""
+
         with pytest.raises(ValidationError) as exc_info:
             ValidationRules.validate_benchmark_name("", ["tpch"])
 
         assert "Benchmark name cannot be empty" in str(exc_info.value)
 
     def test_validate_benchmark_name_invalid(self):
-        """Test benchmark name validation with invalid name."""
+
         available = ["tpch", "tpcds"]
 
         with pytest.raises(ValidationError) as exc_info:
@@ -311,7 +311,7 @@ class TestValidationRules:
         assert exc_info.value.details["path"] == invalid
 
     def test_validate_output_directory_cloud_invalid_credentials(self):
-        """Test output directory validation with cloud path and invalid credentials."""
+
         # This should fail because we don't have S3 credentials set up
         with pytest.raises(CloudStorageError) as exc_info:
             ValidationRules.validate_output_directory("s3://test-bucket/path")

@@ -26,19 +26,19 @@ class TestExecutionStyleFilter:
     """Tests for ExecutionStyleFilter dataclass."""
 
     def test_default_values(self):
-        """Test that default filter shows all platforms."""
+
         style_filter = ExecutionStyleFilter()
         assert style_filter.execution_mode == "all"
         assert style_filter.location == "all"
 
     def test_sql_local_filter(self):
-        """Test SQL + Local filter configuration."""
+
         style_filter = ExecutionStyleFilter(execution_mode="sql", location="local")
         assert style_filter.execution_mode == "sql"
         assert style_filter.location == "local"
 
     def test_dataframe_cloud_filter(self):
-        """Test DataFrame + Cloud filter configuration."""
+
         style_filter = ExecutionStyleFilter(execution_mode="dataframe", location="cloud")
         assert style_filter.execution_mode == "dataframe"
         assert style_filter.location == "cloud"
@@ -48,18 +48,18 @@ class TestCategoryConstants:
     """Tests for category classification constants."""
 
     def test_local_categories_exist(self):
-        """Test that local categories are defined."""
+
         assert "analytical" in LOCAL_CATEGORIES
         assert "embedded" in LOCAL_CATEGORIES
         assert "distributed" in LOCAL_CATEGORIES
         assert "dataframe" in LOCAL_CATEGORIES
 
     def test_cloud_categories_exist(self):
-        """Test that cloud categories are defined."""
+
         assert "cloud" in CLOUD_CATEGORIES
 
     def test_categories_are_disjoint(self):
-        """Test that local and cloud categories don't overlap."""
+
         assert LOCAL_CATEGORIES.isdisjoint(CLOUD_CATEGORIES)
 
 
@@ -73,7 +73,7 @@ class TestFilterPlatforms:
             return DatabaseManager()
 
     def test_filter_all_returns_all(self, db_manager):
-        """Test that 'all' filter returns all platforms unchanged."""
+
         platforms = ["duckdb", "polars", "bigquery", "snowflake"]
         style_filter = ExecutionStyleFilter(execution_mode="all", location="all")
 
@@ -82,7 +82,7 @@ class TestFilterPlatforms:
         assert result == platforms
 
     def test_filter_sql_only(self, db_manager):
-        """Test filtering for SQL-only platforms."""
+
         platforms = ["duckdb", "polars", "pandas", "bigquery"]
         style_filter = ExecutionStyleFilter(execution_mode="sql", location="all")
 
@@ -97,7 +97,7 @@ class TestFilterPlatforms:
         assert "pandas" not in result  # DataFrame-only
 
     def test_filter_dataframe_only(self, db_manager):
-        """Test filtering for DataFrame-only platforms."""
+
         platforms = ["duckdb", "polars", "pandas", "pyspark"]
         style_filter = ExecutionStyleFilter(execution_mode="dataframe", location="all")
 
@@ -111,7 +111,7 @@ class TestFilterPlatforms:
         assert "duckdb" not in result
 
     def test_filter_local_only(self, db_manager):
-        """Test filtering for local platforms."""
+
         platforms = ["duckdb", "sqlite", "bigquery", "snowflake"]
         style_filter = ExecutionStyleFilter(execution_mode="all", location="local")
 
@@ -124,7 +124,7 @@ class TestFilterPlatforms:
         assert "snowflake" not in result
 
     def test_filter_cloud_only(self, db_manager):
-        """Test filtering for cloud platforms."""
+
         platforms = ["duckdb", "sqlite", "bigquery", "snowflake", "databricks"]
         style_filter = ExecutionStyleFilter(execution_mode="all", location="cloud")
 
@@ -138,7 +138,7 @@ class TestFilterPlatforms:
         assert "sqlite" not in result
 
     def test_filter_sql_local(self, db_manager):
-        """Test combined SQL + Local filter."""
+
         platforms = ["duckdb", "polars", "pandas", "bigquery", "databricks"]
         style_filter = ExecutionStyleFilter(execution_mode="sql", location="local")
 
@@ -152,7 +152,7 @@ class TestFilterPlatforms:
         assert "databricks" not in result  # Cloud
 
     def test_filter_dataframe_cloud(self, db_manager):
-        """Test combined DataFrame + Cloud filter."""
+
         platforms = ["duckdb", "polars", "pandas", "databricks", "glue"]
         style_filter = ExecutionStyleFilter(execution_mode="dataframe", location="cloud")
 
@@ -166,7 +166,7 @@ class TestFilterPlatforms:
         assert "pandas" not in result  # Local
 
     def test_filter_empty_platforms_list(self, db_manager):
-        """Test filtering with empty platform list."""
+
         style_filter = ExecutionStyleFilter(execution_mode="sql", location="local")
 
         result = db_manager.filter_platforms([], style_filter)
@@ -197,7 +197,7 @@ class TestPromptExecutionStyle:
     @patch("benchbox.cli.database.Prompt.ask")
     @patch("benchbox.cli.database.console")
     def test_prompt_sql_local(self, mock_console, mock_prompt, db_manager):
-        """Test prompting for SQL + Local preferences."""
+
         mock_prompt.side_effect = ["1", "1"]  # SQL, Local
 
         result = db_manager.prompt_execution_style()
@@ -208,7 +208,7 @@ class TestPromptExecutionStyle:
     @patch("benchbox.cli.database.Prompt.ask")
     @patch("benchbox.cli.database.console")
     def test_prompt_dataframe_cloud(self, mock_console, mock_prompt, db_manager):
-        """Test prompting for DataFrame + Cloud preferences."""
+
         mock_prompt.side_effect = ["2", "2"]  # DataFrame, Cloud
 
         result = db_manager.prompt_execution_style()
@@ -264,7 +264,7 @@ class TestSelectDatabaseWithFilter:
     @patch("benchbox.cli.database.console")
     @patch("benchbox.cli.database.PlatformRegistry.get_platform_capabilities")
     def test_select_with_sql_filter(self, mock_caps, mock_console, mock_prompt, db_manager):
-        """Test that SQL filter applies execution_mode from filter."""
+
         mock_caps.return_value = MagicMock(supports_sql=True, supports_dataframe=False, default_mode="sql")
         mock_prompt.return_value = "1"  # Select first platform
 
@@ -277,7 +277,7 @@ class TestSelectDatabaseWithFilter:
     @patch("benchbox.cli.database.console")
     @patch("benchbox.cli.database.PlatformRegistry.get_platform_capabilities")
     def test_select_with_dataframe_filter(self, mock_caps, mock_console, mock_prompt, db_manager):
-        """Test that DataFrame filter applies execution_mode from filter."""
+
         mock_caps.return_value = MagicMock(supports_sql=True, supports_dataframe=True, default_mode="dataframe")
         mock_prompt.return_value = "1"  # Select first platform
 
@@ -290,7 +290,7 @@ class TestSelectDatabaseWithFilter:
     @patch("benchbox.cli.database.console")
     @patch("benchbox.cli.database.PlatformRegistry.get_platform_capabilities")
     def test_select_filters_platform_list(self, mock_caps, mock_console, mock_prompt, db_manager):
-        """Test that filter actually reduces the platform list shown."""
+
         mock_caps.return_value = MagicMock(supports_sql=True, supports_dataframe=False, default_mode="sql")
         mock_prompt.return_value = "1"
 
@@ -304,7 +304,7 @@ class TestSelectDatabaseWithFilter:
     @patch("benchbox.cli.database.console")
     @patch("benchbox.cli.database.PlatformRegistry.get_platform_capabilities")
     def test_select_with_no_filter(self, mock_caps, mock_console, mock_prompt, db_manager):
-        """Test select_database with no filter shows all platforms."""
+
         mock_caps.return_value = MagicMock(supports_sql=True, supports_dataframe=False, default_mode="sql")
         mock_prompt.return_value = "1"
 

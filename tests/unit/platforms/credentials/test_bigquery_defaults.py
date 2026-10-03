@@ -43,7 +43,7 @@ class TestBigQueryCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that existing credential values are shown as defaults in prompts."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -99,7 +99,7 @@ class TestBigQueryCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that setup works when no existing credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -149,7 +149,7 @@ class TestBigQueryCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test handling of partial existing credentials."""
+
         # Setup: only some credentials exist
         mock_manager = Mock()
         existing_creds = {
@@ -208,7 +208,7 @@ class TestBigQueryCredentialDefaults:
         mock_auto_detect,
         mock_output_location,
     ):
-        """Test that auto-detection is skipped when existing credentials are present."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -261,7 +261,7 @@ class TestBigQueryCredentialDefaults:
         mock_auto_detect,
         mock_output_location,
     ):
-        """Test that auto-detection is skipped when credentials already exist."""
+
         # Setup: existing credentials
         mock_manager = Mock()
         existing_creds = {
@@ -316,7 +316,7 @@ class TestBigQueryCredentialDefaults:
         mock_auto_detect,
         mock_output_location,
     ):
-        """Test that auto-detection is offered when no credentials exist."""
+
         # Setup: no existing credentials
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
@@ -363,7 +363,7 @@ class TestBigQueryCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that optional storage bucket shows existing value."""
+
         # Setup: credentials with storage bucket
         mock_manager = Mock()
         existing_creds = {

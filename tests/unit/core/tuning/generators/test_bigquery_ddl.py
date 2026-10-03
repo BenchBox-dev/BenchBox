@@ -36,12 +36,12 @@ class TestBigQueryDDLGeneratorBasics:
     """Tests for BigQueryDDLGenerator basic properties."""
 
     def test_platform_name(self) -> None:
-        """Test platform name property."""
+
         generator = BigQueryDDLGenerator()
         assert generator.platform_name == "bigquery"
 
     def test_supported_tuning_types(self) -> None:
-        """Test supported tuning types."""
+
         generator = BigQueryDDLGenerator()
         assert generator.supports_tuning_type("partitioning")
         assert generator.supports_tuning_type("clustering")
@@ -53,7 +53,7 @@ class TestPartitioningGeneration:
     """Tests for PARTITION BY clause generation."""
 
     def test_date_partitioning_day(self) -> None:
-        """Test DATE partitioning with DAY granularity."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -63,7 +63,7 @@ class TestPartitioningGeneration:
         assert clauses.partition_by == "PARTITION BY l_shipdate"
 
     def test_date_partitioning_month(self) -> None:
-        """Test DATE partitioning with MONTH granularity."""
+
         generator = BigQueryDDLGenerator(default_partition_granularity=PartitionGranularity.MONTH)
         table_tuning = TableTuning(
             table_name="orders",
@@ -73,7 +73,7 @@ class TestPartitioningGeneration:
         assert clauses.partition_by == "PARTITION BY DATE_TRUNC(o_orderdate, MONTH)"
 
     def test_timestamp_partitioning(self) -> None:
-        """Test TIMESTAMP partitioning."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="events",
@@ -83,7 +83,7 @@ class TestPartitioningGeneration:
         assert clauses.partition_by == "PARTITION BY TIMESTAMP_TRUNC(event_ts, DAY)"
 
     def test_datetime_partitioning(self) -> None:
-        """Test DATETIME partitioning."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="logs",
@@ -93,7 +93,7 @@ class TestPartitioningGeneration:
         assert clauses.partition_by == "PARTITION BY DATETIME_TRUNC(log_datetime, DAY)"
 
     def test_integer_range_partitioning(self) -> None:
-        """Test integer range partitioning with RANGE_BUCKET."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="customers",
@@ -103,7 +103,7 @@ class TestPartitioningGeneration:
         assert "PARTITION BY RANGE_BUCKET(customer_id, GENERATE_ARRAY(" in clauses.partition_by
 
     def test_multiple_partition_columns_uses_first(self) -> None:
-        """Test that multiple partition columns uses first with warning."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -125,7 +125,7 @@ class TestClusteringGeneration:
     """Tests for CLUSTER BY clause generation."""
 
     def test_basic_clustering(self) -> None:
-        """Test basic clustering with multiple columns."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -138,7 +138,7 @@ class TestClusteringGeneration:
         assert clauses.cluster_by == "CLUSTER BY l_orderkey, l_partkey"
 
     def test_clustering_respects_order(self) -> None:
-        """Test that clustering columns are sorted by order property."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -174,7 +174,7 @@ class TestClusteringGeneration:
         assert clauses.cluster_by == "CLUSTER BY col1, col2, col3, col4"
 
     def test_sorting_maps_to_clustering(self) -> None:
-        """Test that sorting columns are treated as clustering columns."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="events",
@@ -187,7 +187,7 @@ class TestClusteringGeneration:
         assert clauses.cluster_by == "CLUSTER BY event_date, event_id"
 
     def test_combined_clustering_and_sorting(self) -> None:
-        """Test that clustering and sorting columns are combined."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="events",
@@ -202,7 +202,7 @@ class TestDistributionWarning:
     """Tests for distribution warning (not supported in BigQuery)."""
 
     def test_distribution_logs_warning(self) -> None:
-        """Test that distribution columns trigger a warning."""
+
         generator = BigQueryDDLGenerator()
         table_tuning = TableTuning(
             table_name="orders",
@@ -219,7 +219,7 @@ class TestRequirePartitionFilter:
     """Tests for require_partition_filter option."""
 
     def test_require_partition_filter_enabled(self) -> None:
-        """Test that require_partition_filter adds OPTIONS."""
+
         generator = BigQueryDDLGenerator(require_partition_filter=True)
         table_tuning = TableTuning(
             table_name="orders",
@@ -229,7 +229,7 @@ class TestRequirePartitionFilter:
         assert clauses.table_options.get("require_partition_filter") is True
 
     def test_require_partition_filter_disabled(self) -> None:
-        """Test that require_partition_filter=False doesn't add option."""
+
         generator = BigQueryDDLGenerator(require_partition_filter=False)
         table_tuning = TableTuning(
             table_name="orders",
@@ -243,7 +243,7 @@ class TestCreateTableDDL:
     """Tests for CREATE TABLE DDL generation."""
 
     def test_basic_create_table(self) -> None:
-        """Test basic CREATE TABLE without tuning."""
+
         generator = BigQueryDDLGenerator()
         columns = [
             ColumnDefinition("id", "INT64", ColumnNullability.NOT_NULL),
@@ -256,7 +256,7 @@ class TestCreateTableDDL:
         assert ddl.endswith(";")
 
     def test_create_table_with_partitioning(self) -> None:
-        """Test CREATE TABLE with PARTITION BY."""
+
         generator = BigQueryDDLGenerator()
         columns = [
             ColumnDefinition("l_orderkey", "INT64", ColumnNullability.NOT_NULL),
@@ -273,7 +273,7 @@ class TestCreateTableDDL:
         assert "PARTITION BY l_shipdate" in ddl
 
     def test_create_table_with_clustering(self) -> None:
-        """Test CREATE TABLE with CLUSTER BY."""
+
         generator = BigQueryDDLGenerator()
         columns = [
             ColumnDefinition("l_orderkey", "INT64"),
@@ -292,7 +292,7 @@ class TestCreateTableDDL:
         assert "CLUSTER BY l_orderkey, l_partkey" in ddl
 
     def test_create_table_with_all_tuning(self) -> None:
-        """Test CREATE TABLE with partitioning, clustering, and options."""
+
         generator = BigQueryDDLGenerator(require_partition_filter=True)
         columns = [
             ColumnDefinition("l_orderkey", "INT64", ColumnNullability.NOT_NULL),
@@ -319,14 +319,14 @@ class TestCreateTableDDL:
         assert ddl.endswith(";")
 
     def test_create_table_if_not_exists(self) -> None:
-        """Test CREATE TABLE IF NOT EXISTS."""
+
         generator = BigQueryDDLGenerator()
         columns = [ColumnDefinition("id", "INT64")]
         ddl = generator.generate_create_table_ddl("test", columns, if_not_exists=True)
         assert "CREATE TABLE IF NOT EXISTS test" in ddl
 
     def test_create_table_with_schema(self) -> None:
-        """Test CREATE TABLE with dataset prefix."""
+
         generator = BigQueryDDLGenerator()
         columns = [ColumnDefinition("id", "INT64")]
         ddl = generator.generate_create_table_ddl("orders", columns, schema="tpch")
@@ -337,7 +337,7 @@ class TestPartitionGranularityEnum:
     """Tests for PartitionGranularity enum."""
 
     def test_enum_values(self) -> None:
-        """Test enum values."""
+
         assert PartitionGranularity.DAY.value == "DAY"
         assert PartitionGranularity.MONTH.value == "MONTH"
         assert PartitionGranularity.YEAR.value == "YEAR"

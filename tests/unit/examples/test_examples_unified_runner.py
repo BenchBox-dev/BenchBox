@@ -121,7 +121,7 @@ class TestUnifiedRunner:
 
     @patch("benchbox.core.platform_registry.PlatformRegistry.get_platform_availability")
     def test_list_platforms_functionality(self, mock_get_availability):
-        """Test --list-platforms functionality."""
+
         mock_get_availability.return_value = {
             "duckdb": True,
             "databricks": False,
@@ -137,7 +137,7 @@ class TestUnifiedRunner:
                 assert any("duckdb" in str(call) for call in mock_emit.call_args_list)
 
     def test_list_benchmarks_functionality(self):
-        """Test --list-benchmarks functionality."""
+
         # Test that main returns 0 when --list-benchmarks is used
         with patch("sys.argv", ["unified_runner.py", "--list-benchmarks"]):
             with patch("benchbox.core.results.display.emit") as mock_emit:
@@ -150,7 +150,7 @@ class TestUnifiedRunner:
                 assert any("Available benchmarks" in call for call in calls)
 
     def test_auto_detect_databricks_config_no_sdk(self):
-        """Test Databricks auto-detection when SDK is not available."""
+
         from benchbox.platforms.databricks import DatabricksAdapter
 
         with patch("benchbox.platforms.databricks.DatabricksAdapter._auto_detect_databricks_config") as mock_detect:
@@ -159,7 +159,7 @@ class TestUnifiedRunner:
             assert result is None
 
     def test_auto_detect_databricks_config_with_sdk(self):
-        """Test Databricks auto-detection when SDK is available."""
+
         from benchbox.platforms.databricks import DatabricksAdapter
 
         with patch("benchbox.platforms.databricks.DatabricksAdapter._auto_detect_databricks_config") as mock_detect:
@@ -173,7 +173,7 @@ class TestUnifiedRunner:
             assert "server_hostname" in result
 
     def test_get_platform_adapter_config_duckdb(self):
-        """Test DuckDB platform adapter configuration."""
+
         args = Namespace(
             benchmark="tpch",
             scale=0.01,
@@ -197,7 +197,7 @@ class TestUnifiedRunner:
                 assert not config["force_recreate"]
 
     def test_get_platform_adapter_config_databricks(self):
-        """Test Databricks platform adapter configuration."""
+
         args = Namespace(
             server_hostname="test.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -220,7 +220,7 @@ class TestUnifiedRunner:
         assert "tpch" in config["schema"]
 
     def test_get_platform_adapter_config_clickhouse(self):
-        """Test ClickHouse platform adapter configuration."""
+
         args = Namespace(
             mode="local",
             data_path="/custom/path",
@@ -234,7 +234,7 @@ class TestUnifiedRunner:
         assert config["data_path"] == "/custom/path"
 
     def test_get_benchmark_config(self):
-        """Test benchmark configuration generation."""
+
         args = Namespace(
             scale=1.0,
             verbose=2,
@@ -257,7 +257,7 @@ class TestUnifiedRunner:
             assert "output_dir" in config
 
     def test_console_summary_data(self):
-        """Test console summary data preparation using current helper."""
+
         results = MagicMock()
         results.successful_queries = 22
         results.total_queries = 22
@@ -279,7 +279,7 @@ class TestUnifiedRunner:
         assert result_data["average_query_time"] == 5.5
 
     def test_display_results(self, capsys):
-        """Test result display functionality."""
+
         result_data = {
             "benchmark": "tpch",
             "scale_factor": 0.1,
@@ -305,7 +305,7 @@ class TestUnifiedRunner:
         assert "✅ TPCH benchmark completed!" in captured.out
 
     def test_create_platform_specific_args_duckdb(self):
-        """Test creation of DuckDB-specific arguments via registry."""
+
         import argparse
 
         from benchbox.core.platform_registry import PlatformRegistry
@@ -322,7 +322,7 @@ class TestUnifiedRunner:
     @patch("unified_runner.PlatformRegistry.create_adapter")
     @patch("unified_runner.list_available_platforms")
     def test_main_dry_run_mode(self, mock_list_platforms, mock_create_adapter, tmp_path):
-        """Test main function in dry-run mode."""
+
         mock_list_platforms.return_value = {"duckdb": True}
 
         dry_run_dir = tmp_path / "dry"
@@ -356,7 +356,7 @@ class TestUnifiedRunner:
 
     @patch("unified_runner.list_available_platforms")
     def test_main_unavailable_platform(self, mock_list_platforms):
-        """Test main function with unavailable platform."""
+
         mock_list_platforms.return_value = {"duckdb": False}
 
         test_args = ["unified_runner.py", "--platform", "duckdb", "--benchmark", "tpch"]
@@ -404,7 +404,7 @@ class TestUnifiedRunner:
         assert is_quiet() == previous_state
 
     def test_phase_validation(self):
-        """Test that phase validation works correctly."""
+
         valid_phases = [
             "generate",
             "load",
@@ -820,7 +820,7 @@ class TestUnifiedRunnerIntegration:
     """Integration tests for the unified runner (requires actual execution)."""
 
     def test_unified_runner_help(self):
-        """Test that unified runner help works."""
+
         script_path = examples_dir / "unified_runner.py"
         result = subprocess.run([sys.executable, str(script_path), "--help"], capture_output=True, text=True)
 
@@ -830,7 +830,7 @@ class TestUnifiedRunnerIntegration:
         assert "--benchmark" in result.stdout
 
     def test_unified_runner_list_platforms(self):
-        """Test that --list-platforms works."""
+
         script_path = examples_dir / "unified_runner.py"
         result = subprocess.run(
             [sys.executable, str(script_path), "--list-platforms"],

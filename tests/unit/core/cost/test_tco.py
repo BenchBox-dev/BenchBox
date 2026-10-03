@@ -31,7 +31,7 @@ class TestGrowthModel:
     """Tests for GrowthModel enum."""
 
     def test_growth_model_values(self):
-        """Test all growth model values exist."""
+
         assert GrowthModel.NONE.value == "none"
         assert GrowthModel.LINEAR.value == "linear"
         assert GrowthModel.COMPOUND.value == "compound"
@@ -41,7 +41,7 @@ class TestGrowthConfig:
     """Tests for GrowthConfig dataclass."""
 
     def test_default_config(self):
-        """Test default growth configuration."""
+
         config = GrowthConfig()
 
         assert config.model == GrowthModel.NONE
@@ -49,7 +49,7 @@ class TestGrowthConfig:
         assert config.data_growth_rate is None
 
     def test_custom_config(self):
-        """Test custom growth configuration."""
+
         config = GrowthConfig(
             model=GrowthModel.COMPOUND,
             annual_rate=0.15,
@@ -61,17 +61,17 @@ class TestGrowthConfig:
         assert config.data_growth_rate == 0.20
 
     def test_get_data_growth_rate_with_value(self):
-        """Test get_data_growth_rate when explicitly set."""
+
         config = GrowthConfig(annual_rate=0.10, data_growth_rate=0.20)
         assert config.get_data_growth_rate() == 0.20
 
     def test_get_data_growth_rate_defaults_to_annual(self):
-        """Test get_data_growth_rate defaults to annual_rate."""
+
         config = GrowthConfig(annual_rate=0.10)
         assert config.get_data_growth_rate() == 0.10
 
     def test_calculate_multiplier_no_growth(self):
-        """Test multiplier with no growth model."""
+
         config = GrowthConfig(model=GrowthModel.NONE, annual_rate=0.10)
 
         # All years should return 1.0
@@ -86,7 +86,7 @@ class TestGrowthConfig:
         assert config.calculate_multiplier(1) == 1.0
 
     def test_calculate_multiplier_linear(self):
-        """Test linear growth multiplier calculation."""
+
         config = GrowthConfig(model=GrowthModel.LINEAR, annual_rate=0.10)
 
         # Year 1: base (1.0)
@@ -99,7 +99,7 @@ class TestGrowthConfig:
         assert config.calculate_multiplier(5) == pytest.approx(1.4, rel=0.001)
 
     def test_calculate_multiplier_compound(self):
-        """Test compound growth multiplier calculation."""
+
         config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.10)
 
         # Year 1: base (1.0)
@@ -116,7 +116,7 @@ class TestDiscountType:
     """Tests for DiscountType enum."""
 
     def test_discount_type_values(self):
-        """Test all discount type values exist."""
+
         assert DiscountType.NONE.value == "none"
         assert DiscountType.RESERVED.value == "reserved"
         assert DiscountType.COMMITTED_USE.value == "committed_use"
@@ -128,7 +128,7 @@ class TestDiscountConfig:
     """Tests for DiscountConfig dataclass."""
 
     def test_default_config(self):
-        """Test default discount configuration."""
+
         config = DiscountConfig()
 
         assert config.discount_type == DiscountType.NONE
@@ -137,7 +137,7 @@ class TestDiscountConfig:
         assert config.effective_start_year == 1
 
     def test_custom_config(self):
-        """Test custom discount configuration."""
+
         config = DiscountConfig(
             discount_type=DiscountType.RESERVED,
             discount_percent=0.30,
@@ -151,7 +151,7 @@ class TestDiscountConfig:
         assert config.effective_start_year == 2
 
     def test_get_discount_multiplier_no_discount(self):
-        """Test multiplier with no discount."""
+
         config = DiscountConfig(discount_type=DiscountType.NONE)
 
         # All years should return 1.0
@@ -159,7 +159,7 @@ class TestDiscountConfig:
         assert config.get_discount_multiplier(5) == 1.0
 
     def test_get_discount_multiplier_with_discount(self):
-        """Test multiplier with discount."""
+
         config = DiscountConfig(
             discount_type=DiscountType.RESERVED,
             discount_percent=0.20,
@@ -170,7 +170,7 @@ class TestDiscountConfig:
         assert config.get_discount_multiplier(5) == 0.80
 
     def test_get_discount_multiplier_delayed_start(self):
-        """Test multiplier with delayed start year."""
+
         config = DiscountConfig(
             discount_type=DiscountType.COMMITTED_USE,
             discount_percent=0.25,
@@ -200,12 +200,12 @@ class TestBudgetThreshold:
         assert threshold.period == "annual"
 
     def test_default_period(self):
-        """Test default period is annual."""
+
         threshold = BudgetThreshold(name="test", amount=50000.0)
         assert threshold.period == "annual"
 
     def test_is_exceeded_same_period(self):
-        """Test threshold check with same period."""
+
         threshold = BudgetThreshold(name="test", amount=10000.0, period="annual")
 
         assert threshold.is_exceeded(5000.0, "annual") is False
@@ -213,7 +213,7 @@ class TestBudgetThreshold:
         assert threshold.is_exceeded(10001.0, "annual") is True
 
     def test_is_exceeded_monthly_to_annual(self):
-        """Test threshold conversion from monthly cost to annual threshold."""
+
         threshold = BudgetThreshold(name="test", amount=12000.0, period="annual")
 
         # $1000/month = $12000/year (at threshold)
@@ -222,7 +222,7 @@ class TestBudgetThreshold:
         assert threshold.is_exceeded(1001.0, "monthly") is True
 
     def test_is_exceeded_annual_to_monthly(self):
-        """Test threshold conversion from annual cost to monthly threshold."""
+
         threshold = BudgetThreshold(name="test", amount=1000.0, period="monthly")
 
         # $12000/year = $1000/month (at threshold)
@@ -256,7 +256,7 @@ class TestYearlyProjection:
     """Tests for YearlyProjection dataclass."""
 
     def test_create_projection(self):
-        """Test creating a yearly projection."""
+
         projection = YearlyProjection(
             year=1,
             calendar_year=2025,
@@ -273,7 +273,7 @@ class TestYearlyProjection:
         assert projection.projected_cost == 85000.0
 
     def test_to_dict(self):
-        """Test converting projection to dictionary."""
+
         projection = YearlyProjection(
             year=2,
             calendar_year=2026,
@@ -300,7 +300,7 @@ class TestTCOProjection:
     """Tests for TCOProjection dataclass."""
 
     def test_default_projection(self):
-        """Test default projection values."""
+
         projection = TCOProjection(
             platform="snowflake",
             base_annual_cost=100000.0,
@@ -315,7 +315,7 @@ class TestTCOProjection:
         assert projection.budget_alerts == []
 
     def test_to_dict(self):
-        """Test converting projection to dictionary."""
+
         projection = TCOProjection(
             platform="bigquery",
             base_annual_cost=50000.0,
@@ -355,7 +355,7 @@ class TestTCOCalculator:
         return TCOCalculator()
 
     def test_calculate_tco_basic(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test basic TCO calculation."""
+
         projection = calculator.calculate_tco(
             benchmark_cost=sample_benchmark_cost,
             annual_runs=12,  # Monthly runs
@@ -372,7 +372,7 @@ class TestTCOCalculator:
         assert projection.total_tco == pytest.approx(60000.0, rel=0.001)
 
     def test_calculate_tco_with_growth(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test TCO calculation with growth."""
+
         growth_config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.10)
 
         projection = calculator.calculate_tco(
@@ -395,7 +395,7 @@ class TestTCOCalculator:
         assert projection.total_tco > 60000.0  # More than flat projection
 
     def test_calculate_tco_with_discount(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test TCO calculation with discount."""
+
         discount_config = DiscountConfig(
             discount_type=DiscountType.RESERVED,
             discount_percent=0.20,
@@ -441,7 +441,7 @@ class TestTCOCalculator:
     def test_calculate_tco_with_growth_and_discount(
         self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost
     ):
-        """Test TCO calculation with both growth and discount."""
+
         growth_config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.10)
         discount_config = DiscountConfig(
             discount_type=DiscountType.RESERVED,
@@ -466,7 +466,7 @@ class TestTCOCalculator:
         assert projection.yearly_projections[2].projected_cost == pytest.approx(11616.0, rel=0.001)
 
     def test_calculate_tco_custom_platform(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test TCO calculation with custom platform override."""
+
         projection = calculator.calculate_tco(
             benchmark_cost=sample_benchmark_cost,
             annual_runs=1,
@@ -476,7 +476,7 @@ class TestTCOCalculator:
         assert projection.platform == "databricks"
 
     def test_calculate_tco_custom_start_year(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test TCO calculation with custom start year."""
+
         projection = calculator.calculate_tco(
             benchmark_cost=sample_benchmark_cost,
             annual_runs=1,
@@ -490,7 +490,7 @@ class TestTCOCalculator:
         assert projection.yearly_projections[2].calendar_year == 2032
 
     def test_calculate_tco_metadata(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that TCO projection includes metadata."""
+
         projection = calculator.calculate_tco(
             benchmark_cost=sample_benchmark_cost,
             annual_runs=12,
@@ -502,7 +502,7 @@ class TestTCOCalculator:
         assert "generated_at" in projection.metadata
 
     def test_calculate_tco_from_annual_cost(self, calculator: TCOCalculator):
-        """Test TCO calculation from known annual cost."""
+
         projection = calculator.calculate_tco_from_annual_cost(
             annual_cost=50000.0,
             platform="redshift",
@@ -514,7 +514,7 @@ class TestTCOCalculator:
         assert projection.total_tco == pytest.approx(150000.0, rel=0.001)
 
     def test_calculate_tco_cumulative_cost(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that cumulative costs are calculated correctly."""
+
         growth_config = GrowthConfig(model=GrowthModel.LINEAR, annual_rate=0.20)
 
         projection = calculator.calculate_tco(
@@ -534,7 +534,7 @@ class TestTCOCalculator:
         assert projection.total_tco == projection.yearly_projections[-1].cumulative_cost
 
     def test_calculate_tco_monthly_cost(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that monthly costs are calculated correctly."""
+
         projection = calculator.calculate_tco(
             benchmark_cost=sample_benchmark_cost,
             annual_runs=12,
@@ -545,7 +545,7 @@ class TestTCOCalculator:
         assert projection.yearly_projections[0].monthly_cost == pytest.approx(1000.0, rel=0.001)
 
     def test_calculate_tco_average_annual_cost(self, calculator: TCOCalculator, sample_benchmark_cost: BenchmarkCost):
-        """Test that average annual cost is calculated correctly."""
+
         growth_config = GrowthConfig(model=GrowthModel.COMPOUND, annual_rate=0.10)
 
         projection = calculator.calculate_tco(
@@ -681,7 +681,7 @@ class TestTCOCalculatorPlatformComparison:
     """Tests for TCO Calculator platform comparison functionality."""
 
     def test_compare_platforms_basic(self):
-        """Test basic platform comparison."""
+
         calculator = TCOCalculator()
 
         # Create projections for different platforms
@@ -701,7 +701,7 @@ class TestTCOCalculatorPlatformComparison:
         assert comparison["rankings"][0]["rank"] == 1
 
     def test_compare_platforms_savings_calculation(self):
-        """Test savings calculation in comparison."""
+
         calculator = TCOCalculator()
 
         projections = [
@@ -721,7 +721,7 @@ class TestTCOCalculatorPlatformComparison:
         assert comparison["rankings"][1]["savings_vs_max"] == 0.0
 
     def test_compare_platforms_empty(self):
-        """Test comparison with no projections."""
+
         calculator = TCOCalculator()
 
         comparison = calculator.compare_platforms([])
@@ -729,7 +729,7 @@ class TestTCOCalculatorPlatformComparison:
         assert "error" in comparison
 
     def test_compare_platforms_single(self):
-        """Test comparison with single projection."""
+
         calculator = TCOCalculator()
 
         projections = [TCOProjection(platform="only_one", base_annual_cost=100.0, total_tco=500.0)]
@@ -754,7 +754,7 @@ class TestCreateStandardTCOScenarios:
         )
 
     def test_creates_three_scenarios(self, sample_benchmark_cost: BenchmarkCost):
-        """Test that three scenarios are created."""
+
         scenarios = create_standard_tco_scenarios(sample_benchmark_cost)
 
         assert len(scenarios) == 3
@@ -763,7 +763,7 @@ class TestCreateStandardTCOScenarios:
         assert "aggressive" in scenarios
 
     def test_conservative_scenario(self, sample_benchmark_cost: BenchmarkCost):
-        """Test conservative scenario has no growth or discount."""
+
         scenarios = create_standard_tco_scenarios(sample_benchmark_cost, annual_runs=12)
 
         conservative = scenarios["conservative"]
@@ -774,7 +774,7 @@ class TestCreateStandardTCOScenarios:
         assert conservative.total_tco == pytest.approx(60000.0, rel=0.001)
 
     def test_moderate_scenario(self, sample_benchmark_cost: BenchmarkCost):
-        """Test moderate scenario has growth and discount."""
+
         scenarios = create_standard_tco_scenarios(sample_benchmark_cost, annual_runs=12)
 
         moderate = scenarios["moderate"]
@@ -785,7 +785,7 @@ class TestCreateStandardTCOScenarios:
         assert moderate.discount_config.discount_percent == 0.15
 
     def test_aggressive_scenario(self, sample_benchmark_cost: BenchmarkCost):
-        """Test aggressive scenario has high growth."""
+
         scenarios = create_standard_tco_scenarios(sample_benchmark_cost, annual_runs=12)
 
         aggressive = scenarios["aggressive"]
@@ -807,7 +807,7 @@ class TestCreateStandardTCOScenarios:
             assert len(scenario.yearly_projections) == 5
 
     def test_custom_annual_runs(self, sample_benchmark_cost: BenchmarkCost):
-        """Test scenarios with custom annual runs."""
+
         scenarios = create_standard_tco_scenarios(sample_benchmark_cost, annual_runs=52)  # Weekly
 
         # Base should be 52 * $1000 = $52000/year

@@ -42,7 +42,7 @@ class TestPolarsDataFrameAdapter:
     """Tests for PolarsDataFrameAdapter."""
 
     def test_initialization(self):
-        """Test adapter initialization."""
+
         adapter = PolarsDataFrameAdapter()
 
         assert adapter.platform_name == "Polars"
@@ -52,7 +52,7 @@ class TestPolarsDataFrameAdapter:
         assert adapter.n_rows is None
 
     def test_initialization_with_options(self):
-        """Test adapter initialization with custom options."""
+
         adapter = PolarsDataFrameAdapter(
             working_dir="/tmp/polars",
             verbose=True,
@@ -68,7 +68,7 @@ class TestPolarsDataFrameAdapter:
         assert adapter.n_rows == 1000
 
     def test_platform_info(self):
-        """Test get_platform_info method."""
+
         adapter = PolarsDataFrameAdapter()
 
         info = adapter.get_platform_info()
@@ -79,7 +79,7 @@ class TestPolarsDataFrameAdapter:
         assert info["streaming"] is False
 
     def test_create_context(self):
-        """Test context creation."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -223,7 +223,7 @@ class TestPolarsWindowFunctions:
     """Tests for Polars window-function helpers."""
 
     def test_window_functions_without_partitions(self):
-        """Test ranking, running, and distribution windows without partitions."""
+
         adapter = PolarsDataFrameAdapter()
         lf = pl.LazyFrame({"val": [10, 20, 30, 40], "ord": [1, 2, 3, 4]})
 
@@ -260,7 +260,7 @@ class TestPolarsWindowFunctions:
         assert result["cume_dist"].to_list() == pytest.approx([1.0, 0.75, 0.5, 0.25])
 
     def test_window_functions_with_partitions(self):
-        """Test partition-aware window helpers on grouped data."""
+
         adapter = PolarsDataFrameAdapter()
         lf = pl.LazyFrame({"grp": ["A", "A", "B"], "val": [10, 20, 5], "ord": [1, 2, 1]})
 
@@ -288,7 +288,7 @@ class TestPolarsDataLoading:
     """Tests for Polars data loading methods."""
 
     def test_read_csv_basic(self, tmp_path):
-        """Test reading a basic CSV file."""
+
         adapter = PolarsDataFrameAdapter()
 
         # Create a test CSV file
@@ -304,7 +304,7 @@ class TestPolarsDataLoading:
         assert df.columns == ["id", "name", "amount"]
 
     def test_read_csv_with_delimiter(self, tmp_path):
-        """Test reading CSV with custom delimiter."""
+
         adapter = PolarsDataFrameAdapter()
 
         # Create a pipe-delimited file
@@ -317,7 +317,7 @@ class TestPolarsDataLoading:
         assert len(df) == 2
 
     def test_read_csv_with_column_names(self, tmp_path):
-        """Test reading CSV with explicit column names."""
+
         adapter = PolarsDataFrameAdapter()
 
         # Create a headerless CSV
@@ -361,7 +361,7 @@ class TestPolarsDataLoading:
         assert nulled.schema["n"] == pl.Int64  # numeric column unaffected
 
     def test_read_csv_respects_n_rows(self, tmp_path):
-        """Test CSV scanning honors the adapter row limit."""
+
         adapter = PolarsDataFrameAdapter(n_rows=2)
 
         csv_path = tmp_path / "limited.csv"
@@ -372,7 +372,7 @@ class TestPolarsDataLoading:
         assert df["id"].to_list() == [1, 2]
 
     def test_read_parquet(self, tmp_path):
-        """Test reading a Parquet file."""
+
         adapter = PolarsDataFrameAdapter()
 
         # Create a test Parquet file
@@ -394,7 +394,7 @@ class TestPolarsDataLoading:
         assert len(df) == 3
 
     def test_read_parquet_casts_categorical_to_string(self, tmp_path):
-        """Test parquet scans cast dictionary-like categorical columns back to strings."""
+
         adapter = PolarsDataFrameAdapter()
 
         parquet_path = tmp_path / "categorical.parquet"
@@ -411,7 +411,7 @@ class TestPolarsDataLoading:
         assert df["category"].to_list() == ["A", "B"]
 
     def test_collect_lazy_frame(self):
-        """Test collecting a LazyFrame."""
+
         adapter = PolarsDataFrameAdapter()
 
         lf = pl.LazyFrame({"a": [1, 2, 3]})
@@ -421,7 +421,7 @@ class TestPolarsDataLoading:
         assert len(df) == 3
 
     def test_collect_lazy_frame_with_streaming(self):
-        """Test collecting a LazyFrame when streaming mode is enabled."""
+
         adapter = PolarsDataFrameAdapter(streaming=True)
 
         df = adapter.collect(pl.LazyFrame({"a": [1, 2, 3]}))
@@ -430,7 +430,7 @@ class TestPolarsDataLoading:
         assert df["a"].to_list() == [1, 2, 3]
 
     def test_collect_eager_frame(self):
-        """Test collect on already eager DataFrame."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"a": [1, 2, 3]})
@@ -440,7 +440,7 @@ class TestPolarsDataLoading:
         assert len(result) == 3
 
     def test_get_row_count_dataframe(self):
-        """Test getting row count from DataFrame."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"a": [1, 2, 3, 4, 5]})
@@ -449,7 +449,7 @@ class TestPolarsDataLoading:
         assert count == 5
 
     def test_get_row_count_lazy_frame(self):
-        """Test getting row count from LazyFrame."""
+
         adapter = PolarsDataFrameAdapter()
 
         lf = pl.LazyFrame({"a": [1, 2, 3]})
@@ -458,7 +458,7 @@ class TestPolarsDataLoading:
         assert count == 3
 
     def test_concat_dataframes(self):
-        """Test concatenating DataFrames."""
+
         adapter = PolarsDataFrameAdapter()
 
         lf1 = pl.LazyFrame({"a": [1, 2]})
@@ -470,14 +470,14 @@ class TestPolarsDataLoading:
         assert len(df) == 4
 
     def test_union_all_requires_at_least_one_dataframe(self):
-        """Test union_all validates at least one input frame."""
+
         adapter = PolarsDataFrameAdapter()
 
         with pytest.raises(ValueError, match="At least one DataFrame required for union"):
             adapter.union_all()
 
     def test_union_all_single_dataframe_returns_same_frame(self):
-        """Test union_all returns the only input frame unchanged."""
+
         adapter = PolarsDataFrameAdapter()
         frame = pl.LazyFrame({"a": [1, 2]})
 
@@ -486,7 +486,7 @@ class TestPolarsDataLoading:
         assert result is frame
 
     def test_rename_columns(self):
-        """Test rename_columns operation."""
+
         adapter = PolarsDataFrameAdapter()
 
         result = adapter.rename_columns(pl.LazyFrame({"old_name": [1, 2]}), {"old_name": "new_name"}).collect()
@@ -494,7 +494,7 @@ class TestPolarsDataLoading:
         assert result.columns == ["new_name"]
 
     def test_get_first_row(self):
-        """Test getting first row."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"a": [1, 2], "b": ["x", "y"]})
@@ -503,7 +503,7 @@ class TestPolarsDataLoading:
         assert first == (1, "x")
 
     def test_get_first_row_empty(self):
-        """Test getting first row from empty DataFrame."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"a": [], "b": []})
@@ -517,7 +517,7 @@ class TestPolarsQueryExecution:
     """Tests for query execution with Polars."""
 
     def test_simple_select_query(self):
-        """Test executing a simple select query."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -548,7 +548,7 @@ class TestPolarsQueryExecution:
         assert result["rows_returned"] == 3
 
     def test_filter_query(self):
-        """Test executing a filter query."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -578,7 +578,7 @@ class TestPolarsQueryExecution:
         assert result["rows_returned"] == 2  # 150 and 200
 
     def test_groupby_query(self):
-        """Test executing a group by query."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -611,7 +611,7 @@ class TestPolarsQueryExecution:
         assert result["rows_returned"] == 2  # Two categories
 
     def test_join_query(self):
-        """Test executing a join query."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -651,7 +651,7 @@ class TestPolarsQueryExecution:
         assert result["rows_returned"] == 3
 
     def test_query_with_context_helpers(self):
-        """Test query using context expression helpers."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -686,7 +686,7 @@ class TestPolarsTableLoading:
     """Tests for table loading functionality."""
 
     def test_load_table_parquet(self, tmp_path):
-        """Test loading a table from Parquet."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -705,7 +705,7 @@ class TestPolarsTableLoading:
         assert row_count == 3
 
     def test_load_table_csv(self, tmp_path):
-        """Test loading a table from CSV."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -719,7 +719,7 @@ class TestPolarsTableLoading:
         assert row_count == 2
 
     def test_load_multiple_tables(self, tmp_path):
-        """Test loading multiple tables."""
+
         adapter = PolarsDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -740,7 +740,7 @@ class TestPolarsScalarExtraction:
     """Tests for Polars scalar extraction optimization."""
 
     def test_scalar_single_value_dataframe(self):
-        """Test scalar extraction from single-value DataFrame."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"value": [42]})
@@ -749,7 +749,7 @@ class TestPolarsScalarExtraction:
         assert result == 42
 
     def test_scalar_with_column_name(self):
-        """Test scalar extraction with explicit column name."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"a": [1], "b": [2], "c": [3]})
@@ -767,7 +767,7 @@ class TestPolarsScalarExtraction:
         assert result == 100
 
     def test_scalar_first_column_multicolumn_df(self):
-        """Test scalar extraction defaults to first column."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"first": [10], "second": [20]})
@@ -776,7 +776,7 @@ class TestPolarsScalarExtraction:
         assert result == 10
 
     def test_scalar_empty_dataframe_raises(self):
-        """Test that scalar extraction on empty DataFrame raises ValueError."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"value": []})
@@ -785,7 +785,7 @@ class TestPolarsScalarExtraction:
             adapter.scalar(df)
 
     def test_scalar_float_value(self):
-        """Test scalar extraction with float value."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"value": [3.14159]})
@@ -794,7 +794,7 @@ class TestPolarsScalarExtraction:
         assert result == pytest.approx(3.14159)
 
     def test_scalar_string_value(self):
-        """Test scalar extraction with string value."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = pl.DataFrame({"value": ["hello"]})
@@ -813,7 +813,7 @@ class TestPolarsScalarExtraction:
         assert result == 999
 
     def test_scalar_to_df(self):
-        """Test creating a single-row DataFrame from scalar values."""
+
         adapter = PolarsDataFrameAdapter()
 
         df = adapter.scalar_to_df({"total": 99, "label": "ok"})
@@ -848,7 +848,7 @@ class TestPolarsNotAvailable:
     """Tests for behavior when Polars is not installed."""
 
     def test_polars_available_flag(self):
-        """Test that POLARS_AVAILABLE flag is set correctly."""
+
         from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE
 
         # This just tests that the flag exists and is boolean

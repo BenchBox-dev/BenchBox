@@ -75,7 +75,7 @@ class TestDatabricksDataFrameAdapterInitialization:
     """Test DatabricksDataFrameAdapter initialization."""
 
     def test_initialization_success(self, mock_databricks_sql):
-        """Test successful adapter initialization."""
+
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -100,7 +100,7 @@ class TestDatabricksDataFrameAdapterInitialization:
             )
 
     def test_initialization_with_cluster_id(self, mock_databricks_sql):
-        """Test initialization with cluster ID for Databricks Connect."""
+
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -111,7 +111,7 @@ class TestDatabricksDataFrameAdapterInitialization:
         assert adapter.cluster_id == "0101-123456-abc123"
 
     def test_initialization_with_execution_mode(self, mock_databricks_sql):
-        """Test initialization with different execution modes."""
+
         # SQL mode
         adapter_sql = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
@@ -133,7 +133,7 @@ class TestDatabricksDataFrameAdapterInitialization:
             assert adapter_df.execution_mode == "sql"
 
     def test_inheritance_from_databricks_adapter(self, mock_databricks_sql):
-        """Test that DatabricksDataFrameAdapter inherits from DatabricksAdapter."""
+
         from benchbox.platforms.databricks import DatabricksAdapter
 
         adapter = DatabricksDataFrameAdapter(
@@ -198,7 +198,7 @@ class TestDatabricksDataFrameAdapterPlatformInfo:
     """Test DatabricksDataFrameAdapter platform info methods."""
 
     def test_platform_name_sql_mode(self, mock_databricks_sql):
-        """Test platform_name in SQL mode."""
+
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -267,7 +267,7 @@ class TestDatabricksDataFrameAdapterExpressionHelpers:
                 mock_lit.assert_called_once_with(42)
 
     def test_aggregation_expressions(self, mock_databricks_sql):
-        """Test aggregation expression helpers."""
+
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -365,7 +365,7 @@ class TestDatabricksDataFrameAdapterSparkSession:
     """Test Spark session management."""
 
     def test_spark_session_created_lazily(self, mock_databricks_sql):
-        """Test Spark session is created lazily."""
+
         adapter = DatabricksDataFrameAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -401,14 +401,14 @@ class TestDatabricksDataFrameAdapterRegistry:
     """Test platform registry integration."""
 
     def test_databricks_df_registered_in_platform_registry(self):
-        """Test databricks-df is registered in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         available = PlatformRegistry.get_available_platforms()
         assert "databricks-df" in available
 
     def test_databricks_df_metadata_correct(self):
-        """Test databricks-df metadata is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         info = PlatformRegistry.get_platform_info("databricks-df")
@@ -419,7 +419,7 @@ class TestDatabricksDataFrameAdapterRegistry:
         assert "dataframe" in info.supports
 
     def test_databricks_df_capabilities_correct(self):
-        """Test databricks-df capabilities are correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("databricks-df")
@@ -445,7 +445,7 @@ class TestDatabricksDataFrameAdapterIntegration:
     """Integration tests for DatabricksDataFrameAdapter."""
 
     def test_adapter_creates_with_from_config_factory(self, mock_databricks_sql):
-        """Test adapter can be created via platform registry factory."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         config = {

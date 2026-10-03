@@ -35,14 +35,14 @@ class TestMetadataCatalogLoader:
     """Test Metadata Primitives catalog loading functionality."""
 
     def test_load_catalog(self):
-        """Test that the catalog loads successfully."""
+
         catalog = load_metadata_catalog()
         assert isinstance(catalog, MetadataCatalog)
         assert catalog.version == 1
         assert len(catalog.queries) > 0
 
     def test_catalog_version(self):
-        """Test that catalog has correct version."""
+
         catalog = load_metadata_catalog()
         assert catalog.version == 1
 
@@ -58,7 +58,7 @@ class TestMetadataCatalogLoader:
             assert len(query.sql.strip()) > 0
 
     def test_catalog_categories(self):
-        """Test that expected categories exist."""
+
         catalog = load_metadata_catalog()
 
         categories = {q.category for q in catalog.queries.values()}
@@ -66,7 +66,7 @@ class TestMetadataCatalogLoader:
         assert expected_categories.issubset(categories)
 
     def test_query_variants(self):
-        """Test that query variants are properly structured."""
+
         catalog = load_metadata_catalog()
 
         # Find a query with variants
@@ -80,7 +80,7 @@ class TestMetadataCatalogLoader:
                 assert len(sql.strip()) > 0
 
     def test_query_skip_on(self):
-        """Test that skip_on lists are properly structured."""
+
         catalog = load_metadata_catalog()
 
         # Find queries with skip_on
@@ -106,19 +106,19 @@ class TestMetadataPrimitivesQueryManager:
     """Test Metadata Primitives query manager functionality."""
 
     def test_query_manager_initialization(self):
-        """Test query manager initializes correctly."""
+
         manager = MetadataPrimitivesQueryManager()
         queries = manager.get_all_queries()
         assert len(queries) > 0
         assert isinstance(queries, dict)
 
     def test_catalog_version(self):
-        """Test query manager exposes catalog version."""
+
         manager = MetadataPrimitivesQueryManager()
         assert manager.catalog_version == 1
 
     def test_get_query(self):
-        """Test getting individual queries."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # Test valid query
@@ -128,14 +128,14 @@ class TestMetadataPrimitivesQueryManager:
         assert "table_name" in query.lower()
 
     def test_get_query_invalid(self):
-        """Test error handling for invalid query IDs."""
+
         manager = MetadataPrimitivesQueryManager()
 
         with pytest.raises(ValueError, match="Invalid query ID"):
             manager.get_query("invalid_query_id")
 
     def test_get_query_with_dialect_variant(self):
-        """Test getting dialect-specific variants."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # schema_list_tables has a clickhouse variant
@@ -146,7 +146,7 @@ class TestMetadataPrimitivesQueryManager:
         assert "information_schema" in base_query.lower()
 
     def test_get_query_skip_on(self):
-        """Test that queries marked skip_on raise errors for skipped dialects."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # schema_list_views is skipped on clickhouse
@@ -204,7 +204,7 @@ class TestMetadataPrimitivesQueryManager:
                 manager.get_query(query_id, dialect="databricks")
 
     def test_get_query_entry(self):
-        """Test getting full query entry."""
+
         manager = MetadataPrimitivesQueryManager()
 
         entry = manager.get_query_entry("schema_list_tables")
@@ -213,7 +213,7 @@ class TestMetadataPrimitivesQueryManager:
         assert entry.category == "schema"
 
     def test_get_all_queries(self):
-        """Test getting all queries."""
+
         manager = MetadataPrimitivesQueryManager()
 
         queries = manager.get_all_queries()
@@ -222,7 +222,7 @@ class TestMetadataPrimitivesQueryManager:
         assert all(isinstance(v, str) for v in queries.values())
 
     def test_query_categories(self):
-        """Test query category functionality."""
+
         manager = MetadataPrimitivesQueryManager()
 
         categories = manager.get_query_categories()
@@ -232,7 +232,7 @@ class TestMetadataPrimitivesQueryManager:
         assert "query" in categories
 
     def test_get_queries_by_category(self):
-        """Test getting queries filtered by category."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # Test schema category
@@ -250,7 +250,7 @@ class TestMetadataPrimitivesQueryManager:
         assert len(empty_queries) == 0
 
     def test_get_queries_for_dialect(self):
-        """Test getting all queries for a specific dialect."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # Test DuckDB (should include most queries)
@@ -269,30 +269,30 @@ class TestMetadataPrimitivesBenchmark:
     """Test Metadata Primitives benchmark functionality."""
 
     def test_benchmark_initialization(self):
-        """Test benchmark initializes correctly."""
+
         benchmark = MetadataPrimitivesBenchmark()
         assert benchmark._name == "Metadata Primitives Benchmark"
         assert benchmark._version == "1.0"
         assert benchmark.query_manager is not None
 
     def test_benchmark_with_scale_factor(self):
-        """Test benchmark accepts scale_factor for API compatibility."""
+
         benchmark = MetadataPrimitivesBenchmark(scale_factor=0.1)
         assert benchmark.scale_factor == 0.1
 
     def test_data_source_none(self):
-        """Test that metadata primitives doesn't require data generation."""
+
         benchmark = MetadataPrimitivesBenchmark()
         assert benchmark.get_data_source_benchmark() is None
 
     def test_generate_data_empty(self):
-        """Test that generate_data returns empty dict."""
+
         benchmark = MetadataPrimitivesBenchmark()
         result = benchmark.generate_data()
         assert result == {}
 
     def test_get_query(self):
-        """Test getting queries from benchmark."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         # Test getting individual query
@@ -301,14 +301,14 @@ class TestMetadataPrimitivesBenchmark:
         assert "SELECT" in query.upper()
 
     def test_get_query_with_params_error(self):
-        """Test that params are not supported."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         with pytest.raises(ValueError, match="don't accept parameters"):
             benchmark.get_query("schema_list_tables", params={"foo": "bar"})
 
     def test_get_queries(self):
-        """Test getting all queries."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         queries = benchmark.get_queries()
@@ -316,7 +316,7 @@ class TestMetadataPrimitivesBenchmark:
         assert len(queries) > 0
 
     def test_get_queries_with_dialect(self):
-        """Test getting queries for specific dialect."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         # Should filter out unsupported queries
@@ -324,7 +324,7 @@ class TestMetadataPrimitivesBenchmark:
         assert "schema_list_views" not in clickhouse_queries
 
     def test_get_queries_by_category(self):
-        """Test getting queries by category."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         schema_queries = benchmark.get_queries_by_category("schema")
@@ -334,7 +334,7 @@ class TestMetadataPrimitivesBenchmark:
         assert len(column_queries) > 0
 
     def test_get_query_categories(self):
-        """Test getting list of categories."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         categories = benchmark.get_query_categories()
@@ -344,7 +344,7 @@ class TestMetadataPrimitivesBenchmark:
         assert "query" in categories
 
     def test_invalid_query(self):
-        """Test error handling for invalid queries."""
+
         benchmark = MetadataPrimitivesBenchmark()
 
         with pytest.raises(ValueError, match="Invalid query ID"):
@@ -356,7 +356,7 @@ class TestMetadataQueryResult:
     """Test MetadataQueryResult dataclass."""
 
     def test_result_creation(self):
-        """Test creating a result object."""
+
         result = MetadataQueryResult(
             query_id="schema_list_tables",
             category="schema",
@@ -372,7 +372,7 @@ class TestMetadataQueryResult:
         assert result.error is None
 
     def test_result_with_error(self):
-        """Test creating a result with error."""
+
         result = MetadataQueryResult(
             query_id="schema_list_tables",
             category="schema",
@@ -390,7 +390,7 @@ class TestMetadataBenchmarkResult:
     """Test MetadataBenchmarkResult dataclass."""
 
     def test_result_creation(self):
-        """Test creating a benchmark result object."""
+
         result = MetadataBenchmarkResult()
         assert result.total_queries == 0
         assert result.successful_queries == 0
@@ -400,7 +400,7 @@ class TestMetadataBenchmarkResult:
         assert result.category_summary == {}
 
     def test_result_with_data(self):
-        """Test benchmark result with populated data."""
+
         query_results = [
             MetadataQueryResult(
                 query_id="q1",
@@ -441,7 +441,7 @@ class TestQueryContentValidation:
     """Test that queries contain expected SQL content."""
 
     def test_schema_queries_content(self):
-        """Test schema discovery queries have expected content."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # List tables query should reference information_schema.tables
@@ -450,7 +450,7 @@ class TestQueryContentValidation:
         assert "table_type" in query.lower()
 
     def test_column_queries_content(self):
-        """Test column introspection queries have expected content."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # Column list query should reference columns
@@ -459,7 +459,7 @@ class TestQueryContentValidation:
         assert "data_type" in query.lower()
 
     def test_stats_queries_content(self):
-        """Test statistics queries have expected content."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # Stats query should aggregate counts
@@ -467,7 +467,7 @@ class TestQueryContentValidation:
         assert "count" in query.lower()
 
     def test_query_introspection_content(self):
-        """Test query introspection queries have expected content."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # Explain query should have EXPLAIN
@@ -480,7 +480,7 @@ class TestDialectVariants:
     """Test dialect-specific query variants."""
 
     def test_clickhouse_variants_use_system_tables(self):
-        """Test ClickHouse variants use system.* tables."""
+
         manager = MetadataPrimitivesQueryManager()
 
         clickhouse_queries = manager.get_queries_for_dialect("clickhouse")
@@ -494,7 +494,7 @@ class TestDialectVariants:
         assert has_system_tables
 
     def test_duckdb_variants(self):
-        """Test DuckDB-specific variants."""
+
         manager = MetadataPrimitivesQueryManager()
 
         # schema_list_views has a DuckDB variant using duckdb_views()
@@ -502,7 +502,7 @@ class TestDialectVariants:
         assert "duckdb_views()" in duckdb_query
 
     def test_base_query_unchanged_without_variant(self):
-        """Test base query returned when no variant exists."""
+
         manager = MetadataPrimitivesQueryManager()
 
         base_query = manager.get_query("schema_list_schemata")

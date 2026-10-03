@@ -30,14 +30,14 @@ class TestDataVaultSchema:
     """Tests for Data Vault schema definitions."""
 
     def test_table_collections_not_empty(self):
-        """Verify table collections are populated."""
+
         assert len(HUBS) > 0, "Should have at least one Hub table"
         assert len(LINKS) > 0, "Should have at least one Link table"
         assert len(SATELLITES) > 0, "Should have at least one Satellite table"
         assert len(TABLES) > 0, "Should have at least one table"
 
     def test_tables_sum_equals_total(self):
-        """Verify TABLES contains exactly the union of HUBS, LINKS, and SATELLITES."""
+
         combined = set(HUBS) | set(LINKS) | set(SATELLITES)
         assert set(TABLES) == combined, "TABLES should equal HUBS + LINKS + SATELLITES"
 

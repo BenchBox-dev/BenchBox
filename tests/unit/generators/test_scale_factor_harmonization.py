@@ -129,7 +129,7 @@ def test_tsbs_devops_scales_linearly_not_quadratically():
 
 
 def test_tsbs_devops_duration_fixed_at_large_sf():
-    """Verify duration_days does not scale with SF."""
+
     for sf in [1, 10, 100]:
         g = TSBSDevOpsDataGenerator(scale_factor=sf)
         assert g.duration_days == DEFAULT_DURATION_DAYS, (
@@ -138,7 +138,7 @@ def test_tsbs_devops_duration_fixed_at_large_sf():
 
 
 def test_flightdata_warns_at_corpus_ceiling(caplog):
-    """Verify FlightData logs a warning when BTS corpus is exhausted."""
+
     import logging
 
     from benchbox.core.flightdata.downloader import FlightDataDownloader
@@ -152,7 +152,7 @@ def test_flightdata_warns_at_corpus_ceiling(caplog):
 
 
 def test_flightdata_no_warning_below_ceiling(caplog):
-    """Verify FlightData does NOT warn at normal scale factors."""
+
     import logging
 
     from benchbox.core.flightdata.downloader import FlightDataDownloader
@@ -191,7 +191,7 @@ def test_nyctaxi_warns_at_sample_rate_saturation(caplog):
 
 
 def test_nyctaxi_no_warning_below_saturation(caplog):
-    """Verify NYC Taxi does NOT warn at normal scale factors."""
+
     import logging
 
     from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader

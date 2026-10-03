@@ -287,10 +287,9 @@ class TestPlatformConfigBuilders:
         return Mock(display_name="Test Platform", driver_package="test-driver")
 
     def test_bigquery_config_builder_loads_credentials(self, mock_credential_manager):
-        """Test BigQuery config builder loads and merges credentials."""
+
         from benchbox.platforms.bigquery import _build_bigquery_config
 
-        # Mock saved credentials
         mock_credential_manager.get_platform_credentials.return_value = {
             "project_id": "saved-project",
             "dataset_id": "saved-dataset",
@@ -312,7 +311,6 @@ class TestPlatformConfigBuilders:
         # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("bigquery")
 
-        # Verify result is DatabaseConfig
         assert isinstance(config, DatabaseConfig)
         assert config.type == "bigquery"
         assert config.name == "BigQuery"
@@ -325,7 +323,7 @@ class TestPlatformConfigBuilders:
         assert config.options["credentials_path"] == "/saved/path/creds.json"  # from saved
 
     def test_bigquery_config_builder_no_saved_credentials(self, mock_credential_manager):
-        """Test BigQuery config builder works with no saved credentials."""
+
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         # No saved credentials
@@ -342,7 +340,7 @@ class TestPlatformConfigBuilders:
         assert config.options["dataset_id"] == "cli-dataset"
 
     def test_bigquery_config_builder_fallback_display_name(self, mock_credential_manager):
-        """Test BigQuery config builder uses fallback when info is None."""
+
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_credential_manager.get_platform_credentials.return_value = {}
@@ -353,10 +351,9 @@ class TestPlatformConfigBuilders:
         assert config.driver_package == "google-cloud-bigquery"
 
     def test_snowflake_config_builder_loads_credentials(self, mock_credential_manager):
-        """Test Snowflake config builder loads and merges credentials."""
+
         from benchbox.platforms.snowflake import _build_snowflake_config
 
-        # Mock saved credentials
         mock_credential_manager.get_platform_credentials.return_value = {
             "account": "saved-account",
             "username": "saved-user",
@@ -379,7 +376,6 @@ class TestPlatformConfigBuilders:
         # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("snowflake")
 
-        # Verify result is DatabaseConfig
         assert isinstance(config, DatabaseConfig)
         assert config.type == "snowflake"
         assert config.name == "Snowflake"
@@ -393,7 +389,7 @@ class TestPlatformConfigBuilders:
         assert config.options["database"] == "override-db"  # from overrides (highest priority)
 
     def test_snowflake_config_builder_no_saved_credentials(self, mock_credential_manager):
-        """Test Snowflake config builder works with no saved credentials."""
+
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         mock_credential_manager.get_platform_credentials.return_value = None
@@ -410,7 +406,7 @@ class TestPlatformConfigBuilders:
         assert config.options["password"] == "cli-pass"
 
     def test_snowflake_config_builder_fallback_display_name(self, mock_credential_manager):
-        """Test Snowflake config builder uses fallback when info is None."""
+
         from benchbox.platforms.snowflake import _build_snowflake_config
 
         mock_credential_manager.get_platform_credentials.return_value = {}
@@ -436,10 +432,9 @@ class TestPlatformConfigBuilders:
         assert config.options["edition"] == "enterprise"
 
     def test_redshift_config_builder_loads_credentials(self, mock_credential_manager):
-        """Test Redshift config builder loads and merges credentials."""
+
         from benchbox.platforms.redshift import _build_redshift_config
 
-        # Mock saved credentials
         mock_credential_manager.get_platform_credentials.return_value = {
             "host": "saved-host.redshift.amazonaws.com",
             "username": "saved-user",
@@ -462,7 +457,6 @@ class TestPlatformConfigBuilders:
         # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("redshift")
 
-        # Verify result is DatabaseConfig
         assert isinstance(config, DatabaseConfig)
         assert config.type == "redshift"
         assert config.name == "Redshift"
@@ -476,7 +470,7 @@ class TestPlatformConfigBuilders:
         assert config.options["port"] == 5440  # from overrides (highest priority)
 
     def test_redshift_config_builder_no_saved_credentials(self, mock_credential_manager):
-        """Test Redshift config builder works with no saved credentials."""
+
         from benchbox.platforms.redshift import _build_redshift_config
 
         mock_credential_manager.get_platform_credentials.return_value = None
@@ -493,7 +487,7 @@ class TestPlatformConfigBuilders:
         assert config.options["password"] == "cli-pass"
 
     def test_redshift_config_builder_fallback_display_name(self, mock_credential_manager):
-        """Test Redshift config builder uses fallback when info is None."""
+
         from benchbox.platforms.redshift import _build_redshift_config
 
         mock_credential_manager.get_platform_credentials.return_value = {}
@@ -504,10 +498,9 @@ class TestPlatformConfigBuilders:
         assert config.driver_package == "redshift-connector"
 
     def test_databricks_config_builder_loads_credentials(self, mock_credential_manager):
-        """Test Databricks config builder loads and merges credentials."""
+
         from benchbox.platforms.databricks import _build_databricks_config
 
-        # Mock saved credentials
         mock_credential_manager.get_platform_credentials.return_value = {
             "server_hostname": "saved-host.databricks.com",
             "http_path": "/sql/1.0/saved",
@@ -530,7 +523,6 @@ class TestPlatformConfigBuilders:
         # Verify credential loading was called
         mock_credential_manager.get_platform_credentials.assert_called_once_with("databricks")
 
-        # Verify result is DatabaseConfig
         assert isinstance(config, DatabaseConfig)
         assert config.type == "databricks"
         assert config.name == "Databricks"
@@ -544,7 +536,7 @@ class TestPlatformConfigBuilders:
         assert config.options["schema"] == "override-schema"  # from overrides (highest priority)
 
     def test_databricks_config_builder_no_saved_credentials(self, mock_credential_manager):
-        """Test Databricks config builder works with no saved credentials."""
+
         from benchbox.platforms.databricks import _build_databricks_config
 
         mock_credential_manager.get_platform_credentials.return_value = None
@@ -565,7 +557,7 @@ class TestPlatformConfigBuilders:
         assert config.options["access_token"] == "cli-token"
 
     def test_databricks_config_builder_fallback_display_name(self, mock_credential_manager):
-        """Test Databricks config builder uses fallback when info is None."""
+
         from benchbox.platforms.databricks import _build_databricks_config
 
         mock_credential_manager.get_platform_credentials.return_value = {}
@@ -576,7 +568,7 @@ class TestPlatformConfigBuilders:
         assert config.driver_package == "databricks-sql-connector"
 
     def test_config_builder_functions_exist(self):
-        """Test that config builder functions are defined in platform modules."""
+
         # This test verifies the functions exist, not that they're registered
         # (registration requires platform dependencies to be available)
 

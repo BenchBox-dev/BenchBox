@@ -29,7 +29,7 @@ class TestVerboseLogging:
     """Test verbose logging setup and configuration."""
 
     def test_setup_verbose_logging_enabled(self):
-        """Test verbose logging setup when enabled."""
+
         logger, settings = setup_verbose_logging(verbose=True)
 
         # Verify logger is returned and configured
@@ -42,7 +42,7 @@ class TestVerboseLogging:
         assert root_logger.level <= logging.DEBUG
 
     def test_setup_verbose_logging_disabled(self):
-        """Test verbose logging setup when disabled."""
+
         logger, settings = setup_verbose_logging(verbose=False)
 
         # When verbose is False, the function returns None (expected behavior)
@@ -51,7 +51,7 @@ class TestVerboseLogging:
         assert settings.level == 0
 
     def test_verbose_logging_third_party_suppression(self):
-        """Test that third-party loggers are properly suppressed in verbose mode."""
+
         setup_verbose_logging(verbose=True)
 
         # Check that third-party loggers are set to appropriate levels
@@ -64,7 +64,7 @@ class TestVerboseLogging:
         assert sqlalchemy_logger.level >= logging.INFO
 
     def test_verbose_logging_function_exists(self):
-        """Test that verbose logging function exists and is callable."""
+
         assert callable(setup_verbose_logging)
 
         # Test that function handles both verbose states
@@ -96,7 +96,7 @@ class TestCLIVerboseMode:
     @patch("benchbox.cli.main.ConfigManager")
     @patch("benchbox.cli.orchestrator.BenchmarkOrchestrator")
     def test_verbose_flag_short_form(self, mock_orchestrator, mock_config_manager):
-        """Test that -v flag enables verbose logging."""
+
         mock_config = Mock()
         mock_config.config_path = "test_config.yaml"
         mock_config.validate_config.return_value = True
@@ -114,7 +114,7 @@ class TestCLIVerboseMode:
     @patch("benchbox.cli.main.ConfigManager")
     @patch("benchbox.cli.orchestrator.BenchmarkOrchestrator")
     def test_verbose_flag_long_form(self, mock_orchestrator, mock_config_manager):
-        """Test that --verbose flag enables verbose logging."""
+
         mock_config = Mock()
         mock_config.config_path = "test_config.yaml"
         mock_config.validate_config.return_value = True
@@ -130,7 +130,7 @@ class TestCLIVerboseMode:
         assert result.exit_code in [0, 1]  # May exit with 1 due to mocking
 
     def test_verbose_without_flag_help_works(self):
-        """Test that help works without verbose flag."""
+
         result = self.runner.invoke(run, ["--help"])
 
         # Check that help was displayed successfully
@@ -150,8 +150,7 @@ class TestVerboseModeIntegration:
     """Test verbose mode integration with different components."""
 
     def test_verbose_logging_infrastructure_works(self):
-        """Test that verbose logging infrastructure is working."""
-        # Setup verbose logging
+
         logger, settings = setup_verbose_logging(verbose=True)
 
         # Test that debug logging infrastructure works
@@ -159,7 +158,7 @@ class TestVerboseModeIntegration:
         assert settings.verbose_enabled is True
 
     def test_verbose_logging_with_different_loggers(self):
-        """Test that verbose logging works with various logger names."""
+
         setup_verbose_logging(verbose=True)
 
         # Test various BenchBox loggers
@@ -187,7 +186,7 @@ class TestVerboseModeExamples:
     @patch("benchbox.cli.main.ConfigManager")
     @patch("benchbox.cli.orchestrator.BenchmarkOrchestrator")
     def test_verbose_with_database_and_benchmark_flags(self, mock_orchestrator, mock_config_manager):
-        """Test verbose mode with database and benchmark flags."""
+
         mock_config = Mock()
         mock_config.config_path = "test_config.yaml"
         mock_config.validate_config.return_value = True
@@ -215,7 +214,7 @@ class TestVerboseModeExamples:
     @patch("benchbox.cli.main.ConfigManager")
     @patch("benchbox.cli.orchestrator.BenchmarkOrchestrator")
     def test_verbose_short_flag_with_options(self, mock_orchestrator, mock_config_manager):
-        """Test verbose short flag with various options."""
+
         mock_config = Mock()
         mock_config.config_path = "test_config.yaml"
         mock_config.validate_config.return_value = True
@@ -247,7 +246,7 @@ class TestVerboseLoggingCoverage:
     """Test verbose logging coverage across different scenarios."""
 
     def test_verbose_logging_infrastructure_complete(self):
-        """Test that verbose logging infrastructure is complete."""
+
         # Verify that setup_verbose_logging function exists and is callable
         assert callable(setup_verbose_logging)
 
@@ -262,7 +261,7 @@ class TestVerboseLoggingCoverage:
         assert normal_settings.verbose_enabled is False
 
     def test_verbose_mode_help_text_includes_examples(self):
-        """Test that CLI help includes verbose mode option."""
+
         runner = CliRunner()
         result = runner.invoke(run, ["--help"])
 
@@ -273,7 +272,7 @@ class TestVerboseLoggingCoverage:
         assert "Verbose output" in result.output or "verbose" in result.output.lower()
 
     def test_verbose_logging_with_different_levels(self):
-        """Test verbose logging with different logging levels."""
+
         # Test verbose enabled
         logger_verbose, verbose_settings = setup_verbose_logging(verbose=True)
         assert logger_verbose is not None
@@ -291,7 +290,7 @@ class TestVerboseLoggingCoverage:
         assert callable(logger_verbose.error)
 
     def test_setup_verbose_logging_return_values(self):
-        """Test that setup_verbose_logging returns appropriate values."""
+
         # Test verbose mode returns logger, non-verbose returns None
         verbose_logger, verbose_settings = setup_verbose_logging(verbose=True)
         normal_logger, normal_settings = setup_verbose_logging(verbose=False)
@@ -309,7 +308,7 @@ class TestVerboseLoggingCoverage:
         assert hasattr(verbose_logger, "error")
 
     def test_verbose_logging_repeated_calls(self):
-        """Test that repeated calls to setup_verbose_logging work correctly."""
+
         # Multiple calls should work without issues
         logger1, settings1 = setup_verbose_logging(verbose=True)
         logger2, settings2 = setup_verbose_logging(verbose=False)

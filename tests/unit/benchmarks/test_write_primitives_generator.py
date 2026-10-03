@@ -122,7 +122,7 @@ class TestFileLocking:
     """Tests for file locking mechanisms during bulk load generation."""
 
     def test_lock_prevents_concurrent_generation(self):
-        """Test that file locking prevents concurrent bulk load file generation."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -145,7 +145,7 @@ class TestFileLocking:
                 gen1._release_bulk_load_lock()
 
     def test_lock_is_released_after_generation(self):
-        """Test that lock file is properly removed after generation completes."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -162,7 +162,7 @@ class TestFileLocking:
             assert not lock_file.exists()
 
     def test_lock_contains_pid(self):
-        """Test that lock file contains the process ID."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -190,7 +190,7 @@ class TestFileLocking:
                 gen._release_bulk_load_lock()
 
     def test_stale_lock_detection_by_pid(self):
-        """Test that stale locks are detected when process is not running."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             files_dir = output_dir / "write_primitives_auxiliary"
@@ -241,7 +241,7 @@ class TestFileLocking:
             gen._release_bulk_load_lock()
 
     def test_process_liveness_check(self):
-        """Test that process liveness check works correctly."""
+
         gen = WritePrimitivesDataGenerator(scale_factor=0.01, verbose=False)
 
         # Current process should be running
@@ -257,7 +257,7 @@ class TestScaleFactorValidation:
     """Tests for scale factor validation of bulk load files."""
 
     def test_files_reused_when_scale_factor_matches(self):
-        """Test that bulk load files are reused when scale factor matches."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -285,7 +285,7 @@ class TestScaleFactorValidation:
             assert test_file.stat().st_mtime == frozen_mtime
 
     def test_files_regenerated_when_scale_factor_changes(self):
-        """Test that bulk load files are regenerated when scale factor changes."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -319,7 +319,7 @@ class TestScaleFactorValidation:
             assert metadata["scale_factor"] == 0.02
 
     def test_metadata_file_written_correctly(self):
-        """Test that metadata file is written with correct information."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -414,7 +414,7 @@ class TestSmallDatasetHandling:
             assert len(lines) > 1  # Header + at least some data rows
 
     def test_all_parallel_parts_have_roughly_equal_rows(self):
-        """Test that parallel parts have roughly equal row distribution."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -462,7 +462,7 @@ class TestConcurrentGeneration:
     """Tests for concurrent bulk load file generation scenarios."""
 
     def test_double_check_locking_pattern(self):
-        """Test that double-check locking prevents redundant generation."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -490,7 +490,7 @@ class TestConcurrentGeneration:
             assert test_file.stat().st_mtime == frozen_mtime
 
     def test_force_regenerate_bypasses_existing_files(self):
-        """Test that force_regenerate regenerates files even if they exist."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -523,7 +523,7 @@ class TestErrorHandling:
     """Tests for error handling edge cases."""
 
     def test_corrupted_metadata_file_handled_gracefully(self):
-        """Test that corrupted metadata file doesn't crash generation."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             files_dir = output_dir / "write_primitives_auxiliary"
@@ -545,7 +545,7 @@ class TestErrorHandling:
             assert (files_dir / "csv_small_1k.csv").exists()
 
     def test_missing_metadata_file_handled_gracefully(self):
-        """Test that missing metadata file doesn't prevent file reuse."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -568,7 +568,7 @@ class TestErrorHandling:
             assert isinstance(result, bool)
 
     def test_no_tpch_data_skips_bulk_load_generation(self):
-        """Test that bulk load generation is skipped when no TPC-H data exists."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
 
@@ -580,7 +580,7 @@ class TestErrorHandling:
             assert files == {}
 
     def test_lock_timeout_returns_false(self):
-        """Test that lock acquisition timeout returns False."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
             files_dir = output_dir / "write_primitives_auxiliary"

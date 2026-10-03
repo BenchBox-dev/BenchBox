@@ -35,7 +35,7 @@ class TestTPCDSMaintenanceTestIntegration:
     """Integration tests for TPC-DS Maintenance Test."""
 
     def test_maintenance_test_config_creation(self):
-        """Test creating maintenance test configuration."""
+
         config = MaintenanceTestConfig(
             concurrent_streams=2,
             maintenance_interval=10.0,
@@ -49,7 +49,7 @@ class TestTPCDSMaintenanceTestIntegration:
         assert config.verbose is True
 
     def test_maintenance_test_initialization(self):
-        """Test maintenance test initialization."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
         def connection_factory():
@@ -68,7 +68,7 @@ class TestTPCDSMaintenanceTestIntegration:
         assert maintenance_test.verbose is True
 
     def test_maintenance_operations_initialization(self):
-        """Test maintenance operations initialization."""
+
         operations = MaintenanceOperations()
 
         assert operations.connection is None
@@ -81,7 +81,7 @@ class TestTPCDSMaintenanceTestIntegration:
             assert op_type in operations.operation_handlers
 
     def test_benchmark_run_maintenance_test_basic(self):
-        """Test basic maintenance test execution through benchmark."""
+
         # Setup mock connection factory
         mock_connection = Mock()
         Mock(return_value=mock_connection)
@@ -115,13 +115,12 @@ class TestTPCDSMaintenanceTestIntegration:
             mock_connection = Mock()
             result = benchmark.run_maintenance_test(connection=mock_connection, config=config)
 
-            # Verify result
             assert isinstance(result, MaintenanceTestResult)
             assert result.test_duration > 0
             # Note: The test may fail with connection errors for mock connections, which is expected
 
     def test_benchmark_run_maintenance_test_validation(self):
-        """Test maintenance test input validation."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
         # Test invalid connection object - API now expects connection object, not string
@@ -130,7 +129,7 @@ class TestTPCDSMaintenanceTestIntegration:
             benchmark.run_maintenance_test(None)
 
     def test_benchmark_validate_data_integrity(self):
-        """Test data integrity validation."""
+
         # benchmark instance
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
@@ -142,7 +141,7 @@ class TestTPCDSMaintenanceTestIntegration:
         # For now, just verify the method exists
 
     def test_maintenance_operations_type_enum(self):
-        """Test maintenance operation type enumeration."""
+
         # Test all operation types exist
         expected_operations = [
             "INSERT_STORE_SALES",
@@ -166,7 +165,7 @@ class TestTPCDSMaintenanceTestIntegration:
             assert expected in actual_operations
 
     def test_maintenance_test_concurrent_execution(self):
-        """Test concurrent execution of maintenance operations."""
+
         # maintenance test with concurrent streams
         MaintenanceTestConfig(
             concurrent_streams=2,
@@ -189,7 +188,7 @@ class TestTPCDSMaintenanceTestIntegration:
         assert maintenance_test.scale_factor >= 1.0
 
     def test_maintenance_test_result_metrics_calculation(self):
-        """Test maintenance test result metrics calculation."""
+
         # test result with mock metrics
         result = MaintenanceTestResult(test_duration=10.0, total_operations=3, successful_operations=2)
 
@@ -237,7 +236,7 @@ class TestTPCDSMaintenanceTestIntegration:
         assert len(result.maintenance_operations) == 3
 
     def test_maintenance_operations_data_generation(self):
-        """Test maintenance operations data generation helpers."""
+
         operations = MaintenanceOperations()
 
         # Test store sales row generation
@@ -266,7 +265,7 @@ class TestTPCDSMaintenanceTestIntegration:
         assert len(web_returns_row) == 24  # All columns for web_returns
 
     def test_maintenance_test_error_handling(self):
-        """Test maintenance test error handling."""
+
         MaintenanceTestConfig(scale_factor=1.0, verbose=False)
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
@@ -284,7 +283,7 @@ class TestTPCDSMaintenanceTestIntegration:
         # For now, just verify the interface exists
 
     def test_maintenance_test_report_generation(self):
-        """Test maintenance test report generation."""
+
         MaintenanceTestConfig(scale_factor=1.0)
         benchmark = TPCDSBenchmark(scale_factor=1.0)
 
@@ -315,7 +314,7 @@ class TestTPCDSMaintenanceTestIntegration:
         assert len(result.maintenance_operations) == 1
 
     def test_benchmark_info_includes_maintenance_test(self):
-        """Test that benchmark info includes maintenance test support."""
+
         benchmark = TPCDSBenchmark(scale_factor=1.0)
         info = benchmark.get_benchmark_info()
 
@@ -329,7 +328,7 @@ class TestTPCDSMaintenanceTestPerformance:
     """Performance tests for TPC-DS Maintenance Test."""
 
     def test_maintenance_test_timeout_handling(self):
-        """Test maintenance test timeout handling."""
+
         MaintenanceTestConfig(
             scale_factor=1.0,
             verbose=False,
@@ -348,7 +347,7 @@ class TestTPCDSMaintenanceTestPerformance:
         assert maintenance_test.connection_factory == connection_factory
 
     def test_maintenance_operations_throughput_calculation(self):
-        """Test throughput calculation for maintenance operations."""
+
         from benchbox.core.tpcds.maintenance_test import TPCDSMaintenanceOperation
 
         # Test basic operation creation
@@ -385,7 +384,7 @@ class TestTPCDSMaintenanceTestDatabaseIntegration:
         Path(f.name).unlink(missing_ok=True)
 
     def test_maintenance_test_with_real_database(self, temp_db_path):
-        """Test maintenance test with real database connection."""
+
         # This test uses a temporary SQLite database for integration testing
 
         benchmark = TPCDSBenchmark(scale_factor=1.0)  # Very small scale

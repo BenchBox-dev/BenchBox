@@ -65,7 +65,7 @@ class TestLargePlans:
         assert self._count_operators(plan.logical_root) >= 50
 
     def test_serialize_large_plan(self) -> None:
-        """Test serialization of large plan."""
+
         explain = self._create_deep_duckdb_plan(100)
         parser = DuckDBQueryPlanParser()
         plan = parser.parse_explain_output("test_serial", explain)
@@ -80,7 +80,7 @@ class TestLargePlans:
         assert restored.query_id == plan.query_id
 
     def test_large_plan_fingerprint_computed(self) -> None:
-        """Test that large plans get fingerprints computed."""
+
         explain = self._create_deep_duckdb_plan(100)
         parser = DuckDBQueryPlanParser()
         plan = parser.parse_explain_output("test_fp", explain)
@@ -129,7 +129,7 @@ class TestWideUnionPlans:
         assert plan is None, "Text UNION plans should be rejected (branching cannot be parsed)"
 
     def test_union_with_20_branches(self) -> None:
-        """Test that text UNION plans with many branches are correctly rejected."""
+
         explain = self._create_wide_union_plan(20)
         parser = DuckDBQueryPlanParser()
         plan = parser.parse_explain_output("test_wide_20", explain)
@@ -142,7 +142,7 @@ class TestSpecialCharacters:
     """Test plans with special characters in identifiers."""
 
     def test_table_name_with_underscore(self) -> None:
-        """Test table names with underscores."""
+
         explain = """
 ┌───────────────────────────┐
 │         SEQ_SCAN          │
@@ -157,7 +157,7 @@ class TestSpecialCharacters:
         assert plan.logical_root.operator_type == LogicalOperatorType.SCAN
 
     def test_postgresql_json_with_special_chars(self) -> None:
-        """Test PostgreSQL parser handles special characters in JSON."""
+
         explain = """[{
             "Plan": {
                 "Node Type": "Seq Scan",
@@ -182,7 +182,7 @@ class TestParserThreadSafety:
     """Test that parsers are thread-safe."""
 
     def test_duckdb_parser_thread_safety(self) -> None:
-        """Test DuckDB parser can handle concurrent parse calls."""
+
         explain = """
 ┌───────────────────────────┐
 │         PROJECTION        │
@@ -227,7 +227,7 @@ class TestParserThreadSafety:
             assert plan.logical_root is not None
 
     def test_concurrent_futures_parser_safety(self) -> None:
-        """Test parser with concurrent.futures ThreadPoolExecutor."""
+
         explain = """
 ┌───────────────────────────┐
 │         FILTER            │
@@ -255,7 +255,7 @@ class TestParserThreadSafety:
         assert len(set(query_ids)) == 10
 
     def test_postgresql_parser_thread_safety(self) -> None:
-        """Test PostgreSQL parser is thread-safe."""
+
         explain = """[{
             "Plan": {
                 "Node Type": "Seq Scan",
@@ -283,7 +283,7 @@ class TestOperatorIdReset:
     """Test that operator IDs reset correctly between parses."""
 
     def test_operator_id_resets_between_parses_duckdb(self) -> None:
-        """Test DuckDB parser resets operator ID counter per parse."""
+
         explain = """
 ┌───────────────────────────┐
 │         SEQ_SCAN          │
@@ -306,7 +306,7 @@ class TestOperatorIdReset:
         assert plan2.logical_root.operator_id == plan3.logical_root.operator_id
 
     def test_operator_id_resets_between_parses_postgresql(self) -> None:
-        """Test PostgreSQL parser resets operator ID counter per parse."""
+
         explain = """[{
             "Plan": {
                 "Node Type": "Seq Scan",
@@ -332,25 +332,25 @@ class TestEmptyAndInvalidInput:
     """Test handling of empty and invalid inputs."""
 
     def test_empty_string_returns_none(self) -> None:
-        """Test empty string returns None."""
+
         parser = DuckDBQueryPlanParser()
         result = parser.parse_explain_output("empty", "")
         assert result is None
 
     def test_whitespace_only_returns_none(self) -> None:
-        """Test whitespace-only string returns None."""
+
         parser = DuckDBQueryPlanParser()
         result = parser.parse_explain_output("whitespace", "   \n\n   ")
         assert result is None
 
     def test_invalid_json_postgresql_returns_none(self) -> None:
-        """Test invalid JSON for PostgreSQL returns None."""
+
         parser = PostgreSQLQueryPlanParser()
         result = parser.parse_explain_output("invalid", "not valid json {}")
         assert result is None
 
     def test_no_plan_key_postgresql_returns_none(self) -> None:
-        """Test PostgreSQL JSON without Plan key returns None."""
+
         parser = PostgreSQLQueryPlanParser()
         result = parser.parse_explain_output("no_plan", '[{"NotPlan": {}}]')
         assert result is None

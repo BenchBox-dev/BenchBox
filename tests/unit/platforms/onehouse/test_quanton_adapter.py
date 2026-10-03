@@ -26,7 +26,7 @@ class TestQuantonAdapterInitialization:
     """Test QuantonAdapter initialization."""
 
     def test_missing_api_key_raises_error(self):
-        """Test error when api_key is not provided."""
+
         with (
             patch.dict("os.environ", {}, clear=True),
         ):
@@ -57,7 +57,7 @@ class TestQuantonAdapterInitialization:
             )
 
     def test_invalid_table_format_raises_error(self):
-        """Test error when invalid table format is provided."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -73,7 +73,7 @@ class TestQuantonAdapterInitialization:
                 )
 
     def test_valid_configuration(self):
-        """Test valid configuration creates adapter correctly."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -98,7 +98,7 @@ class TestQuantonAdapterInitialization:
             assert adapter.cluster_size == "medium"
 
     def test_api_key_from_environment(self):
-        """Test api_key can be read from environment variable."""
+
         with (
             patch.dict("os.environ", {"ONEHOUSE_API_KEY": "env-api-key"}, clear=False),
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
@@ -114,7 +114,7 @@ class TestQuantonAdapterInitialization:
             assert adapter.api_key == "env-api-key"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -138,7 +138,7 @@ class TestQuantonAdapterPlatformInfo:
     """Test platform info methods."""
 
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -168,7 +168,7 @@ class TestQuantonAdapterPlatformInfo:
             assert info["supports_delta"] is True
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -188,7 +188,7 @@ class TestQuantonAdapterConnection:
     """Test connection functionality."""
 
     def test_create_connection_success(self):
-        """Test successful connection to Quanton API."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -212,7 +212,7 @@ class TestQuantonAdapterConnection:
             assert result["region"] == "us-west-2"
 
     def test_create_connection_failure(self):
-        """Test connection failure raises error."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -237,7 +237,7 @@ class TestQuantonAdapterDataLoading:
     """Test data loading functionality."""
 
     def test_load_data_existing_tables(self, tmp_path):
-        """Test load_data skips upload when tables exist."""
+
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -269,14 +269,14 @@ class TestQuantonAdapterRegistry:
     """Test platform registry integration."""
 
     def test_platform_metadata_exists(self):
-        """Test Quanton metadata exists in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "quanton" in all_metadata
 
     def test_platform_metadata_content(self):
-        """Test Quanton metadata content is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -293,7 +293,7 @@ class TestQuantonAdapterTuning:
     """Test tuning interface implementation."""
 
     def test_apply_platform_optimizations(self):
-        """Test apply_platform_optimizations returns empty list."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -329,7 +329,7 @@ class TestQuantonAdapterTuning:
             assert result == []
 
     def test_configure_for_benchmark(self):
-        """Test configure_for_benchmark sets benchmark type."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
@@ -356,7 +356,7 @@ class TestQuantonAdapterCLI:
     """Test CLI argument handling."""
 
     def test_add_cli_arguments(self):
-        """Test add_cli_arguments adds expected arguments."""
+
         from benchbox.platforms.onehouse import QuantonAdapter
 
         parser = MagicMock()
@@ -371,7 +371,7 @@ class TestQuantonAdapterFromConfig:
     """Test from_config factory method."""
 
     def test_from_config_basic(self):
-        """Test from_config creates adapter with basic config."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -400,7 +400,7 @@ class TestQuantonAdapterTableFormats:
     """Test multi-table-format support."""
 
     def test_iceberg_format(self):
-        """Test Iceberg table format configuration."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -417,7 +417,7 @@ class TestQuantonAdapterTableFormats:
             assert adapter.table_format_str == "iceberg"
 
     def test_hudi_format(self):
-        """Test Hudi table format configuration."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -434,7 +434,7 @@ class TestQuantonAdapterTableFormats:
             assert adapter.table_format_str == "hudi"
 
     def test_delta_format(self):
-        """Test Delta table format configuration."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -455,7 +455,7 @@ class TestQuantonAdapterClose:
     """Test cleanup functionality."""
 
     def test_close_logs_metrics(self):
-        """Test close logs resource usage metrics."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.logger") as mock_logger,
@@ -501,7 +501,7 @@ class TestQuantonAdapterTestConnection:
     """Test test_connection method."""
 
     def test_test_connection_success(self):
-        """Test test_connection returns True on success."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -521,7 +521,7 @@ class TestQuantonAdapterTestConnection:
             assert adapter.test_connection() is True
 
     def test_test_connection_failure(self):
-        """Test test_connection returns False on failure."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -545,7 +545,7 @@ class TestQuantonAdapterCreateSchema:
     """Test create_schema method."""
 
     def test_create_schema_success(self):
-        """Test create_schema creates database successfully."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -569,7 +569,7 @@ class TestQuantonAdapterCreateSchema:
             assert call_args[0][0] == "test_schema"
 
     def test_create_schema_uses_default_database(self):
-        """Test create_schema uses default database when none specified."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -614,7 +614,7 @@ class TestQuantonAdapterCreateSchema:
             adapter.create_schema(_benchmark(), None)
 
     def test_create_schema_other_error(self):
-        """Test create_schema logs warning on other errors."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -643,7 +643,7 @@ class TestQuantonAdapterDDLGeneration:
     """Test DDL generation for different table formats."""
 
     def test_generate_iceberg_ddl(self):
-        """Test Iceberg table DDL generation."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -664,7 +664,7 @@ class TestQuantonAdapterDDLGeneration:
             assert "s3://bucket/tables/test_table" in ddl
 
     def test_generate_hudi_ddl_with_record_key(self):
-        """Test Hudi table DDL generation with record key."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -690,7 +690,7 @@ class TestQuantonAdapterDDLGeneration:
             assert "MERGE_ON_READ" in ddl
 
     def test_generate_hudi_ddl_without_record_key(self):
-        """Test Hudi table DDL generation without record key uses fallback."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.logger") as mock_logger,
@@ -712,7 +712,7 @@ class TestQuantonAdapterDDLGeneration:
             mock_logger.warning.assert_called()
 
     def test_generate_delta_ddl(self):
-        """Test Delta table DDL generation."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -736,7 +736,7 @@ class TestQuantonAdapterExecuteQuery:
     """Test query execution."""
 
     def test_execute_query_success(self):
-        """Test execute_query returns results."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.OnehouseClient") as mock_client_class,
@@ -810,7 +810,7 @@ class TestQuantonAdapterLoadDataFull:
     """Test load_data with table creation."""
 
     def test_load_data_uploads_and_creates_tables(self, tmp_path):
-        """Test load_data uploads data and creates tables."""
+
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
         (source_dir / "lineitem.parquet").write_bytes(b"fake parquet")
@@ -844,7 +844,7 @@ class TestQuantonAdapterLoadDataFull:
             mock_staging_instance.upload_tables.assert_called_once()
 
     def test_load_data_source_not_found(self, tmp_path):
-        """Test load_data raises error when source not found."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -861,7 +861,7 @@ class TestQuantonAdapterLoadDataFull:
                 adapter.load_data(_benchmark("lineitem"), None, tmp_path / "nonexistent")
 
     def test_load_data_table_creation_error(self, tmp_path):
-        """Test load_data handles table creation errors gracefully."""
+
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -898,7 +898,7 @@ class TestQuantonAdapterApplyTuning:
     """Test apply_tuning_configuration method."""
 
     def test_apply_tuning_with_scale_factor(self):
-        """Test apply_tuning_configuration sets scale factor."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -922,7 +922,7 @@ class TestQuantonAdapterApplyTuning:
             assert adapter._scale_factor == 10.0
 
     def test_apply_tuning_with_all_options(self):
-        """Test apply_tuning_configuration with all options."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -952,7 +952,7 @@ class TestQuantonAdapterFromConfigExtended:
     """Test from_config with additional options."""
 
     def test_from_config_with_hudi_options(self):
-        """Test from_config with Hudi-specific options."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -979,7 +979,7 @@ class TestQuantonAdapterFromConfigExtended:
             assert adapter.hudi_table_type == "MERGE_ON_READ"
 
     def test_from_config_with_onehouse_api_key(self):
-        """Test from_config with onehouse_api_key alias."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -1001,7 +1001,7 @@ class TestQuantonAdapterStagingInitialization:
     """Test staging initialization scenarios."""
 
     def test_staging_initialization_failure_warning(self):
-        """Test that staging initialization failure is logged as warning."""
+
         with (
             patch("benchbox.platforms.onehouse.quanton_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.onehouse.quanton_adapter.logger") as mock_logger,

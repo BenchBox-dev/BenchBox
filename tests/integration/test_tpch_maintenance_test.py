@@ -108,7 +108,6 @@ class TestMaintenanceTest:
             shutil.rmtree(self.temp_dir)
 
     def test_maintenance_test_initialization(self):
-        """Test TPCHMaintenanceTest initialization."""
 
         def connection_factory():
             return self.mock_connection
@@ -126,7 +125,6 @@ class TestMaintenanceTest:
         assert maintenance_test.connection_factory is not None
 
     def test_sequential_maintenance_test(self):
-        """Test sequential maintenance test execution."""
 
         def connection_factory():
             return self.mock_connection
@@ -154,7 +152,6 @@ class TestMaintenanceTest:
         assert results.success is True
 
     def test_concurrent_maintenance_test(self):
-        """Test concurrent maintenance test execution."""
 
         def connection_factory():
             return self.mock_connection
@@ -177,7 +174,6 @@ class TestMaintenanceTest:
         assert results.success is True
 
     def test_maintenance_test_error_handling(self):
-        """Test error handling in maintenance test."""
 
         def failing_connection_factory():
             raise RuntimeError("Connection failed")
@@ -202,7 +198,6 @@ class TestMaintenanceTest:
         assert len(results.errors) > 0
 
     def test_maintenance_test_report_generation(self):
-        """Test maintenance test report generation."""
 
         def connection_factory():
             return self.mock_connection
@@ -228,7 +223,6 @@ class TestMaintenanceTest:
         assert results.overall_throughput >= 0
 
     def test_maintenance_test_results_save(self):
-        """Test saving maintenance test results."""
 
         def connection_factory():
             return self.mock_connection
@@ -257,7 +251,7 @@ class TestMaintenanceOperation:
     """Test suite for the TPCHMaintenanceOperation dataclass."""
 
     def test_operation_creation(self):
-        """Test creating a maintenance operation."""
+
         operation = TPCHMaintenanceOperation(
             operation_type="RF1",
             start_time=time.time(),
@@ -274,7 +268,7 @@ class TestMaintenanceOperation:
         assert operation.error is None
 
     def test_operation_with_error(self):
-        """Test creating a failed operation."""
+
         operation = TPCHMaintenanceOperation(
             operation_type="RF2",
             start_time=time.time(),
@@ -293,7 +287,7 @@ class TestMaintenanceTestConfig:
     """Test suite for the TPCHMaintenanceTestConfig dataclass."""
 
     def test_config_defaults(self):
-        """Test default configuration values."""
+
         config = TPCHMaintenanceTestConfig()
 
         assert config.scale_factor == 1.0
@@ -305,7 +299,7 @@ class TestMaintenanceTestConfig:
         assert config.verbose is False
 
     def test_config_custom_values(self):
-        """Test custom configuration values."""
+
         config = TPCHMaintenanceTestConfig(
             scale_factor=10.0,
             maintenance_pairs=5,
@@ -341,7 +335,7 @@ class TestMaintenanceTestPerformance:
             shutil.rmtree(self.temp_dir)
 
     def test_maintenance_test_performance(self):
-        """Test maintenance test executes within reasonable time."""
+
         mock_connection = MockConnection()
 
         def connection_factory():
@@ -369,7 +363,7 @@ class TestMaintenanceTestPerformance:
         assert results.total_time > 0
 
     def test_scale_factor_impact(self):
-        """Test that scale factor affects operation metrics."""
+
         # Use separate connections for each test to avoid interference
         small_connection = MockConnection()
         large_connection = MockConnection()
@@ -433,7 +427,6 @@ class TestMaintenanceTestPerformance:
 
         result = maintenance_test._execute_rf1(pair_id=0)
 
-        # Verify operation succeeded
         assert result.success is True
         assert result.rows_affected > 0
         assert mock_connection.committed is True
@@ -467,7 +460,6 @@ class TestMaintenanceTestPerformance:
 
         result = maintenance_test._execute_rf2(pair_id=0)
 
-        # Verify operation succeeded
         assert result.success is True
         assert result.rows_affected > 0
         assert mock_connection.committed is True
@@ -684,7 +676,6 @@ class TestForeignKeyValidation:
 
         conn = duckdb.connect(":memory:")
 
-        # Create tables
         conn.execute("""
             CREATE TABLE CUSTOMER (
                 C_CUSTKEY INTEGER PRIMARY KEY,
@@ -879,7 +870,6 @@ class TestForeignKeyValidation:
 
         result = maintenance_test._execute_rf1(pair_id=0)
 
-        # Verify success
         assert result.success is True, f"RF1 should succeed: {result.error}"
 
         # Verify all lineitems reference valid parts

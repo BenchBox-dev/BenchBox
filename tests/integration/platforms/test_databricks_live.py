@@ -41,7 +41,7 @@ class TestLiveDatabricksConnection:
     """Test basic Databricks connectivity."""
 
     def test_databricks_live_connection(self, live_databricks_adapter):
-        """Verify Databricks connection works and can execute simple query."""
+
         connection = live_databricks_adapter.create_connection()
         try:
             # Execute simple query to verify connection
@@ -54,7 +54,7 @@ class TestLiveDatabricksConnection:
             live_databricks_adapter.close_connection(connection)
 
     def test_databricks_live_version_info(self, live_databricks_adapter):
-        """Verify we can get Databricks version information."""
+
         connection = live_databricks_adapter.create_connection()
         try:
             metadata = live_databricks_adapter.get_platform_info(connection)
@@ -67,7 +67,7 @@ class TestLiveDatabricksConnection:
             live_databricks_adapter.close_connection(connection)
 
     def test_databricks_live_catalog_access(self, live_databricks_adapter):
-        """Verify Unity Catalog access."""
+
         connection = live_databricks_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -95,7 +95,6 @@ class TestLiveDatabricksSchemaManagement:
         try:
             cursor = connection.cursor()
 
-            # Create schema
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {unique_test_schema}")
 
             # Verify schema exists
@@ -119,7 +118,6 @@ class TestLiveDatabricksDataLoading:
         # Create TPC-H benchmark
         tpch = TPCH(scale_factor=test_scale_factor, output_dir=test_output_dir, verbose=False)
 
-        # Generate data
         data_files = tpch.generate_data()
         assert len(data_files) > 0, "No data files generated"
 
@@ -127,7 +125,6 @@ class TestLiveDatabricksDataLoading:
         try:
             cursor = connection.cursor()
 
-            # Create schema
             cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {unique_test_schema}")
             cursor.execute(f"USE SCHEMA {unique_test_schema}")
 
@@ -137,10 +134,8 @@ class TestLiveDatabricksDataLoading:
                 if statement.strip():
                     cursor.execute(statement)
 
-            # Load data using adapter
             stats, errors, _ = live_databricks_adapter.load_data(tpch, connection, test_output_dir)
 
-            # Verify data was loaded
             assert len(stats) > 0, "No tables loaded"
             assert all(count > 0 for count in stats.values()), "Some tables have zero rows"
 
@@ -203,7 +198,6 @@ class TestLiveDatabricksQueryExecution:
             cursor.execute(query1_databricks)
             results = cursor.fetchall()
 
-            # Verify we got results
             assert len(results) > 0, "Query 1 returned no results"
             print(f"Query 1 returned {len(results)} rows")
 
@@ -217,7 +211,7 @@ class TestLiveDatabricksSpecificFeatures:
     def test_databricks_live_copy_into(
         self, live_databricks_adapter, unique_test_schema, test_output_dir, cleanup_test_schema
     ):
-        """Test COPY INTO functionality with staged files."""
+
         cleanup_test_schema(live_databricks_adapter, unique_test_schema)
 
         connection = live_databricks_adapter.create_connection()
@@ -251,7 +245,7 @@ class TestLiveDatabricksSpecificFeatures:
             live_databricks_adapter.close_connection(connection)
 
     def test_databricks_live_cleanup(self, live_databricks_adapter, unique_test_schema):
-        """Verify cleanup works correctly."""
+
         connection = live_databricks_adapter.create_connection()
         try:
             cursor = connection.cursor()

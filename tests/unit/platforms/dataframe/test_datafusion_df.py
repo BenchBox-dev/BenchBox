@@ -44,7 +44,7 @@ class TestDataFusionDataFrameAdapter:
     """Tests for DataFusionDataFrameAdapter."""
 
     def test_initialization(self):
-        """Test adapter initialization."""
+
         adapter = DataFusionDataFrameAdapter()
 
         assert adapter.platform_name == "DataFusion"
@@ -56,7 +56,7 @@ class TestDataFusionDataFrameAdapter:
         assert info["batch_size"] == 8192
 
     def test_initialization_with_options(self):
-        """Test adapter initialization with custom options."""
+
         adapter = DataFusionDataFrameAdapter(
             working_dir="/tmp/datafusion",
             verbose=True,
@@ -76,7 +76,7 @@ class TestDataFusionDataFrameAdapter:
         assert info["batch_size"] == 4096
 
     def test_platform_info(self):
-        """Test get_platform_info method."""
+
         adapter = DataFusionDataFrameAdapter()
 
         info = adapter.get_platform_info()
@@ -87,7 +87,7 @@ class TestDataFusionDataFrameAdapter:
         assert "target_partitions" in info
 
     def test_create_context(self):
-        """Test context creation."""
+
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -172,7 +172,7 @@ class TestDataFusionDataLoading:
     """Tests for DataFusion data loading methods."""
 
     def test_read_csv_basic(self, tmp_path):
-        """Test reading a basic CSV file."""
+
         adapter = DataFusionDataFrameAdapter()
 
         # Create a test CSV file
@@ -188,7 +188,7 @@ class TestDataFusionDataLoading:
         assert result.num_columns == 3
 
     def test_read_csv_with_delimiter(self, tmp_path):
-        """Test reading CSV with custom delimiter."""
+
         adapter = DataFusionDataFrameAdapter()
 
         # Create a pipe-delimited file
@@ -301,7 +301,7 @@ class TestDataFusionDataLoading:
         assert result.column_names == ["id", "name"]
 
     def test_read_parquet(self, tmp_path):
-        """Test reading a Parquet file."""
+
         adapter = DataFusionDataFrameAdapter()
 
         # Create a test Parquet file
@@ -324,7 +324,7 @@ class TestDataFusionDataLoading:
         assert result.num_rows == 3
 
     def test_collect_dataframe(self):
-        """Test collecting a DataFrame to PyArrow Table."""
+
         adapter = DataFusionDataFrameAdapter()
 
         # Register test data and get DataFrame
@@ -337,7 +337,7 @@ class TestDataFusionDataLoading:
         assert result.num_rows == 3
 
     def test_collect_empty_dataframe(self):
-        """Test collecting an empty DataFusion result returns an empty table."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
@@ -350,7 +350,7 @@ class TestDataFusionDataLoading:
         assert result.num_columns == 0
 
     def test_get_row_count_dataframe(self):
-        """Test getting row count from DataFrame."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"a": [1, 2, 3, 4, 5]}))
@@ -361,7 +361,7 @@ class TestDataFusionDataLoading:
         assert count == 5
 
     def test_get_row_count_table(self):
-        """Test getting row count from PyArrow Table."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"a": [1, 2, 3]})
@@ -379,7 +379,7 @@ class TestDataFusionWindowFunctions:
     """
 
     def test_window_row_number(self):
-        """Test row_number window function returns valid expression."""
+
         adapter = DataFusionDataFrameAdapter()
 
         # window_row_number returns an expression
@@ -398,7 +398,7 @@ class TestDataFusionWindowFunctions:
         assert "rn" in collected.column_names
 
     def test_window_rank(self):
-        """Test rank window function returns valid expression."""
+
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.window_rank(
@@ -414,7 +414,7 @@ class TestDataFusionWindowFunctions:
         assert "rnk" in collected.column_names
 
     def test_window_dense_rank(self):
-        """Test dense_rank window function returns valid expression."""
+
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.window_dense_rank(
@@ -430,7 +430,7 @@ class TestDataFusionWindowFunctions:
         assert "drnk" in collected.column_names
 
     def test_window_sum(self):
-        """Test window sum function returns valid expression."""
+
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.window_sum(
@@ -446,7 +446,7 @@ class TestDataFusionWindowFunctions:
         assert "total" in collected.column_names
 
     def test_window_avg(self):
-        """Test window avg function returns valid expression."""
+
         adapter = DataFusionDataFrameAdapter()
 
         expr = adapter.window_avg(
@@ -467,7 +467,7 @@ class TestDataFusionDataFrameOperations:
     """Tests for DataFusion DataFrame operations."""
 
     def test_union_all(self):
-        """Test union_all operation."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("t1", pa.table({"a": [1, 2]}))
@@ -482,7 +482,7 @@ class TestDataFusionDataFrameOperations:
         assert result.num_rows == 4
 
     def test_rename_columns(self):
-        """Test rename_columns operation."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"old_name": [1, 2, 3]}))
@@ -500,7 +500,7 @@ class TestDataFusionQueryExecution:
     """Tests for query execution with DataFusion."""
 
     def test_simple_select_query(self):
-        """Test executing a simple select query."""
+
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -534,7 +534,7 @@ class TestDataFusionQueryExecution:
         assert result["rows_returned"] == 3
 
     def test_filter_query(self):
-        """Test executing a filter query."""
+
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -570,7 +570,7 @@ class TestDataFusionTableLoading:
     """Tests for table loading functionality."""
 
     def test_load_table_parquet(self, tmp_path):
-        """Test loading a table from Parquet."""
+
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -592,7 +592,7 @@ class TestDataFusionTableLoading:
         assert row_count == 3
 
     def test_load_table_csv(self, tmp_path):
-        """Test loading a table from CSV."""
+
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -606,7 +606,7 @@ class TestDataFusionTableLoading:
         assert row_count == 2
 
     def test_load_multiple_tables(self, tmp_path):
-        """Test loading multiple tables."""
+
         adapter = DataFusionDataFrameAdapter()
         ctx = adapter.create_context()
 
@@ -630,7 +630,7 @@ class TestDataFusionSpecificFeatures:
     """Tests for DataFusion-specific features."""
 
     def test_sql_execution(self):
-        """Test SQL execution via DataFusion."""
+
         adapter = DataFusionDataFrameAdapter()
 
         # Register test data
@@ -643,7 +643,7 @@ class TestDataFusionSpecificFeatures:
         assert result.num_rows == 2
 
     def test_register_table(self):
-        """Test registering a PyArrow table."""
+
         adapter = DataFusionDataFrameAdapter()
 
         test_table = pa.table({"x": [1, 2, 3]})
@@ -655,7 +655,7 @@ class TestDataFusionSpecificFeatures:
         assert result.num_rows == 3
 
     def test_register_table_from_lazy_dataframe(self):
-        """Test registering a DataFusion DataFrame for SQL access."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("source", pa.table({"x": [1, 2, 3]}))
@@ -667,7 +667,7 @@ class TestDataFusionSpecificFeatures:
         assert result.to_pydict() == {"x": [2, 3]}
 
     def test_register_parquet_table(self, tmp_path):
-        """Test registering a parquet file as a SQL table."""
+
         adapter = DataFusionDataFrameAdapter()
 
         parquet_path = tmp_path / "events.parquet"
@@ -681,7 +681,7 @@ class TestDataFusionSpecificFeatures:
         assert result.to_pydict() == {"event_id": [2]}
 
     def test_to_pandas(self):
-        """Test conversion to pandas DataFrame."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
@@ -694,7 +694,7 @@ class TestDataFusionSpecificFeatures:
         assert "a" in pandas_df.columns
 
     def test_to_pandas_from_lazy_dataframe(self):
-        """Test conversion to pandas from a lazy DataFusion DataFrame."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
@@ -703,7 +703,7 @@ class TestDataFusionSpecificFeatures:
         assert pandas_df.to_dict(orient="list") == {"a": [2, 3]}
 
     def test_to_polars_from_lazy_dataframe(self):
-        """Test conversion to Polars from a lazy DataFusion DataFrame."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"a": [1, 2, 3]}))
@@ -720,7 +720,7 @@ class TestDataFusionSpecificFeatures:
         assert adapter.lit(expr) is expr
 
     def test_get_logical_plan_contains_filter_and_scan(self):
-        """Test logical-plan inspection on a filtered SQL query."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"x": [1, 2, 3], "y": [10, 20, 30]}))
@@ -730,7 +730,7 @@ class TestDataFusionSpecificFeatures:
         assert "TableScan" in plan
 
     def test_parse_memory_limit_variants(self):
-        """Test memory-limit parsing accepts common unit suffixes."""
+
         adapter = DataFusionDataFrameAdapter()
 
         assert adapter._parse_memory_limit("1.5GB") == 1610612736
@@ -739,7 +739,7 @@ class TestDataFusionSpecificFeatures:
         assert adapter._parse_memory_limit("128") == 128
 
     def test_get_first_row_from_lazy_dataframe(self):
-        """Test first-row extraction auto-collects lazy DataFrames."""
+
         adapter = DataFusionDataFrameAdapter()
 
         adapter.register_table("test", pa.table({"id": [1, 2], "name": ["A", "B"]}))
@@ -753,7 +753,7 @@ class TestDataFusionScalarExtraction:
     """Tests for DataFusion scalar extraction optimization."""
 
     def test_scalar_from_pyarrow_table(self):
-        """Test scalar extraction from PyArrow Table."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"value": [42]})
@@ -762,7 +762,7 @@ class TestDataFusionScalarExtraction:
         assert result == 42
 
     def test_scalar_with_column_name(self):
-        """Test scalar extraction with explicit column name."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"a": [1], "b": [2], "c": [3]})
@@ -784,7 +784,7 @@ class TestDataFusionScalarExtraction:
         assert result == 100
 
     def test_scalar_first_column_multicolumn(self):
-        """Test scalar extraction defaults to first column."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"first": [10], "second": [20]})
@@ -793,7 +793,7 @@ class TestDataFusionScalarExtraction:
         assert result == 10
 
     def test_scalar_empty_table_raises(self):
-        """Test that scalar extraction on empty table raises ValueError."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"value": pa.array([], type=pa.int64())})
@@ -802,7 +802,7 @@ class TestDataFusionScalarExtraction:
             adapter.scalar(table)
 
     def test_scalar_float_value(self):
-        """Test scalar extraction with float value."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"value": [3.14159]})
@@ -811,7 +811,7 @@ class TestDataFusionScalarExtraction:
         assert result == pytest.approx(3.14159)
 
     def test_scalar_string_value(self):
-        """Test scalar extraction with string value."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"value": ["hello"]})
@@ -830,7 +830,7 @@ class TestDataFusionScalarExtraction:
         assert result == 999
 
     def test_scalar_multiple_rows_raises(self):
-        """Test that scalar extraction on multi-row DataFrame raises ValueError."""
+
         adapter = DataFusionDataFrameAdapter()
 
         table = pa.table({"value": [1, 2, 3]})
@@ -1087,7 +1087,7 @@ class TestDataFusionNotAvailable:
     """Tests for behavior when DataFusion is not installed."""
 
     def test_datafusion_available_flag(self):
-        """Test that DATAFUSION_DF_AVAILABLE flag is set correctly."""
+
         from benchbox.platforms.dataframe.datafusion_df import DATAFUSION_DF_AVAILABLE
 
         # This just tests that the flag exists and is boolean
@@ -1110,7 +1110,7 @@ class TestDataFusionASTRegexPatterns:
     """
 
     def test_extract_alias_name_simple(self):
-        """Test alias name extraction from simple alias pattern."""
+
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_alias_name
 
         # Sample AST string matching actual DataFusion error message format
@@ -1133,7 +1133,7 @@ class TestDataFusionASTRegexPatterns:
         assert result == "avg_result"
 
     def test_extract_alias_name_no_match(self):
-        """Test alias name extraction returns None for no match."""
+
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_alias_name
 
         ast_str = "Column { relation: None }"  # No escaped quotes with name:
@@ -1159,7 +1159,7 @@ class TestDataFusionASTRegexPatterns:
         assert operation == "divide"
 
     def test_extract_multiplier_no_literal(self):
-        """Test multiplier extraction returns None for no literal."""
+
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_multiplier
 
         ast_str = "BinaryExpr { left: Column, op: Add, right: Column }"
@@ -1168,7 +1168,7 @@ class TestDataFusionASTRegexPatterns:
         assert operation is None
 
     def test_extract_multiplier_unsupported_operation(self):
-        """Test multiplier extraction returns None for unsupported ops."""
+
         from benchbox.platforms.dataframe.unified_frame import _extract_datafusion_multiplier
 
         ast_str = "BinaryExpr { left: ..., op: Add, right: Literal(Float64(1.0), None) }"
@@ -1186,7 +1186,7 @@ class TestDataFusionASTExtractionIntegration:
     """
 
     def test_get_ast_string_for_alias(self):
-        """Test that _get_datafusion_ast_string returns parseable string for aliases."""
+
         from datafusion import col as df_col, functions as df_f
 
         from benchbox.platforms.dataframe.unified_frame import _get_datafusion_ast_string
@@ -1200,7 +1200,7 @@ class TestDataFusionASTExtractionIntegration:
         assert "Alias" in ast_str or "AggregateFunction" in ast_str
 
     def test_get_ast_string_for_binary_expr(self):
-        """Test that _get_datafusion_ast_string handles binary expressions."""
+
         from datafusion import col as df_col, functions as df_f, lit as df_lit
 
         from benchbox.platforms.dataframe.unified_frame import _get_datafusion_ast_string
@@ -1215,7 +1215,7 @@ class TestDataFusionASTExtractionIntegration:
         assert "Alias" in ast_str or "BinaryExpr" in ast_str
 
     def test_get_ast_string_returns_none_for_simple_column(self):
-        """Test that _get_datafusion_ast_string may return None for simple columns."""
+
         from datafusion import col as df_col
 
         from benchbox.platforms.dataframe.unified_frame import _get_datafusion_ast_string

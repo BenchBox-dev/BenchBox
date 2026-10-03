@@ -141,7 +141,7 @@ class TestQueryPlanComparison:
         )
 
     def test_identical_plans(self, simple_scan_plan):
-        """Test comparison of identical plans."""
+
         result = compare_query_plans(simple_scan_plan, simple_scan_plan)
 
         assert result.plans_identical is True
@@ -152,7 +152,7 @@ class TestQueryPlanComparison:
         assert result.similarity.property_mismatches == 0
 
     def test_different_table_name(self, simple_scan_plan, simple_scan_plan_different_table):
-        """Test comparison of plans with different table names."""
+
         result = compare_query_plans(simple_scan_plan, simple_scan_plan_different_table)
 
         assert result.plans_identical is False
@@ -166,7 +166,7 @@ class TestQueryPlanComparison:
         assert "table_name" in property_diffs[0].differences
 
     def test_different_join_type(self, join_plan, join_plan_different_type):
-        """Test comparison of plans with different join types."""
+
         result = compare_query_plans(join_plan, join_plan_different_type)
 
         assert result.plans_identical is False
@@ -178,7 +178,7 @@ class TestQueryPlanComparison:
         assert "join_type" in property_diffs[0].differences
 
     def test_different_operator_types(self, simple_scan_plan, join_plan):
-        """Test comparison of plans with different operator types."""
+
         result = compare_query_plans(simple_scan_plan, join_plan)
 
         assert result.plans_identical is False
@@ -186,7 +186,7 @@ class TestQueryPlanComparison:
         assert result.similarity.overall_similarity < 0.5
 
     def test_complex_plan_comparison(self, complex_plan):
-        """Test comparison of complex plans."""
+
         # Compare plan to itself
         result = compare_query_plans(complex_plan, complex_plan)
 
@@ -195,7 +195,7 @@ class TestQueryPlanComparison:
         assert result.similarity.total_operators_left > 3  # Multiple operators
 
     def test_similarity_score_calculation(self, join_plan, join_plan_different_type):
-        """Test that similarity scores are calculated correctly."""
+
         result = compare_query_plans(join_plan, join_plan_different_type)
 
         # Plans have same structure, just different join type
@@ -208,7 +208,7 @@ class TestQueryPlanComparison:
         assert result.similarity.property_mismatches == 1
 
     def test_structure_mismatch(self, simple_scan_plan, complex_plan):
-        """Test detection of structural mismatches."""
+
         result = compare_query_plans(simple_scan_plan, complex_plan)
 
         assert result.plans_identical is False
@@ -216,7 +216,7 @@ class TestQueryPlanComparison:
         assert result.similarity.overall_similarity < 0.5
 
     def test_filter_expression_comparison(self):
-        """Test comparison of filter expressions."""
+
         # Plan 1: Single filter
         scan1 = LogicalOperator(
             operator_id="scan_1",
@@ -261,7 +261,7 @@ class TestQueryPlanComparison:
         assert "filter_expressions" in property_diffs[0].differences
 
     def test_aggregation_function_comparison(self):
-        """Test comparison of aggregation functions."""
+
         # Plan 1: SUM aggregation
         scan1 = LogicalOperator(
             operator_id="scan_1",
@@ -306,7 +306,7 @@ class TestQueryPlanComparison:
         assert "aggregation_functions" in property_diffs[0].differences
 
     def test_summary_generation(self, simple_scan_plan, join_plan):
-        """Test that summary is generated."""
+
         result = compare_query_plans(simple_scan_plan, join_plan)
 
         assert result.summary
@@ -314,7 +314,7 @@ class TestQueryPlanComparison:
         assert len(result.summary) > 0
 
     def test_comparator_reusable(self, simple_scan_plan, join_plan):
-        """Test that comparator can be reused for multiple comparisons."""
+
         comparator = QueryPlanComparator()
 
         result1 = comparator.compare_plans(simple_scan_plan, simple_scan_plan)
@@ -324,7 +324,7 @@ class TestQueryPlanComparison:
         assert result2.plans_identical is True
 
     def test_cross_platform_comparison(self):
-        """Test comparison of plans from different platforms."""
+
         # DuckDB plan
         duckdb_plan = QueryPlanDAG(
             query_id="q1",
@@ -353,7 +353,7 @@ class TestQueryPlanComparison:
         assert result.similarity.overall_similarity == 1.0
 
     def test_empty_children_handling(self):
-        """Test comparison handles operators with no children."""
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -382,7 +382,7 @@ class TestQueryPlanComparison:
         assert result.similarity.overall_similarity == 1.0
 
     def test_unequal_children_count(self):
-        """Test comparison when operators have different numbers of children."""
+
         # Plan 1: Join with 2 children
         join1 = LogicalOperator(
             operator_id="join_1",
@@ -428,7 +428,6 @@ class TestFingerprintIntegrityInComparison:
     """Test that comparator respects fingerprint integrity."""
 
     def test_identical_comparison_requires_trusted_fingerprints(self):
-        """Test that fingerprint fast-path only works with trusted fingerprints."""
 
         # Create two identical plans
         plan1 = QueryPlanDAG(
@@ -458,7 +457,7 @@ class TestFingerprintIntegrityInComparison:
         assert result.fingerprints_match is True
 
     def test_stale_fingerprint_forces_full_comparison(self):
-        """Test that stale fingerprint forces full tree comparison."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         # Create identical plans
@@ -492,7 +491,7 @@ class TestFingerprintIntegrityInComparison:
         # (would need full comparison which finds they match)
 
     def test_unverified_fingerprint_forces_full_comparison(self):
-        """Test that unverified fingerprint forces full tree comparison."""
+
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         # Create a plan and manually set it to unverified
@@ -576,7 +575,7 @@ class TestStringOperatorTypeHandling:
     """Test comparison with string operator types (unknown/unmapped operators)."""
 
     def test_compare_plans_with_string_operator_types(self):
-        """Test that comparison works with string operator types."""
+
         # Plan 1: String operator type (unknown operator)
         plan1 = QueryPlanDAG(
             query_id="q1",
@@ -607,7 +606,7 @@ class TestStringOperatorTypeHandling:
         assert result.similarity.overall_similarity == 1.0
 
     def test_compare_mixed_enum_and_string_types(self):
-        """Test comparison where one plan uses enum and other uses matching string."""
+
         # Plan with enum type
         plan1 = QueryPlanDAG(
             query_id="q1",
@@ -637,7 +636,7 @@ class TestStringOperatorTypeHandling:
         assert result.similarity.overall_similarity == 1.0
 
     def test_compare_different_string_operator_types(self):
-        """Test comparison of plans with different string operator types."""
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -669,7 +668,7 @@ class TestStringOperatorTypeHandling:
         assert type_diffs[0].differences["right_type"] == "IndexScan"
 
     def test_compare_with_string_join_type(self):
-        """Test comparison works with string join types."""
+
         # Plan with string join type
         plan1 = QueryPlanDAG(
             query_id="q1",
@@ -725,7 +724,7 @@ class TestStringOperatorTypeHandling:
         assert "join_type" in property_diffs[0].differences
 
     def test_complex_plan_with_mixed_operator_types(self):
-        """Test complex plan comparison with mixed enum and string operator types."""
+
         # Build a complex plan with mix of enum and string types
         plan1 = QueryPlanDAG(
             query_id="q1",

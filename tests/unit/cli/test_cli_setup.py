@@ -69,7 +69,7 @@ class TestSetupCommand:
     """Test the setup CLI command."""
 
     def test_setup_command_exists(self):
-        """Test that the setup command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -77,7 +77,7 @@ class TestSetupCommand:
         assert "setup" in result.output
 
     def test_setup_help(self):
-        """Test the setup help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--help"])
 
@@ -90,7 +90,7 @@ class TestSetupCommand:
         assert "--remove" in result.output
 
     def test_setup_no_platform_error(self):
-        """Test setup without platform shows error."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup"])
 
@@ -99,7 +99,7 @@ class TestSetupCommand:
         assert "Available platforms:" in result.output
 
     def test_setup_list_platforms(self, isolated_home: Path):
-        """Test setup --list-platforms against a real credential file."""
+
         _seed_credentials(
             isolated_home,
             {
@@ -123,7 +123,7 @@ class TestSetupCommand:
         assert "○ Not configured" in result.output
 
     def test_setup_status_no_credentials(self, isolated_home: Path):
-        """Test setup --status with no credentials configured."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--status"])
 
@@ -133,7 +133,7 @@ class TestSetupCommand:
         assert not _credentials_file(isolated_home).exists()
 
     def test_setup_status_with_credentials(self, isolated_home: Path):
-        """Test setup --status with configured credentials."""
+
         _seed_credentials(
             isolated_home,
             {
@@ -151,7 +151,7 @@ class TestSetupCommand:
         assert "❌ Invalid" in result.output
 
     def test_setup_remove_confirmed(self, isolated_home: Path):
-        """Test setup --remove with confirmation deletes the real entry."""
+
         _seed_credentials(
             isolated_home,
             {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.VALID)},
@@ -165,7 +165,7 @@ class TestSetupCommand:
         assert "databricks" not in _read_credentials(isolated_home)
 
     def test_setup_remove_cancelled(self, isolated_home: Path):
-        """Test setup --remove with cancellation keeps the real entry."""
+
         _seed_credentials(
             isolated_home,
             {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.VALID)},
@@ -179,7 +179,7 @@ class TestSetupCommand:
         assert "databricks" in _read_credentials(isolated_home)
 
     def test_setup_remove_no_credentials(self, isolated_home: Path):
-        """Test setup --remove with no existing credentials."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--platform", "databricks", "--remove"])
 
@@ -188,7 +188,7 @@ class TestSetupCommand:
 
     @patch("benchbox.platforms.databricks.credentials.validate_databricks_credentials")
     def test_setup_validate_only_success(self, mock_validate, isolated_home: Path):
-        """Test setup --validate-only with valid credentials."""
+
         manager = _seed_credentials(
             isolated_home,
             {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.NOT_VALIDATED)},
@@ -211,7 +211,7 @@ class TestSetupCommand:
 
     @patch("benchbox.platforms.databricks.credentials.validate_databricks_credentials")
     def test_setup_validate_only_failure(self, mock_validate, isolated_home: Path):
-        """Test setup --validate-only with invalid credentials."""
+
         _seed_credentials(
             isolated_home,
             {"databricks": ({"host": "https://x.cloud.databricks.com"}, CredentialStatus.NOT_VALIDATED)},
@@ -229,7 +229,7 @@ class TestSetupCommand:
         assert stored["error_message"] == "Authentication failed"
 
     def test_setup_validate_only_no_credentials(self, isolated_home: Path):
-        """Test setup --validate-only with no credentials."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--platform", "databricks", "--validate-only"])
 
@@ -259,7 +259,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials")
     def test_setup_interactive_databricks(self, mock_setup_databricks, mock_check_deps, isolated_home: Path):
-        """Test interactive setup for Databricks."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -276,7 +276,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.snowflake.setup_snowflake_credentials")
     def test_setup_interactive_snowflake(self, mock_setup_snowflake, mock_check_deps, isolated_home: Path):
-        """Test interactive setup for Snowflake."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -292,7 +292,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.redshift.setup_redshift_credentials")
     def test_setup_interactive_redshift(self, mock_setup_redshift, mock_check_deps, isolated_home: Path):
-        """Test interactive setup for Redshift."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -308,7 +308,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.motherduck.setup_motherduck_credentials")
     def test_setup_interactive_motherduck(self, mock_setup_motherduck, mock_check_deps, isolated_home: Path):
-        """Test interactive setup for MotherDuck."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -324,7 +324,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.singlestore.setup_singlestore_credentials")
     def test_setup_interactive_singlestore(self, mock_setup_singlestore, mock_check_deps, isolated_home: Path):
-        """Test interactive setup for SingleStore."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -339,7 +339,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.credentials.bigquery.setup_bigquery_credentials")
     def test_setup_interactive_bigquery(self, mock_setup_bigquery, mock_check_deps, isolated_home: Path):
-        """Test interactive setup for BigQuery."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -355,7 +355,7 @@ class TestSetupCommand:
     @patch("benchbox.utils.dependencies.check_platform_dependencies")
     @patch("benchbox.platforms.databricks.credentials.setup_databricks_credentials")
     def test_setup_platform_case_insensitive(self, mock_setup_databricks, mock_check_deps, isolated_home: Path):
-        """Test that platform names are case insensitive."""
+
         del isolated_home
         mock_check_deps.return_value = (True, [])
 
@@ -371,7 +371,7 @@ class TestSetupValidation:
 
     @patch("benchbox.platforms.credentials.snowflake.validate_snowflake_credentials")
     def test_validate_snowflake(self, mock_validate, isolated_home: Path):
-        """Test validation for Snowflake platform."""
+
         _seed_credentials(
             isolated_home,
             {"snowflake": ({"account": "xy12345", "user": "tester"}, CredentialStatus.NOT_VALIDATED)},
@@ -387,7 +387,7 @@ class TestSetupValidation:
 
     @patch("benchbox.platforms.credentials.bigquery.validate_bigquery_credentials")
     def test_validate_bigquery(self, mock_validate, isolated_home: Path):
-        """Test validation for BigQuery platform."""
+
         _seed_credentials(
             isolated_home,
             {"bigquery": ({"project": "test-project"}, CredentialStatus.NOT_VALIDATED)},
@@ -403,7 +403,7 @@ class TestSetupValidation:
 
     @patch("benchbox.platforms.credentials.redshift.validate_redshift_credentials")
     def test_validate_redshift(self, mock_validate, isolated_home: Path):
-        """Test validation for Redshift platform."""
+
         _seed_credentials(
             isolated_home,
             {"redshift": ({"host": "cluster.example.com"}, CredentialStatus.NOT_VALIDATED)},
@@ -435,7 +435,7 @@ class TestSetupValidation:
 
     @patch("benchbox.platforms.credentials.singlestore.validate_singlestore_credentials")
     def test_validate_singlestore(self, mock_validate, isolated_home: Path):
-        """Test validate-only dispatch for SingleStore."""
+
         _seed_credentials(
             isolated_home,
             {"singlestore": ({"host": "localhost"}, CredentialStatus.NOT_VALIDATED)},
@@ -456,7 +456,7 @@ class TestSetupIntegration:
     """Integration tests for setup command."""
 
     def test_setup_real_execution_list(self, isolated_home: Path):
-        """Test setup --list-platforms with real execution."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--list-platforms"])
 
@@ -467,7 +467,7 @@ class TestSetupIntegration:
         assert "MotherDuck" in result.output
 
     def test_setup_real_execution_status(self, isolated_home: Path):
-        """Test setup --status with real execution and an empty store."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["setup", "--status"])
 

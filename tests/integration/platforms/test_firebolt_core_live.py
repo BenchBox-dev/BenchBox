@@ -31,7 +31,7 @@ class TestLiveFireboltCoreConnection:
     """Test basic Firebolt Core connectivity via Docker."""
 
     def test_connection(self, live_firebolt_core_adapter):
-        """Verify we can connect to Firebolt Core and run a trivial query."""
+
         connection = live_firebolt_core_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -42,7 +42,7 @@ class TestLiveFireboltCoreConnection:
             live_firebolt_core_adapter.close_connection(connection)
 
     def test_platform_info(self, live_firebolt_core_adapter):
-        """Verify platform info reports Core mode metadata."""
+
         info = live_firebolt_core_adapter.get_platform_info()
         assert info is not None
         assert info.get("platform_type") == "firebolt"

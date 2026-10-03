@@ -33,7 +33,7 @@ class TestAWSGlueAdapterInitialization:
             )
 
     def test_missing_job_role_raises_error(self):
-        """Test error when job_role is not provided."""
+
         from benchbox.platforms.aws import AWSGlueAdapter
 
         with pytest.raises(ConfigurationError, match="job_role"):
@@ -52,7 +52,7 @@ class TestAWSGlueAdapterInitialization:
             )
 
     def test_valid_configuration(self):
-        """Test valid configuration initializes correctly."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -74,7 +74,7 @@ class TestAWSGlueAdapterInitialization:
             assert adapter.job_role == "arn:aws:iam::123456789012:role/GlueRole"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -99,7 +99,7 @@ class TestAWSGlueAdapterPlatformInfo:
     """Test platform information methods."""
 
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct information."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -123,7 +123,7 @@ class TestAWSGlueAdapterPlatformInfo:
             assert info["supports_dataframe"] is True
 
     def test_get_dialect(self):
-        """Test get_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -143,7 +143,7 @@ class TestAWSGlueAdapterConnection:
     """Test connection management."""
 
     def test_create_connection_success(self):
-        """Test successful connection creation."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.aws.glue_adapter.boto3") as mock_boto3,
@@ -172,7 +172,7 @@ class TestAWSGlueAdapterSchema:
     """Test schema creation."""
 
     def test_create_schema_new_database(self):
-        """Test creating a new Glue database."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.aws.glue_adapter.boto3") as mock_boto3,
@@ -211,7 +211,7 @@ class TestAWSGlueAdapterSchema:
                 assert call_args[1]["DatabaseInput"]["Name"] == "tpch_sf1"
 
     def test_create_schema_existing_database(self):
-        """Test creating schema when database already exists."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.aws.glue_adapter.boto3") as mock_boto3,
@@ -240,7 +240,7 @@ class TestAWSGlueAdapterDataLoading:
     """Test data loading functionality."""
 
     def test_load_data_existing_tables(self):
-        """Test load_data skips upload when tables exist."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -265,7 +265,7 @@ class TestAWSGlueAdapterDataLoading:
             mock_staging_instance.upload_tables.assert_not_called()
 
     def test_load_data_new_tables(self):
-        """Test load_data uploads tables when they don't exist."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.aws.glue_adapter.boto3") as mock_boto3,
@@ -307,7 +307,7 @@ class TestAWSGlueAdapterJobStatus:
     """Test Glue job status constants."""
 
     def test_job_status_values(self):
-        """Test all job status values are defined."""
+
         from benchbox.platforms.aws.glue_adapter import GlueJobStatus
 
         assert GlueJobStatus.STARTING == "STARTING"
@@ -322,7 +322,7 @@ class TestAWSGlueAdapterRegistry:
     """Test platform registry integration."""
 
     def test_platform_metadata_exists(self):
-        """Test AWS Glue metadata exists in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         # Check that glue is in the platform metadata
@@ -330,7 +330,7 @@ class TestAWSGlueAdapterRegistry:
         assert "glue" in all_metadata
 
     def test_platform_metadata_content(self):
-        """Test AWS Glue metadata content is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         # Access metadata through the public interface
@@ -348,7 +348,7 @@ class TestAWSGlueAdapterTuning:
     """Test tuning interface implementation."""
 
     def test_apply_platform_optimizations(self):
-        """Test apply_platform_optimizations returns empty list."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -405,7 +405,7 @@ class TestAWSGlueAdapterCLI:
     """Test CLI argument handling."""
 
     def test_add_cli_arguments(self):
-        """Test add_cli_arguments adds expected arguments."""
+
         from argparse import ArgumentParser
 
         from benchbox.platforms.aws import AWSGlueAdapter
@@ -427,7 +427,7 @@ class TestAWSGlueAdapterFromConfig:
     """Test from_config factory method."""
 
     def test_from_config_basic(self):
-        """Test from_config creates adapter with basic config."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -449,7 +449,7 @@ class TestAWSGlueAdapterFromConfig:
             assert adapter.s3_staging_dir == "s3://my-bucket/data"
 
     def test_from_config_generates_database_name(self):
-        """Test from_config generates database name when not provided."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -475,7 +475,7 @@ class TestAWSGlueAdapterClose:
     """Test cleanup functionality."""
 
     def test_close_logs_dpu_hours(self):
-        """Test close method logs DPU usage."""
+
         with (
             patch("benchbox.platforms.aws.glue_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.aws.glue_adapter.logger") as mock_logger,

@@ -53,7 +53,7 @@ class TestCompareCommand:
         return baseline_path, current_path
 
     def test_compare_command_exists(self):
-        """Test that the compare command is available."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -61,7 +61,7 @@ class TestCompareCommand:
         assert "compare" in result.output
 
     def test_compare_help(self):
-        """Test the compare help output."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -89,7 +89,7 @@ class TestCompareCommand:
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     def test_compare_two_files_success(self, mock_exporter_class, mock_load):
-        """Test successful comparison of two result files."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
@@ -120,7 +120,7 @@ class TestCompareCommand:
     @patch.object(_compare_module, "load_result_file")
     @patch.object(_compare_module, "ResultExporter")
     def test_compare_with_regression_detection(self, mock_exporter_class, mock_load):
-        """Test comparison with regression detection and exit code."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
@@ -160,7 +160,7 @@ class TestCompareCommand:
             assert "regression detected" in result.output.lower()
 
     def test_compare_json_output_format(self):
-        """Test comparison with JSON output format."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -185,7 +185,7 @@ class TestCompareCommand:
                     pytest.fail("Output is not valid JSON")
 
     def test_compare_invalid_threshold_format(self):
-        """Test that invalid regression threshold is rejected."""
+
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -198,7 +198,7 @@ class TestCompareCommand:
             assert "Invalid threshold format" in result.output
 
     def test_compare_help_includes_plan_options(self):
-        """Test that --include-plans and --plan-threshold options are in help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["compare", "--help"])
 
@@ -210,7 +210,7 @@ class TestCompareCommand:
     @patch.object(_compare_module, "ResultExporter")
     @patch.object(_compare_module, "_compare_plans")
     def test_compare_with_include_plans_flag(self, mock_compare_plans, mock_exporter_class, mock_load):
-        """Test comparison with --include-plans flag."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
@@ -255,7 +255,7 @@ class TestCompareCommand:
     @patch.object(_compare_module, "ResultExporter")
     @patch.object(_compare_module, "_compare_plans")
     def test_compare_include_plans_no_plans_available(self, mock_compare_plans, mock_exporter_class, mock_load):
-        """Test --include-plans when result files have no captured plans."""
+
         runner = CliRunner()
         self._set_loaded_result_pair(mock_load)
 
@@ -284,7 +284,7 @@ class TestResultFileDiscovery:
     """Test the result file discovery and metadata extraction functions."""
 
     def test_result_file_metadata_class(self):
-        """Test ResultFileMetadata properties."""
+
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -304,7 +304,7 @@ class TestResultFileDiscovery:
         assert "result.json" in meta.short_path
 
     def test_result_file_metadata_formatted_timestamp_handles_invalid(self):
-        """Test that formatted_timestamp handles invalid timestamps."""
+
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -322,7 +322,7 @@ class TestResultFileDiscovery:
         assert ts == "invalid-timestam"  # truncated to 16 chars
 
     def test_result_file_metadata_empty_timestamp(self):
-        """Test that formatted_timestamp handles empty timestamps."""
+
         from benchbox.cli.commands.compare import ResultFileMetadata
 
         meta = ResultFileMetadata(
@@ -338,7 +338,7 @@ class TestResultFileDiscovery:
         assert meta.formatted_timestamp == "Unknown"
 
     def test_discover_result_files_with_valid_files(self):
-        """Test discovery of valid BenchBox result files."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -376,7 +376,7 @@ class TestResultFileDiscovery:
             assert results[0].scale == 0.01
 
     def test_discover_result_files_excludes_manifests(self):
-        """Test that manifest files are excluded from discovery."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -427,7 +427,7 @@ class TestResultFileDiscovery:
             assert "2025-12-13" in results[2].timestamp
 
     def test_discover_result_files_handles_empty_directory(self):
-        """Test discovery with empty directory."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -435,7 +435,7 @@ class TestResultFileDiscovery:
             assert len(results) == 0
 
     def test_discover_result_files_handles_nonexistent_directory(self):
-        """Test discovery with nonexistent directory."""
+
         from benchbox.cli.commands.compare import _discover_result_files_with_metadata
 
         results = _discover_result_files_with_metadata(search_dirs=[Path("/nonexistent/path/that/does/not/exist")])
@@ -446,7 +446,7 @@ class TestComparePlansDeprecation:
     """Test that compare-plans command is deprecated and hidden."""
 
     def test_compare_plans_hidden_from_help(self):
-        """Test that compare-plans is hidden from main help."""
+
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 

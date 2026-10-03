@@ -47,7 +47,7 @@ class TestLiveClickHouseConnection:
     """Test basic ClickHouse connectivity via Docker."""
 
     def test_connection(self, clickhouse_adapter):
-        """Verify we can connect to ClickHouse and run a trivial query."""
+
         connection = clickhouse_adapter.create_connection()
         try:
             assert connection is not None
@@ -55,7 +55,7 @@ class TestLiveClickHouseConnection:
             clickhouse_adapter.close_connection(connection)
 
     def test_platform_info(self, clickhouse_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = clickhouse_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "clickhouse"
@@ -65,7 +65,7 @@ class TestLiveClickHouseQueryExecution:
     """Test query execution against a live ClickHouse instance."""
 
     def test_create_schema(self, clickhouse_adapter):
-        """Verify we can create a database/schema."""
+
         connection = clickhouse_adapter.create_connection()
         try:
             clickhouse_adapter.execute_query(

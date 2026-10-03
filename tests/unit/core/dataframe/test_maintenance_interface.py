@@ -33,7 +33,7 @@ class TestDataFrameMaintenanceCapabilities:
     """Tests for DataFrameMaintenanceCapabilities."""
 
     def test_default_capabilities(self):
-        """Test default capability values."""
+
         caps = DataFrameMaintenanceCapabilities(platform_name="test")
 
         assert caps.platform_name == "test"
@@ -45,7 +45,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps.transaction_isolation == TransactionIsolation.NONE
 
     def test_delta_lake_capabilities(self):
-        """Test Delta Lake has full ACID capabilities."""
+
         caps = DELTA_LAKE_CAPABILITIES
 
         assert caps.platform_name == "delta-lake"
@@ -59,7 +59,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps.supports_time_travel is True
 
     def test_iceberg_capabilities(self):
-        """Test Iceberg has full ACID capabilities."""
+
         caps = ICEBERG_CAPABILITIES
 
         assert caps.platform_name == "iceberg"
@@ -83,7 +83,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps.supports_row_level_delete is False
 
     def test_polars_capabilities_full(self):
-        """Test Polars has full maintenance capabilities via read-modify-write."""
+
         caps = POLARS_CAPABILITIES
 
         assert caps.platform_name == "polars"
@@ -97,13 +97,13 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps.supports_time_travel is False
 
     def test_supports_operation_insert(self):
-        """Test supports_operation for INSERT."""
+
         caps = DataFrameMaintenanceCapabilities(platform_name="test", supports_insert=True)
         assert caps.supports_operation(MaintenanceOperationType.INSERT) is True
         assert caps.supports_operation(MaintenanceOperationType.BULK_INSERT) is True
 
     def test_supports_operation_delete(self):
-        """Test supports_operation for DELETE."""
+
         # Row-level delete
         caps = DataFrameMaintenanceCapabilities(platform_name="test", supports_delete=True)
         assert caps.supports_operation(MaintenanceOperationType.DELETE) is True
@@ -118,7 +118,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps2.supports_operation(MaintenanceOperationType.BULK_DELETE) is True
 
     def test_supports_operation_update(self):
-        """Test supports_operation for UPDATE."""
+
         caps_no = DataFrameMaintenanceCapabilities(platform_name="test", supports_update=False)
         caps_yes = DataFrameMaintenanceCapabilities(platform_name="test", supports_update=True)
 
@@ -126,7 +126,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps_yes.supports_operation(MaintenanceOperationType.UPDATE) is True
 
     def test_supports_operation_merge(self):
-        """Test supports_operation for MERGE."""
+
         caps_no = DataFrameMaintenanceCapabilities(platform_name="test", supports_merge=False)
         caps_yes = DataFrameMaintenanceCapabilities(platform_name="test", supports_merge=True)
 
@@ -134,7 +134,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert caps_yes.supports_operation(MaintenanceOperationType.MERGE) is True
 
     def test_validate_tpc_compliance_full(self):
-        """Test TPC compliance validation with full capabilities."""
+
         caps = DELTA_LAKE_CAPABILITIES
         is_compliant, issues = caps.validate_tpc_compliance()
 
@@ -142,7 +142,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert issues == []
 
     def test_validate_tpc_compliance_partial(self):
-        """Test TPC compliance validation with partial capabilities."""
+
         caps = PARQUET_CAPABILITIES
         is_compliant, issues = caps.validate_tpc_compliance()
 
@@ -153,7 +153,7 @@ class TestDataFrameMaintenanceCapabilities:
         assert any("UPDATE" in issue for issue in issues)
 
     def test_validate_tpc_compliance_insert_only(self):
-        """Test TPC compliance with insert only."""
+
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
             supports_insert=True,
@@ -171,7 +171,7 @@ class TestMaintenanceResult:
     """Tests for MaintenanceResult."""
 
     def test_successful_result(self):
-        """Test creating a successful result."""
+
         now = time.time()
         result = MaintenanceResult(
             operation_type=MaintenanceOperationType.INSERT,
@@ -188,7 +188,7 @@ class TestMaintenanceResult:
         assert result.error_message is None
 
     def test_failure_factory(self):
-        """Test creating a failure result."""
+
         result = MaintenanceResult.failure(
             MaintenanceOperationType.DELETE,
             "Table not found",
@@ -200,7 +200,7 @@ class TestMaintenanceResult:
         assert result.operation_type == MaintenanceOperationType.DELETE
 
     def test_failure_with_start_time(self):
-        """Test failure factory with explicit start time."""
+
         start = time.time() - 2.0  # 2 seconds ago
         result = MaintenanceResult.failure(
             MaintenanceOperationType.UPDATE,
@@ -247,7 +247,7 @@ class TestBaseDataFrameMaintenanceOperations:
             return 50
 
     def test_capabilities_cached(self):
-        """Test that capabilities are cached."""
+
         caps = DataFrameMaintenanceCapabilities(platform_name="test")
         ops = self.MockMaintenanceOps(caps)
 
@@ -259,7 +259,7 @@ class TestBaseDataFrameMaintenanceOperations:
         assert result1 is result2
 
     def test_insert_rows_success(self):
-        """Test successful INSERT operation."""
+
         caps = DataFrameMaintenanceCapabilities(platform_name="test", supports_insert=True)
         ops = self.MockMaintenanceOps(caps)
 
@@ -271,7 +271,7 @@ class TestBaseDataFrameMaintenanceOperations:
         assert ops.insert_called is True
 
     def test_delete_rows_success(self):
-        """Test successful DELETE operation."""
+
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
             supports_delete=True,
@@ -286,7 +286,7 @@ class TestBaseDataFrameMaintenanceOperations:
         assert ops.delete_called is True
 
     def test_delete_not_supported(self):
-        """Test DELETE raises NotImplementedError when not supported."""
+
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
             supports_delete=False,
@@ -301,7 +301,7 @@ class TestBaseDataFrameMaintenanceOperations:
         assert "Delta Lake" in str(exc_info.value)
 
     def test_update_not_implemented_by_default(self):
-        """Test UPDATE raises NotImplementedError by default."""
+
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
             supports_update=True,  # Capability declared but not implemented
@@ -312,7 +312,7 @@ class TestBaseDataFrameMaintenanceOperations:
             ops.update_rows("/path/to/table", "id = 1", {"name": "new"})
 
     def test_merge_not_implemented_by_default(self):
-        """Test MERGE raises NotImplementedError by default."""
+
         caps = DataFrameMaintenanceCapabilities(
             platform_name="test",
             supports_merge=True,  # Capability declared but not implemented
@@ -323,7 +323,6 @@ class TestBaseDataFrameMaintenanceOperations:
             ops.merge_rows("/path/to/table", MagicMock(), "id = source.id")
 
     def test_insert_exception_returns_failure(self):
-        """Test that exceptions during INSERT return failure result."""
 
         class FailingOps(self.MockMaintenanceOps):
             def _do_insert(self, *args, **kwargs) -> int:
@@ -343,14 +342,14 @@ class TestMaintenanceOperationType:
     """Tests for MaintenanceOperationType enum."""
 
     def test_basic_operations(self):
-        """Test basic operation types."""
+
         assert MaintenanceOperationType.INSERT.value == "insert"
         assert MaintenanceOperationType.DELETE.value == "delete"
         assert MaintenanceOperationType.UPDATE.value == "update"
         assert MaintenanceOperationType.MERGE.value == "merge"
 
     def test_bulk_operations(self):
-        """Test bulk operation types."""
+
         assert MaintenanceOperationType.BULK_INSERT.value == "bulk_insert"
         assert MaintenanceOperationType.BULK_DELETE.value == "bulk_delete"
 
@@ -359,7 +358,7 @@ class TestTransactionIsolation:
     """Tests for TransactionIsolation enum."""
 
     def test_isolation_levels(self):
-        """Test isolation level values."""
+
         assert TransactionIsolation.NONE.value == "none"
         assert TransactionIsolation.READ_COMMITTED.value == "read_committed"
         assert TransactionIsolation.SNAPSHOT.value == "snapshot"
@@ -370,7 +369,7 @@ class TestGetMaintenanceOperationsForPlatform:
     """Tests for get_maintenance_operations_for_platform."""
 
     def test_unknown_platform_returns_none(self):
-        """Test that unknown platforms return None."""
+
         result = get_maintenance_operations_for_platform("unknown-platform")
         assert result is None
 
@@ -409,7 +408,7 @@ class TestGetMaintenanceOperationsForPlatform:
             assert caps.supports_merge is True
 
     def test_case_insensitive(self):
-        """Test that platform names are case-insensitive."""
+
         # Both should return the same result type (may be None if deps not installed)
         result1 = get_maintenance_operations_for_platform("Polars-DF")
         result2 = get_maintenance_operations_for_platform("POLARS-DF")

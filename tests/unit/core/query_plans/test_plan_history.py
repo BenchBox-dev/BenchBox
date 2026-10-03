@@ -110,7 +110,7 @@ class TestPlanHistoryEntry:
     """Tests for PlanHistoryEntry dataclass."""
 
     def test_to_dict(self) -> None:
-        """Test to_dict conversion."""
+
         entry = PlanHistoryEntry(
             run_id="run1",
             timestamp="2024-01-01T00:00:00Z",
@@ -127,7 +127,7 @@ class TestPlanHistoryEntry:
         assert result["execution_time_ms"] == 50.0
 
     def test_from_dict(self) -> None:
-        """Test from_dict creation."""
+
         data = {
             "run_id": "run1",
             "timestamp": "2024-01-01T00:00:00Z",
@@ -155,7 +155,7 @@ class TestPlanHistory:
     """
 
     def test_add_run(self) -> None:
-        """Test adding a benchmark run to history."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -193,7 +193,7 @@ class TestPlanHistory:
             assert history.get_run_count() == 0
 
     def test_query_plan_history(self) -> None:
-        """Test retrieving history for a query."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -262,14 +262,14 @@ class TestPlanHistory:
             assert [e.run_id for e in entries] == ["run-b", "run-a"]
 
     def test_query_plan_history_empty(self) -> None:
-        """Test history for non-existent query."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
             entries = history.query_plan_history("nonexistent")
             assert entries == []
 
     def test_detect_plan_flapping_no_flapping(self) -> None:
-        """Test flapping detection with stable plan."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -286,7 +286,7 @@ class TestPlanHistory:
             assert history.detect_plan_flapping("q1") is False
 
     def test_detect_plan_flapping_single_change(self) -> None:
-        """Test flapping detection with single plan change."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -305,7 +305,7 @@ class TestPlanHistory:
             assert history.detect_plan_flapping("q1") is False
 
     def test_detect_plan_flapping_detected(self) -> None:
-        """Test flapping detection with frequent changes."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -350,7 +350,7 @@ class TestPlanHistory:
             assert history.detect_plan_flapping("q1") is False
 
     def test_detect_plan_flapping_few_runs(self) -> None:
-        """Test flapping detection with too few runs."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -425,7 +425,7 @@ class TestPlanHistory:
             assert history.detect_plan_flapping("q1") is True
 
     def test_get_plan_version_history(self) -> None:
-        """Test version history tracking."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -482,7 +482,7 @@ class TestPlanHistory:
             assert versions[3] == ("b" * 64, 2)  # genuine change: version bumps
 
     def test_get_all_query_ids(self) -> None:
-        """Test getting all query IDs."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -502,7 +502,7 @@ class TestPlanHistory:
             assert query_ids == {"q1", "q2"}
 
     def test_get_run_count(self) -> None:
-        """Test run count."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -519,7 +519,7 @@ class TestPlanHistory:
             assert history.get_run_count() == 3
 
     def test_clear(self) -> None:
-        """Test clearing history."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = PlanHistory(Path(tmpdir))
 
@@ -541,13 +541,13 @@ class TestCreatePlanHistory:
     """Tests for create_plan_history factory function."""
 
     def test_creates_history_instance(self) -> None:
-        """Test factory function creates PlanHistory."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             history = create_plan_history(tmpdir)
             assert isinstance(history, PlanHistory)
 
     def test_creates_directory_if_not_exists(self) -> None:
-        """Test factory creates storage directory."""
+
         with tempfile.TemporaryDirectory() as tmpdir:
             new_dir = Path(tmpdir) / "subdir" / "history"
             create_plan_history(new_dir)

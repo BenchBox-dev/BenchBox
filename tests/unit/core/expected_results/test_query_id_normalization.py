@@ -27,7 +27,7 @@ class TestQueryIDNormalization:
         return QueryValidator()
 
     def test_normalize_integer_query_id(self, validator):
-        """Test normalization of integer query IDs."""
+
         # Integer query IDs should be converted to strings
         result = validator.validate_query_result(
             benchmark_type="tpch",
@@ -39,7 +39,7 @@ class TestQueryIDNormalization:
         assert result.expected_row_count == 4
 
     def test_normalize_string_numeric_query_id(self, validator):
-        """Test normalization of string numeric query IDs."""
+
         result = validator.validate_query_result(
             benchmark_type="tpch",
             query_id="1",  # String numeric
@@ -130,7 +130,7 @@ class TestQueryIDNormalization:
         assert result.expected_row_count == 1
 
     def test_normalize_multi_digit_query_ids(self, validator):
-        """Test normalization of multi-digit query IDs in various formats."""
+
         # Plain multi-digit
         result = validator.validate_query_result(
             benchmark_type="tpch",
@@ -150,7 +150,7 @@ class TestQueryIDNormalization:
         assert result.is_valid
 
     def test_normalize_tpcds_query_ids(self, validator):
-        """Test normalization works for TPC-DS benchmark as well."""
+
         result = validator.validate_query_result(
             benchmark_type="tpcds",
             query_id="Q1",
@@ -189,7 +189,7 @@ class TestQueryIDNormalization:
         assert result.expected_row_count == 4
 
     def test_normalize_whitespace_handling(self, validator):
-        """Test that IDs with whitespace are handled."""
+
         # Whitespace should not prevent digit extraction
         result = validator.validate_query_result(
             benchmark_type="tpch",
@@ -201,7 +201,7 @@ class TestQueryIDNormalization:
         assert result.expected_row_count == 4
 
     def test_normalize_mixed_case_prefix(self, validator):
-        """Test that mixed case prefixes are handled."""
+
         result = validator.validate_query_result(
             benchmark_type="tpch",
             query_id="Query1",  # Mixed case
@@ -212,7 +212,7 @@ class TestQueryIDNormalization:
         assert result.expected_row_count == 4
 
     def test_normalize_id_with_no_digits_falls_back(self, validator):
-        """Test that IDs with no digits fall back gracefully."""
+
         result = validator.validate_query_result(
             benchmark_type="tpch",
             query_id="INVALID_NO_DIGITS",
@@ -224,7 +224,7 @@ class TestQueryIDNormalization:
         assert result.validation_mode.value == "skip"
 
     def test_normalize_consistency_across_formats(self, validator):
-        """Test that different formats for same query produce same result."""
+
         # After BUG-1 fix, "01" also normalizes correctly to "1"
         formats = ["1", 1, "01", "Q1", "q1", "query1", "Query1"]
 
@@ -246,7 +246,7 @@ class TestQueryIDNormalization:
         assert expected_counts[0] == 4
 
     def test_internal_normalize_method_directly(self, validator):
-        """Test the internal _normalize_query_id method directly."""
+
         # Test various formats
         assert validator._normalize_query_id("tpch", 1) == "1"
         assert validator._normalize_query_id("tpch", "1") == "1"

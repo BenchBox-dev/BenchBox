@@ -26,7 +26,7 @@ class TestTPCDSDialectSwitch:
     """Test TPC-DS dialect switch to Netezza default."""
 
     def test_tpcds_query_manager_default_dialect_netezza(self):
-        """Test that TPCDSQueryManager uses netezza as default dialect."""
+
         # Create a mock DSQGenBinary that tracks dialect calls
         mock_dsqgen = Mock(spec=DSQGenBinary)
         mock_dsqgen.generate.return_value = "SELECT * FROM test LIMIT 100"
@@ -44,7 +44,7 @@ class TestTPCDSDialectSwitch:
             assert sql == "SELECT * FROM test LIMIT 100"
 
     def test_tpcds_query_manager_explicit_ansi_dialect(self):
-        """Test that explicit ansi dialect specification still works."""
+
         mock_dsqgen = Mock(spec=DSQGenBinary)
         mock_dsqgen.generate.return_value = "SELECT TOP 100 * FROM test"
 
@@ -65,7 +65,6 @@ class TestTPCDSDialectSwitch:
     # and file system setup. Unit tests focus on the API layer changes.
 
     def test_platform_adapter_tpcds_base_dialect(self):
-        """Test that platform adapters return netezza for TPC-DS base dialect."""
 
         # Create a concrete mock adapter since PlatformAdapter is abstract
         class MockAdapter(PlatformAdapter):
@@ -149,7 +148,7 @@ class TestTPCDSDialectSwitch:
                 assert sql == expected_sql
 
     def test_generate_with_parameters_uses_netezza_default(self):
-        """Test that generate_with_parameters uses netezza as default dialect."""
+
         mock_dsqgen = Mock(spec=DSQGenBinary)
         mock_dsqgen.generate_with_parameters.return_value = "SELECT * FROM test WHERE x = 5 LIMIT 10"
 
@@ -166,7 +165,7 @@ class TestTPCDSDialectSwitch:
             assert sql == "SELECT * FROM test WHERE x = 5 LIMIT 10"
 
     def test_backward_compatibility_maintained(self):
-        """Test that existing code specifying ansi dialect continues to work."""
+
         # This test ensures that any existing code that explicitly specifies
         # dialect='ansi' will continue to work unchanged
         mock_dsqgen = Mock(spec=DSQGenBinary)

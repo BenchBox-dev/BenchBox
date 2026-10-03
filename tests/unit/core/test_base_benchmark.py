@@ -87,19 +87,19 @@ class TestInitialization:
     """Tests for benchmark initialization."""
 
     def test_basic_initialization(self):
-        """Test that MockBenchmark can be initialized with default parameters."""
+
         benchmark = MockBenchmark()
         assert benchmark.scale_factor == 1.0
         assert benchmark._name == "Mock Benchmark"
         assert benchmark._version == "1.0.0"
 
     def test_custom_scale_factor(self):
-        """Test initialization with a custom scale factor."""
+
         benchmark = MockBenchmark(scale_factor=5.0)
         assert benchmark.scale_factor == 5.0
 
     def test_invalid_scale_factor(self):
-        """Test that initialization with an invalid scale factor raises ValueError."""
+
         with pytest.raises(ValueError, match="Scale factor must be positive"):
             MockBenchmark(scale_factor=-1.0)
 
@@ -107,7 +107,7 @@ class TestInitialization:
             MockBenchmark(scale_factor=0)
 
     def test_custom_config(self):
-        """Test initialization with custom configuration parameters."""
+
         benchmark = MockBenchmark(scale_factor=2.0, custom_param="value")
         assert benchmark.scale_factor == 2.0
         assert benchmark.config.get("custom_param") == "value"
@@ -149,19 +149,19 @@ class TestMetadata:
     """Tests for metadata property access."""
 
     def test_name_access(self, base_benchmark):
-        """Test retrieval of benchmark name."""
+
         assert base_benchmark.name == "Mock Benchmark"
 
     def test_version_access(self, base_benchmark):
-        """Test retrieval of benchmark version."""
+
         assert base_benchmark.version == "1.0.0"
 
     def test_description_access(self, base_benchmark):
-        """Test retrieval of benchmark description."""
+
         assert base_benchmark.description == "A mock benchmark for testing"
 
     def test_metadata_immutability(self, base_benchmark):
-        """Test that metadata attributes are read-only."""
+
         with pytest.raises(AttributeError):
             base_benchmark.name = "New Name"
 
@@ -177,18 +177,16 @@ class TestResourceManagement:
     """Tests for resource management functionality."""
 
     def test_cleanup(self, base_benchmark):
-        """Test that cleanup method properly releases resources."""
-        # Set up resources
+
         base_benchmark._resources = ["resource1", "resource2"]
 
-        # Cleanup
         base_benchmark.cleanup()
 
         # Verify resources are released
         assert base_benchmark._resources == []
 
     def test_context_manager(self):
-        """Test using MockBenchmark as a context manager."""
+
         with MockBenchmark(scale_factor=1.0) as benchmark:
             # Use the benchmark
             benchmark._resources = ["resource1"]
@@ -198,7 +196,7 @@ class TestResourceManagement:
         assert benchmark._resources == []
 
     def test_context_manager_with_exception(self):
-        """Test context manager behavior during exceptions."""
+
         benchmark = None
         try:
             with MockBenchmark(scale_factor=1.0) as benchmark:
@@ -214,12 +212,12 @@ class TestErrorHandling:
     """Tests for error handling behaviors."""
 
     def test_invalid_query_id(self, base_benchmark):
-        """Test behavior with invalid query IDs."""
+
         with pytest.raises(ValueError, match="Query ID .* not found"):
             base_benchmark.get_query(999)
 
     def test_query_execution_error(self, base_benchmark, mock_db_connection):
-        """Test response to query execution errors."""
+
         # Make the mock connection raise an exception during execution
         mock_db_connection.cursor.return_value.execute.side_effect = Exception("DB Error")
 
@@ -233,12 +231,12 @@ class TestQueryManagement:
     """Tests for query management functionality."""
 
     def test_get_query(self, base_benchmark):
-        """Test retrieving individual queries by ID."""
+
         query = base_benchmark.get_query(1)
         assert query == "SELECT * FROM table1"
 
     def test_get_all_queries(self, base_benchmark):
-        """Test retrieving all available queries."""
+
         queries = base_benchmark.get_all_queries()
         assert len(queries) == 3
         assert 1 in queries
@@ -246,7 +244,7 @@ class TestQueryManagement:
         assert 3 in queries
 
     def test_nonexistent_query(self, base_benchmark):
-        """Test behavior with nonexistent query IDs."""
+
         with pytest.raises(ValueError):
             base_benchmark.get_query(999)
 
@@ -256,7 +254,7 @@ class TestDataGeneration:
     """Tests for data generation functionality."""
 
     def test_generate_data_default(self, base_benchmark):
-        """Test data generation with default parameters."""
+
         data = base_benchmark.generate_data()
         assert "table1" in data
         assert "table2" in data
@@ -264,13 +262,12 @@ class TestDataGeneration:
         assert len(data["table2"]) == 10
 
     def test_generate_specific_tables(self, base_benchmark):
-        """Test generating data for specific tables."""
+
         data = base_benchmark.generate_data(tables=["table1"])
         assert "table1" in data
         assert "table2" not in data
 
     def test_scale_factor_effect(self):
-        """Test relationship between scale factor and data volume."""
 
         # Create a custom mock benchmark that respects scale factor
         class ScaledMockBenchmark(MockBenchmark):
