@@ -4,7 +4,7 @@
     "Q36 is stable over 40 repeats or classified with the reason",
     "The classifier and the promotion gate fail or flag a cell that differs between repeated runs"
   ],
-  "context": "2026-10-03 state. First half (cause and Q36 stability): #2547 (fix/validator-float-tie-sort, BenchBox.wt-tpcds-n03), float-bucketed row pairing in benchbox/core/tpchavoc/validation.py; owner approved ('proceed with N3'). Soundness path. Its latest required CI run on the head was CANCELLED (soundness-flag red too), so it needs a fresh run before a maintainer merge. Second half (flaky-cell detection): KEEP n03b. BenchBox.wt-tpcds-n03b, branch feat/cross-surface-flake-detection (4722642f6, local only, no PR): --repeats N in cross_surface.py returns non-zero when a cell's outcome changes between runs; soundness path; drafted PR body is lost, rewrite it. t14's --repeat (#2553) is report-only and exits zero, so it serves diagnosis, not enforcement. An earlier recommendation to retire n03b was withdrawn after Codex's review (finding 8, verified in n03b's cross_surface.py ~2100-2130).",
+  "context": "Owner decision D7 (2026-10-03): soundness-path PRs (#2547, the n03b branch) wait until #2567 retires the merge queue. Do not open or arm them before then.",
   "description": "Q36 on the expression family at SF 0.03 diverges in some runs of identical code (40 repeats in one process: 2 divergent without the #2502 changes, 1 with them; detail: Value mismatch at row 4, column 3. Original: 0, Variant: 1). Q36 uses none of the changed code. Find the cause (likely a tie or an unstable aggregation order). A cell that flips between runs cannot be a stable gate, so the classifier (t14) and the promotion gate (t20) need repeat-run detection.",
   "sessions": [
     {
@@ -29,6 +29,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "7b08942b48134ff0a387f4a796ace276",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T13:20:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "223db6642e814a2abdaf921f8794a27c",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
