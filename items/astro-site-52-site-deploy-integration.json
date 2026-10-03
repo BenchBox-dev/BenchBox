@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "routes.yml declares Astro sources per route with pinned refs; assembly tests updated",
+    "All dlv2-60 pre-deploy gates run on an Astro-built candidate and pass",
+    "Preview deploy of an Astro candidate with probes, receipt and a rollback-by-receipt drill to the last Sphinx artifact",
+    "Mixed state (Sphinx /docs/ from tag + Astro /docs/dev/ and /blog/ from trunk) renders a consistent header and passes link checks"
+  ],
+  "context": "The mixed-version window is real: release-pinned /docs/ stays on Sphinx until a release ships website/. The shared header must therefore work on both. Keep landing/shared assets until the last Sphinx-built route is gone.",
+  "description": "After dlv2-62, site-deploy is the only production writer. Extend its route manifest (site/routes.yml) and assembly so each route is built from its pinned source:\n- / and /docs/: Astro built from the latest release tag. This requires a release tag that contains website/; until one exists, those routes keep the Sphinx build from the tag.\n- /docs/dev/ and /blog/: Astro built from trunk.\n- /results/: the Explorer artifact plus the corpus snapshot, each pinned by its own SHA and digest.\n- API reference: release-pinned.\n\nKeep artifact assembly and verification: per-route source SHA, corpus SHA, artifact sha256, privacy gate, explorer-compat (both orders), corpus bijection, digest, cross-route link check, post-deploy probes, receipts, and rollback-by-receipt.\n\nThe assemble step may be rewritten to consume Astro output, but no gate is removed.",
+  "links": [
+    "dlv2-60-publication-integration",
+    "dlv2-62-publication-cutover-and-retirement",
+    "scripts/assemble_public_site.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:12:49Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "22aba7c8e2ca47ff95c080c1edffa162",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
