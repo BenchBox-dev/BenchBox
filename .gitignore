@@ -247,3 +247,4 @@ node_modules/
 /.agents/skills/
 /.claude/skills/.system/
 /.claude/skills/blog/
+/site-inventory/

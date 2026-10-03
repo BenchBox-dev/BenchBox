@@ -144,6 +144,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | File | Classification |
 | --- | --- |
 | `test_agent_instruction_audit.py` | tooling |
+| `test_api_reference_url_map.py` | product-safety |
 | `test_assemble_public_site.py` | product-safety |
 | `test_audit_sha_check.py` | product-safety |
 | `test_batch_integration.py` | product-safety |
@@ -152,6 +153,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_branch_prune_merged.py` | pure-process |
 | `test_browser_gate_aggregate.py` | product-safety |
 | `test_build_joinorder_data.py` | product-safety |
+| `test_check_api_contract_symbols.py` | product-safety |
 | `test_check_complexity.py` | tooling |
 | `test_check_dependency_bounds.py` | product-safety |
 | `test_check_doc_relative_links.py` | tooling |
@@ -219,6 +221,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_scan_explorer_stale_theme.py` | product-safety |
 | `test_scan_explorer_tokens.py` | product-safety |
 | `test_shrink_rollup.py` | pure-process |
+| `test_site_inventory.py` | product-safety |
 | `test_skill_sync_ci_policy.py` | tooling |
 | `test_soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |
 | `test_sqlglot_generator.py` | product-safety |
