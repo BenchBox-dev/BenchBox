@@ -186,8 +186,8 @@ def find_dataframe_divergences(
     # unseeded production run path, so no gate-local fraction override is needed:
     # clear any ambient parameter overrides and declare the gate's scale through
     # the same product seam the run path uses. Restore both afterwards.
-    previous_overrides = tpch_dataframe_queries._parameter_overrides
-    previous_scale_factor = tpch_dataframe_queries._scale_factor
+    previous_overrides = tpch_dataframe_queries._parameter_overrides.get()
+    previous_scale_factor = tpch_dataframe_queries._scale_factor.get()
     set_parameter_overrides(None)
     set_scale_factor(benchmark.scale_factor)
     try:

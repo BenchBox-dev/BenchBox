@@ -6,7 +6,7 @@ import { docsLoader } from "./loaders/docs-loader.ts";
 const docs = defineCollection({
   loader: docsLoader([
     { id: "docs/usage/getting-started", file: "docs/usage/getting-started.md" },
-    { id: "docs/benchmarks/industry-benchmarks", file: "docs/benchmarks/industry-benchmarks.rst" },
+    { id: "docs/benchmarks/industry-benchmarks", file: "docs/benchmarks/industry-benchmarks.md" },
     { id: "docs/benchmarks/queries/tpch/q1", file: "docs/benchmarks/queries/tpch/q1.md" },
     {
       id: "docs/reference/python-api/additional-utilities",
