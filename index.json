@@ -6922,12 +6922,17 @@
       "title": "Inventory offline test coverage for every registered platform adapter and fill the gaps"
     },
     "dlv2-15-required-t2-cases": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-04T16:46:24Z",
+        "generation": "cba5646821fe4ce2b95c2ac1ef527bb7",
+        "renewals": 0,
+        "worker": "mcp:codex-mcp-client:joe@joe-mac-mini.local:5c1aaa54eb8a559e60579282"
+      },
       "needs": [
         "dlv2-11-optional-engine-clean-skips"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Define the required T2 engine cases and fail T2 when a required case skips"
     },
     "dlv2-16-split-timing-policy": {
