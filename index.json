@@ -911,6 +911,16 @@
       "status": "open",
       "title": "Decision gate: choose what replaces the 27 autodoc API reference pages now that docstrings are deprecated"
     },
+    "astro-site-10-spike-and-go-gate": {
+      "claim": null,
+      "needs": [
+        "astro-site-00-decisions-adr",
+        "astro-site-01-url-content-inventory"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Decision gate G1: run a time-boxed Astro spike and record go/no-go plus custom-vs-Starlight"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
