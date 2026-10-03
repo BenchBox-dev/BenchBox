@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Parity job runs on every PR touching docs/ or website/ (non-required)",
+    "Report: zero unexplained differences; allow-list entries each have a reason and approval",
+    "Redirect-page count reported against the 5% abandon threshold",
+    "Owner sign-off recorded in _project/decisions/astro-parity-signoff.md"
+  ],
+  "description": "Add a non-required CI job that assembles both sites from the same develop SHA and runs `site_inventory diff` (astro-site-01) on them.\n\nIt checks:\n- missing paths\n- lost anchors\n- changed titles and headings\n- broken internal links\n- missing images\n- tag pages, archives and series\n- atom.xml entry ids\n- generated query pages\n- the API URL map\n\nIt also runs axe over every page template, the docs/blog Explorer-byte check, check_artifact_privacy.py, and the Pagefind smoke search.\n\nEvery remaining difference must be in an allow-list. Each allow-list entry carries a reason and an owner approval. Redirect pages count toward the ADR abandon threshold.\n\nGate: the owner signs off the parity report before astro-site-53 may start.",
+  "links": [
+    "scripts/publication/check_artifact_privacy.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:12:11Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2a5aab54b82a416da9d5c5237bff8a63",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}

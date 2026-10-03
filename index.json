@@ -1026,6 +1026,19 @@
       "status": "open",
       "title": "Integrate the Results Explorer into the shared shell without changing its behaviour"
     },
+    "astro-site-50-parity-harness": {
+      "claim": null,
+      "needs": [
+        "astro-site-33-blog-collection-and-feed",
+        "astro-site-34-api-reference-implementation",
+        "astro-site-35-landing-and-prompts-port",
+        "astro-site-36-site-metadata-and-404",
+        "astro-site-40-explorer-shell-integration"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Decision gate G2: add a parity harness comparing the Astro build with the Sphinx site, and require a clean result"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],
