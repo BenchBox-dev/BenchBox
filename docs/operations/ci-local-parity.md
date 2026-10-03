@@ -235,11 +235,14 @@ that correctly certified run BEHIND. Refresh such PRs one at a time.
 ### Local preflight
 
 `make pr-preflight` lints the changed Python files with ruff and runs the tests
-mapped from the changed paths (`_project/scripts/preflight_targets.py`). It does not run
-the classifier, the skill-integrity lane, the content guard, type checking, or
-the remaining guards in `make ci-lint`; run `make skill-integrity-check`,
-`make ci-lint`, or `make pr-preflight-fast-tests` for them. CI runs every one
-of them on the PR.
+mapped from the changed paths (`_project/scripts/preflight_targets.py`), failed
+tests first. The pre-push hook runs it. Checks that now run only in CI, with
+the command to run each locally: `ty` (`uv run ty check`), import-linter
+(`make lint-imports`), comment policy (`make comment-policy-check`), the
+content guard (`make pr-preflight-fast-tests`), skill integrity
+(`make skill-integrity-check`), UAT hygiene (`make uat-artifact-hygiene`); the
+full fast lane is `make pr-preflight-fast-tests` and every `ci-lint` guard is
+`make ci-lint`.
 
 The preflight does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
 or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` remains the sole
@@ -257,8 +260,7 @@ exactly as before this table existed.
 of whether the branch's `needs-code-ci` path-filter decision is true. This
 preserves the fix for docs-plus-code PRs that previously hit those guards for
 the first time in CI. The `needs-code-ci` decision still gates only the
-fast-test pytest run. Direct invocation, including the opt-in `BENCHBOX_PREPUSH=1`
-hook, creates the classifier JSON and path lists when the caller did not
+fast-test pytest run. Direct invocation creates the classifier JSON and path lists when the caller did not
 supply them. It runs under the shared test lock.
 
 ## Hosted merge-gate guard inventory

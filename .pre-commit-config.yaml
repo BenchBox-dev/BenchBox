@@ -65,14 +65,15 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
-      # Opt-in full fast lane at push time (BENCHBOX_PREPUSH=1), the same
-      # selection CI runs. `make pr-preflight` is the default pre-push gate:
-      # it lints the changed Python files and runs only their tests.
-      - id: pr-preflight-fast-tests
-        name: pr-preflight (fast tests, mirrors CI)
-        entry: bash -c 'if [ "$BENCHBOX_PREPUSH" = "1" ]; then exec make pr-preflight-fast-tests; else echo "SKIPPED (the full fast lane runs at pre-push only when BENCHBOX_PREPUSH=1)"; fi'
+      # Push-time gate: ruff on the changed Python files and the tests mapped
+      # from them. The full fast lane is CI's job; `make pr-preflight-fast-tests`
+      # runs it locally on request.
+      - id: pr-preflight
+        name: pr-preflight (changed-file lint and tests)
+        entry: make pr-preflight
         language: system
         pass_filenames: false
+        always_run: true
         stages: [pre-push]
 
       # Validate any blind-spot finding files staged in this commit.

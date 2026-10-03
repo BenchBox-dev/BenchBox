@@ -355,7 +355,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `timing-policy-check` | product-safety | Monotonic-clock policy |
 | `comment-policy` | tooling | Comments, docstrings, parser coverage and completed-scope enforcement |
 | `timing-policy-fast-lane` | pure-process | Fast-lane mechanics |
-| `pr-preflight-fast-tests` | pure-process | PR-loop mechanics |
+| `pr-preflight` | pure-process | PR-loop mechanics |
 | `blind-spot-validate` | product-safety | Blind-spot coverage |
 | `explorer-tokens` | product-safety | Explorer token integrity |
 | `duplicate-code-warn` | tooling | Hygiene |

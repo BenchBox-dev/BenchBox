@@ -331,7 +331,8 @@ class TestMakefileCommands:
         assert "ruff check --force-exclude" in preflight_body
         assert "ruff format --check --force-exclude" in preflight_body
         assert "-q -n 0" in preflight_body
-        assert "--lf" in preflight_body
+        assert "--ff" in preflight_body
+        assert "--lf" not in preflight_body
         assert "CI runs the fast lane" in preflight_body
         assert "local_validation" not in preflight_body
         assert "pr-preflight-fast-tests" not in preflight_body

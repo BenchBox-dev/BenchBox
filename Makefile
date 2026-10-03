@@ -1362,12 +1362,9 @@ pr-preflight:
 		echo "No test files map to the changed paths; CI runs the fast lane."; \
 		exit 0; \
 	fi; \
-	LAST_FAILED=.pytest_cache/v/cache/lastfailed; \
-	LF=; \
-	if [ -s "$$LAST_FAILED" ] && [ "$$(tr -d ' \n' < "$$LAST_FAILED")" != "{}" ]; then LF=--lf; fi; \
 	echo "==> tests for changed files"; \
 	STATUS=0; \
-	uv run -- python -m pytest -q -n 0 --tb=short $$LF $$(cat "$$TEST_LIST") || STATUS=$$?; \
+	uv run -- python -m pytest -q -n 0 --tb=short --ff $$(cat "$$TEST_LIST") || STATUS=$$?; \
 	if [ "$$STATUS" -eq 5 ]; then echo "Mapped tests are all deselected by the default markers."; STATUS=0; fi; \
 	exit "$$STATUS"
 

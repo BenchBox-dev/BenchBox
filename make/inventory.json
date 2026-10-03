@@ -1,5 +1,5 @@
 {
-  "contract_sha256": "667b5fab96e112ad7dffacb0333425c2fe7f43ba5002de1045296c77f380f26e",
+  "contract_sha256": "01bf70124a912552634b2820598f91c6e5e8496d112e48017e1d422b825f482c",
   "default_goal": "test",
   "include_order": [
     "make/platform-tests.mk",
@@ -1251,8 +1251,8 @@
     "pr-preflight": [
       {
         "header": "pr-preflight:",
-        "recipe": "\t@set -eu; \\\n\tgit fetch origin develop --quiet; \\\n\tPY_LIST=$$(mktemp); \\\n\tTEST_LIST=$$(mktemp); \\\n\ttrap 'rm -f \"$$PY_LIST\" \"$$TEST_LIST\"' EXIT; \\\n\tuv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > \"$$PY_LIST\"; \\\n\tuv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > \"$$TEST_LIST\"; \\\n\tif [ -s \"$$PY_LIST\" ]; then \\\n\t\techo \"==> ruff (changed Python files)\"; \\\n\t\tuv run -- ruff check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\t\tuv run -- ruff format --check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\telse \\\n\t\techo \"No Python files changed; skipping ruff.\"; \\\n\tfi; \\\n\tif [ ! -s \"$$TEST_LIST\" ]; then \\\n\t\techo \"No test files map to the changed paths; CI runs the fast lane.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tLAST_FAILED=.pytest_cache/v/cache/lastfailed; \\\n\tLF=; \\\n\tif [ -s \"$$LAST_FAILED\" ] && [ \"$$(tr -d ' \\n' < \"$$LAST_FAILED\")\" != \"{}\" ]; then LF=--lf; fi; \\\n\techo \"==> tests for changed files\"; \\\n\tSTATUS=0; \\\n\tuv run -- python -m pytest -q -n 0 --tb=short $$LF $$(cat \"$$TEST_LIST\") || STATUS=$$?; \\\n\tif [ \"$$STATUS\" -eq 5 ]; then echo \"Mapped tests are all deselected by the default markers.\"; STATUS=0; fi; \\\n\texit \"$$STATUS\"",
-        "recipe_sha256": "537f2e2793bb5746c82e97911a0b7b66e4dceea54c286b8f9050875a8fd8b5bb"
+        "recipe": "\t@set -eu; \\\n\tgit fetch origin develop --quiet; \\\n\tPY_LIST=$$(mktemp); \\\n\tTEST_LIST=$$(mktemp); \\\n\ttrap 'rm -f \"$$PY_LIST\" \"$$TEST_LIST\"' EXIT; \\\n\tuv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > \"$$PY_LIST\"; \\\n\tuv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > \"$$TEST_LIST\"; \\\n\tif [ -s \"$$PY_LIST\" ]; then \\\n\t\techo \"==> ruff (changed Python files)\"; \\\n\t\tuv run -- ruff check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\t\tuv run -- ruff format --check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\telse \\\n\t\techo \"No Python files changed; skipping ruff.\"; \\\n\tfi; \\\n\tif [ ! -s \"$$TEST_LIST\" ]; then \\\n\t\techo \"No test files map to the changed paths; CI runs the fast lane.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\techo \"==> tests for changed files\"; \\\n\tSTATUS=0; \\\n\tuv run -- python -m pytest -q -n 0 --tb=short --ff $$(cat \"$$TEST_LIST\") || STATUS=$$?; \\\n\tif [ \"$$STATUS\" -eq 5 ]; then echo \"Mapped tests are all deselected by the default markers.\"; STATUS=0; fi; \\\n\texit \"$$STATUS\"",
+        "recipe_sha256": "dbb6d6261fab5d2fbbfdf5aa7e35f78a4bb52b12c4c2abc02a9d534604b8a949"
       }
     ],
     "pr-preflight-fast-tests": [
@@ -2221,7 +2221,7 @@
     ]
   },
   "schema_version": 2,
-  "semantic_sha256": "9f296810e2cbe0d4e08a66fa1ffb5d26acce81377e562ce0e184ce9b86f84ca9",
+  "semantic_sha256": "ab2ca7ebb7232706c49e1fb8c04962583873861f1b81bf48aaf2d22182721e2b",
   "semantic_statements": [
     {
       "body": "override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))",
@@ -3987,9 +3987,9 @@
       ]
     },
     {
-      "body": "pr-preflight:\n\t@set -eu; \\\n\tgit fetch origin develop --quiet; \\\n\tPY_LIST=$$(mktemp); \\\n\tTEST_LIST=$$(mktemp); \\\n\ttrap 'rm -f \"$$PY_LIST\" \"$$TEST_LIST\"' EXIT; \\\n\tuv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > \"$$PY_LIST\"; \\\n\tuv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > \"$$TEST_LIST\"; \\\n\tif [ -s \"$$PY_LIST\" ]; then \\\n\t\techo \"==> ruff (changed Python files)\"; \\\n\t\tuv run -- ruff check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\t\tuv run -- ruff format --check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\telse \\\n\t\techo \"No Python files changed; skipping ruff.\"; \\\n\tfi; \\\n\tif [ ! -s \"$$TEST_LIST\" ]; then \\\n\t\techo \"No test files map to the changed paths; CI runs the fast lane.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\tLAST_FAILED=.pytest_cache/v/cache/lastfailed; \\\n\tLF=; \\\n\tif [ -s \"$$LAST_FAILED\" ] && [ \"$$(tr -d ' \\n' < \"$$LAST_FAILED\")\" != \"{}\" ]; then LF=--lf; fi; \\\n\techo \"==> tests for changed files\"; \\\n\tSTATUS=0; \\\n\tuv run -- python -m pytest -q -n 0 --tb=short $$LF $$(cat \"$$TEST_LIST\") || STATUS=$$?; \\\n\tif [ \"$$STATUS\" -eq 5 ]; then echo \"Mapped tests are all deselected by the default markers.\"; STATUS=0; fi; \\\n\texit \"$$STATUS\"",
+      "body": "pr-preflight:\n\t@set -eu; \\\n\tgit fetch origin develop --quiet; \\\n\tPY_LIST=$$(mktemp); \\\n\tTEST_LIST=$$(mktemp); \\\n\ttrap 'rm -f \"$$PY_LIST\" \"$$TEST_LIST\"' EXIT; \\\n\tuv run -- python _project/scripts/preflight_targets.py python --base-ref origin/develop > \"$$PY_LIST\"; \\\n\tuv run -- python _project/scripts/preflight_targets.py tests --base-ref origin/develop > \"$$TEST_LIST\"; \\\n\tif [ -s \"$$PY_LIST\" ]; then \\\n\t\techo \"==> ruff (changed Python files)\"; \\\n\t\tuv run -- ruff check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\t\tuv run -- ruff format --check --force-exclude $$(cat \"$$PY_LIST\"); \\\n\telse \\\n\t\techo \"No Python files changed; skipping ruff.\"; \\\n\tfi; \\\n\tif [ ! -s \"$$TEST_LIST\" ]; then \\\n\t\techo \"No test files map to the changed paths; CI runs the fast lane.\"; \\\n\t\texit 0; \\\n\tfi; \\\n\techo \"==> tests for changed files\"; \\\n\tSTATUS=0; \\\n\tuv run -- python -m pytest -q -n 0 --tb=short --ff $$(cat \"$$TEST_LIST\") || STATUS=$$?; \\\n\tif [ \"$$STATUS\" -eq 5 ]; then echo \"Mapped tests are all deselected by the default markers.\"; STATUS=0; fi; \\\n\texit \"$$STATUS\"",
       "kind": "rule",
-      "sha256": "9937b78aa702d028cede20ee77548523a76ac29dd6e2a6f73a3982a95942fcab",
+      "sha256": "8eb5647b89f327bc1d9cabcbcbcf3ed424b196170c3208a7c0eec06919aa9c0b",
       "targets": [
         "pr-preflight"
       ]

@@ -35,7 +35,7 @@ This document provides guidelines and instructions for contributing.
 
    This installs two hooks (configured in `.pre-commit-config.yaml`):
    - **pre-commit**: ruff format/check, codespell, YAML / markdown lint, timing-policy check.
-   - **pre-push**: `pr-preflight-fast-tests` — when `BENCHBOX_PREPUSH=1`, runs the full fast-test lane (`make pr-preflight-fast-tests`); without it the hook is skipped and `make pr-preflight` is the local gate.
+   - **pre-push**: `pr-preflight` — runs `make pr-preflight` (ruff on the changed Python files and the tests mapped from them) before each push.
    Existing clones that installed hooks before the pre-push stage was added should re-run `pre-commit install` once.
 
    If `pre-commit install` errors with `Cowardly refusing to install hooks with core.hooksPath set` and points at the default `.git/hooks` location, run `git config --unset-all core.hooksPath` and try again — that's a redundant override left over from earlier tooling.
@@ -122,7 +122,7 @@ There are two layers, and you only need the first:
 make pr-preflight
 ```
 
-This runs `ruff check` and `ruff format --check` on the Python files you changed, then runs the tests for them without xdist, so it does not wait on the shared test lock. A changed `tests/**/test_*.py` runs itself; a changed `benchbox/**/<module>.py` or `scripts/<module>.py` runs every `tests/**/test_<module>.py`. If a previous run left failures in the pytest cache it reruns only those (`--lf`). If no test maps to your change it runs no tests and says CI will run the fast lane.
+This runs `ruff check` and `ruff format --check` on the Python files you changed, then runs the tests for them without xdist, so it does not wait on the shared test lock. A changed `tests/**/test_*.py` runs itself; a changed `benchbox/**/<module>.py` or `scripts/<module>.py` runs every `tests/**/test_<module>.py`. Tests that failed in the previous run go first (`--ff`), then the rest run. If no test maps to your change it runs no tests and says CI will run the fast lane.
 
 It does not run the full fast lane, type checking, or the other lint guards. CI runs all of them on every PR within about 20 minutes and is the authoritative check. To run the full fast lane before pushing, use `make pr-preflight-fast-tests`; to run the CI lint guards use `make ci-lint`.
 

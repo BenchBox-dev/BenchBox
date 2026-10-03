@@ -1120,21 +1120,15 @@ class TestReleaseInfrastructure:
         assert "pr-open" not in preflight
         assert "pr-arm-auto-merge" not in preflight
 
-    def test_pre_push_fast_lane_hook_skips_or_runs_its_actual_entry(self, tmp_path: Path):
+    def test_pre_push_hook_runs_the_targeted_preflight(self, tmp_path: Path):
         config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
-        hook = next(
-            hook
-            for repo in config["repos"]
-            for hook in repo.get("hooks", [])
-            if hook.get("id") == "pr-preflight-fast-tests"
-        )
-        entry = hook["entry"]
-
-        skipped_env = os.environ.copy()
-        skipped_env.pop("BENCHBOX_PREPUSH", None)
-        skipped = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env)
-        assert skipped.returncode == 0
-        assert "SKIPPED" in skipped.stdout
+        hooks = [
+            hook for repo in config["repos"] for hook in repo.get("hooks", []) if "pre-push" in hook.get("stages", [])
+        ]
+        preflight_hooks = [hook for hook in hooks if hook["id"] == "pr-preflight"]
+        assert len(preflight_hooks) == 1
+        assert all(hook["id"] != "pr-preflight-fast-tests" for hook in hooks)
+        entry = preflight_hooks[0]["entry"]
 
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
@@ -1142,13 +1136,12 @@ class TestReleaseInfrastructure:
         fake_make = bin_dir / "make"
         fake_make.write_text('#!/bin/sh\nprintf \'%s\\n\' "$*" > "$HOOK_TRACE"\n', encoding="utf-8")
         fake_make.chmod(0o755)
-        active_env = os.environ.copy()
-        active_env.update(
-            {"BENCHBOX_PREPUSH": "1", "HOOK_TRACE": str(trace), "PATH": f"{bin_dir}:{active_env['PATH']}"}
-        )
-        active = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=active_env)
-        assert active.returncode == 0, active.stderr
-        assert trace.read_text(encoding="utf-8").split() == ["pr-preflight-fast-tests"]
+        env = os.environ.copy()
+        env.pop("BENCHBOX_PREPUSH", None)
+        env.update({"HOOK_TRACE": str(trace), "PATH": f"{bin_dir}:{env['PATH']}"})
+        result = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=env)
+        assert result.returncode == 0, result.stderr
+        assert trace.read_text(encoding="utf-8").split() == ["pr-preflight"]
 
     def test_issue_templates_exist(self):
         """Test that GitHub issue templates exist."""
