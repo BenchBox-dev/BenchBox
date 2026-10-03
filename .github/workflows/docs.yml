@@ -1,7 +1,7 @@
 name: Documentation
 
 on:
-  # Pull-request and merge-queue validation lives in ci.yml. This workflow keeps
+  # Pull-request validation lives in ci.yml. This workflow keeps
   # the protected-develop baseline capture and the release Pages deploy.
   push:
     branches: [release, develop]
@@ -43,7 +43,6 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           RECOVERY_SOURCE_SHA: ${{ inputs.baseline_source_sha }}
           CURRENT_SHA: ${{ github.sha }}
           CURRENT_REF: ${{ github.ref }}
@@ -64,14 +63,14 @@ jobs:
             SOURCE_SHA="$RECOVERY_SOURCE_SHA"
           fi
           echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          BASE_SHA="${PR_BASE_SHA:-$GROUP_BASE_SHA}"
+          BASE_SHA="$PR_BASE_SHA"
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT_NAME" != pull_request ] && [ "$EVENT_NAME" != merge_group ]; then
+          if [ "$EVENT_NAME" != pull_request ]; then
             echo 'changed=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Missing exact PR or merge-group base SHA."
+            echo "::error::Missing exact PR base SHA."
             exit 1
           fi
           git cat-file -e "$BASE_SHA^{commit}" || {
@@ -102,8 +101,8 @@ jobs:
           # input is byte-identical to the base, because it renders the same
           # site; this is the premise that lets unchanged trees skip the gate.
           # The walk stops at the first ancestor whose site inputs differ, so a
-          # differently rendered tree is never used. This covers a queue group
-          # ahead that changed no site inputs and therefore published nothing.
+          # differently rendered tree is never used. This covers a base whose
+          # predecessor changed no site inputs and therefore published nothing.
           CANDIDATES="$BASE_SHA"
           ANCESTORS=$(git rev-list --first-parent --max-count=25 "$BASE_SHA^" 2>/dev/null || true)
           for ANCESTOR in $ANCESTORS; do
@@ -230,13 +229,9 @@ jobs:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'develop') ||
-      github.event_name == 'merge_group'
+      (github.event_name == 'pull_request' && github.base_ref == 'develop')
     needs: [visual-inputs, build]
     runs-on: ubuntu-latest
-    # Build (about 15 minutes) plus this job must fit inside the 60-minute
-    # merge-queue check timeout with room for runner queueing, so the job
-    # never idles long on a runner waiting for a baseline.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -274,29 +269,22 @@ jobs:
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
-      # A merge-queue follower's base is the head of the group ahead of it. That
-      # group publishes a candidate baseline for its exact head once its own
-      # comparison passes. When the group ahead changed no site inputs it
-      # publishes nothing, so the lookup also accepts the nearest ancestor whose
-      # site inputs are byte-identical to the base, which is found at once. The
-      # bounded queue wait only matters when the group ahead did change site
-      # inputs; both groups build concurrently, so its candidate usually lands
-      # within minutes of this capture. Pull requests keep the short retry only.
+      # When no baseline is bound to the exact base, the lookup also accepts the
+      # nearest ancestor whose site inputs are byte-identical to the base.
       - name: Download visual baseline for base or site-equivalent ancestor
         id: baseline
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
           PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES: ${{ needs.visual-inputs.outputs.baseline_candidates }}
           PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
-          PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS: ${{ github.event_name == 'merge_group' && '600' || '0' }}
         run: node scripts/download-public-site-visual-baseline.mjs
         working-directory: results-explorer
 
       - name: Compare public site with exact base
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           E2E_PAGES_SHAPED: "1"
           E2E_SITE_DIR: ${{ github.workspace }}/site
@@ -306,9 +294,9 @@ jobs:
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.baseline.outputs.baseline_sha }}
           PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
-          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
-          APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
-          APPROVAL_REASON: ${{ github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON || github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+          APPROVED_HEAD_SHA: ${{ github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
+          APPROVAL_REASON: ${{ github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
@@ -321,18 +309,6 @@ jobs:
           name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
           path: ${{ runner.temp }}/public-site-visual-current
           retention-days: 30
-
-      # Runs only after this group's exact-base comparison passed. The capture
-      # is of `merge_group.head_sha`, the exact tree the next queue group merges
-      # onto, and the download script trusts it only from a merge_group run of
-      # this workflow on this repository's develop queue branch.
-      - name: Upload merge-queue candidate visual baseline
-        if: github.event_name == 'merge_group'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
-          path: ${{ runner.temp }}/public-site-visual-current
-          retention-days: 7
 
       - name: Upload visual diagnostics
         if: failure()
@@ -370,7 +346,7 @@ jobs:
           if [ "$EVENT_NAME" = pull_request ] && [ "$BASE_REF" != develop ]; then
             exit 0
           fi
-          if [ "$EVENT_NAME" != pull_request ] && [ "$EVENT_NAME" != merge_group ]; then
+          if [ "$EVENT_NAME" != pull_request ]; then
             exit 0
           fi
           if [ "$SITE_CHANGED" = false ]; then
