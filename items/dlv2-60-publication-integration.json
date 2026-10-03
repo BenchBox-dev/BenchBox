@@ -5,7 +5,7 @@
     "Privacy, explorer-compat (both orders), corpus bijection, digest, and link gates wired and tested",
     "Same-day preview: deploy to a non-production target with full probes, receipt, and a rollback-by-receipt drill (github-pages reviewer approval via API); byte/route parity against current production explained. No multi-day shadow."
   ],
-  "context": "Parallel track; does not block the CI flip. Candidate gating on merge_group ci.yml runs becomes testable after dlv2-f3. Reviewer findings covered: codex C2/C3, muse M7/M14, agy A10.",
+  "context": "Parallel track; does not block the CI flip. Candidate gating on merge_group ci.yml runs becomes testable after dlv2-f3. Reviewer findings covered: codex C2/C3, muse M7/M14, agy A10.\n\nPROGRESS 2026-10-03 16:25Z (session_01GZSaWtTiCz9etgrhYRuVzu): implementation in progress in a local worktree (branch wip/dlv2-60, not pushed), from a research pass on the existing control plane. Design choices: workflow_dispatch only (preview|deploy|rollback), concurrency pages-deploy, generation authority = latest site-deploy Deployment status + retained receipt artifact, new code in scripts/site_deploy/ (scripts/publication/* untouched), preview = in-runner local server with Pages 404 emulation plus rollback drill. Known owner dependency: approving a github-pages pending deployment needs a required-reviewer USER token (GITHUB_TOKEN cannot), so production deploys and the production rollback drill need the owner's approval click or a reviewer token. Will push from claude/bold-newton-uudn48 after PR #2585 merges.",
   "description": "Decision D2 (approved): REPLACE the publication control plane. This item builds and shadows the replacement; dlv2-62 cuts over and retires the old plane.\nRequired design (from adversarial review; all mandatory):\n1. Route manifest site/routes.yml: `/` (landing) and `/docs/` from the latest release tag; `/docs/dev/`, blog, and `/results/` (explorer UI + DuckDB snapshot) from trunk. Extend scripts/assemble_public_site.py (currently copies local build dirs only) to read the manifest and build each route from its pinned ref.\n2. Candidate identity: only develop commits with a successful merge_group ci.yml run; record source SHA per route, corpus SHA, and the sha256 of the assembled artifact.\n3. Pre-deploy gates (reuse existing scripts): scripts/publication/check_artifact_privacy.py, check_explorer_compat.py (both mixed-version orders; results-explorer/src/db.ts:289 rejects older snapshots), check_corpus_bijection.py, compare_db_digest.py, validator_parity.py, cross-route link check.\n4. One serialized production writer: a single workflow with concurrency group, cancel-in-progress false, and a generation check that refuses a candidate older than the currently deployed one, tested with delayed and overlapping runs in both trigger orders.\n5. Deploy via actions/deploy-pages with environment github-pages (reviewers kept; the agent approves pending deployments via API after gates pass, per standing approval). Explorer ordering: snapshot before UI; rollback UI before snapshot.\n6. Post-deploy probes: fetch every route and verify served bytes/digests match the artifact (reuse scripts/publication/verify_live.py logic); write a durable receipt (deployment id, SHAs, artifact hash, probe results) as a GitHub Deployment status plus a retained workflow artifact.\n7. Rollback job: redeploy an exact prior artifact by receipt, after verifying it is the last known good (probed green), then probe again.\n8. Shadow: deploy to a non-production target (preview Pages site or artifact-only dry run with full probes against a local server) for >=5 working days alongside the existing plane; compare outputs.",
   "sessions": [
     {
@@ -39,6 +39,14 @@
       "generation": "d079762be58042e9ad8f09bb463b97c9",
       "op": "take",
       "op_id": "ab9eab4bd66945ac9e38c0f6f0b5b20a",
+      "session_id": "021e12dfd5aa41b38fc786d2a1a04293"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:18597091d1eeb494a4ae3b6f",
+      "at": "2026-10-03T16:22:50Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "939159a7f29f42f38feec78706eaa46d",
       "session_id": "021e12dfd5aa41b38fc786d2a1a04293"
     }
   ]
