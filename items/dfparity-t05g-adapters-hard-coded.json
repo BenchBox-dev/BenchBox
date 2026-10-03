@@ -5,6 +5,7 @@
     "With the adapter binding, each query matches the DuckDB reference on both families at SF 0.1, or the reason is documented",
     "No other query's status changes in the SF 0.1 per-query probe"
   ],
+  "context": "2026-10-03: done locally on feat/tpcds-adapters-hard-coded (worktree BenchBox.wt-tpcds-t05g, commit cac581699, based on the combined branch feat/tpcds-bind-dsqgen-values). All eight queries are bound and both families rewritten to read the drawn values (Q41 rebuilt with all eight groups; Q73 spec reads counties and buy potentials; Q74 reads its aggregate and ORDER BY permutation; Q85 its statuses and states; Q89 its categories and classes; Q16 counties; Q24 amount column; Q88 dep counts). Real bug fixed: Q16 counted NULL warehouses as different warehouses. The inventory now counts only the first statement and treats lettered defines as one multi-valued draw. HARD_CODED and LITERAL_FALLBACK are empty, and 66 queries have adapters. 1300 tpcds unit tests pass. Multi-draw check: 0 divergences over 16+8 draws plus crafted draws. Vacuous at SF 0.01: Q16 (one warehouse), Q24 (no zip match), Q88 template draws (store 'ese' absent); Q74 never exceeds 1 row. Their logic past those filters is unverified against data (t18 SF 1 lane / t19). Lands in the follow-up PR after the combined PR merges.",
   "description": "These eight implementations cannot take the dsqgen draw: they read one value or none (Q41 hard-codes colors and has no adapter by design; Q88 also has a literal fallback and an incomplete pandas run in the inventory). Each needs a rewrite so the implementation reads the values the SQL varies, then an adapter as in t04, removal from HARD_CODED in the inventory test, and deletion of dead YAML keys. Eight is within the inventory's budget of 15 hard-coded queries (test_hard_coded_queries_stay_within_the_adapter_budget). Q41 is the t04 negative control: its binding must be added deliberately and the control re-pointed. queries.py PRs queue one at a time. Effort about 3 to 4 days (judgement, not measured).",
   "sessions": [
     {
@@ -14,6 +15,14 @@
       "op": "create",
       "op_id": "29a2e9d3b6034bfc9b788c4c268c20df",
       "session_id": "9731d44c64f34c7d82551352fec356a5"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T15:57:40Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "0b1f9f0e70c1453cb35864064b5ddc49",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
