@@ -68,7 +68,7 @@ document already described in prose.
 ## Seed Corpus
 
 After the 2026-08-28 trust boundary, the checked-in
-corpus holds **328** maintainer-run bundles across **20** benchmarks and **58**
+corpus holds **329** maintainer-run bundles across **20** benchmarks and **58**
 cohorts, all at the >=3-identity validator floor. Covered families include the
 local set (amplab, clickbench, coffeeshop, h2odb, joinorder, read_primitives,
 ssb, tpcds, tpch, tpch_skew), the admitted datavault, flightdata, nyctaxi,
