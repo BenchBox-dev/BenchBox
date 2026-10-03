@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-09-26T23:00:14.762435+00:00",
+  "generated_at": "2026-10-03T14:47:24.699428+00:00",
   "bundles": [
     {
       "file": "amplab_sf001_clickhouse_local_sql_20260825_175441_e89a4de7.json",
@@ -653,6 +653,58 @@
       "bundle_sha256": "3f6ea7f8315f023edea1e3bec49c7fd40da02177c12659fa50980d03bf323d81"
     },
     {
+      "file": "datavault_sf001_bigquery_sql_20260927_100530_5ec9efa0.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-27T10:05:30.313826",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "52ea84ec8b3272fea65c93af9545df151a40d96051cbb5070bd5ee3d019d52ea"
+    },
+    {
+      "file": "datavault_sf01_bigquery_sql_20260930_072535_d291326d.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-30T07:25:35.750511",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9643735477b2870e14599212fb5eaa85e91aea6ce21745310d827a403eee072f"
+    },
+    {
+      "file": "datavault_sf1_bigquery_sql_20261001_091125_26fe04bf.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T09:11:25.406905",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "79d8c861395b18d2f8f2c783d069fdde9b9a9cb328f09da2a0f041fbba19f20c"
+    },
+    {
+      "file": "datavault_sf10_bigquery_sql_20261001_110327_d1328d05.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T11:03:27.233904",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3eeebe24bad274bb218b009375a36038d30150d541284f3060fae685f78d06dd"
+    },
+    {
       "file": "datavault_sf001_clickhouse_local_sql_20260826_172319_c202ec05.json",
       "benchmark": "datavault",
       "benchmark_name": "Data Vault",
@@ -705,6 +757,45 @@
       "bundle_sha256": "b8ac5ca886fcc63df6c6f956a9494e91aa1c4cabfb79db3bd1722f2ab73b5c8d"
     },
     {
+      "file": "datavault_sf01_databricks_sql_20260930_175402_7225e491.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-30T17:54:01.944842",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "af519c10ce882d402141e14b035c86c011ba003f142f60481ff3db78accbcace"
+    },
+    {
+      "file": "datavault_sf1_databricks_sql_20260930_180331_e7b23724.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-30T18:03:31.114502",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "f830fa9abf22561ebcc9ba5bc64976aa7adee15e3dcf6cf19343d77cc164a211"
+    },
+    {
+      "file": "datavault_sf10_databricks_sql_20261001_195104_c9a232ef.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T19:51:04.261364",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "f5efe937271235b6235fc1177b92bbae2dc09aa8fb02166d3bdf321d66e41e1d"
+    },
+    {
       "file": "datavault_sf001_duckdb_sql_20260826_163426_e3781d0d.json",
       "benchmark": "datavault",
       "benchmark_name": "Data Vault",
@@ -729,6 +820,84 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "e32c1ffc997c38d4bb23b2ca5996b466270e429408dfa9c57ec716fb602ea963"
+    },
+    {
+      "file": "datavault_sf01_snowflake_sql_20260926_082823_c709896c.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Snowflake",
+      "platform_version": "10.34.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-26T08:28:23.587327",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "e7eb6da617adc220522f895a1565b44749f17744d20b0da9460a1d99d731a3e2"
+    },
+    {
+      "file": "datavault_sf1_snowflake_sql_20260925_224900_77db76a8.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Snowflake",
+      "platform_version": "10.34.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:48:59.996214",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "472f9f847df348bf31d0f1dd9f80fe2af0811e844b3c943f196388a710cb8acf"
+    },
+    {
+      "file": "datavault_sf10_snowflake_sql_20260930_180120_db643832.json",
+      "benchmark": "datavault",
+      "benchmark_name": "Data Vault",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-30T18:01:20.026381",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d4918143d89697aa28ef2121557d4d2b247198abf88122ffb62f74e509b53cf4"
+    },
+    {
+      "file": "flightdata_sf01_bigquery_sql_20260920_115330_5dd56bc3.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-20T11:53:30.769657",
+      "query_count": 40,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "ef199e55c94d4b962ab93f01924382ebbfafd60a90473dd68f4bf757d10a52d6"
+    },
+    {
+      "file": "flightdata_sf1_bigquery_sql_20260927_123112_15864c7e.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-27T12:31:12.510950",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "632e6bd2503d8735c44f89bb6f7d02a3bc6dfcb7268afa96abfe68b191e7aaff"
+    },
+    {
+      "file": "flightdata_sf10_bigquery_sql_20260927_150859_7146e9c3.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-27T15:08:59.865093",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "04ab3d974f90ef046d9de13d9f61af87ab6961f73a655086348e156e82fa0602"
     },
     {
       "file": "flightdata_sf001_clickhouse_local_sql_20260826_172222_5f3f4c89.json",
@@ -809,6 +978,45 @@
       "bundle_sha256": "fc114a6f3ae438a2ae7e38567aa3ab89119a6d9b95978fbac92544e33e0a43c0"
     },
     {
+      "file": "flightdata_sf01_databricks_sql_20261001_102859_b0afbbe8.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T10:28:59.297329",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "e90649c3655c424463db29edd2145dbd73f89e8f9b752e172acfcbe33f19b664"
+    },
+    {
+      "file": "flightdata_sf1_databricks_sql_20261001_143909_6326e239.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T14:39:09.492257",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "8c3912550b56b6794c083625afee27490664f4fbb7931042d3a3cf536ae16ebe"
+    },
+    {
+      "file": "flightdata_sf10_databricks_sql_20261001_151316_6644c94b.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T15:13:16.281453",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "1cfe475c3a3fa58e6636849d9fe041512725e7528e0359a83249fdb4685d08d0"
+    },
+    {
       "file": "flightdata_sf001_duckdb_sql_20260826_163352_55f0b3f1.json",
       "benchmark": "flightdata",
       "benchmark_name": "Flight Data OLAP",
@@ -846,6 +1054,45 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "3eaae9d678c3b705077c1a87ac9ae23994200563be35ef8bcd5ff83ee38654d8"
+    },
+    {
+      "file": "flightdata_sf01_snowflake_sql_20261001_102703_bb18d2c8.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T10:27:02.852291",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "462cc74227d010ebfb66e34c7a5cc2211f883fb89f188393e2c9a474eb25e327"
+    },
+    {
+      "file": "flightdata_sf1_snowflake_sql_20261001_111501_3a83168a.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T11:15:01.155381",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "6bc382ba24ddc1a169d0a853f22175a3c79e0434bd74f953cb18ca77fdd19f8d"
+    },
+    {
+      "file": "flightdata_sf10_snowflake_sql_20261001_113621_e22fa5a3.json",
+      "benchmark": "flightdata",
+      "benchmark_name": "Flight Data OLAP",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T11:36:21.083296",
+      "query_count": 60,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2cc3449aedf77ce4a204254902333fe3500f682eea2a6d7d029a272cda30e0fb"
     },
     {
       "file": "h2odb_sf001_clickhouse_local_sql_20260826_113044_c45bba08.json",
@@ -1160,6 +1407,84 @@
       "bundle_sha256": "4f7bae8e9dd4881d9ff3b6f28fc6bce26745e5f834b20246b47f5d26a2378cdf"
     },
     {
+      "file": "metadata_primitives_sf1_bigquery_sql_20260929_204456_e435b418.json",
+      "benchmark": "metadata_primitives",
+      "benchmark_name": "Metadata Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-29T20:44:56.111762",
+      "query_count": 135,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "0724827e372caf1af4257f53ecd009bb71315a3ff480f1daacd7c8e83c6969fc"
+    },
+    {
+      "file": "metadata_primitives_sf1_databricks_sql_20261001_191204_8daddf3b.json",
+      "benchmark": "metadata_primitives",
+      "benchmark_name": "Metadata Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T19:12:04.171662",
+      "query_count": 177,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "08d392e75fa40625a23c913b4f259e4504f9cb551c9e79415308535f4fe774cd"
+    },
+    {
+      "file": "metadata_primitives_sf1_snowflake_sql_20261001_111119_1ee8b07d.json",
+      "benchmark": "metadata_primitives",
+      "benchmark_name": "Metadata Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T11:11:19.096428",
+      "query_count": 180,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "8c19e0c98fb3653f53e055a887c456b9395e29117583558c40d4c6c637b25dc4"
+    },
+    {
+      "file": "nyctaxi_sf01_bigquery_sql_20260925_221622_67c2e5e9.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-25T22:16:22.848963",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "408bdababac42ef4c57223cd7fd60afc381068e5e4b87f754001c3a0e15e44b1"
+    },
+    {
+      "file": "nyctaxi_sf1_bigquery_sql_20260923_091616_1f78ef99.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-23T09:16:16.508675",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "19ed922401b9c292bbfe0385ab57045be882d13605037852f326d61fca06e8fc"
+    },
+    {
+      "file": "nyctaxi_sf10_bigquery_sql_20260927_120407_fec02550.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-27T12:04:07.234314",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "a35aab13831f75eb93f455ec7c5d161eb85a2de4382d8c2d50833f103af81e76"
+    },
+    {
       "file": "nyctaxi_sf001_clickhouse_local_sql_20260826_172208_fd44405e.json",
       "benchmark": "nyctaxi",
       "benchmark_name": "NYC Taxi OLAP",
@@ -1238,6 +1563,45 @@
       "bundle_sha256": "2eccd6ac4227ef2edeb1ff0af45f529970b6f7543116ad57197af67e0b7b04f3"
     },
     {
+      "file": "nyctaxi_sf01_databricks_sql_20261001_101301_84fd0b4c.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T10:13:01.023041",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9c975de1c7bd815cce7b1103a4f903d7647f8850b7d10aa23fe8706f247abd58"
+    },
+    {
+      "file": "nyctaxi_sf1_databricks_sql_20261001_101715_c8b8cad2.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T10:17:15.039719",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9d9ebc92ea53fea876407b80bec704847d2af1f5f870ba2ad436ce72c4c218c4"
+    },
+    {
+      "file": "nyctaxi_sf10_databricks_sql_20261001_102629_e82aa7d2.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T10:26:29.723351",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "92776915a182c1a00384bac85d3e0d06ae8f7744def35ccd1b3c1b5ef8b23400"
+    },
+    {
       "file": "nyctaxi_sf001_duckdb_sql_20260826_163341_b51bee79.json",
       "benchmark": "nyctaxi",
       "benchmark_name": "NYC Taxi OLAP",
@@ -1275,6 +1639,71 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "c1d588d7657d952314016b2ff37a3a0b605e019aa708ff8b54669fd4ebfa8f5a"
+    },
+    {
+      "file": "nyctaxi_sf01_snowflake_sql_20261001_101251_06190f1d.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T10:12:50.106201",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "1114ab7d410d47418d34c38eb998659b221dd4418f1102659e1e4c8294c31c70"
+    },
+    {
+      "file": "nyctaxi_sf1_snowflake_sql_20260925_092203_0cd1a463.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "Snowflake",
+      "platform_version": "10.34.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T09:22:03.595460",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "f9b3d2c11adda623e5a12e4d2ca0e4b4884570260205a6fe71b42ec36d8444aa"
+    },
+    {
+      "file": "nyctaxi_sf10_snowflake_sql_20261001_102124_4c662b94.json",
+      "benchmark": "nyctaxi",
+      "benchmark_name": "NYC Taxi OLAP",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T10:21:24.241370",
+      "query_count": 75,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "6a44b05019663363e3960a8f5f61ca9f195a5f76e9256d4d4269bc6a1d997143"
+    },
+    {
+      "file": "read_primitives_sf001_bigquery_sql_20260930_081905_1a102885.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-30T08:19:05.518400",
+      "query_count": 426,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "f4820de0b8f0a3180aa6cbe0f327ca2046ee5ec17fd4fb3fb3831e57bd5fb6e0"
+    },
+    {
+      "file": "read_primitives_sf01_bigquery_sql_20260929_184751_5bfa3d9b.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-29T18:47:51.638467",
+      "query_count": 426,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "ccbc7e792beb8f846f49ae8a70380b00e9b6f7b8c0dc630330a5296ade4ca63f"
     },
     {
       "file": "read_primitives_sf001_clickhouse_local_sql_20260826_113104_3465d4f3.json",
@@ -1327,6 +1756,32 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "d81e7cdae32515c68ec307e0bbe09a4f23c428ecee2ee35845f3df4f1db33c91"
+    },
+    {
+      "file": "read_primitives_sf001_databricks_sql_20261001_152239_14b1d8d2.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T15:22:39.726762",
+      "query_count": 444,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "83ba93f47da0b841fe1db4152ae1adac807e0a541d820d9a9396c3f0d352cb60"
+    },
+    {
+      "file": "read_primitives_sf01_databricks_sql_20261001_143234_f068492b.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T14:32:34.785810",
+      "query_count": 444,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "ec6c7dbf1ac19db03d6af9b03755efce380ea1bc28cefa9b88b8804304364d81"
     },
     {
       "file": "read_primitives_sf001_duckdb_sql_20260825_172118_c9cb14d4.json",
@@ -1431,6 +1886,32 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "dba5cdddd75907b67f43d3823c241c716b680047d7a45be457e8cb60934b9e10"
+    },
+    {
+      "file": "read_primitives_sf001_snowflake_sql_20261001_103832_16df8896.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T10:38:32.753285",
+      "query_count": 444,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "aa2194b5036763273d63b29e352780add83eb30bacc2943b340f5581be1cb350"
+    },
+    {
+      "file": "read_primitives_sf01_snowflake_sql_20261001_105057_79bd90a5.json",
+      "benchmark": "read_primitives",
+      "benchmark_name": "Read Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T10:50:57.592311",
+      "query_count": 444,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3512a43789ee8952c50d633e0afc17d671a0fce93e729f2714b360aee5f00d10"
     },
     {
       "file": "ssb_sf001_clickhouse_local_sql_20260825_175415_374cef00.json",
@@ -2252,6 +2733,19 @@
       "bundle_sha256": "5293ac3a9592b7576566668f098fa8353bbef464d5b1c20dc33bf6f788bab8f5"
     },
     {
+      "file": "tpcds_obt_sf1_bigquery_sql_20260923_152357_480ffcea.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-23T15:23:57.507409",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "8d767d1ac4ba6cd4d3f6ab6dc8050ebe0f71adb95654a5e3ba941bfc7d5387ec"
+    },
+    {
       "file": "tpcds_obt_sf1_clickhouse_local_sql_20260826_171140_836c988b.json",
       "benchmark": "tpcds_obt",
       "benchmark_name": "TPC-DS One Big Table",
@@ -2278,6 +2772,19 @@
       "bundle_sha256": "4d34fab2ee7d5b20e0bfabb233323e0604c6ae8c4ff51843c8b71517aabc8baa"
     },
     {
+      "file": "tpcds_obt_sf1_databricks_sql_20261001_192224_d11b3297.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T19:22:24.309142",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "6a5eb592e6e491a720bdad6ab9c0daa117fc76f5db2624de0131856b60256ebc"
+    },
+    {
       "file": "tpcds_obt_sf1_duckdb_sql_20260826_162433_2a6932b1.json",
       "benchmark": "tpcds_obt",
       "benchmark_name": "TPC-DS One Big Table",
@@ -2289,6 +2796,19 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "224c18b9fc693297fcfee359bc96c134446ce4ca3172eeec1f2bc4ea8d65ca48"
+    },
+    {
+      "file": "tpcds_obt_sf1_snowflake_sql_20261001_173028_d35974f6.json",
+      "benchmark": "tpcds_obt",
+      "benchmark_name": "TPC-DS One Big Table",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T17:30:28.122374",
+      "query_count": 267,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "1fd9a95b990a5f2369317bfb2704aeb6ef7055d00d8acc68d9c3554a9d7361c5"
     },
     {
       "file": "tpch_sf001_cedardb_sql_20260825_095330_cf0d9e4d.json",
@@ -2863,6 +3383,45 @@
       "bundle_sha256": "88eb5edd3059dffe4b1c9bb2b26698e18acd807ec8146243b42689e27eab9d2e"
     },
     {
+      "file": "tpch_skew_sf01_bigquery_sql_20260925_224018_ec5b9708.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-25T22:40:18.011687",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "819de8622ab5aca0fb51bf9366c44bf8c95020662d1a61f3c4b385a4d9ef260b"
+    },
+    {
+      "file": "tpch_skew_sf1_bigquery_sql_20260925_225451_d1e9d2fd.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:54:51.565170",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "0ea8db8cec4e25efb71d70e41fa3fb23be1c191396a98cd48d00ddf753f7302a"
+    },
+    {
+      "file": "tpch_skew_sf10_bigquery_sql_20260927_104923_b3fc1da6.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-27T10:49:22.998631",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "12488739cca47da9d95e2bab27aca16c7a09a0860fbee2fcee6e4456757145c5"
+    },
+    {
       "file": "tpch_skew_sf001_clickhouse_local_sql_20260824_091113_ff38aebf.json",
       "benchmark": "tpch_skew",
       "benchmark_name": "TPC-H Skew Benchmark (moderate)",
@@ -2939,6 +3498,45 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "2a83322c5c337da2636949d2f484b647a5c45d7e57078dcda7115d4d7e341b9f"
+    },
+    {
+      "file": "tpch_skew_sf01_databricks_sql_20261001_103252_6c8936f3.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T10:32:52.286688",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "97662b89526034ef19757ab84010a4a86279a54af0000e1d3354658c0e5ac58c"
+    },
+    {
+      "file": "tpch_skew_sf1_databricks_sql_20261001_103719_61f8cbae.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T10:37:19.534413",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "bdb26f4135f216a86fa913015d891f4d11a6bd848333962612319760c032f2d4"
+    },
+    {
+      "file": "tpch_skew_sf10_databricks_sql_20261001_104602_9f1d9a8b.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T10:46:02.884888",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "b8579144c8286c8ce54ac9a4c0ea1d65194c647bb21e68d5b6e2d64c65314105"
     },
     {
       "file": "tpch_skew_sf001_duckdb_sql_20260824_082549_fea46d50.json",
@@ -3058,6 +3656,84 @@
       "bundle_sha256": "e1367c8d07d61af45d34ff96a3a28598b2c332aa80c5a3efafaae12f6387170c"
     },
     {
+      "file": "tpch_skew_sf01_snowflake_sql_20260925_220834_4a9526c3.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "Snowflake",
+      "platform_version": "10.34.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-25T22:08:34.733739",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "09cc0b677ebfd5edb3792542c2c4e75e72003ddcf3357edef29c579993c17183"
+    },
+    {
+      "file": "tpch_skew_sf1_snowflake_sql_20260925_221217_97d77ab8.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "Snowflake",
+      "platform_version": "10.34.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:12:17.380165",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "60bc23cba50824c2f68fe086b73d0da1f5d450864e7a2639dbe3393fbeb6c065"
+    },
+    {
+      "file": "tpch_skew_sf10_snowflake_sql_20260929_124322_e9d6506c.json",
+      "benchmark": "tpch_skew",
+      "benchmark_name": "TPC-H Skew Benchmark (moderate)",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-29T12:43:21.882436",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9d6269b898213625e690b7cd08fd95be40dab2d058acdd4790e52b6a806143c6"
+    },
+    {
+      "file": "tpchavoc_sf01_bigquery_sql_20260929_141245_143d6f5e.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-29T14:12:45.903827",
+      "query_count": 654,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "013e70550f571129d7bcb90ae87a6351d3b0026602dfe7f7075f24cb783346b1"
+    },
+    {
+      "file": "tpchavoc_sf1_bigquery_sql_20261001_113358_53fc08cb.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T11:33:58.091063",
+      "query_count": 654,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3fe79bebac0477a2a4fec6108dd9575b05fcf7cc488719eedc9688107dd6d570"
+    },
+    {
+      "file": "tpchavoc_sf10_bigquery_sql_20261001_190554_ad5f29c8.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T19:05:54.266483",
+      "query_count": 654,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "55993d797642f303c1f6d44332f7677ea2f8d38be30a48773d9f93440e18d40d"
+    },
+    {
       "file": "tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json",
       "benchmark": "tpchavoc",
       "benchmark_name": "TPC-Havoc",
@@ -3136,6 +3812,45 @@
       "bundle_sha256": "2dd6fca15f82568597bd6eed6b5acbedb61681835470d30b51a70ef6642460d9"
     },
     {
+      "file": "tpchavoc_sf01_databricks_sql_20261001_073813_8d9b08b5.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T07:38:13.202526",
+      "query_count": 657,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9b756b43f9714debff635b1ecc2f95851c10929463a5c5c2ba522d3d8f35cb44"
+    },
+    {
+      "file": "tpchavoc_sf1_databricks_sql_20261001_075954_ffaa37ca.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T07:59:54.266908",
+      "query_count": 657,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "fb47946351a6a1f9bb82f0563ff3b8ce103c84149f5b249bcf4a7c11f005ee59"
+    },
+    {
+      "file": "tpchavoc_sf10_databricks_sql_20261001_084206_6d92a08e.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T08:42:06.450925",
+      "query_count": 657,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "94419bc6ba0164de24b62277b66445c6722de962f8765f3eeed18a09d1a8a4ea"
+    },
+    {
       "file": "tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json",
       "benchmark": "tpchavoc",
       "benchmark_name": "TPC-Havoc",
@@ -3173,6 +3888,396 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5"
+    },
+    {
+      "file": "tpchavoc_sf01_snowflake_sql_20260930_194734_9da55014.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-30T19:47:34.800530",
+      "query_count": 654,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "42e1be186f55a297552b69e6f82a5c47c341a87d9dd5e6d597ca1f9d8bafbc82"
+    },
+    {
+      "file": "tpchavoc_sf1_snowflake_sql_20260930_200344_2761bdbc.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-30T20:03:43.674957",
+      "query_count": 654,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "60bec6fed54c01bb216de24f4035e52aa13a56dca2d5263449863fbb7bac1762"
+    },
+    {
+      "file": "tpchavoc_sf10_snowflake_sql_20260930_193124_48bb07c7.json",
+      "benchmark": "tpchavoc",
+      "benchmark_name": "TPC-Havoc",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-30T19:31:24.567595",
+      "query_count": 654,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "b4ed07e5a9419a3c2269a8d2a831fbeb68111fae7b0fadc34df1edf1670d63a9"
+    },
+    {
+      "file": "transaction_primitives_sf001_bigquery_sql_20261001_205304_209908db.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T20:53:04.989934",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "53dd2783fc80a3090fedb0c2881a2b9ec30ed70c8afe6be1f06af4364b224e7e"
+    },
+    {
+      "file": "transaction_primitives_sf01_bigquery_sql_20261001_151409_dc7eeac0.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T15:14:09.090700",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "a6dc5a469ba4ca4d651fcdd13e3c7d8336797f4f571137682b8b93aec69b711a"
+    },
+    {
+      "file": "transaction_primitives_sf1_bigquery_sql_20261001_154316_52129540.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T15:43:16.330020",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "43e0f5753e8f2581fbca580040e387061d75724dbf43a2c5af436dbb3995ee55"
+    },
+    {
+      "file": "transaction_primitives_sf001_databricks_sql_20261001_165710_25cbf2c1.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T16:57:10.271249",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "5f80e54518ea2566c89c9ff3b3b895d0923df3138dea47b232c78c3faa7ba56c"
+    },
+    {
+      "file": "transaction_primitives_sf01_databricks_sql_20261001_175853_773a7d29.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T17:58:53.171291",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "7771856754bff526fa37e62a606f1d0623963a9b2c7d53a4db37529a4bb31071"
+    },
+    {
+      "file": "transaction_primitives_sf1_databricks_sql_20261001_190409_576d4969.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T19:04:09.286818",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "98c910bd128f0d7c7c0ac302d360436a28b6c93bd105b6085ef972218e985e55"
+    },
+    {
+      "file": "transaction_primitives_sf001_snowflake_sql_20261001_084848_c3e017eb.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T08:48:47.794781",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "acc10702b195fa4016b961cb58825c031bf6631f0008a2338d83cfb532f6feb2"
+    },
+    {
+      "file": "transaction_primitives_sf01_snowflake_sql_20261001_090534_90566a67.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T09:05:33.928681",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "e2ea21fcaf0baf3e6df6da9372e089a22b6b0f24ac84925a306144ec7122cecd"
+    },
+    {
+      "file": "transaction_primitives_sf1_snowflake_sql_20261001_092311_b4c0d6da.json",
+      "benchmark": "transaction_primitives",
+      "benchmark_name": "Transaction Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T09:23:10.048525",
+      "query_count": 69,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "f17a2c358bfeaecfb67e5abbbd4ca383341da4693f631c08ee0f8da166de9361"
+    },
+    {
+      "file": "tsbs_devops_sf01_bigquery_sql_20260929_192405_78305c52.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-29T19:24:05.299310",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "603530ec76feb51e947cc9179b8cba91f2234a02ae10bba6ac73b6904d232329"
+    },
+    {
+      "file": "tsbs_devops_sf1_bigquery_sql_20260929_194803_b2f76dae.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-29T19:48:03.092032",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "79d0287247c6f044992a03facf161a279f2f2597cc61947b271641a3531f5e85"
+    },
+    {
+      "file": "tsbs_devops_sf10_bigquery_sql_20261001_085654_76754d66.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 10.0,
+      "timestamp": "2026-10-01T08:56:54.989711",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "24ae1e276158b4007b04d86a8dbcd88c693e40490b42ad2776e00a3ac9612d3d"
+    },
+    {
+      "file": "tsbs_devops_sf01_databricks_sql_20260930_173454_741f616c.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-30T17:34:53.768574",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "3b9eba6e4186e648c7d657d46e58ea16b63488fea6d0af1331c118b1b1577cd6"
+    },
+    {
+      "file": "tsbs_devops_sf1_databricks_sql_20260930_173958_176e523b.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-30T17:39:58.318970",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "5605a923874eaa3b159b110cd4f94001c4f6dcee55c2ddd7ff7b12e70ad7144c"
+    },
+    {
+      "file": "tsbs_devops_sf10_databricks_sql_20260930_174638_397e236a.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-30T17:46:38.724227",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2505704c1227c6f27c6f6023434961c967eff9fc514ddbbead12c64bf4250559"
+    },
+    {
+      "file": "tsbs_devops_sf01_snowflake_sql_20260929_192425_ba04d0d6.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-29T19:24:25.570081",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "93cea4edec566fd66bc3eb7285d5713755c1e84ce66dc2db42d7b8db2c17c8d5"
+    },
+    {
+      "file": "tsbs_devops_sf1_snowflake_sql_20260929_192925_18bb194f.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-29T19:29:25.681418",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "60f4d13e6231dac9b1d321b475cb214721dadf6050ad595bd9021268adc0df46"
+    },
+    {
+      "file": "tsbs_devops_sf10_snowflake_sql_20260929_224733_a340c633.json",
+      "benchmark": "tsbs_devops",
+      "benchmark_name": "TSBS DevOps",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 10.0,
+      "timestamp": "2026-09-29T22:47:33.031481",
+      "query_count": 54,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "aa90aa054b21ae9bf7f1db54c4e7f846a668d6975767eb7170ba7d9e6b455636"
+    },
+    {
+      "file": "write_primitives_sf001_bigquery_sql_20261001_202950_88736ac2.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T20:29:50.609017",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "9b56ac5abbbe778d8699b7574a1ba370dbe486d9aa2b1452a0a25b6611c30593"
+    },
+    {
+      "file": "write_primitives_sf01_bigquery_sql_20261001_131148_b2d946ee.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T13:11:48.628043",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "7659f7358f87386c1b664bcd66d7a3ffe9791a2cdb105430ead5543d8243bda8"
+    },
+    {
+      "file": "write_primitives_sf1_bigquery_sql_20261001_144917_922446ec.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "BigQuery",
+      "platform_version": "unknown",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T14:49:17.258936",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "761e4ef014410d8b28db80ef919cb8b98d21cb149004294a78c88b5b0c07fcf9"
+    },
+    {
+      "file": "write_primitives_sf001_databricks_sql_20261001_164226_94cc487b.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.01,
+      "timestamp": "2026-10-01T16:42:25.932544",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "b79ac4affc6272c8a5d7c00886b4c7c819042215b6b29f0f8fa68f6fcf07a317"
+    },
+    {
+      "file": "write_primitives_sf01_databricks_sql_20261001_174439_9055e7de.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 0.1,
+      "timestamp": "2026-10-01T17:44:39.570283",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d391f4e8b2c01896ab56d0c6a523a054bb828e2bc080ff06075d6ca2c95b931c"
+    },
+    {
+      "file": "write_primitives_sf1_databricks_sql_20261001_184834_88ba12ba.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "Databricks",
+      "platform_version": "2026.36",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T18:48:34.274914",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "8880ffca0b8f7eb4871c811047e7d12c6923fe800c4b7cbe8c5dc57eedeeecc4"
+    },
+    {
+      "file": "write_primitives_sf001_snowflake_sql_20260930_212005_0fab9883.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.01,
+      "timestamp": "2026-09-30T21:20:04.888609",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "1e61b5de9cb402b0a5699df54bb3fa237ade3c1c9662cc99a24f69739b2e5f63"
+    },
+    {
+      "file": "write_primitives_sf01_snowflake_sql_20260930_222159_5d085279.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 0.1,
+      "timestamp": "2026-09-30T22:21:59.737180",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "f397a57ee7c560854cc90fc3d1dd8af0d67df6c3cb9a67277defe12387c3c1fd"
+    },
+    {
+      "file": "write_primitives_sf1_snowflake_sql_20261001_083039_3c313d6f.json",
+      "benchmark": "write_primitives",
+      "benchmark_name": "Write Primitives",
+      "platform": "Snowflake",
+      "platform_version": "10.35.101",
+      "scale_factor": 1.0,
+      "timestamp": "2026-10-01T08:30:39.365740",
+      "query_count": 336,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "405e56dc4da5053f78daeb54e11b196ba0a6edb6cd95a84e6b665debf0cff914"
     }
   ],
   "cohorts": {
@@ -3241,14 +4346,28 @@
       "SQLite v3.53.1"
     ],
     "datavault@sf0.01": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
     ],
     "datavault@sf0.1": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.34.101"
+    ],
+    "datavault@sf1.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.34.101"
+    ],
+    "datavault@sf10.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
     ],
     "flightdata@sf0.01": [
       "ClickHouse Local",
@@ -3256,14 +4375,25 @@
       "DuckDB v1.3.2"
     ],
     "flightdata@sf0.1": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.35.101"
     ],
     "flightdata@sf1.0": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.35.101"
+    ],
+    "flightdata@sf10.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
     ],
     "h2odb@sf0.01": [
       "ClickHouse Local",
@@ -3296,36 +4426,58 @@
       "Polars v1.40.0",
       "SQLite v3.53.1"
     ],
+    "metadata_primitives@sf1.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
     "nyctaxi@sf0.01": [
       "ClickHouse Local",
       "DataFusion v53.0.0",
       "DuckDB v1.3.2"
     ],
     "nyctaxi@sf0.1": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.35.101"
     ],
     "nyctaxi@sf1.0": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.34.101"
+    ],
+    "nyctaxi@sf10.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
     ],
     "read_primitives@sf0.01": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2",
       "Pandas v2.3.3",
       "Polars v1.40.0",
-      "SQLite v3.53.1"
+      "SQLite v3.53.1",
+      "Snowflake v10.35.101"
     ],
     "read_primitives@sf0.1": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2",
       "Pandas v2.3.3",
       "Polars v1.40.0",
-      "SQLite v3.53.1"
+      "SQLite v3.53.1",
+      "Snowflake v10.35.101"
     ],
     "ssb@sf0.01": [
       "ClickHouse Local",
@@ -3396,9 +4548,12 @@
       "Spark v4.1.1"
     ],
     "tpcds_obt@sf1.0": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.35.101"
     ],
     "tpch@sf0.01": [
       "CedarDB",
@@ -3450,18 +4605,29 @@
       "SQLite v3.53.1"
     ],
     "tpch_skew@sf0.1": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2",
       "Polars v1.40.0",
-      "SQLite v3.53.1"
+      "SQLite v3.53.1",
+      "Snowflake v10.34.101"
     ],
     "tpch_skew@sf1.0": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
+      "Databricks v2026.36",
       "DuckDB v1.3.2",
       "Polars v1.40.0",
-      "SQLite v3.53.1"
+      "SQLite v3.53.1",
+      "Snowflake v10.34.101"
+    ],
+    "tpch_skew@sf10.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
     ],
     "tpchavoc@sf0.01": [
       "ClickHouse Local",
@@ -3469,41 +4635,103 @@
       "DuckDB v1.3.2"
     ],
     "tpchavoc@sf0.1": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.35.101"
     ],
     "tpchavoc@sf1.0": [
+      "BigQuery",
       "ClickHouse Local",
       "DataFusion v53.0.0",
-      "DuckDB v1.3.2"
+      "Databricks v2026.36",
+      "DuckDB v1.3.2",
+      "Snowflake v10.35.101"
+    ],
+    "tpchavoc@sf10.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "transaction_primitives@sf0.01": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "transaction_primitives@sf0.1": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "transaction_primitives@sf1.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "tsbs_devops@sf0.1": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "tsbs_devops@sf1.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "tsbs_devops@sf10.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "write_primitives@sf0.01": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "write_primitives@sf0.1": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
+    ],
+    "write_primitives@sf1.0": [
+      "BigQuery",
+      "Databricks v2026.36",
+      "Snowflake v10.35.101"
     ]
   },
   "summary": {
-    "total_bundles": 244,
+    "total_bundles": 329,
     "by_benchmark": {
       "amplab": 19,
       "clickbench": 14,
       "coffeeshop": 17,
-      "datavault": 6,
-      "flightdata": 9,
+      "datavault": 16,
+      "flightdata": 18,
       "h2odb": 18,
       "joinorder": 6,
-      "nyctaxi": 9,
-      "read_primitives": 12,
+      "metadata_primitives": 3,
+      "nyctaxi": 18,
+      "read_primitives": 18,
       "ssb": 32,
       "tpcdi": 9,
       "tpcds": 22,
-      "tpcds_obt": 3,
+      "tpcds_obt": 6,
       "tpch": 44,
-      "tpch_skew": 15,
-      "tpchavoc": 9
+      "tpch_skew": 24,
+      "tpchavoc": 18,
+      "transaction_primitives": 9,
+      "tsbs_devops": 9,
+      "write_primitives": 9
     },
     "by_platform": {
+      "BigQuery": 29,
       "CedarDB": 1,
       "ClickHouse Local": 38,
       "ClickHouse Server": 1,
       "DataFusion": 45,
+      "Databricks": 28,
       "DuckDB": 80,
       "DuckLake": 1,
       "LakeSail": 1,
@@ -3511,14 +4739,15 @@
       "Polars": 28,
       "PySpark": 2,
       "SQLite": 23,
+      "Snowflake": 28,
       "Spark": 6,
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 244
+      "maintainer-run": 329
     },
     "by_funding": {
-      "unspecified": 244
+      "unspecified": 329
     }
   }
 }

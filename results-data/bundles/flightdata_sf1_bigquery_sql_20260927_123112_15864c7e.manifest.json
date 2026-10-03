@@ -1,0 +1,8 @@
+{
+  "bundle_file": "flightdata_sf1_bigquery_sql_20260927_123112_15864c7e.json",
+  "bundle_hash": "632e6bd2503d8735c44f89bb6f7d02a3bc6dfcb7268afa96abfe68b191e7aaff",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
