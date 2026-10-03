@@ -23,6 +23,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from csv import reader
 from datetime import date
 from typing import Any
@@ -113,6 +115,26 @@ def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None
     """
     global _parameter_overrides
     _parameter_overrides = overrides
+
+
+@contextmanager
+def seeded_parameter_overrides(seed: int | None, scale_factor: float, stream_id: int) -> Iterator[None]:
+    if seed is None:
+        yield
+        return
+
+    from benchbox.core.tpch.benchmark import power_stream_seed
+    from benchbox.core.tpch.parameter_extractor import get_tpch_extracted_parameters
+
+    stream_seed = power_stream_seed(seed, stream_id)
+    assert stream_seed is not None
+    overrides = get_tpch_extracted_parameters(stream_seed, float(scale_factor))
+    previous = _parameter_overrides
+    set_parameter_overrides(overrides)
+    try:
+        yield
+    finally:
+        set_parameter_overrides(previous)
 
 
 def set_scale_factor(scale_factor: float | None) -> None:
