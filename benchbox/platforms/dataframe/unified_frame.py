@@ -23,7 +23,8 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Generic, TypeVar
+from functools import wraps
+from typing import TYPE_CHECKING, Any, Callable, Generic, TypeVar
 
 if TYPE_CHECKING:
     import polars as pl
@@ -119,7 +120,108 @@ def _unwrap_unified_expr(value: Any) -> Any:
     return value
 
 
-class UnifiedStrExpr:
+def _resolve_datafusion_value(value: Any, frame: Any) -> Any:
+    while (
+        frame is not None
+        and isinstance(value, _DataFusionDeferredOperations)
+        and value._datafusion_resolver is not None
+    ):
+        value = value._datafusion_resolver(frame)
+    if isinstance(value, tuple):
+        return tuple(_resolve_datafusion_value(item, frame) for item in value)
+    if isinstance(value, list):
+        return [_resolve_datafusion_value(item, frame) for item in value]
+    if isinstance(value, dict):
+        return {key: _resolve_datafusion_value(item, frame) for key, item in value.items()}
+    return value
+
+
+def _has_datafusion_resolver(value: Any) -> bool:
+    if isinstance(value, _DataFusionDeferredOperations):
+        return value._datafusion_resolver is not None
+    if isinstance(value, (tuple, list)):
+        return any(_has_datafusion_resolver(item) for item in value)
+    if isinstance(value, dict):
+        return any(_has_datafusion_resolver(item) for item in value.values())
+    return False
+
+
+def _defer_datafusion_operation(operation: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(operation)
+    def apply(*args: Any, **kwargs: Any) -> Any:
+        result = operation(*args, **kwargs)
+        if (
+            isinstance(result, _DataFusionDeferredOperations)
+            and all(result is not argument for argument in args)
+            and (_has_datafusion_resolver(args) or _has_datafusion_resolver(kwargs))
+        ):
+            captured_args = _resolve_datafusion_value(args, None)
+            captured_kwargs = _resolve_datafusion_value(kwargs, None)
+            result._datafusion_resolver = lambda frame: operation(
+                *_resolve_datafusion_value(captured_args, frame), **_resolve_datafusion_value(captured_kwargs, frame)
+            )
+        return result
+
+    return apply
+
+
+class _DataFusionDeferredOperations:
+    _datafusion_resolver: Callable[[Any], Any] | None = None
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        for name, member in tuple(vars(cls).items()):
+            if name in {"__init__", "__repr__", "native"} or (name.startswith("_") and not name.endswith("__")):
+                continue
+            if isinstance(member, property) and member.fget is not None:
+                setattr(
+                    cls,
+                    name,
+                    property(_defer_datafusion_operation(member.fget), member.fset, member.fdel, member.__doc__),
+                )
+            elif callable(member):
+                setattr(cls, name, _defer_datafusion_operation(member))
+
+
+def _bind_datafusion_arguments(operation: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(operation)
+    def apply(self: Any, *args: Any, **kwargs: Any) -> Any:
+        frame = self._source_df if isinstance(self, UnifiedGroupBy) else self._df
+        if _is_datafusion_df(frame):
+            args = _resolve_datafusion_value(args, frame)
+            kwargs = _resolve_datafusion_value(kwargs, frame)
+        return operation(self, *args, **kwargs)
+
+    return apply
+
+
+def _datafusion_division(numerator: Any, denominator: Any) -> UnifiedExpr:
+    from datafusion import lit as df_lit
+
+    def native(value: Any) -> Any:
+        value = value.native if isinstance(value, UnifiedExpr) else value
+        return value if _is_datafusion_expr(value) else df_lit(value)
+
+    def build(frame: Any = None) -> UnifiedExpr:
+        import pyarrow as pa
+        from datafusion import functions as df_f
+
+        left = native(numerator if frame is None else _resolve_datafusion_value(numerator, frame))
+        right = native(denominator if frame is None else _resolve_datafusion_value(denominator, frame))
+        divisor = df_f.nullif(right, df_f.cast_to_type(df_lit(0), right))
+        quotient = left / divisor
+        if frame is not None and pa.types.is_integer(
+            frame.select(quotient.alias("__division_type__")).schema()[0].type
+        ):
+            quotient = left.cast(pa.float64()) / divisor
+        return UnifiedExpr(quotient)
+
+    result = build()
+    result._datafusion_resolver = build
+    return result
+
+
+class UnifiedStrExpr(_DataFusionDeferredOperations):
     """Platform-agnostic string expression namespace.
 
     Provides Polars-style .str accessor methods that work across platforms:
@@ -313,7 +415,7 @@ class UnifiedStrExpr:
         return UnifiedExpr(self._expr.str.len_chars())
 
 
-class UnifiedListExpr:
+class UnifiedListExpr(_DataFusionDeferredOperations):
     """Platform-agnostic list/array expression namespace.
 
     Provides Polars-style .list accessor methods that work across platforms:
@@ -575,7 +677,7 @@ class UnifiedListExpr:
         return UnifiedExpr(self._expr.alias(name))
 
 
-class UnifiedMapExpr:
+class UnifiedMapExpr(_DataFusionDeferredOperations):
     """Platform-agnostic map expression namespace.
 
     Provides map accessor methods across platforms.
@@ -629,7 +731,7 @@ class UnifiedMapExpr:
         raise NotImplementedError("Map operations not supported on Polars (no native Map dtype)")
 
 
-class UnifiedDtExpr:
+class UnifiedDtExpr(_DataFusionDeferredOperations):
     """Platform-agnostic datetime expression namespace.
 
     Provides Polars-style .dt accessor methods that work across platforms:
@@ -766,7 +868,7 @@ class UnifiedDtExpr:
         return UnifiedExpr(self._expr.dt.total_days())
 
 
-class UnifiedStructExpr:
+class UnifiedStructExpr(_DataFusionDeferredOperations):
     """Platform-agnostic struct field accessor.
 
     Provides .struct.field(name) access pattern across platforms.
@@ -786,7 +888,7 @@ class UnifiedStructExpr:
         return UnifiedExpr(self._expr.struct.field(name))
 
 
-class UnifiedExpr:
+class UnifiedExpr(_DataFusionDeferredOperations):
     """Platform-agnostic expression wrapper.
 
     Wraps PySpark Columns and DataFusion Exprs to add Polars-compatible methods like
@@ -996,30 +1098,14 @@ class UnifiedExpr:
         return UnifiedExpr(self._unwrap(other) * self._expr)
 
     def __truediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = self._unwrap(other)
-        # DataFusion: use nullif to prevent DivideByZero errors
-        # dividend / nullif(divisor, 0) returns NULL when divisor is 0
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            if isinstance(other_expr, (int, float)):
-                # Literal divisor - no need for nullif if non-zero
-                if other_expr == 0:
-                    return UnifiedExpr(self._expr / df_f.nullif(df_lit(other_expr), df_lit(0)))
-                return UnifiedExpr(self._expr / other_expr)
-            # Column divisor - wrap in nullif for safety
-            return UnifiedExpr(self._expr / df_f.nullif(other_expr, df_lit(0)))
-        return UnifiedExpr(self._expr / other_expr)
+            return _datafusion_division(self, other)
+        return UnifiedExpr(self._expr / self._unwrap(other))
 
     def __rtruediv__(self, other: Any) -> UnifiedExpr:
-        other_expr = self._unwrap(other)
-        # DataFusion: use nullif to prevent DivideByZero errors
         if self._is_datafusion:
-            from datafusion import functions as df_f, lit as df_lit
-
-            # self._expr is the divisor here
-            return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
-        return UnifiedExpr(other_expr / self._expr)
+            return _datafusion_division(other, self)
+        return UnifiedExpr(self._unwrap(other) / self._expr)
 
     # =========================================================================
     # Comparison Operations
@@ -2160,7 +2246,7 @@ class _DataFusionDeferredFilter(UnifiedExpr):
         return self._apply_filtered_agg(df_f.max)
 
 
-class UnifiedWhenThen:
+class UnifiedWhenThen(_DataFusionDeferredOperations):
     """Intermediate result from when().then() for chaining.
 
     This allows the Polars-style when/then/otherwise pattern:
@@ -2245,7 +2331,7 @@ class UnifiedWhenThen:
         return UnifiedExpr(self._when_builder.otherwise(val))
 
 
-class UnifiedWhen:
+class UnifiedWhen(_DataFusionDeferredOperations):
     """Platform-agnostic WHEN expression builder.
 
     Provides Polars-style when/then/otherwise syntax that works across platforms:
@@ -2390,6 +2476,7 @@ class UnifiedGroupBy(Generic[DF, Expr]):
         self._adapter = adapter
         self._source_df = source_df
 
+    @_bind_datafusion_arguments
     def agg(self, *exprs: Expr) -> UnifiedLazyFrame:
         """Aggregate the grouped data.
 
@@ -2617,6 +2704,7 @@ def _prepare_join_items(df, items: list, side: str) -> tuple[Any, list[str], lis
     join_cols: list[str] = []
     temp_cols: list[str] = []
     for i, item in enumerate(items):
+        item = _resolve_datafusion_value(item, df)
         if isinstance(item, UnifiedExpr):
             temp_col = f"__{side}_join_key_{i}__"
             df = df.with_column(temp_col, item.native)
@@ -3297,6 +3385,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     # Grouping Operations
     # =========================================================================
 
+    @_bind_datafusion_arguments
     def group_by(self, *columns: str | Expr | list) -> UnifiedGroupBy:
         """Group by one or more columns.
 
@@ -3344,6 +3433,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     # Filter/Select Operations
     # =========================================================================
 
+    @_bind_datafusion_arguments
     def filter(self, condition: Expr) -> UnifiedLazyFrame:
         """Filter rows by condition.
 
@@ -3358,6 +3448,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
         result = self._df.filter(native_condition)
         return UnifiedLazyFrame(result, self._adapter)
 
+    @_bind_datafusion_arguments
     def select(self, *columns: str | Expr | list) -> UnifiedLazyFrame:
         """Select columns.
 
@@ -3431,6 +3522,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
                     return True
         return False
 
+    @_bind_datafusion_arguments
     def with_columns(self, *exprs: Expr | list) -> UnifiedLazyFrame:
         """Add or replace columns.
 
@@ -3635,6 +3727,7 @@ class UnifiedLazyFrame(Generic[DF, Expr]):
     # Sorting Operations
     # =========================================================================
 
+    @_bind_datafusion_arguments
     def sort(
         self,
         by: str | list[str] | list[tuple[str, str]],

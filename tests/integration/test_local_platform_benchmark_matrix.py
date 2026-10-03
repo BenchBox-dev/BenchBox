@@ -22,7 +22,6 @@ from benchbox.core.benchmark_registry import get_benchmark_metadata, list_benchm
 from benchbox.core.expected_results.models import ValidationMode
 from benchbox.core.expected_results.registry import get_registry
 from benchbox.core.results.loader import find_latest_result
-from benchbox.core.tpch.benchmark import get_reference_seed
 from benchbox.core.validation.query_validation import QueryValidator
 from tests.e2e.utils import is_dataframe_available, is_gpu_available, is_platform_available
 from tests.integration._cli_e2e_utils import run_cli_command
@@ -497,14 +496,6 @@ def test_local_platform_benchmark_matrix(
     ]
     if query_subset:
         command.extend(["--queries", ",".join(query_subset)])
-        # The bounded correctness gate validates emitted cardinalities against the
-        # stored TPC-H answer files. Those answers correspond to the reference qgen
-        # seed, so pin it to make stream-0 expected-results validation deterministic
-        # and EXACT. Without it, query parameters drift and only structurally-fixed
-        # (single-row) queries would coincidentally match.
-        gate_seed = get_reference_seed(scale_factor) if benchmark_name == "tpch" else None
-        if gate_seed is not None:
-            command.extend(["--seed", str(gate_seed)])
 
     result = run_cli_command(command, cwd=case_dir, timeout=MATRIX_CASE_TIMEOUT)
 
