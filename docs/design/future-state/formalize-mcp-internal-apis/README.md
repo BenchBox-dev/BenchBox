@@ -42,7 +42,6 @@ from benchbox import (
 Instead of reaching into internal modules:
 
 ```python
-# Before (fragile):
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
 from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
 from benchbox.platforms.dataframe import DATAFRAME_PLATFORMS

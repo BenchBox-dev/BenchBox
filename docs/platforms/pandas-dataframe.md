@@ -27,23 +27,18 @@ Pandas is the most widely-used Python data analysis library, with over 50 millio
 ## Installation
 
 ```bash
-# Install Pandas DataFrame support
 uv add benchbox --extra pandas
 
-# Or with pip
 pip install "benchbox[pandas]"
 
-# Verify installation
 python -c "import pandas; print(f'Pandas {pandas.__version__}')"
 ```
 
 ## Quick Start
 
 ```bash
-# Run TPC-H on Pandas DataFrame
 benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 
-# With PyArrow backend (2-5x faster for aggregations)
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1 \
   --platform-option dtype_backend=pyarrow
 ```
@@ -73,7 +68,6 @@ benchbox run --platform pandas-df --benchmark tpch --scale 0.1 \
 - Requires `pyarrow` package
 
 ```bash
-# Example: Use PyArrow backend for large datasets
 benchbox run --platform pandas-df --benchmark tpch --scale 1 \
   --platform-option dtype_backend=pyarrow
 ```
@@ -114,12 +108,12 @@ Pandas loads entire datasets into memory with eager evaluation:
 
 2. **Reduce scale factor** for faster iteration:
    ```bash
-   --scale 0.01  # Start small
+   --scale 0.01
    ```
 
 3. **Consider Polars** for larger datasets:
    ```bash
-   --platform polars-df  # Lazy evaluation and automatic parallelization
+   --platform polars-df
    ```
 
 ## Query Implementation
@@ -127,21 +121,17 @@ Pandas loads entire datasets into memory with eager evaluation:
 Pandas queries use string-based column access and boolean indexing:
 
 ```python
-# TPC-H Q1: Pricing Summary Report
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
-    # Filter using boolean indexing
     cutoff = pd.to_datetime("1998-12-01") - pd.Timedelta(days=90)
     filtered = lineitem[lineitem["l_shipdate"] <= cutoff]
 
-    # Compute derived columns
     filtered = filtered.assign(
         disc_price=filtered["l_extendedprice"] * (1 - filtered["l_discount"]),
         charge=filtered["l_extendedprice"] * (1 - filtered["l_discount"]) * (1 + filtered["l_tax"])
     )
 
-    # Aggregate
     result = (
         filtered
         .groupby(["l_returnflag", "l_linestatus"], as_index=False)
@@ -188,7 +178,6 @@ MemoryError: Unable to allocate array with shape (N,) and dtype float64
 If queries involving string columns are slow:
 
 ```bash
-# Use PyArrow for efficient string handling
 --platform-option dtype_backend=pyarrow
 ```
 
@@ -205,17 +194,14 @@ These are safe to ignore or suppress with `--quiet`.
 ```python
 from benchbox.platforms.dataframe import PandasDataFrameAdapter
 
-# Create adapter with custom configuration
 adapter = PandasDataFrameAdapter(
     working_dir="./benchmark_data",
     dtype_backend="pyarrow"
 )
 
-# Create context and load tables
 ctx = adapter.create_context()
 adapter.load_tables(ctx, data_dir="./tpch_data")
 
-# Execute query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)

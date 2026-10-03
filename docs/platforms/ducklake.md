@@ -23,10 +23,8 @@ The DuckLake platform is **beta** (promoted from experimental on 2026-07-30). Th
 ## Quick Start
 
 ```bash
-# Install DuckDB >= 1.3 (required for the ducklake extension)
 uv add "duckdb>=1.3,<2.0"
 
-# Run benchmark (metadata/data paths default under benchmark_runs/databases/)
 benchbox run --platform ducklake --benchmark tpch --scale 0.01
 ```
 
@@ -74,12 +72,9 @@ The catalog metadata backend is selected with `--platform-option catalog=<duckdb
 | `postgres` | `ducklake`, `postgres` | Self-hosted PostgreSQL database | The target database **must already exist** - DuckLake's `ATTACH` does not run `CREATE DATABASE` |
 
 ```bash
-# SQLite catalog, local Parquet data
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option catalog=sqlite
 
-# Self-hosted PostgreSQL catalog (the "ducklake_catalog" database must
-# already exist on the target server)
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
     --platform-option catalog=postgres \
     --platform-option pg_host=localhost \
@@ -116,10 +111,8 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 0.01 with default (generated) paths
 benchbox run --platform ducklake --benchmark tpch --scale 0.01
 
-# TPC-DS at scale factor 1
 benchbox run --platform ducklake --benchmark tpcds --scale 1.0
 ```
 
@@ -136,7 +129,6 @@ benchbox run --platform ducklake --benchmark tpch --scale 0.1 \
 Without `--force`, an existing catalog is reused: schema creation and data loading are skipped and queries run directly against the already-populated catalog. For `catalog=duckdb`/`sqlite` this is detected from the `metadata_path` file; for `catalog=postgres` the catalog lives server-side, so it is detected after the `ATTACH` by inspecting the attached catalog itself.
 
 ```bash
-# Wipe the existing catalog metadata file and Parquet data, then rebuild
 benchbox run --platform ducklake --benchmark tpch --scale 0.1 --force
 ```
 
@@ -165,13 +157,11 @@ adapter logs a warning naming the prefix; clear it yourself, e.g.
 from benchbox import TPCH
 from benchbox.platforms.ducklake import DuckLakeAdapter
 
-# Initialize adapter
 adapter = DuckLakeAdapter(
     metadata_path="benchmark_runs/databases/tpch_sf1.ducklake",
     data_path="benchmark_runs/databases/tpch_sf1_data",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -190,13 +180,9 @@ DuckLake extends `DuckDBAdapter`, which means:
 ```python
 from benchbox.core.platform_registry import PlatformRegistry
 
-# Check platform family
 family = PlatformRegistry.get_platform_family("ducklake")
-# Returns: "duckdb"
 
-# Check inheritance
 parent = PlatformRegistry.get_inherited_platform("ducklake")
-# Returns: "duckdb"
 ```
 
 ## Comparison: DuckLake vs DuckDB

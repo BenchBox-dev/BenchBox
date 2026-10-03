@@ -381,10 +381,6 @@ gh api -X POST repos/BenchBox-dev/BenchBox/rulesets \
   -f 'conditions[ref_name][include][]=refs/tags/v*' \
   -f 'conditions[ref_name][exclude][]=' \
   -f 'rules[][type]=creation'
-# Restricting the actor list further (e.g. to a release-bot identity) needs
-# a bypass_actors / rules payload tailored to who should retain the ability
-# to tag; draft that with the admin before applying, this is a starting
-# point, not the final payload.
 ```
 
 Why this can't be applied by the write-task's own PR: same as the
@@ -397,8 +393,6 @@ w3): `_project/scripts/ruleset_review_enforcement.py` carries a
 flag. Feed it the live tag rulesets to check:
 
 ```bash
-# Fetch each ruleset in full (the list endpoint omits conditions/rules,
-# which the predicate correctly treats as "not protected"):
 ids=$(gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[].id')
 for id in $ids; do gh api repos/BenchBox-dev/BenchBox/rulesets/$id; done \
   | jq -s '.' \
@@ -499,7 +493,6 @@ publish paths). Observed on 2026-08-05:
 
 ```bash
 gh api repos/BenchBox-dev/BenchBox/environments/test-pypi --jq '{name, protection_rules}'
-# {"name":"test-pypi","protection_rules":[]}
 ```
 
 That empty gate is accepted by design; do not copy the real-PyPI

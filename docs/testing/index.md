@@ -21,7 +21,6 @@ Fast, isolated tests for individual components without external dependencies.
 
 ```bash
 make test-unit
-# or
 uv run -- python -m pytest -m unit
 ```
 
@@ -30,7 +29,6 @@ Tests that verify interaction between components, may use embedded databases.
 
 ```bash
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 ```
 
@@ -38,13 +36,10 @@ uv run -- python -m pytest -m "integration and not live_integration"
 End-to-end tests that validate complete benchmark workflows through the CLI.
 
 ```bash
-# Quick E2E tests (dry-run mode)
 uv run -- python -m pytest -m e2e_quick
 
-# Local platform E2E tests (full execution)
 uv run -- python -m pytest -m e2e_local
 
-# All E2E tests
 uv run -- python -m pytest tests/e2e/
 ```
 
@@ -63,10 +58,8 @@ Tests that execute real queries against database engines running in Docker conta
 No cloud credentials needed: just Docker.
 
 ```bash
-# Single platform
 make test-docker-clickhouse
 
-# All Docker platforms
 make test-docker-all
 ```
 
@@ -77,7 +70,6 @@ Tests that require live database credentials and cloud platforms.
 
 ```bash
 make test-live
-# or
 uv run -- python -m pytest -m live_integration
 ```
 

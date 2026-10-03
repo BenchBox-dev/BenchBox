@@ -1,5 +1,4 @@
 drop SEQUENCE store_seq;
---SET SERVEROUTPUT ON;
 DECLARE
    max_sk NUMBER;
 BEGIN

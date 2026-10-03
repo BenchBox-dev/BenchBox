@@ -34,22 +34,16 @@ benchbox setup --platform <name> [OPTIONS]
 ## Usage Examples
 
 ```bash
-# Interactive credential setup
 benchbox setup --platform databricks
 
-# List all platforms and their status
 benchbox setup --list-platforms
 
-# Check credential status across all platforms
 benchbox setup --status
 
-# Validate credentials without modification
 benchbox setup --platform snowflake --validate-only
 
-# Run connectivity diagnostics (Redshift)
 benchbox setup --platform redshift --diagnose
 
-# Remove stored credentials
 benchbox setup --platform databricks --remove
 ```
 

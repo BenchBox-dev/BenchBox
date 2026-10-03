@@ -36,7 +36,6 @@ Basic Configuration
     from benchbox.tpch import TPCH
     from benchbox.platforms.redshift import RedshiftAdapter
 
-    # Connect to Redshift cluster
     adapter = RedshiftAdapter(
         host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
         port=5439,
@@ -45,7 +44,6 @@ Basic Configuration
         password="SecurePassword123"
     )
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=1.0)
     results = benchmark.run_with_platform(adapter)
 
@@ -54,7 +52,6 @@ With S3 Data Loading
 
 .. code-block:: python
 
-    # Efficient loading via S3 COPY command
     adapter = RedshiftAdapter(
         host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
         username="admin",
@@ -320,7 +317,6 @@ IAM Role Authentication (Recommended)
 
 .. code-block:: bash
 
-    # Create IAM role with S3 read permissions
     aws iam create-role --role-name RedshiftCopyRole \
         --assume-role-policy-document '{
             "Version": "2012-10-17",
@@ -331,11 +327,9 @@ IAM Role Authentication (Recommended)
             }]
         }'
 
-    # Attach S3 read policy
     aws iam attach-role-policy --role-name RedshiftCopyRole \
         --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
-    # Associate role with cluster
     Amazon Redshift modify-cluster-iam-roles \
         --cluster-identifier my-cluster \
         --add-iam-roles arn:aws:iam::123456789:role/RedshiftCopyRole
@@ -370,12 +364,11 @@ Workload Management (WLM)
 
 .. code-block:: python
 
-    # Use multiple query slots for large queries
     adapter = RedshiftAdapter(
         host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
         username="admin",
         password="password",
-        wlm_query_slot_count=3  # Use 3 slots for more resources
+        wlm_query_slot_count=3
     )
 
 Data Loading
@@ -400,12 +393,10 @@ Via S3 COPY (Recommended)
         iam_role="arn:aws:iam::123456789:role/RedshiftCopyRole"
     )
 
-    # Generate data locally
     benchmark = TPCH(scale_factor=1.0)
     data_dir = Path("./tpch_data")
     benchmark.generate_data(data_dir)
 
-    # Load data (automatically uploads to S3 then uses COPY)
     conn = adapter.create_connection()
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
 
@@ -416,12 +407,10 @@ Direct Loading (Small Datasets)
 
 .. code-block:: python
 
-    # For small datasets (< 100MB), skip S3
     adapter = RedshiftAdapter(
         host="my-cluster.123456.us-east-1.redshift.amazonaws.com",
         username="admin",
         password="password"
-        # No s3_bucket specified - uses direct INSERT
     )
 
 Advanced Features
@@ -432,7 +421,6 @@ Distribution Keys
 
 .. code-block:: python
 
-    # Create table with distribution key
     cursor.execute("""
         CREATE TABLE orders (
             o_orderkey BIGINT,
@@ -453,11 +441,9 @@ Illustrative SQL fragments; supply complete table definitions before execution.
 
 .. code-block:: sql
 
-    # Compound sort key (most common)
     CREATE TABLE lineitem (...)
     SORTKEY (l_shipdate, l_orderkey)
 
-    # Interleaved sort key (for multiple filters)
     CREATE TABLE lineitem (...)
     INTERLEAVED SORTKEY (l_shipdate, l_orderkey, l_partkey)
 
@@ -466,13 +452,11 @@ Compression
 
 .. code-block:: python
 
-    # Automatic compression analysis
     adapter = RedshiftAdapter(
         host="my-cluster...",
-        compression_encoding="AUTO"  # Redshift analyzes and applies optimal encoding
+        compression_encoding="AUTO"
     )
 
-    # Check compression
     cursor.execute("""
         SELECT
             "column",
@@ -487,11 +471,9 @@ Vacuum and Analyze
 
 .. code-block:: python
 
-    # Manual maintenance
     adapter.vacuum_table(conn, "lineitem")
     adapter.analyze_table(conn, "lineitem")
 
-    # Or automatic
     adapter = RedshiftAdapter(
         auto_vacuum=True,
         auto_analyze=True
@@ -507,13 +489,10 @@ Distribution Strategy
 
    .. code-block:: sql
 
-       -- EVEN: Small tables, no joins
        CREATE TABLE region (...) DISTSTYLE EVEN
 
-       -- KEY: Large fact tables (distribute by join key)
        CREATE TABLE orders (...) DISTSTYLE KEY DISTKEY (o_custkey)
 
-       -- ALL: Small dimension tables (broadcast to all nodes)
        CREATE TABLE nation (...) DISTSTYLE ALL
 
 Sort Keys
@@ -523,14 +502,12 @@ Sort Keys
 
    .. code-block:: sql
 
-       -- Good for: WHERE l_shipdate BETWEEN ... AND l_orderkey = ...
        SORTKEY (l_shipdate, l_orderkey)
 
 2. **Use interleaved for multiple filter combinations**:
 
    .. code-block:: sql
 
-       -- Good for varying filter combinations
        INTERLEAVED SORTKEY (l_shipdate, l_orderkey, l_partkey)
 
 Data Loading
@@ -561,13 +538,8 @@ Connection Timeout
 
 .. code-block:: bash
 
-    # 1. Check cluster status
     Amazon Redshift describe-clusters --cluster-identifier my-cluster
 
-    # 2. Verify security group allows inbound on port 5439
-    # 3. Check VPC routing and NAT gateway
-
-    # 4. Test connectivity
     psql -h my-cluster.123456.us-east-1.redshift.amazonaws.com \
          -U admin -d dev -p 5439
 
@@ -580,12 +552,6 @@ S3 COPY Errors
 
 .. code-block:: python
 
-    # 1. Verify IAM role permissions
-    # Role needs: s3:GetObject, s3:ListBucket
-
-    # 2. Check S3 bucket region matches cluster region
-
-    # 3. View error details
     cursor.execute("""
         SELECT * FROM stl_load_errors
         ORDER BY starttime DESC
@@ -601,10 +567,8 @@ Slow Query Performance
 
 .. code-block:: python
 
-    # 1. Check query execution plan
     plan = adapter.get_query_plan(conn, query)
 
-    # 2. Verify distribution keys
     cursor.execute("""
         SELECT
             TRIM(t.name) AS table,
@@ -616,13 +580,11 @@ Slow Query Performance
         WHERE c.distkey = TRUE
     """)
 
-    # 3. Check sort key usage
     cursor.execute("""
         SELECT * FROM svv_table_info
         WHERE "table" = 'lineitem'
     """)
 
-    # 4. Run VACUUM and ANALYZE
     adapter.vacuum_table(conn, "lineitem")
     adapter.analyze_table(conn, "lineitem")
 

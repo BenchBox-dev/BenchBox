@@ -58,14 +58,11 @@ Metadata operations are critical for:
 ### CLI Usage
 
 ```bash
-# Run metadata primitives benchmark on DuckDB
 benchbox run --platform duckdb --benchmark metadata_primitives
 
-# Run specific categories only
 benchbox run --platform snowflake --benchmark metadata_primitives \
   --benchmark-option categories=schema,column
 
-# Run with complexity testing
 benchbox run --platform duckdb --benchmark metadata_primitives \
   --benchmark-option complexity=wide_tables
 ```
@@ -76,16 +73,12 @@ benchbox run --platform duckdb --benchmark metadata_primitives \
 from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 import duckdb
 
-# Initialize benchmark
 benchmark = MetadataPrimitivesBenchmark()
 
-# Connect to database
 conn = duckdb.connect(":memory:")
 
-# Create test schema (TPC-H + TPC-DS tables)
 conn.execute(benchmark.get_create_tables_sql())
 
-# Run benchmark
 result = benchmark.run_benchmark(
     connection=conn,
     dialect="duckdb",
@@ -96,7 +89,6 @@ print(f"Queries: {result.total_queries}")
 print(f"Successful: {result.successful_queries}")
 print(f"Total time: {result.total_time_ms:.1f}ms")
 
-# View category summary
 for cat, summary in result.category_summary.items():
     print(f"{cat}: {summary['avg_time_ms']:.2f}ms avg")
 ```
@@ -106,13 +98,11 @@ for cat, summary in result.category_summary.items():
 ### Schema Discovery
 
 ```sql
--- schema_list_tables: List all tables
 SELECT table_name, table_type, table_schema
 FROM information_schema.tables
 WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
 ORDER BY table_name;
 
--- schema_list_views: List all views
 SELECT table_name, view_definition
 FROM information_schema.views
 WHERE table_schema NOT IN ('information_schema', 'pg_catalog')
@@ -122,13 +112,11 @@ ORDER BY table_name;
 ### Column Introspection
 
 ```sql
--- column_for_table: Get columns for a specific table
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_name = 'lineitem'
 ORDER BY ordinal_position;
 
--- column_types: Get column type distribution
 SELECT data_type, COUNT(*) as count
 FROM information_schema.columns
 GROUP BY data_type
@@ -138,7 +126,6 @@ ORDER BY count DESC;
 ### Table Statistics
 
 ```sql
--- stats_table_sizes: Get table sizes and row estimates
 SELECT table_name,
        pg_size_pretty(pg_total_relation_size(table_name::regclass)) as size
 FROM information_schema.tables
@@ -148,10 +135,8 @@ WHERE table_type = 'BASE TABLE';
 ### Query Introspection
 
 ```sql
--- query_explain_plan: Get execution plan
 EXPLAIN SELECT * FROM lineitem WHERE l_quantity > 10;
 
--- query_analyze: Get execution statistics
 EXPLAIN ANALYZE SELECT COUNT(*) FROM orders;
 ```
 
@@ -176,7 +161,6 @@ from benchbox.core.metadata_primitives import MetadataPrimitivesBenchmark
 
 benchmark = MetadataPrimitivesBenchmark()
 
-# Run with wide tables preset
 result = benchmark.run_complexity_benchmark(
     connection=conn,
     dialect="duckdb",
@@ -200,9 +184,9 @@ from benchbox.core.metadata_primitives.complexity import (
 )
 
 config = MetadataComplexityConfig(
-    width_factor=500,           # 500 columns per table
-    catalog_size=100,           # 100 tables
-    view_depth=5,               # 5 levels of nested views
+    width_factor=500,
+    catalog_size=100,
+    view_depth=5,
     type_complexity=TypeComplexity.NESTED,
     constraint_density=ConstraintDensity.MODERATE,
     acl_role_count=10,
@@ -233,7 +217,6 @@ The benchmark includes comprehensive access control testing.
 ### ACL Mutation Testing
 
 ```python
-# Run ACL benchmark measuring GRANT/REVOKE performance
 acl_result = benchmark.run_acl_benchmark(
     connection=conn,
     dialect="snowflake",
@@ -285,7 +268,6 @@ The benchmark provides platform-specific query variants for optimal performance:
 ### DuckDB
 
 ```sql
--- Uses PRAGMA for metadata
 PRAGMA table_info('lineitem');
 PRAGMA database_list;
 ```
@@ -293,7 +275,6 @@ PRAGMA database_list;
 ### ClickHouse
 
 ```sql
--- Uses system tables
 SELECT * FROM system.tables WHERE database = currentDatabase();
 SELECT * FROM system.columns WHERE table = 'lineitem';
 ```
@@ -301,7 +282,6 @@ SELECT * FROM system.columns WHERE table = 'lineitem';
 ### Snowflake
 
 ```sql
--- Uses SHOW commands
 SHOW TABLES;
 SHOW COLUMNS IN TABLE lineitem;
 DESCRIBE TABLE lineitem;
@@ -310,7 +290,6 @@ DESCRIBE TABLE lineitem;
 ### BigQuery
 
 ```sql
--- Uses INFORMATION_SCHEMA with project prefix
 SELECT * FROM `project.dataset.INFORMATION_SCHEMA.TABLES`;
 SELECT * FROM `project.dataset.INFORMATION_SCHEMA.COLUMNS`;
 ```
@@ -346,14 +325,12 @@ class MetadataQueryResult:
 Measure how quickly catalogs can scan your database:
 
 ```python
-# Simulate catalog scan pattern
 result = benchmark.run_benchmark(
     connection=conn,
     dialect="snowflake",
     categories=["schema", "column"]
 )
 
-# Check if scan meets SLA (e.g., < 5 seconds)
 assert result.total_time_ms < 5000, "Catalog scan too slow"
 ```
 
@@ -362,7 +339,6 @@ assert result.total_time_ms < 5000, "Catalog scan too slow"
 Test autocomplete responsiveness:
 
 ```python
-# Column lookup should be fast for autocomplete
 column_queries = benchmark.run_benchmark(
     connection=conn,
     dialect="postgresql",
@@ -378,10 +354,8 @@ assert avg_time < 100, f"Column lookup too slow: {avg_time}ms"
 Test metadata operations after migrations:
 
 ```python
-# Run full schema discovery
 result = benchmark.run_benchmark(conn, "duckdb")
 
-# Verify all tables discoverable
 schema_results = [r for r in result.results if r.category == "schema"]
 assert all(r.success for r in schema_results), "Schema discovery failed"
 ```
@@ -391,12 +365,10 @@ assert all(r.success for r in schema_results), "Schema discovery failed"
 Verify permission introspection:
 
 ```python
-# Run ACL queries
 acl_result = benchmark.run_benchmark(
     conn, "snowflake", categories=["acl"]
 )
 
-# Check all ACL queries succeed
 assert acl_result.successful_queries == acl_result.total_queries
 ```
 
@@ -416,11 +388,9 @@ benchbox run --platform duckdb --benchmark metadata_primitives \
 Match complexity presets to your production environment:
 
 ```python
-# For typical OLAP warehouse
-config = "wide_tables"  # If you have denormalized tables
+config = "wide_tables"
 
-# For data governance heavy environment
-config = "acl_dense"  # If you use fine-grained permissions
+config = "acl_dense"
 ```
 
 ### 3. Clean Up Test Objects
@@ -428,7 +398,6 @@ config = "acl_dense"  # If you use fine-grained permissions
 Always clean up complexity test objects:
 
 ```python
-# Manual cleanup
 benchmark.cleanup_benchmark_objects(conn, "duckdb", prefix="benchbox_")
 ```
 
@@ -437,11 +406,9 @@ benchmark.cleanup_benchmark_objects(conn, "duckdb", prefix="benchbox_")
 Track metadata performance over time:
 
 ```python
-# Save results for comparison
 results = benchmark.run_benchmark(conn, "duckdb")
 baseline_time = results.total_time_ms
 
-# Later runs
 new_results = benchmark.run_benchmark(conn, "duckdb")
 if new_results.total_time_ms > baseline_time * 1.2:
     print("WARNING: 20%+ performance regression detected")

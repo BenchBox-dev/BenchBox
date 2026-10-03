@@ -40,22 +40,16 @@ Re-export existing benchmark results in different formats without re-running ben
 ### Usage Examples
 
 ```bash
-# Export most recent result to CSV
 benchbox export --last --format csv
 
-# Export specific result file to multiple formats
 benchbox export results/tpch_sf1_duckdb.json --format csv --format html
 
-# Export latest TPC-H result to all formats
 benchbox export --last --benchmark tpc_h --format json --format csv --format html
 
-# Export latest DuckDB result to HTML
 benchbox export --last --platform duckdb --format html
 
-# Export to custom directory
 benchbox export --last --format csv --output-dir ./reports/
 
-# Export with specific file and force overwrite
 benchbox export benchmark_runs/results/tpcds_sf10.json --format html --force
 ```
 
@@ -63,21 +57,16 @@ benchbox export benchmark_runs/results/tpcds_sf10.json --format html --force
 
 **Share Results with Team:**
 ```bash
-# Export recent result as HTML report
 benchbox export --last --format html --output-dir ./team_reports/
-# Share the HTML file via email or documentation
 ```
 
 **Analyze in Spreadsheet:**
 ```bash
-# Export to CSV for Excel/Sheets analysis
 benchbox export --last --format csv --output-dir ~/Downloads/
-# Open CSV in Excel for charting and analysis
 ```
 
 **Archive Benchmarks:**
 ```bash
-# Export all formats for comprehensive archival
 benchbox export --last --format json --format csv --format html --output-dir ./archive/
 ```
 
@@ -117,19 +106,14 @@ is a separate sidecar surface from local result discovery.
 ### Usage Examples
 
 ```bash
-# Show recent results
 benchbox results
 
-# Show more results
 benchbox results --limit 25
 
-# Show exact result file paths accepted by submit/export (one per line, pipeable)
 benchbox results --paths
 
-# Pipe into submit to package each result in turn
 benchbox results --paths --limit 100 | xargs -n1 -I{} benchbox submit {} --output ./submissions
 
-# Show hosted submissions and public URLs
 benchbox results --submitted
 ```
 
@@ -178,34 +162,26 @@ benchbox compare BASELINE.json CURRENT.json [OPTIONS]
 
 **Basic Comparison:**
 ```bash
-# Compare two result files
 benchbox compare baseline.json current.json
 
-# Compare with all queries shown (not just changes)
 benchbox compare baseline.json current.json --show-all-queries
 ```
 
 **CI/CD Integration:**
 ```bash
-# Fail pipeline if any query regresses more than 10%
 benchbox compare baseline.json current.json --fail-on-regression 10%
 
-# Stricter threshold for critical paths
 benchbox compare baseline.json current.json --fail-on-regression 5%
 
-# Using decimal notation
 benchbox compare baseline.json current.json --fail-on-regression 0.1
 ```
 
 **Export Comparison Reports:**
 ```bash
-# Export as JSON for dashboards
 benchbox compare baseline.json current.json --format json --output comparison.json
 
-# Generate HTML report for stakeholders
 benchbox compare baseline.json current.json --format html --output report.html
 
-# Save text report to file
 benchbox compare baseline.json current.json --output comparison.txt
 ```
 
@@ -249,15 +225,12 @@ The comparison report includes:
 
 **Regression Testing in CI/CD:**
 ```bash
-# 1. Run baseline benchmark (e.g., main branch)
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
   --output ./baseline-results
 
-# 2. Run current benchmark (e.g., feature branch)
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
   --output ./current-results
 
-# 3. Compare and fail on regression
 benchbox compare \
   baseline-results/results/*.json \
   current-results/results/*.json \
@@ -266,15 +239,12 @@ benchbox compare \
 
 **Before/After Optimization Analysis:**
 ```bash
-# Run without tuning
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
   --tuning notuning --output ./baseline
 
-# Run with tuning
 benchbox run --platform snowflake --benchmark tpch --scale 1 \
   --tuning tuned --output ./optimized
 
-# Compare results
 benchbox compare \
   baseline/results/tpch_*.json \
   optimized/results/tpch_*.json \
@@ -283,7 +253,6 @@ benchbox compare \
 
 **Cross-Platform Comparison:**
 ```bash
-# Compare DuckDB vs ClickHouse performance
 benchbox compare \
   duckdb-results/results/tpch_sf1.json \
   clickhouse-results/results/tpch_sf1.json \
@@ -315,20 +284,17 @@ from benchbox.core.results.exporter import ResultExporter
 
 exporter = ResultExporter()
 
-# Compare two result files
 comparison = exporter.compare_results(
     Path("baseline.json"),
     Path("current.json")
 )
 
-# Check overall performance
 perf = comparison['performance_changes']['average_query_time']
 print(f"Average query time: {perf['change_percent']:.2f}% change")
 
 if perf['improved']:
     print("Performance improved!")
 
-# Export as HTML report
 report_path = exporter.export_comparison_report(comparison)
 print(f"Report saved to: {report_path}")
 ```

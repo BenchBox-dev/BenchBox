@@ -1,22 +1,7 @@
-/**
- * Integration tests for BenchmarkIndex page.
- *
- * Cases:
- *   (a) Renders the matrix view by default (QueryHeatmap present)
- *   (b) Trust filter toggles rows without refetching the cohort
- *   (c) List-view toggle switches rendered component
- *   (d) Empty platforms list renders QueryHeatmap empty-state
- *   (e) axe-core: no serious/critical violations on a fully-loaded matrix
- */
-
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { BenchmarkSummary } from "@/types";
 import { expectNoAxeViolations } from "@/testing/axe-helper";
-
-// ---------------------------------------------------------------------------
-// Mock `@/db.queryRows` so pages load canonical DuckDB rows from fixtures.
-// ---------------------------------------------------------------------------
 
 vi.mock("@/db", () => ({
   queryRows: vi.fn(),
@@ -38,10 +23,6 @@ const originalScrollIntoView = Element.prototype.scrollIntoView;
 afterEach(() => {
   Element.prototype.scrollIntoView = originalScrollIntoView;
 });
-
-// ---------------------------------------------------------------------------
-// Fixtures - raw DuckDB row shapes
-// ---------------------------------------------------------------------------
 
 const TIMING_ELIGIBLE = {
   has_display_timing: true,
@@ -253,7 +234,6 @@ const CELL_ROWS = [
   { benchmark: "tpch", scale_factor: 0.1, phase: "power", result_id: "r2", platform_id: "sqlite", query_id: "Q2", display_ms: 200, ...TIMING_CELL_ELIGIBLE },
 ];
 
-// The legacy SUMMARY fixture remains useful for the direct-component axe test.
 const SUMMARY: BenchmarkSummary = {
   benchmark: "tpch",
   scale_factor: 0.1,
@@ -328,12 +308,6 @@ const SUMMARY: BenchmarkSummary = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Mock dispatch - match by SQL-prefix of the canonical helpers in
-// `src/lib/duckdbQueries.ts`. Tests override the default behaviour via
-// `vi.mocked(queryRows).mockImplementationOnce(...)` for edge cases.
-// ---------------------------------------------------------------------------
-
 type QueryRowsImpl = (sql: string, params?: unknown[]) => Promise<unknown[]>;
 
 function defaultImpl(
@@ -373,9 +347,6 @@ function getRenderedResultOrder(container: ParentNode): string[] {
   ).filter((id) => !id.startsWith("excluded-run-"));
 }
 
-// The Query matrix card and the Results (List) table both key their rows by
-// the same result-id testids - so row-order assertions need to scope to the
-// one section under test rather than the whole page.
 function matrixRoot(container: ParentNode): ParentNode {
   const root = container.querySelector('[data-testid="summary-chart-preview-query_heatmap"]');
   if (!root) throw new Error("expected the query_heatmap Analysis card to be rendered");
@@ -387,11 +358,6 @@ function listRoot(container: ParentNode): ParentNode {
   return root;
 }
 
-// The query matrix and query ranks cards are collapsed <details> by default;
-// tests that need their content open them the same way a reader's click
-// would (jsdom fires no click-driven native toggle in this codebase's
-// version, so the assignment + explicit `toggle` event mirrors the pattern
-// used throughout SummaryChartOverview.test.tsx).
 function openMatrixCard(container: ParentNode): void {
   const details = matrixRoot(container) as HTMLDetailsElement;
   details.open = true;
@@ -403,10 +369,6 @@ function openRanksCard(container: ParentNode): void {
   details.open = true;
   fireEvent(details, new Event("toggle"));
 }
-
-// ---------------------------------------------------------------------------
-// (a) Matrix view is the default
-// ---------------------------------------------------------------------------
 
 describe("BenchmarkIndex", () => {
   it("renders the page title", async () => {
@@ -437,13 +399,9 @@ describe("BenchmarkIndex", () => {
     const meta = screen.getByTestId("page-header-meta");
     expect(meta.textContent).toContain("2 published runs");
     expect(meta.textContent).toContain("2 queries");
-    // The hero's prose and its "Jump to matrix" link are gone: the link moved
-    // the reader a quarter of a page, and the matrix follows immediately.
     expect(screen.queryByText(/Jump to matrix/)).toBeNull();
     expect(container.querySelector("#benchmark-section-analysis")).not.toBeNull();
     expect(container.querySelector("#provenance-legend")).not.toBeNull();
-    // The matrix is now embedded as the first Analysis card, titled "Query
-    // matrix", not a standalone page section.
     const cards = container.querySelectorAll("[data-testid^='summary-chart-preview-']");
     expect(cards.length).toBeGreaterThan(0);
     expect(cards[0]?.getAttribute("data-testid")).toBe("summary-chart-preview-query_heatmap");
@@ -477,8 +435,6 @@ describe("BenchmarkIndex", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    // The platform name is the receipt link, and the labels column carries
-    // validation status; neither is behind a disclosure any more.
     expect(screen.queryByText("Run details")).toBeNull();
     const receiptLinks = screen.getAllByRole("link", { name: /Open receipt for/ }) as HTMLAnchorElement[];
     expect(receiptLinks[0]?.getAttribute("href")).toBe("/results/r/r1#run-receipt");
@@ -490,8 +446,6 @@ describe("BenchmarkIndex", () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    // The "Result links" sections repeated one link per row that the rows
-    // already carried.
     expect(screen.queryByTestId("matrix-result-links")).toBeNull();
     expect(screen.queryByTestId("ranks-result-links")).toBeNull();
     expect(
@@ -508,8 +462,6 @@ describe("BenchmarkIndex", () => {
     expect(status).toHaveAttribute("aria-atomic", "true");
     expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more platforms");
-    // No dead button: the pending state is status text, and the real
-    // affordance appears in the same slot once it can be used.
     expect(screen.queryByRole("button", { name: /Select 2 / })).toBeNull();
     expect(screen.getByTestId("benchmark-compare-cta-pending").textContent).toBe(
       "Select 2 results to compare",
@@ -577,9 +529,6 @@ describe("BenchmarkIndex", () => {
   });
 
   it("does not expose a same-label alias unless that exact slug has public results", async () => {
-    // Same-label aliases (e.g. `ssb` legacy slug + `star_schema` canonical
-    // slug both render "SSB"). The switcher should expose the populated slug
-    // and suppress the same-label alias when that alias has no public results.
     const legacyRows = RESULT_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     const legacyRankings = RANKING_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
     const legacyCells = CELL_ROWS.map((row) => ({ ...row, benchmark: "ssb" }));
@@ -601,10 +550,6 @@ describe("BenchmarkIndex", () => {
   });
 
   it("hides no-result benchmarks even when the corpus-list query fails", async () => {
-    // Hard failure of listBenchmarksWithPublicResults must NOT silently
-    // revert to the catalog-wide list - that would re-introduce the
-    // no-result dead-end anti-pattern. The switcher collapses to only the
-    // current benchmark via the fallback option.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(queryRows).mockImplementation(async (sql: string) => {
       const s = String(sql).replace(/\s+/g, " ").trim();
@@ -673,8 +618,6 @@ describe("BenchmarkIndex", () => {
   it("compare tray shows selected metadata and public IDs while compare URLs keep short aliases", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     const list = () => listRoot(container) as HTMLElement;
-    // Selection now happens from the Results table's own checkboxes, so wait
-    // for the per-cohort summary to make both rows comparable before clicking.
     await waitFor(() => {
       const boxes = within(list()).getAllByRole("checkbox") as HTMLInputElement[];
       expect(boxes.filter((box) => !box.disabled)).toHaveLength(2);
@@ -738,8 +681,6 @@ describe("BenchmarkIndex", () => {
     vi.mocked(queryRows).mockImplementation(defaultImpl(resultRows, rankingRows, cellRows));
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    // The Results table's checkboxes start disabled until the per-cohort
-    // summary resolves and confirms each row is comparable.
     await waitFor(() => {
       const boxes = within(listRoot(container) as HTMLElement).getAllByRole("checkbox") as HTMLInputElement[];
       expect(boxes.filter((box) => !box.disabled)).toHaveLength(5);
@@ -826,11 +767,7 @@ describe("BenchmarkIndex", () => {
 
     render(<BenchmarkIndex benchmark="tpch" />);
 
-    // `?view=ranks` opens the Query ranks Analysis card automatically.
     await waitFor(() => expect(screen.getByTestId("rank-gate-notice")).toBeTruthy());
-    // The card title stays "Query ranks" regardless of gate state now that
-    // ranks live in the shared card grid; only the expanded content swaps
-    // to the gate notice.
     expect(screen.getByRole("heading", { name: "Query ranks" })).toBeTruthy();
     expect(screen.getByTestId("rank-gate-notice").textContent).toContain("Ranks are unavailable");
     expect(screen.getByTestId("rank-gate-notice").textContent).toContain("No results meet the requirements for ranking");
@@ -859,11 +796,6 @@ describe("BenchmarkIndex", () => {
     vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, rows, CELL_ROWS));
 
     render(<BenchmarkIndex benchmark="tpch" />);
-    // The compare checkbox lives in the Results table's rows. List's rows
-    // render as soon as the raw result rows resolve, ahead of the async
-    // per-cohort summary that determines eligibility, so the checkbox
-    // starts disabled ("not part of the current cohort summary") and only
-    // becomes enabled/disabled-for-cause once the summary settles.
     await waitFor(() => {
       const boxes = screen.getAllByLabelText(/Select SQLite/) as HTMLInputElement[];
       expect(boxes.length).toBeGreaterThan(0);
@@ -913,9 +845,6 @@ describe("BenchmarkIndex", () => {
     );
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    // List's rows render as soon as the (unfiltered by cohort ranking) result
-    // rows resolve, ahead of the async per-cohort summary this assertion
-    // also depends on (via the ranking-query call history) - wait for both.
     await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
     await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
 
@@ -944,11 +873,6 @@ describe("BenchmarkIndex", () => {
   });
 
   it("keeps a filter with no real choice visible but disabled, with an explanation", async () => {
-    // Regression: filters used to unmount entirely once their option count
-    // dropped to <=1, which made the filter bar's contents shift for
-    // reasons the reader could not see. Every fixture row here has a null
-    // platform_version, so the filter should stay mounted, disabled, and
-    // explain why rather than disappear.
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
 
@@ -960,9 +884,6 @@ describe("BenchmarkIndex", () => {
   it("filters the cohort by architecture", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByText(/Showing \d+ of \d+ results/)).toBeTruthy());
-    // The architecture filter's options come from the per-cohort summary,
-    // not the raw result rows List renders from - wait for it or the
-    // filter is still showing its single-option disabled placeholder.
     await waitFor(() => expect(screen.getByTestId("cohort-counts")).toBeTruthy());
     const list = () => listRoot(container) as HTMLElement;
     expect(within(list()).getByText("SQLite")).toBeTruthy();
@@ -1000,14 +921,7 @@ describe("BenchmarkIndex", () => {
     expect(within(list()).getByText("DuckDB")).toBeTruthy();
   });
 
-  // -----------------------------------------------------------------------
-  // (c) List view toggle
-  // -----------------------------------------------------------------------
-
   it("list section renders its own Geomean column, and opening the query matrix card exposes its own query columns", async () => {
-    // The Results (List) table and the Query matrix card each own their
-    // column set now: List's Geomean column is always visible, while the
-    // matrix's per-query Q1/Q2 columns only render once that card is open.
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
     expect(screen.queryByRole("button", { name: /^Q1/ })).toBeNull();
@@ -1022,16 +936,12 @@ describe("BenchmarkIndex", () => {
 
   it("scrolls to the Results section for a `?view=list` deep link, leaving the Analysis cards intact", async () => {
     window.history.replaceState(null, "", "/results/tpch/?view=list");
-    // jsdom does not implement scrollIntoView; stub it so the page's
-    // mount-time deep-link scroll has something to call.
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
 
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
-    // The query matrix Analysis card is still rendered (collapsed) - `view=list`
-    // scrolls to Results without removing it from the page.
     await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
     await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith(expect.objectContaining({ block: "start" })));
     const listSection = container.querySelector("#benchmark-section-list");
@@ -1080,19 +990,15 @@ describe("BenchmarkIndex", () => {
     expect(within(list).getByText("x86-64")).toBeTruthy();
     expect(within(list).getByText("AMD EPYC")).toBeTruthy();
 
-    // Arch sort asc (arm64, x86_64)
     fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
     expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
 
-    // Arch sort desc (x86_64, arm64)
     fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
     expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
 
-    // CPU sort asc (amd_epyc, apple_silicon)
     fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
     expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r2", "list-r1"]);
 
-    // CPU sort desc (apple_silicon, amd_epyc)
     fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
     expect(getRenderedResultOrder(listRoot(container))).toEqual(["list-r1", "list-r2"]);
   });
@@ -1106,9 +1012,6 @@ describe("BenchmarkIndex", () => {
       display_geomean_ms: index + 1,
       geomean_ms: index + 1,
     }));
-    // Keep summary eligibility pending while the list paginates. The list
-    // remains usable, but compare checkboxes must expose one shared pending
-    // status rather than row-level reasons based on incomplete data.
     let finishRanking!: (rows: unknown[]) => void;
     const ranking = new Promise<unknown[]>((resolve) => { finishRanking = resolve; });
     const fallback = defaultImpl(manyRows, RANKING_ROWS, CELL_ROWS);
@@ -1117,7 +1020,6 @@ describe("BenchmarkIndex", () => {
     );
 
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    // List's own readiness signal - independent of the Matrix summary.
     await waitFor(() => expect(screen.getByText("Showing 200 of 205 results for SF 0.1")).toBeTruthy());
     expect(getRenderedResultOrder(listRoot(container))).toHaveLength(200);
     const list = listRoot(container) as HTMLElement;
@@ -1132,10 +1034,6 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => expect(getRenderedResultOrder(listRoot(container))).toHaveLength(205));
     expect(screen.getByText("Showing 205 of 205 results for SF 0.1")).toBeTruthy();
 
-    // A late summary resolution re-renders the page but must leave the
-    // expanded List alone. The trailing query-matrix-card assertion proves
-    // the summary actually resolved, so the stability check above it is
-    // non-vacuous.
     finishRanking([...RANKING_ROWS]);
     await waitFor(() => expect(screen.getByTestId("summary-chart-preview-query_heatmap")).toBeTruthy());
     openMatrixCard(container);
@@ -1173,10 +1071,6 @@ describe("BenchmarkIndex", () => {
     expect(vi.mocked(queryRows).mock.calls.some(([sql]) => String(sql).includes("platform_version IN (?)"))).toBe(true);
   });
 
-  // -----------------------------------------------------------------------
-  // (b) Trust filter hides rows without refetching
-  // -----------------------------------------------------------------------
-
   it("trust tier select offers every trust tier present in the cohort", async () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
@@ -1202,33 +1096,24 @@ describe("BenchmarkIndex", () => {
 
   it("selecting a trust tier hides other tiers' rows without extra fetch", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
-    // The trust select's options come from the same async summary query as
-    // the Results table's compare eligibility, which can resolve after
-    // List's (sync) "SQLite" text does.
     await waitFor(() => expect(screen.getByTestId("benchmark-trust-filter")).not.toBeDisabled());
     const trustFilter = screen.getByTestId("benchmark-trust-filter") as HTMLSelectElement;
     const list = () => listRoot(container) as HTMLElement;
 
     const callsBefore = vi.mocked(queryRows).mock.calls.length;
 
-    // Select only the maintainer-run tier.
     fireEvent.change(trustFilter, { target: { value: "maintainer-run" } });
 
-    // SQLite (community-submission) should now be gone
     await waitFor(() => expect(within(list()).queryByText("SQLite")).toBeNull());
 
-    // DuckDB (maintainer-run) should still be visible
     expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
 
-    // No additional queryRows calls - client-side filtering only.
     expect(vi.mocked(queryRows).mock.calls.length).toBe(callsBefore);
   });
 
   it("keeps filtered-out selections in the status and compare tray", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     const list = () => listRoot(container) as HTMLElement;
-    // Wait for the Results table's checkboxes to become comparable (the
-    // per-cohort summary must resolve before selection is possible).
     await waitFor(() => {
       const boxes = within(list()).getAllByRole("checkbox") as HTMLInputElement[];
       expect(boxes.filter((box) => !box.disabled)).toHaveLength(2);
@@ -1246,25 +1131,13 @@ describe("BenchmarkIndex", () => {
     expect(screen.getAllByRole("link", { name: /Compare 2 selected/ }).length).toBeGreaterThan(0);
   });
 
-  // -----------------------------------------------------------------------
-  // (d) Empty ranking cohort shows the informational empty state
-  // -----------------------------------------------------------------------
-
   it("empty cohort omits the Analysis section (and its matrix/ranks cards) entirely", async () => {
-    // Matrix and Ranks are now cards inside the Analysis section, which only
-    // renders when the per-cohort summary has at least one platform. An
-    // empty cohort has no analysis to show, so the whole section - not a
-    // per-card placeholder - is omitted.
     vi.mocked(queryRows).mockImplementation(defaultImpl(RESULT_ROWS, [], []));
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByTestId("benchmark-compare-guidance")).toBeTruthy());
     expect(container.querySelector("#benchmark-section-analysis")).toBeNull();
     expect(container.querySelector("[data-testid^='summary-chart-preview-']")).toBeNull();
   });
-
-  // -----------------------------------------------------------------------
-  // (e) axe-core: no serious/critical violations
-  // -----------------------------------------------------------------------
 
   it("has no serious/critical axe violations when matrix is loaded", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
@@ -1278,11 +1151,6 @@ describe("BenchmarkIndex", () => {
     await expectNoAxeViolations(container);
   });
 
-  // -----------------------------------------------------------------------
-  // Phase guard: when only "standard" phase is available, the page must
-  // request the "standard" cohort (not the stale phaseFilter="power" default).
-  // -----------------------------------------------------------------------
-
   it("loads standard-phase cohort when only standard is available for the SF", async () => {
     const standardRows = RESULT_ROWS.map((r) => ({ ...r, test_type: "standard" }));
     const standardRankings = RANKING_ROWS.map((r) => ({ ...r, phase: "standard" }));
@@ -1295,8 +1163,6 @@ describe("BenchmarkIndex", () => {
       expect(new URL(window.location.href).searchParams.get("phase")).toBe("standard"),
     );
 
-    // Verify the last benchmark_rankings call targets "standard" (any earlier
-    // call may still use the default phase filter before results resolve).
     const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
@@ -1309,8 +1175,6 @@ describe("BenchmarkIndex", () => {
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
 
-    // "power" is the useUrlState default, so correcting to it strips the
-    // phase key rather than leaving a redundant `?phase=power` param.
     await waitFor(() =>
       expect(new URL(window.location.href).searchParams.get("phase")).toBeNull(),
     );

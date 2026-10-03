@@ -51,18 +51,15 @@ benchbox run --platform duckdb --benchmark tpch \
 This works for any platform, not just DuckDB:
 
 ```bash
-# Snowflake connector
 benchbox run --platform snowflake --benchmark tpch \
   --platform-option driver_version=3.12.0 \
   --platform-option driver_auto_install=true \
   --output s3://my-bucket/results/
 
-# Polars DataFrame engine
 benchbox run --platform polars-df --benchmark tpch \
   --platform-option driver_version=1.36.1 \
   --platform-option driver_auto_install=true
 
-# ClickHouse Cloud (clickhouse-connect HTTP driver)
 benchbox run --platform clickhouse-cloud --benchmark tpch \
   --platform-option driver_version=0.10.0 \
   --platform-option driver_auto_install=true \
@@ -84,7 +81,6 @@ If you want every `uv run` to use a specific version permanently:
 
 ```bash
 uv add "duckdb==1.5.0" --allow-prereleases
-# Re-lock and run normally
 benchbox run --platform duckdb --benchmark tpch
 ```
 
@@ -103,7 +99,6 @@ For scripts and CI pipelines, check the result JSON:
 
 ```bash
 jq '.execution.driver_version_actual' result.json
-# or
 jq '.platform.client_version' result.json
 ```
 

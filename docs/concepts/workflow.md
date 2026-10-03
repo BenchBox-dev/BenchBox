@@ -12,13 +12,10 @@ Common patterns and workflows for running benchmarks with BenchBox.
 The simplest path from installation to results:
 
 ```bash
-# 1. Install
 uv pip install benchbox
 
-# 2. Run benchmark
 benchbox run --benchmark tpch --platform duckdb --scale 0.1
 
-# 3. View results
 cat benchmark_runs/tpch_0.1_duckdb_*/results.json
 ```
 
@@ -37,16 +34,13 @@ See: [Getting Started Guide](../usage/getting-started.md)
 Typical workflow for developers testing query changes or experimenting:
 
 ```bash
-# 1. Generate data once
 benchbox datagen --benchmark tpch --scale 0.01 --output ./data/tpch_0.01
 
-# 2. Run specific queries during development
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
   --output ./data/tpch_0.01 \
   --queries Q1,Q3,Q7 \
   --verbose
 
-# 3. Run full suite when ready
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
   --output ./data/tpch_0.01
 ```
@@ -66,16 +60,13 @@ benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
 Compare performance across different database platforms:
 
 ```bash
-# Generate data once
 benchbox datagen --benchmark tpch --scale 1 --output ./data/tpch_1
 
-# Run on multiple platforms
 for platform in duckdb clickhouse-local; do
   benchbox run --benchmark tpch --platform $platform --scale 1 \
     --output benchmark_runs/tpch_1_${platform}
 done
 
-# Compare results
 benchbox compare \
   benchmark_runs/tpch_1_duckdb/results.json \
   benchmark_runs/tpch_1_clickhouse-local/results.json
@@ -93,22 +84,16 @@ See: [Platform Comparison Matrix](../platforms/comparison-matrix.md)
 Running benchmarks on cloud platforms (BigQuery, Snowflake, Databricks):
 
 ```bash
-# 1. Check cloud credentials
 export DATABRICKS_TOKEN="dapi..."
 export DATABRICKS_HOST="https://....cloud.databricks.com"
 
-# 2. Preview queries without execution (to avoid costs)
 benchbox run --benchmark tpcds --platform databricks --scale 1 \
   --dry-run ./preview
 
-# Review generated queries in ./preview/queries/
-
-# 3. Run benchmark (queries will execute and incur costs)
 benchbox run --benchmark tpcds --platform databricks --scale 1 \
   --platform-option uc_catalog=hive_metastore \
   --platform-option uc_schema=benchbox_test
 
-# 4. Results saved with cloud execution metadata
 cat benchmark_runs/tpcds_1_databricks_*/results.json
 ```
 
@@ -117,7 +102,6 @@ cat benchmark_runs/tpcds_1_databricks_*/results.json
 Skip native table materialization (COPY/CTAS) and query directly over staged Parquet files:
 
 ```bash
-# External mode: register views/external tables over staged data
 benchbox run --benchmark tpch --platform snowflake --scale 1 \
   --table-mode external \
   --platform-option staging_root=s3://my-bucket/benchbox/
@@ -140,23 +124,11 @@ See: [Platform Selection Guide](../platforms/platform-selection-guide.md)
 Preview benchmark execution without running queries:
 
 ```bash
-# Generate queries and configuration
 benchbox run --benchmark tpcds --platform bigquery --scale 10 \
   --dry-run ./preview
 
-# Inspect outputs
 tree ./preview
-# preview/
-# ├── queries/
-# │   ├── q1.sql
-# │   ├── q2.sql
-# │   └── ...
-# ├── schema/
-# │   ├── store_sales.ddl
-# │   └── ...
-# └── summary.json
 
-# Review summary
 cat ./preview/summary.json
 ```
 
@@ -173,7 +145,6 @@ See: [Dry Run Guide](../usage/dry-run.md)
 Automated benchmarking in continuous integration:
 
 ```yaml
-# .github/workflows/benchmarks.yml
 name: Benchmark Tests
 
 on: [pull_request]
@@ -212,20 +183,17 @@ See: [Testing Guide](../development/testing.md)
 Running benchmarks according to TPC specifications for official results:
 
 ```bash
-# 1. Power Test (single query stream)
 benchbox run --official --benchmark tpch --platform snowflake --scale 100 \
   --phases power \
   --seed 42 \
   --output results/power/
 
-# 2. Throughput Test (concurrent streams)
 benchbox run --official --benchmark tpch --platform snowflake --scale 100 \
   --phases throughput \
   --concurrency 4 \
   --seed 42 \
   --output results/throughput/
 
-# 3. Calculate composite metric
 benchbox metrics qphh \
   --power-results results/power/results.json \
   --throughput-results results/throughput/results.json
@@ -253,16 +221,13 @@ See:
 Optimizing query performance with platform-specific tunings:
 
 ```bash
-# 1. Baseline run (no tunings)
 benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --output baseline/
 
-# 2. Apply tunings (partitioning, sorting, indexes)
 benchbox run --benchmark tpcds --platform clickhouse-local --scale 10 \
   --tuning tunings/clickhouse_tpcds.yaml \
   --output tuned/
 
-# 3. Compare results
 benchbox compare baseline/results.json tuned/results.json
 ```
 
@@ -286,16 +251,13 @@ See: [Performance Guide](../advanced/performance.md)
 Generating benchmark data separately from execution:
 
 ```bash
-# Generate multiple scale factors
 for sf in 0.01 0.1 1 10; do
   benchbox datagen --benchmark tpch --scale $sf \
     --output ./data/tpch_${sf}
 done
 
-# Compress for storage
 tar -czf tpch_data.tar.gz ./data/
 
-# Later: use pre-generated data
 benchbox run --benchmark tpch --platform duckdb --scale 1 \
   --output ./data/tpch_1
 ```
@@ -313,15 +275,9 @@ See: [Data Generation Guide](../usage/data-generation.md)
 Verifying benchmark results for correctness:
 
 ```bash
-# Run with validation enabled
 benchbox run --benchmark tpch --platform duckdb --scale 0.1 \
   --validation strict
 
-# Validation checks:
-# - Row count verification
-# - Result checksum validation
-# - Data type compliance
-# - Constraint satisfaction
 ```
 
 **Validation Modes**:
@@ -336,16 +292,13 @@ See: [TPC Validation Guide](../guides/tpc/tpc-validation-guide.md)
 Tracking benchmark performance over time:
 
 ```bash
-# Run benchmark daily
 benchbox run --benchmark tpch --platform duckdb --scale 1 \
   --output benchmark_runs/$(date +%Y%m%d)/
 
-# Aggregate results
 benchbox aggregate \
   --input-dir benchmark_runs/ \
   --output-file performance_trends.csv
 
-# Visualize trends
 benchbox visualize benchmark_runs/results/*.json
 ```
 
@@ -364,19 +317,15 @@ See: [Performance Monitoring](../advanced/performance.md)
 Troubleshooting benchmark issues:
 
 ```bash
-# 1. Enable debug logging (redirect to a file with the shell)
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
   -vv > debug.log 2>&1
 
-# 2. Run single query with maximum detail
 benchbox run --benchmark tpch --platform duckdb --scale 0.01 \
   --queries Q1 \
   --verbose \
-  --show-plans  # Shows query plan
+  --show-plans
 
-# 3. Inspect database state
 benchbox shell --platform duckdb --database benchmark.duckdb
-# Interactive SQL shell opens
 ```
 
 **Common Issues**:
@@ -392,12 +341,10 @@ See: [Troubleshooting Guide](../usage/troubleshooting.md)
 Creating and running a custom benchmark:
 
 ```python
-# 1. Define benchmark class
 from benchbox.base import BaseBenchmark
 
 class MyBenchmark(BaseBenchmark):
     def generate_data(self):
-        # Custom data generation logic
         ...
 
     def get_queries(self):
@@ -410,7 +357,6 @@ class MyBenchmark(BaseBenchmark):
         queries = self.get_queries()
         return queries[query_id]
 
-# 2. Run benchmark
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 benchmark = MyBenchmark(scale_factor=0.1)

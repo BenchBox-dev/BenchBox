@@ -145,21 +145,16 @@ Some queries have variants (e.g., Q14a/Q14b) that test slightly different patter
 ```python
 from benchbox import TPCDS
 
-# Initialize TPC-DS benchmark
 tpcds = TPCDS(scale_factor=1.0, output_dir="tpcds_data")
 
-# Generate data using C tools
 data_files = tpcds.generate_data()
 
-# Get all queries (1-99)
 queries = tpcds.get_queries()
 print(f"Generated {len(queries)} queries")
 
-# Get specific query with parameters
 query_1 = tpcds.get_query(1, seed=42)
 print(query_1)
 
-# Query variants
 query_14a = tpcds.get_query("14a", seed=42)
 query_14b = tpcds.get_query("14b", seed=42)
 ```
@@ -167,13 +162,10 @@ query_14b = tpcds.get_query("14b", seed=42)
 ### Data Generation with C Tools
 
 ```python
-# TPC-DS requires the official C tools (dsdgen/dsqgen)
 tpcds = TPCDS(scale_factor=1.0, output_dir="tpcds_sf1", verbose=True)
 
-# Generate all tables using dsdgen
 data_files = tpcds.generate_data()
 
-# Check generated files
 for table_name in tpcds.get_available_tables():
     table_path = tpcds.output_dir / f"{table_name.lower()}.dat"
     print(f"{table_name}: {table_path} ({table_path.stat().st_size} bytes)")
@@ -182,17 +174,14 @@ for table_name in tpcds.get_available_tables():
 ### Stream Generation and Testing
 
 ```python
-# Generate query streams for throughput testing
 tpcds = TPCDS(scale_factor=1.0, output_dir="tpcds_data")
 
-# Generate multiple concurrent streams
 streams = tpcds.generate_streams(
     num_streams=4,
     rng_seed=42,
     streams_output_dir="streams"
 )
 
-# Each stream contains a random permutation of queries
 for i, stream_info in enumerate(tpcds.get_all_streams_info()):
     print(f"Stream {i}:")
     print(f"  Queries: {stream_info['query_count']}")
@@ -205,16 +194,13 @@ for i, stream_info in enumerate(tpcds.get_all_streams_info()):
 import duckdb
 from benchbox import TPCDS
 
-# Initialize and generate data
 tpcds = TPCDS(scale_factor=0.1, output_dir="tpcds_small")
 data_files = tpcds.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("tpcds.duckdb")
 schema_sql = tpcds.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load data from DAT files
 table_mappings = {
     'call_center': 'call_center.dat',
     'catalog_page': 'catalog_page.dat',
@@ -255,7 +241,6 @@ for table_name, file_name in table_mappings.items():
         """)
         print(f"Loaded {table_name}")
 
-# Run sample queries
 sample_queries = [1, 3, 7, 19, 27, 42]
 for query_id in sample_queries:
     try:
@@ -269,15 +254,12 @@ for query_id in sample_queries:
 ### Advanced-level Parameter Management
 
 ```python
-# Use specific seeds for reproducible results
 query_reproducible = tpcds.get_query(42, seed=12345)
 
-# Scale-aware parameter generation
 query_large = tpcds.get_query(42,
                               seed=12345,
                               scale_factor=100.0)
 
-# Stream-based parameter generation
 query_stream = tpcds.get_query(42,
                                seed=12345,
                                stream_id=0)
@@ -443,15 +425,14 @@ allowed by default, but remain unofficial and are not compliance-valid.
 tpcds = TPCDS(
     scale_factor=1.0,
     output_dir="tpcds_data",
-    verbose=True,          # Enable detailed logging
-    parallel=8,            # Parallel data generation
-    use_c_tools=True       # Use official TPC-DS C tools
+    verbose=True,
+    parallel=8,
+    use_c_tools=True
 )
 
-# Access to internal components
-c_tools = tpcds.c_tools           # Direct C tool access
-query_manager = tpcds.queries     # Query management
-data_generator = tpcds.generator  # Data generation
+c_tools = tpcds.c_tools
+query_manager = tpcds.queries
+data_generator = tpcds.generator
 ```
 
 ## Integration Examples
@@ -459,15 +440,12 @@ data_generator = tpcds.generator  # Data generation
 ### Distributed Database Testing
 
 ```python
-# Large scale data generation for distributed systems
 tpcds_large = TPCDS(scale_factor=100, output_dir="/shared/tpcds_sf100")
 data_files = tpcds_large.generate_data()
 
-# Partition-aware data loading (example for Spark)
 for table_name in tpcds_large.get_available_tables():
     table_path = f"/shared/tpcds_sf100/{table_name.lower()}.dat"
 
-    # Create partitioned tables
     spark.sql(f"""
         CREATE TABLE {table_name}
         USING DELTA
@@ -477,7 +455,6 @@ for table_name in tpcds_large.get_available_tables():
                CASE
                    WHEN {table_name}_sk % 100 < 10 THEN 'p0'
                    WHEN {table_name}_sk % 100 < 20 THEN 'p1'
-                   -- ... more partitions
                    ELSE 'p9'
                END as partition_col
         FROM read_csv('{table_path}', delimiter='|', header=false)
@@ -498,7 +475,6 @@ class TPCDSBenchmark:
 
     def benchmark_query_set(self, query_ids: List[int],
                            iterations: int = 3) -> Dict:
-        """Benchmark a set of TPC-DS queries."""
         results = {}
 
         for query_id in query_ids:
@@ -531,7 +507,6 @@ class TPCDSBenchmark:
                         'error': str(e)
                     })
 
-            # Calculate statistics
             successful_runs = [r for r in query_results if r['status'] == 'success']
             if successful_runs:
                 times = [r['time'] for r in successful_runs]
@@ -554,10 +529,8 @@ class TPCDSBenchmark:
 
         return results
 
-# Usage
 benchmark = TPCDSBenchmark(tpcds, conn)
 
-# Test different query categories
 fast_queries = [1, 6, 11, 13, 16, 21]
 medium_queries = [3, 7, 19, 27, 42, 52]
 complex_queries = [14, 23, 24, 64, 78]
@@ -593,14 +566,12 @@ complex_results = benchmark.benchmark_query_set(complex_queries)
 
 **Issue: dsdgen/dsqgen not found**
 ```bash
-# Ensure TPC-DS C tools are compiled and available
 cd _sources/tpc-ds/tools
 make
 ```
 
 **Issue: Out of disk space during generation**
 ```python
-# Use smaller scale factor or external storage
 tpcds = TPCDS(scale_factor=0.1, output_dir="/external/storage")
 ```
 
@@ -608,22 +579,19 @@ tpcds = TPCDS(scale_factor=0.1, output_dir="/external/storage")
 
 **Issue: Query timeout on complex queries**
 ```python
-# Increase timeout and use smaller scale factor for testing
-conn.execute("SET query_timeout='1800s'")  # 30 minutes
-tpcds = TPCDS(scale_factor=0.1)  # Smaller dataset
+conn.execute("SET query_timeout='1800s'")
+tpcds = TPCDS(scale_factor=0.1)
 ```
 
 **Issue: Out of memory on analytical queries**
 ```python
-# Configure memory limits and optimize queries
 conn.execute("SET memory_limit='8GB'")
 conn.execute("SET max_memory='8GB'")
 ```
 
 **Issue: Parameter substitution errors**
 ```python
-# Use explicit seeds and validate query IDs
-query = tpcds.get_query(42, seed=12345)  # Reproducible parameters
+query = tpcds.get_query(42, seed=12345)
 ```
 
 ## Streaming Data Generation
@@ -635,13 +603,10 @@ BenchBox includes patched TPC-DS binaries that support streaming data generation
 The `-FILTER Y` flag outputs generated data to stdout instead of creating files:
 
 ```bash
-# Generate ship_mode table to stdout (can be piped to compression)
 dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y | zstd > ship_mode.dat.zst
 
-# Generate with fixed seed for reproducibility
 dsdgen -TABLE date_dim -SCALE 1 -FILTER Y -RNGSEED 12345 | gzip > date_dim.dat.gz
 
-# Direct loading into database (example with DuckDB)
 dsdgen -TABLE customer -SCALE 1 -FILTER Y | \
   duckdb -c "COPY customer FROM '/dev/stdin' (DELIMITER '|')"
 ```
@@ -661,7 +626,6 @@ import gzip
 from pathlib import Path
 
 def generate_table_compressed(table_name: str, scale: int, output_path: Path):
-    """Generate TPC-DS table directly to compressed file."""
     dsdgen = Path("_binaries/tpc-ds/darwin-arm64/dsdgen")
     tools_dir = Path("_sources/tpc-ds/tools")
 
@@ -677,7 +641,6 @@ def generate_table_compressed(table_name: str, scale: int, output_path: Path):
             f.write(line)
         proc.wait()
 
-# Generate compressed data
 generate_table_compressed("ship_mode", 1, Path("ship_mode.dat.gz"))
 ```
 

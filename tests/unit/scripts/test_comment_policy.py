@@ -2471,3 +2471,8 @@ def test_unknown_division_html_sink_stays_unresolved() -> None:
     source = '(unknown / "page.html").write_text("<script>// unresolved</script>")'
     assert not javascript_requests("a.py", source, "python")
     assert any(f.kind == "payload-error" for f in scan("a.py", source, "python", {}))
+
+
+def test_c_include_targets_are_not_comments() -> None:
+    findings = scan("a.c", '#include <stdio.h>\n#include "local.h"\nint x; /* note */\n', "c")
+    assert [(f.line, f.text) for f in findings] == [(3, "/* note */")]

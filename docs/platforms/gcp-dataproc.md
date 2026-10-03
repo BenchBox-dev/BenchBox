@@ -18,10 +18,8 @@ Google Cloud Dataproc is Google Cloud's fully managed Apache Spark and Hadoop se
 ## Installation
 
 ```bash
-# Install with Dataproc support
 uv add benchbox --extra dataproc
 
-# Dependencies installed: google-cloud-dataproc, google-cloud-storage
 ```
 
 ## Prerequisites
@@ -38,11 +36,9 @@ uv add benchbox --extra dataproc
 ### Environment Variables
 
 ```bash
-# Required
 export DATAPROC_PROJECT_ID=my-project-id
 export DATAPROC_GCS_STAGING_DIR=gs://your-bucket/benchbox/
 
-# Optional
 export DATAPROC_REGION=us-central1
 export DATAPROC_CLUSTER_NAME=my-cluster
 export DATAPROC_DATABASE=benchbox
@@ -56,13 +52,11 @@ export DATAPROC_EPHEMERAL=false
 ### CLI Usage
 
 ```bash
-# Basic usage with existing cluster
 benchbox run --platform dataproc --benchmark tpch --scale 1.0 \
   --platform-option project_id=my-project \
   --platform-option cluster_name=my-cluster \
   --platform-option gcs_staging_dir=gs://bucket/benchbox/
 
-# With custom machine types
 benchbox run --platform dataproc --benchmark tpch --scale 10.0 \
   --platform-option project_id=my-project \
   --platform-option cluster_name=my-cluster \
@@ -70,14 +64,12 @@ benchbox run --platform dataproc --benchmark tpch --scale 10.0 \
   --platform-option worker_machine_type=n2-highmem-8 \
   --platform-option num_workers=4
 
-# With preemptible workers
 benchbox run --platform dataproc --benchmark tpch --scale 10.0 \
   --platform-option project_id=my-project \
   --platform-option cluster_name=my-cluster \
   --platform-option gcs_staging_dir=gs://bucket/benchbox/ \
   --platform-option use_preemptible=true
 
-# Dry-run to preview queries
 benchbox run --platform dataproc --benchmark tpch --dry-run ./preview \
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://bucket/benchbox/
@@ -116,7 +108,6 @@ benchbox run --platform dataproc --benchmark tpch --dry-run ./preview \
 ```python
 from benchbox.platforms.gcp import DataprocAdapter
 
-# Initialize adapter with existing cluster
 adapter = DataprocAdapter(
     project_id="my-project",
     region="us-central1",
@@ -126,7 +117,6 @@ adapter = DataprocAdapter(
     num_workers=4,
 )
 
-# Or with ephemeral cluster
 adapter = DataprocAdapter(
     project_id="my-project",
     gcs_staging_dir="gs://my-bucket/benchbox/",
@@ -134,19 +124,15 @@ adapter = DataprocAdapter(
     use_preemptible_workers=True,
 )
 
-# Create database in Hive
 adapter.create_schema("tpch_sf1")
 
-# Load data to GCS and create Hive tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query (submitted as Dataproc job)
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Clean up (deletes ephemeral cluster if configured)
 adapter.close()
 ```
 
@@ -159,7 +145,7 @@ Best for ongoing development and multiple benchmark runs:
 ```python
 adapter = DataprocAdapter(
     project_id="my-project",
-    cluster_name="benchmark-cluster",  # Existing cluster
+    cluster_name="benchmark-cluster",
     gcs_staging_dir="gs://bucket/benchbox/",
 )
 ```
@@ -189,16 +175,6 @@ adapter = DataprocAdapter(
 BenchBox automatically optimizes Spark configuration based on benchmark type and scale factor:
 
 ```python
-# Automatic configuration includes:
-# - Adaptive Query Execution (AQE) settings
-# - Shuffle partition tuning
-# - Memory allocation
-# - Join optimization
-
-# For TPC-H at SF=10 with 4 workers:
-# spark.sql.shuffle.partitions = 200
-# spark.sql.adaptive.enabled = true
-# spark.sql.adaptive.skewJoin.enabled = true
 ```
 
 ## Cost Estimation
@@ -217,7 +193,6 @@ BenchBox automatically optimizes Spark configuration based on benchmark type and
 Minimum required IAM roles:
 
 ```bash
-# For the service account running BenchBox
 gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="serviceAccount:SA_EMAIL" \
   --role="roles/dataproc.editor"
@@ -226,7 +201,6 @@ gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="serviceAccount:SA_EMAIL" \
   --role="roles/storage.objectAdmin"
 
-# For Dataproc worker service account
 gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
   --role="roles/dataproc.worker"

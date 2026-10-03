@@ -34,9 +34,6 @@ main(int argc, char *argv[])
 		for (q=0; q<queries; q++)
 			seq[q]=q+1;
 
-		/*
-		 * just cycle arond the sequence swapping with a random other entry
-		 */
 		for (i=0; i<SWAPS; i++) {
 			x= i % queries;
 			do 

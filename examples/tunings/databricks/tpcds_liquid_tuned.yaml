@@ -1,6 +1,3 @@
-# Databricks TPC-DS Liquid AUTO Tuned Configuration
-# Renders the shared logical TPC profile through Databricks Liquid Clustering AUTO.
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

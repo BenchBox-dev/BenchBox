@@ -29,13 +29,10 @@ Quick Start
     from benchbox.read_primitives import ReadPrimitives
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark
     benchmark = ReadPrimitives(scale_factor=1.0)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on platform
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
@@ -115,10 +112,8 @@ Generate Read Primitives benchmark data (TPC-H schema).
 
 .. code-block:: python
 
-    # Generate all tables
     table_files = benchmark.generate_data()
 
-    # Generate specific tables
     table_files = benchmark.generate_data(tables=["lineitem", "orders"])
 
     for table_name, file_path in table_files.items():
@@ -138,13 +133,10 @@ Get a specific primitive query.
 
 .. code-block:: python
 
-    # Get simple aggregation query
     q1 = benchmark.get_query("aggregation_simple")
 
-    # Get window function query
     q2 = benchmark.get_query("window_rank")
 
-    # Get join query
     q3 = benchmark.get_query("join_inner")
 
 Parameters:
@@ -166,11 +158,9 @@ Get all primitive queries.
 
 .. code-block:: python
 
-    # Get all queries
     queries = benchmark.get_queries()
     print(f"Total queries: {len(queries)}")
 
-    # Get with dialect translation
     queries_sf = benchmark.get_queries(dialect="snowflake")
 
 Parameters:
@@ -187,13 +177,10 @@ Get queries filtered by category.
 
 .. code-block:: python
 
-    # Get all aggregation queries
     agg_queries = benchmark.get_queries_by_category("aggregation")
 
-    # Get all window function queries
     window_queries = benchmark.get_queries_by_category("window")
 
-    # Get all join queries
     join_queries = benchmark.get_queries_by_category("join")
 
 Parameters:
@@ -262,13 +249,10 @@ Get CREATE TABLE SQL for all tables.
 
 .. code-block:: python
 
-    # Standard SQL
     create_sql = benchmark.get_create_tables_sql()
 
-    # With dialect
     create_sql_pg = benchmark.get_create_tables_sql(dialect="postgres")
 
-    # With tuning configuration
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
@@ -293,17 +277,14 @@ Run the complete Read Primitives benchmark.
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Run all queries
     results = benchmark.run_benchmark(conn)
 
-    # Run specific queries
     results = benchmark.run_benchmark(
         conn,
         queries=["aggregation_simple", "window_rank"],
         iterations=3
     )
 
-    # Run specific categories
     results = benchmark.run_benchmark(
         conn,
         categories=["aggregation", "window"],
@@ -327,10 +308,8 @@ Run benchmark for a specific query category.
 
 .. code-block:: python
 
-    # Run all aggregation queries
     agg_results = benchmark.run_category_benchmark(conn, "aggregation", iterations=3)
 
-    # Run all window function queries
     window_results = benchmark.run_category_benchmark(conn, "window", iterations=3)
 
     print(f"Aggregation results: {agg_results}")
@@ -351,10 +330,8 @@ Load generated data into a database.
 
 .. code-block:: python
 
-    # Load all tables
     benchmark.load_data_to_database(conn)
 
-    # Load specific tables
     benchmark.load_data_to_database(conn, tables=["lineitem", "orders"])
 
 Parameters:
@@ -373,7 +350,6 @@ Execute a primitive query on the database.
 
 .. code-block:: python
 
-    # Execute single query
     result = benchmark.execute_query("aggregation_simple", conn)
 
 Parameters:
@@ -417,17 +393,13 @@ Basic Benchmark Run
     from benchbox.read_primitives import ReadPrimitives
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark with scale factor 0.1 (~100MB)
     benchmark = ReadPrimitives(scale_factor=0.1)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on DuckDB
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
-    # Print results
     print(f"Benchmark: {results.benchmark_name}")
     print(f"Total time: {results.total_execution_time:.2f}s")
     print(f"Queries: {results.successful_queries}/{results.total_queries}")
@@ -446,14 +418,11 @@ Category-Based Execution
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Load data
     adapter.create_schema(benchmark, conn)
     benchmark.load_data_to_database(conn)
 
-    # Get all categories
     categories = benchmark.get_query_categories()
 
-    # Run each category
     category_results = {}
 
     for category in categories:
@@ -471,7 +440,6 @@ Category-Based Execution
         print(f"  Avg query time: {results['average_time']:.3f}s")
         print(f"  Successful: {results['successful_queries']}/{results['query_count']}")
 
-    # Print category summary
     print("\n" + "="*60)
     print("Category Performance Summary")
     print("="*60)
@@ -490,13 +458,11 @@ Selective Query Execution
     benchmark = ReadPrimitives(scale_factor=0.1)
     adapter = DuckDBAdapter()
 
-    # Setup
     benchmark.generate_data()
     conn = adapter.create_connection()
     adapter.create_schema(benchmark, conn)
     benchmark.load_data_to_database(conn)
 
-    # Run specific queries
     selected_queries = [
         "aggregation_simple",
         "aggregation_group",
@@ -518,7 +484,6 @@ Selective Query Execution
         query_times[query_id] = duration
         print(f"  {query_id:25s}: {duration:.3f}s")
 
-    # Summary
     total_time = sum(query_times.values())
     avg_time = total_time / len(query_times)
     print(f"\nTotal: {total_time:.2f}s, Average: {avg_time:.3f}s")
@@ -535,27 +500,21 @@ Performance Regression Testing
     benchmark = ReadPrimitives(scale_factor=0.1)
     adapter = DuckDBAdapter()
 
-    # Setup
     benchmark.generate_data()
     conn = adapter.create_connection()
     adapter.create_schema(benchmark, conn)
     benchmark.load_data_to_database(conn)
 
-    # Run baseline benchmark
     print("Running baseline benchmark...")
     baseline_results = benchmark.run_benchmark(conn, iterations=3)
 
-    # Save baseline
     with open("baseline_results.json", "w") as f:
         json.dump(baseline_results, f, indent=2)
 
-    # ... make changes to database configuration ...
 
-    # Run comparison benchmark
     print("\nRunning comparison benchmark...")
     comparison_results = benchmark.run_benchmark(conn, iterations=3)
 
-    # Compare results
     print("\nPerformance Comparison:")
     print(f"{'Query':<30s} {'Baseline':<12s} {'Current':<12s} {'Change':<10s}")
     print("-" * 70)
@@ -584,13 +543,11 @@ Multi-Category Analysis
     benchmark = ReadPrimitives(scale_factor=0.1)
     adapter = DuckDBAdapter()
 
-    # Setup
     benchmark.generate_data()
     conn = adapter.create_connection()
     adapter.create_schema(benchmark, conn)
     benchmark.load_data_to_database(conn)
 
-    # Run selected categories
     categories_to_test = ["aggregation", "window", "join", "filter"]
 
     results_data = []
@@ -609,13 +566,11 @@ Multi-Category Analysis
             "success_rate": (results["successful_queries"] / results["query_count"]) * 100
         })
 
-    # Create DataFrame for analysis
     df = pd.DataFrame(results_data)
 
     print("\nCategory Analysis:")
     print(df.to_string(index=False))
 
-    # Identify slowest categories
     df_sorted = df.sort_values("avg_time", ascending=False)
     print(f"\nSlowest categories:")
     for idx, row in df_sorted.head(3).iterrows():
@@ -664,12 +619,10 @@ Custom Primitive Development
 
     from benchbox.read_primitives import ReadPrimitives
 
-    # Extend with custom primitives
     class CustomPrimitives(ReadPrimitives):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 
-            # Add custom queries
             self._custom_queries = {
                 "custom_complex_join": """
                     SELECT l.l_orderkey, o.o_custkey, c.c_name, p.p_name
@@ -694,18 +647,14 @@ Custom Primitive Development
             }
 
         def get_query(self, query_id, *, params=None):
-            # Check custom queries first
             if query_id in self._custom_queries:
                 return self._custom_queries[query_id]
 
-            # Fall back to standard primitives
             return super().get_query(query_id, params=params)
 
-    # Use custom primitives
     custom_bench = CustomPrimitives(scale_factor=0.1)
     custom_bench.generate_data()
 
-    # Execute custom query
     custom_query = custom_bench.get_query("custom_complex_join")
     print(f"Custom query: {custom_query}")
 
@@ -732,20 +681,16 @@ Read Primitives provides full DataFrame support for both expression-family and p
     from benchbox.platforms import get_dataframe_adapter
     from pathlib import Path
 
-    # Expression family (Polars, PySpark, DataFusion). create_context() returns an
-    # empty context, so load the generated tables into it before querying.
     polars_adapter = get_dataframe_adapter("polars-df", working_dir="./data")
     ctx = polars_adapter.create_context()
     polars_adapter.load_tables_from_data_source(ctx, Path("./data"))
     result = aggregation_distinct_expression_impl(ctx)
 
-    # Pandas family (Pandas, Dask, cuDF)
     pandas_adapter = get_dataframe_adapter("pandas-df", working_dir="./data")
     pandas_ctx = pandas_adapter.create_context()
     pandas_adapter.load_tables_from_data_source(pandas_ctx, Path("./data"))
     result = aggregation_distinct_pandas_impl(pandas_ctx)
 
-    # Check which queries are skipped for DataFrame
     print(f"Skipped queries: {SKIP_FOR_DATAFRAME}")
 
 **DataFrame Query Categories**:

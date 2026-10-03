@@ -41,8 +41,6 @@ describe("formatRunIdentity", () => {
       driver_version: "1.3.2",
       run_date: "2026-04-17",
     });
-    // A run's age belongs to the date's display treatment, not to its
-    // identity: it changes daily and would double every label's length.
     expect(formatRunIdentity(s, "table")).toMatch(/^DuckDB · v1\.3\.2 · 2026-04-17$/);
   });
 
@@ -82,7 +80,6 @@ describe("formatRunIdentitiesForCohort", () => {
       source({ result_id: "r3", platform: "DuckDB" }),
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
-    // The two DataFusion runs must be distinguishable; DuckDB stays plain.
     expect(new Set(labels).size).toBe(3);
     expect(labels[2]).toBe("DuckDB");
     expect(labels[0]).toContain("v44");
@@ -90,9 +87,6 @@ describe("formatRunIdentitiesForCohort", () => {
   });
 
   it("falls through to the short result id, not the run date, when versions also match", () => {
-    // Chart labels deliberately skip the date qualifier (it truncates to
-    // nothing at chart-label widths); the short result id disambiguates
-    // instead.
     const cohort = [
       source({
         result_id: "r1",
@@ -134,9 +128,6 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
 
-    // Version and scale are invariant within the cohort, and the calendar
-    // date is excluded from chart labels entirely, so the short result id
-    // is what disambiguates.
     expect(new Set(labels).size).toBe(2);
     expect(labels.join(" ")).not.toContain("2026-05-01");
     expect(labels.join(" ")).not.toContain("2026-05-02");
@@ -162,8 +153,6 @@ describe("formatRunIdentitiesForCohort", () => {
     ];
     const labels = formatRunIdentitiesForCohort(cohort, "chart");
 
-    // The run date is excluded from chart labels, so the next natural
-    // qualifier (scale) disambiguates instead of the result-id fallback.
     expect(labels[0]).toBe("Spark v3.5.0");
     expect(labels[1]).toMatch(/^Spark SF 0\.01$/);
     expect(labels.join(" ")).not.toMatch(/1111aaaa|2222bbbb/);
@@ -204,8 +193,6 @@ describe("formatRunIdentitiesForCohort", () => {
   });
 
   it("uses the trailing result_id token when 8-char prefixes collide", () => {
-    // BenchBox result_ids usually share their benchmark/platform/date prefix;
-    // the content hash lives at the end and is the compact distinguishing token.
     const cohort = [
       source({ result_id: "tpch-spark-sf0.01-20260403-aaaaaaaa", platform: "Spark" }),
       source({ result_id: "tpch-spark-sf0.01-20260403-bbbbbbbb", platform: "Spark" }),
@@ -238,10 +225,6 @@ describe("formatRunIdentitiesForCohort", () => {
   });
 
   it("keeps the run date out of chart labels entirely, even when nothing else disambiguates", () => {
-    // Audit finding: chart labels used to render "DuckDB v1.4.3 20…
-    // c138f960" where the truncated date consumed label budget without
-    // conveying anything. The short id already disambiguates, so the date
-    // qualifier is dropped from the chart variant's qualifier chain.
     const cohort = [
       source({
         result_id: "tpch-duckdb-sf0.01-20260403-c138f960",

@@ -34,17 +34,13 @@ It accepts one of the keywords `tuned`, `notuning`, `auto`, or an explicit
 path to a YAML file; it defaults to `notuning` when omitted.
 
 ```bash
-# Auto-discover the platform/benchmark tuned template (the primary UX)
 benchbox run --platform duckdb --benchmark tpch --tuning tuned
 
-# Explicit baseline (no tuning)
 benchbox run --platform duckdb --benchmark tpch --tuning notuning
 
-# Point directly at a file
 benchbox run --platform duckdb --benchmark tpch \
   --tuning examples/tunings/duckdb/tpch_tuned.yaml
 
-# DataFrame platform - these files must be referenced explicitly
 benchbox run --platform polars --benchmark tpch --mode dataframe \
   --tuning examples/tunings/dataframe/polars_optimized.yaml
 ```
@@ -92,7 +88,6 @@ Point `--tuning tuned` at a different template collection without relying on
 the working directory:
 
 ```bash
-# Directory must use the same <platform>/<benchmark>_tuned.yaml layout
 export BENCHBOX_TUNING_PATH=/path/to/my-tunings
 benchbox run --platform duckdb --benchmark tpch --tuning tuned
 ```
@@ -103,7 +98,6 @@ Set a default file that `--tuning tuned` uses before falling back to
 auto-discovery:
 
 ```yaml
-# benchbox.yaml
 tuning:
   default_config_file: ./tuning/my_tuning.yaml
 ```
@@ -118,13 +112,10 @@ benchbox run --platform duckdb --benchmark tpch --tuning tuned
 ## Inspecting templates
 
 ```bash
-# List everything available under examples/tunings/
 benchbox tuning list
 
-# Filter by platform and/or benchmark
 benchbox tuning list --platform duckdb --benchmark tpch
 
-# Show what --tuning would actually resolve to (including which file, if any)
 benchbox tuning show tuned --platform duckdb --benchmark tpch
 ```
 
@@ -215,7 +206,6 @@ You can customize any configuration file by:
 
 Example customization:
 ```yaml
-# Custom TPC-H configuration with specific partitioning
 table_tunings:
   LINEITEM:
     table_name: LINEITEM
@@ -223,7 +213,6 @@ table_tunings:
     - name: L_SHIPDATE
       type: DATE
       order: 1
-    # Add custom sorting
     sorting:
     - name: L_ORDERKEY
       type: INTEGER

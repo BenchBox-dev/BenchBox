@@ -70,17 +70,14 @@ uv add benchbox
 The benchmark works with any database supported by Python. Examples:
 
 ```python
-# SQLite (for testing)
 import sqlite3
 def connection_factory():
     return sqlite3.connect("tpch.db")
 
-# PostgreSQL
 import psycopg2
 def connection_factory():
     return psycopg2.connect("host=localhost dbname=tpch user=postgres")
 
-# MySQL
 import mysql.connector
 def connection_factory():
     return mysql.connector.connect(
@@ -99,22 +96,18 @@ Here's a minimal example to run the official TPC-H benchmark:
 from benchbox import TPCH
 import sqlite3
 
-# Create benchmark instance
 benchmark = TPCH(
     scale_factor=1.0,
     output_dir="./tpch_benchmark",
     verbose=True
 )
 
-# Generate data
 benchmark.generate_data()
 
-# Setup database connection factory
 def connection_factory():
     conn = sqlite3.connect("tpch.db")
     return conn
 
-# Run official benchmark
 result = benchmark.run_official_benchmark(
     connection_factory=connection_factory,
     num_streams=2,
@@ -122,7 +115,6 @@ result = benchmark.run_official_benchmark(
     audit_trail=True
 )
 
-# Display results
 print(f"QphH@Size: {result.qphh_at_size:.2f}")
 print(f"Power@Size: {result.power_test.power_at_size:.2f}")
 print(f"Throughput@Size: {result.throughput_test.throughput_at_size:.2f}")
@@ -137,10 +129,10 @@ print(f"Certification Ready: {result.certification_ready}")
 from benchbox import TPCH
 
 benchmark = TPCH(
-    scale_factor=1.0,           # Scale factor (1.0 = ~1GB)
-    output_dir="./output",      # Output directory
-    verbose=True,               # Enable verbose output
-    parallel=4                  # Parallel data generation
+    scale_factor=1.0,
+    output_dir="./output",
+    verbose=True,
+    parallel=4
 )
 ```
 
@@ -148,34 +140,30 @@ benchmark = TPCH(
 
 ```python
 result = benchmark.run_official_benchmark(
-    connection_factory=connection_factory,    # Database connection factory
-    num_streams=2,                           # Number of concurrent streams
-    output_dir="./benchmark_results",        # Results output directory
-    verbose=True,                            # Enable verbose logging
-    validate_results=True,                   # Enable result validation
-    audit_trail=True                         # Enable audit trail
+    connection_factory=connection_factory,
+    num_streams=2,
+    output_dir="./benchmark_results",
+    verbose=True,
+    validate_results=True,
+    audit_trail=True
 )
 ```
 
 ### Accessing Results
 
 ```python
-# Overall results
 print(f"Success: {result.success}")
 print(f"QphH@Size: {result.qphh_at_size}")
 print(f"Total Time: {result.total_benchmark_time}")
 
-# Power Test results
 print(f"Power Test Time: {result.power_test.total_time}")
 print(f"Power@Size: {result.power_test.power_at_size}")
 print(f"Query Times: {result.power_test.query_times}")
 
-# Throughput Test results
 print(f"Throughput Test Time: {result.throughput_test.total_time}")
 print(f"Throughput@Size: {result.throughput_test.throughput_at_size}")
 print(f"Stream Times: {result.throughput_test.stream_times}")
 
-# Validation results
 print(f"Certification Ready: {result.certification_ready}")
 print(f"Validation Errors: {result.validation_errors}")
 ```
@@ -187,8 +175,6 @@ print(f"Validation Errors: {result.validation_errors}")
 The Power Test measures single-stream performance by executing all 22 TPC-H queries sequentially:
 
 ```python
-# Power Test is automatically run as part of the official benchmark
-# It executes queries 1-22 in order with fixed parameters
 ```
 
 **Key characteristics:**
@@ -202,8 +188,6 @@ The Power Test measures single-stream performance by executing all 22 TPC-H quer
 The Throughput Test measures multi-stream performance by executing multiple concurrent query streams:
 
 ```python
-# Throughput Test runs multiple streams concurrently
-# Each stream contains all 22 queries in randomized order
 ```
 
 **Key characteristics:**
@@ -296,11 +280,9 @@ from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 from pathlib import Path
 
-# Generate TPC-H data
 benchmark = TPCH(scale_factor=1.0, output_dir=Path("./tpch_data"))
 benchmark.generate_data()
 
-# Step 1: Run power and throughput tests on clean data
 adapter = DuckDBAdapter(database_path="tpch.duckdb", force_recreate=True)
 
 power_result = adapter.run_benchmark(benchmark, test_execution_type="power")
@@ -309,16 +291,12 @@ print(f"Power Test: {power_result.total_execution_time:.2f}s")
 throughput_result = adapter.run_benchmark(benchmark, test_execution_type="throughput")
 print(f"Throughput Test: {throughput_result.total_execution_time:.2f}s")
 
-# Step 2: RELOAD database before maintenance (creates fresh database)
 print("\n⚠️  Reloading database before maintenance test...")
 adapter = DuckDBAdapter(database_path="tpch.duckdb", force_recreate=True)
 
-# Step 3: Run maintenance test
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 print(f"Maintenance Test: {maintenance_result.total_execution_time:.2f}s")
 
-# WARNING: Database now contains modified data
-# Must reload before running power/throughput again
 print("\n⚠️  Database modified - reload required before additional tests!")
 ```
 
@@ -368,13 +346,10 @@ For a benchmark with:
 - Number of Streams: 2
 
 ```python
-# Calculate components
-power_at_size = 3600 * 1.0 / 100  # = 36.0
-throughput_at_size = 2 * 3600 * 1.0 / 150  # = 48.0
+power_at_size = 3600 * 1.0 / 100
+throughput_at_size = 2 * 3600 * 1.0 / 150
 
-# Calculate QphH@Size
 qphh_at_size = (power_at_size * throughput_at_size) ** 0.5
-# = (36.0 * 48.0) ** 0.5 = 41.57
 ```
 
 ## Reporting and Validation
@@ -384,10 +359,8 @@ qphh_at_size = (power_at_size * throughput_at_size) ** 0.5
 ```python
 from benchbox.core.tpch.reporting import TPCHReportGenerator
 
-# Create report generator
 report_generator = TPCHReportGenerator(output_dir="./reports")
 
-# Generate systematic HTML report
 html_report = report_generator.generate_systematic_report(
     result=result,
     report_title="TPC-H Benchmark Report",
@@ -395,10 +368,8 @@ html_report = report_generator.generate_systematic_report(
     include_certification_info=True
 )
 
-# Generate certification report
 cert_report = report_generator.generate_certification_report(result=result)
 
-# Generate performance CSV
 csv_report = report_generator.generate_performance_csv(result=result)
 ```
 
@@ -407,7 +378,6 @@ csv_report = report_generator.generate_performance_csv(result=result)
 The benchmark automatically validates results against TPC-H specification:
 
 ```python
-# Validation is automatically performed
 if result.certification_ready:
     print("Benchmark is certification ready!")
 else:
@@ -419,7 +389,6 @@ else:
 ### Benchmark Comparison
 
 ```python
-# Compare two benchmark results
 comparison = report_generator.compare_results(
     baseline_result=baseline_result,
     current_result=current_result
@@ -428,7 +397,6 @@ comparison = report_generator.compare_results(
 print(f"Performance Change: {comparison.relative_change:+.1%}")
 print(f"Significant Change: {comparison.significant_change}")
 
-# Generate comparison report
 comparison_report = report_generator.generate_comparison_report(
     baseline_result=baseline_result,
     current_result=current_result
@@ -442,9 +410,8 @@ For TPC-H certification, follow these steps:
 ### 1. Preparation
 
 ```python
-# Use appropriate scale factor for certification
 benchmark = TPCH(
-    scale_factor=100.0,  # Use certified scale factor
+    scale_factor=100.0,
     output_dir="./certification_data",
     verbose=True
 )
@@ -453,24 +420,20 @@ benchmark = TPCH(
 ### 2. Data Generation
 
 ```python
-# Generate certification data
 data_files = benchmark.generate_data()
 ```
 
 ### 3. Database Setup
 
 ```python
-# Setup production database with proper configuration
-# Use appropriate database system for certification
 ```
 
 ### 4. Benchmark Execution
 
 ```python
-# Run with certification parameters
 result = benchmark.run_official_benchmark(
     connection_factory=connection_factory,
-    num_streams=8,  # Use appropriate number of streams
+    num_streams=8,
     validate_results=True,
     audit_trail=True
 )
@@ -479,7 +442,6 @@ result = benchmark.run_official_benchmark(
 ### 5. Report Generation
 
 ```python
-# Generate certification reports
 report_generator = TPCHReportGenerator(output_dir="./certification_reports")
 cert_report = report_generator.generate_certification_report(result=result)
 ```
@@ -487,7 +449,6 @@ cert_report = report_generator.generate_certification_report(result=result)
 ### 6. Validation
 
 ```python
-# Ensure certification readiness
 if result.certification_ready:
     print("Ready for certification submission")
 else:
@@ -512,13 +473,10 @@ else:
 ### Benchmark Configuration
 
 ```python
-# For development
 benchmark = TPCH(scale_factor=0.01, verbose=True)
 
-# For performance testing
 benchmark = TPCH(scale_factor=10.0, parallel=8)
 
-# For certification
 benchmark = TPCH(scale_factor=100.0, verbose=True)
 ```
 
@@ -535,8 +493,6 @@ benchmark = TPCH(scale_factor=100.0, verbose=True)
 #### Database Connection Issues
 
 ```python
-# Issue: Connection timeouts
-# Solution: Increase connection timeout
 def connection_factory():
     conn = sqlite3.connect("tpch.db", timeout=30)
     return conn
@@ -545,24 +501,18 @@ def connection_factory():
 #### Query Execution Failures
 
 ```python
-# Issue: Query syntax errors
-# Solution: Check SQL dialect compatibility
 query = benchmark.get_query(1, dialect="postgres")
 ```
 
 #### Memory Issues
 
 ```python
-# Issue: Out of memory during execution
-# Solution: Use smaller scale factor or increase system memory
-benchmark = TPCH(scale_factor=0.1)  # Reduce scale factor
+benchmark = TPCH(scale_factor=0.1)
 ```
 
 #### Performance Issues
 
 ```python
-# Issue: Slow query execution
-# Solution: Optimize database configuration and indexing
 ```
 
 ### Debugging
@@ -570,7 +520,6 @@ benchmark = TPCH(scale_factor=0.1)  # Reduce scale factor
 Enable verbose logging for detailed debugging:
 
 ```python
-# Enable verbose output
 benchmark = TPCH(verbose=True)
 result = benchmark.run_official_benchmark(
     connection_factory=connection_factory,
@@ -581,8 +530,6 @@ result = benchmark.run_official_benchmark(
 Check audit trail logs:
 
 ```python
-# Audit trail files are created in output_dir
-# Check benchmark_audit_*.log files for detailed execution logs
 ```
 
 ### Performance Optimization
@@ -599,7 +546,6 @@ Check audit trail logs:
 
 ```python
 def custom_connection_factory():
-    """Custom connection factory with specific configuration."""
     conn = sqlite3.connect("tpch.db")
     conn.execute("PRAGMA cache_size=100000")
     conn.execute("PRAGMA journal_mode=WAL")
@@ -610,7 +556,6 @@ def custom_connection_factory():
 
 ```python
 def custom_validate_result(result):
-    """Custom result validation."""
     if result.qphh_at_size < 100:
         result.validation_errors.append("QphH@Size below minimum threshold")
     return result
@@ -620,7 +565,6 @@ def custom_validate_result(result):
 
 ```python
 def run_multiple_benchmarks():
-    """Run multiple benchmarks with different configurations."""
     scale_factors = [0.1, 0.5, 1.0]
     results = []
 
@@ -642,16 +586,16 @@ def run_multiple_benchmarks():
 ```python
 class TPCH:
     def __init__(self, scale_factor=1.0, output_dir=None, verbose=False, parallel=1):
-        """Initialize TPC-H benchmark."""
+        pass
 
     def generate_data(self) -> List[Path]:
-        """Generate TPC-H data files."""
+        pass
 
     def run_official_benchmark(self, connection_factory, num_streams=2, **kwargs) -> QphHResult:
-        """Run official TPC-H benchmark."""
+        pass
 
     def get_query(self, query_id, **kwargs) -> str:
-        """Get specific TPC-H query."""
+        pass
 ```
 
 ### TPCHOfficialBenchmark Class
@@ -659,10 +603,10 @@ class TPCH:
 ```python
 class TPCHOfficialBenchmark:
     def __init__(self, benchmark, connection_factory, num_streams=2, **kwargs):
-        """Initialize official benchmark runner."""
+        pass
 
     def run_official_benchmark(self) -> QphHResult:
-        """Run complete official benchmark."""
+        pass
 ```
 
 ### TPCHReportGenerator Class
@@ -670,16 +614,16 @@ class TPCHOfficialBenchmark:
 ```python
 class TPCHReportGenerator:
     def __init__(self, output_dir=None):
-        """Initialize report generator."""
+        pass
 
     def generate_systematic_report(self, result, **kwargs) -> Path:
-        """Generate systematic HTML report."""
+        pass
 
     def generate_certification_report(self, result) -> Path:
-        """Generate certification report."""
+        pass
 
     def compare_results(self, baseline_result, current_result) -> ComparisonResult:
-        """Compare benchmark results."""
+        pass
 ```
 
 ## Conclusion

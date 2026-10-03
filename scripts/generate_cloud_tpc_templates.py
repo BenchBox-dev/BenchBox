@@ -52,19 +52,7 @@ CLI_DESCRIPTION = (
 PLATFORMS = ("snowflake",)
 BENCHMARKS = ("tpch", "tpcds")
 
-PLATFORM_TITLES = {
-    "bigquery": "BigQuery",
-    "redshift": "Redshift",
-    "snowflake": "Snowflake",
-}
-
-HEADER = """# {platform_title} {benchmark_title} Tuned Configuration
-# Generated from the logical tuning profile (benchbox/core/tuning/profiles/tpc.yaml)
-# by scripts/generate_cloud_tpc_templates.py. Do not hand-edit: re-run the
-# generator after changing the profile. Provides platform-native tuning for
-# {benchmark_title} benchmark workloads.
-
-primary_keys:
+HEADER = """primary_keys:
   enabled: true
   enforce_uniqueness: true
   nullable: false
@@ -157,12 +145,7 @@ def render_template(platform: str, benchmark: str) -> str:
     for candidate in profile.required_candidates(benchmark):
         by_table[candidate.table].append(candidate)
 
-    lines = [
-        HEADER.format(
-            platform_title=PLATFORM_TITLES[platform],
-            benchmark_title=benchmark.upper(),
-        ).rstrip()
-    ]
+    lines = [HEADER.rstrip()]
     for table in sorted(by_table):
         block = render_table(platform, table, by_table[table])
         dumped = yaml.safe_dump({table: block}, sort_keys=False, default_flow_style=False)

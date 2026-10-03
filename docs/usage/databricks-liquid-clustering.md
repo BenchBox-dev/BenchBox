@@ -13,7 +13,7 @@ Use unified tuning `platform_optimizations`:
 
 ```yaml
 platform_optimizations:
-  databricks_clustering_strategy: liquid_clustering  # liquid_clustering | liquid_clustering_auto | z_order | none
+  databricks_clustering_strategy: liquid_clustering
   liquid_clustering_enabled: true
   liquid_clustering_columns:
     - event_time

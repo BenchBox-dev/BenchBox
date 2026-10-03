@@ -3,7 +3,6 @@ import { resetDuckDbInitializationFailures } from "@/db";
 interface ErrorMessageProps {
   title?: string;
   message: string;
-  // Reissue the page read after the reader explicitly requests recovery.
   onRetry?: () => void;
 }
 

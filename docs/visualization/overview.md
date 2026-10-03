@@ -67,19 +67,14 @@ benchbox/core/visualization/
 ASCII charts provide terminal-friendly visualization without requiring a browser or external dependencies:
 
 ```bash
-# Display charts directly in terminal
 benchbox visualize results.json
 
-# Without colors (for piping or plain terminals)
 benchbox visualize results.json --no-color
 
-# Without Unicode (for terminals without Unicode support)
 benchbox visualize results.json --no-unicode
 
-# Specific chart type
 benchbox visualize results.json --chart-type performance_bar
 
-# Use a template
 benchbox visualize results.json --template flagship
 ```
 

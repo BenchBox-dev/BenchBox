@@ -1,5 +1,4 @@
 drop SEQUENCE web_page_seq;
---SET SERVEROUTPUT ON;
 DECLARE
    max_sk NUMBER;
 BEGIN

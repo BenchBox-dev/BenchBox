@@ -203,77 +203,53 @@ belong in an explicit workflow or correctness gate.
 
 ### Quick Development Testing
 ```bash
-# Run the curated fast lane
 make test-fast
-# or
 uv run -- python -m pytest -m fast
 
-# Run specific benchmark tests
 uv run -- python -m pytest tests/unit/benchmarks/test_tpch_core.py
 
-# Run with coverage (fast tests only - quick feedback)
 make coverage-fast
-# or routine coverage (excludes stress/resource-heavy/live tests)
 make coverage-all
-# or full tree including opt-in stress/resource-heavy/live tests (needs services + credentials)
 make coverage-opt-in-all
-# or
 uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
 
 ### E2E Testing
 ```bash
-# Quick E2E tests (dry-run mode)
 make test-e2e-quick
-# or
 uv run -- python -m pytest -m e2e_quick
 
-# Local platform E2E tests (full execution)
 uv run -- python -m pytest -m e2e_local
 
-# All E2E tests
 uv run -- python -m pytest tests/e2e/ -v
 
-# Specific E2E test module
 uv run -- python -m pytest tests/e2e/test_cli_options.py -v
 ```
 
 ### Comprehensive Testing
 ```bash
-# Run all tests
 make test-all
-# or
 uv run -- python -m pytest
 
-# Run with parallel execution
 make test-parallel
-# or
 uv run -- python -m pytest -n auto
 
-# Run integration tests
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration and not stress"
 
-# Run performance tests
 uv run -- python -m pytest tests/performance/ -m performance
 ```
 
 ### Using the Unified Test Runner
 ```bash
-# Run optimized development tests
 uv run -- python tests/utilities/unified_test_runner.py --strategy development
 
-# Run CI-optimized tests
 uv run -- python tests/utilities/unified_test_runner.py --strategy ci
 
-# Run specific benchmarks with parallel execution
 uv run -- python tests/utilities/unified_test_runner.py --benchmark tpch tpcds --parallel --workers 4
 
-# Run with coverage reporting
 uv run -- python tests/utilities/unified_test_runner.py --coverage --report
 
-# Run benchmark validation
 uv run -- python tests/utilities/benchmark_validator.py --benchmark all --quick-check
 ```
 
@@ -281,22 +257,17 @@ uv run -- python tests/utilities/benchmark_validator.py --benchmark all --quick-
 
 ### Basic Profiling
 ```bash
-# Profile a test run
 uv run -- python tests/utilities/performance_profiler.py python -m pytest tests/unit/
 
-# Profile with detailed output
 uv run -- python tests/utilities/performance_profiler.py --output performance_report.md python -m pytest tests/unit/
 
-# Check for performance regressions
 uv run -- python tests/utilities/performance_profiler.py --check-regressions python -m pytest tests/unit/
 ```
 
 ### Advanced Profiling
 ```bash
-# Update performance baselines
 uv run -- python tests/utilities/performance_profiler.py --update-baseline python -m pytest tests/unit/
 
-# Profile specific test categories
 uv run -- python tests/utilities/performance_profiler.py python -m pytest tests/integration/ -m "integration and not slow"
 ```
 
@@ -337,22 +308,15 @@ Tests are organized using pytest markers for selective execution:
 
 ### Example Usage
 ```bash
-# Run only fast unit tests
 make test-dev
-# or
 uv run -- python -m pytest -m "unit and fast"
 
-# Run integration tests excluding slow ones
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not slow"
 
-# Run TPC-H related tests
 make test-tpch
-# or
 uv run -- python -m pytest -m tpch
 
-# Run all tests except memory intensive ones
 uv run -- python -m pytest -m "not memory_intensive"
 ```
 
@@ -523,7 +487,7 @@ Global test configuration including:
 1. **Follow naming conventions**: Use descriptive test names with `test_` prefix
 2. **Group related tests**: Organize tests by functionality and component
 3. **Use clear assertions**: Make test failures easy to understand
-4. **Document complex tests**: Add docstrings for complex test scenarios
+4. **Document complex fixtures**: Record shared fixture contracts in this guide, not in test docstrings or comments
 
 ### Performance Testing
 1. **Establish baselines**: Use the performance profiler to set baseline metrics
@@ -537,49 +501,36 @@ Global test configuration including:
 
 #### Slow Test Execution
 ```bash
-# Profile test execution
 uv run -- python tests/utilities/performance_profiler.py python -m pytest tests/unit/ -v
 
-# Run only fast tests
 make test-fast
-# or
 uv run -- python -m pytest -m fast
 
-# Use parallel execution
 make test-parallel
-# or
 uv run -- python -m pytest -n auto
 ```
 
 #### Memory Issues
 ```bash
-# Run memory-intensive tests separately
 uv run -- python -m pytest -m "memory_intensive" --maxfail=1
 
-# Monitor memory usage
 uv run -- python tests/utilities/performance_profiler.py --output memory_report.md python -m pytest tests/unit/
 ```
 
 #### Database Connection Issues
 ```bash
-# Run database tests with verbose output
 make test-integration
-# or
 uv run -- python -m pytest tests/integration/ -v -s
 
-# Test database connectivity
 uv run -- python -c "import duckdb; print(duckdb.connect().execute('SELECT 1').fetchone())"
 ```
 
 ### Test Cache Management
 ```bash
-# Clear pytest cache
 uv run -- python -m pytest --cache-clear
 
-# Clear custom test cache
 uv run -- python tests/utilities/unified_test_runner.py --help
 
-# Run with dry-run to see commands
 uv run -- python tests/utilities/unified_test_runner.py --dry-run
 ```
 

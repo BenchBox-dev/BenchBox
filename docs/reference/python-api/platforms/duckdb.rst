@@ -32,13 +32,10 @@ Basic usage:
     from benchbox.tpch import TPCH
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # In-memory database (default)
     adapter = DuckDBAdapter()
 
-    # Or persistent database
     adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=0.1)
     results = benchmark.run_with_platform(adapter)
 
@@ -302,13 +299,10 @@ Suitable for small datasets and rapid iteration:
 
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Default in-memory configuration
     adapter = DuckDBAdapter()
 
-    # With memory limit
     adapter = DuckDBAdapter(memory_limit="2GB")
 
-    # With thread control
     adapter = DuckDBAdapter(
         memory_limit="4GB",
         thread_limit=4
@@ -321,14 +315,11 @@ For reusable benchmark data:
 
 .. code-block:: python
 
-    # Create persistent database
     adapter = DuckDBAdapter(database_path="./benchmarks/tpch.duckdb")
 
-    # Run benchmark (data persists)
     benchmark = TPCH(scale_factor=1.0)
     results = benchmark.run_with_platform(adapter)
 
-    # Later: reuse the same database
     adapter2 = DuckDBAdapter(database_path="./benchmarks/tpch.duckdb")
     results2 = benchmark.run_with_platform(adapter2)
 
@@ -341,9 +332,9 @@ Configure for optimal performance:
 
     adapter = DuckDBAdapter(
         database_path="benchmark.duckdb",
-        memory_limit="16GB",      # Set appropriate for your system
-        thread_limit=8,           # Match your CPU cores
-        temp_directory="/fast/ssd/temp",  # Use fast storage
+        memory_limit="16GB",
+        thread_limit=8,
+        temp_directory="/fast/ssd/temp",
         config={
             "default_order": "DESC",
             "preserve_insertion_order": False,
@@ -366,10 +357,8 @@ Enable query profiling for analysis:
         }
     )
 
-    # Run benchmark
     results = benchmark.run_with_platform(adapter)
 
-    # Profile information saved to ./profiles/
 
 Data Loading
 ------------
@@ -384,13 +373,10 @@ Bulk Loading from Parquet
     import duckdb
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create adapter with custom connection
     adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 
-    # Access underlying DuckDB connection
     conn = adapter.connection
 
-    # Custom bulk load from Parquet
     conn.execute("""
         CREATE TABLE lineitem AS
         SELECT * FROM read_parquet('data/lineitem/*.parquet')
@@ -401,7 +387,6 @@ Loading from CSV
 
 .. code-block:: python
 
-    # DuckDB automatically detects CSV format
     conn.execute("""
         CREATE TABLE customer AS
         SELECT * FROM read_csv('data/customer.tbl',
@@ -431,11 +416,9 @@ Execute Queries Directly
 
     adapter = DuckDBAdapter()
 
-    # Execute arbitrary SQL
     result = adapter.connection.execute("SELECT COUNT(*) FROM lineitem")
     row_count = result.fetchone()[0]
 
-    # Execute with parameters
     query = "SELECT * FROM orders WHERE o_orderdate > ?"
     result = adapter.connection.execute(query, ["1995-01-01"])
 
@@ -444,13 +427,11 @@ Query Plans and Optimization
 
 .. code-block:: python
 
-    # Get query plan
     explain_result = adapter.connection.execute(
         "EXPLAIN SELECT * FROM lineitem WHERE l_shipdate > '1995-01-01'"
     )
     print(explain_result.fetchall())
 
-    # Analyze query with profiling
     adapter.connection.execute("PRAGMA enable_profiling")
     result = adapter.connection.execute("SELECT COUNT(*) FROM lineitem")
     profiling_info = adapter.connection.execute("PRAGMA profiling_output").fetchall()
@@ -463,13 +444,11 @@ Parallel Query Execution
 
 .. code-block:: python
 
-    # DuckDB automatically parallelizes queries
     adapter = DuckDBAdapter(
         memory_limit="16GB",
-        thread_limit=8  # Use 8 threads for parallel execution
+        thread_limit=8
     )
 
-    # Complex aggregation will use all threads
     results = benchmark.run_with_platform(adapter)
 
 Extensions and Functions
@@ -482,11 +461,9 @@ Extensions and Functions
     adapter = DuckDBAdapter()
     conn = adapter.connection
 
-    # Load DuckDB extensions
     conn.execute("INSTALL httpfs")
     conn.execute("LOAD httpfs")
 
-    # Now can read from S3
     conn.execute("""
         CREATE TABLE data AS
         SELECT * FROM read_parquet('s3://bucket/data/*.parquet')
@@ -497,7 +474,6 @@ Window Functions
 
 .. code-block:: python
 
-    # DuckDB supports advanced window functions
     query = """
         SELECT
             l_orderkey,
@@ -549,8 +525,7 @@ Performance Optimization
 
    .. code-block:: python
 
-       # Prefer HUGEINT over VARCHAR for large integers
-       # Use DATE/TIMESTAMP instead of VARCHAR for dates
+
 
 3. **Create indexes** for filtered columns:
 
@@ -565,7 +540,7 @@ Data Validation
 
    .. code-block:: python
 
-       expected_rows = 6_000_000  # SF=1 TPC-H
+       expected_rows = 6_000_000
        actual_rows = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
        assert actual_rows == expected_rows, f"Expected {expected_rows}, got {actual_rows}"
 
@@ -589,10 +564,8 @@ Out of Memory Errors
 
 .. code-block:: python
 
-    # Set explicit memory limit
     adapter = DuckDBAdapter(memory_limit="4GB")
 
-    # Or use persistent database with disk spilling
     adapter = DuckDBAdapter(
         database_path="benchmark.duckdb",
         memory_limit="4GB",
@@ -608,13 +581,10 @@ Slow Query Performance
 
 .. code-block:: python
 
-    # 1. Increase thread count
     adapter = DuckDBAdapter(thread_limit=8)
 
-    # 2. Use persistent database to avoid repeated loads
     adapter = DuckDBAdapter(database_path="cached.duckdb")
 
-    # 3. Enable profiling to identify bottlenecks
     adapter = DuckDBAdapter(enable_profiling=True)
 
 Database Lock Errors
@@ -626,11 +596,9 @@ Database Lock Errors
 
 .. code-block:: python
 
-    # Use separate database files for concurrent access
     adapter1 = DuckDBAdapter(database_path="benchmark1.duckdb")
     adapter2 = DuckDBAdapter(database_path="benchmark2.duckdb")
 
-    # Or use in-memory for read-only workloads
     adapter = DuckDBAdapter(database_path=":memory:")
 
 See Also

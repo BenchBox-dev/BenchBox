@@ -1,15 +1,4 @@
 // @vitest-environment node
-/**
- * Guardrail: user-facing strings (Error messages, JSX text, console output)
- * must not reference internal repository documents. The deployed explorer
- * is read by users who do not have access to `_project/`, `AGENTS.md`, or
- * `CLAUDE.md`; pointing them at those paths is a leak of internal context
- * dressed up as actionable guidance.
- *
- * The scan looks at string literals, template literals, and static JSX text.
- * Source-code comments are intentionally allowed to reference internal docs
- * because they help maintainers and never reach the runtime.
- */
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

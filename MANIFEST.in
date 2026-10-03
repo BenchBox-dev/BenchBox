@@ -6,9 +6,6 @@ include MANIFEST.in
 
 recursive-include benchbox *.py *.sql *.yaml *.json *.jinja2 *.md *.csv *.toml
 
-# Include _sources/ for sdist (patches, EULAs, compilation infra, templates)
-# Note: Runtime templates are ALSO bundled inside benchbox/_binaries/*/templates/
-# for wheel installs where _sources/ is not available
 include _sources/README.md
 include _sources/tpc-h/EULA.txt
 include _sources/tpc-h/PATCHES.md
@@ -22,22 +19,15 @@ recursive-include _sources/tpc-ds/query_variants *.tpl
 recursive-include _sources/tpc-h/dbgen/queries *.sql
 recursive-include _sources/tpc-h/dbgen/variants *.sql
 
-# Include pre-compiled TPC binaries (required for data generation)
-# These are platform-specific executables for TPC-H and TPC-DS benchmarks
-# Binaries are included inside the benchbox package for proper installation
 recursive-include benchbox/_binaries/tpc-h *
 recursive-include benchbox/_binaries/tpc-ds *
 include benchbox/_binaries/SHA256MANIFEST.json
-# Exclude macOS metadata files
 global-exclude .DS_Store
 
 prune tests
 prune docs
 prune examples
 
-# Defence-in-depth: exclude maintainer-only and develop-only content from sdist.
-# The two-branch model keeps these on the develop branch (never on main) — this
-# pruning is a tripwire if the branch model ever leaks paths through.
 prune _project
 prune _blog
 prune .claude

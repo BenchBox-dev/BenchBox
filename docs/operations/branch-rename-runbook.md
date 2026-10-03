@@ -35,7 +35,7 @@ the branch before the PR merges, or `release-cut` would open PRs against a
    the current `main-release-only` properties. Inspect the old one first:
    ```bash
    gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {id, name, target}'
-   gh api repos/BenchBox-dev/BenchBox/rulesets/<old-id>        # capture rules
+   gh api repos/BenchBox-dev/BenchBox/rulesets/<old-id>
    ```
    Recreate with: target `refs/heads/release`; required checks `validate-base`,
    `release-required-result`; `strict_required_status_checks_policy: false`;
@@ -46,14 +46,11 @@ the branch before the PR merges, or `release-cut` would open PRs against a
 ## Verify
 
 ```bash
-# Branch renamed
-gh api repos/BenchBox-dev/BenchBox/branches/release --jq .name   # -> release
-gh api repos/BenchBox-dev/BenchBox/branches/main --jq .name      # -> 404 (redirect covers old URLs)
+gh api repos/BenchBox-dev/BenchBox/branches/release --jq .name
+gh api repos/BenchBox-dev/BenchBox/branches/main --jq .name
 
-# Ruleset targets the release branch
-gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {name, target}'  # release-only -> refs/heads/release
+gh api repos/BenchBox-dev/BenchBox/rulesets --jq '.[] | {name, target}'
 
-# Drift check parses the doc and matches live state (once the PR is on develop)
 uv run -- python scripts/ruleset_drift_check.py --token "$RULESET_DRIFT_TOKEN" --require-bypass-actor-visibility
 ```
 

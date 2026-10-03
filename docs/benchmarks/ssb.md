@@ -244,17 +244,13 @@ ORDER BY d_year, c_nation;
 ```python
 from benchbox import SSB
 
-# Initialize SSB benchmark
 ssb = SSB(scale_factor=1.0, output_dir="ssb_data")
 
-# Generate data
 data_files = ssb.generate_data()
 
-# Get all queries
 queries = ssb.get_queries()
 print(f"Generated {len(queries)} SSB queries")
 
-# Get specific query with parameters
 query_1_1 = ssb.get_query("Q1.1", params={
     'year': 1993,
     'discount_min': 1,
@@ -267,15 +263,12 @@ print(query_1_1)
 ### Data Generation and Loading
 
 ```python
-# Generate SSB data at different scales
 ssb_small = SSB(scale_factor=0.1, output_dir="ssb_small")
 data_files = ssb_small.generate_data()
 
-# Check generated tables
 available_tables = ssb_small.get_available_tables()
 print(f"Available tables: {available_tables}")
 
-# Get schema information
 schema = ssb_small.get_schema()
 for table in schema:
     print(f"Table {table['name']}: {len(table['columns'])} columns")
@@ -287,16 +280,13 @@ for table in schema:
 import duckdb
 from benchbox import SSB
 
-# Initialize and generate data
 ssb = SSB(scale_factor=0.01, output_dir="ssb_tiny")
 data_files = ssb.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("ssb.duckdb")
 schema_sql = ssb.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load SSB tables
 table_mappings = {
     'date': 'date.csv',
     'customer': 'customer.csv',
@@ -316,7 +306,6 @@ for table_name, file_name in table_mappings.items():
         """)
         print(f"Loaded {table_name}")
 
-# Run SSB query flights
 flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 for query_id in flight_1_queries:
     query_sql = ssb.get_query(query_id, params={
@@ -346,7 +335,6 @@ class SSBPerformanceTester:
         self.connection = connection
 
     def run_flight_benchmark(self, flight_number: int, iterations: int = 3) -> Dict:
-        """Benchmark a specific SSB flight."""
         flight_queries = {
             1: ["Q1.1", "Q1.2", "Q1.3"],
             2: ["Q2.1", "Q2.2", "Q2.3"],
@@ -365,7 +353,6 @@ class SSBPerformanceTester:
 
             times = []
             for iteration in range(iterations):
-                # Get parameterized query
                 query_sql = self.ssb.get_query(query_id, seed=42)
 
                 start_time = time.time()
@@ -385,8 +372,6 @@ class SSBPerformanceTester:
         return results
 
     def _get_query_with_custom_params(self, query_id: str) -> str:
-        """Example of getting query with custom parameters."""
-        # Example custom parameters for each query type
         custom_params = {
             'year': 1993,
             'year_month': 199401,
@@ -409,7 +394,6 @@ class SSBPerformanceTester:
         return self.ssb.get_query(query_id, params=custom_params)
 
     def run_complete_benchmark(self) -> Dict:
-        """Run all SSB flights and return systematic results."""
         complete_results = {}
 
         for flight_num in range(1, 5):
@@ -417,7 +401,6 @@ class SSBPerformanceTester:
             flight_results = self.run_flight_benchmark(flight_num)
             complete_results[f"Flight_{flight_num}"] = flight_results
 
-        # Calculate summary statistics
         all_times = []
         for flight_data in complete_results.values():
             for query_data in flight_data.values():
@@ -432,31 +415,22 @@ class SSBPerformanceTester:
 
         return complete_results
 
-# Usage
 performance_tester = SSBPerformanceTester(ssb, conn)
 
-# Test individual flights
 flight_1_results = performance_tester.run_flight_benchmark(1)
 print("Flight 1 Results:")
 for query_id, stats in flight_1_results.items():
     print(f"  {query_id}: {stats['avg_time']:.3f}s avg, {stats['rows_returned']} rows")
 
-# Run complete benchmark
 complete_results = performance_tester.run_complete_benchmark()
 ```
 
 ### Columnar Database Optimization
 
 ```python
-# SSB is particularly well-suited for columnar databases
-# Example optimization for columnar systems
-
 def optimize_for_columnar(ssb: SSB, connection):
-    """Optimize SSB for columnar database performance."""
 
-    # Create column-store configured tables
     optimization_sql = """
-    -- Optimize fact table for columnar access
     CREATE TABLE lineorder_configured AS
     SELECT
         lo_orderdate,
@@ -472,13 +446,11 @@ def optimize_for_columnar(ssb: SSB, connection):
     FROM lineorder
     ORDER BY lo_orderdate, lo_custkey;
 
-    -- Create projection indices for common query patterns
     CREATE INDEX idx_lineorder_date ON lineorder_configured(lo_orderdate);
     CREATE INDEX idx_lineorder_cust ON lineorder_configured(lo_custkey);
     CREATE INDEX idx_lineorder_part ON lineorder_configured(lo_partkey);
     CREATE INDEX idx_lineorder_supp ON lineorder_configured(lo_suppkey);
 
-    -- Optimize dimension tables
     CREATE INDEX idx_date_year ON date(d_year);
     CREATE INDEX idx_customer_region ON customer(c_region);
     CREATE INDEX idx_supplier_region ON supplier(s_region);
@@ -488,7 +460,6 @@ def optimize_for_columnar(ssb: SSB, connection):
     connection.execute(optimization_sql)
     print("Applied columnar optimizations")
 
-# Apply optimizations
 optimize_for_columnar(ssb, conn)
 ```
 
@@ -543,19 +514,17 @@ optimize_for_columnar(ssb, conn)
 ssb = SSB(
     scale_factor=1.0,
     output_dir="ssb_data",
-    # SSB-specific configuration
-    date_range_years=7,      # Default date range
-    enable_compression=True,  # Compress output files
-    partition_fact_table=True, # Partition LINEORDER by date
-    generate_indices=True    # Generate recommended indices
+    date_range_years=7,
+    enable_compression=True,
+    partition_fact_table=True,
+    generate_indices=True
 )
 
-# Access query parameterization
 query_params = {
-    'year': 1995,           # Specific year for temporal queries
-    'region': 'ASIA',       # Geographic focus
-    'category': 'MFGR#13',  # Product category
-    'discount_range': (2, 4) # Discount selectivity
+    'year': 1995,
+    'region': 'ASIA',
+    'category': 'MFGR#13',
+    'discount_range': (2, 4)
 }
 
 query = ssb.get_query("Q2.1", params=query_params)
@@ -569,14 +538,11 @@ query = ssb.get_query("Q2.1", params=query_params)
 from pyspark.sql import SparkSession
 from benchbox import SSB
 
-# Initialize Spark and SSB
 spark = SparkSession.builder.appName("SSB-Benchmark").getOrCreate()
 ssb = SSB(scale_factor=10, output_dir="/data/ssb_sf10")
 
-# Generate and load data
 data_files = ssb.generate_data()
 
-# Create Spark tables
 tables = ['date', 'customer', 'supplier', 'part', 'lineorder']
 for table_name in tables:
     file_path = f"/data/ssb_sf10/{table_name}.csv"
@@ -584,11 +550,9 @@ for table_name in tables:
     df = spark.read.csv(file_path, header=True, inferSchema=True)
     df.createOrReplaceTempView(table_name)
 
-    # Cache dimension tables for better join performance
     if table_name != 'lineorder':
         df.cache()
 
-# Run SSB queries with Spark SQL
 flight_2_queries = ["Q2.1", "Q2.2", "Q2.3"]
 for query_id in flight_2_queries:
     query_sql = ssb.get_query(query_id, params={
@@ -611,16 +575,12 @@ for query_id in flight_2_queries:
 import clickhouse_connect
 from benchbox import SSB
 
-# Initialize ClickHouse client and SSB
 client = clickhouse_connect.get_client(host='localhost', port=8123)
 ssb = SSB(scale_factor=1.0, output_dir="ssb_data")
 
-# Generate data
 data_files = ssb.generate_data()
 
-# Create ClickHouse tables configured for analytics
 create_tables_sql = """
--- Optimized fact table for ClickHouse
 CREATE TABLE lineorder (
     lo_orderkey UInt32,
     lo_linenumber UInt8,
@@ -643,7 +603,6 @@ CREATE TABLE lineorder (
 PARTITION BY toYear(lo_orderdate)
 ORDER BY (lo_orderdate, lo_custkey, lo_partkey);
 
--- Dimension tables
 CREATE TABLE customer (
     c_custkey UInt32,
     c_name String,
@@ -656,20 +615,16 @@ CREATE TABLE customer (
 ) ENGINE = MergeTree()
 ORDER BY c_custkey;
 
--- Add other dimension tables...
 """
 
 client.execute(create_tables_sql)
 
-# Load data using ClickHouse CSV import
 for table_name in ['customer', 'supplier', 'part', 'date', 'lineorder']:
     file_path = ssb.output_dir / f"{table_name}.csv"
 
-    # Use ClickHouse's configured CSV import
     with open(file_path, 'rb') as f:
         client.insert_file(table_name, f, fmt='CSV')
 
-# Run configured SSB queries
 flight_1_results = {}
 for query_id in ["Q1.1", "Q1.2", "Q1.3"]:
     query_sql = ssb.get_query(query_id, params={
@@ -714,7 +669,6 @@ for query_id in ["Q1.1", "Q1.2", "Q1.3"]:
 
 **Issue: Slow fact table scans in Flight 1**
 ```sql
--- Solution: Ensure proper indexing and partitioning
 CREATE INDEX idx_lineorder_orderdate ON lineorder(lo_orderdate);
 CREATE INDEX idx_lineorder_discount ON lineorder(lo_discount);
 CREATE INDEX idx_lineorder_quantity ON lineorder(lo_quantity);
@@ -722,31 +676,27 @@ CREATE INDEX idx_lineorder_quantity ON lineorder(lo_quantity);
 
 **Issue: Inefficient joins in Flight 3**
 ```sql
--- Solution: Optimize join order (smallest tables first)
 SELECT c_nation, s_nation, d_year, sum(lo_revenue) as revenue
-FROM date, customer, supplier, lineorder  -- Small to large table order
+FROM date, customer, supplier, lineorder
 WHERE lo_orderdate = d_datekey
   AND lo_custkey = c_custkey
   AND lo_suppkey = s_suppkey
-  -- Other conditions...
 ```
 
 ### Data Loading Issues
 
 **Issue: Memory issues with large scale factors**
 ```python
-# Solution: Use streaming data generation
 ssb = SSB(
     scale_factor=100,
     output_dir="/data/ssb_large",
-    stream_generation=True,  # Generate in chunks
-    chunk_size=1000000       # 1M rows per chunk
+    stream_generation=True,
+    chunk_size=1000000
 )
 ```
 
 **Issue: Incorrect query results**
 ```python
-# Solution: Validate data generation and parameterization
 validation_queries = [
     "SELECT COUNT(*) FROM lineorder",
     "SELECT MIN(d_year), MAX(d_year) FROM date",

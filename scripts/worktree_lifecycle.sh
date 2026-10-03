@@ -1,10 +1,6 @@
 #!/bin/sh
 set -eu
 
-# Keep user-controlled branch and path values in environment variables. This
-# helper is called by Make without interpolating those values into a shell
-# recipe, so punctuation in either value cannot become shell syntax.
-
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 operation=${1:-}
 
@@ -94,8 +90,6 @@ release_creation_lock() {
 
 acquire_creation_lock() {
   if mkdir "$creation_lock_dir" 2>/dev/null; then
-    # mkdir is the ownership handoff. Set the flag before writing the PID so a
-    # signal in this narrow window can still release this process's lock.
     creation_lock_owned=yes
     if ! printf '%s\n' "$$" > "$creation_lock_dir/pid"; then
       release_creation_lock
@@ -150,8 +144,6 @@ create_worktree() {
   primary_clone=$(dirname "$common_dir")
   worktree_path=$(canonical_path "$worktree_input")
   creation_lock_dir=$common_dir/worktree-create.lock
-  # Serialize the collision checks and git worktree add. This is a short-lived
-  # create transaction lock, not a retained worktree pool or slot reservation.
   trap on_exit EXIT
   trap 'on_signal 129' HUP
   trap 'on_signal 130' INT
@@ -169,8 +161,6 @@ create_worktree() {
   base_oid=$(git rev-parse origin/develop^{commit}) || die "Could not resolve fetched origin/develop"
   creation_started=yes
   git worktree add -b "$branch" "$worktree_path" origin/develop
-  # Hooks live in the common Git directory. Installation is owned by the
-  # primary clone; never rewrite the shared hook from this linked worktree.
   "$script_dir/set_worktree_identity.sh" "$worktree_path"
 
   py_runner="python3"

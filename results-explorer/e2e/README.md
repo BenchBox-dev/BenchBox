@@ -9,9 +9,9 @@ per-run generated fixture corpus. Architecture decisions live in
 ```bash
 cd results-explorer
 npm ci
-npm run test:e2e:install          # once; downloads browser binaries
-npm run test:e2e:chromium         # writes fixtures, rebuilds dist, runs Chromium
-npm run test:e2e:full             # local full-matrix convenience entrypoint
+npm run test:e2e:install
+npm run test:e2e:chromium
+npm run test:e2e:full
 ```
 
 For a brand-new machine, `npm run test:e2e:chromium:setup` wraps the browser

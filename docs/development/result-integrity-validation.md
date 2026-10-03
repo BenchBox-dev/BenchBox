@@ -151,13 +151,13 @@ The validator returns an `IntegrityReport` dataclass:
 ```python
 @dataclass
 class IntegrityReport:
-    file: str                           # File path validated
-    benchmark_id: str                   # Benchmark identifier
-    platform: str                       # Platform name
-    scale_factor: float                 # Scale factor
-    overall_status: CheckStatus         # Worst status across all checks
-    checks: list[CheckResult]           # Individual check results
-    summary: dict[str, int]             # Counts by status (PASS, WARN, FAIL)
+    file: str
+    benchmark_id: str
+    platform: str
+    scale_factor: float
+    overall_status: CheckStatus
+    checks: list[CheckResult]
+    summary: dict[str, int]
 ```
 
 **Helper methods:**
@@ -169,11 +169,11 @@ Each `CheckResult` contains:
 ```python
 @dataclass
 class CheckResult:
-    category: CheckCategory   # STRUCTURAL, COMPLETENESS, or BELIEVABILITY
-    name: str                 # Check identifier (e.g., "query_count_math")
-    status: CheckStatus       # PASS, WARN, or FAIL
-    message: str              # Human-readable description
-    details: dict | None      # Optional structured details
+    category: CheckCategory
+    name: str
+    status: CheckStatus
+    message: str
+    details: dict | None
 ```
 
 ## Convenience Functions
@@ -183,10 +183,8 @@ The module provides two convenience functions for common use cases:
 ```python
 from benchbox.core.results.integrity_validator import validate_file, validate_directory
 
-# Single file
 report = validate_file(Path("results/tpch_duckdb_sf1.json"))
 
-# Directory (returns list of reports)
 reports = validate_directory(Path("results/"), pattern="*.json")
 ```
 

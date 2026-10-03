@@ -22,13 +22,10 @@ BenchBox supports capturing, analyzing, and comparing query execution plans acro
 ## Quick Start
 
 ```bash
-# 1. Run benchmark with plan capture
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 
-# 2. View a specific plan
 benchbox show-plan --run benchmark_runs/latest/results.json --query-id q05
 
-# 3. Compare plans between two runs
 benchbox compare run_before.json run_after.json --include-plans
 ```
 
@@ -276,10 +273,8 @@ benchbox show-plan \
 Control tree display:
 
 ```bash
-# Compact view without operator properties
 benchbox show-plan --run results.json --query-id q05 --compact --no-properties
 
-# Limit tree depth for very complex plans
 benchbox show-plan --run results.json --query-id q05 --max-depth 3
 ```
 
@@ -428,18 +423,14 @@ from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.query_plans.comparison import compare_query_plans
 from benchbox.core.query_plans.visualization import render_plan
 
-# Load results
 with open('results.json') as f:
     results = BenchmarkResults.from_dict(json.load(f))
 
-# Get a query execution
 query_exec = results.phases['power'].queries[0]
 plan = query_exec.query_plan
 
-# Render plan
 print(render_plan(plan))
 
-# Compare two plans
 comparison = compare_query_plans(plan1, plan2)
 print(f"Similarity: {comparison.similarity.overall_similarity:.1%}")
 print(f"Type mismatches: {comparison.similarity.type_mismatches}")
@@ -451,7 +442,6 @@ Traverse plan trees programmatically:
 
 ```python
 def count_scans(plan):
-    """Count total scan operations in plan."""
     def count_in_operator(op):
         count = 1 if op.operator_type == LogicalOperatorType.SCAN else 0
         if op.children:
@@ -461,7 +451,6 @@ def count_scans(plan):
 
     return count_in_operator(plan.logical_root)
 
-# Analyze plans
 num_scans = count_scans(query_exec.query_plan)
 print(f"Total scans: {num_scans}")
 ```
@@ -471,13 +460,11 @@ print(f"Total scans: {num_scans}")
 Use fingerprints for fast plan comparison:
 
 ```python
-# Check if plans are identical
 if plan1.plan_fingerprint == plan2.plan_fingerprint:
     print("Plans are identical")
 else:
     print("Plans differ")
 
-# Group queries by plan
 plans_by_fingerprint = {}
 for query_exec in all_queries:
     fp = query_exec.query_plan.plan_fingerprint
@@ -485,7 +472,6 @@ for query_exec in all_queries:
         plans_by_fingerprint[fp] = []
     plans_by_fingerprint[fp].append(query_exec.query_id)
 
-# Find queries with same plan
 for fp, query_ids in plans_by_fingerprint.items():
     if len(query_ids) > 1:
         print(f"Queries {query_ids} share same plan")
@@ -504,10 +490,8 @@ for fp, query_ids in plans_by_fingerprint.items():
 
 **Solution**:
 ```bash
-# Ensure --capture-plans is included
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 
-# Check which platforms support capture
 benchbox platforms
 ```
 
@@ -585,15 +569,12 @@ To compare costs/estimates, examine the JSON export directly.
 ### Cross-Platform Analysis
 
 ```bash
-# Run same benchmark on different platforms
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 benchbox run --platform datafusion --benchmark tpch --scale 1 --capture-plans
 
-# Compare plans
 benchbox compare benchmark_runs/duckdb_*/results.json \
   benchmark_runs/datafusion_*/results.json --include-plans
 
-# Show only the most-changed plans
 benchbox compare benchmark_runs/duckdb_*/results.json \
   benchmark_runs/datafusion_*/results.json \
   --include-plans --plan-threshold 0.9
@@ -602,12 +583,10 @@ benchbox compare benchmark_runs/duckdb_*/results.json \
 ### Regression Testing
 
 ```bash
-# Automated regression check
 benchbox compare baseline.json current.json \
   --include-plans --plan-threshold 0.95 \
   --format json > regression_report.json
 
-# Check exit code
 if [ $? -ne 0 ]; then
     echo "Plan regressions detected!"
     exit 1
@@ -700,8 +679,8 @@ constants share a normalized fingerprint.
 The capability is also available programmatically:
 
 ```python
-plan.plan_fingerprint          # literal-sensitive (default)
-plan.normalized_fingerprint    # literal-normalized
+plan.plan_fingerprint
+plan.normalized_fingerprint
 plan.compute_plan_fingerprint(normalize_literals=True)
 ```
 

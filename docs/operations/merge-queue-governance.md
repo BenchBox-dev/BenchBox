@@ -78,10 +78,8 @@ PR lane.
 Developers submit and arm PRs through repository standard Makefile targets:
 
 ```bash
-# Open PR against develop with currency check
 make pr-open
 
-# When PR is ready for merge, run the exact readiness transaction and arm
 make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
@@ -110,7 +108,6 @@ If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbo
 If the merge queue must be immediately disabled due to CI outages, deadlocks, or GitHub platform degradation, the operator executes:
 
 ```bash
-# Emergency rollback to standard branch protection
 gh api --method PUT repos/BenchBox-dev/BenchBox/rulesets/15611785 \
   --input docs/operations/rulesets/develop-squash-only-rollback.json
 ```

@@ -38,9 +38,7 @@ default matches.
 both. The existing names become aliases in their respective modules for
 backward compatibility:
 ```python
-# tpch/throughput_test.py
 TPCHThroughputStreamResult = ThroughputStreamResult
-# tpcds/throughput_test.py
 TPCDSThroughputStreamResult = ThroughputStreamResult
 ```
 

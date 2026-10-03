@@ -133,12 +133,11 @@ def test_update_baseline_file_reports_removal_despite_name_collision(tmp_path: P
     assert data["beta"] == {"Q9_expression": "beta reason"}
 
 
-def test_update_baseline_file_regenerates_header(tmp_path: Path) -> None:
+def test_update_baseline_file_writes_data_without_comments(tmp_path: Path) -> None:
     target = _write(tmp_path, SAMPLE)
     update_baseline_file(target, {"Q18_expression"}, "clickbench")
     text = target.read_text()
-    assert text.startswith("# Known-divergence baseline")
-    assert "make cross-surface-update-baseline BENCHMARK=<gate>" in text
+    assert not any(line.lstrip().startswith("#") for line in text.splitlines())
 
 
 def test_real_baseline_file_is_supported() -> None:

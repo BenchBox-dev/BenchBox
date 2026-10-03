@@ -50,10 +50,8 @@ tests/uat/
 ## Running tests
 
 ```bash
-# Fast tests only (default for `make test-fast`).
 uv run -- python -m pytest tests/uat -q -m fast
 
-# All tests including the slow-marked replay assertion.
 uv run -- python -m pytest tests/uat -q -m "fast or slow"
 ```
 
@@ -115,7 +113,7 @@ with other local runs. Keep fast tests for this mapping in sync with
 Interrupted-run recovery is explicit:
 
 ```bash
-make uat-docker-cleanup        # dry-run inventory + commands
+make uat-docker-cleanup
 make uat-docker-cleanup APPLY=1
 ```
 

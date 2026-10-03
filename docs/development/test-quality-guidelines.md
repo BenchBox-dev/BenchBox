@@ -16,7 +16,6 @@ This document defines standards for writing effective, maintainable tests in Ben
 **Bad**: Testing that a collection has a specific count.
 
 ```python
-# BAD - breaks when tables are added/removed
 def test_table_count():
     assert len(TABLES) == 21
 ```
@@ -24,13 +23,11 @@ def test_table_count():
 **Good**: Test structural properties or specific members.
 
 ```python
-# GOOD - tests behavior, not implementation detail
 def test_all_tables_have_required_columns():
     for table in TABLES:
         assert table.has_primary_key()
         assert "created_at" in table.column_names
 
-# GOOD - tests specific requirements
 def test_required_tables_present():
     required = {"users", "orders", "products"}
     assert required.issubset(set(TABLES.keys()))
@@ -41,22 +38,18 @@ def test_required_tables_present():
 **Bad**: Asserting something that would raise an exception anyway.
 
 ```python
-# BAD - import_module raises ImportError on failure, never returns None
 module = importlib.import_module("mypackage")
-assert module is not None  # Redundant
+assert module is not None
 
-# BAD - constructor raises on failure
 obj = MyClass()
-assert obj is not None  # Redundant
+assert obj is not None
 ```
 
 **Good**: Remove redundant assertions or replace with meaningful ones.
 
 ```python
-# GOOD - just import (failure = ImportError with clear message)
 importlib.import_module("mypackage")
 
-# GOOD - verify behavior after construction
 obj = MyClass()
 assert obj.is_initialized
 assert obj.config == expected_config
@@ -67,7 +60,6 @@ assert obj.config == expected_config
 **Bad**: Checking type without verifying content.
 
 ```python
-# BAD - doesn't verify the dict has expected content
 result = get_stats()
 assert isinstance(result, dict)
 ```
@@ -75,7 +67,6 @@ assert isinstance(result, dict)
 **Good**: Verify structure or content.
 
 ```python
-# GOOD - verifies both type and content
 result = get_stats()
 assert isinstance(result, dict)
 assert "row_count" in result
@@ -87,7 +78,6 @@ assert result["row_count"] >= 0
 **Bad**: Testing that a constant equals its expected value.
 
 ```python
-# BAD - just duplicates the constant definition
 def test_default_scale():
     assert DEFAULT_SCALE == 0.01
 ```
@@ -95,9 +85,8 @@ def test_default_scale():
 **Good**: Test that the constant is used correctly.
 
 ```python
-# GOOD - tests that default is actually applied
 def test_default_scale_applied():
-    benchmark = TPCH()  # No scale_factor arg
+    benchmark = TPCH()
     assert benchmark.scale_factor == 0.01
 ```
 
@@ -106,7 +95,6 @@ def test_default_scale_applied():
 **Bad**: Testing format/structure instead of behavior.
 
 ```python
-# BAD - tests format, not correctness
 def test_query_format():
     query = generate_query(1)
     assert query.startswith("SELECT")
@@ -117,7 +105,6 @@ def test_query_format():
 **Good**: Test that the query works correctly.
 
 ```python
-# GOOD - tests actual behavior
 def test_query_returns_expected_rows():
     query = generate_query(1)
     result = conn.execute(query)
@@ -129,16 +116,14 @@ def test_query_returns_expected_rows():
 Sometimes `assert x is not None` is appropriate:
 
 ```python
-# VALID - function legitimately returns None for invalid input
 plan = parser.parse(malformed_input)
-if plan is not None:  # Parser returns None for unparseable input
+if plan is not None:
     assert plan.logical_root is not None
 ```
 
 ```python
-# VALID - optional field that should be present in this test case
 result = get_user(user_id)
-assert result.email is not None  # Some users might not have email
+assert result.email is not None
 ```
 
 The key distinction: use `is not None` when `None` is a valid return value that you want to explicitly check for, not when the function would raise an exception instead.

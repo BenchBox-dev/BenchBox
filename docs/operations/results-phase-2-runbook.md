@@ -348,7 +348,6 @@ git fetch "$REMOTE" published-results
 git switch -c rollback-results "$REMOTE/published-results"
 BAD_SHA="$(gh pr view "$PR_NUMBER" --repo BenchBox-dev/BenchBox --json mergeCommit --jq '.mergeCommit.oid')"
 git show --stat --oneline "$BAD_SHA"
-# Stop unless this is the exact non-accepted change approved for archive reversal.
 git revert "$BAD_SHA"
 git push "$REMOTE" HEAD:published-results
 ```

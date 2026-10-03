@@ -1,22 +1,5 @@
 name: Upload TPC Answer Files
 
-# Packages TPC-H and TPC-DS answer files as tar.gz archives and uploads them
-# to the stable 'answers-v1' GitHub release tag.
-#
-# The 'answers-v1' tag is intentionally separate from version tags (v*).
-# Answer files are TPC specification data and do not change between BenchBox
-# releases, so using a stable tag keeps the download URL constant across all
-# package versions.
-#
-# Uploaded assets:
-#   tpch-answers.tar.gz   - 22 TPC-H answer files (q1.out … q22.out)
-#   tpcds-answers.tar.gz  - TPC-DS answer files (*.ans) from answer_sets/
-#   checksums.sha256      - SHA256 digests for both archives
-#
-# Run this workflow:
-#   1. When answer files are updated in _sources/ (rare - TPC spec changes)
-#   2. After initial repository setup (create the answers-v1 release for the first time)
-
 on:
   workflow_dispatch:
     inputs:
@@ -30,11 +13,11 @@ jobs:
   upload-answers:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to create/update releases and upload assets
+      contents: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Verify answer file sources exist
         run: |

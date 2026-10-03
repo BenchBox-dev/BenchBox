@@ -10,8 +10,8 @@ BenchBox visualization supports customization for themes, colors, and terminal d
 BenchBox provides light and dark themes optimized for different contexts:
 
 ```bash
-benchbox visualize results/*.json --theme light   # Default, best for light terminals
-benchbox visualize results/*.json --theme dark    # Best for dark terminal backgrounds
+benchbox visualize results/*.json --theme light
+benchbox visualize results/*.json --theme dark
 ```
 
 **Theme Differences:**
@@ -57,20 +57,16 @@ BenchBox uses a colorblind-safe categorical palette designed for data visualizat
 ### Color Control
 
 ```bash
-# Full ANSI color output (default)
 benchbox visualize results/*.json
 
-# Disable colors (for piping to files or plain terminals)
 benchbox visualize results/*.json --no-color
 ```
 
 ### Character Set
 
 ```bash
-# Unicode block characters (default): ▏▎▍▌▋▊▉█
 benchbox visualize results/*.json
 
-# ASCII-only characters for basic terminals: .-=+#@
 benchbox visualize results/*.json --no-unicode
 ```
 
@@ -111,15 +107,13 @@ For fine-grained control, use the Python API directly:
 from benchbox.core.visualization.ascii.base import ChartOptions
 from benchbox.core.visualization.ascii.bar_chart import BarChart, BarData
 
-# Custom chart options
 opts = ChartOptions(
     use_color=True,
     use_unicode=True,
     theme="dark",
-    width=100,  # Override terminal width detection
+    width=100,
 )
 
-# Create chart with custom settings
 data = [
     BarData(label="Platform A", value=100.5, is_best=True),
     BarData(label="Platform B", value=150.2),
@@ -141,7 +135,6 @@ print(chart.render())
 ```python
 from benchbox.core.visualization.exporters import render_ascii_chart
 
-# Render any chart type via the generic factory
 output = render_ascii_chart(
     chart_type="performance_bar",
     data=data,

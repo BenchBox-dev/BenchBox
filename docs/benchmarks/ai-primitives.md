@@ -87,17 +87,13 @@ Vector embedding generation:
 ### CLI Usage
 
 ```bash
-# Run AI Primitives benchmark on Snowflake
 benchbox run --platform snowflake --benchmark ai_primitives --scale 0.01
 
-# Dry run to estimate costs first
 benchbox run --platform snowflake --benchmark ai_primitives --dry-run ./preview
 
-# Set cost budget (fails if exceeded)
 benchbox run --platform snowflake --benchmark ai_primitives \
   --benchmark-option max_cost_usd=1.00
 
-# Run specific categories only
 benchbox run --platform databricks --benchmark ai_primitives \
   --benchmark-option categories=nlp,transform
 ```
@@ -107,21 +103,18 @@ benchbox run --platform databricks --benchmark ai_primitives \
 ```python
 from benchbox.core.ai_primitives import AIPrimitivesBenchmark
 
-# Initialize with cost budget
 benchmark = AIPrimitivesBenchmark(
     scale_factor=0.01,
     max_cost_usd=1.00,
     dry_run=False
 )
 
-# Estimate costs before execution
 total_cost, estimates = benchmark.estimate_cost(
     platform="snowflake",
     categories=["nlp", "transform"]
 )
 print(f"Estimated cost: ${total_cost:.4f}")
 
-# Run benchmark
 result = benchmark.run_benchmark(
     connection=snowflake_connection,
     platform="snowflake",
@@ -139,15 +132,12 @@ print(f"Total cost: ${result.total_cost_estimated_usd:.4f}")
 Snowflake Cortex provides LLM functions directly in SQL:
 
 ```sql
--- Text completion
 SELECT SNOWFLAKE.CORTEX.COMPLETE('llama3-8b', 'Summarize: ' || comment) AS summary
 FROM customer LIMIT 10;
 
--- Sentiment analysis
 SELECT SNOWFLAKE.CORTEX.SENTIMENT(c_comment) AS sentiment
 FROM customer WHERE c_nationkey = 1;
 
--- Embedding generation
 SELECT SNOWFLAKE.CORTEX.EMBED_TEXT_768('e5-base-v2', c_comment) AS embedding
 FROM customer LIMIT 10;
 ```
@@ -159,7 +149,6 @@ FROM customer LIMIT 10;
 BigQuery ML provides AI functions through external model connections:
 
 ```sql
--- Text generation
 SELECT ML.GENERATE_TEXT(
     MODEL `project.dataset.llm_model`,
     (SELECT 'Summarize: ' || comment AS prompt),
@@ -167,7 +156,6 @@ SELECT ML.GENERATE_TEXT(
 ).ml_generate_text_result AS summary
 FROM `project.dataset.customer` LIMIT 10;
 
--- Embedding generation
 SELECT ML.GENERATE_EMBEDDING(
     MODEL `project.dataset.embedding_model`,
     (SELECT c_comment AS content)
@@ -182,14 +170,12 @@ FROM `project.dataset.customer` LIMIT 10;
 Databricks provides AI functions through Foundation Model APIs:
 
 ```sql
--- Text completion
 SELECT ai_query(
     'databricks-meta-llama-3-1-70b-instruct',
     CONCAT('Summarize this customer: ', c_comment)
 ) AS summary
 FROM customer LIMIT 10;
 
--- Classification
 SELECT ai_classify(c_comment, ARRAY('positive', 'negative', 'neutral')) AS sentiment
 FROM customer LIMIT 10;
 ```
@@ -207,7 +193,6 @@ from benchbox.core.ai_primitives import AIPrimitivesBenchmark
 
 benchmark = AIPrimitivesBenchmark(scale_factor=0.01)
 
-# Get detailed cost estimates
 total_cost, estimates = benchmark.estimate_cost(platform="snowflake")
 
 for estimate in estimates:
@@ -219,11 +204,9 @@ for estimate in estimates:
 ### Budget Enforcement
 
 ```bash
-# Set maximum cost (execution fails if exceeded)
 benchbox run --platform snowflake --benchmark ai_primitives \
   --benchmark-option max_cost_usd=1.00
 
-# Dry run mode (estimates only, no AI calls)
 benchbox run --platform snowflake --benchmark ai_primitives \
   --dry-run ./cost_preview
 ```
@@ -311,7 +294,7 @@ Prevent runaway costs with budget limits:
 ```python
 benchmark = AIPrimitivesBenchmark(
     scale_factor=0.01,
-    max_cost_usd=1.00  # Hard limit
+    max_cost_usd=1.00
 )
 ```
 
@@ -320,7 +303,6 @@ benchmark = AIPrimitivesBenchmark(
 Run specific categories to focus testing:
 
 ```bash
-# Test NLP only
 benchbox run --platform snowflake --benchmark ai_primitives \
   --benchmark-option categories=nlp
 ```

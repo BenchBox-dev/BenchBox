@@ -6,22 +6,17 @@ Each extension has its own Compose file because some extensions conflict with ea
 ## Quick Start
 
 ```bash
-# Start ONE extension at a time on port 5432:
 
-# pg_duckdb - DuckDB-accelerated PostgreSQL
 docker compose -f docker-compose.pg-duckdb.yaml up -d
 
-# pg_mooncake - Columnstore PostgreSQL
 docker compose -f docker-compose.pg-mooncake.yaml up -d
 
-# TimescaleDB - Time-series PostgreSQL
 docker compose -f docker-compose.timescaledb.yaml up -d
 ```
 
 ## Running Benchmarks
 
 ```bash
-# After starting the container:
 benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 \
   --platform-option host=localhost --platform-option password=benchbox
 
@@ -57,9 +52,7 @@ All containers use the same defaults for simplicity:
 ## Cleanup
 
 ```bash
-# Stop and remove a specific container
 docker compose -f docker-compose.pg-duckdb.yaml down
 
-# Stop and remove with volumes (deletes data)
 docker compose -f docker-compose.pg-duckdb.yaml down -v
 ```

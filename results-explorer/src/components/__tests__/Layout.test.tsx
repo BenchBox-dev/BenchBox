@@ -139,7 +139,6 @@ describe("Layout", () => {
     const light = within(group).getByRole("radio", { name: "Light theme" });
     const dark = within(group).getByRole("radio", { name: "Dark theme" });
 
-    // Initial roving tabindex: only the checked option is tabbable.
     expect(system).toHaveAttribute("tabindex", "0");
     expect(light).toHaveAttribute("tabindex", "-1");
     expect(dark).toHaveAttribute("tabindex", "-1");
@@ -160,7 +159,6 @@ describe("Layout", () => {
     expect(system).toHaveAttribute("tabindex", "0");
     expect(document.documentElement.dataset.bbThemeChoice).toBe("system");
 
-    // ArrowLeft wraps from the first option to the last.
     fireEvent.keyDown(system, { key: "ArrowLeft" });
     expect(document.activeElement).toBe(dark);
     expect(dark).toHaveAttribute("aria-checked", "true");
@@ -203,9 +201,6 @@ describe("Layout", () => {
   });
 
   it("updates the active explorer subnav after a client-side route() call", async () => {
-    // Regression: prior to this fix, Layout read `window.location.pathname`
-    // once at module render time, so navigating from Overview to Query
-    // via preact-router left "Overview" highlighted indefinitely.
     renderWithRouter("/results/");
 
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });

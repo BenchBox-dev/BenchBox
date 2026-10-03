@@ -30,10 +30,8 @@ Unlike Apache Spark, Snowpark Connect has some limitations:
 ## Installation
 
 ```bash
-# Install with Snowpark Connect support
 uv add benchbox --extra snowpark-connect
 
-# Dependencies installed: snowflake-snowpark-python
 ```
 
 ## Prerequisites
@@ -49,12 +47,10 @@ uv add benchbox --extra snowpark-connect
 ### Environment Variables
 
 ```bash
-# Required
 export SNOWFLAKE_ACCOUNT=xy12345.us-east-1
 export SNOWFLAKE_USER=my_user
 export SNOWFLAKE_PASSWORD=my_password
 
-# Optional
 export SNOWFLAKE_WAREHOUSE=COMPUTE_WH
 export SNOWFLAKE_DATABASE=BENCHBOX
 export SNOWFLAKE_ROLE=SYSADMIN
@@ -63,20 +59,17 @@ export SNOWFLAKE_ROLE=SYSADMIN
 ### CLI Usage
 
 ```bash
-# Basic usage
 benchbox run --platform snowpark-connect --benchmark tpch --scale 1.0 \
   --platform-option account=xy12345.us-east-1 \
   --platform-option user=my_user \
   --platform-option password=my_password
 
-# With custom warehouse
 benchbox run --platform snowpark-connect --benchmark tpch --scale 1.0 \
   --platform-option account=xy12345.us-east-1 \
   --platform-option user=my_user \
   --platform-option password=my_password \
   --platform-option warehouse=BENCHMARK_WH
 
-# Dry-run to preview queries
 benchbox run --platform snowpark-connect --benchmark tpch --dry-run ./preview \
   --platform-option account=xy12345.us-east-1 \
   --platform-option user=my_user \
@@ -103,7 +96,6 @@ benchbox run --platform snowpark-connect --benchmark tpch --dry-run ./preview \
 ```python
 from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
-# Initialize with credentials
 adapter = SnowparkConnectAdapter(
     account="xy12345.us-east-1",
     user="my_user",
@@ -112,20 +104,15 @@ adapter = SnowparkConnectAdapter(
     database="BENCHBOX",
 )
 
-# Create session (no Spark cluster needed!)
 adapter.create_connection()
 
-# Create schema
 adapter.create_schema("tpch_benchmark")
 
-# Execute SQL query
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Or use DataFrame API
 df = adapter.get_dataframe("lineitem")
 result = adapter.execute_dataframe(df.filter(df["l_quantity"] > 30).limit(10))
 
-# Close session
 adapter.close()
 ```
 

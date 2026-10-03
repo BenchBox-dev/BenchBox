@@ -37,7 +37,6 @@ Basic Configuration
     from benchbox.tpch import TPCH
     from benchbox.platforms.snowflake import SnowflakeAdapter
 
-    # Connect to Snowflake
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="benchbox_user",
@@ -47,7 +46,6 @@ Basic Configuration
         schema="PUBLIC"
     )
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=1.0)
     results = benchmark.run_with_platform(adapter)
 
@@ -302,13 +300,10 @@ Key-Pair Authentication (Recommended for Production)
 
 .. code-block:: bash
 
-    # Generate key pair
     openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
 
-    # Extract public key
     openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
 
-    # In Snowflake, assign public key to user
     ALTER USER benchbox_user SET RSA_PUBLIC_KEY='MIIBIjANBgkqh...';
 
 .. code-block:: python
@@ -316,7 +311,7 @@ Key-Pair Authentication (Recommended for Production)
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="benchbox_user",
-        password="",  # Not needed with key-pair
+        password="",
         private_key_path="/path/to/rsa_key.p8",
         warehouse="COMPUTE_WH",
         database="BENCHBOX"
@@ -341,7 +336,6 @@ Warehouse Sizing
 
 .. code-block:: python
 
-    # Small for development (1 credit/hour)
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="user",
@@ -350,7 +344,6 @@ Warehouse Sizing
         warehouse_size="X-SMALL"
     )
 
-    # Large for production (8 credits/hour)
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="user",
@@ -359,7 +352,6 @@ Warehouse Sizing
         warehouse_size="LARGE"
     )
 
-    # 4X-Large for heavy workloads (128 credits/hour)
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="user",
@@ -373,7 +365,6 @@ Multi-Cluster Warehouse
 
 .. code-block:: python
 
-    # Auto-scale for concurrent workloads
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="user",
@@ -381,7 +372,7 @@ Multi-Cluster Warehouse
         warehouse="MULTI_CLUSTER_WH",
         warehouse_size="LARGE",
         multi_cluster_warehouse=True,
-        auto_suspend=60,  # Suspend after 1 minute idle
+        auto_suspend=60,
         auto_resume=True
     )
 
@@ -407,16 +398,13 @@ Snowflake uses internal stages for efficient data loading:
         database="BENCHBOX"
     )
 
-    # Generate data locally
     benchmark = TPCH(scale_factor=1.0)
     data_dir = Path("./tpch_data")
     benchmark.generate_data(data_dir)
 
-    # Load data (automatically uses PUT + COPY INTO)
     conn = adapter.create_connection()
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
 
-    # Data uploaded to internal stage, then bulk loaded
     print(f"Loaded {sum(table_stats.values()):,} rows in {load_time:.2f}s")
 
 External Stage (S3/GCS/Azure)
@@ -424,11 +412,9 @@ External Stage (S3/GCS/Azure)
 
 .. code-block:: python
 
-    # Create external stage
     conn = adapter.create_connection()
     cursor = conn.cursor()
 
-    # S3 external stage
     cursor.execute("""
         CREATE OR REPLACE STAGE benchbox_stage
         URL = 's3://my-bucket/benchbox-data/'
@@ -438,7 +424,6 @@ External Stage (S3/GCS/Azure)
         )
     """)
 
-    # Load from external stage
     cursor.execute("""
         COPY INTO lineitem
         FROM @benchbox_stage/lineitem.tbl
@@ -454,15 +439,13 @@ Compressed Data
 
 .. code-block:: python
 
-    # Snowflake automatically handles compressed files
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="user",
         password="password",
-        compression="GZIP"  # GZIP, BROTLI, ZSTD, etc.
+        compression="GZIP"
     )
 
-    # GZIP files automatically decompressed during COPY INTO
 
 Query Execution
 ---------------
@@ -475,7 +458,6 @@ Basic Query Execution
     adapter = SnowflakeAdapter(account="...", username="...", password="...")
     conn = adapter.create_connection()
 
-    # Execute SQL query
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
@@ -498,12 +480,10 @@ Query Statistics
 
 .. code-block:: python
 
-    # Execute with query tag for tracking
     cursor.execute("ALTER SESSION SET QUERY_TAG = 'benchmark_q1'")
     cursor.execute(query)
     results = cursor.fetchall()
 
-    # Get query history with performance metrics
     cursor.execute("""
         SELECT
             QUERY_ID,
@@ -531,7 +511,6 @@ Query Plans
 
 .. code-block:: python
 
-    # Get query execution plan
     cursor.execute("""
         EXPLAIN
         SELECT * FROM lineitem
@@ -550,7 +529,6 @@ Clustering
 
 .. code-block:: python
 
-    # Create table with clustering key
     cursor.execute("""
         CREATE OR REPLACE TABLE orders_clustered (
             o_orderkey NUMBER,
@@ -562,15 +540,11 @@ Clustering
         CLUSTER BY (o_orderdate, o_orderkey)
     """)
 
-    # Snowflake automatically maintains clustering
 
-    # Manual recluster if needed
     cursor.execute("ALTER TABLE orders_clustered RECLUSTER")
 
-    # Enable automatic clustering
     cursor.execute("ALTER TABLE orders_clustered RESUME RECLUSTER")
 
-    # Check clustering quality
     cursor.execute("""
         SELECT SYSTEM$CLUSTERING_INFORMATION('orders_clustered')
     """)
@@ -580,21 +554,18 @@ Time Travel
 
 .. code-block:: python
 
-    # Query data as of 1 hour ago
     cursor.execute("""
         SELECT * FROM lineitem
         AT(OFFSET => -3600)
         WHERE l_shipdate = '1995-01-01'
     """)
 
-    # Query data at specific timestamp
     cursor.execute("""
         SELECT * FROM lineitem
         AT(TIMESTAMP => '2025-01-01 00:00:00'::TIMESTAMP)
         WHERE l_shipdate = '1995-01-01'
     """)
 
-    # View table changes (before/after)
     cursor.execute("""
         SELECT * FROM lineitem
         BEFORE(STATEMENT => '01a12345-6789-abcd-ef01-234567890abc')
@@ -605,23 +576,20 @@ Zero-Copy Cloning
 
 .. code-block:: python
 
-    # Clone database instantly (no data copy)
     cursor.execute("""
         CREATE DATABASE benchbox_clone
         CLONE benchbox
     """)
 
-    # Clone table
     cursor.execute("""
         CREATE TABLE lineitem_clone
         CLONE lineitem
     """)
 
-    # Clone at specific time
     cursor.execute("""
         CREATE TABLE lineitem_yesterday
         CLONE lineitem
-        AT(OFFSET => -86400)  # 24 hours ago
+        AT(OFFSET => -86400)
     """)
 
 Result Set Caching
@@ -629,16 +597,13 @@ Result Set Caching
 
 .. code-block:: python
 
-    # Enable result caching (default)
     cursor.execute("ALTER SESSION SET USE_CACHED_RESULT = TRUE")
 
-    # First execution computes result
     cursor.execute("SELECT COUNT(*) FROM lineitem")
-    result1 = cursor.fetchone()  # Executes query
+    result1 = cursor.fetchone()
 
-    # Second execution uses cached result (instant, no credits)
     cursor.execute("SELECT COUNT(*) FROM lineitem")
-    result2 = cursor.fetchone()  # Returns cached result
+    result2 = cursor.fetchone()
 
 Best Practices
 --------------
@@ -650,24 +615,18 @@ Warehouse Management
 
    .. code-block:: python
 
-       # Development: X-SMALL to SMALL
-       # Testing: MEDIUM to LARGE
-       # Production: LARGE to 4X-LARGE
-
        adapter = SnowflakeAdapter(
-           warehouse_size="MEDIUM",  # Balance of cost and performance
-           auto_suspend=300,  # Suspend after 5 min idle
-           auto_resume=True  # Auto-resume on query
+           warehouse_size="MEDIUM",
+           auto_suspend=300,
+           auto_resume=True
        )
 
 2. **Use separate warehouses** for different workloads:
 
    .. code-block:: python
 
-       # Loading warehouse
        load_adapter = SnowflakeAdapter(warehouse="LOAD_WH", warehouse_size="LARGE")
 
-       # Query warehouse
        query_adapter = SnowflakeAdapter(warehouse="QUERY_WH", warehouse_size="MEDIUM")
 
 3. **Enable multi-cluster** for concurrent workloads:
@@ -687,7 +646,7 @@ Cost Optimization
    .. code-block:: python
 
        adapter = SnowflakeAdapter(
-           auto_suspend=60,  # Aggressive suspension (1 minute)
+           auto_suspend=60,
            auto_resume=True
        )
 
@@ -695,24 +654,20 @@ Cost Optimization
 
    .. code-block:: python
 
-       # Enabled by default - reuses results for identical queries
        cursor.execute("ALTER SESSION SET USE_CACHED_RESULT = TRUE")
 
 3. **Start small, scale up as needed**:
 
    .. code-block:: python
 
-       # Start with smallest warehouse
        adapter = SnowflakeAdapter(warehouse_size="X-SMALL")
 
-       # Monitor and resize if needed
        cursor.execute(f"ALTER WAREHOUSE {warehouse} SET WAREHOUSE_SIZE = 'MEDIUM'")
 
 4. **Monitor credit usage**:
 
    .. code-block:: python
 
-       # Check warehouse credit usage
        cursor.execute("""
            SELECT
                WAREHOUSE_NAME,
@@ -754,7 +709,6 @@ Data Organization
            SELECT SYSTEM$CLUSTERING_INFORMATION('lineitem')
        """)
 
-       # Recluster if quality degrades
        if clustering_depth > 10:
            cursor.execute("ALTER TABLE lineitem RECLUSTER")
 
@@ -770,15 +724,12 @@ Warehouse Not Running
 
 .. code-block:: python
 
-    # 1. Enable auto-resume
     adapter = SnowflakeAdapter(
-        auto_resume=True  # Warehouse starts automatically
+        auto_resume=True
     )
 
-    # 2. Manually resume warehouse
     cursor.execute(f"ALTER WAREHOUSE {warehouse} RESUME")
 
-    # 3. Check warehouse status
     cursor.execute(f"SHOW WAREHOUSES LIKE '{warehouse}'")
     status = cursor.fetchall()
     print(f"Warehouse state: {status[0][1]}")
@@ -792,14 +743,6 @@ Authentication Failed
 
 .. code-block:: python
 
-    # 1. Verify account identifier format
-    # Correct: "xy12345.us-east-1" or "xy12345.us-east-1.aws"
-    # Incorrect: "https://xy12345.snowflakecomputing.com"
-
-    # 2. Check username (case-insensitive but must exist)
-    # In Snowflake UI: SHOW USERS;
-
-    # 3. Use key-pair auth for better security
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="benchbox_user",
@@ -816,7 +759,6 @@ Insufficient Privileges
 
 .. code-block:: bash
 
-    # Grant required privileges in Snowflake
     GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE benchbox_role;
     GRANT USAGE ON DATABASE BENCHBOX TO ROLE benchbox_role;
     GRANT CREATE SCHEMA ON DATABASE BENCHBOX TO ROLE benchbox_role;
@@ -825,12 +767,11 @@ Insufficient Privileges
 
 .. code-block:: python
 
-    # Specify role with sufficient privileges
     adapter = SnowflakeAdapter(
         account="xy12345.us-east-1",
         username="user",
         password="password",
-        role="BENCHBOX_ROLE"  # Role with required privileges
+        role="BENCHBOX_ROLE"
     )
 
 High Costs
@@ -842,7 +783,6 @@ High Costs
 
 .. code-block:: python
 
-    # 1. Check query history for expensive queries
     cursor.execute("""
         SELECT
             QUERY_TEXT,
@@ -855,13 +795,10 @@ High Costs
         LIMIT 10
     """)
 
-    # 2. Use smaller warehouse
     adapter = SnowflakeAdapter(warehouse_size="X-SMALL")
 
-    # 3. Enable aggressive auto-suspend
-    adapter = SnowflakeAdapter(auto_suspend=60)  # 1 minute
+    adapter = SnowflakeAdapter(auto_suspend=60)
 
-    # 4. Set resource monitors
     cursor.execute("""
         CREATE RESOURCE MONITOR daily_limit WITH CREDIT_QUOTA = 100
         TRIGGERS ON 75 PERCENT DO NOTIFY
@@ -881,26 +818,20 @@ Slow Query Performance
 
 .. code-block:: python
 
-    # 1. Resize warehouse
     cursor.execute(f"""
         ALTER WAREHOUSE {warehouse} SET WAREHOUSE_SIZE = 'LARGE'
     """)
 
-    # 2. Check clustering quality
     cursor.execute("""
         SELECT SYSTEM$CLUSTERING_INFORMATION('lineitem')
     """)
 
-    # 3. Add clustering keys
     cursor.execute("""
         ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey)
     """)
 
-    # 4. Enable automatic clustering
     cursor.execute("ALTER TABLE lineitem RESUME RECLUSTER")
 
-    # 5. Check query profile
-    # In Snowflake UI: Query History → Click query → View Profile
 
 See Also
 --------

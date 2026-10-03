@@ -33,9 +33,6 @@ interface RunReceiptProps {
 interface ReceiptRow {
   label: string;
   value: ComponentChildren;
-  // Marked when the row's value is the "Not recorded" placeholder rather than
-  // real data. Missing rows move behind the "Show missing fields"
-  // disclosure so the default view is dense with what is actually known.
   isMissing?: boolean;
 }
 
@@ -63,18 +60,10 @@ function rowFromSummary(label: string, value: string): ReceiptRow {
   return recordedRow(label, value);
 }
 
-/**
- * Integrity rows for the validation / override pair. The Validation cell
- * always renders (as a badge, so an overridden run can never read as a clean
- * pass), while the Override audit row appears only when the pipeline recorded
- * an accepted override.
- */
 function overrideRows(detail: DetailResult): ReceiptRow[] {
   const rules = parseOverrideRules(detail.override_rules);
   const status = detail.validation_status;
   if (rules.length === 0) {
-    // No override: keep the long-standing missing-row contract (a null
-    // status hides behind the disclosure) and badge recorded statuses.
     if (status === null || status === undefined || status === "") return [missingRow("Validation")];
     return [recordedRow("Validation", <ValidationBadge validationStatus={status} showMissing />)];
   }
@@ -99,12 +88,6 @@ function formattedRow(label: string, raw: string | null | undefined, format: (ra
   return recordedRow(label, value === raw ? value : <span title={`Recorded value: ${raw}`}>{value}</span>);
 }
 
-/**
- * Row for a full-length identity hash (ADR-1 requested-config / applied-ledger
- * SHA-256). Renders a monospace prefix for readability while the full value
- * stays available in the `title` tooltip, keeping the receipt compact without
- * hiding identity. Missing for legacy bundles that never recorded the hash.
- */
 function hashRow(label: string, raw: string | null | undefined): ReceiptRow {
   if (raw === null || raw === undefined || raw === "") return missingRow(label);
   return recordedRow(
@@ -148,21 +131,8 @@ export function RunReceipt({
         formattedRow("Execution mode", detail.execution_mode, formatExecutionMode),
         formattedRow("Tuning mode", detail.tuning_mode, formatTuningMode),
         rowFromString("Tuning hash", detail.tuning_hash),
-        // ADR-1 bundle-emitted tuning identities, shown as distinct labeled
-        // kinds: the canonical requested-config hash and the physical
-        // applied-ledger hash. Distinct from the self-derived "Tuning hash"
-        // above; null for legacy bundles.
         hashRow("Requested config hash", detail.requested_config_hash),
         hashRow("Applied ledger hash", detail.applied_ledger_hash),
-        // ADR-1 tuning verified-state: applied_verified means the applied tuning
-        // was corroborated by the post-load introspection receipt; the other
-        // states are the honest execution-derived ledger statuses. Missing
-        // (behind the disclosure) for legacy bundles predating the ledger.
-        // The per-statement applied receipt drills down beneath the badge when
-        // the run published one. Its verdicts are rendered verbatim - the
-        // explorer never recomputes a verdict or a corroboration decision -
-        // and the drill-down is absent entirely when there is no readable
-        // receipt, leaving this row exactly as it renders today.
         detail.tuning_validation_status
           ? recordedRow(
               "Tuning verification",
@@ -192,16 +162,8 @@ export function RunReceipt({
       title: "Integrity",
       rows: [
         rowFromString("Trust", detail.trust_label, formatTrustLabel),
-        // The receipt states funding even when it is "unspecified". The chip
-        // stays silent in that case to avoid noise, but a provenance receipt
-        // should record that no disclosure was made rather than omit the row.
         rowFromString("Funding", detail.funding, formatFunding),
         rowFromString("Visibility", detail.visibility, formatVisibility),
-        // An accepted plausibility override is never a clean pass: the
-        // validation cell badges overridden (warning tone) whenever the
-        // pipeline recorded covered rule ids, and a dedicated Override row
-        // names the rules plus the audit fields. No override means no row —
-        // absence is the normal case, not missing data.
         ...overrideRows(detail),
         rowFromString("Compliance", detail.compliance_class),
         rankingEligibilityRow(isRankingEligible),
@@ -227,10 +189,6 @@ export function RunReceipt({
     },
   ];
 
-  // Total missing rows across every section. The disclosure stays out of
-  // the DOM entirely when nothing is missing — that lets fully-populated
-  // results skip the toggle row and keeps the receipt as compact as it
-  // is today.
   const totalMissing = sections.reduce(
     (sum, section) => sum + section.rows.filter((row) => row.isMissing).length,
     0,
@@ -317,17 +275,6 @@ function ReceiptSection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// ADR-1 applied-tuning receipt drill-down
-//
-// `detail.applied_receipt` is the `receipt` sub-object of the run's
-// bundle's `platform.tuning.applied`, carried through the pipeline as an opaque
-// JSON string (see explorer_pipeline/transformer.py::_applied_receipt). It is
-// parsed here for display only: every verdict shown is the one the platform
-// recorded at introspection time. Nothing is recomputed, and no corroboration
-// decision is made in the browser.
-// ---------------------------------------------------------------------------
-
 interface AppliedReceiptEntry {
   statement?: unknown;
   phase?: unknown;
@@ -347,14 +294,6 @@ interface ParsedAppliedReceipt {
   originalEntryCount?: number;
 }
 
-/**
- * Best-effort parse of the receipt's `entries` list and defensive cap marker.
- *
- * Returns an empty receipt for every degraded shape - absent, empty,
- * unparsable, not an object, or no `entries` array - so the caller renders no
- * drill-down and no error. A published receipt must never be able to break the
- * receipt panel, so this never throws.
- */
 function parseAppliedReceipt(raw: string | null | undefined): ParsedAppliedReceipt {
   const empty = { entries: [], truncated: false };
   if (typeof raw !== "string" || raw.trim() === "") return empty;
@@ -382,10 +321,6 @@ function parseAppliedReceipt(raw: string | null | undefined): ParsedAppliedRecei
   };
 }
 
-/**
- * Render a recorded receipt value as text without inventing one. Returns null
- * for anything the receipt did not record, so the field is simply omitted.
- */
 function receiptText(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "string") return value.trim() === "" ? null : value;
@@ -424,8 +359,6 @@ function AppliedReceiptDrilldown({ raw }: { raw?: string | null }) {
       <ul class="mt-2 list-none space-y-2 p-0">
         {entries.map((entry, index) => (
           <li
-            // Receipt entries have no stable identity of their own; index is
-            // the honest key for a fixed, render-once verbatim list.
             key={index}
             class="border-t border-[var(--bb-data-border)] pt-2"
             data-testid="applied-receipt-entry"
@@ -487,9 +420,6 @@ function bundleLinkRow(url: string): ReceiptRow {
 }
 
 function plansRow(detail: DetailResult): ReceiptRow {
-  // The Plans row is always present at default — it carries semantic
-  // status ("Plans not published" / "Plans available" / a download link)
-  // that audit users care about even when no file is reachable.
   if (!detail.has_plans) return recordedRow("Plans", "Plans not published");
   const plansUrl = planDownloadUrl(detail);
   if (plansUrl === null) return recordedRow("Plans", "Plans available");
@@ -555,12 +485,6 @@ function rankingEligibilityRow(value: boolean | null | undefined): ReceiptRow {
 }
 
 export function planDownloadUrl(detail: DetailResult) {
-  // Gate on the explicit publication signal, not source-side detection.
-  // ``has_plans`` reflects "the source bundle had a *.plans.json sidecar",
-  // but the explorer pipeline excludes plan sidecars from bundle discovery
-  // (_project/scripts/explorer_pipeline/pipeline.py:439), so plan files are
-  // never copied to the published bundles directory and this URL would 404.
-  // Only render a link when the pipeline has actually published the file.
   if (!detail.plans_published) return null;
   if (!detail.has_plans || !detail.bundle_download_url) return null;
   if (!detail.bundle_download_url.endsWith(".json")) return null;

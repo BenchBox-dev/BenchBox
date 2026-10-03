@@ -83,11 +83,6 @@ Core implementations live under `benchbox/core/{benchmark}/`.
 ```python
 from benchbox import TPCH
 
-# Benchmark knows:
-# - How to generate data (dbgen invocation)
-# - How to retrieve queries (with parameter substitution)
-# - Schema definitions
-# - Validation rules
 ```
 
 See: [Custom Benchmarks Guide](../advanced/custom-benchmarks.md)
@@ -107,11 +102,6 @@ See: [Custom Benchmarks Guide](../advanced/custom-benchmarks.md)
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Adapter handles:
-# - Connection management
-# - Data loading strategies (COPY, INSERT, external tables)
-# - Query execution and error handling
-# - Result collection and formatting
 ```
 
 **Supported Adapters**:
@@ -178,15 +168,15 @@ See: [Result Schema Reference](../reference/result-schema-v1.md)
 class DatabaseConnection(ABC):
     @abstractmethod
     def execute(self, query: str) -> Any:
-        """Execute query, return cursor/result"""
+        pass
 
     @abstractmethod
     def fetchall(self, cursor) -> list:
-        """Fetch all results from cursor"""
+        pass
 
     @abstractmethod
     def close(self) -> None:
-        """Close connection"""
+        pass
 ```
 
 All platform adapters implement this interface, enabling benchmark code to remain platform-agnostic.
@@ -204,13 +194,11 @@ All platform adapters implement this interface, enabling benchmark code to remai
 
 **Example**:
 ```python
-# TPC-H uses official dbgen binary
 generator = TPCHGenerator(scale_factor=1.0, output_dir="./data")
-file_paths = generator.generate()  # Returns list of .parquet files
+file_paths = generator.generate()
 
-# Custom benchmarks use Python
 generator = CoffeeShopGenerator(scale_factor=0.001)
-file_paths = generator.generate()  # Generates with Faker
+file_paths = generator.generate()
 ```
 
 See: [Data Generation Guide](../usage/data-generation.md)
@@ -223,16 +211,12 @@ See: [Data Generation Guide](../usage/data-generation.md)
 
 **Commands**:
 ```bash
-# Run benchmark end-to-end
 benchbox run --benchmark tpch --platform duckdb --scale 1
 
-# Generate data only
 benchbox datagen --benchmark tpcds --scale 0.1
 
-# Dry run (preview queries)
 benchbox run --benchmark tpch --dry-run ./output
 
-# Check dependencies
 benchbox check-deps --matrix
 ```
 
@@ -340,13 +324,10 @@ See: [Adding New Platforms](../development/adding-new-platforms.md)
 TPC benchmarks support query variants with different parameter substitutions:
 
 ```python
-# Get query with random parameters (default)
 query = benchmark.get_query("q1")
 
-# Get query with specific parameters
 query = benchmark.get_query("q1", params={"date": "1998-09-02", "quantity": 24})
 
-# Generate multiple variants for seed sweep
 variants = benchmark.generate_query_variants("q1", count=5, seed_start=42)
 ```
 

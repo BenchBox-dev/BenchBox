@@ -17,7 +17,6 @@ test.describe("benchmark and platform section indexes", () => {
     await expect(
       page.getByTestId("benchmarks-index-list").getByRole("link", { name: /TPC-H/ }),
     ).toHaveAttribute("href", "/results/tpch/");
-    // The activity chart links each row to the same page.
     await expect(
       page.getByTestId("submission-activity-grid").getByRole("link", { name: "TPC-H" }),
     ).toHaveAttribute("href", "/results/tpch/");

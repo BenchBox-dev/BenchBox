@@ -20,7 +20,7 @@ db2 "connect to $1"
 
 activate_constraints()
 {
-cut -f3 -d' ' $1.sql |sort |uniq | 	# get a list of table names
+cut -f3 -d' ' $1.sql |sort |uniq |
    while read t
    do
       db2 "set integrity off "

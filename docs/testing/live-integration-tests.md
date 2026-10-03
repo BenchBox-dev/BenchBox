@@ -100,10 +100,8 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 Test that credentials are configured correctly:
 
 ```bash
-# Check what would run (dry-run)
 make test-live-databricks --dry-run
 
-# Run a single platform test
 make test-live-databricks
 ```
 
@@ -111,31 +109,24 @@ make test-live-databricks
 
 ### Run All Live Tests
 ```bash
-# Run all platforms (requires all credentials)
 make test-live-all
 ```
 
 ### Run Individual Platforms
 ```bash
-# Databricks only
 make test-live-databricks
 
-# Snowflake only
 make test-live-snowflake
 
-# BigQuery only
 make test-live-bigquery
 ```
 
 ### Run with pytest Directly
 ```bash
-# All live tests
 uv run -- python -m pytest -m live_integration -v
 
-# Specific platform
 uv run -- python -m pytest -m live_databricks -v
 
-# Specific test file
 uv run -- python -m pytest tests/integration/platforms/test_databricks_live.py -v
 ```
 
@@ -221,13 +212,10 @@ Create dedicated service accounts with minimal permissions:
 
 **Solution**: Check that required environment variables are set:
 ```bash
-# Databricks
 echo $DATABRICKS_TOKEN
 
-# Snowflake
 echo $SNOWFLAKE_PASSWORD
 
-# BigQuery
 echo $GOOGLE_APPLICATION_CREDENTIALS
 ```
 
@@ -266,13 +254,10 @@ echo $GOOGLE_APPLICATION_CREDENTIALS
 
 **Solution**: Manually drop test schemas if needed:
 ```sql
--- Databricks
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
--- Snowflake
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
--- BigQuery
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 ```
 
@@ -286,9 +271,9 @@ Tests can run in CI with secrets:
 name: Live Integration Tests
 
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday
+    - cron: '0 0 * * 0'
 
 jobs:
   test-databricks:
@@ -331,9 +316,7 @@ jobs:
 
 Regular smoke tests don't require credentials:
 ```bash
-# Run smoke tests (use stubs)
 make test-smoke
-# or
 uv run -- python -m pytest -m platform_smoke -v
 ```
 
@@ -341,10 +324,8 @@ uv run -- python -m pytest -m platform_smoke -v
 
 Enable verbose output:
 ```bash
-# Verbose pytest output
 uv run -- python -m pytest -m live_databricks -vv -s
 
-# Capture logs
 uv run -- python -m pytest -m live_databricks -v --log-cli-level=DEBUG
 ```
 

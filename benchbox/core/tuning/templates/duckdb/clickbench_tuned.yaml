@@ -1,14 +1,10 @@
-# DuckDB ClickBench Tuned Configuration
-# This configuration enables all DuckDB-supported optimizations for ClickBench benchmark
-# Provides maximum performance with constraints and table-level tunings enabled
-
 primary_keys:
-  enabled: false # ClickBench data typically doesn't have primary keys
+  enabled: false
   enforce_uniqueness: false
   nullable: false
 
 foreign_keys:
-  enabled: false # ClickBench uses a single flat table
+  enabled: false
   enforce_referential_integrity: false
   on_delete_action: RESTRICT
   on_update_action: RESTRICT

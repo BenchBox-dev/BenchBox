@@ -83,13 +83,10 @@ The denormalized table contains columns from all TPC-DS dimensions:
 ## Quick Start
 
 ```bash
-# Run TPC-DS-OBT on DuckDB
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0
 
-# Run specific queries
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0 --queries Q1,Q3,Q7
 
-# Compare with standard TPC-DS
 benchbox run --platform duckdb --benchmark tpcds --scale 1.0
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1.0
 ```
@@ -109,12 +106,10 @@ Configure TPC-DS-OBT via `--benchmark-option KEY=VALUE`:
 Accepts hyphenated aliases (e.g. `dimension-mode`, `output-format`, `tpcds-source-dir`).
 
 ```bash
-# Minimal dimensions, store channel only (parquet is the default - no flag needed)
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \
   --benchmark-option dimension_mode=minimal \
   --benchmark-option channels=store
 
-# Force the legacy pipe-delimited .dat output (rarely needed):
 benchbox run --platform duckdb --benchmark tpcds_obt --scale 1 \
   --benchmark-option output_format=dat
 ```

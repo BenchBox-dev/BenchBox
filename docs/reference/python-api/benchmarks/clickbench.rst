@@ -28,13 +28,10 @@ Quick Start
     from benchbox.clickbench import ClickBench
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark
     benchmark = ClickBench(scale_factor=0.01)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on platform
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
@@ -91,16 +88,12 @@ Get a specific ClickBench query.
 
 .. code-block:: python
 
-    # Get simple count query
     q1 = benchmark.get_query("Q1")
 
-    # Get filtered count query
     q2 = benchmark.get_query("Q2")
 
-    # Get string operations query
     q21 = benchmark.get_query("Q21")
 
-    # Get complex analytics query
     q43 = benchmark.get_query("Q43")
 
 Parameters:
@@ -122,11 +115,9 @@ Get all ClickBench benchmark queries.
 
 .. code-block:: python
 
-    # Get all queries
     queries = benchmark.get_queries()
-    print(f"Total queries: {len(queries)}")  # 43 queries
+    print(f"Total queries: {len(queries)}")
 
-    # Get with dialect translation
     queries_sf = benchmark.get_queries(dialect="snowflake")
 
 Parameters:
@@ -184,13 +175,10 @@ Get CREATE TABLE SQL for ClickBench.
 
 .. code-block:: python
 
-    # Standard SQL
     create_sql = benchmark.get_create_tables_sql()
 
-    # With dialect
     create_sql_ch = benchmark.get_create_tables_sql(dialect="clickhouse")
 
-    # With tuning configuration
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
@@ -210,10 +198,8 @@ Translate a ClickBench query to a different SQL dialect.
 
 .. code-block:: python
 
-    # Translate query to BigQuery dialect
     q1_bq = benchmark.translate_query("Q1", "bigquery")
 
-    # Translate to Snowflake dialect
     q10_sf = benchmark.translate_query("Q10", "snowflake")
 
 Parameters:
@@ -263,17 +249,13 @@ Basic Benchmark Run
     from benchbox.clickbench import ClickBench
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark with scale factor 0.01 (~1M rows)
     benchmark = ClickBench(scale_factor=0.01)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on DuckDB
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
-    # Print results
     print(f"Benchmark: {results.benchmark_name}")
     print(f"Total time: {results.total_execution_time:.2f}s")
     print(f"Queries: {results.successful_queries}/{results.total_queries}")
@@ -294,14 +276,11 @@ Category-Based Execution
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Load data
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Get query categories
     categories = benchmark.get_query_categories()
 
-    # Run each category
     category_results = {}
 
     for category_name, query_ids in categories.items():
@@ -324,7 +303,6 @@ Category-Based Execution
             "query_count": len(query_ids)
         }
 
-    # Print category summary
     print("\nCategory Summary:")
     for category, stats in category_results.items():
         print(f"{category}: {stats['avg_time']:.3f}s avg ({stats['query_count']} queries)")
@@ -342,13 +320,11 @@ Performance Analysis
     benchmark = ClickBench(scale_factor=0.01)
     adapter = DuckDBAdapter()
 
-    # Setup
     benchmark.generate_data()
     conn = adapter.create_connection()
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Run with multiple iterations
     iterations = 3
     all_results = {}
 
@@ -376,7 +352,6 @@ Performance Analysis
                 "times": times
             }
 
-    # Print performance summary
     print("Performance Summary (3 iterations):")
     print(f"{'Query':<8} {'Mean':<10} {'Median':<10} {'Min':<10} {'Max':<10}")
     print("-" * 50)
@@ -385,7 +360,6 @@ Performance Analysis
         print(f"{query_id:<8} {stats['mean']:<10.4f} {stats['median']:<10.4f} "
               f"{stats['min']:<10.4f} {stats['max']:<10.4f}")
 
-    # Calculate arithmetic mean
     all_times = [stats["median"] for stats in all_results.values()]
     geomean = (1.0 / len(all_times)) * sum(all_times)
     print(f"\nGeometric mean query time: {geomean:.4f}s")
@@ -435,19 +409,15 @@ Columnar Database Optimization
     from benchbox.clickbench import ClickBench
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-    # ClickBench is designed for columnar databases
     benchmark = ClickBench(scale_factor=1.0)
     adapter = ClickHouseAdapter(host="localhost")
 
-    # Generate and load data
     benchmark.generate_data()
     conn = adapter.create_connection()
 
-    # Create schema with columnar optimizations
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Add ClickHouse-specific optimizations
     conn.execute("""
         ALTER TABLE hits
         MODIFY COLUMN SearchPhrase String CODEC(ZSTD(3))
@@ -458,7 +428,6 @@ Columnar Database Optimization
         MODIFY COLUMN URL String CODEC(ZSTD(3))
     """)
 
-    # Run scan queries (benefit most from columnar storage)
     scan_queries = ["Q1", "Q2", "Q7"]
     for query_id in scan_queries:
         query = benchmark.get_query(query_id)
@@ -474,12 +443,10 @@ Query Translation Example
 
     benchmark = ClickBench(scale_factor=0.01)
 
-    # Original query
     q1_original = benchmark.get_query("Q1")
     print("Original (ClickHouse):")
     print(q1_original)
 
-    # Translate to different dialects
     q1_duckdb = benchmark.translate_query("Q1", "duckdb")
     print("\nDuckDB:")
     print(q1_duckdb)
@@ -503,13 +470,11 @@ Selective Query Execution
     benchmark = ClickBench(scale_factor=0.01)
     adapter = DuckDBAdapter()
 
-    # Setup
     benchmark.generate_data()
     conn = adapter.create_connection()
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Run only fast queries (scan + simple aggregation)
     fast_queries = ["Q1", "Q2", "Q3", "Q4", "Q7"]
 
     print("Running fast queries:")
@@ -518,7 +483,6 @@ Selective Query Execution
         result = adapter.execute_query(conn, query, query_id)
         print(f"{query_id}: {result['execution_time']:.3f}s ({result['status']})")
 
-    # Run only string operations queries
     string_queries = [f"Q{i}" for i in range(20, 30)]
 
     print("\nRunning string operations queries:")

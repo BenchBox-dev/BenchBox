@@ -104,8 +104,6 @@ describe("corpus section indexes", () => {
       expect(listResults).toHaveBeenCalledTimes(2);
       expect(within(list).getAllByRole("link")).toHaveLength(expectedCount);
       expect(within(list).getByRole("link", { name: expectedLinkName })).toHaveAttribute("href", expectedHref);
-      // Each card carries its latest run date as one chip; the age rides in
-      // the title rather than lengthening the line.
       expect(within(list).getAllByText(/^Latest$/)).toHaveLength(expectedCount);
       expect(screen.queryByText(new RegExp(`No published ${kind}`, "i"))).toBeNull();
       expect(document.title).toBe(`${title} · BenchBox Results`);
@@ -127,9 +125,6 @@ describe("corpus section indexes", () => {
       renderIndex(kind);
 
       const list = await screen.findByTestId(listId);
-      // Benchmarks index cards report coverage in platforms; the platforms
-      // index reports coverage in benchmarks. Either way, one of each stays
-      // singular rather than defaulting to "1 runs · 1 benchmarks".
       const coverageNoun = kind === "benchmarks" ? "platform" : "benchmark";
       expect(within(list).getByText(`1 run · 1 ${coverageNoun}`)).toBeTruthy();
       expect(within(list).queryByText(/1 runs/)).toBeNull();

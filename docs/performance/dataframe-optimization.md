@@ -28,8 +28,8 @@ Polars is the default expression-family adapter and excels at single-node perfor
 from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
 adapter = PolarsDataFrameAdapter(
-    streaming=True,      # Enable streaming for large datasets
-    rechunk=True,        # Rechunk for better memory layout
+    streaming=True,
+    rechunk=True,
 )
 ```
 
@@ -51,8 +51,8 @@ Pandas is the reference Pandas-family implementation.
 from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
 adapter = PandasDataFrameAdapter(
-    copy_on_write=True,              # Enable CoW for Pandas 2.0+
-    dtype_backend="pyarrow",         # Use PyArrow backend
+    copy_on_write=True,
+    dtype_backend="pyarrow",
 )
 ```
 
@@ -74,10 +74,10 @@ PySpark excels at distributed processing and large-scale data.
 from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 
 adapter = PySparkDataFrameAdapter(
-    master="local[*]",           # Use all cores locally
-    driver_memory="8g",          # Increase driver memory
-    shuffle_partitions=200,      # Tune for your data size
-    enable_aqe=True,             # Enable Adaptive Query Execution
+    master="local[*]",
+    driver_memory="8g",
+    shuffle_partitions=200,
+    enable_aqe=True,
 )
 ```
 
@@ -99,9 +99,9 @@ DataFusion provides SQL-like optimization with expression-family syntax.
 from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
 
 adapter = DataFusionDataFrameAdapter(
-    repartition_joins=True,      # Enable parallel hash joins
-    parquet_pushdown=True,       # Push predicates to Parquet scan
-    batch_size=8192,             # Row batch size
+    repartition_joins=True,
+    parquet_pushdown=True,
+    batch_size=8192,
 )
 ```
 
@@ -113,10 +113,8 @@ When extracting a single value (e.g., for use in a subsequent filter), use the
 optimized `scalar()` method:
 
 ```python
-# Before (inefficient)
 total = df.select(col("value").sum()).collect()[0, 0]
 
-# After (optimized)
 total = ctx.scalar(df.select(col("value").sum()))
 ```
 
@@ -131,11 +129,9 @@ This uses platform-native methods for efficient scalar extraction:
 Write queries that allow predicate push-down to file scans:
 
 ```python
-# Good: Filter early, before joins
 filtered = lineitem.filter(col("l_shipdate") >= lit(start_date))
 result = filtered.join(orders, ...)
 
-# Avoid: Filter after expensive operations
 result = lineitem.join(orders, ...).filter(col("l_shipdate") >= lit(start_date))
 ```
 
@@ -144,11 +140,9 @@ result = lineitem.join(orders, ...).filter(col("l_shipdate") >= lit(start_date))
 Select only needed columns early in the query:
 
 ```python
-# Good: Select columns early
 subset = lineitem.select("l_orderkey", "l_quantity", "l_extendedprice")
 result = subset.join(orders.select("o_orderkey", "o_orderdate"), ...)
 
-# Avoid: Carrying unnecessary columns through joins
 result = lineitem.join(orders, ...).select("l_orderkey", "l_quantity", ...)
 ```
 
@@ -177,15 +171,12 @@ For datasets larger than available memory:
 BenchBox provides built-in profiling for DataFrame queries:
 
 ```python
-# Execute with profiling
 result, profile = adapter.execute_query_profiled(ctx, query)
 
-# Access timing breakdown
 print(f"Planning time: {profile.planning_time_ms}ms")
 print(f"Execution time: {profile.execution_time_ms}ms")
 print(f"Peak memory: {profile.peak_memory_mb}MB")
 
-# Get query plan (lazy platforms only)
 if profile.query_plan:
     print(profile.query_plan.plan_text)
 ```
@@ -195,7 +186,6 @@ if profile.query_plan:
 Use YAML tuning configurations for reproducible optimization:
 
 ```yaml
-# tuning/performance.yaml
 platform: polars-df
 settings:
   streaming:

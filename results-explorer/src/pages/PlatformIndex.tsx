@@ -100,9 +100,6 @@ const PLATFORM_TABLE_COLUMNS = [
 ] as const;
 type PlatformTableColumn = (typeof PLATFORM_TABLE_COLUMNS)[number];
 const PLATFORM_ROUTE_ALIASES: Readonly<Record<string, string>> = {
-  // Historical links used underscores, while the registry's canonical ID is
-  // hyphenated. Keep this explicit: arbitrary underscore rewriting would
-  // corrupt legitimate platform or benchmark identifiers.
   clickhouse_local: "clickhouse-local",
 };
 const PLATFORM_RESULT_FACET_KEYS: ExplorerFacetKey[] = [
@@ -146,9 +143,6 @@ function canonicalPlatformRouteKey(value: string): string {
 
 function platformRowsForRequest(rows: PlatformIndexRowRow[], platform: string): PlatformIndexRowRow[] {
   const requested = canonicalPlatformRouteKey(platform);
-  // platform_id is the canonical URL identity. Only fall back to display
-  // labels when no canonical id matches, otherwise same-name sibling tracks
-  // such as datafusion/datafusion-44 would collapse into one page.
   const idMatches = rows.filter((row) => normalizePlatformKey(row.platform_id) === requested);
   if (idMatches.length > 0) return idMatches;
   return rows.filter((row) => normalizePlatformKey(row.platform) === requested);
@@ -158,19 +152,11 @@ function trendMetricDescription(metric: TrendMetric): string {
   return metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
 }
 
-/** The version this row reports, normalized, or null when none is recorded. */
 function versionText(entry: { driver_version: string | null; platform_version?: string | null }): string | null {
   const parts = splitVersion(entry.driver_version ?? entry.platform_version ?? null);
   return parts ? (parts.suffix ? `${parts.core}…` : parts.core) : null;
 }
 
-/**
- * Labels for the Version column, parallel to `rows`.
- *
- * Leads with the version. Rows that would be indistinguishable from another
- * row on everything this table displays - version, benchmark, scale, phase,
- * and run date - also carry their short id, which is the row's own handle.
- */
 function buildVersionCellLabels(rows: readonly PlatformIndexRowRow[]): string[] {
   const base = rows.map((row) => versionText(row) ?? row.short_id);
   const displayedKey = (row: PlatformIndexRowRow, index: number) =>
@@ -189,7 +175,6 @@ function primaryMetricContract(metric: string): string {
   return trendMetricDescription(normalizeTrendMetric(metric));
 }
 
-/** Short form for the per-row "Ranked on" cell; the full contract is its title. */
 function primaryMetricShort(metric: string): string {
   return normalizeTrendMetric(metric) === "power_score" ? "Power score ↑" : "Geomean ↓";
 }
@@ -303,8 +288,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return () => { cancelled = true; };
   }, [requestedRows, basis]);
   const [error, setError] = useState<string | null>(null);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [rowsRetryToken, setRowsRetryToken] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [visibleLimit, setVisibleLimit] = useState(TABLE_RENDER_LIMIT);
@@ -313,8 +296,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const { facets, setFacet } = useFacetState();
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all") ?? "all";
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
-  // Single-select filters for the platform detail table. Each maps to shared
-  // facet state, so the result count updates as soon as the user picks a value.
   const benchmarkFilter = singleFacetValue(facets.benchmark, "all") ?? "all";
   const scaleFilter = singleFacetValue(facets.scale_factor, "all") ?? "all";
   const phaseFilter = singleFacetValue(facets.phase, "all") ?? "all";
@@ -330,14 +311,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const trustFilterValue =
     facets.trust_tier.length === 0 ? "all" : facets.trust_tier.length === 1 ? facets.trust_tier[0]! : "__multiple__";
   const dateWindowFilter: DateWindowFacet = facets.date_window;
-  // Helper for the string-array facets that share the "all means empty
-  // array" pattern. date_window has its own DateWindowFacet shape.
   const setSingleArrayFacet = (
     key: "benchmark" | "scale_factor" | "phase" | "trust_tier" | "validation_status" | "platform_version" | "arch" | "cpu_family" | "memory_gb",
     value: string,
   ) => setFacet(key, value === "all" ? [] : [value]);
-  // Every filter the cohort filter panel exposes on this page. Used both to
-  // decide whether "Clear filters" is shown and, when clicked, to clear it.
   const hasPlatformFilters = hasActiveFacets(facets, PLATFORM_RESULT_FACET_KEYS);
   const resetPlatformFilters = () => {
     for (const key of PLATFORM_RESULT_FACET_KEYS) {
@@ -345,8 +322,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       else setFacet(key, [] as never);
     }
   };
-  // Lead with recency. A cross-benchmark latency sort invites comparison
-  // across different workloads and metric contracts.
   const [sort, setSort] = useState<SortState<PlatformSortKey>>({
     key: "run_date",
     direction: "desc",
@@ -357,9 +332,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    // Fetch all platform index rows so we can also accept legacy display-name URLs.
-    // Cost stays small in the committed corpus; the query projects only the table
-    // columns plus cohort metadata needed to avoid mixed-cohort trend charts.
     getPlatformIndexRows()
       .then(async (r) => {
         if (cancelled) return;
@@ -427,8 +399,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     );
   }
 
-  // Match by stable platform_id first, with display-name fallback for
-  // previously generated links.
   const allPlatformResults = platformRowsForBasis(requestedRows, basisDetails, basis);
   const routeMetricContracts = new Set(
     allPlatformResults.map((row) => primaryMetricContract(row.primary_metric)),
@@ -439,9 +409,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const platformColumnCount = PLATFORM_TABLE_COLUMNS.length - (showMetricContract ? 0 : 1);
   const canonicalPlatformId = normalizePlatformKey(allPlatformResults[0]?.platform_id ?? canonicalPlatformRouteKey(platform));
 
-  // Distinct platform options for the in-page sibling pivot, sorted by
-  // display name. Platform ids can arrive with mixed casing from older
-  // snapshots, so option identity is normalized to the URL slug form.
   const platformOptions = (() => {
     const byId = new Map<string, { platform_id: string; platform: string }>();
     for (const row of rows) {
@@ -451,14 +418,10 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     return [...byId.values()].sort((a, b) => a.platform.localeCompare(b.platform));
   })();
 
-  // Unique non-null tuning modes - only show filter when multiple modes present.
   const tuningModes = [
     ...new Set(allPlatformResults.map((r) => r.tuning_mode).filter((m): m is string => m !== null)),
   ].sort();
 
-  // Derived option lists for the cohort filter panel. Each list is built
-  // from the unfiltered cohort (allPlatformResults) so the user can always
-  // see every available value, even after narrowing.
   const benchmarkOptions = [...new Set(allPlatformResults.map((r) => r.benchmark))].sort();
   const scaleOptions = [
     ...new Set(allPlatformResults.map((r) => r.scale_factor)),
@@ -520,8 +483,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
   const platformResults = [...platformResultsRaw].sort((a, b) => {
     const dir = sort.direction === "asc" ? 1 : -1;
     if (sort.key === "benchmark") return dir * a.benchmark.localeCompare(b.benchmark);
-    // run_date is "YYYY-MM-DD" (ISO 8601); strict lexicographic compare matches
-    // chronological order without dragging in locale-sensitive collation.
     if (sort.key === "run_date") {
       if (a.run_date === b.run_date) return a.result_id.localeCompare(b.result_id);
       return dir * (a.run_date < b.run_date ? -1 : 1);
@@ -546,10 +507,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     }
     const av = a[sort.key];
     const bv = b[sort.key];
-    // Nulls sort last in BOTH directions. Convention varies (Excel flips
-    // null position with direction; React Table / AG Grid default to
-    // always-last). We pick always-last so a click never buries the
-    // populated rows below the gaps.
     if (av === null && bv === null) return 0;
     if (av === null) return 1;
     if (bv === null) return -1;
@@ -567,10 +524,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     visibleLimit,
   );
   const runIdentityLabels = formatRunIdentitiesForCohort(platformResults, "table");
-  // What the Version cell shows. The version alone identifies a row on this
-  // page, because the platform is fixed and benchmark, scale, phase, and date
-  // are their own columns - except when two runs agree on all of those, which
-  // is exactly when the short id has to appear.
   const versionCellLabels = buildVersionCellLabels(platformResults);
 
   function toggleSort(key: PlatformSortKey) {
@@ -614,8 +567,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
     });
   }
 
-  // The first selected row defines the comparison cohort. Compatible siblings
-  // stay selectable; incompatible rows show a disabled checkbox and reason.
   const cohortLockSignature = (() => {
     const firstSelectedId = [...selected][0];
     if (firstSelectedId === undefined) return null;
@@ -773,8 +724,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         }
         actions={
           <>
-          {/* Platform switcher (sibling pivot) is the only header action now;
-              tuning lives in the cohort filter panel below. */}
           {platformOptions.length > 1 && (
             <div class="flex items-center gap-2">
               <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="platform-switcher">
@@ -806,13 +755,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
         }
       />
 
-      {/* One shared cohort filter panel (CohortFilterPanel), same anatomy as
-          the Benchmark page: benchmark, scale, phase, tuning, platform
-          version, trust tier, validation, architecture, CPU family, memory,
-          and run date. Filters are always visible - a filter that pops in
-          and out of existence as the cohort narrows is disorienting - and
-          Scale/Phase both offer an "All" option here, unlike the Benchmark
-          page where the benchmark (and so scale/phase) are always fixed. */}
       <CohortFilterPanel
         testId="platform-detail-filters"
         fields={platformCohortFilterFields}
@@ -836,8 +778,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
               {compareGuidance}
             </p>
           </div>
-          {/* One slot, whatever the state - see BenchmarkIndex for why a
-              disabled button that later relocates is worse than status text. */}
           {compareUrl ? (
             <a
               href={compareUrl}
@@ -899,8 +839,6 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
             right={<GroupBySelect id="platform-group-by" testId="platform-group-by" value={groupBy} onChange={setGroupBy} />}
           />
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
-            {/* This line exists only to say when the render limit is holding
-                rows back. */}
             <div>
               {visiblePlatformResults.length === platformResults.length ? null : (
                 <span>
@@ -1291,7 +1229,6 @@ function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | nul
   return metric === "power_score" ? row.power_score : row.display_geomean_ms;
 }
 
-/** Shared thumbnail chrome for the Analysis card grid's preview state. */
 function AnalysisMiniFrame({ children }: { children: ComponentChildren }) {
   return (
     <div class="summary-chart-thumbnail mt-4 flex items-center justify-center rounded-md bg-[var(--bb-surface-data-muted)] p-2">
@@ -1308,7 +1245,6 @@ function AnalysisMiniUnavailable({ label }: { label: string }) {
   );
 }
 
-/** Up to four small sparklines, one per trendable ranking, for the trends card thumbnail. */
 function TrendsThumbnail({ cohorts }: { cohorts: TrendCohort[] }) {
   const items = cohorts.slice(0, 4);
   if (items.length === 0) {
@@ -1369,7 +1305,6 @@ interface CoverageStat {
   latestRunDate: string;
 }
 
-/** Runs-per-benchmark coverage for this platform, given the active filters. */
 function buildCoverageStats(rows: PlatformIndexRowRow[]): CoverageStat[] {
   const byBenchmark = new Map<string, { scales: Set<number>; runs: number; latestRunDate: string }>();
   for (const row of rows) {
@@ -1397,7 +1332,6 @@ interface CoverageBarItem {
   runs: number;
 }
 
-/** Top 5 benchmarks by run count, then the rest aggregated into one "N others" bar. */
 function coverageBarItems(stats: CoverageStat[]): CoverageBarItem[] {
   const top = stats.slice(0, 5).map((stat) => ({ label: humanizeBenchmark(stat.benchmark), runs: stat.runs }));
   const rest = stats.slice(5);
@@ -1480,14 +1414,11 @@ interface PlatformRowProps {
   checked: boolean;
   onToggle: () => void;
   showMetricContract: boolean;
-  /** Rows outside the selected cohort cannot be added to the comparison. */
   disabledReason?: string;
 }
 
 function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle, showMetricContract, disabledReason }: PlatformRowProps) {
   const disabledCopy = describeCompareExclusionReason(disabledReason);
-  // An accepted override is never a clean pass, even when the recorded
-  // validation status alone would hide or clean-read these badges.
   const entryOverrideRules = parseOverrideRules(entry.override_rules);
   const reasonId = disabledCopy ? `platform-compare-reason-${entry.result_id}` : undefined;
   return (
@@ -1512,10 +1443,6 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
           data-testid={`platform-compare-checkbox-${entry.result_id}`}
         />
       </td>
-      {/* The platform is fixed for the whole page, and this table already has
-          columns for date, scale, phase, and labels. The only part of a run's
-          identity this cell has to carry is the version, plus the receipt it
-          links to. */}
       <td class="table-td" aria-colindex={platformTableColumnIndex("version", showMetricContract)}>
         <a
           href={resultReceiptHref(entry)}
@@ -1599,9 +1526,6 @@ function PlatformCompareReasonStatus({
   id?: string;
   copy: CompareExclusionReasonCopy | null;
 }) {
-  // Only the exceptional state is worth a line. The checkbox already says
-  // whether a row is selected or selectable; repeating that beside every
-  // version reads as part of the version.
   if (copy === null) return null;
   return (
     <div id={id} class="mt-1 text-xs text-[var(--bb-data-fg-muted)]" data-testid="platform-disabled-reason">

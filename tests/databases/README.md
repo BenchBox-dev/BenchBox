@@ -27,7 +27,6 @@ These databases are accessed through fixtures defined in `tests/fixtures/databas
 
 ```python
 def test_example(tpch_test_db):
-    # Use the TPC-H test database
     result = tpch_test_db.execute("SELECT COUNT(*) FROM customer").fetchone()
     assert result[0] > 0
 ```

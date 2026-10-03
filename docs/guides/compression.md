@@ -21,16 +21,12 @@ The compression system offers:
 Enable compression with command-line options:
 
 ```bash
-# Basic compression (uses zstd by default)
 benchbox run --platform duckdb --benchmark tpch --compression zstd
 
-# Specify compression type and level
 benchbox run --platform duckdb --benchmark tpch --compression gzip:9
 
-# Use zstd with custom level for maximum compression
 benchbox run --platform snowflake --benchmark tpcds --compression zstd:19
 
-# Disable compression
 benchbox run --platform duckdb --benchmark tpch --compression none
 ```
 
@@ -39,7 +35,6 @@ benchbox run --platform duckdb --benchmark tpch --compression none
 ```python
 from benchbox.core.ssb.benchmark import SSBBenchmark
 
-# Create benchmark with compression
 benchmark = SSBBenchmark(
     scale_factor=1.0,
     output_dir="./data",
@@ -48,9 +43,7 @@ benchmark = SSBBenchmark(
     compression_level=5
 )
 
-# Generate compressed data
 data_files = benchmark.generate_data()
-# Files will be saved as .zst files with automatic compression
 ```
 
 ## Compression Types
@@ -101,10 +94,8 @@ Based on testing with SSB benchmark data:
 - **Level 9**: Maximum compression, slower
 
 ```bash
-# Fast compression
 benchbox run --platform duckdb --benchmark tpch --compression gzip:1
 
-# Maximum compression
 benchbox run --platform duckdb --benchmark tpch --compression gzip:9
 ```
 
@@ -114,10 +105,8 @@ benchbox run --platform duckdb --benchmark tpch --compression gzip:9
 - **Level 19**: Maximum compression (higher levels exist but take 10x+ longer)
 
 ```bash
-# Fast compression
 benchbox run --platform duckdb --benchmark tpch --compression zstd:1
 
-# High compression
 benchbox run --platform duckdb --benchmark tpch --compression zstd:15
 ```
 
@@ -148,24 +137,18 @@ from benchbox.utils.compression_mixin import CompressionMixin
 
 class MyDataGenerator(CompressionMixin):
     def __init__(self, scale_factor=1.0, output_dir=None, **kwargs):
-        # Initialize compression mixin
         super().__init__(**kwargs)
 
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd()
 
     def generate_data(self):
-        """Generate data with optional compression."""
-        # Get compressed filename
         filename = self.get_compressed_filename("data.csv")
         file_path = self.output_dir / filename
 
-        # Open file with compression if enabled
         with self.open_output_file(file_path, "wt") as f:
             writer = csv.writer(f)
-            # Write data...
 
-        # Print compression report if enabled
         if self.should_use_compression():
             files = {"data": file_path}
             self.print_compression_report(files)
@@ -182,7 +165,6 @@ class MyBenchmark(BaseBenchmark):
     def __init__(self, scale_factor=1.0, **config):
         super().__init__(scale_factor, **config)
 
-        # Pass compression settings to data generator
         self.data_generator = MyDataGenerator(
             scale_factor=scale_factor,
             output_dir=self.output_dir,
@@ -207,14 +189,11 @@ Platform adapters automatically detect and load compressed data files. During da
 ### Custom Compression Levels by Use Case
 
 ```bash
-# CI/CD environments - prioritize speed
 benchbox run --platform duckdb --benchmark tpch --compression zstd:1
 
-# Storage-constrained environments - prioritize size
 benchbox run --platform duckdb --benchmark tpch --compression zstd:19
 
-# Production benchmarking - balanced performance
-benchbox run --platform duckdb --benchmark tpch --compression zstd  # Uses default level 3
+benchbox run --platform duckdb --benchmark tpch --compression zstd
 ```
 
 ### Dry Run with Compression
@@ -285,7 +264,7 @@ benchbox run --platform duckdb --benchmark tpch --compression zstd:15
 
 **For Balance:**
 ```bash
-benchbox run --platform duckdb --benchmark tpch --compression zstd  # Uses default level 3
+benchbox run --platform duckdb --benchmark tpch --compression zstd
 ```
 
 ## Troubleshooting
@@ -294,9 +273,7 @@ benchbox run --platform duckdb --benchmark tpch --compression zstd  # Uses defau
 
 **"zstandard library not available"**
 ```bash
-# Install zstandard
 uv pip install zstandard
-# or
 pip install zstandard
 ```
 
@@ -329,10 +306,9 @@ manager = CompressionManager()
 compression_type = manager.detect_compression(Path("data.csv.gz"))
 compressor = manager.get_compressor(compression_type)
 
-# Test decompression
 try:
     with compressor.open_for_read(Path("data.csv.gz"), 'rt') as f:
-        content = f.read(100)  # Read first 100 characters
+        content = f.read(100)
     print("File is valid")
 except Exception as e:
     print(f"File is corrupted: {e}")
@@ -347,16 +323,12 @@ from benchbox.utils.compression import CompressionManager
 
 manager = CompressionManager()
 
-# Get available compressors
 compressors = manager.get_available_compressors()
 
-# Get specific compressor
 compressor = manager.get_compressor('zstd', level=5)
 
-# Detect compression type
 compression_type = manager.detect_compression(Path("file.csv.gz"))
 
-# Get compression statistics
 info = manager.get_compression_info(original_file, compressed_file)
 ```
 
@@ -367,22 +339,12 @@ from benchbox.utils.compression_mixin import CompressionMixin
 
 class MyGenerator(CompressionMixin):
     pass
-    # Mixin methods available:
-    # - get_compressed_filename(filename) -> str
-    # - open_output_file(path, mode) -> file_object
-    # - compress_existing_file(path) -> Path
-    # - should_use_compression() -> bool
-    # - print_compression_report(files) -> None
 ```
 
 ### CLI Options
 
 ```bash
---compression TYPE[:LEVEL]   # Compression: zstd, zstd:9, gzip:6, none
-                             # Examples: --compression zstd
-                             #           --compression zstd:15
-                             #           --compression gzip:9
-                             #           --compression none
+--compression TYPE[:LEVEL]
 ```
 
 ## Examples Repository

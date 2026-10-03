@@ -45,17 +45,13 @@ routes, carriers, and temporal patterns - across 20 OLAP queries.
 ## Usage
 
 ```bash
-# Default scale (SF=1.0, ~24M flights, ~2.8 GB uncompressed CSV)
 benchbox run --platform duckdb --benchmark flightdata --scale 1.0
 
-# Quick dev sample
 benchbox run --platform duckdb --benchmark flightdata --scale 0.01
 
-# Pin the most recent year included (default is LAST_AVAILABLE_YEAR)
 benchbox run --platform duckdb --benchmark flightdata --scale 1.0 \
   --benchmark-option end_year=2024
 
-# Reproducible runs via seed
 benchbox run --platform duckdb --benchmark flightdata --scale 1.0 \
   --benchmark-option seed=42
 ```

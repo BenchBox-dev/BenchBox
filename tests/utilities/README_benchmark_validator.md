@@ -29,12 +29,12 @@ The unified benchmark validator is a comprehensive tool for validating all Bench
 
 ### Required Dependencies
 ```bash
-pip install benchbox  # The BenchBox library
+pip install benchbox
 ```
 
 ### Optional Dependencies
 ```bash
-pip install duckdb    # For enhanced query syntax validation
+pip install duckdb
 ```
 
 ## Usage
@@ -43,43 +43,32 @@ pip install duckdb    # For enhanced query syntax validation
 
 #### Basic Usage
 ```bash
-# Validate all benchmarks with default settings
 python tests/utilities/benchmark_validator.py
 
-# Validate specific benchmark
 python tests/utilities/benchmark_validator.py --benchmark tpch
 
-# Multiple benchmarks
 python tests/utilities/benchmark_validator.py --benchmark tpch,tpcds
 ```
 
 #### Validation Options
 ```bash
-# Quick validation (fast checks only)
 python tests/utilities/benchmark_validator.py --benchmark tpch --quick-check
 
-# Full validation (includes data generation)
 python tests/utilities/benchmark_validator.py --benchmark tpch --full-validation
 
-# Schema validation only
 python tests/utilities/benchmark_validator.py --benchmark tpch --validate-schema
 
-# Query validation only
 python tests/utilities/benchmark_validator.py --benchmark tpch --validate-queries
 ```
 
 #### Scale Factor and Output
 ```bash
-# Custom scale factor
 python tests/utilities/benchmark_validator.py --benchmark tpch --scale 0.1
 
-# JSON output
 python tests/utilities/benchmark_validator.py --benchmark tpch --output-format json
 
-# Save to file
 python tests/utilities/benchmark_validator.py --benchmark tpch --output-file validation_report.txt
 
-# Markdown report
 python tests/utilities/benchmark_validator.py --benchmark tpch --output-format markdown --output-file report.md
 ```
 
@@ -89,10 +78,8 @@ python tests/utilities/benchmark_validator.py --benchmark tpch --output-format m
 ```python
 from tests.utilities.benchmark_validator import BenchmarkValidator
 
-# Create validator
 validator = BenchmarkValidator(verbose=True)
 
-# Validate single benchmark
 report = validator.validate_benchmark(
     benchmark_name='tpch',
     scale_factor=0.01,
@@ -105,21 +92,18 @@ print(f"Success Rate: {report.success_rate:.1f}%")
 
 #### Comprehensive Validation
 ```python
-# Validate multiple benchmarks
 results = validator.validate_all_benchmarks(
     benchmarks=['tpch', 'tpcds', 'primitives'],
     scale_factor=0.01,
     full_validation=True
 )
 
-# Generate report
 report = validator.generate_report(results, 'markdown')
 print(report)
 ```
 
 #### Custom Validation
 ```python
-# Schema validation only
 schema_report = validator.validate_benchmark(
     benchmark_name='tpch',
     validate_schema=True,
@@ -127,7 +111,6 @@ schema_report = validator.validate_benchmark(
     validate_data=False
 )
 
-# Query validation with custom DuckDB connection
 import duckdb
 conn = duckdb.connect(':memory:')
 validator = BenchmarkValidator(duckdb_connection=conn)

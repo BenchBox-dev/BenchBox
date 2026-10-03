@@ -18,10 +18,8 @@ Dataproc Serverless is Google Cloud's fully managed Apache Spark service that el
 ## Installation
 
 ```bash
-# Install with Dataproc Serverless support
 uv add benchbox --extra dataproc-serverless
 
-# Dependencies installed: google-cloud-dataproc, google-cloud-storage
 ```
 
 ## Prerequisites
@@ -38,11 +36,9 @@ uv add benchbox --extra dataproc-serverless
 ### Environment Variables
 
 ```bash
-# Required
 export GOOGLE_CLOUD_PROJECT=my-project
 export GCS_STAGING_DIR=gs://my-bucket/benchbox
 
-# Optional
 export DATAPROC_REGION=us-central1
 export DATAPROC_RUNTIME_VERSION=2.1
 ```
@@ -50,24 +46,20 @@ export DATAPROC_RUNTIME_VERSION=2.1
 ### CLI Usage
 
 ```bash
-# Basic usage
 benchbox run --platform dataproc-serverless --benchmark tpch --scale 1.0 \
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://my-bucket/benchbox
 
-# With custom region
 benchbox run --platform dataproc-serverless --benchmark tpch --scale 1.0 \
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://my-bucket/benchbox \
   --platform-option region=europe-west1
 
-# With service account
 benchbox run --platform dataproc-serverless --benchmark tpch --scale 1.0 \
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://my-bucket/benchbox \
   --platform-option service_account=my-sa@my-project.iam.gserviceaccount.com
 
-# Dry-run to preview queries
 benchbox run --platform dataproc-serverless --benchmark tpch --dry-run ./preview \
   --platform-option project_id=my-project \
   --platform-option gcs_staging_dir=gs://my-bucket/benchbox
@@ -92,29 +84,23 @@ benchbox run --platform dataproc-serverless --benchmark tpch --dry-run ./preview
 ```python
 from benchbox.platforms.gcp import DataprocServerlessAdapter
 
-# Initialize with project and staging
 adapter = DataprocServerlessAdapter(
     project_id="my-project",
     region="us-central1",
     gcs_staging_dir="gs://my-bucket/benchbox",
 )
 
-# Verify connection
 adapter.create_connection()
 
-# Create schema
 adapter.create_schema("tpch_benchmark")
 
-# Load data to GCS and create tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query via Serverless batch
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Clean up
 adapter.close()
 ```
 
@@ -162,7 +148,6 @@ gcloud auth application-default login
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-key.json
 
-# Or use service account impersonation
 gcloud auth application-default login --impersonate-service-account=SA@PROJECT.iam.gserviceaccount.com
 ```
 
@@ -200,12 +185,10 @@ roles/storage.objectAdmin    # Read/write GCS staging
 Recommended project-level setup:
 
 ```bash
-# Grant Dataproc permissions
 gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="user:USER@DOMAIN.COM" \
   --role="roles/dataproc.worker"
 
-# Grant storage permissions
 gcloud projects add-iam-policy-binding PROJECT_ID \
   --member="user:USER@DOMAIN.COM" \
   --role="roles/storage.objectAdmin"

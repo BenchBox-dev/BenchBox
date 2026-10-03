@@ -1,5 +1,3 @@
-# TEMPLATE — editable tuned follow-up UAT sweep config.
-
 name: "uat-tuned-followup-20260505"
 description: "Tuned multi-scale local UAT sweep for BenchBox submissions"
 

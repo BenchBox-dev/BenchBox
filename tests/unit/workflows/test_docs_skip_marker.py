@@ -44,7 +44,8 @@ def test_skip_marker_exposes_bound_deployment_id() -> None:
     assert capture["id"] == "capture-deployment"
     run = capture["run"]
     assert 'select(.ref == "release")' in run
-    assert "pushed_at" in run
+    assert "run_started_at" in run
+    assert "select(.created_at >= env.SINCE)" in run
 
 
 def test_skip_marker_posts_inactive_without_side_effects() -> None:

@@ -55,7 +55,6 @@ class OperationsRegistryBase(Generic[OperationT]):
     def __init__(self, version: int, operations: dict[str, OperationT]) -> None:
         ...
 
-# Subclass:
 class TransactionOperationsManager(OperationsRegistryBase[WriteOperation]):
     def __init__(self) -> None:
         catalog = load_transaction_primitives_catalog()
@@ -88,7 +87,6 @@ validation + `kwargs` extraction + `operations_manager.get_operation()` +
 auto-setup):
 
 ```python
-# Both files lines 823-842 / 968-988 (identical logic):
 if not connection: raise ValueError(...)
 if not hasattr(connection, "execute"): raise ValueError(...)
 platform_key = kwargs.get("platform_key")

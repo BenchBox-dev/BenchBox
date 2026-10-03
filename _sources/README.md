@@ -133,13 +133,9 @@ See `_sources/tpc-ds/PATCHES.md` for detailed documentation.
 After applying patches, verify they were applied correctly:
 
 ```bash
-# TPC-H: Check for -z flag
 grep -n "zstdout" _sources/tpc-h/dbgen/dss.h
-# Expected: "EXTERN int  zstdout;"
 
-# TPC-DS: Check FILTER fix
 grep -n '"FILTER"' _sources/tpc-ds/tools/params.h
-# Expected: "FILTER" without leading underscore
 ```
 
 ## Compiling Binaries
@@ -159,15 +155,11 @@ grep -n '"FILTER"' _sources/tpc-ds/tools/params.h
 For quick local development on Apple Silicon:
 
 ```bash
-# TPC-H
 cd _sources/tpc-h/dbgen
 make -f makefile.suite CC=clang MACHINE=LINUX DATABASE=ORACLE WORKLOAD=TPCH
-# Output: dbgen, qgen
 
-# TPC-DS (requires patches applied first)
 cd _sources/tpc-ds/tools
 make CC=clang CFLAGS="-O2 -DMACOS -DMAXINT=INT_MAX -fcommon"
-# Output: dsdgen, dsqgen, distcomp
 ```
 
 ### Full Multi-Platform Compilation
@@ -196,11 +188,9 @@ cd _sources/compilation/scripts
 Build Docker images for cross-compilation:
 
 ```bash
-# Linux x86_64
 docker build -f _sources/compilation/docker/Dockerfile.linux-x86_64 \
     -t benchbox/tpc-linux-x86_64 _sources/compilation/docker/
 
-# Linux ARM64
 docker build -f _sources/compilation/docker/Dockerfile.linux-arm64 \
     -t benchbox/tpc-linux-arm64 _sources/compilation/docker/
 ```
@@ -210,18 +200,14 @@ docker build -f _sources/compilation/docker/Dockerfile.linux-arm64 \
 After compilation, verify binaries work correctly:
 
 ```bash
-# TPC-H: Generate small dataset
 _binaries/tpc-h/darwin-arm64/dbgen -s 0.01 -f
-ls -la *.tbl  # Should create customer.tbl, orders.tbl, etc.
+ls -la *.tbl
 
-# TPC-H: Test stdout mode
 _binaries/tpc-h/darwin-arm64/dbgen -z -s 0.01 -T c | head -5
 
-# TPC-DS: Generate small dataset (bundled binaries require SCALE >= 1)
 _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -DIR /tmp
 cat /tmp/ship_mode.dat | head -5
 
-# TPC-DS: Test stdout mode
 _binaries/tpc-ds/darwin-arm64/dsdgen -SCALE 1 -TABLE ship_mode -FILTER Y | head -5
 ```
 
@@ -258,7 +244,6 @@ Neither dbgen nor dsdgen are thread-safe for parallel generation of the same tab
 Use the `-C` (chunks) and `-S` (step) flags for parallel generation:
 
 ```bash
-# Generate customer table in 4 parallel chunks
 for i in 1 2 3 4; do
     dbgen -s 10 -C 4 -S $i -T c &
 done

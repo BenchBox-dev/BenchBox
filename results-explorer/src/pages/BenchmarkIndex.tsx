@@ -58,7 +58,6 @@ import { groupCohortRows, limitCohortGroups, type CohortGroupBy } from "@/lib/qu
 
 const BENCHMARK_SELECTION_LIMIT_REASON_ID = "benchmark-selection-limit";
 
-// Deep-link ids for the expandable analysis cards.
 const CHART_CARD_ANCHORS: Readonly<Record<string, string>> = {
   query_heatmap: "benchmark-section-matrix",
   rank_table: "benchmark-section-ranks",
@@ -130,11 +129,6 @@ function benchmarkContextNote(benchmark: string): string | null {
   return null;
 }
 
-/**
- * Distinct canonical benchmark families paired with display labels for the
- * in-page sibling switcher. Raw aliases remain reachable as legacy routes,
- * but the switcher exposes one value per canonical family.
- */
 function uniqueBenchmarkOptions(availableBenchmarks: ReadonlySet<string> | null): { value: string; label: string }[] {
   if (availableBenchmarks === null) return [];
   const seen = new Set<string>();
@@ -178,13 +172,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Distinct benchmark slugs that have at least one public result bundle.
-  // Drives the corpus-aware sibling switcher so users cannot pivot into a
-  // no-result benchmark detail page. `null` means the list is still loading;
-  // on hard failure we instead collapse to a single-element set containing
-  // only the current benchmark so the switcher never silently regresses to
-  // the catalog-wide list (which would re-introduce the no-result dead-end
-  // anti-pattern Contract A is meant to prevent).
   const [availableBenchmarks, setAvailableBenchmarks] = useState<ReadonlySet<string> | null>(null);
 
   useEffect(() => {
@@ -195,11 +182,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        // Hard failure (snapshot missing, transport error, etc.). Collapse
-        // the switcher to just the current benchmark via the fallback
-        // <option>; never silently revert to catalog-wide, which would let
-        // users pivot into no-result dead ends. Log once so observability
-        // can pick up persistent snapshot failures.
         console.warn("listBenchmarksWithPublicResults failed; switcher will show only the current benchmark", err);
         setAvailableBenchmarks(new Set(canonicalBenchmark ? [canonicalBenchmark] : []));
       });
@@ -208,7 +190,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     };
   }, [benchmark]);
 
-  // Filter state - URL-synced so views are shareable.
   const { facets, setFacet, resetFacets } = useFacetState();
   const requestedSf = singleFacetValue(facets.scale_factor);
   const phaseFilter = singleFacetValue(facets.phase, "power") ?? "power";
@@ -295,19 +276,13 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     };
   }, []);
 
-  // Row selection for Compare
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [resultsRetryToken, setResultsRetryToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    // The List section always renders Arch/CPU columns, independent of
-    // whether the active facets filter on hardware, so it must always ask
-    // for those columns rather than relying on listResults' filter-sniffing.
     listResults(benchmarkResultWhere, { includeHardware: true })
       .then((r) => {
         if (!cancelled) setResults(r);
@@ -338,7 +313,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     };
   }, [benchmarkVersionDomainWhere, facets.platform_version]);
 
-  // Derive available scale factors and phases from the loaded rows.
   const benchmarkResults = results?.filter((r) => canonicalBenchmarkSlug(r.benchmark) === canonicalBenchmark) ?? [];
   const benchmarkNotFound = results !== null && benchmarkResults.length === 0 && !isKnownBenchmark(canonicalBenchmark);
   useDocumentTitle(benchmarkNotFound ? "Not found · BenchBox Results" : `${title} · BenchBox Results`);
@@ -350,7 +324,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const scaleFilter: string | null =
     requestedSf !== null && scaleFactors.includes(requestedSf) ? requestedSf : null;
 
-  // Set defaults once manifest loads.
   const effectiveSf = scaleFilter ?? scaleFactors[0] ?? "0.01";
 
   useEffect(() => {
@@ -358,9 +331,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     setScaleFilter(effectiveSf);
   }, [effectiveSf, requestedSf, results, scaleFactors.length]);
 
-  // Phases available for the *current* scale factor only - prevents requesting
-  // a phase+SF combination that has no artifact (e.g. "power" for SF 0.01
-  // when only SF 0.1 has power runs).
   const phases = [
     ...new Set(
       benchmarkResults
@@ -370,8 +340,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     ),
   ].sort();
 
-  // If the stored phaseFilter isn't available for the current SF, fall back to
-  // the first available phase so we never request a non-existent artifact.
   const effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter);
   const summaryKey = JSON.stringify([benchmark, effectiveSf, effectivePhase]);
 
@@ -380,12 +348,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     setPhaseFilter(effectivePhase);
   }, [effectivePhase, phaseFilter, phases.length, results, setPhaseFilter]);
 
-  // Load the BenchmarkSummary from DuckDB whenever (sf, phase) changes.
   useEffect(() => {
-    // Guard: don't request until phases have resolved for the current SF.
-    // Without this guard, effectivePhase falls back to the stale phaseFilter
-    // default ("power") even when only "standard" rows exist, triggering a
-    // needless empty-cohort fetch.
     if (!results || phases.length === 0) return;
     let cancelled = false;
     setSelectedIds(new Set());
@@ -411,15 +374,8 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     return () => {
       cancelled = true;
     };
-    // `phaseFilter` is intentionally omitted: `effectivePhase` is derived from
-    // it, so any phaseFilter change that produces a new effectivePhase
-    // already triggers this effect. Including phaseFilter would cause a redundant
-    // double-fetch when the user picks a phase that is available.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [results, benchmark, effectiveSf, effectivePhase]);
 
-  // Native fragment navigation happens before async sections exist. Wait for
-  // the current cohort so replacing its skeleton cannot move the target away.
   useEffect(() => {
     if (!requestedSection || requestedSection !== "list" || summaryLoading || settledSummaryKey !== summaryKey) return;
     const navigationKey = `${benchmark}:${requestedSection}:${sectionNavigation}`;
@@ -439,19 +395,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     );
   }
 
-  // preact-router's `:benchmark/` slug matches any single segment, so an
-  // unknown slug like /results/does-not-exist/ would otherwise render an
-  // empty BenchmarkIndex shell. Once results are loaded, distinguish:
-  //   - Unknown slug (not in BENCHMARK_LABELS) → NotFound with a
-  //     specific message so the user knows it's the slug that's wrong.
-  //   - Known benchmark with no published rows yet → an "empty corpus"
-  //     state that explains TPC-DS / ClickBench / etc. are supported
-  //     but haven't been ingested yet.
-  // Note: the summary-fetch useEffect above is incidentally safe for
-  // both cases because its `phases.length === 0` early-return catches
-  // them — `phases` is derived from `benchmarkResults` so it's always
-  // [] when this guard fires. A future refactor that decouples them
-  // would need to add an explicit early-return there.
   if (benchmarkResults.length === 0) {
     if (benchmarkNotFound) {
       return (
@@ -510,7 +453,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       }
     : null;
 
-  // Collect unique trust labels and tuning modes from the loaded summary.
   const tuningModes = summaryWithResultMetadata
     ? [...new Set(summaryWithResultMetadata.platforms.map((p) => p.tuning_mode).filter((m): m is string => m !== null))].sort()
     : [];
@@ -564,7 +506,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     ),
   ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-  // Apply client-side filters (tuning + trust) to the summary platforms.
   const filteredSummary: BenchmarkSummary | null = summaryWithResultMetadata
     ? {
         ...summaryWithResultMetadata,
@@ -581,8 +522,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     : null;
   const excludedRows = filteredSummary?.platforms.filter((row) => !isTimingDisplayable(row)) ?? [];
   const rankGateReason = filteredSummary ? formatCohortExclusion(filteredSummary) : null;
-  // Compare eligibility is derived from the filtered summary so the Results
-  // table and analysis cards use the same result_id and cohort boundaries.
   const compareEligibilityByResultId = new Map(
     (filteredSummary?.platforms ?? []).map((row) => [row.result_id, row] as const),
   );
@@ -603,15 +542,10 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     .map((id) => selectedCompareRowsById.get(id))
     .filter((row): row is PlatformRow => row !== undefined);
 
-  // Build the Compare URL from selected compact IDs when available.
   const compareUrl =
     selectedCompareRows.length >= 2
       ? buildCompareUrl(selectedCompareRows.map((row) => compareIdForRow(row)))
       : null;
-  // Corpus-aware switcher: list only benchmarks with public results once the
-  // distinct-benchmarks query resolves. The currently-viewed benchmark is
-  // always reachable through the fallback option below, so direct links to
-  // no-result benchmark routes still recover gracefully.
   const benchmarkOptions = uniqueBenchmarkOptions(availableBenchmarks);
   const hasCurrentBenchmarkOption = benchmarkOptions.some(
     (option) => canonicalBenchmarkSlug(option.value) === canonicalBenchmark,
@@ -772,7 +706,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         }
         actions={
           <>
-          {/* Keep the section link while clearing benchmark-specific filters. */}
           <div class="flex items-center gap-2">
             <label class="text-sm font-medium text-[var(--bb-data-fg-primary)]" for="benchmark-switcher">
               Benchmark:
@@ -804,8 +737,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         }
       />
 
-      {/* Keep the full cohort filter set mounted so its layout and explanations
-          stay stable as other filters narrow the available choices. */}
       <CohortFilterPanel
         testId="benchmark-filters"
         fields={benchmarkCohortFilterFields}
@@ -854,11 +785,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </p>
             )}
           </div>
-          {/* One slot, whatever the state. A disabled button that looks
-              clickable and then relocates the moment it becomes clickable
-              costs the reader two mistakes; the affordance appears here only
-              when it can actually be used, and the pending state reads as
-              status text. */}
           {compareUrl ? (
             <a href={compareUrl} class="btn btn-primary shrink-0 text-sm no-underline" data-testid="benchmark-compare-cta">
               Compare {selectedComparableCount} selected
@@ -950,7 +876,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       )}
 
       <TrayAnnouncer count={selectedComparableCount} />
-      {/* Sticky Compare bar */}
       {compareUrl && (
         <CompareTray
           summary={
@@ -1025,10 +950,6 @@ function ExcludedRunsDisclosure({ rows }: { rows: PlatformRow[] }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// List view - sorted table of all result rows for the benchmark
-// ---------------------------------------------------------------------------
-
 function ListTable({
   benchmark,
   results,
@@ -1047,13 +968,11 @@ function ListTable({
   scaleFactor: string;
   phase?: string;
   facets: FacetState;
-  /** The matching summary PlatformRow for a result_id, scoped to the current SF/phase cohort. */
   compareEligibilityByResultId: Map<string, PlatformRow>;
   compareEligibilityState: "loading" | "ready" | "error";
   selectedIds: Set<string>;
   onSelectionChange: (next: Set<string>) => void;
   selectionAtCap: boolean;
-  /** ID of the page-level explanation shown when the selection cap is active. */
   selectionLimitReasonId?: string;
 }) {
   const [sort, setSort] = useState<SortState<BenchmarkListSortKey>>({
@@ -1087,9 +1006,6 @@ function ListTable({
   }, [filtered, groupBy, visibleLimit]);
   const runIdentityLabels = formatRunIdentitiesForCohort(filtered, "table");
 
-  // Skip the mount run: visibleLimit already starts at TABLE_RENDER_LIMIT,
-  // and a mount-time reset would silently eat a Show more click that lands
-  // before this effect flushes.
   const skipVisibleLimitResetOnMount = useRef(true);
   useEffect(() => {
     if (skipVisibleLimitResetOnMount.current) {
@@ -1347,11 +1263,6 @@ function ListTable({
   );
 }
 
-/**
- * Return the reason a list row's compare checkbox cannot be checked. A row is
- * selectable only when its filtered summary row is timing-displayable and
- * comparable.
- */
 function listRowDisabledReasonCode(compareRow: PlatformRow | undefined): string | null {
   if (!compareRow) return "not_in_cohort_summary";
   if (!isTimingDisplayable(compareRow)) return compareRow.display_exclusion_reason ?? "display_timing_unavailable";

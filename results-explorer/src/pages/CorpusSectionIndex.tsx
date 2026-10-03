@@ -38,8 +38,6 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
   const [error, setError] = useState<string | null>(null);
   const retriedEmpty = useRef(false);
   const [sort, setSort] = useUrlState<SectionSort>("sort", "name", sectionSortSerde);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [rowsRetryToken, setRowsRetryToken] = useState(0);
   useDocumentTitle(`${title} · BenchBox Results`);
 

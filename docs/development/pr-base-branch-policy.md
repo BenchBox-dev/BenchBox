@@ -21,7 +21,7 @@ Before the single `ci.yml`, almost every PR workflow filtered on those integrati
 ```yaml
 on:
   pull_request:
-    branches: [develop]   # or release / published-results
+    branches: [develop]
 ```
 
 A PR opened against `fix/parent` triggered **no** required checks. The GitHub

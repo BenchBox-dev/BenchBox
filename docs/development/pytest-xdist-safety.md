@@ -74,9 +74,8 @@ provides a C extension that modifies process titles via macOS kernel APIs.
 xdist's `remote.py` calls `setproctitle()` twice per test execution:
 
 ```python
-# xdist/remote.py lines 224-230
-worker_title("[pytest-xdist running] %s" % item.nodeid)  # before test
-worker_title("[pytest-xdist idle]")                        # after test
+worker_title("[pytest-xdist running] %s" % item.nodeid)
+worker_title("[pytest-xdist idle]")
 ```
 
 At ~100+ tests/second per worker, this generates ~200+ kernel-level process

@@ -553,7 +553,7 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             if token in Error:
                 raise ValueError(f"unrecognized {lang} syntax at line {source[:offset].count(chr(10)) + 1}")
             if token in Comment:
-                if token in Comment.Preproc:
+                if token in Comment.Preproc or token in Comment.PreprocFile:
                     continue
                 if lang == "bash" and offset and source[offset - 1] not in " \t\r\n;|&()":
                     continue

@@ -130,7 +130,6 @@ pip install snowflake-connector-python
 **Redshift:**
 ```bash
 pip install redshift_connector boto3
-# Alternative: pip install psycopg2-binary boto3
 ```
 
 **ClickHouse:**

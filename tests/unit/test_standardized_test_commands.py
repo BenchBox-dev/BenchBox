@@ -505,7 +505,6 @@ class TestMakefileCommands:
         assert '-m "not (slow or stress or resource_heavy or live_integration)"' in test_ci_body
         assert "--cov=benchbox" in test_ci_body
         assert "--cov-fail-under=0" in test_ci_body
-        assert "Maintained broad local CI profile" in makefile_content
         assert pytest_ci_config.sections() == ["pytest"]
         assert "--cov-config=pyproject.toml" in pytest_ci_addopts
         assert coverage_run["source"] == ["benchbox"]

@@ -75,18 +75,14 @@ Each guide in this section:
 All examples are in the `examples/` directory of the BenchBox repository:
 
 ```bash
-# Clone the repository (if not already cloned)
 git clone https://github.com/BenchBox-dev/benchbox.git
 cd benchbox/examples
 
-# Install BenchBox
 uv add benchbox
 
-# Run a local example (no configuration needed)
 cd getting_started/local
 python duckdb_tpch_power.py
 
-# Run a feature example
 cd ../../features
 python query_subset.py
 ```

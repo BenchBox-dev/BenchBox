@@ -21,19 +21,14 @@ LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark built on Dat
 ## Quick Start
 
 ```bash
-# Install the Spark Connect-capable PySpark client
 uv add benchbox --extra lakesail
 
-# Start a local Docker-backed Sail Spark Connect server
 make uat-bring-up PLATFORM=lakesail
 
-# Check client and endpoint readiness without starting a server
 benchbox platforms check lakesail-df
 
-# Run SQL benchmark
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# Run DataFrame benchmark
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 ```
 
@@ -103,25 +98,18 @@ adapter = LakeSailAdapter(
 ### SQL Mode
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
-# (driver_memory / shuffle_partitions are adapter parameters, not CLI options)
 benchbox run --platform lakesail --benchmark tpcds --scale 10.0
 
-# Specific queries only
 benchbox run --platform lakesail --benchmark tpch --scale 1.0 --queries Q1,Q6,Q17
 
-# Dry run to preview execution
 benchbox run --dry-run ./preview --platform lakesail --benchmark tpch
 ```
 
 ### DataFrame Mode
 
 ```bash
-# TPC-H DataFrame benchmark
-# (a custom endpoint or driver memory needs the Python adapter below)
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 ```
 
@@ -130,13 +118,10 @@ benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 Run the same benchmark on both platforms to compare performance:
 
 ```bash
-# LakeSail Sail
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 
-# Apache Spark (for comparison)
 benchbox run --platform spark --benchmark tpch --scale 10.0
 
-# Compare results
 benchbox compare lakesail_tpch_sf10.json spark_tpch_sf10.json
 ```
 
@@ -174,7 +159,6 @@ adapter = LakeSailDataFrameAdapter(
     enable_aqe=True,
 )
 
-# Use as context manager for automatic cleanup
 with adapter as ctx:
     df = ctx.read_parquet(Path("lineitem.parquet"))
     result = df.filter(df["l_quantity"] > 25).groupBy("l_returnflag").count()
@@ -227,7 +211,6 @@ LakeSail supports the following tuning types:
 Single-node, multi-threaded execution. Best for development, testing, and small-to-medium scale benchmarks.
 
 ```bash
-# local is the default sail_mode
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 ```
 
@@ -241,8 +224,6 @@ benchbox run --platform lakesail --benchmark tpch --scale 1.0
 Multi-node cluster execution for large-scale benchmarks.
 
 ```bash
-# Distributed mode is selected through the Python adapter
-# (sail_mode="distributed", sail_workers=4)
 benchbox run --platform lakesail --benchmark tpch --scale 100.0
 ```
 

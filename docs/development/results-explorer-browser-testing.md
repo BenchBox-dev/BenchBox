@@ -38,9 +38,9 @@ dependencies installed.
 ```bash
 cd results-explorer
 npm ci
-npm run test:e2e:install       # one-time: installs Chromium/Firefox/WebKit
-npm run test:e2e:chromium      # deterministic local/CI entrypoint
-npm run test:e2e:full          # local full-matrix convenience entrypoint
+npm run test:e2e:install
+npm run test:e2e:chromium
+npm run test:e2e:full
 ```
 
 On a clean machine, `npm run test:e2e:chromium:setup` wraps the one-time

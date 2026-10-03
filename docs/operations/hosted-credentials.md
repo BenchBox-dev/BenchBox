@@ -13,10 +13,8 @@ evidence, and configuration files.
 Choose the shortest practical lifetime.
 
 ```sh
-# Developer or headless writer: 90 days.
 export TODO_DB_AUTH_TOKEN="$(turso db tokens create benchbox-todo --expiration 90d)"
 
-# Scheduled audit/export: server-enforced read-only, 180 days.
 export TODO_DB_RO_AUTH_TOKEN="$(turso db tokens create benchbox-todo --read-only --expiration 180d)"
 ```
 
@@ -80,11 +78,6 @@ that script read `TODO_DB_CREDENTIAL_CAPABILITY`, which todo-db sets to
 `read-only` or `read-write` in the command's environment:
 
 ```sh
-#!/bin/sh
-# Exit 0 with no output means "absent", which is the only condition that lets a
-# read-only request fall back to read-write. A missing entry makes `security`
-# exit 44, and a non-zero exit is an error that stops resolution, so the absent
-# case has to be handled deliberately.
 case "$TODO_DB_CREDENTIAL_CAPABILITY" in
   read-only)
     security find-generic-password -w -s benchbox-todo-ro 2>/dev/null || exit 0

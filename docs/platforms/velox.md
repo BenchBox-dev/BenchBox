@@ -30,16 +30,13 @@ The Gluten Velox bundle jar is **Linux-only**. There are no prebuilt jars for ma
 ### Option A - Docker (recommended on macOS/Windows)
 
 ```bash
-# Build the image
 cd docker/velox
 docker build \
     --platform linux/amd64 \
     -t benchbox-velox:dev ../..
 
-# (a) All-in-one: run the benchmark inside the container
 docker compose run --rm velox-runner --benchmark tpch --scale 0.1
 
-# (b) Host-driver / container-backend: start a Gluten-enabled Spark-Connect server
 docker compose up -d velox-connect
 benchbox run --platform velox --platform-option deployment=remote \
     --platform-option endpoint=sc://localhost:50051 \
@@ -51,13 +48,8 @@ See [Velox Docker Dev Workflow](velox_docker_dev.md) for a full walkthrough of b
 ### Option B - Native Linux
 
 ```bash
-# Install the Velox extra (pulls pyspark[connect]>=3.5.0)
 uv add benchbox --extra velox
 
-# Download the Gluten Velox bundle jar for your Spark 4.0 / Scala 2.13 / arch
-# (see docs/platforms/velox_jar_setup.md for release tarballs and verification steps)
-
-# Run locally with Gluten wired into an in-process SparkSession
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
     --platform-option offheap_size=8g
@@ -129,28 +121,23 @@ Overriding `spark.shuffle.manager` via `spark_config` raises `ValueError` - `Col
 ### Local Mode (Linux or inside Docker)
 
 ```bash
-# TPC-H SF1 with 16 GB off-heap
 benchbox run --platform velox --benchmark tpch --scale 1.0 \
     --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=16g
 
-# TPC-DS SF10, specific queries
 benchbox run --platform velox --benchmark tpcds --scale 10.0 \
     --queries Q1,Q6,Q17 \
     --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=24g \
     --platform-option driver_memory=12g --platform-option shuffle_partitions=400
 
-# Dry-run preview
 benchbox run --dry-run ./preview --platform velox --benchmark tpch --scale 1.0
 ```
 
 ### Remote Mode (Spark-Connect)
 
 ```bash
-# 1. Start a Gluten-enabled Spark-Connect server
 cd docker/velox
 docker compose up -d velox-connect
 
-# 2. Run benchbox on the host, connecting to the container
 benchbox run --platform velox --benchmark tpch --scale 1.0 \
     --platform-option deployment=remote \
     --platform-option endpoint=sc://localhost:50051
@@ -161,17 +148,13 @@ The adapter does **not** auto-start a server - if `sc://host:port` is unreachabl
 ### Accelerated-Spark Tier Comparison
 
 ```bash
-# Apache Spark baseline
 benchbox run --platform spark --benchmark tpch --scale 10.0
 
-# Same workload with Gluten + Velox
 benchbox run --platform velox --benchmark tpch --scale 10.0 \
     --platform-option gluten_jar_path=/opt/gluten.jar --platform-option offheap_size=24g
 
-# LakeSail Sail (Rust / DataFusion)
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 
-# Compare
 benchbox compare spark_tpch_sf10.json velox_tpch_sf10.json lakesail_tpch_sf10.json
 ```
 
@@ -195,7 +178,6 @@ benchmark.generate_data()
 adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
 
-# Confirm native execution happened
 info = adapter.get_platform_info(connection=adapter._spark_session)
 print("Velox active:", info["velox_active"])
 ```
@@ -294,7 +276,7 @@ The server isn't running or isn't reachable. The adapter does not auto-start ser
 ```bash
 cd docker/velox
 docker compose up -d velox-connect
-docker compose logs velox-connect   # check for startup errors
+docker compose logs velox-connect
 ```
 
 ### Out-of-memory / excessive JVM fallback

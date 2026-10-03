@@ -39,7 +39,6 @@ Server Mode
     from benchbox.tpch import TPCH
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-    # Connect to ClickHouse server
     adapter = ClickHouseAdapter(
         host="localhost",
         port=9000,
@@ -48,7 +47,6 @@ Server Mode
         password=""
     )
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=1.0)
     results = benchmark.run_with_platform(adapter)
 
@@ -59,13 +57,11 @@ Local Mode (Embedded)
 
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-    # Embedded ClickHouse with chDB
     adapter = ClickHouseAdapter(
         mode="local",
-        data_path="./benchmark.chdb"  # Optional persistent storage
+        data_path="./benchmark.chdb"
     )
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=0.1)
     results = benchmark.run_with_platform(adapter)
 
@@ -409,14 +405,12 @@ Server Mode - Local Development
 
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-    # Default local server
     adapter = ClickHouseAdapter(
         host="localhost",
         port=9000,
         database="benchmark"
     )
 
-    # With authentication
     adapter = ClickHouseAdapter(
         host="localhost",
         port=9000,
@@ -430,10 +424,9 @@ Server Mode - Production
 
 .. code-block:: python
 
-    # Production server with TLS
     adapter = ClickHouseAdapter(
         host="clickhouse.example.com",
-        port=9440,  # Secure native port
+        port=9440,
         database="production_benchmarks",
         username="admin",
         password="production_password",
@@ -447,10 +440,8 @@ Local Mode - Development
 
 .. code-block:: python
 
-    # In-memory execution (fast, no persistence)
     adapter = ClickHouseAdapter(mode="local")
 
-    # Persistent storage (data survives restarts)
     adapter = ClickHouseAdapter(
         mode="local",
         data_path="./benchmarks/clickhouse_local.chdb"
@@ -461,14 +452,13 @@ Performance Tuning
 
 .. code-block:: python
 
-    # High-performance configuration
     adapter = ClickHouseAdapter(
         host="localhost",
         database="benchmark",
-        max_memory_usage="64GB",     # Increase for large datasets
-        max_execution_time=600,      # 10 minute timeout
-        max_threads=32,              # Use all available cores
-        compression=False            # Disabled by default for compatibility
+        max_memory_usage="64GB",
+        max_execution_time=600,
+        max_threads=32,
+        compression=False
     )
 
 Data Loading
@@ -484,7 +474,6 @@ Bulk Loading from Files
     adapter = ClickHouseAdapter(host="localhost", database="benchmark")
     conn = adapter.create_connection()
 
-    # Load from CSV
     conn.execute("""
         CREATE TABLE lineitem (
             l_orderkey UInt32,
@@ -507,7 +496,6 @@ Bulk Loading from Files
         ORDER BY (l_orderkey, l_linenumber)
     """)
 
-    # Bulk insert from CSV file
     conn.execute("""
         INSERT INTO lineitem
         FROM INFILE 'data/lineitem.tbl'
@@ -519,7 +507,6 @@ Loading from S3
 
 .. code-block:: python
 
-    # ClickHouse can read directly from S3
     conn.execute("""
         CREATE TABLE lineitem AS
         SELECT * FROM s3(
@@ -528,7 +515,6 @@ Loading from S3
         )
     """)
 
-    # With credentials
     conn.execute("""
         CREATE TABLE lineitem AS
         SELECT * FROM s3(
@@ -552,11 +538,9 @@ Execute Queries Directly
     adapter = ClickHouseAdapter(host="localhost", database="benchmark")
     conn = adapter.create_connection()
 
-    # Simple query
     result = conn.execute("SELECT COUNT(*) FROM lineitem")
-    row_count = result[0][0]  # Result is list of tuples
+    row_count = result[0][0]
 
-    # Complex analytical query
     result = conn.execute("""
         SELECT
             l_returnflag,
@@ -575,7 +559,6 @@ Query Plans and Optimization
 
 .. code-block:: python
 
-    # Get query plan
     plan = conn.execute("""
         EXPLAIN
         SELECT * FROM lineitem
@@ -584,7 +567,6 @@ Query Plans and Optimization
     for row in plan:
         print(row[0])
 
-    # Analyze query pipeline
     pipeline = conn.execute("""
         EXPLAIN PIPELINE
         SELECT COUNT(*) FROM lineitem
@@ -599,7 +581,6 @@ Table Engines
 
 .. code-block:: python
 
-    # MergeTree (most common for analytics)
     conn.execute("""
         CREATE TABLE orders (
             o_orderkey UInt32,
@@ -612,7 +593,6 @@ Table Engines
         PARTITION BY toYYYYMM(o_orderdate)
     """)
 
-    # ReplacingMergeTree (deduplication)
     conn.execute("""
         CREATE TABLE customer_updates (
             c_custkey UInt32,
@@ -628,7 +608,6 @@ Materialized Views
 
 .. code-block:: python
 
-    # Create materialized view for pre-aggregation
     conn.execute("""
         CREATE MATERIALIZED VIEW orders_by_date
         ENGINE = SummingMergeTree()
@@ -646,7 +625,6 @@ Distributed Queries
 
 .. code-block:: python
 
-    # Query across multiple shards (cluster setup required)
     result = conn.execute("""
         SELECT
             l_returnflag,
@@ -667,14 +645,13 @@ Memory Management
 
        adapter = ClickHouseAdapter(
            host="localhost",
-           max_memory_usage="16GB"  # Per query limit
+           max_memory_usage="16GB"
        )
 
 2. **Monitor memory usage** during execution:
 
    .. code-block:: python
 
-       # Check memory usage
        result = conn.execute("""
            SELECT
                query,
@@ -688,7 +665,6 @@ Memory Management
 
    .. code-block:: python
 
-       # Enable external aggregation automatically
        conn.execute("SET max_bytes_before_external_group_by = 10000000000")
 
 Performance Optimization
@@ -700,12 +676,10 @@ Performance Optimization
 
    .. code-block:: sql
 
-       # Good: Order by commonly filtered columns
        CREATE TABLE lineitem (...)
        ENGINE = MergeTree()
        ORDER BY (l_shipdate, l_orderkey)
 
-       # Better: Include all filter columns
        ORDER BY (l_shipdate, l_returnflag, l_orderkey)
 
 2. **Use appropriate data types**:
@@ -724,7 +698,7 @@ Performance Optimization
 
        CREATE TABLE lineitem (...)
        ENGINE = MergeTree()
-       PARTITION BY toYYYYMM(l_shipdate)  # Monthly partitions
+       PARTITION BY toYYYYMM(l_shipdate)
        ORDER BY (l_orderkey, l_linenumber)
 
 Connection Management
@@ -737,21 +711,18 @@ Connection Management
        adapter = ClickHouseAdapter(host="localhost")
        conn = adapter.create_connection()
 
-       # Run multiple queries
        for query_id in range(1, 23):
            result = conn.execute(queries[query_id])
 
-       # Close when done
        adapter.close_connection(conn)
 
 2. **Set connection timeouts** appropriately:
 
    .. code-block:: python
 
-       # Long-running benchmarks need longer timeouts
        adapter = ClickHouseAdapter(
            host="localhost",
-           max_execution_time=600  # 10 minutes
+           max_execution_time=600
        )
 
 Common Issues
@@ -766,21 +737,16 @@ Connection Refused
 
 .. code-block:: bash
 
-    # 1. Check if server is running
     ps aux | grep clickhouse-server
 
-    # 2. Start server if not running
     sudo service clickhouse-server start
 
-    # 3. Check port is listening
     netstat -ln | grep 9000
 
-    # 4. Test connection
     clickhouse-client --host=localhost --port=9000
 
 .. code-block:: python
 
-    # Verify connection in Python
     import socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     result = sock.connect_ex(('localhost', 9000))
@@ -798,19 +764,16 @@ Memory Limit Exceeded
 
 .. code-block:: python
 
-    # 1. Increase memory limit
     adapter = ClickHouseAdapter(
         host="localhost",
         max_memory_usage="32GB"
     )
 
-    # 2. Enable external operations
     conn = adapter.create_connection()
     conn.execute("SET max_bytes_before_external_group_by = 20000000000")
     conn.execute("SET max_bytes_before_external_sort = 20000000000")
 
-    # 3. Reduce scale factor for testing
-    benchmark = TPCH(scale_factor=0.1)  # Start small
+    benchmark = TPCH(scale_factor=0.1)
 
 Local Mode Import Error
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -821,10 +784,8 @@ Local Mode Import Error
 
 .. code-block:: bash
 
-    # Install chDB
     uv pip install chdb
 
-    # Or switch to server mode
     adapter = ClickHouseAdapter(mode="server", host="localhost")
 
 Slow Query Performance
@@ -836,24 +797,18 @@ Slow Query Performance
 
 .. code-block:: python
 
-    # 1. Increase thread count
     adapter = ClickHouseAdapter(
         host="localhost",
-        max_threads=16  # Use more CPU cores
+        max_threads=16
     )
 
-    # 2. Check query plan
     plan = conn.execute("EXPLAIN SELECT ...")
-    # Look for FullScanStep (table scan) - may need better ORDER BY
 
-    # 3. Enable query profiling
     conn.execute("SET log_queries = 1")
     conn.execute("SET log_query_threads = 1")
 
-    # Run query
     result = conn.execute("SELECT ...")
 
-    # Check query log
     log = conn.execute("""
         SELECT
             query,

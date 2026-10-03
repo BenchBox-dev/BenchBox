@@ -45,17 +45,12 @@ When you add a new chart type:
 If you change how a number is calculated (either Python or TS side):
 
 ```bash
-# 1. Modify the Python implementation
-# 2. Regenerate fixtures - this changes the contract:
 make parity-fixtures
 
-# 3. Run parity-check to confirm fixtures now match
 make parity-check
 
-# 4. Run Vitest - new fixture values must pass the TS side too
 cd results-explorer && npm test -- chartMath.parity
 
-# 5. Commit the fixture diff - reviewers must approve the numeric change
 git add tests/parity/fixtures/
 ```
 
@@ -64,8 +59,8 @@ git add tests/parity/fixtures/
 ## Verifying parity without regenerating
 
 ```bash
-make parity-check      # Python side: regenerate into tmpdir, diff, fail if different
-cd results-explorer && npm test -- chartMath.parity   # TS side: all fixture cases pass
+make parity-check
+cd results-explorer && npm test -- chartMath.parity
 ```
 
 ## Float tolerance
@@ -92,9 +87,9 @@ Check `git diff` to see if the Python function or the TS helper was modified.
 
 **2. Python changed intentionally** (you updated the math in `generate_visualization_fixtures.py` or the referenced Python module):
 ```bash
-make parity-fixtures      # regenerate fixtures from new Python source
-make parity-check         # confirm no remaining drift
-cd results-explorer && npm test -- chartMath.parity   # TS must still pass
+make parity-fixtures
+make parity-check
+cd results-explorer && npm test -- chartMath.parity
 ```
 
 **3. TypeScript changed intentionally** (you updated a helper in `chartMath.ts`):

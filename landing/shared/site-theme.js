@@ -45,7 +45,6 @@
                 window.localStorage.setItem(storageKey, choice);
             }
         } catch (error) {
-            // localStorage can be blocked; the data attributes still update for this page.
         }
         applyTheme(choice);
     }
@@ -57,9 +56,6 @@
             });
         });
 
-        // Roving-tabindex radiogroup per the WAI-ARIA radio pattern: arrow
-        // keys move focus and selection together and wrap at the ends;
-        // Home/End jump to the first/last option; Space/Enter select.
         document.querySelectorAll('[role="radiogroup"]').forEach(function (group) {
             var options = Array.prototype.slice.call(group.querySelectorAll("[data-benchbox-theme-option]"));
             if (!options.length) return;

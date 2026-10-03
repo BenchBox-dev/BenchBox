@@ -49,14 +49,12 @@ uv add benchbox datafusion
 from benchbox.platforms.datafusion import DataFusionAdapter
 from benchbox import TPCH
 
-# Create adapter with default settings
 adapter = DataFusionAdapter(
     working_dir="./datafusion_working",
     memory_limit="16G",
-    data_format="parquet"  # Columnar format with compression and predicate pushdown
+    data_format="parquet"
 )
 
-# Run TPC-H benchmark
 benchmark = TPCH(scale_factor=1.0)
 results = benchmark.run_with_platform(adapter)
 
@@ -67,12 +65,10 @@ print(f"Average query time: {results.average_query_time:.3f}s")
 ### CLI Usage
 
 ```bash
-# Run TPC-H benchmark with DataFusion
 benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
   --platform-option memory_limit=16G \
   --platform-option target_partitions=8
 
-# Spill to a fast disk
 benchbox run --platform datafusion --benchmark tpch --scale 1.0 \
   --platform-option temp_dir=/fast/ssd/datafusion
 ```
@@ -129,30 +125,24 @@ revert a manually-installed version and how to work around it.
 #### Memory Configuration
 
 ```python
-# Conservative memory limit for constrained environments
 adapter = DataFusionAdapter(memory_limit="4G")
 
-# Aggressive memory allocation for large-scale benchmarks
 adapter = DataFusionAdapter(memory_limit="64G")
 
-# Memory limit with disk spilling
 adapter = DataFusionAdapter(
     memory_limit="16G",
-    temp_dir="/fast/nvme/temp"  # Fast SSD for spilling
+    temp_dir="/fast/nvme/temp"
 )
 ```
 
 #### Parallelism Configuration
 
 ```python
-# Match CPU core count (default)
 import os
 adapter = DataFusionAdapter(target_partitions=os.cpu_count())
 
-# Conservative for multi-tenant systems
 adapter = DataFusionAdapter(target_partitions=4)
 
-# Aggressive for dedicated benchmark server
 adapter = DataFusionAdapter(target_partitions=32)
 ```
 
@@ -161,22 +151,17 @@ adapter = DataFusionAdapter(target_partitions=32)
 The `batch_size` parameter controls RecordBatch size for query execution:
 
 ```python
-# Default (recommended for most workloads)
 adapter = DataFusionAdapter(batch_size=8192)
 
-# Smaller batches: Lower latency, lower memory
 adapter = DataFusionAdapter(
     batch_size=4096,
     memory_limit="4G"
 )
-# Use when: Memory-constrained, interactive queries, lower latency required
 
-# Larger batches: Higher throughput, higher memory
 adapter = DataFusionAdapter(
     batch_size=16384,
     memory_limit="32G"
 )
-# Use when: Batch processing, maximum throughput, ample memory available
 ```
 
 **Batch Size Guidelines**:
@@ -196,7 +181,7 @@ adapter = DataFusionAdapter(
 ```python
 adapter = DataFusionAdapter(
     data_format="parquet",
-    working_dir="/fast/ssd/datafusion"  # Fast storage for conversion
+    working_dir="/fast/ssd/datafusion"
 )
 ```
 
@@ -209,7 +194,7 @@ adapter = DataFusionAdapter(
 ```python
 adapter = DataFusionAdapter(
     data_format="csv",
-    memory_limit="4G"  # Lower memory requirements
+    memory_limit="4G"
 )
 ```
 
@@ -342,24 +327,19 @@ For advanced use cases requiring connection reuse or custom query execution:
 ```python
 from benchbox.platforms.datafusion import DataFusionAdapter
 
-# Create adapter
 adapter = DataFusionAdapter(
     memory_limit="16G",
     data_format="parquet"
 )
 
-# Create and manage connection manually
 connection = adapter.create_connection()
 
-# Execute multiple custom queries on same connection
 query1 = "SELECT COUNT(*) FROM lineitem WHERE l_shipdate > '1995-01-01'"
 result1 = connection.sql(query1).collect()
 
 query2 = "SELECT AVG(l_extendedprice) FROM lineitem"
 result2 = connection.sql(query2).collect()
 
-# Connection is automatically cleaned up when adapter is garbage collected
-# or you can explicitly close if needed
 ```
 
 **When to use manual connection management**:
@@ -373,7 +353,6 @@ result2 = connection.sql(query2).collect()
 ### Query Execution Options
 
 ```python
-# Execute with row count validation
 result = adapter.execute_query(
     connection,
     query="SELECT * FROM lineitem WHERE l_shipdate > '1995-01-01'",
@@ -394,15 +373,12 @@ Preview queries without executing them:
 ```python
 adapter = DataFusionAdapter(dry_run_mode=True)
 
-# Queries will be validated but not executed
 results = benchmark.run_with_platform(adapter)
-# Check generated SQL in results
 ```
 
 ### Platform Validation
 
 ```python
-# Validate platform capabilities before running
 validation = adapter.validate_platform_capabilities("tpch")
 
 if validation.is_valid:
@@ -450,7 +426,7 @@ else:
 adapter = DataFusionAdapter(
     memory_limit="4G",
     target_partitions=4,
-    data_format="csv"  # CSV is fine for small datasets
+    data_format="csv"
 )
 ```
 
@@ -520,10 +496,9 @@ adapter = DataFusionAdapter(
 
 **Solution**:
 ```python
-# Reduce memory limit or use CSV format
 adapter = DataFusionAdapter(
     memory_limit="8G",
-    data_format="csv",  # Lower memory footprint
+    data_format="csv",
     temp_dir="/large/disk/temp"
 )
 ```
@@ -534,10 +509,9 @@ adapter = DataFusionAdapter(
 
 **Solution**:
 ```python
-# Use Parquet format for better query performance
 adapter = DataFusionAdapter(
     data_format="parquet",
-    working_dir="/fast/ssd/datafusion"  # Use fast storage
+    working_dir="/fast/ssd/datafusion"
 )
 ```
 
@@ -547,12 +521,10 @@ adapter = DataFusionAdapter(
 
 **Solution**:
 ```python
-# Validate platform capabilities first
 validation = adapter.validate_platform_capabilities("tpcds")
 if validation.warnings:
     print("Platform warnings:", validation.warnings)
 
-# Check query compatibility with PostgreSQL dialect
 ```
 
 #### Mixed-Case Column Names

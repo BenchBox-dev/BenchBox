@@ -120,10 +120,10 @@ helper_queries:
     - portable
     - reference
     - self-help
-  - - scholaramalgamalg #14
-    - scholaramalgamalg #7
-    - exportiunivamalg #9
-    - scholaramalgamalg #9
+  - - scholaramalgamalg
+    - scholaramalgamalg
+    - exportiunivamalg
+    - scholaramalgamalg
   - - Women
     - Music
     - Men
@@ -131,10 +131,10 @@ helper_queries:
     - classical
     - fragrances
     - pants
-  - - amalgimporto #1
-    - edu packscholar #1
-    - exportiimporto #1
-    - importoamalg #1
+  - - amalgimporto
+    - edu packscholar
+    - exportiimporto
+    - importoamalg
   - - avg_quarterly_sales
     - sum_sales
     - i_manufact_id
@@ -155,10 +155,10 @@ helper_queries:
     - portable
     - reference
     - self-help
-  - - scholaramalgamalg #14
-    - scholaramalgamalg #7
-    - exportiunivamalg #9
-    - scholaramalgamalg #9
+  - - scholaramalgamalg
+    - scholaramalgamalg
+    - exportiunivamalg
+    - scholaramalgamalg
   - - Women
     - Music
     - Men
@@ -166,10 +166,10 @@ helper_queries:
     - classical
     - fragrances
     - pants
-  - - amalgimporto #1
-    - edu packscholar #1
-    - exportiimporto #1
-    - importoamalg #1
+  - - amalgimporto
+    - edu packscholar
+    - exportiimporto
+    - importoamalg
   - - i_manager_id
     - avg_monthly_sales
     - sum_sales

@@ -180,17 +180,13 @@ The benchmark leverages the existing TPC-H data generation infrastructure:
 ```python
 from benchbox import ReadPrimitives
 
-# Initialize Read Primitives benchmark
 primitives = ReadPrimitives(scale_factor=0.01, output_dir="primitives_data")
 
-# Generate TPC-H data (reused across all queries)
 data_files = primitives.generate_data()
 
-# Get all primitive queries
 queries = primitives.get_queries()
 print(f"Available: {len(queries)} primitive queries")
 
-# Get specific query
 agg_query = primitives.get_query("aggregation_sum_basic")
 print(agg_query)
 ```
@@ -198,7 +194,6 @@ print(agg_query)
 ### Category-Based Testing
 
 ```python
-# Get queries by category
 aggregation_queries = primitives.get_queries_by_category("aggregation")
 join_queries = primitives.get_queries_by_category("join")
 window_queries = primitives.get_queries_by_category("window_function")
@@ -207,7 +202,6 @@ print(f"Aggregation tests: {len(aggregation_queries)}")
 print(f"Join tests: {len(join_queries)}")
 print(f"Window function tests: {len(window_queries)}")
 
-# Run category-specific tests
 for query_id, query_sql in aggregation_queries.items():
     result = conn.execute(query_sql).fetchall()
     print(f"{query_id}: {len(result)} rows")
@@ -220,16 +214,13 @@ import duckdb
 from benchbox import ReadPrimitives
 import time
 
-# Initialize and generate data
 primitives = ReadPrimitives(scale_factor=0.01, output_dir="primitives_tiny")
 data_files = primitives.generate_data()
 
-# Create DuckDB connection and load TPC-H schema
 conn = duckdb.connect("primitives.duckdb")
 schema_sql = primitives.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load TPC-H data (using TPC-H loading patterns)
 for table_name in primitives.get_available_tables():
     file_path = primitives.tables[table_name.upper()]
 
@@ -240,7 +231,6 @@ for table_name in primitives.get_available_tables():
                               header=false)
     """)
 
-# Run primitive queries by category
 categories = ["aggregation", "filter", "join", "group_by", "window_function"]
 
 results = {}
@@ -276,7 +266,6 @@ class PrimitivesRegressionTester:
         self.connection = connection
 
     def run_regression_suite(self, categories: List[str] = None) -> Dict:
-        """Run regression tests on specified primitive categories."""
         if categories is None:
             categories = ["aggregation", "filter", "join", "group_by"]
 
@@ -289,7 +278,6 @@ class PrimitivesRegressionTester:
             for query_id, query_sql in category_queries.items():
                 times = []
 
-                # Run each query 3 times for stable measurements
                 for _ in range(3):
                     start_time = time.time()
                     result = self.connection.execute(query_sql).fetchall()
@@ -309,7 +297,6 @@ class PrimitivesRegressionTester:
 
     def compare_with_baseline(self, current_results: Dict, baseline_results: Dict,
                              threshold: float = 0.1) -> List[Dict]:
-        """Compare current results with baseline, flag regressions."""
         regressions = []
 
         for query_id, current in current_results.items():
@@ -330,13 +317,10 @@ class PrimitivesRegressionTester:
 
         return regressions
 
-# Usage
 tester = PrimitivesRegressionTester(primitives, conn)
 
-# Run regression suite
 current_results = tester.run_regression_suite()
 
-# Compare with baseline
 regressions = tester.compare_with_baseline(current_results, baseline_results)
 
 if regressions:
@@ -354,7 +338,6 @@ from typing import Dict
 import time
 
 def profile_primitive_categories(primitives: ReadPrimitives, connection) -> Dict:
-    """Profile performance across all primitive categories."""
 
     categories = primitives.get_all_categories()
     profile_results = {}
@@ -378,7 +361,6 @@ def profile_primitive_categories(primitives: ReadPrimitives, connection) -> Dict
                 'max_time': max(times)
             }
 
-    # Sort by total time to identify bottlenecks
     sorted_categories = sorted(
         profile_results.items(),
         key=lambda x: x[1]['total_time'],
@@ -395,7 +377,6 @@ def profile_primitive_categories(primitives: ReadPrimitives, connection) -> Dict
 
     return dict(sorted_categories)
 
-# Usage
 profile = profile_primitive_categories(primitives, conn)
 ```
 
@@ -434,13 +415,10 @@ profile = profile_primitive_categories(primitives, conn)
 ### Basic Configuration
 
 ```python
-# Development mode - fast iteration
 primitives = ReadPrimitives(scale_factor=0.001, output_dir="primitives_dev")
 
-# CI/CD mode - balanced performance
 primitives = ReadPrimitives(scale_factor=0.01, output_dir="primitives_ci")
 
-# Production validation - realistic scale
 primitives = ReadPrimitives(scale_factor=1.0, output_dir="primitives_prod")
 ```
 
@@ -450,12 +428,11 @@ primitives = ReadPrimitives(scale_factor=1.0, output_dir="primitives_prod")
 primitives = ReadPrimitives(
     scale_factor=0.1,
     output_dir="primitives_data",
-    verbose=True,                # Enable detailed logging
-    parallel=4,                  # Parallel data generation
-    cache_data=True              # Cache generated data
+    verbose=True,
+    parallel=4,
+    cache_data=True
 )
 
-# Get queries with dialect translation
 query_postgres = primitives.get_query("aggregation_sum_basic", dialect="postgres")
 query_duckdb = primitives.get_query("aggregation_sum_basic", dialect="duckdb")
 query_mysql = primitives.get_query("aggregation_sum_basic", dialect="mysql")
@@ -487,34 +464,30 @@ query_mysql = primitives.get_query("aggregation_sum_basic", dialect="mysql")
 
 **Issue: Data generation too slow**
 ```python
-# Solution: Use smaller scale factor or parallel generation
 primitives = ReadPrimitives(scale_factor=0.01, parallel=8)
 ```
 
 **Issue: Out of disk space**
 ```python
-# Solution: Use micro scale factor or clean up old data
-primitives = ReadPrimitives(scale_factor=0.001)  # ~1MB only
+primitives = ReadPrimitives(scale_factor=0.001)
 ```
 
 ### Query Execution Issues
 
 **Issue: Queries timeout on large scale**
 ```python
-# Solution: Start with smaller scale factor
-primitives = ReadPrimitives(scale_factor=0.01)  # Fast execution
+primitives = ReadPrimitives(scale_factor=0.01)
 ```
 
 **Issue: Inconsistent performance measurements**
 ```python
-# Solution: Run multiple iterations and use median
 times = []
 for _ in range(5):
     start = time.time()
     result = conn.execute(query_sql).fetchall()
     times.append(time.time() - start)
 
-median_time = sorted(times)[len(times) // 2]  # Use median
+median_time = sorted(times)[len(times) // 2]
 ```
 
 ## DataFrame Support
@@ -539,13 +512,10 @@ The Read Primitives benchmark provides **full DataFrame support** for both expre
 Run Read Primitives on DataFrame platforms using the CLI:
 
 ```bash
-# Run on Polars DataFrame
 benchbox run --platform polars-df --benchmark read-primitives --scale 0.01
 
-# Run on Pandas DataFrame
 benchbox run --platform pandas-df --benchmark read-primitives --scale 0.01
 
-# Run on PySpark DataFrame
 benchbox run --platform pyspark-df --benchmark read-primitives --scale 0.01
 ```
 
@@ -559,21 +529,16 @@ from benchbox.core.read_primitives.dataframe_queries import (
 )
 from benchbox.platforms import get_dataframe_adapter
 
-# Create benchmark
 primitives = ReadPrimitives(scale_factor=0.01)
 primitives.generate_data()
 
-# Create DataFrame context for Polars, then load the generated tables into it.
-# create_context() returns an empty context; working_dir does not register files.
 polars_adapter = get_dataframe_adapter("polars-df", working_dir=str(primitives.output_dir))
 ctx = polars_adapter.create_context()
 polars_adapter.load_tables_from_data_source(ctx, primitives.output_dir)
 
-# Execute expression-family query
 result = aggregation_distinct_expression_impl(ctx)
 print(result.collect())
 
-# Or create context for Pandas
 pandas_adapter = get_dataframe_adapter("pandas-df", working_dir=str(primitives.output_dir))
 pandas_ctx = pandas_adapter.create_context()
 pandas_adapter.load_tables_from_data_source(pandas_ctx, primitives.output_dir)
@@ -587,7 +552,6 @@ Expression-family queries use `ctx.col()` and `ctx.lit()` for declarative, lazy 
 
 ```python
 def aggregation_groupby_large_expression_impl(ctx):
-    """Aggregates within high cardinality grouping."""
     lineitem = ctx.get_table("lineitem")
     col = ctx.col
 
@@ -604,10 +568,8 @@ Pandas-family queries use string column access and boolean indexing:
 
 ```python
 def filter_selective_pandas_impl(ctx):
-    """Selective filter on large table."""
     lineitem = ctx.get_table("lineitem")
 
-    # Pandas-style filtering
     result = lineitem[lineitem["l_returnflag"] == "R"]
     return result
 ```

@@ -1,35 +1,16 @@
-/**
- * The one cohort filter panel shared by BenchmarkIndex and PlatformIndex.
- *
- * Both pages narrow the same kind of cohort (scale, phase, tuning, platform
- * version, trust tier, validation, architecture, CPU family, memory, run
- * date) with only the pivot column differing - the benchmark page fixes the
- * benchmark and lets the reader pick a platform, the platform page fixes the
- * platform and lets the reader pick a benchmark. Each page supplies its own
- * ordered field list; this component only owns the layout, the disabled
- * state, and the "Clear filters" affordance.
- */
 export interface CohortFilterOption {
   value: string;
   label: string;
 }
 
 export interface CohortFilterFieldSpec {
-  /** Element id; also used as the React key. */
   id: string;
-  /** `data-testid` on the `<select>`, when a test or e2e spec depends on it. */
   testId?: string;
   label: string;
   value: string;
   options: CohortFilterOption[];
   onChange: (value: string) => void;
-  /** Non-null disables the select and becomes its `title`. */
   disabledReason?: string | null;
-  /**
-   * An extra disabled option shown only while `value` equals its own value -
-   * the "N tiers selected" / "N versions selected" placeholder for a facet
-   * whose URL state can hold more values than this single-select can offer.
-   */
   multiValueOption?: CohortFilterOption;
 }
 
@@ -38,7 +19,6 @@ interface CohortFilterPanelProps {
   showClear: boolean;
   onClear: () => void;
   clearTestId?: string;
-  /** `data-testid` on the outer `<section>`, when an e2e spec depends on it. */
   testId?: string;
 }
 

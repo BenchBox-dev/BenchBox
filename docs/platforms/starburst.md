@@ -19,15 +19,12 @@ Starburst Galaxy is a managed Trino service providing serverless distributed SQL
 ## Quick Start
 
 ```bash
-# Install Trino driver
 uv add trino
 
-# Set credentials
 export STARBURST_HOST=my-cluster.trino.galaxy.starburst.io
 export STARBURST_USER=joe@example.com/accountadmin
 export STARBURST_PASSWORD=your-password
 
-# Run benchmark
 benchbox run --platform starburst --benchmark tpch --scale 1.0
 ```
 
@@ -49,11 +46,9 @@ export STARBURST_HOST=my-cluster.trino.galaxy.starburst.io
 export STARBURST_USER=joe@example.com/accountadmin
 export STARBURST_PASSWORD=your-password
 
-# Optional: separate role configuration
 export STARBURST_USER=joe@example.com
-export STARBURST_ROLE=accountadmin  # Appended automatically
+export STARBURST_ROLE=accountadmin
 
-# Optional: default catalog
 export STARBURST_CATALOG=tpch_sf1
 
 benchbox run --platform starburst --benchmark tpch --scale 1.0
@@ -88,10 +83,8 @@ benchbox run --platform starburst --benchmark tpch --scale 1.0 \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform starburst --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
 benchbox run --platform starburst --benchmark tpcds --scale 10.0
 ```
 
@@ -106,11 +99,9 @@ benchbox run --platform starburst --benchmark tpch --scale 1.0 \
 ### With Table Format
 
 ```bash
-# Use Iceberg tables (default)
 benchbox run --platform starburst --benchmark tpch --scale 1.0 \
     --platform-option table_format=iceberg
 
-# Use Delta Lake tables
 benchbox run --platform starburst --benchmark tpch --scale 1.0 \
     --platform-option table_format=delta
 ```
@@ -121,7 +112,6 @@ benchbox run --platform starburst --benchmark tpch --scale 1.0 \
 from benchbox import TPCH
 from benchbox.platforms.starburst import StarburstAdapter
 
-# Initialize adapter
 adapter = StarburstAdapter(
     host="my-cluster.trino.galaxy.starburst.io",
     username="joe@example.com/accountadmin",
@@ -131,7 +121,6 @@ adapter = StarburstAdapter(
     table_format="iceberg",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -149,13 +138,9 @@ Starburst inherits from Trino, which means:
 ```python
 from benchbox.core.platform_registry import PlatformRegistry
 
-# Check platform family
 family = PlatformRegistry.get_platform_family("starburst")
-# Returns: "trino"
 
-# Check inheritance
 parent = PlatformRegistry.get_inherited_platform("starburst")
-# Returns: "trino"
 ```
 
 ## Table Formats
@@ -170,7 +155,6 @@ Starburst Galaxy supports multiple table formats:
 | `delta` | Delta Lake | Databricks ecosystem integration |
 
 ```bash
-# Iceberg (recommended for analytics)
 benchbox run --platform starburst --benchmark tpch --scale 1.0 \
     --platform-option table_format=iceberg
 ```

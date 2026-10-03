@@ -44,18 +44,15 @@ benchbox metrics qphh --power-results <path> --throughput-results <path> [OPTION
 ## Usage Examples
 
 ```bash
-# Calculate QphH from test results
 benchbox metrics qphh \
   --power-results results/power/results.json \
   --throughput-results results/throughput/results.json
 
-# Specify scale factor explicitly
 benchbox metrics qphh \
   --power-results power.json \
   --throughput-results throughput.json \
   --scale-factor 100
 
-# Export to JSON file
 benchbox metrics qphh \
   --power-results power.json \
   --throughput-results throughput.json \

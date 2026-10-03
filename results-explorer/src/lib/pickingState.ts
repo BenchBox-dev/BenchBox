@@ -86,7 +86,6 @@ export function readPagesRestorePickingIds(
     try {
       storage.removeItem(PAGES_RESTORE_PICKING_KEY);
     } catch {
-      // A denied storage read cannot carry picking state across the fallback.
     }
     return [];
   }
@@ -102,7 +101,6 @@ export function writePotentialPagesRestorePickingIds(
     if (normalized.length === 0) storage.removeItem(PAGES_RESTORE_PICKING_KEY);
     else storage.setItem(PAGES_RESTORE_PICKING_KEY, JSON.stringify(normalized));
   } catch {
-    // Picking remains available in memory when sessionStorage is unavailable.
   }
 }
 

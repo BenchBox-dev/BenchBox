@@ -11,7 +11,6 @@ make worktree-create BRANCH=chore/cut-next-release WORKTREE_PATH=../BenchBox.wt-
 cd ../BenchBox.wt-cut-next-release
 make agent-write-preflight
 make release-cut VERSION=X.Y.Z
-# review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z
 ```
 
@@ -104,10 +103,9 @@ Running the optional campaign:
 
 ```bash
 make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml
-make uat-sweep CONFIG=tests/uat/configs/release-gate-02-docker-nonoltp.yaml   # after stage 1 completes
-make uat-sweep CONFIG=tests/uat/configs/release-gate-03-docker-oltp.yaml     # after stage 2 completes
+make uat-sweep CONFIG=tests/uat/configs/release-gate-02-docker-nonoltp.yaml
+make uat-sweep CONFIG=tests/uat/configs/release-gate-03-docker-oltp.yaml
 make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir>
-# review the campaign report; it is historical evidence, not a release input
 ```
 
 See `docs/operations/uat-framework.md` "Three-stage UAT campaign" for campaign
@@ -169,7 +167,7 @@ Steps 1-3 are idempotent, so an interrupted cut is resumed by re-running the
 same command from the `vX.Y.Z` branch:
 
 ```bash
-make release-cut VERSION=X.Y.Z      # reuses the branch, keeps the CHANGELOG section
+make release-cut VERSION=X.Y.Z
 ```
 
 The branch is reused rather than recreated, the version bump and `uv lock`
@@ -178,7 +176,7 @@ untouched — so a section you curated between runs survives. To throw the cut
 away instead:
 
 ```bash
-make release-cut-abort VERSION=X.Y.Z   # discard tracked edits and restore the creating worktree branch
+make release-cut-abort VERSION=X.Y.Z
 ```
 
 `release-cut-abort` works in the creating linked worktree, even if the primary
@@ -356,7 +354,6 @@ make worktree-create BRANCH=chore/cut-patch-release WORKTREE_PATH=../BenchBox.wt
 cd ../BenchBox.wt-cut-patch-release
 make agent-write-preflight
 make release-cut VERSION=X.Y.Z
-# review the PR; wait for validate-base and release-required-result
 make release-finalize VERSION=X.Y.Z
 ```
 
@@ -376,7 +373,6 @@ tags. Passing the content check alone does not authorize tagging or publication.
 
 ```bash
 make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
-# hand-curate the [X.Y.Z] section of CHANGELOG.md, then
 make release-check VERSION=X.Y.Z [BASE_REF=<immutable-predecessor-sha>]
 ```
 

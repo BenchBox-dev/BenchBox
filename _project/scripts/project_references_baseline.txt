@@ -5,9 +5,7 @@
 .gitignore::_project/PROJECT_TODO.yaml
 .gitignore::_project/TODO_ENTRY_TEMPLATE.yaml
 .gitignore::_project/TODO_SCHEMA.yaml
-.importlinter::_project/TODO/main/planning/import-layering-enforcement.yaml
 Makefile::_project/cross-surface-baseline-autodetect/summary.json
-Makefile::_project/release-evidence/uat-gate-summary.json
 _blog/building-benchbox/outlines/01-why-we-deleted-plotly.md::_project/DONE/core-functionality/active/drop-plotly-html-charts.yaml
 _blog/building-benchbox/outlines/01-why-we-deleted-plotly.md::_project/DONE/core-functionality/planning/enhance-ascii-charting.yaml
 _blog/building-benchbox/outlines/12-sketch-functions-databricks-response.md::_project/DONE/main/read-primitives-approximate-aggregate-queries.yaml
@@ -32,7 +30,6 @@ docs/operations/uat-framework.md::_project/release-evidence/uat-gate-summary.jso
 docs/reference/public-contracts.md::_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml
 make/inventory.json::_project/cross-surface-baseline-autodetect/summary.json
 make/monolith-baseline.json::_project/cross-surface-baseline-autodetect/summary.json
-results-explorer/src/lib/starterQueries.ts::_project/TODO/.../explorer-canonical-browser-duckdb-read-model.yaml
 scripts/release_readiness_check.py::_project/release-evidence/uat-gate-summary.json
 tests/uat/_cli.py::_project/release-evidence/uat-gate-summary.json
 tests/unit/scripts/test_e2e_specs_have_no_hardcoded_ids.py::_project/audits/results-explorer-usability-20260507.md

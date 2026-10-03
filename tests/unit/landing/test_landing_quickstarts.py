@@ -74,7 +74,7 @@ def browser_catalog(gen, catalog):
 def _load_committed_generated_payload():
     text = GENERATED_PATH.read_text(encoding="utf-8")
     prefix = "window.__BENCHBOX_PROMPT_CATALOG__ = "
-    assert text.startswith("// AUTO-GENERATED")
+    assert text.startswith(prefix)
     payload = text.split(prefix, 1)[1].rsplit(";\n", 1)[0]
     return json.loads(payload)
 

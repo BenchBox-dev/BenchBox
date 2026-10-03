@@ -4386,56 +4386,6 @@
       "removal_trigger": "The function is split below the complexity limit."
     },
     {
-      "path": "benchbox/core/amplab/dataframe_queries/__init__.py",
-      "token": "# noqa: F401",
-      "count": 1,
-      "consumer": "Ruff rule F401",
-      "necessity": "Ruff F401 sees the otherwise unused _queries import. Importing benchbox.core.amplab.dataframe_queries.queries executes its module-level registrations, populating the registry exposed by this package.",
-      "alternative": "An explicit registration function would remove the side-effect import, but changes executable initialization and requires separate reviewed implementation.",
-      "owner": "comment-cleanup-amplab",
-      "removal_trigger": "Remove when package initialization explicitly invokes query registration without an otherwise unused import."
-    },
-    {
-      "path": "benchbox/core/clickbench/dataframe_queries/__init__.py",
-      "token": "# noqa: F401",
-      "count": 1,
-      "consumer": "Ruff rule F401",
-      "necessity": "Ruff F401 sees the otherwise unused _queries import. Importing benchbox.core.clickbench.dataframe_queries.queries executes its module-level registrations, populating the registry exposed by this package.",
-      "alternative": "An explicit registration function would remove the side-effect import, but changes executable initialization and requires separate reviewed implementation.",
-      "owner": "comment-cleanup-clickbench",
-      "removal_trigger": "Remove when package initialization explicitly invokes query registration without an otherwise unused import."
-    },
-    {
-      "path": "benchbox/core/coffeeshop/dataframe_queries/__init__.py",
-      "token": "# noqa: F401",
-      "count": 1,
-      "consumer": "Ruff rule F401",
-      "necessity": "Ruff F401 sees the otherwise unused _queries import. Importing benchbox.core.coffeeshop.dataframe_queries.queries executes its module-level registrations, populating the registry exposed by this package.",
-      "alternative": "An explicit registration function would remove the side-effect import, but changes executable initialization and requires separate reviewed implementation.",
-      "owner": "comment-cleanup-coffeeshop",
-      "removal_trigger": "Remove when package initialization explicitly invokes query registration without an otherwise unused import."
-    },
-    {
-      "path": "benchbox/core/h2odb/dataframe_queries/__init__.py",
-      "token": "# noqa: F401",
-      "count": 1,
-      "consumer": "Ruff rule F401",
-      "necessity": "Ruff F401 sees the otherwise unused _queries import. Importing benchbox.core.h2odb.dataframe_queries.queries executes its module-level registrations, populating the registry exposed by this package.",
-      "alternative": "An explicit registration function would remove the side-effect import, but changes executable initialization and requires separate reviewed implementation.",
-      "owner": "comment-cleanup-h2odb",
-      "removal_trigger": "Remove when package initialization explicitly invokes query registration without an otherwise unused import."
-    },
-    {
-      "path": "benchbox/core/ssb/dataframe_queries/__init__.py",
-      "token": "# noqa: F401",
-      "count": 1,
-      "consumer": "Ruff rule F401",
-      "necessity": "Ruff F401 sees the otherwise unused _queries import. Importing benchbox.core.ssb.dataframe_queries.queries executes its module-level registrations, populating the registry exposed by this package.",
-      "alternative": "An explicit registration function would remove the side-effect import, but changes executable initialization and requires separate reviewed implementation.",
-      "owner": "comment-cleanup-ssb",
-      "removal_trigger": "Remove when package initialization explicitly invokes query registration without an otherwise unused import."
-    },
-    {
       "path": "tests/unit/core/test_tpc_reporting_execution.py",
       "consumer": "pyproject.toml",
       "necessity": "Ruff measures this maintenance and integrity test at complexity 22 against the configured ceiling 18; its fake connection and maintenance operations exercise one existing scenario.",

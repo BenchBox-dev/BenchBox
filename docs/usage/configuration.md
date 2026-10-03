@@ -14,7 +14,6 @@ If no file is present, BenchBox uses sensible defaults. You can generate a tunin
 ## Minimal Example
 
 ```yaml
-# benchbox.yaml
 benchmarks:
   default_scale: 0.1
   continue_on_error: false
@@ -57,7 +56,7 @@ Use these helpers when you need to inspect or persist configuration programmatic
 ```python
 from benchbox.cli.config import ConfigManager
 
-config = ConfigManager()             # auto-detects benchbox.yaml
+config = ConfigManager()
 scale = config.get("benchmarks.default_scale")
 config.set("execution.power_run.iterations", 5)
 config.save_config()
@@ -103,10 +102,8 @@ Point `BENCHBOX_TUNING_CONFIG` at a configuration checked into your repo to make
 Before running large jobs, dry-run the plan and validate dependencies:
 
 ```bash
-# Render the execution plan without running anything
 uv run -- benchbox run --dry-run ./plan --platform duckdb --benchmark tpch
 
-# Check platform requirements declared in the config
 uv run -- benchbox check-deps --matrix
 ```
 

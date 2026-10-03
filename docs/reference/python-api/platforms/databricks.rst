@@ -35,7 +35,6 @@ Basic Configuration
     from benchbox.tpch import TPCH
     from benchbox.platforms.databricks import DatabricksAdapter
 
-    # Connect to Databricks SQL Warehouse
     adapter = DatabricksAdapter(
         server_hostname="dbc-12345678-abcd.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/abcd1234efgh5678",
@@ -44,7 +43,6 @@ Basic Configuration
         schema="benchbox"
     )
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=1.0)
     results = benchmark.run_with_platform(adapter)
 
@@ -53,14 +51,12 @@ Auto-Detection (Recommended)
 
 .. code-block:: python
 
-    # Auto-detect from Databricks SDK configuration
-    # Uses ~/.databrickscfg or environment variables
     from benchbox.platforms.databricks import DatabricksAdapter
 
     adapter = DatabricksAdapter.from_config({
         "benchmark": "tpch",
         "scale_factor": 1.0,
-        "very_verbose": True  # Shows auto-detection details
+        "very_verbose": True
     })
 
 API Reference
@@ -325,7 +321,6 @@ Environment Variables
 
 .. code-block:: bash
 
-    # Set Databricks credentials
     export DATABRICKS_HOST="https://dbc-12345678-abcd.cloud.databricks.com"
     export DATABRICKS_TOKEN="dapi1234567890abcdef"
     export DATABRICKS_WAREHOUSE_ID="abcd1234efgh5678"
@@ -335,7 +330,6 @@ Environment Variables
     import os
     from benchbox.platforms.databricks import DatabricksAdapter
 
-    # Use environment variables
     adapter = DatabricksAdapter(
         server_hostname=os.environ["DATABRICKS_HOST"].replace("https://", ""),
         http_path=f"/sql/1.0/warehouses/{os.environ['DATABRICKS_WAREHOUSE_ID']}",
@@ -347,7 +341,6 @@ Unity Catalog Configuration
 
 .. code-block:: python
 
-    # With Unity Catalog volumes for staging
     adapter = DatabricksAdapter(
         server_hostname="workspace.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/abc123",
@@ -359,14 +352,12 @@ Unity Catalog Configuration
         uc_volume="tpch_staging"
     )
 
-    # Data will be staged to: dbfs:/Volumes/staging/benchmark_data/tpch_staging/
 
 S3 Staging Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-    # Use S3 for data staging
     adapter = DatabricksAdapter(
         server_hostname="workspace.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/abc123",
@@ -379,7 +370,6 @@ Delta Lake Optimization
 
 .. code-block:: python
 
-    # High-performance Delta Lake configuration
     adapter = DatabricksAdapter(
         server_hostname="workspace.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/large-warehouse",
@@ -397,10 +387,6 @@ Personal Access Token
 
 .. code-block:: bash
 
-    # Generate token in Databricks UI:
-    # User Settings → Developer → Access Tokens → Generate New Token
-
-    # Use in environment
     export DATABRICKS_TOKEN="dapi1234567890abcdef"
 
 Databricks CLI Configuration
@@ -408,11 +394,8 @@ Databricks CLI Configuration
 
 .. code-block:: bash
 
-    # Configure Databricks CLI
     databricks configure --token
-    # Enter workspace URL and token
 
-    # Then use auto-detection
     adapter = DatabricksAdapter.from_config({
         "benchmark": "tpch",
         "scale_factor": 1.0
@@ -423,7 +406,6 @@ Service Principal (Production)
 
 .. code-block:: python
 
-    # For production deployments
     from databricks.sdk import WorkspaceClient
     from databricks.sdk.oauth import ClientCredentials
 
@@ -452,7 +434,6 @@ UC Volumes (Recommended)
     from benchbox.tpch import TPCH
     from pathlib import Path
 
-    # Configure adapter with UC Volume
     adapter = DatabricksAdapter(
         server_hostname="workspace.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/abc123",
@@ -462,15 +443,11 @@ UC Volumes (Recommended)
         uc_volume="tpch_volume"
     )
 
-    # Generate data locally
     benchmark = TPCH(scale_factor=1.0)
     data_dir = Path("./tpch_data")
     benchmark.generate_data(data_dir)
 
-    # Upload to UC Volume (manual step)
-    # databricks fs cp -r ./tpch_data/ dbfs:/Volumes/staging/benchmark_data/tpch_volume/
 
-    # Load data using COPY INTO
     conn = adapter.create_connection()
     table_stats, load_time = adapter.load_data(benchmark, conn, data_dir)
 
@@ -479,7 +456,6 @@ S3 Data Loading
 
 .. code-block:: python
 
-    # Load directly from S3
     adapter = DatabricksAdapter(
         server_hostname="workspace.cloud.databricks.com",
         http_path="/sql/1.0/warehouses/abc123",
@@ -487,8 +463,6 @@ S3 Data Loading
         staging_root="s3://my-bucket/benchbox-data"
     )
 
-    # Data is loaded via COPY INTO from S3
-    # Ensure IAM role or instance profile has S3 read permissions
 
 Delta Lake Tables
 -----------------
@@ -503,26 +477,18 @@ All benchmark tables are automatically created as Delta Lake tables:
     adapter = DatabricksAdapter(...)
     conn = adapter.create_connection()
 
-    # Creates Delta Lake tables automatically
     schema_time = adapter.create_schema(benchmark, conn)
 
-    # Tables created with:
-    # - USING DELTA format
-    # - Auto-optimize enabled
-    # - Auto-compact enabled
 
 Manual Delta Optimization
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. code-block:: python
 
-    # Optimize specific table
     adapter.optimize_table(conn, "lineitem")
 
-    # Vacuum old files (removes files older than retention period)
-    adapter.vacuum_table(conn, "lineitem", hours=168)  # 7 days
+    adapter.vacuum_table(conn, "lineitem", hours=168)
 
-    # Z-ORDER clustering for query performance
     cursor = conn.cursor()
     cursor.execute("""
         OPTIMIZE lineitem
@@ -534,22 +500,18 @@ Delta Lake Time Travel
 
 .. code-block:: python
 
-    # Query historical data
     cursor = conn.cursor()
 
-    # Query by version
     cursor.execute("""
         SELECT * FROM lineitem VERSION AS OF 5
         WHERE l_shipdate = '1995-01-01'
     """)
 
-    # Query by timestamp
     cursor.execute("""
         SELECT * FROM lineitem TIMESTAMP AS OF '2025-01-01 00:00:00'
         WHERE l_shipdate = '1995-01-01'
     """)
 
-    # View table history
     cursor.execute("DESCRIBE HISTORY lineitem")
     history = cursor.fetchall()
 
@@ -564,7 +526,6 @@ Basic Query Execution
     adapter = DatabricksAdapter(...)
     conn = adapter.create_connection()
 
-    # Execute SQL query
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
@@ -587,7 +548,6 @@ Query Plans and Optimization
 
 .. code-block:: python
 
-    # View query plan
     cursor.execute("""
         EXPLAIN FORMATTED
         SELECT * FROM lineitem
@@ -595,7 +555,6 @@ Query Plans and Optimization
     """)
     plan = cursor.fetchall()
 
-    # View query costs
     cursor.execute("""
         EXPLAIN COST
         SELECT count(*) FROM lineitem
@@ -610,14 +569,11 @@ Spark Configuration
 
 .. code-block:: python
 
-    # Configure Spark settings for performance
     cursor = conn.cursor()
 
-    # Adaptive Query Execution
     cursor.execute("SET spark.sql.adaptive.enabled = true")
     cursor.execute("SET spark.sql.adaptive.coalescePartitions.enabled = true")
 
-    # Join optimization
     cursor.execute("SET spark.sql.adaptive.skewJoin.enabled = true")
     cursor.execute("SET spark.sql.join.preferSortMergeJoin = true")
 
@@ -626,7 +582,6 @@ Partitioning Strategy
 
 .. code-block:: python
 
-    # Create partitioned Delta table
     cursor.execute("""
         CREATE OR REPLACE TABLE orders
         USING DELTA
@@ -643,13 +598,11 @@ Clustering and Z-ORDER
 
 .. code-block:: python
 
-    # Z-ORDER clustering for co-location
     cursor.execute("""
         OPTIMIZE lineitem
         ZORDER BY (l_orderkey, l_partkey, l_shipdate)
     """)
 
-    # Check optimization metrics
     cursor.execute("DESCRIBE HISTORY lineitem")
     history = cursor.fetchall()
 
@@ -658,8 +611,6 @@ Photon Engine
 
 .. code-block:: python
 
-    # Photon is enabled automatically on compatible warehouses
-    # Check if Photon is active
     cursor.execute("SET spark.databricks.photon.enabled")
     result = cursor.fetchone()
     print(f"Photon enabled: {result}")
@@ -674,10 +625,7 @@ Warehouse Selection
 
    .. code-block:: python
 
-       # Small: 1-10GB data, development
-       # Medium: 10-100GB data, testing
-       # Large: 100GB-1TB data, production
-       # X-Large/2X-Large: 1TB+ data, heavy workloads
+
 
 2. **Use Serverless SQL Warehouses** for variable workloads:
 
@@ -722,17 +670,14 @@ Delta Lake Optimization
 
    .. code-block:: python
 
-       # After bulk loads
        adapter.optimize_table(conn, "lineitem")
 
-       # With Z-ORDER for query patterns
        cursor.execute("OPTIMIZE lineitem ZORDER BY (l_shipdate, l_orderkey)")
 
 3. **Vacuum old files** to reduce storage costs:
 
    .. code-block:: python
 
-       # Keep 7 days of history
        adapter.vacuum_table(conn, "lineitem", hours=168)
 
 Cost Optimization
@@ -743,14 +688,13 @@ Cost Optimization
    .. code-block:: python
 
        adapter = DatabricksAdapter(
-           auto_terminate_minutes=10  # Terminate after 10 min idle
+           auto_terminate_minutes=10
        )
 
 2. **Use smallest warehouse** that meets SLA:
 
    .. code-block:: python
 
-       # Start small, scale up if needed
        adapter = DatabricksAdapter(
            cluster_size="Small"
        )
@@ -773,7 +717,6 @@ Warehouse Not Available
 
 .. code-block:: python
 
-    # 1. Check warehouse status
     from databricks.sdk import WorkspaceClient
 
     w = WorkspaceClient()
@@ -781,10 +724,7 @@ Warehouse Not Available
     for wh in warehouses:
         print(f"{wh.name}: {wh.state}")
 
-    # 2. Start warehouse manually
-    # Or use serverless warehouses (auto-start)
 
-    # 3. Wait for auto-start (may take 1-2 minutes)
     import time
     adapter = DatabricksAdapter(...)
     for attempt in range(5):
@@ -807,18 +747,12 @@ Authentication Failed
 
 .. code-block:: bash
 
-    # 1. Verify token hasn't expired
-    databricks workspace list  # Test token
+    databricks workspace list
 
-    # 2. Generate new token
-    # Databricks UI → User Settings → Access Tokens
-
-    # 3. Check environment variables
     echo $DATABRICKS_TOKEN
 
 .. code-block:: python
 
-    # 4. Verify token in code
     import os
     token = os.getenv("DATABRICKS_TOKEN")
     if not token:
@@ -833,19 +767,16 @@ Unity Catalog Errors
 
 .. code-block:: python
 
-    # 1. Check catalog permissions
     cursor = conn.cursor()
     cursor.execute("SHOW CATALOGS")
     catalogs = cursor.fetchall()
     print("Available catalogs:", catalogs)
 
-    # 2. Use workspace catalog (always available)
     adapter = DatabricksAdapter(
-        catalog="workspace",  # Or "hive_metastore"
+        catalog="workspace",
         schema="default"
     )
 
-    # 3. Create catalog if authorized
     adapter = DatabricksAdapter(
         catalog="benchmarks",
         schema="tpch",
@@ -861,25 +792,17 @@ Slow Query Performance
 
 .. code-block:: python
 
-    # 1. Enable Photon (if not already enabled)
-    # Use Photon-enabled warehouse
-
-    # 2. Optimize Delta tables
     adapter.optimize_table(conn, "lineitem")
 
-    # 3. Add Z-ORDER clustering
     cursor.execute("""
         OPTIMIZE lineitem
         ZORDER BY (l_orderkey, l_shipdate)
     """)
 
-    # 4. Update table statistics
     cursor.execute("ANALYZE TABLE lineitem COMPUTE STATISTICS")
 
-    # 5. Check query plan
     cursor.execute("EXPLAIN EXTENDED SELECT ...")
     plan = cursor.fetchall()
-    # Look for FullScan - may need better clustering
 
 Out of Memory Errors
 ~~~~~~~~~~~~~~~~~~~~
@@ -890,16 +813,11 @@ Out of Memory Errors
 
 .. code-block:: python
 
-    # 1. Use larger warehouse
-    # Switch from Medium to Large or X-Large
-
-    # 2. Optimize data layout
     cursor.execute("""
         OPTIMIZE lineitem
         ZORDER BY (l_orderkey)
     """)
 
-    # 3. Reduce data scan with partitioning
     cursor.execute("""
         CREATE OR REPLACE TABLE lineitem_partitioned
         USING DELTA

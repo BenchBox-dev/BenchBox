@@ -46,13 +46,11 @@ BenchBox provides the following commands:
 ## Quick Start
 
 ```bash
-# Run a simple TPC-H benchmark on DuckDB
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
-# Get help for any command
 benchbox run --help
-benchbox run --help-topic all       # All options including advanced
-benchbox run --help-topic examples  # Categorized usage examples
+benchbox run --help-topic all
+benchbox run --help-topic examples
 ```
 
 ## Documentation Sections

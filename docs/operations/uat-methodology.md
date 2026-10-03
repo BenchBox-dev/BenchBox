@@ -22,10 +22,8 @@ fresh per-platform / per-benchmark numbers.
 ### Invocation
 
 ```bash
-# Roll up an entire sweep results directory:
 make uat-validate RESULTS_DIR=~/Developer/benchmark_runs/results OUTPUT_TSV=uat-rollup.tsv
 
-# Direct module form, useful inside scripts:
 uv run -- python -m tests.uat._cli validate \
     --results-dir ~/Developer/benchmark_runs/results \
     --output-tsv uat-rollup.tsv

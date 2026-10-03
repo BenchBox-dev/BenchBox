@@ -75,13 +75,11 @@ literal gaps. The following still do **not** trip the gate today:
 Append an inline marker on the same line as the literal:
 
 ```tsx
-// JS / TS / TSX / JSX
-<div class="text-gray-700" /> // allow-explorer-token-literal: third-party widget skin
+<div class="text-gray-700" />
 ```
 
 ```css
-/* CSS */
-.legacy-badge { color: theme('colors.gray.700'); } /* allow-explorer-token-literal: legacy alias retained for badge migration */
+.legacy-badge { color: theme('colors.gray.700'); }
 ```
 
 The marker requires a non-empty reason. Lines without a reason still trip

@@ -1,39 +1,8 @@
-# visible_metrics.yaml
-# Registry of every user-visible metric in the BenchBox results explorer.
-#
-# This file is the G-2 parity test driver for the DuckDB-only browser metric
-# contract. Tests read this registry and dispatch on `kind`:
-#
-#   raw_copy  → assert DuckDB column == committed bundle field verbatim
-#   derived   → assert DuckDB-backed read-path value == canonical Python
-#               reference computation (_project.scripts.explorer_pipeline.*),
-#               within the `tolerance` declared per metric
-#
-# "Canonical Python reference computation" means the pipeline's own Python
-# implementation under _project/scripts/explorer_pipeline/ (plus read-only
-# imports from benchbox/core/results/). TypeScript code is NEVER a reference
-# oracle. Pre-calculated CLI JSON artifacts and bridge artifacts are NEVER
-# a reference oracle.
-#
-# Fields:
-#   table            DuckDB canonical table or view name
-#   column           column name in that table/view
-#   kind             raw_copy | derived
-#   source_field     (raw_copy) JSON path in the committed bundle
-#   canonical_ref    (derived) Python dotted path to the reference function
-#   tolerance        (derived) max relative divergence (0 = exact match)
-#   display_surfaces list of UI surfaces that render this column
-#   notes            optional clarification
-
 schema_version: 1
 generated_date: "2026-04-18"
 originating_todo: explorer-canonical-browser-duckdb-read-model
 
 metrics:
-
-  # ---------------------------------------------------------------------------
-  # results table - base table, one row per result bundle
-  # ---------------------------------------------------------------------------
 
   - table: results
     column: result_id
@@ -319,10 +288,6 @@ metrics:
     display_surfaces: [result_detail]
     notes: "Constructed as {bundle_url_prefix}/{result_id}.json"
 
-  # ---------------------------------------------------------------------------
-  # query_display_timings table - one row per (result_id, query_id)
-  # ---------------------------------------------------------------------------
-
   - table: query_display_timings
     column: display_ms
     kind: derived
@@ -340,10 +305,6 @@ metrics:
     tolerance: 0
     display_surfaces: [result_detail]
     notes: "Number of passing measurement runs that contributed to display_ms"
-
-  # ---------------------------------------------------------------------------
-  # query_executions table - one row per individual query run
-  # ---------------------------------------------------------------------------
 
   - table: query_executions
     column: duration_ms
@@ -375,10 +336,6 @@ metrics:
     source_field: "queries[].stream"
     display_surfaces: [result_detail]
 
-  # ---------------------------------------------------------------------------
-  # benchmark_matrix_cells table - Platform × Query display_ms per cohort
-  # ---------------------------------------------------------------------------
-
   - table: benchmark_matrix_cells
     column: display_ms
     kind: derived
@@ -389,10 +346,6 @@ metrics:
       Same value as query_display_timings.display_ms for the same (result_id, query_id).
       Denormalized into this table so the matrix view loads one record per
       (benchmark, scale_factor, phase) instead of joining across all results.
-
-  # ---------------------------------------------------------------------------
-  # benchmark_rankings table - per-(benchmark, scale, phase, result_id) ranking
-  # ---------------------------------------------------------------------------
 
   - table: benchmark_rankings
     column: rank
@@ -454,15 +407,6 @@ metrics:
     display_surfaces: [benchmark_index, compare]
     notes: "≥ 1.0 - slowest row in cohort = 1.0, better rows > 1.0; direction-aware on primary_metric"
 
-  # ---------------------------------------------------------------------------
-  # cohort_metadata table - meta-leaderboard cohort + per-variant ranks
-  #
-  # PRIMARY KEY is (cohort_key, result_id): one row PER PUBLISHABLE VARIANT,
-  # not per platform. Same platform may appear more than once per cohort when
-  # run with different tuning_mode or trust_label. The pipeline preserves all
-  # variants; the UI is responsible for any display-time collapsing.
-  # ---------------------------------------------------------------------------
-
   - table: cohort_metadata
     column: rank
     kind: derived
@@ -514,10 +458,6 @@ metrics:
     display_surfaces: [home]
     notes: "Enables Home to surface cross-trust-level comparisons on the cohort panel without a secondary query"
 
-  # ---------------------------------------------------------------------------
-  # meta_leaderboard table - pre-computed cross-cohort platform summary
-  # ---------------------------------------------------------------------------
-
   - table: meta_leaderboard
     column: avg_rank
     kind: derived
@@ -536,10 +476,6 @@ metrics:
     tolerance: 0
     display_surfaces: [home]
     notes: "Count of cohorts in which this platform has a non-null rank"
-
-  # ---------------------------------------------------------------------------
-  # short_ids table - short_id -> result_id mapping
-  # ---------------------------------------------------------------------------
 
   - table: short_ids
     column: short_id

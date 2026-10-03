@@ -18,7 +18,6 @@ describe("TuningVerificationBadge", () => {
     expect(tuningVerificationLabel(null)).toBe("Not recorded");
     expect(tuningVerificationLabel(undefined)).toBe("Not recorded");
     expect(tuningVerificationLabel("")).toBe("Not recorded");
-    // An unrecognized future status must not silently read as verified.
     expect(tuningVerificationLabel("some_new_status")).toBe("Not recorded");
   });
 

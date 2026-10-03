@@ -150,14 +150,11 @@ ORDER BY sl.l_returnflag, sl.l_linestatus
 ```python
 from benchbox import DataVault
 
-# Initialize benchmark
 dv = DataVault(scale_factor=1.0, output_dir="datavault_data")
 
-# Generate data (TPC-H → Data Vault transformation)
 data_files = dv.generate_data()
 print(f"Generated {len(data_files)} tables")
 
-# Get queries
 queries = dv.get_queries()
 query_1 = dv.get_query(1)
 ```
@@ -168,15 +165,12 @@ query_1 = dv.get_query(1)
 import duckdb
 from benchbox import DataVault
 
-# Generate Data Vault data
 dv = DataVault(scale_factor=0.1, output_dir="dv_test")
 data_files = dv.generate_data()
 
-# Create schema
 conn = duckdb.connect("datavault.duckdb")
 conn.execute(dv.get_create_tables_sql())
 
-# Load tables in order
 for table_name in dv.get_table_loading_order():
     file_path = data_files.get(table_name)
     if file_path:
@@ -185,7 +179,6 @@ for table_name in dv.get_table_loading_order():
             SELECT * FROM read_csv('{file_path}', delim='|', header=false)
         """)
 
-# Run queries
 for query_id in range(1, 23):
     result = conn.execute(dv.get_query(query_id)).fetchall()
     print(f"Q{query_id}: {len(result)} rows")
@@ -194,13 +187,10 @@ for query_id in range(1, 23):
 ### CLI Usage
 
 ```bash
-# Generate data
 benchbox run --platform duckdb --benchmark datavault --scale 1.0 --phases generate
 
-# Run power test
 benchbox run --platform duckdb --benchmark datavault --scale 1.0 --phases power
 
-# Dry run to preview queries
 benchbox run --dry-run ./preview --platform duckdb --benchmark datavault --scale 0.1
 ```
 
@@ -219,7 +209,6 @@ Configure Data Vault via `--benchmark-option KEY=VALUE`:
 Accepts hyphenated aliases (e.g. `hash-algorithm`, `record-source`).
 
 ```bash
-# Custom record source (hash algorithm stays md5 - SHA-256 is rejected at the CLI)
 benchbox run --platform duckdb --benchmark datavault --scale 1 \
   --benchmark-option record_source=MY_SOURCE
 ```
@@ -228,14 +217,14 @@ benchbox run --platform duckdb --benchmark datavault --scale 1 \
 
 ```python
 DataVault(
-    scale_factor=1.0,       # TPC-H scale factor (1.0 = ~1GB source)
-    output_dir="output",    # Directory for generated files
-    parallel=4,             # Parallel workers for TPC-H generation
-    force_regenerate=False, # Regenerate even if data exists
-    hash_algorithm="md5",   # Hash algorithm (only md5 supported)
-    record_source="TPCH",   # Source identifier for audit columns
-    compress_data=False,    # Enable file compression
-    compression_type="gzip" # Compression type (gzip, zstd)
+    scale_factor=1.0,
+    output_dir="output",
+    parallel=4,
+    force_regenerate=False,
+    hash_algorithm="md5",
+    record_source="TPCH",
+    compress_data=False,
+    compression_type="gzip"
 )
 ```
 
@@ -270,16 +259,16 @@ from benchbox.core.datavault import validate_row_counts
 report = validate_row_counts(
     data_dir=Path("datavault_data"),
     scale_factor=1.0,
-    use_manifest=True,   # prefers _datagen_manifest.json if present
-    tolerance_pct=1.0,   # default variance allowance
+    use_manifest=True,
+    tolerance_pct=1.0,
 )
 
-print(report)                  # human-readable summary
-print(report.is_valid)         # True when every table is within tolerance
-print(report.tables_passed,    # counts populated by __post_init__
+print(report)
+print(report.is_valid)
+print(report.tables_passed,
       report.tables_failed,
       report.tables_validated)
-report.to_dict()               # serialisable form for JSON output
+report.to_dict()
 ```
 
 Fields on `DataVaultValidationReport`:

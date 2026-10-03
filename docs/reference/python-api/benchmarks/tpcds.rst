@@ -27,13 +27,10 @@ Quick Start
     from benchbox.tpcds import TPCDS
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark
     benchmark = TPCDS(scale_factor=1.0)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on platform
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
@@ -139,13 +136,10 @@ Get a specific TPC-DS query.
 
 .. code-block:: python
 
-    # Get query 1
     q1 = benchmark.get_query(1)
 
-    # Get with dialect translation
     q1_bq = benchmark.get_query(1, dialect="bigquery")
 
-    # Get with custom parameters
     q1_param = benchmark.get_query(1, seed=42, scale_factor=10.0)
 
 Parameters:
@@ -171,11 +165,9 @@ Get all TPC-DS queries.
 
 .. code-block:: python
 
-    # Get all queries
     queries = benchmark.get_queries()
     print(f"Total queries: {len(queries)}")
 
-    # Get with dialect translation
     queries_bq = benchmark.get_queries(dialect="bigquery")
 
 Parameters:
@@ -233,13 +225,10 @@ Get CREATE TABLE SQL for all tables.
 
 .. code-block:: python
 
-    # Standard SQL
     create_sql = benchmark.get_create_tables_sql()
 
-    # With dialect
     create_sql_bq = benchmark.get_create_tables_sql(dialect="bigquery")
 
-    # With tuning configuration
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
@@ -259,7 +248,6 @@ Generate query streams for throughput testing.
 
 .. code-block:: python
 
-    # Generate 4 concurrent streams
     streams = benchmark.generate_streams(
         num_streams=4,
         rng_seed=42,
@@ -320,17 +308,13 @@ Basic Benchmark Run
     from benchbox.tpcds import TPCDS
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark with scale factor 1 (~1GB)
     benchmark = TPCDS(scale_factor=1.0)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on DuckDB
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
-    # Print results
     print(f"Benchmark: {results.benchmark_name}")
     print(f"Total time: {results.total_execution_time:.2f}s")
     print(f"Queries: {results.successful_queries}/{results.total_queries}")
@@ -349,11 +333,9 @@ Query Subset Execution
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Load data
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Execute reporting queries (1-10)
     for query_id in range(1, 11):
         query = benchmark.get_query(query_id)
         result = adapter.execute_query(conn, query, f"query{query_id}")
@@ -383,7 +365,6 @@ Query Complexity Analysis
         }
         complexity_metrics.append(metrics)
 
-    # Sort by complexity
     sorted_queries = sorted(
         complexity_metrics,
         key=lambda x: (x["subqueries"], x["joins"], x["window_functions"]),
@@ -438,7 +419,6 @@ Variant Testing
 
     benchmark = TPCDS(scale_factor=1.0)
 
-    # Generate queries with different seeds
     variants = {}
     for seed in [42, 123, 456]:
         variant_queries = {}
@@ -449,7 +429,6 @@ Variant Testing
             )
         variants[seed] = variant_queries
 
-    # Compare query variants
     q1_v1 = variants[42][1]
     q1_v2 = variants[123][1]
     if q1_v1 != q1_v2:
@@ -467,7 +446,6 @@ Stream-Based Testing
     benchmark = TPCDS(scale_factor=1.0)
     benchmark.generate_data()
 
-    # Generate 4 concurrent streams
     streams = benchmark.generate_streams(num_streams=4, rng_seed=42)
 
     adapter = DuckDBAdapter()
@@ -487,7 +465,6 @@ Stream-Based Testing
 
         return {"stream_id": stream_id, "total_time": total_time}
 
-    # Run streams in parallel
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(run_stream, i) for i in range(1, 5)]
         results = [f.result() for f in concurrent.futures.as_completed(futures)]

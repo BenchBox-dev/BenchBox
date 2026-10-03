@@ -2,12 +2,8 @@ drop table s_store;
 create table s_store as 
 select * from 
 (select s_store_id stor_store_id
-       --,stor_address_id
-       --,stor_divison_id
-       --,stor_opened_date
        ,d1.d_date stor_closed_date
        ,s_store_name stor_name
-       --,stor_store_class
        ,s_number_employees stor_employees
        ,s_floor_space stor_floor_space
        ,s_hours stor_hours

@@ -30,18 +30,15 @@ from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningType
 
-# Create optimized tuning configuration
 tuning = UnifiedTuningConfiguration()
 
-# Enable table partitioning for large tables
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.PARTITIONING,
     columns=["l_shipdate"],
-    num_partitions=12  # Monthly partitions
+    num_partitions=12
 )
 
-# Enable clustered indexes on frequently joined columns
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.CLUSTERING,
@@ -54,10 +51,8 @@ tuning.enable_table_tuning(
     columns=["o_orderkey"]
 )
 
-# Create benchmark with tunings
 benchmark = TPCH(scale_factor=1.0)
 
-# Run with optimized configuration
 adapter = DuckDBAdapter(memory_limit="8GB", threads=8)
 results = adapter.run_benchmark(benchmark, tuning_config=tuning)
 
@@ -73,7 +68,6 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningTyp
 
 tuning = UnifiedTuningConfiguration()
 
-# Partition large tables by date
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.PARTITIONING,
@@ -81,14 +75,12 @@ tuning.enable_table_tuning(
     partition_by="toYYYYMM(l_shipdate)"
 )
 
-# Order by common filter columns
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.SORTING,
     columns=["l_orderkey", "l_partkey"]
 )
 
-# Enable compression
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.COMPRESSION,
@@ -109,26 +101,22 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningTyp
 
 tuning = UnifiedTuningConfiguration()
 
-# Z-ordering for multi-dimensional clustering
 tuning.enable_platform_optimization(
     TuningType.Z_ORDERING,
     table_name="lineitem",
     columns=["l_orderkey", "l_partkey", "l_shipdate"]
 )
 
-# Auto-optimize for background compaction
 tuning.enable_platform_optimization(
     TuningType.AUTO_OPTIMIZE,
     enabled=True
 )
 
-# Auto-compact for small files
 tuning.enable_platform_optimization(
     TuningType.AUTO_COMPACT,
     enabled=True
 )
 
-# Bloom filters for high-cardinality columns
 tuning.enable_platform_optimization(
     TuningType.BLOOM_FILTER_INDEX,
     table_name="lineitem",
@@ -156,7 +144,6 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningTyp
 
 tuning = UnifiedTuningConfiguration()
 
-# Clustering keys for frequently filtered columns
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.CLUSTERING,
@@ -169,7 +156,6 @@ tuning.enable_table_tuning(
     columns=["o_orderdate", "o_custkey"]
 )
 
-# Partition large tables
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.PARTITIONING,
@@ -179,7 +165,7 @@ tuning.enable_table_tuning(
 
 benchmark = TPCH(scale_factor=100.0)
 adapter = SnowflakeAdapter(
-    warehouse="LARGE_WH",  # Use larger warehouse
+    warehouse="LARGE_WH",
     database="BENCHMARKS",
     schema="TPCH"
 )
@@ -196,7 +182,6 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningTyp
 
 tuning = UnifiedTuningConfiguration()
 
-# Partition by date column (native BigQuery partitioning)
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.PARTITIONING,
@@ -204,7 +189,6 @@ tuning.enable_table_tuning(
     partition_type="DAY"
 )
 
-# Clustering for multi-column optimization
 tuning.enable_table_tuning(
     "lineitem",
     TuningType.CLUSTERING,
@@ -231,15 +215,12 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration, TuningType
 
 def create_comprehensive_tuning(benchmark_name: str, scale_factor: float):
-    """Create comprehensive tuning configuration based on benchmark and scale."""
     tuning = UnifiedTuningConfiguration()
 
     if benchmark_name == "tpcds":
-        # TPC-DS specific optimizations
         fact_tables = ["store_sales", "web_sales", "catalog_sales"]
 
         for table in fact_tables:
-            # Partition by date
             tuning.enable_table_tuning(
                 table,
                 TuningType.PARTITIONING,
@@ -249,7 +230,6 @@ def create_comprehensive_tuning(benchmark_name: str, scale_factor: float):
                 num_partitions=24 if scale_factor >= 1.0 else 12
             )
 
-            # Cluster by primary key
             primary_keys = {
                 "store_sales": ["ss_item_sk", "ss_ticket_number"],
                 "web_sales": ["ws_item_sk", "ws_order_number"],
@@ -262,7 +242,6 @@ def create_comprehensive_tuning(benchmark_name: str, scale_factor: float):
                 columns=primary_keys[table]
             )
 
-        # Add indexes on dimension tables
         dimension_tables = ["item", "store", "customer", "date_dim"]
 
         for dim_table in dimension_tables:
@@ -278,7 +257,6 @@ def create_comprehensive_tuning(benchmark_name: str, scale_factor: float):
 
     return tuning
 
-# Usage
 tuning = create_comprehensive_tuning("tpcds", scale_factor=10.0)
 benchmark = TPCDS(scale_factor=10.0)
 adapter = DuckDBAdapter(memory_limit="16GB", threads=16)
@@ -299,7 +277,6 @@ from benchbox.core.tuning.interface import (
 
 tuning = UnifiedTuningConfiguration()
 
-# Define primary keys for referential integrity
 tuning.add_primary_key(
     PrimaryKeyConfiguration(
         table_name="nation",
@@ -316,7 +293,6 @@ tuning.add_primary_key(
     )
 )
 
-# Define foreign keys to enable join optimizations
 tuning.add_foreign_key(
     ForeignKeyConfiguration(
         table_name="nation",
@@ -352,16 +328,13 @@ Run only performance-critical queries:
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Identify slow queries from previous run
 slow_queries = [1, 6, 12, 17, 21]
 
 benchmark = TPCH(scale_factor=1.0)
 adapter = DuckDBAdapter()
 
-# Generate data once
 benchmark.generate_data()
 
-# Run only specific queries
 for query_id in slow_queries:
     query = benchmark.get_query(query_id)
 
@@ -391,35 +364,28 @@ class CachedBenchmark:
         self.cache = {}
 
     def run_query_cached(self, query_id):
-        """Run query with caching."""
         query_sql = self.benchmark.get_query(query_id)
 
-        # Create cache key from query
         cache_key = hashlib.md5(query_sql.encode()).hexdigest()
 
         if cache_key in self.cache:
             print(f"Query {query_id}: Cache hit")
             return self.cache[cache_key]
 
-        # Execute query
         print(f"Query {query_id}: Cache miss, executing...")
         conn = self.adapter.create_connection()
         result = conn.execute(query_sql).fetchall()
 
-        # Cache result
         self.cache[cache_key] = result
 
         return result
 
-# Usage
 benchmark = TPCH(scale_factor=0.01)
 adapter = DuckDBAdapter()
 cached = CachedBenchmark(benchmark, adapter)
 
-# First run - cache miss
 result1 = cached.run_query_cached(1)
 
-# Second run - cache hit
 result2 = cached.run_query_cached(1)
 ```
 
@@ -435,13 +401,10 @@ from concurrent.futures import ProcessPoolExecutor
 import time
 
 def generate_with_parallelization(scale_factor: float, num_workers: int = 4):
-    """Generate benchmark data using multiple processes."""
     start_time = time.time()
 
     benchmark = TPCH(scale_factor=scale_factor)
 
-    # TPC tools handle parallelization internally for most benchmarks
-    # But we can optimize by controlling worker count
     data_files = benchmark.generate_data(verbose=True)
 
     generation_time = time.time() - start_time
@@ -453,7 +416,6 @@ def generate_with_parallelization(scale_factor: float, num_workers: int = 4):
 
     return data_files
 
-# Generate with optimization
 data_files = generate_with_parallelization(scale_factor=1.0, num_workers=8)
 ```
 
@@ -466,7 +428,6 @@ from benchbox.tpch import TPCH
 from pathlib import Path
 
 def get_or_generate_data(benchmark_name: str, scale_factor: float, cache_dir: str = "data_cache"):
-    """Get cached data or generate if not exists."""
     cache_path = Path(cache_dir) / benchmark_name / f"sf{scale_factor}"
 
     if cache_path.exists() and list(cache_path.glob("*.tbl")):
@@ -481,11 +442,9 @@ def get_or_generate_data(benchmark_name: str, scale_factor: float, cache_dir: st
 
     return cache_path
 
-# Usage - data generated once, reused for all runs
 data_dir = get_or_generate_data("tpch", scale_factor=1.0)
 
 benchmark = TPCH(scale_factor=1.0, output_dir=str(data_dir))
-# Use existing data instead of regenerating
 ```
 
 ## Cloud Platform Optimization
@@ -498,24 +457,19 @@ Optimize data loading from S3:
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Generate data directly to S3
 benchmark = TPCH(
     scale_factor=10.0,
     output_dir="s3://my-benchbox-bucket/tpch/sf10"
 )
 
-# Generate once, use many times
 benchmark.generate_data(verbose=True)
 
-# DuckDB can read directly from S3
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load data from S3 (DuckDB handles S3 natively)
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, "s3://my-benchbox-bucket/tpch/sf10")
 
-# Run queries
 results = adapter.run_benchmark(benchmark)
 ```
 
@@ -527,16 +481,13 @@ Use cloud storage in the same region as compute:
 from benchbox.tpch import TPCH
 from benchbox.platforms.databricks import DatabricksAdapter
 
-# Use UC Volumes in same region as workspace
 benchmark = TPCH(
     scale_factor=100.0,
     output_dir="dbfs:/Volumes/main/benchmarks/tpch_sf100"
 )
 
-# Generate to regional storage
 benchmark.generate_data(verbose=True)
 
-# Run on same-region warehouse
 adapter = DatabricksAdapter(
     warehouse_id="your_warehouse_id",
     catalog="main",
@@ -558,32 +509,25 @@ from benchbox.tpcds import TPCDS
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 def run_memory_optimized_benchmark(scale_factor: float):
-    """Run benchmark with aggressive memory management."""
-    # Configure DuckDB with memory limits
     adapter = DuckDBAdapter(
-        memory_limit="8GB",  # Set explicit limit
-        threads=4  # Limit parallelism to control memory
+        memory_limit="8GB",
+        threads=4
     )
 
     benchmark = TPCDS(scale_factor=scale_factor)
 
-    # Generate data in chunks if needed
     print("Generating data...")
     benchmark.generate_data()
 
-    # Force garbage collection before loading
     gc.collect()
 
-    # Run benchmark
     print("Running benchmark...")
     results = adapter.run_benchmark(benchmark)
 
-    # Cleanup
     gc.collect()
 
     return results
 
-# Usage
 results = run_memory_optimized_benchmark(scale_factor=10.0)
 ```
 
@@ -597,7 +541,6 @@ from pathlib import Path
 import shutil
 
 def run_with_cleanup(scale_factor: float, temp_dir: str = "/tmp/benchbox"):
-    """Run benchmark with automatic cleanup."""
     temp_path = Path(temp_dir)
     temp_path.mkdir(parents=True, exist_ok=True)
 
@@ -611,11 +554,9 @@ def run_with_cleanup(scale_factor: float, temp_dir: str = "/tmp/benchbox"):
         return results
 
     finally:
-        # Cleanup temporary files
         print(f"Cleaning up {temp_path}")
         shutil.rmtree(temp_path, ignore_errors=True)
 
-# Usage
 results = run_with_cleanup(scale_factor=1.0)
 ```
 
@@ -632,7 +573,6 @@ from benchbox.core.results.timing import TimingCollector, TimingAnalyzer
 import time
 
 def profile_queries(benchmark, adapter, query_ids):
-    """Profile specific queries with detailed timing."""
     collector = TimingCollector(enable_detailed_timing=True)
     conn = adapter.create_connection()
 
@@ -640,23 +580,17 @@ def profile_queries(benchmark, adapter, query_ids):
         query_sql = benchmark.get_query(query_id)
 
         with collector.time_query(query_id, f"Query {query_id}") as timing:
-            # Phase 1: Query compilation
             with collector.time_phase(query_id, "compile"):
-                # DuckDB compiles on first execute
                 pass
 
-            # Phase 2: Execution
             with collector.time_phase(query_id, "execute"):
                 result = conn.execute(query_sql).fetchall()
 
-            # Record metrics
             collector.record_metric(query_id, "rows_returned", len(result))
 
-    # Analyze timings
     timings = collector.get_completed_timings()
     analyzer = TimingAnalyzer(timings)
 
-    # Get analysis
     analysis = analyzer.analyze_query_performance()
 
     print("\nPerformance Analysis:")
@@ -665,7 +599,6 @@ def profile_queries(benchmark, adapter, query_ids):
     print(f"Median: {analysis['basic_stats']['median']:.3f}s")
     print(f"P95: {analysis['percentiles'][95]:.3f}s")
 
-    # Phase breakdown
     if analysis['timing_phases']:
         print("\nPhase Breakdown:")
         for phase, stats in analysis['timing_phases'].items():
@@ -673,7 +606,6 @@ def profile_queries(benchmark, adapter, query_ids):
 
     return analysis
 
-# Usage
 benchmark = TPCH(scale_factor=0.1)
 adapter = DuckDBAdapter()
 benchmark.generate_data()
@@ -693,20 +625,15 @@ from benchbox.core.results.exporter import ResultExporter
 from pathlib import Path
 
 def run_regression_test(baseline_file: Path, threshold: float = 10.0):
-    """Run benchmark and compare against baseline."""
-    # Run current benchmark
     benchmark = TPCH(scale_factor=0.01)
     adapter = DuckDBAdapter()
     current_results = adapter.run_benchmark(benchmark)
 
-    # Export current results
     exporter = ResultExporter(output_dir="regression_tests")
     current_file = exporter.export_result(current_results, formats=["json"])["json"]
 
-    # Compare with baseline
     comparison = exporter.compare_results(baseline_file, current_file)
 
-    # Check for regressions
     perf_changes = comparison.get("performance_changes", {})
     avg_change = perf_changes.get("average_query_time", {})
 
@@ -717,7 +644,6 @@ def run_regression_test(baseline_file: Path, threshold: float = 10.0):
         print(f"✅ No regression: {avg_change.get('change_percent', 0):.2f}% change")
         return True
 
-# Usage in CI/CD
 baseline = Path("baselines/tpch_sf001_duckdb.json")
 passed = run_regression_test(baseline, threshold=10.0)
 exit(0 if passed else 1)
@@ -730,14 +656,11 @@ exit(0 if passed else 1)
 Always test with small scale factors first:
 
 ```python
-# Development
-benchmark = TPCH(scale_factor=0.01)  # Fast iteration
+benchmark = TPCH(scale_factor=0.01)
 
-# Testing
-benchmark = TPCH(scale_factor=0.1)   # Reasonable test
+benchmark = TPCH(scale_factor=0.1)
 
-# Production
-benchmark = TPCH(scale_factor=1.0)   # Full-scale
+benchmark = TPCH(scale_factor=1.0)
 ```
 
 ### 2. Use Appropriate Tunings
@@ -745,10 +668,8 @@ benchmark = TPCH(scale_factor=1.0)   # Full-scale
 Match tunings to your workload:
 
 ```python
-# OLAP-focused (analytical queries)
 tuning.enable_table_tuning("fact_table", TuningType.CLUSTERING, columns=["date", "id"])
 
-# OLTP-focused (point lookups)
 tuning.enable_table_tuning("fact_table", TuningType.PRIMARY_KEY, columns=["id"])
 ```
 
@@ -771,13 +692,10 @@ print(f"CPU: {process.cpu_percent()}%")
 Reuse generated data and connections:
 
 ```python
-# Generate once
 benchmark.generate_data()
 
-# Reuse connection
 conn = adapter.create_connection()
 
-# Run multiple benchmarks with same data
 for config in configurations:
     results = run_with_config(conn, benchmark, config)
 ```

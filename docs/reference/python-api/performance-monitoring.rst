@@ -27,18 +27,14 @@ Quick Start
 
     from benchbox.monitoring.performance import PerformanceMonitor
 
-    # Create monitor
     monitor = PerformanceMonitor()
 
-    # Record metrics
     monitor.increment_counter("queries_executed")
     monitor.set_gauge("memory_usage_mb", 2048.5)
 
     with monitor.time_operation("query_execution"):
-        # Run benchmark query
         result = execute_query(query)
 
-    # Get snapshot
     snapshot = monitor.snapshot()
     print(f"Queries: {snapshot.counters['queries_executed']}")
     print(f"Avg time: {snapshot.timings['query_execution'].mean:.3f}s")
@@ -254,7 +250,6 @@ Clear all recorded metrics and metadata.
 
 .. code-block:: python
 
-    # Reset between benchmark runs
     for benchmark in benchmarks:
         monitor.reset()
         run_benchmark(benchmark)
@@ -472,8 +467,8 @@ Persist snapshot and return any regression alerts.
     alerts = history.record(
         snapshot,
         regression_thresholds={
-            "query_execution": 0.15,  # 15% threshold
-            "memory_usage_mb": 0.20   # 20% threshold
+            "query_execution": 0.15,
+            "memory_usage_mb": 0.20
         },
         prefer_lower_metrics=["query_execution", "memory_usage_mb"]
     )
@@ -648,14 +643,12 @@ Basic Monitoring
 
     monitor = PerformanceMonitor()
 
-    # Set benchmark metadata
     monitor.update_metadata({
         "benchmark": "tpch",
         "scale_factor": 1.0,
         "database": "duckdb"
     })
 
-    # Run benchmark and record metrics
     for query_id in range(1, 23):
         with monitor.time_operation(f"query_Q{query_id}"):
             result = execute_query(query_id)
@@ -664,7 +657,6 @@ Basic Monitoring
         monitor.increment_counter("queries_executed")
         monitor.increment_counter("rows_returned", rows)
 
-    # Get summary
     snapshot = monitor.snapshot()
     print(f"Executed {snapshot.counters['queries_executed']} queries")
     print(f"Total time: {snapshot.timings['query_Q1'].total:.2f}s")
@@ -674,7 +666,6 @@ Statistical Analysis
 
 .. code-block:: python
 
-    # Run query multiple times for stable timing
     monitor = PerformanceMonitor()
 
     for iteration in range(10):
@@ -703,25 +694,22 @@ Regression Detection
         PerformanceHistory
     )
 
-    # Setup history
     history = PerformanceHistory(
         Path("benchbox_performance.json"),
         max_entries=100
     )
 
-    # Run benchmark
     monitor = PerformanceMonitor()
     monitor.set_metadata("version", "1.2.3")
 
     with monitor.time_operation("full_benchmark"):
         run_full_benchmark()
 
-    # Record and check for regressions
     snapshot = monitor.snapshot()
     alerts = history.record(
         snapshot,
         regression_thresholds={
-            "full_benchmark": 0.10,  # 10% threshold
+            "full_benchmark": 0.10,
         },
         prefer_lower_metrics=["full_benchmark"]
     )
@@ -741,7 +729,6 @@ Trend Analysis
 
     history = PerformanceHistory(Path("performance.json"))
 
-    # Analyze trends
     metrics_to_check = [
         "query_execution",
         "data_loading",
@@ -769,7 +756,6 @@ Performance Dashboard
     from pathlib import Path
 
     def create_performance_dashboard(history_path: Path):
-        """Create performance dashboard from history."""
         history = PerformanceHistory(history_path)
 
         dashboard = {
@@ -778,25 +764,22 @@ Performance Dashboard
             "latest_snapshot": None
         }
 
-        # Get all metrics from latest snapshot
         if history._history:
             latest = history._history[-1]
             dashboard["latest_snapshot"] = latest
 
-            # Analyze each timing metric
             for metric_name in latest.get("timings", {}).keys():
                 values = history.metric_history(metric_name)
                 trend = history.trend(metric_name, window=10)
 
                 dashboard["metrics"][metric_name] = {
                     "current": values[-1] if values else 0,
-                    "history": values[-20:],  # Last 20 values
+                    "history": values[-20:],
                     "trend": trend
                 }
 
         return dashboard
 
-    # Generate dashboard
     dashboard = create_performance_dashboard(Path("performance.json"))
     with open("dashboard.json", "w") as f:
         json.dump(dashboard, f, indent=2)
@@ -814,16 +797,13 @@ CI/CD Integration
     )
 
     def ci_performance_check():
-        """Performance check for CI/CD pipeline."""
         monitor = PerformanceMonitor()
         monitor.set_metadata("ci_run", True)
         monitor.set_metadata("commit", os.getenv("CI_COMMIT_SHA"))
 
-        # Run benchmarks
         with monitor.time_operation("ci_benchmark"):
             run_ci_benchmarks()
 
-        # Check for regressions
         history = PerformanceHistory(
             Path("ci_performance_history.json"),
             max_entries=50
@@ -854,11 +834,9 @@ Best Practices
 
    .. code-block:: python
 
-       # Good: Automatic timing
        with monitor.time_operation("operation"):
            do_work()
 
-       # Avoid: Manual timing (error-prone)
        start = time.time()
        do_work()
        monitor.record_timing("operation", time.time() - start)
@@ -867,7 +845,6 @@ Best Practices
 
    .. code-block:: python
 
-       # Always record context
        monitor.update_metadata({
            "benchmark": "tpch",
            "scale_factor": 1.0,
@@ -880,13 +857,10 @@ Best Practices
 
    .. code-block:: python
 
-       # Counters: Things that accumulate
        monitor.increment_counter("queries_executed")
 
-       # Gauges: Current values
        monitor.set_gauge("memory_usage_mb", current_memory)
 
-       # Timings: Operations with duration
        with monitor.time_operation("query"):
            execute_query()
 
@@ -894,23 +868,19 @@ Best Practices
 
    .. code-block:: python
 
-       # Conservative: 10% threshold
        thresholds = {"query_time": 0.10}
 
-       # Moderate: 15% threshold
        thresholds = {"query_time": 0.15}
 
-       # Permissive: 25% threshold
        thresholds = {"query_time": 0.25}
 
 5. **Maintain History Rolling Window**
 
    .. code-block:: python
 
-       # Keep manageable history (50-100 entries)
        history = PerformanceHistory(
            Path("performance.json"),
-           max_entries=100  # ~100 recent runs
+           max_entries=100
        )
 
 Common Issues

@@ -18,10 +18,8 @@ Athena for Apache Spark is AWS's interactive Spark service with sub-second start
 ## Installation
 
 ```bash
-# Install with Athena Spark support
 uv add benchbox --extra athena-spark
 
-# Dependencies installed: boto3
 ```
 
 ## Prerequisites
@@ -38,42 +36,35 @@ uv add benchbox --extra athena-spark
 ### Environment Variables
 
 ```bash
-# Required
 export ATHENA_SPARK_WORKGROUP=my-spark-workgroup
 export ATHENA_S3_STAGING_DIR=s3://my-bucket/benchbox
 
-# Optional
 export AWS_REGION=us-east-1
 ```
 
 ### CLI Usage
 
 ```bash
-# Basic usage
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
   --platform-option workgroup=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox
 
-# With custom region
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
   --platform-option workgroup=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option region=eu-west-1
 
-# With specific Spark engine version
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
   --platform-option workgroup=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option "engine_version=PySpark engine version 3"
 
-# With custom DPU configuration
 benchbox run --platform athena-spark --benchmark tpch --scale 1.0 \
   --platform-option workgroup=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option coordinator_dpu_size=2 \
   --platform-option max_concurrent_dpus=40
 
-# Dry-run to preview queries
 benchbox run --platform athena-spark --benchmark tpch --dry-run ./preview \
   --platform-option workgroup=my-spark-workgroup \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox
@@ -116,29 +107,23 @@ revert a manually-installed version and how to work around it.
 ```python
 from benchbox.platforms.aws import AthenaSparkAdapter
 
-# Initialize with workgroup and staging
 adapter = AthenaSparkAdapter(
     workgroup="my-spark-workgroup",
     s3_staging_dir="s3://my-bucket/benchbox",
     region="us-east-1",
 )
 
-# Start session
 adapter.create_connection()
 
-# Create schema
 adapter.create_schema("tpch_benchmark")
 
-# Load data to S3 and create tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query via session
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Terminate session
 adapter.close()
 ```
 

@@ -158,17 +158,13 @@ Common flags:
 Examples:
 
 ```bash
-# Package the latest result for PR contribution
 uv run -- benchbox submit --last --output ./submission
 
-# Preview a hosted upload without credentials or network
 uv run -- benchbox submit --last --service --dry-run
 
-# Log in and upload to the hosted service
 uv run -- benchbox auth login
 uv run -- benchbox submit --last --service
 
-# Track hosted submissions
 uv run -- benchbox results --submitted
 ```
 

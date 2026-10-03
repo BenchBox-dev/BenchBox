@@ -206,16 +206,13 @@ from benchbox.cli.benchmarks import BenchmarkManager
 from benchbox.cli.database import DatabaseManager
 from benchbox.cli.system import SystemProfiler
 
-# Get system-specific recommendations
 profiler = SystemProfiler()
 system_profile = profiler.get_system_profile()
 
-# Get intelligent database recommendations
 db_manager = DatabaseManager()
 recommended_db = db_manager._get_recommended_database()
 performance_rating = db_manager._get_performance_rating(recommended_db)
 
-# Get smart benchmark configuration
 bench_manager = BenchmarkManager()
 recommended_scale = bench_manager._get_recommended_scale(
     bench_manager.benchmarks['tpch'],
@@ -233,7 +230,6 @@ print(f"Recommended scale for TPC-H: {recommended_scale}")
 from benchbox.cli.benchmarks import BenchmarkManager
 
 def run_appropriate_benchmarks():
-    """Run benchmarks with system-configured settings."""
     manager = BenchmarkManager()
     system_profile = manager._get_system_profile()
 
@@ -242,7 +238,6 @@ def run_appropriate_benchmarks():
     for benchmark_id in benchmarks:
         benchmark_info = manager.benchmarks[benchmark_id]
 
-        # Get intelligent recommendations
         recommended_scale = manager._get_recommended_scale(benchmark_info, system_profile)
         recommended_queries = manager._get_recommended_query_subset(
             benchmark_info, recommended_scale, system_profile
@@ -266,18 +261,16 @@ def run_appropriate_benchmarks():
 ### Development Workflow
 
 ```bash
-# Development cycle
-benchbox run --benchmark primitives --scale 0.01  # Quick smoke test
-benchbox run --benchmark tpch --scale 0.1                 # Moderate validation
-benchbox run --benchmark tpcds --scale 0.01               # Complex benchmark test
+benchbox run --benchmark primitives --scale 0.01
+benchbox run --benchmark tpch --scale 0.1
+benchbox run --benchmark tpcds --scale 0.01
 ```
 
 ### Production Benchmarking
 
 ```bash
-# Production evaluation
-benchbox run --benchmark tpch --scale 1.0      # Full TPC-H
-benchbox run --benchmark tpcds --scale 1.0     # Full TPC-DS
+benchbox run --benchmark tpch --scale 1.0
+benchbox run --benchmark tpcds --scale 1.0
 ```
 
 The intelligent guidance features make BenchBox accessible to users of all experience levels while ensuring appropriate performance for any system configuration.

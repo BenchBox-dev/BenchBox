@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-/** Download the visual baseline for the exact base SHA or a site-equivalent ancestor. */
 
 import { execFile } from "node:child_process";
 import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -13,11 +12,7 @@ const repository = process.env.GITHUB_REPOSITORY;
 const baseSha = process.env.PUBLIC_SITE_VISUAL_BASE_SHA;
 const output = process.env.PUBLIC_SITE_VISUAL_BASELINE;
 const apiUrl = process.env.GITHUB_API_URL ?? "https://api.github.com";
-// Space-separated first-parent ancestors of the base whose public-site inputs
-// are byte-identical to it, nearest first. The workflow classifier computes
-// them; they render the same site as the base.
 const candidateShas = (process.env.PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES ?? "").split(/\s+/).filter(Boolean);
-// Optional bounded wait for a leader group or develop push to publish the base.
 const waitSeconds = Number(process.env.PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS ?? "0");
 
 if (!/^[0-9a-f]{40}$/.test(baseSha ?? "")) {

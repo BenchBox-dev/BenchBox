@@ -841,13 +841,10 @@ BenchBox v0.1.0 is the **initial public release** of the database benchmarking f
 ### Quick Start
 
 ```bash
-# Install
 pip install benchbox
 
-# Run TPC-H on DuckDB
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
-# Run with DataFrame API
 benchbox run --platform polars-df --benchmark tpch --scale 0.01
 ```
 

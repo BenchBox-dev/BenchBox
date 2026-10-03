@@ -30,7 +30,6 @@ A **deployment mode** represents how a database platform is deployed and accesse
 Use the first-class platform names or the colon syntax to specify deployment modes:
 
 ```bash
-# ClickHouse first-class platform names (preferred)
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.1
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1
@@ -39,23 +38,18 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1
 ### Platform-Specific Examples
 
 ```bash
-# ClickHouse: local (chDB) or server (self-hosted)
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.1
 
-# ClickHouse Cloud: first-class platform
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 \
     --platform-option host=abc123.aws.clickhouse.cloud
 
-# Firebolt: core (local Docker), cloud (Firebolt Cloud)
 benchbox run --platform firebolt:core --benchmark tpch --scale 0.1
 benchbox run --platform firebolt:cloud --benchmark tpch --scale 0.1
 
-# TimescaleDB: self-hosted or cloud (Timescale Cloud)
-benchbox run --platform timescaledb --benchmark tpch --scale 0.1  # self-hosted
+benchbox run --platform timescaledb --benchmark tpch --scale 0.1
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.1
 
-# Standalone cloud platforms (managed mode only)
 benchbox run --platform motherduck --benchmark tpch --scale 0.1
 benchbox run --platform starburst --benchmark tpch --scale 0.1
 ```
@@ -111,10 +105,8 @@ The bare `clickhouse` selector has been removed (it now raises an error). The co
 Zero-configuration ClickHouse local mode via the chDB library.
 
 ```bash
-# Install chDB
 uv add benchbox --extra clickhouse-local
 
-# Run benchmark
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 ```
 
@@ -129,19 +121,15 @@ benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 Connect to a self-hosted ClickHouse server or cluster.
 
 ```bash
-# Install driver
 uv add benchbox --extra clickhouse-server
 
-# Environment variables
 export CLICKHOUSE_HOST=localhost
 export CLICKHOUSE_PORT=9000
 export CLICKHOUSE_USER=default
 export CLICKHOUSE_PASSWORD=secret
 
-# Run benchmark
 benchbox run --platform clickhouse-server --benchmark tpch --scale 1.0
 
-# Or with inline options
 benchbox run --platform clickhouse-server --benchmark tpch --scale 1.0 \
     --platform-option host=clickhouse.example.com \
     --platform-option port=9000 \
@@ -165,18 +153,14 @@ benchbox run --platform clickhouse-server --benchmark tpch --scale 1.0 \
 ClickHouse Cloud is now a **first-class platform** (`clickhouse-cloud`), not a deployment mode. This follows the pattern established by MotherDuck (DuckDB) and Starburst (Trino).
 
 ```bash
-# Install ClickHouse Cloud extra
 uv add benchbox --extra clickhouse-cloud
 
-# Environment variables
 export CLICKHOUSE_CLOUD_HOST=abc123.us-east-2.aws.clickhouse.cloud
 export CLICKHOUSE_CLOUD_PASSWORD=your-password
-export CLICKHOUSE_CLOUD_USER=default  # optional, defaults to 'default'
+export CLICKHOUSE_CLOUD_USER=default
 
-# Run benchmark
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 
-# Or with inline options
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 \
     --platform-option host=abc123.us-east-2.aws.clickhouse.cloud \
     --platform-option password=your-password
@@ -210,16 +194,13 @@ Firebolt provides both a free local deployment (Core) and managed cloud service.
 Free, self-hosted Firebolt via Docker with the same query engine as cloud.
 
 ```bash
-# Start Firebolt Core
 docker run -i --rm --ulimit memlock=8589934592:8589934592 \
   --security-opt seccomp=unconfined -p 127.0.0.1:3473:3473 \
   -v ./firebolt-core-data:/firebolt-core/volume \
   ghcr.io/firebolt-db/firebolt-core:preview-rc
 
-# Install SDK
 uv add firebolt-sdk
 
-# Run benchmark
 benchbox run --platform firebolt:core --benchmark tpch --scale 0.1 \
     --platform-option url=http://localhost:3473
 ```
@@ -242,20 +223,16 @@ benchbox run --platform firebolt:core --benchmark tpch --scale 0.1 \
 Connect to Firebolt Cloud managed service with OAuth authentication.
 
 ```bash
-# Environment variables
 export FIREBOLT_CLIENT_ID=your-client-id
 export FIREBOLT_CLIENT_SECRET=your-client-secret
 export FIREBOLT_ACCOUNT_NAME=your-account
 export FIREBOLT_ENGINE_NAME=your-engine
 
-# Alternative environment variable names (also supported)
 export SERVICE_ACCOUNT_ID=your-client-id
 export SERVICE_ACCOUNT_SECRET=your-client-secret
 
-# Run benchmark
 benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0
 
-# Or with inline options
 benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
     --platform-option client_id=your-client-id \
     --platform-option client_secret=your-client-secret \
@@ -290,10 +267,8 @@ TimescaleDB extends PostgreSQL with time-series capabilities and supports both s
 Connect to a self-hosted TimescaleDB server.
 
 ```bash
-# Install driver
 uv add psycopg2-binary
 
-# Run benchmark
 benchbox run --platform timescaledb --benchmark tpch --scale 0.1 \
     --platform-option host=localhost \
     --platform-option username=postgres \
@@ -316,15 +291,12 @@ benchbox run --platform timescaledb --benchmark tpch --scale 0.1 \
 Connect to Timescale Cloud managed service.
 
 ```bash
-# Environment variables (preferred)
 export TIMESCALE_SERVICE_URL=postgres://user:pass@abc123.tsdb.cloud.timescale.com:5432/tsdb?sslmode=require
 
-# Or individual variables
 export TIMESCALE_HOST=abc123.rc8ft3nbrw.tsdb.cloud.timescale.com
 export TIMESCALE_PASSWORD=your-password
-export TIMESCALE_USER=tsdbadmin  # optional, defaults to 'tsdbadmin'
+export TIMESCALE_USER=tsdbadmin
 
-# Run benchmark
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 1.0
 ```
 
@@ -356,16 +328,12 @@ postgres://username:password@hostname:port/database?sslmode=require
 MotherDuck is a managed cloud service for DuckDB, inheriting DuckDB's SQL dialect.
 
 ```bash
-# Install DuckDB (includes MotherDuck support)
 uv add duckdb
 
-# Environment variable
 export MOTHERDUCK_TOKEN=your-token
 
-# Run benchmark
 benchbox run --platform motherduck --benchmark tpch --scale 1.0
 
-# Or with inline token
 benchbox run --platform motherduck --benchmark tpch --scale 1.0 \
     --platform-option token=your-token
 ```
@@ -393,18 +361,14 @@ Visit [app.motherduck.com/token-request](https://app.motherduck.com/token-reques
 Starburst Galaxy is a managed Trino service, inheriting Trino's SQL dialect.
 
 ```bash
-# Install Trino driver
 uv add trino
 
-# Environment variables
 export STARBURST_HOST=my-cluster.trino.galaxy.starburst.io
 export STARBURST_USER=joe@example.com/accountadmin
 export STARBURST_PASSWORD=your-password
 
-# Run benchmark
 benchbox run --platform starburst --benchmark tpch --scale 1.0
 
-# Or with inline options
 benchbox run --platform starburst --benchmark tpch --scale 1.0 \
     --platform-option host=my-cluster.trino.galaxy.starburst.io \
     --platform-option username=joe@example.com/accountadmin \
@@ -446,20 +410,14 @@ LakeSail Sail is a Rust-based drop-in replacement for Apache Spark. Both SQL (`l
 Single-node multi-threaded execution. Start a Sail server locally, then connect over Spark Connect.
 
 ```bash
-# Install the Spark Connect-capable PySpark client
 uv add benchbox --extra lakesail
 
-# Start the local Docker-backed Sail server
 make uat-bring-up PLATFORM=lakesail
 
-# SQL benchmark
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# DataFrame benchmark
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
-# Endpoint and tuning overrides need the Python adapter (see the
-# LakeSail Platform Guide); LakeSail registers no --platform-option keys.
 ```
 
 ### Distributed Mode
@@ -510,10 +468,8 @@ Apache Gluten offloads Spark SQL physical operators to [Velox](https://velox-lib
 In-process SparkSession with Gluten plugged in. Linux x86_64 host with the official jar, a custom-built Linux arm64 jar, or inside the `benchbox-velox` Docker container.
 
 ```bash
-# Install the Velox extra (pulls pyspark[connect]>=3.5.0)
 uv add benchbox --extra velox
 
-# Provide the Gluten bundle jar (see velox_jar_setup.md for release tarballs and verification steps)
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
     --platform-option offheap_size=8g
@@ -538,10 +494,8 @@ Overriding `spark.shuffle.manager` via `spark_config` raises `ValueError` - `Col
 Connect to a pre-started Gluten-enabled Spark Connect server (including the `benchbox-velox` Docker image). Works on any host that can reach the endpoint - the server itself must still run on Linux.
 
 ```bash
-# Start the Gluten-enabled Spark Connect server (example: provided Docker image)
 docker compose up -d velox-connect
 
-# Drive the benchmark from the host
 benchbox run --platform velox --platform-option deployment=remote \
     --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
@@ -582,7 +536,6 @@ The deployment mode system is built on the `DeploymentCapability` dataclass in `
 ```python
 @dataclass
 class DeploymentCapability:
-    """Describes requirements and characteristics of a specific deployment mode."""
 
     mode: Literal["local", "self-hosted", "managed"]
     requires_credentials: bool = False
@@ -602,26 +555,15 @@ Query deployment information programmatically:
 ```python
 from benchbox.core.platform_registry import PlatformRegistry
 
-# Get available deployment modes for the base ClickHouse platform
 modes = PlatformRegistry.get_available_deployment_modes("clickhouse")
-# ['local', 'server']
 
-# Get default deployment mode
 default = PlatformRegistry.get_default_deployment("clickhouse")
-# 'local'
 
-# Check if mode is supported
 supported = PlatformRegistry.supports_deployment_mode("clickhouse", "server")
-# True
 
-# ClickHouse Cloud is a separate first-class platform, not a deployment mode
-# Use --platform clickhouse-cloud (see clickhouse-cloud.md)
 cap = PlatformRegistry.get_deployment_capability("clickhouse", "server")
-# DeploymentCapability(mode='self-hosted', requires_credentials=True, ...)
 
-# Check cloud storage requirements
 needs_storage = PlatformRegistry.requires_cloud_storage_for_deployment("clickhouse", "server")
-# False
 ```
 
 ### Platform Family and Inheritance
@@ -629,16 +571,11 @@ needs_storage = PlatformRegistry.requires_cloud_storage_for_deployment("clickhou
 Platforms can inherit SQL dialect and configuration from parent platforms:
 
 ```python
-# Get platform family for dialect inheritance
 family = PlatformRegistry.get_platform_family("motherduck")
-# 'duckdb'
 
-# Get parent platform for configuration inheritance
 parent = PlatformRegistry.get_inherited_platform("motherduck")
-# 'duckdb'
 
 parent = PlatformRegistry.get_inherited_platform("starburst")
-# 'trino'
 ```
 
 ---
@@ -650,25 +587,20 @@ parent = PlatformRegistry.get_inherited_platform("starburst")
 Store credentials in environment variables to avoid exposing them in command history:
 
 ```bash
-# ClickHouse Cloud
 export CLICKHOUSE_CLOUD_HOST=...
 export CLICKHOUSE_CLOUD_PASSWORD=...
 
-# Firebolt Cloud
 export FIREBOLT_CLIENT_ID=...
 export FIREBOLT_CLIENT_SECRET=...
 export FIREBOLT_ACCOUNT_NAME=...
 export FIREBOLT_ENGINE_NAME=...
 
-# MotherDuck
 export MOTHERDUCK_TOKEN=...
 
-# Starburst Galaxy
 export STARBURST_HOST=...
 export STARBURST_USER=...
 export STARBURST_PASSWORD=...
 
-# Timescale Cloud
 export TIMESCALE_SERVICE_URL=...
 ```
 
@@ -679,10 +611,8 @@ Snowflake, BigQuery, Redshift, Athena, MotherDuck, and SingleStore; other
 platforms use the environment variables above.
 
 ```bash
-# Save credentials (stored securely)
 benchbox setup --platform snowflake
 
-# Credentials are automatically loaded when running benchmarks
 benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
 
@@ -725,10 +655,8 @@ Solution: Ensure the local service (Docker container) is running.
 Enable verbose logging to debug connection issues:
 
 ```bash
-# Verbose mode
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 -v
 
-# Very verbose mode (includes connection parameters)
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.1 -vv
 ```
 

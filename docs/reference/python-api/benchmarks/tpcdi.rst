@@ -29,13 +29,10 @@ Quick Start
     from benchbox.tpcdi import TPCDI
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark
     benchmark = TPCDI(scale_factor=1.0)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on platform
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
@@ -347,10 +344,8 @@ Generate source data files in various formats for ETL processing.
 
 .. code-block:: python
 
-    # Generate all source formats
     source_files = benchmark.generate_source_data()
 
-    # Generate specific formats
     source_files = benchmark.generate_source_data(
         formats=["csv", "xml"],
         batch_types=["historical", "incremental"]
@@ -374,13 +369,10 @@ Get a specific TPC-DI query.
 
 .. code-block:: python
 
-    # Get validation query
     v1 = benchmark.get_query("V1")
 
-    # Get analytical query
     a1 = benchmark.get_query("A1")
 
-    # Get data quality query
     dq1 = benchmark.get_query("VQ1")
 
 Parameters:
@@ -402,11 +394,9 @@ Get all TPC-DI benchmark queries.
 
 .. code-block:: python
 
-    # Get all queries
     queries = benchmark.get_queries()
     print(f"Total queries: {len(queries)}")
 
-    # Get with dialect translation
     queries_bq = benchmark.get_queries(dialect="bigquery")
 
 Parameters:
@@ -437,13 +427,10 @@ Get CREATE TABLE SQL for all TPC-DI tables.
 
 .. code-block:: python
 
-    # Standard SQL
     create_sql = benchmark.get_create_tables_sql()
 
-    # With dialect
     create_sql_sf = benchmark.get_create_tables_sql(dialect="snowflake")
 
-    # With tuning configuration
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
@@ -471,7 +458,6 @@ Run the complete ETL pipeline for TPC-DI.
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Run historical batch
     etl_result = benchmark.run_etl_pipeline(
         conn,
         batch_type="historical",
@@ -541,7 +527,6 @@ Run the complete TPC-DI benchmark with all phases.
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Run complete benchmark
     results = benchmark.run_full_benchmark(conn, dialect="duckdb")
 
     print(f"Total duration: {results['execution_time_seconds']:.2f}s")
@@ -612,11 +597,9 @@ Calculate official TPC-DI metrics.
 
 .. code-block:: python
 
-    # Run ETL and validation
     etl_result = benchmark.run_etl_benchmark(conn)
     validation_result = benchmark.run_data_validation(conn)
 
-    # Calculate official metrics
     metrics = benchmark.calculate_official_metrics(etl_result, validation_result)
 
     print(f"Composite Performance Score: {metrics.overall_performance:.2f}")
@@ -715,20 +698,15 @@ Basic ETL Pipeline
     from benchbox.tpcdi import TPCDI
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark with scale factor 1 (~100MB)
     benchmark = TPCDI(scale_factor=1.0)
 
-    # Generate source data
     source_files = benchmark.generate_source_data()
 
-    # Setup database
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Create schema
     benchmark.create_schema(conn)
 
-    # Run ETL pipeline
     etl_result = benchmark.run_etl_pipeline(
         conn,
         batch_type="historical",
@@ -750,7 +728,6 @@ Incremental Batch Processing
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Initial historical load
     print("Running historical load...")
     hist_result = benchmark.run_etl_pipeline(
         conn,
@@ -758,7 +735,6 @@ Incremental Batch Processing
         validate_data=True
     )
 
-    # Process incremental batches
     for batch_id in range(1, 4):
         print(f"Processing incremental batch {batch_id}...")
         inc_result = benchmark.run_etl_pipeline(
@@ -777,13 +753,10 @@ Data Quality Validation
 
     benchmark = TPCDI(scale_factor=1.0)
 
-    # Run ETL
     etl_result = benchmark.run_etl_pipeline(conn)
 
-    # Run comprehensive validation
     validation = benchmark.validate_etl_results(conn)
 
-    # Check validation results
     print(f"Validation Queries:")
     for query_id in ["V1", "V2", "V3", "V4", "V5"]:
         status = validation['queries'][query_id]['status']
@@ -795,7 +768,6 @@ Data Quality Validation
         violations = validation['quality_checks'][check_id]['violations']
         print(f"  {check_id}: {status} ({violations} violations)")
 
-    # Overall quality score
     print(f"\nOverall quality score: {validation['quality_score']:.2f}%")
 
 SCD Type 2 Processing Example
@@ -810,13 +782,10 @@ SCD Type 2 Processing Example
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Create schema with SCD support
     benchmark.create_schema(conn)
 
-    # Load initial data
     benchmark.run_etl_pipeline(conn, batch_type="historical")
 
-    # Query current customer records
     current_customers = conn.execute("""
         SELECT CustomerID, LastName, FirstName, IsCurrent, EffectiveDate
         FROM DimCustomer
@@ -829,10 +798,8 @@ SCD Type 2 Processing Example
     for customer in current_customers:
         print(f"  {customer}")
 
-    # Process SCD batch (creates new versions)
     benchmark.run_etl_pipeline(conn, batch_type="scd")
 
-    # Query historical records
     historical_customers = conn.execute("""
         SELECT CustomerID, LastName, FirstName, IsCurrent,
                EffectiveDate, EndDate
@@ -868,7 +835,6 @@ Multi-Platform Comparison
         print(f"\nBenchmarking {name}...")
         conn = adapter.create_connection()
 
-        # Run full benchmark
         result = benchmark.run_full_benchmark(conn)
 
         results_data.append({
@@ -892,28 +858,22 @@ Complete Official Benchmark
     from benchbox.tpcdi import TPCDI
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Setup
     benchmark = TPCDI(scale_factor=3.0, verbose=True)
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Phase 1: Schema Creation
     print("Phase 1: Creating schema...")
     benchmark.create_schema(conn)
 
-    # Phase 2: Historical Load
     print("Phase 2: Historical data load...")
     etl_result = benchmark.run_etl_benchmark(conn)
 
-    # Phase 3: Data Validation
     print("Phase 3: Data quality validation...")
     validation_result = benchmark.run_data_validation(conn)
 
-    # Phase 4: Database Optimization
     print("Phase 4: Database optimization...")
     opt_result = benchmark.optimize_database(conn)
 
-    # Phase 5: Query Execution
     print("Phase 5: Running analytical queries...")
     query_results = {}
     for query_id in ["A1", "A2", "A3", "A4", "A5", "A6"]:
@@ -921,14 +881,12 @@ Complete Official Benchmark
         result = adapter.execute_query(conn, query, query_id)
         query_results[query_id] = result
 
-    # Phase 6: Calculate Official Metrics
     print("Phase 6: Calculating official metrics...")
     official_metrics = benchmark.calculate_official_metrics(
         etl_result,
         validation_result
     )
 
-    # Report results
     print("\n" + "="*60)
     print("TPC-DI Benchmark Results")
     print("="*60)

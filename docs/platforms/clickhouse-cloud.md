@@ -19,14 +19,11 @@ ClickHouse Cloud is the managed cloud version of ClickHouse, providing serverles
 ## Quick Start
 
 ```bash
-# Install ClickHouse Cloud extra
 uv add benchbox --extra clickhouse-cloud
 
-# Set your credentials
 export CLICKHOUSE_CLOUD_HOST=abc123.us-east-2.aws.clickhouse.cloud
 export CLICKHOUSE_CLOUD_PASSWORD=your-password
 
-# Run benchmark
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 ```
 
@@ -49,7 +46,7 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 ```bash
 export CLICKHOUSE_CLOUD_HOST=abc123.us-east-2.aws.clickhouse.cloud
 export CLICKHOUSE_CLOUD_PASSWORD=your-password
-export CLICKHOUSE_CLOUD_USER=default  # optional, defaults to 'default'
+export CLICKHOUSE_CLOUD_USER=default
 
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 ```
@@ -99,13 +96,10 @@ revert a manually-installed version and how to work around it.
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
 benchbox run --platform clickhouse-cloud --benchmark tpcds --scale 10.0
 
-# ClickBench (ClickHouse's own benchmark)
 benchbox run --platform clickhouse-cloud --benchmark clickbench
 ```
 
@@ -119,11 +113,9 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 \
 ### Performance Tuning
 
 ```bash
-# Increase memory limit for complex queries
 benchbox run --platform clickhouse-cloud --benchmark tpcds --scale 100 \
     --platform-option max_memory_usage=16000000000
 
-# Set query timeout
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 10 \
     --platform-option max_execution_time=300
 ```
@@ -131,7 +123,6 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 10 \
 ### Dry Run (Preview)
 
 ```bash
-# Preview what will be executed without running
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
 

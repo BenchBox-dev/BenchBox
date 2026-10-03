@@ -39,7 +39,6 @@ from benchbox.core.validation.cross_platform import (
     tolerance_for,
 )
 
-# Strict by default.
 report = compare_query_results(
     query_id="Q1",
     reference_platform="duckdb",
@@ -49,7 +48,6 @@ report = compare_query_results(
 )
 assert report.matched, report.summary()
 
-# Loosen per-query with a spec-anchored rationale.
 register_query_tolerance(
     "tpch",
     "Q1",

@@ -360,11 +360,9 @@ queries/index
 ```python
 from benchbox import TPCH, ReadPrimitives
 
-# Standard analytical performance
 tpch = TPCH(scale_factor=0.1)
-key_queries = [1, 3, 6, 12]  # Representative subset
+key_queries = [1, 3, 6, 12]
 
-# Focused operation testing
 read_primitives = ReadPrimitives(scale_factor=0.01)
 perf_critical = read_primitives.get_queries_by_category("aggregation")
 ```
@@ -373,14 +371,12 @@ perf_critical = read_primitives.get_queries_by_category("aggregation")
 ```python
 from benchbox import TPCH, TPCDS, JoinOrder
 
-# Multi-benchmark evaluation
 benchmarks = {
     "tpch": TPCH(scale_factor=1.0),
     "tpcds": TPCDS(scale_factor=1.0),
     "joinorder": JoinOrder(scale_factor=1.0)
 }
 
-# Run full suite
 results = {}
 for name, benchmark in benchmarks.items():
     results[name] = run_benchmark(benchmark)
@@ -390,8 +386,7 @@ for name, benchmark in benchmarks.items():
 ```python
 from benchbox import ReadPrimitives
 
-# Focused regression detection
-read_primitives = ReadPrimitives(scale_factor=0.001)  # Fast execution
+read_primitives = ReadPrimitives(scale_factor=0.001)
 regression_queries = [
     "aggregation_basic",
     "join_inner_simple",
@@ -399,10 +394,9 @@ regression_queries = [
     "sort_large_result"
 ]
 
-# Compare against baseline
 for query_id in regression_queries:
     current_time = measure_query(primitives.get_query(query_id))
-    assert current_time < baseline_time * 1.1  # Allow 10% variance
+    assert current_time < baseline_time * 1.1
 ```
 
 ## Resource Characteristics

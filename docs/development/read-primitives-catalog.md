@@ -15,7 +15,6 @@ queries:
   - id: aggregation_distinct
     category: aggregation
     sql: |-
-      -- Distinct count of high cardinality key on a large table
       SELECT ...
 ```
 
@@ -42,7 +41,6 @@ Define alternative SQL for specific platforms using the `variants` field:
 - id: json_aggregates
   category: json
   sql: |-
-    -- Standard SQL version (MySQL syntax)
     SELECT
         p_brand,
         JSON_ARRAYAGG(p_name) as part_names,
@@ -177,7 +175,6 @@ For a complete reference of all current skips, their root causes, and instructio
 - id: timeseries_trend_analysis
   category: timeseries
   sql: |-
-    -- Standard SQL with nested aggregate in REGR_SLOPE
     SELECT
         DATE_TRUNC('month', o_orderdate) as order_month,
         COUNT(*) as order_count,

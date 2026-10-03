@@ -1,54 +1,5 @@
 name: Sync results-data to published-results
 
-# When `results-data/` changes on develop (e.g. a maintainer-run seed corpus
-# refresh from `seed-corpus.yml`, or a UAT integration PR like #164), open a
-# draft PR vs `published-results` mirroring the changed corpus content. The
-# `published-results` branch is intentionally slim (corpus + a small set of
-# vendored validators) per
-# `docs/development/adr/adr-published-results-slim-corpus-branch.md`, so this
-# workflow refreshes develop's curated maintainer subset and shared tooling
-# without deleting accepted published-only archive content.
-#
-# Publication fixed-point precondition: develop's corpus must already be at
-# the publication fixed point before any mirror branch is built or PR opened.
-# The gate below is the same check as
-# tests/unit/scripts/test_corpus_privacy_invariant.py::test_rederived_corpus_publishes_byte_identically_to_what_is_stored
-# (AnonymizationManager + canonical_json_bytes over primary bundles). If
-# re-anonymizing would rewrite stored bytes, this workflow fails loudly and
-# does not open a mirror that would re-publish rewriteable content. When
-# re-derivation is in flight on develop, the mirror waits on that fixed point
-# automatically; once the precondition holds, the mirror runs unattended
-# again. The gate runs on the content being mirrored (develop @ GITHUB_SHA),
-# not on published-results.
-#
-# The mirror PR is intentionally a draft — it never auto-merges. Maintainers
-# review and flip ready when the develop-side change is ready to be visible
-# on the public corpus branch. Validator changes mirror both the thin
-# `scripts/validate_submission.py` entrypoint and its shared
-# `benchbox/validation/bundle.py` implementation plus the stdlib-only
-# `benchbox/core/results/query_status.py` failure policy and the stdlib-only
-# `benchbox/core/results/schema_policy.py` version-key policy it loads the
-# version helpers from (no inline duplicate lives in bundle.py). The shared
-# scripts/publication/validator_parity.py entry point uses that same runtime
-# to compare head and merge payloads without installing the full package.
-#
-# The mirror PR's author is this workflow's own GITHUB_TOKEN identity
-# (github-actions[bot]). GitHub does not start `pull_request`-triggered workflow
-# runs unattended for events raised by GITHUB_TOKEN — documented recursion
-# prevention, not something a trigger filter can work around — so the creator
-# status below is the mirror's automatic evidence even if a maintainer later
-# approves or reruns `validate-submission.yml`
-# the PR touches. Left alone, the PR's statusCheckRollup is empty: not zero
-# failures, zero checks. See #1542 and
-# `docs/operations/results-phase-2-runbook.md` §1.2. The "Validate mirrored
-# corpus content" / "Report validation as a commit status" steps below are the
-# fix: this run validates the exact content it is about to propose and posts
-# the result as a commit status on the mirror branch's head SHA. A commit
-# status is a plain write via the Statuses API, not a workflow trigger, so it
-# is unaffected by the GITHUB_TOKEN recursion rule and needs no new
-# credential — `statuses: write` only widens the permissions already granted
-# to the token this workflow already holds.
-
 on:
   push:
     branches: [develop]
@@ -82,16 +33,10 @@ jobs:
 
     steps:
       - name: Checkout the triggering commit
-        # Pin to ${{ github.sha }} (not `ref: develop`) so each run mirrors
-        # the exact commit that triggered it. With concurrency.cancel-in-progress
-        # set to false, an older queued run that picked up `develop`'s
-        # current tip would mirror newer corpus content while still naming
-        # the branch / PR with the older GITHUB_SHA, producing misattributed
-        # or duplicate mirror PRs.
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0  # full history so we can switch branches and diff
+          fetch-depth: 0
 
       - name: Configure git identity
         run: |
@@ -101,11 +46,6 @@ jobs:
       - name: Detect drift between develop and published-results
         id: drift
         run: |
-          # Fail loudly on a missing remote ref — silent fetch failure must
-          # not be misread as "no drift". Use an explicit refspec so the
-          # remote-tracking ref origin/published-results is created/updated
-          # in this single-branch clone; a bare `git fetch origin published-results`
-          # only populates FETCH_HEAD and leaves origin/published-results missing.
           git fetch origin published-results:refs/remotes/origin/published-results
           PUBLISHED_BASE_SHA=$(git rev-parse --verify origin/published-results^{commit})
           if [[ ! "${PUBLISHED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
@@ -115,12 +55,6 @@ jobs:
           echo "Captured published-results base: ${PUBLISHED_BASE_SHA}"
           echo "published_base_sha=${PUBLISHED_BASE_SHA}" >> "$GITHUB_OUTPUT"
 
-          # Direct two-tree compare (no dots): `published-results` is an
-          # orphan branch (W2 of the parent TODO force-pushed it to a fresh
-          # commit with no merge-base with develop). Three-dot syntax
-          # (`A...B`) walks from the merge-base, which doesn't exist for
-          # unrelated histories and produces a misleading 1-path result.
-          # Two-tree compare is independent of history topology.
           mapfile -t DIFFED < <(git diff --name-only origin/published-results "${GITHUB_SHA}" -- \
             'results-data/bundles' 'results-data/corpus-inventory.json' \
             'results-data/CORPUS_NOTES.md' 'results-data/SEED_CORPUS_SPEC.md' \
@@ -141,25 +75,17 @@ jobs:
           printf '  %s\n' "${DIFFED[@]}"
           echo "has_drift=true" >> "$GITHUB_OUTPUT"
 
-          # Capture file count for the PR body
           {
             echo "diff_count=${#DIFFED[@]}"
           } >> "$GITHUB_OUTPUT"
 
-      # Fixed-point gate: refuse to build or open a mirror when develop's
-      # results-data would be rewritten by a second anonymization pass. Same
-      # logic as test_rederived_corpus_publishes_byte_identically_to_what_is_stored
-      # in tests/unit/scripts/test_corpus_privacy_invariant.py. Runs on the
-      # develop checkout (content being mirrored) before any mirror branch is
-      # created. uv/Python are installed here so the gate can import
-      # AnonymizationManager; later validate steps reuse the same toolchain.
       - name: Install uv
         if: steps.drift.outputs.has_drift == 'true'
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Set up Python
         if: steps.drift.outputs.has_drift == 'true'
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
@@ -167,11 +93,6 @@ jobs:
         if: steps.drift.outputs.has_drift == 'true'
         run: |
           set -euo pipefail
-          # Inline equivalent of
-          # test_rederived_corpus_publishes_byte_identically_to_what_is_stored.
-          # Uses AnonymizationManager directly so this stays a corpus-domain
-          # gate rather than develop's full test matrix.
-          # Fails loud: a skipped/refused mirror must not look like success.
           uv run -- python - <<'PY'
           from __future__ import annotations
 
@@ -227,13 +148,9 @@ jobs:
         if: steps.drift.outputs.has_drift == 'true'
         id: build
         run: |
-          # Branch name is deterministic per develop SHA so re-runs on the
-          # same commit replace rather than accumulate.
           MIRROR_BRANCH="auto/results-mirror-${GITHUB_SHA::8}"
           echo "mirror_branch=${MIRROR_BRANCH}" >> "$GITHUB_OUTPUT"
 
-          # Start from the exact published-results revision captured during the
-          # drift check. Do not resolve the moving ref again here.
           PUBLISHED_BASE_SHA="${{ steps.drift.outputs.published_base_sha }}"
           if [[ ! "${PUBLISHED_BASE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Mirror build has no captured published-results base SHA; refusing to publish."
@@ -241,28 +158,8 @@ jobs:
           fi
           git switch --force-create "${MIRROR_BRANCH}" "${PUBLISHED_BASE_SHA}"
 
-          # Apply the triggering commit's content for each mirrored path.
-          #
-          # results-data/bundles uses a **union overlay**, not a wipe:
-          # community submissions can land on published-results only (they
-          # target that branch, not develop). A prior wipe (`git rm -rf
-          # results-data/bundles` then checkout develop) deleted those
-          # published-only paths whenever develop was also ahead. Overlay
-          # instead:
-          #   - checkout develop's version of every path that exists on develop
-          #     (overwrites shared / develop-ahead files)
-          #   - leave paths that exist only on published-results intact
-          # Develop-side deletions inside bundles therefore do NOT auto-
-          # propagate; that is intentional — never delete public community
-          # content from an automated mirror. FILE_PATHS still use per-path
-          # apply (including removal when missing on the source commit).
           SOURCE_REF="${GITHUB_SHA}"
-          # Directory trees that must union-overlay (never wipe).
           BUNDLES_DIR='results-data/bundles'
-          # corpus-inventory.json is NOT blind-overlaid from develop: after a
-          # union overlay the tree may still hold published-only community
-          # bundles that develop's inventory does not list. Regenerate from the
-          # post-overlay tree so validate --check can pass under mixed drift.
           FILE_PATHS=(
             'results-data/CORPUS_NOTES.md'
             'results-data/SEED_CORPUS_SPEC.md'
@@ -277,12 +174,8 @@ jobs:
           )
 
           if git cat-file -e "${SOURCE_REF}:${BUNDLES_DIR}" 2>/dev/null; then
-            # Union overlay: checkout develop tree without removing published-only.
-            # Do NOT `git rm -rf` the directory first.
             git checkout "${SOURCE_REF}" -- "${BUNDLES_DIR}"
           else
-            # Source has no bundles tree — leave published intact rather than
-            # wipe community submissions. Report so the PR review can decide.
             echo "Source commit has no ${BUNDLES_DIR}; leaving published tree intact (union overlay)."
           fi
 
@@ -290,13 +183,10 @@ jobs:
             if git cat-file -e "${SOURCE_REF}:${path}" 2>/dev/null; then
               git checkout "${SOURCE_REF}" -- "${path}"
             else
-              # File removed on the source commit — mirror the removal.
               git rm -f --quiet "${path}" 2>/dev/null || true
             fi
           done
 
-          # Derive inventory from the unioned tree (published-only + develop).
-          # Same uv/--no-project/--python 3.11 contract as the validate step.
           if [[ -d "${BUNDLES_DIR}" ]]; then
             uv run --no-project --python 3.11 -- python scripts/generate_corpus_inventory.py --write
             git add results-data/corpus-inventory.json
@@ -311,11 +201,6 @@ jobs:
 
           git add results-data scripts benchbox/validation benchbox/core/results/query_status.py benchbox/core/results/schema_policy.py || true
 
-          # The heredoc body inherits the YAML block-scalar's 10-space
-          # indentation — strip it before using the file as a commit message.
-          # Pattern is coupled to this `run: |` block's indent depth; if the
-          # workflow is re-indented in a future refactor, also adjust the
-          # `{10}` count below.
           MSG_FILE=$(mktemp)
           cat > "${MSG_FILE}" <<MSG
           chore(corpus): mirror results-data changes from develop@${GITHUB_SHA::8}
@@ -333,11 +218,6 @@ jobs:
           git commit -F "${MSG_FILE}"
           rm -f "${MSG_FILE}"
 
-          # Compare and set the publication input before pushing a mirror
-          # proposal. The workflow never writes published-results directly, but
-          # a draft built from an older public tip would be an ambiguous
-          # reconciliation and could hide an intervening accepted submission.
-          # Treat movement as an actionable retry instead of opening a stale PR.
           git fetch origin published-results:refs/remotes/origin/published-results
           CURRENT_PUBLISHED_SHA=$(git rev-parse --verify origin/published-results^{commit})
           if [[ "${CURRENT_PUBLISHED_SHA}" != "${PUBLISHED_BASE_SHA}" ]]; then
@@ -348,42 +228,13 @@ jobs:
             exit 1
           fi
 
-          # Push the mirror branch. The branch is auto-named per develop SHA
-          # and only ever managed by this workflow, so force is acceptable;
-          # use `--force-with-lease` to match the project convention and
-          # catch the unlikely race where two concurrent runs targeting the
-          # same SHA collide.
           PRE_COMMIT_ALLOW_NO_CONFIG=1 git push --force-with-lease origin "${MIRROR_BRANCH}"
 
-          # Publish outputs only after the compare-and-set guard and push have
-          # both succeeded. A failed movement check must not satisfy the
-          # always-run status/PR steps below.
           MIRROR_HEAD_SHA=$(git rev-parse --verify HEAD^{commit})
           echo "mirror_head_sha=${MIRROR_HEAD_SHA}" >> "$GITHUB_OUTPUT"
           echo "has_changes=true" >> "$GITHUB_OUTPUT"
 
-      # w0: which checks genuinely protect a corpus-only branch. `published-results`
-      # carries results-data/, a slim results-validation subset of benchbox/, and
-      # docs — not the develop package or test suite. Reimporting develop's
-      # lint/type/pytest matrix here would gate corpus content on checks that have
-      # nothing to do with it (rejected by the ADR for the same reason it rejected
-      # routing submissions through develop directly). The two checks that ARE
-      # domain-appropriate after the publication fixed-point gate above are exactly
-      # the ones `validate-submission.yml` already runs for a human-authored
-      # submission PR: does each changed bundle pass schema/hash/privacy
-      # validation, and is the generated inventory still current. Run precisely
-      # those two, reusing the identical vendored scripts and the identical
-      # `--no-project --python 3.11` invocation convention documented in
-      # `adr-published-results-slim-corpus-branch.md`, so the mirror PR is judged
-      # by the same bar a contributor PR would be. uv/Python were installed
-      # earlier for the fixed-point gate and are reused here.
       - name: Validate mirrored corpus content
-        # The working tree right now (after `git switch --force-create` and the
-        # path-level checkouts above) IS the exact content the PR will present as
-        # its diff — validating it here checks precisely what a reviewer would
-        # see, not a proxy for it. `set -u`/`pipefail` without `-e`: a validator
-        # failure must be captured as a reported state, not abort the job before
-        # the PR / status steps below ever run.
         if: steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         id: validate
         run: |
@@ -404,17 +255,6 @@ jobs:
           if [[ -n "${CHANGED_BUNDLES}" ]]; then
             echo "Validating changed bundle(s):"
             printf '  %s\n' "${CHANGED_BUNDLES}"
-            # No --require-manifest: this run IS the maintainer-run mirror that
-            # validate-submission.yml's own "Validate bundles" step already
-            # waives the sidecar requirement for (same auto/results-mirror-*
-            # same-repo signal) — the seed-corpus, sidecar-less path is
-            # legitimate here too, not a gap.
-            #
-            # --allow-partial-validation: the curated seed corpus intentionally
-            # includes summary.validation=partial cohorts for compare depth.
-            # Community submissions still require passed (validate-submission.yml
-            # never passes this flag). Privacy leaks and inventory staleness
-            # still fail closed below.
             if ! printf '%s\n' "${CHANGED_BUNDLES}" | xargs -d '\n' uv run --no-project --python 3.11 -- \
               python scripts/validate_submission.py --allow-partial-validation; then
               STATE="failure"
@@ -433,29 +273,12 @@ jobs:
           echo "description=${DESCRIPTION}" >> "$GITHUB_OUTPUT"
 
       - name: Report validation as a commit status on the mirror PR
-        # This is the fix for Cause 1 (see the workflow-level comment above): a
-        # commit status posted by THIS run, tied to the mirror branch's own head
-        # SHA, is what makes the PR's statusCheckRollup non-empty. It must carry
-        # the same condition as "Open or update draft PR" so every mirror PR gets
-        # it, not just some.
-        #
-        # `always()`: without it, a step-level failure anywhere above (a flaky
-        # `astral-sh/setup-uv`, a `git diff` error inside the validate step —
-        # anything the validate step's own `set -uo pipefail` capture does not
-        # convert into a reported state) skips every later step, so no status
-        # AND no mirror PR. That would be a new way for the corpus mirror to
-        # silently not exist, which is worse than the blind PR this change is
-        # removing: develop's Corpus Drift Check would stay red with nothing
-        # open to explain it. An unreachable verdict is reported as `error`.
         if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ steps.validate.outputs.state }}
           DESCRIPTION: ${{ steps.validate.outputs.description }}
         run: |
-          # Empty means the validate step never reached its `GITHUB_OUTPUT`
-          # write. Never default this to `success`: an absent verdict is the
-          # one case where the PR carries no evidence either way.
           STATE="${STATE:-error}"
           DESCRIPTION="${DESCRIPTION:-Validation did not complete; see the workflow run.}"
           SHA=$(git rev-parse HEAD)
@@ -467,10 +290,6 @@ jobs:
 
       - name: Open or update draft PR
         id: pr
-        # `always()` for the same reason as the status step above: the mirror PR
-        # existing is what keeps develop's Corpus Drift Check actionable, so it
-        # must not be collateral damage from a toolchain hiccup in the new
-        # validation steps. Before those steps existed this could not happen.
         if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -535,10 +354,6 @@ jobs:
           echo "number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Verify mirror PR publication freshness
-        # The pre-push comparison prevents most stale proposals, but the
-        # accepted branch can advance while the push, status, or PR creation
-        # is in flight. Revalidate after the PR exists and close a stale
-        # proposal so it cannot be mistaken for a current mirror.
         if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -590,13 +405,6 @@ jobs:
           echo "Mirror PR #${PR_NUMBER} is fresh against published-results@${PUBLISHED_BASE_SHA}."
 
       - name: Fail the run if mirrored content failed validation
-        # Runs after the PR/status steps above on purpose: the PR must still
-        # exist and carry the failing status for a maintainer to act on, not
-        # disappear because this job stopped early.
-        #
-        # `!= 'success'` rather than `== 'failure'`: an empty state means the
-        # validate step never produced a verdict, and a run that could not
-        # determine whether the corpus is publishable must not be green.
         if: always() && steps.drift.outputs.has_drift == 'true' && steps.build.outputs.has_changes == 'true' && steps.validate.outputs.state != 'success'
         run: |
           echo "::error::Mirrored corpus content did not pass validation; see the corpus-mirror/validate-bundles status on the mirror PR for detail."

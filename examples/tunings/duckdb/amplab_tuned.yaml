@@ -1,9 +1,5 @@
-# DuckDB AMPLab Tuned Configuration
-# This configuration enables all DuckDB-supported optimizations for AMPLab Big Data Benchmark
-# Provides maximum performance with constraints and table-level tunings enabled
-
 primary_keys:
-  enabled: false # AMPLab benchmark typically uses generated data without keys
+  enabled: false
   enforce_uniqueness: false
   nullable: false
 

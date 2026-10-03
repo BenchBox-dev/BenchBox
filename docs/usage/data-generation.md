@@ -25,12 +25,10 @@ All benchmarks support a consistent `generate_data()` interface:
 ```python
 from benchbox import TPCH, TPCDS
 
-# Generate TPC-H data
 tpch = TPCH(scale_factor=0.1)
 tables = tpch.generate_data()
 print(f"Generated {len(tables)} TPC-H tables")
 
-# Generate TPC-DS data
 tpcds = TPCDS(scale_factor=0.1)
 tables = tpcds.generate_data()
 print(f"Generated {len(tables)} TPC-DS tables")
@@ -41,17 +39,13 @@ print(f"Generated {len(tables)} TPC-DS tables")
 Scale factors control the amount of data generated:
 
 ```python
-# Development and testing - small datasets
-benchmark = TPCH(scale_factor=0.001)  # ~1MB data
+benchmark = TPCH(scale_factor=0.001)
 
-# CI/CD pipelines - fast execution
-benchmark = TPCH(scale_factor=0.01)   # ~10MB data
+benchmark = TPCH(scale_factor=0.01)
 
-# Performance testing - moderate size
-benchmark = TPCH(scale_factor=0.1)    # ~100MB data
+benchmark = TPCH(scale_factor=0.1)
 
-# Production validation - full scale
-benchmark = TPCH(scale_factor=1.0)    # ~1GB data
+benchmark = TPCH(scale_factor=1.0)
 ```
 
 ### Output Directory Management
@@ -61,16 +55,13 @@ Control where data files are generated:
 ```python
 from pathlib import Path
 
-# Default location (current directory)
 benchmark = TPCH(scale_factor=0.1)
 
-# Custom directory
 benchmark = TPCH(
     scale_factor=0.1,
     output_dir="./benchmark-data/tpch"
 )
 
-# Temporary directory for testing
 import tempfile
 temp_dir = tempfile.mkdtemp()
 benchmark = TPCH(scale_factor=0.01, output_dir=temp_dir)
@@ -81,10 +72,9 @@ benchmark = TPCH(scale_factor=0.01, output_dir=temp_dir)
 Speed up data generation with parallel processing:
 
 ```python
-# Use multiple processes for faster generation
 benchmark = TPCH(
     scale_factor=1.0,
-    parallel=4  # Use 4 parallel processes
+    parallel=4
 )
 tables = benchmark.generate_data()
 ```
@@ -110,15 +100,11 @@ Smart validation is enabled by default and works transparently:
 ```python
 from benchbox import TPCH
 
-# First run - no data exists, will generate
 benchmark = TPCH(scale_factor=1.0, output_dir="./data")
 tables = benchmark.generate_data()
-# Output: ⚠️️ Data validation failed, generating TPC-H data...
 
-# Second run - valid data exists, will skip
 benchmark2 = TPCH(scale_factor=1.0, output_dir="./data")
 tables2 = benchmark2.generate_data()
-# Output: ✅ Valid TPC-H data found, skipping generation
 ```
 
 ### Force Regeneration
@@ -126,14 +112,12 @@ tables2 = benchmark2.generate_data()
 When you need to regenerate data regardless of existing files:
 
 ```python
-# Force regeneration even if valid data exists
 benchmark = TPCH(
     scale_factor=1.0,
     output_dir="./data",
     force_regenerate=True
 )
 tables = benchmark.generate_data()
-# Output: ⚠️️ Force regeneration requested, generating data...
 ```
 
 ### Verbose Validation Reports
@@ -180,19 +164,17 @@ TPC-H uses the official dbgen tool for standards-compliant data:
 ```python
 from benchbox import TPCH
 
-# Standard generation
 tpch = TPCH(scale_factor=1.0)
 tables = tpch.generate_data()
 
-# Expected tables and approximate row counts (SF=1.0)
 tables_info = {
     'customer': 150_000,
     'lineitem': 6_001_215,
-    'nation': 25,          # Fixed size
+    'nation': 25,
     'orders': 1_500_000,
     'part': 200_000,
     'partsupp': 800_000,
-    'region': 5,           # Fixed size
+    'region': 5,
     'supplier': 10_000
 }
 ```
@@ -211,10 +193,9 @@ generator. It now produces three tables (`dim_locations`, `dim_products`, and
 ```python
 from benchbox import CoffeeShop
 
-# Reference-aligned generator (small scale for development)
 coffeeshop = CoffeeShop(scale_factor=0.001)
 data_files = coffeeshop.generate_data()
-print(data_files["order_lines"])  # Path to generated CSV file
+print(data_files["order_lines"])
 ```
 
 Scale factors map directly to order counts using the approved formula
@@ -244,11 +225,9 @@ TPC-DS uses the official dsdgen tool for complex analytical data:
 ```python
 from benchbox import TPCDS
 
-# Standard generation
 tpcds = TPCDS(scale_factor=1.0)
 tables = tpcds.generate_data()
 
-# TPC-DS generates 24 tables with complex relationships
 print(f"Generated {len(tables)} TPC-DS tables")
 ```
 
@@ -265,10 +244,8 @@ BenchBox includes patched dsdgen binaries that support streaming data to stdout,
 enabling efficient compression pipelines:
 
 ```bash
-# Generate table directly to compressed file
 dsdgen -TABLE ship_mode -SCALE 1 -FILTER Y | zstd > ship_mode.dat.zst
 
-# Generate with fixed seed for reproducibility
 dsdgen -TABLE date_dim -SCALE 1 -FILTER Y -RNGSEED 12345 | gzip > date_dim.dat.gz
 ```
 
@@ -283,7 +260,6 @@ The Read Primitives benchmark automatically shares data with TPC-H to avoid dupl
 ```python
 from benchbox import ReadPrimitives
 
-# Read Primitives automatically uses TPC-H data
 read_primitives = ReadPrimitives(scale_factor=0.1)
 tables = read_primitives.generate_data()
 ```
@@ -306,16 +282,13 @@ tables = read_primitives.generate_data()
 ```python
 from benchbox import TPCH, ReadPrimitives
 
-# Generate TPC-H data once
-tpch = TPCH(scale_factor=1.0)  # Data goes to: data/tpch_sf1.0/
+tpch = TPCH(scale_factor=1.0)
 tpch_tables = tpch.generate_data()
 
-# Primitives automatically uses the same data
-read_primitives = ReadPrimitives(scale_factor=1.0)  # Also uses: data/tpch_sf1.0/
-prim_tables = read_primitives.generate_data()  # No regeneration needed!
+read_primitives = ReadPrimitives(scale_factor=1.0)
+prim_tables = read_primitives.generate_data()
 
-# Both benchmarks share the same table files
-assert tpch_tables['customer'] == prim_tables['customer']  # Same file path
+assert tpch_tables['customer'] == prim_tables['customer']
 ```
 
 **Custom Output Paths:**
@@ -323,18 +296,16 @@ assert tpch_tables['customer'] == prim_tables['customer']  # Same file path
 You can still use custom paths for isolated Primitives data:
 
 ```python
-# Isolated Primitives data (won't share with TPC-H)
 read_primitives = ReadPrimitives(
     scale_factor=0.1,
     output_dir="./custom-primitives-data"
 )
-tables = read_primitives.generate_data()  # Generates fresh TPC-H data here
+tables = read_primitives.generate_data()
 ```
 
 ### Other Benchmarks
 
 ```python
-# SSB (Star Schema Benchmark)
 from benchbox import SSB
 ssb = SSB(scale_factor=1.0)
 tables = ssb.generate_data()
@@ -358,13 +329,10 @@ Access validation directly for custom workflows:
 ```python
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
-# Create validator for specific benchmark
 validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
 
-# Validate a data directory
 result = validator.validate_data_directory("./data")
 
-# Check results
 if result.valid:
     print("✅ Data is valid")
     print(f"Validated {len(result.tables_validated)} tables")
@@ -373,7 +341,6 @@ else:
     for issue in result.issues:
         print(f"  - {issue}")
 
-# Print detailed report
 validator.print_validation_report(result, verbose=True)
 ```
 
@@ -382,7 +349,6 @@ validator.print_validation_report(result, verbose=True)
 For advanced validation scenarios:
 
 ```python
-# Check if regeneration is needed
 should_regenerate, result = validator.should_regenerate_data("./data")
 
 if should_regenerate:
@@ -392,7 +358,6 @@ if should_regenerate:
 else:
     print("Existing data is valid")
 
-# Force regeneration programmatically
 force_regen = len(result.row_count_mismatches) > 0
 benchmark = TPCH(scale_factor=1.0, force_regenerate=force_regen)
 ```
@@ -415,7 +380,6 @@ Use parallel generation for large scale factors:
 ```python
 import multiprocessing
 
-# Use all available CPU cores
 cores = multiprocessing.cpu_count()
 benchmark = TPCH(scale_factor=10.0, parallel=cores)
 tables = benchmark.generate_data()
@@ -426,13 +390,12 @@ tables = benchmark.generate_data()
 Organize data for maximum reuse:
 
 ```bash
-# Organize by benchmark and scale factor
 ./benchmark-data/
   ├── tpch/
-  │   ├── sf-0.01/    # Small datasets for quick testing
-  │   ├── sf-0.1/     # Medium datasets for CI/CD
-  │   ├── sf-1.0/     # Large datasets for performance testing
-  │   └── sf-10.0/    # Production-scale datasets
+  │   ├── sf-0.01/
+  │   ├── sf-0.1/
+  │   ├── sf-1.0/
+  │   └── sf-10.0/
   └── tpcds/
       ├── sf-0.01/
       └── sf-1.0/
@@ -446,11 +409,11 @@ All benchmarks support these common parameters:
 
 ```python
 benchmark = TPCH(
-    scale_factor=1.0,           # Data scale factor
-    output_dir="./data",        # Output directory
-    verbose=True,               # Show detailed output
-    force_regenerate=False,     # Skip smart validation
-    parallel=1                  # Parallel generation processes
+    scale_factor=1.0,
+    output_dir="./data",
+    verbose=True,
+    force_regenerate=False,
+    parallel=1
 )
 ```
 
@@ -459,13 +422,10 @@ benchmark = TPCH(
 Control behavior globally via environment variables:
 
 ```bash
-# Force regeneration for all benchmarks
 export BENCHBOX_FORCE_REGENERATE=true
 
-# Enable verbose output
 export BENCHBOX_VERBOSE=true
 
-# Set default output directory
 export BENCHBOX_DATA_DIR=./benchmark_runs/datagen
 ```
 
@@ -474,10 +434,8 @@ export BENCHBOX_DATA_DIR=./benchmark_runs/datagen
 Some platforms have special considerations:
 
 ```python
-# ClickHouse - handles large scale factors efficiently
 benchmark = TPCH(scale_factor=100.0, platform="clickhouse-local")
 
-# DuckDB - configured for analytical workloads
 benchmark = TPCH(scale_factor=10.0, platform="duckdb")
 ```
 
@@ -488,14 +446,11 @@ benchmark = TPCH(scale_factor=10.0, platform="duckdb")
 Generate data in different formats:
 
 ```python
-# Generate standard delimited files
 tpch = TPCH(scale_factor=0.1)
 tables = tpch.generate_data()
 
-# Convert to Parquet (if pyarrow available)
 for table_name, file_path in tables.items():
     parquet_path = file_path.with_suffix('.parquet')
-    # Conversion code here
 ```
 
 ### Custom Data Directories
@@ -506,7 +461,6 @@ Implement custom directory structures:
 from pathlib import Path
 from datetime import datetime
 
-# Timestamp-based directories
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 data_dir = Path(f"./runs/{timestamp}/tpch_sf1")
 
@@ -519,7 +473,6 @@ tables = benchmark.generate_data()
 Cache data between runs:
 
 ```yaml
-# GitHub Actions example
 - name: Cache benchmark data
   uses: actions/cache@v3
   with:
@@ -543,10 +496,8 @@ Cache data between runs:
 
 **Problem**: Existing data was generated with different scale factor
 ```python
-# Solution 1: Use matching scale factor
-benchmark = TPCH(scale_factor=0.5)  # Match existing data
+benchmark = TPCH(scale_factor=0.5)
 
-# Solution 2: Force regeneration with new scale factor
 benchmark = TPCH(scale_factor=1.0, force_regenerate=True)
 ```
 
@@ -554,17 +505,14 @@ benchmark = TPCH(scale_factor=1.0, force_regenerate=True)
 
 **Problem**: Some data files are missing or corrupted
 ```python
-# Smart generation automatically detects and regenerates
 benchmark = TPCH(scale_factor=1.0, verbose=True)
 tables = benchmark.generate_data()
-# Output: "Missing files detected, regenerating all data"
 ```
 
 #### Permission Errors
 
 **Problem**: Cannot read/write data files
 ```bash
-# Fix directory permissions
 chmod 755 ./data
 chown $USER:$USER ./data
 ```
@@ -573,11 +521,10 @@ chown $USER:$USER ./data
 
 **Problem**: Not enough space for large scale factors
 ```python
-# Check required space before generation
 def estimate_data_size(benchmark, scale_factor):
     base_size_mb = {
-        'tpch': 1000,    # ~1GB for SF=1.0
-        'tpcds': 2000,   # ~2GB for SF=1.0
+        'tpch': 1000,
+        'tpcds': 2000,
     }
     return base_size_mb.get(benchmark, 1000) * scale_factor
 
@@ -595,7 +542,6 @@ logging.basicConfig(level=logging.DEBUG)
 
 benchmark = TPCH(scale_factor=1.0, verbose=True)
 tables = benchmark.generate_data()
-# Shows detailed generation and validation steps
 ```
 
 ## Best Practices
@@ -608,14 +554,11 @@ tables = benchmark.generate_data()
 4. **Monitor Resources**: Track memory and disk usage
 
 ```python
-# Development pattern
 def setup_benchmark(scale_factor=0.01):
-    """Setup benchmark with smart caching."""
     data_dir = Path("./dev-cache") / f"tpch-sf{scale_factor}"
     return TPCH(scale_factor=scale_factor, output_dir=data_dir, verbose=True)
 
-# Use in development
-tpch = setup_benchmark()  # Uses cache if available
+tpch = setup_benchmark()
 tables = tpch.generate_data()
 ```
 
@@ -627,9 +570,7 @@ tables = tpch.generate_data()
 4. **Plan Storage**: Estimate storage requirements for scale factors
 
 ```python
-# Production pattern
 def setup_production_benchmark(scale_factor=1.0):
-    """Setup production benchmark with validation."""
     data_dir = Path("/opt/benchmark-data") / f"tpch-sf{scale_factor}"
 
     benchmark = TPCH(
@@ -639,10 +580,8 @@ def setup_production_benchmark(scale_factor=1.0):
         parallel=multiprocessing.cpu_count()
     )
 
-    # Pre-validate or generate
     tables = benchmark.generate_data()
 
-    # Additional validation
     validator = BenchmarkDataValidator("tpch", scale_factor)
     result = validator.validate_data_directory(data_dir)
 
@@ -664,29 +603,23 @@ import pytest
 import tempfile
 
 def test_data_generation():
-    """Test basic data generation."""
     with tempfile.TemporaryDirectory() as temp_dir:
         benchmark = TPCH(scale_factor=0.001, output_dir=temp_dir)
         tables = benchmark.generate_data()
 
-        # Validate results
         assert len(tables) == 8
         for table_path in tables.values():
             assert table_path.exists()
             assert table_path.stat().st_size > 0
 
 def test_smart_generation():
-    """Test smart generation skip logic."""
     with tempfile.TemporaryDirectory() as temp_dir:
-        # First generation
         benchmark1 = TPCH(scale_factor=0.001, output_dir=temp_dir)
         tables1 = benchmark1.generate_data()
 
-        # Second generation should skip
         benchmark2 = TPCH(scale_factor=0.001, output_dir=temp_dir, verbose=True)
         tables2 = benchmark2.generate_data()
 
-        # Should return same tables
         assert tables1.keys() == tables2.keys()
 ```
 
@@ -722,7 +655,6 @@ Planned data generation improvements:
 ### Performance Issues
 
 ```python
-# Monitor generation performance
 import time
 
 start_time = time.time()
@@ -737,7 +669,6 @@ print(f"Average: {generation_time/len(tables):.2f}s per table")
 ### Memory Issues
 
 ```python
-# For large scale factors, monitor memory usage
 import psutil
 
 def monitor_generation():
@@ -755,13 +686,11 @@ def monitor_generation():
 ### Validation Issues
 
 ```python
-# Debug validation problems
 from benchbox.utils.data_validation import BenchmarkDataValidator
 
 validator = BenchmarkDataValidator("tpch", scale_factor=1.0)
 result = validator.validate_data_directory("./data")
 
-# Detailed analysis
 if not result.valid:
     print("Validation Issues:")
     print(f"Missing tables: {result.missing_tables}")

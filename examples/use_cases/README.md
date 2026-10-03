@@ -26,10 +26,8 @@ This directory contains complete, production-ready examples demonstrating how to
 
 **Usage:**
 ```bash
-# Generate baseline (run once on main branch)
 python use_cases/ci_regression_test.py --save-baseline baseline.json
 
-# Test for regressions (run in CI)
 python use_cases/ci_regression_test.py --baseline baseline.json
 ```
 
@@ -50,10 +48,8 @@ python use_cases/ci_regression_test.py --baseline baseline.json
 
 **Usage:**
 ```bash
-# Evaluate local platforms
 python use_cases/platform_evaluation.py --platforms duckdb,sqlite
 
-# Add cloud platforms
 python use_cases/platform_evaluation.py --platforms duckdb,databricks,bigquery --dry-run
 ```
 
@@ -72,10 +68,8 @@ python use_cases/platform_evaluation.py --platforms duckdb,databricks,bigquery -
 
 **Usage:**
 ```bash
-# Run full tuning workflow
 python use_cases/incremental_tuning.py
 
-# Custom scale factor
 python use_cases/incremental_tuning.py --scale 1.0
 ```
 
@@ -94,10 +88,8 @@ python use_cases/incremental_tuning.py --scale 1.0
 
 **Usage:**
 ```bash
-# Preview costs
 python use_cases/cost_optimization.py --platform bigquery --dry-run
 
-# See cost strategies
 python use_cases/cost_optimization.py
 ```
 
@@ -133,14 +125,12 @@ python use_cases/cost_optimization.py
 
 ### GitHub Actions
 ```yaml
-# .github/workflows/performance.yml
 - name: Performance Test
   run: python use_cases/ci_regression_test.py --baseline baseline.json
 ```
 
 ### GitLab CI
 ```yaml
-# .gitlab-ci.yml
 performance_test:
   script:
     - python use_cases/ci_regression_test.py --baseline baseline.json
@@ -148,7 +138,6 @@ performance_test:
 
 ### Jenkins
 ```groovy
-// Jenkinsfile
 stage('Performance Test') {
     sh 'python use_cases/ci_regression_test.py --baseline baseline.json'
 }

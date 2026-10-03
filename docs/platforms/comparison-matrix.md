@@ -150,22 +150,14 @@ Performance varies based on workload, query complexity, data size, and hardware.
 ### Installation
 
 ```bash
-# DuckDB (default, included with BenchBox)
 uv add duckdb
 
-# DataFusion
 uv add datafusion
 
-# SQLite (built-in Python)
-# No installation needed
-
-# Polars (DataFrame API only - use polars-df platform)
 uv add polars
 
-# ClickHouse Local (chDB, zero-config)
 uv add benchbox --extra clickhouse-local
 
-# ClickHouse Server (self-hosted, requires running instance)
 uv add benchbox --extra clickhouse-server
 ```
 
@@ -232,28 +224,20 @@ TigerData (`timescaledb:cloud`) security profile:
 ### Installation
 
 ```bash
-# BigQuery
 uv add google-cloud-bigquery google-cloud-storage
 
-# Snowflake
 uv add snowflake-connector-python
 
-# Databricks (SQL mode)
 uv add databricks-sql-connector
 
-# Redshift
 uv add redshift-connector boto3
 
-# Azure Synapse Analytics
 uv add pyodbc azure-storage-blob azure-identity
 
-# Fabric Warehouse
 uv add pyodbc azure-identity azure-storage-file-datalake
 
-# Amazon Athena
 uv add pyathena boto3
 
-# Firebolt
 uv add firebolt-sdk
 ```
 
@@ -298,19 +282,14 @@ Federated and distributed query engines for multi-source analytics.
 ### Installation
 
 ```bash
-# Trino
 uv add trino
 
-# PrestoDB
 uv add presto-python-client
 
-# Apache Spark SQL
 uv add pyspark
 
-# ClickHouse (server mode - requires running instance)
 uv add benchbox --extra clickhouse-server
 
-# SingleStore
 uv add singlestoredb
 ```
 
@@ -355,12 +334,10 @@ Native-code engines that accept Spark SQL / DataFrame workloads without running 
 ### Installation
 
 ```bash
-# LakeSail (uses standard PySpark client via Spark Connect)
 uv add benchbox --extra lakesail
 make uat-bring-up PLATFORM=lakesail
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# Velox (pulls pyspark[connect]>=3.5.0; requires the Gluten bundle jar)
 uv add benchbox --extra velox
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
@@ -407,13 +384,10 @@ Traditional relational databases and specialized time-series engines.
 ### Installation
 
 ```bash
-# PostgreSQL
 uv add psycopg2-binary
 
-# TimescaleDB (uses same driver as PostgreSQL)
 uv add psycopg2-binary
 
-# InfluxDB
 uv add influxdb3-python
 ```
 
@@ -481,16 +455,12 @@ Cloud-managed Apache Spark environments for distributed processing.
 ### Installation
 
 ```bash
-# AWS Spark Services (Glue, EMR Serverless, Athena for Spark)
 uv add boto3
 
-# GCP Spark Services (Dataproc, Dataproc Serverless)
 uv add google-cloud-dataproc google-cloud-storage
 
-# Azure Spark Services (Fabric Spark, Synapse Spark)
 uv add azure-identity azure-storage-file-datalake requests
 
-# Onehouse Quanton
 uv add requests boto3
 ```
 
@@ -552,26 +522,19 @@ Native DataFrame API libraries for programmatic data manipulation.
 ### Installation
 
 ```bash
-# Expression Family
-uv add polars                    # Polars DataFrame
-uv add pyspark                   # PySpark DataFrame (requires Java 17/21)
-uv add datafusion                # DataFusion DataFrame
+uv add polars
+uv add pyspark
+uv add datafusion
 
-# Databricks DataFrame (requires Databricks Connect)
 uv add databricks-connect
 
-# Snowpark Connect (PySpark-compatible on Snowflake)
 uv add "snowflake-snowpark-python[pandas]"
 
-# LakeSail DataFrame (Spark Connect via standard PySpark client)
 uv add pyspark pyarrow
 
-# Pandas Family
-uv add pandas                    # Pandas DataFrame
-uv add dask[distributed]         # Dask DataFrame
+uv add pandas
+uv add dask[distributed]
 
-# cuDF (GPU - requires NVIDIA GPU, Linux only)
-# Note: cuDF requires pip due to CUDA dependencies
 pip install cudf-cu12 --extra-index-url=https://pypi.nvidia.com
 ```
 
@@ -595,18 +558,14 @@ These platforms support both SQL and native DataFrame execution modes. Use the a
 
 **Usage Example:**
 ```bash
-# Polars: DataFrame mode only
-benchbox run --platform polars-df --benchmark tpch --scale 1    # DataFrame mode
+benchbox run --platform polars-df --benchmark tpch --scale 1
 
-# DataFusion: SQL and DataFrame modes
-benchbox run --platform datafusion --benchmark tpch --scale 1   # SQL mode
-benchbox run --platform datafusion-df --benchmark tpch --scale 1 # DataFrame mode
+benchbox run --platform datafusion --benchmark tpch --scale 1
+benchbox run --platform datafusion-df --benchmark tpch --scale 1
 
-# Databricks: SQL Warehouse vs DataFrame
-benchbox run --platform databricks --benchmark tpch --scale 10    # SQL Warehouse
-benchbox run --platform databricks-df --benchmark tpch --scale 10 # Databricks Connect
+benchbox run --platform databricks --benchmark tpch --scale 10
+benchbox run --platform databricks-df --benchmark tpch --scale 10
 
-# Snowpark Connect: DataFrame on Snowflake
 benchbox run --platform snowpark-connect --benchmark tpch --scale 10
 ```
 

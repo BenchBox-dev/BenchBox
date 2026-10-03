@@ -1,16 +1,3 @@
-/**
- * Smoke tests for the 10 chart components added by
- * explorer-close-chart-type-coverage-gaps.
- *
- * Each chart is tested for:
- *   (a) empty data - renders null or an empty-state message without throwing
- *   (b) realistic data - renders an <svg> or <table> without throwing
- *
- * Math correctness is already covered by the parity suite
- * (src/__tests__/parity/chartMath.parity.test.ts); these tests only guard
- * against rendering regressions (null-dereferences, layout crashes).
- */
-
 import { render } from "@testing-library/preact";
 import { describe, it, expect } from "vitest";
 import type { BenchmarkSummary, PlatformRow } from "@/types";
@@ -101,10 +88,6 @@ function emptySummary(): BenchmarkSummary {
   return makeSummary({ platforms: [], query_ids: [] });
 }
 
-// ---------------------------------------------------------------------------
-// PercentileLadder
-// ---------------------------------------------------------------------------
-
 describe("PercentileLadder", () => {
   it("renders nothing when given no rows", () => {
     const { container } = render(<PercentileLadder rows={[]} />);
@@ -127,9 +110,6 @@ describe("PercentileLadder", () => {
   });
 
   it("uses unique data-result-id even when two rows share a platform name", () => {
-    // Variant-tuning case: same platform with different tuning_modes
-    // produces two PlatformRows with the same `platform` display name but
-    // different result_ids. Pre-w6-review, key={row.platform} collided.
     const { container } = render(
       <PercentileLadder
         rows={[
@@ -177,10 +157,6 @@ describe("PercentileLadder", () => {
     expect(labels[0]).not.toBe(labels[1]);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Cohort-aware run identity disambiguation across charts
-// ---------------------------------------------------------------------------
 
 describe("chart run-identity disambiguation", () => {
   function duplicatePlatformSummary(): BenchmarkSummary {
@@ -235,10 +211,6 @@ describe("chart run-identity disambiguation", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// CDFChart
-// ---------------------------------------------------------------------------
-
 describe("CDFChart", () => {
   it("renders nothing for empty summary", () => {
     const { container } = render(<CDFChart summary={emptySummary()} />);
@@ -250,10 +222,6 @@ describe("CDFChart", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// RankTable
-// ---------------------------------------------------------------------------
 
 describe("RankTable", () => {
   it("renders nothing when platforms are empty", () => {
@@ -340,10 +308,6 @@ describe("RankTable", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// DistributionBox
-// ---------------------------------------------------------------------------
-
 describe("DistributionBox", () => {
   it("renders nothing for empty summary", () => {
     const { container } = render(<DistributionBox summary={emptySummary()} />);
@@ -355,10 +319,6 @@ describe("DistributionBox", () => {
     expect(container.querySelector("svg")).not.toBeNull();
   });
 });
-
-// ---------------------------------------------------------------------------
-// QueryHistogram
-// ---------------------------------------------------------------------------
 
 describe("QueryHistogram", () => {
   it("renders nothing for empty summary", () => {
@@ -396,16 +356,10 @@ describe("QueryHistogram", () => {
     const svg = container.querySelector("svg");
     expect(svg?.getAttribute("width")).toBe("100%");
     expect(svg?.getAttribute("viewBox")).toMatch(/^0 0 300 /);
-    // Height floor follows the shared chartFrame layout (196 for this
-    // fixture); the old floor belonged to the retired isNarrowChart sizing.
     expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(100);
   });
 
   it("splits panels on cohort width, not query count alone", () => {
-    // A query group holds one bar per platform. Splitting on query count alone
-    // let a wide cohort clamp each bar to a minimum wider than the group it sat
-    // in, so consecutive groups painted over one another. Reproduced at the
-    // narrow width where the clamp actually bites.
     Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
       configurable: true,
       get: () => 300,
@@ -475,10 +429,6 @@ describe("QueryHistogram", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// PowerBar
-// ---------------------------------------------------------------------------
-
 describe("PowerBar", () => {
   it("shows a 'not available' message when no power_score", () => {
     const summary = makeSummary({
@@ -522,10 +472,6 @@ describe("PowerBar", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// StackedPhase
-// ---------------------------------------------------------------------------
-
 describe("StackedPhase", () => {
   it("shows a 'not available' message when no phase_durations", () => {
     const { container } = render(<StackedPhase summary={makeSummary()} />);
@@ -545,10 +491,6 @@ describe("StackedPhase", () => {
     expect(container.querySelectorAll("rect").length).toBeGreaterThan(0);
   });
 });
-
-// ---------------------------------------------------------------------------
-// TimeSeries
-// ---------------------------------------------------------------------------
 
 function makeEntry(
   overrides: Partial<ChartHistoricalEntry> = {},
@@ -596,8 +538,6 @@ describe("TimeSeries", () => {
     const { container } = render(<TimeSeries entries={entries} />);
     const svg = container.querySelector("svg");
     expect(svg).not.toBeNull();
-    // Height floor follows the shared chartFrame layout (208 for this
-    // fixture); the old floor belonged to the retired isNarrowChart sizing.
     expect(Number(svg?.getAttribute("height"))).toBeGreaterThan(100);
     expect(container.querySelector("path")).not.toBeNull();
   });
@@ -713,9 +653,6 @@ describe("TimeSeries", () => {
   });
 
   it("dedupes duplicate result_id entries before plotting", () => {
-    // Defence in depth: if a future JOIN regression in an upstream query
-    // emits the same result_id twice, the chart should render one circle
-    // for that result, not two stacked at the same coordinates.
     const entries = [
       makeEntry({ result_id: "r1", run_date: "2026-03-01", display_geomean_ms: 15 }),
       makeEntry({ result_id: "r1", run_date: "2026-03-01", display_geomean_ms: 15 }),
@@ -728,10 +665,6 @@ describe("TimeSeries", () => {
     expect(new Set(ids).size).toBe(2);
   });
 });
-
-// ---------------------------------------------------------------------------
-// CostScatter
-// ---------------------------------------------------------------------------
 
 describe("CostScatter", () => {
   it("shows why normalized cost is unavailable when metadata is missing", () => {
@@ -788,10 +721,6 @@ describe("CostScatter", () => {
     expect(container.textContent).toContain("model 2026.05.0");
   });
 });
-
-// ---------------------------------------------------------------------------
-// SparklineTable
-// ---------------------------------------------------------------------------
 
 describe("SparklineTable", () => {
   it("renders nothing when platforms are empty", () => {

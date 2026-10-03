@@ -1,8 +1,3 @@
-# BenchBox Makefile
-# This makefile provides commands for building, testing and development
-
-# Freeze the root before includes change MAKEFILE_LIST; realpath preserves make -f/symlink consumers.
-# `override` reserves this bootstrap variable against command-line and `make -e` environment injection.
 override BENCHBOX_MAKEFILE_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
 PR_FANOUT_JOBS ?= 4
@@ -26,12 +21,6 @@ JOINORDER_POSTGRES_USER ?= postgres
 JOINORDER_QUERIES ?= _project/joinorder/build-inputs/queries
 JOINORDER_REFERENCE ?= _project/joinorder/reference_cardinalities.json
 
-# These targets are deliberately retained in the release Make runtime so the
-# public target inventory stays stable, but their implementation or evidence
-# lives under the development-only portion of `_project/`. The curated release
-# retains only the small Explorer publication helper set. Fail with one
-# explicit policy message on a curated release instead of leaking file-not-found
-# errors from a partially retained `_project/` tree.
 DEVELOPMENT_TREE_ONLY_TARGETS := \
 	correctness-gate-digests-regen cross-surface-baseline-autodetect \
 	oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report \
@@ -46,7 +35,6 @@ DEVELOPMENT_TREE_ONLY_TARGETS := \
 
 .PHONY: test test-unit test-integration test-tpch test-all test-fast test-unlock test-medium test-medium-selected test-slow test-stress test-pytest clean lint lint-markers lint-imports lint-explorer-tokens lint-site-theme-tokens artifact-hygiene agent-instructions-check agent-identity-check agent-commit-range-check audit-sha-check agent-write-preflight install develop coverage coverage-fast coverage-all coverage-opt-in-all coverage-html coverage-report coverage-check test-duckdb test-sqlite test-read-primitives test-benchmarks test-ci typecheck quality-governance-typecheck validate-imports catalog-schema-check format dependency-check docs-build docs-serve docs-clean docs-linkcheck docs-validate docs-check docs-images test-pyspark ci-lint ci-test ci-docs ci-local security-audit spellcheck test-package test-integration-smoke test-correctness-gate plan-capture-gate correctness-gate-digests-regen test-local-matrix joinorder-verify-reference-results complexity-check complexity-report duplicate-check duplicate-check-verbose duplicate-check-json duplicate-check-delta makefile-inventory-check skill-sync skill-sync-check mutation-test tpchavoc-equivalence-report tpchavoc-equivalence-report-postgres tpchavoc-equivalence-report-datafusion tpchavoc-equivalence-report-clickhouse tpchavoc-dataframe-equivalence-report ssb-cross-surface-equivalence-report amplab-cross-surface-equivalence-report coffeeshop-cross-surface-equivalence-report clickbench-cross-surface-equivalence-report joinorder-synthetic-cross-surface-equivalence-report h2odb-cross-surface-equivalence-report read-primitives-cross-surface-equivalence-report cross-surface-update-baseline cross-surface-baseline-autodetect oracle-coverage-map oracle-coverage-map-check cross-surface-applicability-report compile-tpcds-binaries parity-fixtures parity-check compat-docs compat-docs-check query-docs platform-manifest platform-manifest-check pricing-data pricing-data-check pr-preflight pr-preflight-fast-tests pr-preflight-medium-tests pr-content-guard pr-open pr-ready pr-arm-auto-merge pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup worktree-create worktree-remove worktree-list worktree-audit local-validation local-validation-show local-validation-path
 
-# Primary test commands using pytest marker system
 test: test-fast
 	@echo "Default test run completed. Use 'make help' to see all test options."
 
@@ -83,19 +71,15 @@ test-integration:
 test-tpch:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "tpch" --tb=short
 
-# Curated lightweight smoke lane
 test-quick:
 	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=5 --timeout=120
 
-# Verbose test output for all tests
 test-verbose:
 	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -v
 
-# Enhanced pytest commands using comprehensive marker system
 test-pytest:
 	BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest -m "not stress"
 
-# Speed-based testing
 test-fast:
 	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
 
@@ -126,41 +110,11 @@ test-slow:
 test-stress:
 	BENCHBOX_TEST_TIER=t3 uv run -- python -m pytest -m "stress" -n 0 --tb=short -v --timeout=1800
 
-# Development cycle testing using the curated fast unit subset
 test-dev:
 	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and unit and not (slow or stress or resource_heavy or live_integration)" --tb=short --maxfail=3 --timeout=120
 
-# Smoke tests (alias for test-quick)
 test-smoke: test-quick
 
-# Bounded real-result correctness gate for develop PRs: one local benchmark case
-# (DuckDB x TPC-H, SF=1, reference qgen seed) through generate/load/execute with
-# phase, cardinality, EXACT stored answer-set row-count checks, AND stored VALUE
-# digests. The value oracle (BENCHBOX_EMIT_RESULT_DIGEST=1) makes the runner emit an
-# order-normalized digest of each stream-0 query's full result set, which the gate
-# asserts against a stored reference digest -- so a wrong-but-same-cardinality answer
-# (e.g. a perturbed Q1 aggregate, a swapped column) is caught, not just a wrong row
-# count. The proven guarantee is value+cardinality at SF=1/pinned-seed only; values
-# above SF=1 are UNGUARDED (no stored answers exist there). The query subset is the
-# 18 TPC-H queries whose answer-set cardinalities are stable across dbgen builds;
-# Q11/Q16/Q18/Q20 are excluded because their HAVING/threshold boundaries make the
-# stored row count vary with the generated data (see tests/README.md).
-#
-# WHAT THE VALUE ORACLE IS (and is NOT): the stored reference digests are a frozen
-# benchbox-on-DuckDB snapshot, so the value check is a REGRESSION SNAPSHOT vs a
-# DuckDB-pinned baseline (it detects CHANGE from the frozen answer), NOT an
-# independent correctness oracle -- a conceptual value bug present at freeze time is
-# enshrined, not caught. Regenerate the reference with `make correctness-gate-digests-regen`.
-#
-# The JUnit-report guard fails the target if the selected node SKIPs instead of
-# running: pytest exits 0 on a selected skip, which would otherwise pass the gate
-# without executing the benchmark. The report goes to a private temp file (not the
-# repo-root test-results.xml that pytest-ci.ini also writes) and is removed after
-# parsing; both the pytest status and the guard status are propagated.
-#
-# CORRECTNESS_GATE_QUERY_IDS is the ONE source of the gated query-id set, shared by
-# both this gate and `correctness-gate-digests-regen` (the reference is regenerated
-# from the same query set it is asserted against -- never re-hardcode the list).
 CORRECTNESS_GATE_QUERY_IDS := 1,2,3,4,5,6,7,8,9,10,12,13,14,15,17,19,21,22
 
 test-correctness-gate:
@@ -175,72 +129,24 @@ test-correctness-gate:
 plan-capture-gate:
 	uv run -- python -m pytest tests/integration/test_plan_capture_gate.py -q -n 0 --tb=short
 
-# Regenerate the bounded correctness-gate VALUE-digest reference
-# (benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json)
-# from a live gate run. Replaces the historical hand-copy: this runs the SAME gate
-# configuration (DuckDB x TPC-H, SF=1, reference qgen seed, the shared
-# CORRECTNESS_GATE_QUERY_IDS set) with BENCHBOX_EMIT_RESULT_DIGEST=1 and WRITES the
-# stream-0 per-query digests + provenance back to the JSON. Idempotent on a clean
-# tree: `make correctness-gate-digests-regen && git diff --exit-code <json>` is clean.
-# The reference is a regression SNAPSHOT vs a DuckDB-pinned baseline, tied to the
-# DuckDB build in uv.lock (stamped into the file's provenance). Run this whenever the
-# digest normalization changes or DuckDB is bumped, in the SAME change, or
-# `make test-correctness-gate` goes RED on a correct tree.
 correctness-gate-digests-regen:
 	BENCHBOX_CORRECTNESS_GATE_QUERY_IDS=$(CORRECTNESS_GATE_QUERY_IDS) uv run -- python _project/scripts/regenerate_correctness_gate_digests.py
 
-# Gate: compare every TPC-Havoc SQL variant to canonical TPC-H on real SF=0.1
-# DuckDB data; exits non-zero on any divergence beyond KNOWN_DIVERGENCES
-# (see benchbox/core/tpchavoc/equivalence.py).
 tpchavoc-equivalence-report:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence
 
-# Second-engine SAMPLE: compare every Postgres-executable TPC-Havoc SQL variant
-# to canonical TPC-H on the SAME PostgreSQL instance (both translated to the
-# postgres dialect). Excludes POSTGRES_TPCHAVOC_SKIPS (un-executable variants).
-# Needs a reachable Postgres (defaults match the postgres-integration CI service
-# container; override via PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE). Skips
-# cleanly (exit 0) if no server is reachable. The DuckDB gate above stays the
-# hard blocker; this is a non-blocking sample (see equivalence.py).
 tpchavoc-equivalence-report-postgres:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine postgres
 
-# Third-engine SAMPLE: compare every DataFusion-executable TPC-Havoc SQL variant
-# to canonical TPC-H on the SAME in-process DataFusion session (both translated
-# to the datafusion dialect, which the seam normalizes to postgres). Excludes
-# DATAFUSION_TPCHAVOC_SKIPS (variants DataFusion cannot plan). DataFusion is
-# in-process (no service container); skips cleanly (exit 0) only if DataFusion is
-# not installed. The DuckDB gate above stays the hard blocker; this is a
-# non-blocking sample with a DIFFERENT gap profile from Postgres (see equivalence.py).
 tpchavoc-equivalence-report-datafusion:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine datafusion
 
-# Fourth-engine SAMPLE: compare every ClickHouse-executable TPC-Havoc SQL variant
-# to canonical TPC-H on the SAME in-process ClickHouse instance (chDB /
-# clickhouse-local), both translated to the NATIVE clickhouse dialect (NOT
-# normalized to postgres - this is the first sampled engine on a non-Postgres
-# dialect). Excludes CLICKHOUSE_TPCHAVOC_SKIPS (variants ClickHouse cannot execute)
-# and runs with SQL-standard NULL semantics (join_use_nulls=1). Unlike the other
-# three engines this is NOT systematic-zero: CLICKHOUSE_KNOWN_DIVERGENCES records
-# the irreducible engine-semantic result differences (Decimal-vs-Float division,
-# SUM of an empty group = 0, partial correlated-subquery decorrelation). ClickHouse
-# is in-process (no service container); skips cleanly (exit 0) only if chDB is not
-# installed. The DuckDB gate above stays the hard blocker; this is a non-blocking
-# sample (see equivalence.py).
 tpchavoc-equivalence-report-clickhouse:
 	uv run -- python -m benchbox.core.tpchavoc.equivalence --engine clickhouse
 
-# Gate: compare every TPC-Havoc DataFrame variant (both backends) to canonical
-# TPC-H on real SF=0.1 DuckDB-backed data; exits non-zero on any divergence
-# beyond KNOWN_DIVERGENCES (see benchbox/core/tpchavoc/dataframe_equivalence.py).
 tpchavoc-dataframe-equivalence-report:
 	uv run -- python -m benchbox.core.tpchavoc.dataframe_equivalence
 
-# Gate: compare a dual-surface benchmark's DataFrame surface (both backends) to
-# its OWN SQL surface on real SF=0.1 DuckDB-backed data; exits non-zero on any
-# divergence beyond the benchmark's baseline. SQL is the reference for its own
-# DataFrame surface, so no hand-curated answer key is needed (see
-# benchbox/core/equivalence/cross_surface.py). Currently gates ssb, amplab, and coffeeshop.
 ssb-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark ssb
 
@@ -250,130 +156,56 @@ amplab-cross-surface-equivalence-report:
 coffeeshop-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark coffeeshop
 
-# Enforced gate: clickbench SQL<->DataFrame equivalence on a bounded DuckDB cell.
-# In GATES (datavault remains staged) and run in the blocking correctness-gate (ci.yml);
-# exits non-zero on any unclassified divergence. Q18's order-less LIMIT is the one
-# classified exception (see _project/analysis/clickbench-cross-surface-divergences.md).
 clickbench-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark clickbench
 
-# Enforced gate: joinorder_synthetic SQL<->DataFrame equivalence on a bounded DuckDB
-# cell. In GATES (datavault remains staged) and run in the blocking correctness-gate
-# (ci.yml); exits non-zero on any unclassified divergence (see
-# _project/analysis/joinorder-synthetic-cross-surface-divergences.md).
 joinorder-synthetic-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark joinorder_synthetic
 
-# Enforced gate: H2O-DB DataFrame surface vs its own SQL surface on a bounded
-# ~100k-row DuckDB cell (SF=0.01: its generator base is the 10M-row small tier, so
-# the shared SF=0.1 would emit ~1M rows). Q9's PERCENTILE_CONT carries one
-# classified DECIMAL(8,2)-scale exception (see cross_surface.py); every other cell
-# must match. Exits non-zero on any unclassified divergence.
 h2odb-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark h2odb
 
-# Enforced gate: Read Primitives DataFrame surface vs its DuckDB-dialect SQL
-# surface on a bounded ~300k-row TPC-H cell (SF=0.05). Exact accounting: 157
-# runtime SQL queries, 153 DuckDB-transpilable, 152 DataFrame queries, 148
-# gateable. Excluded: 4 DF-only fulltext/json ids DuckDB cannot transpile
-# (classified exclusions); 5 SQL-only rows with no DF query (approx_quantiles_array,
-# approx_top_k_lineitem, 3 optimizer_* rewrites). Every compared cell
-# matches; the classified cells are irreducible engine differences (HLL/T-Digest
-# approximation, DECIMAL-scale percentile/ROUND, ARG_MIN ties, JSON text, Polars
-# Map-dtype gap) plus legitimately-empty selective/no-JSON filters. Exits non-zero
-# on any unclassified divergence.
 read-primitives-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark read_primitives
 
-# Enforced gate: FlightData DataFrame surface vs its own SQL surface on a bounded
-# one-synthetic-month DuckDB cell (SF=0.01 stays offline; SF>=0.1 attempts a BTS
-# download). 20 SQL and 20 DataFrame ids overlap verbatim;
-# every compared cell matches with an empty baseline. Exits non-zero on any
-# unclassified divergence.
 flightdata-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark flightdata
 
-# Enforced gate: Data Vault DataFrame surface vs its own SQL surface on a bounded
-# DuckDB cell (SF=0.01). 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by a
-# mechanical Q prefix ("Q1".."Q22"); every compared cell matches with an empty
-# baseline. The builder forces regeneration on every build, so probes can never
-# pass on a stale manifest. Exits non-zero on any unclassified divergence.
 datavault-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark datavault
 
-# Enforced gate: NYC Taxi DataFrame surface vs its own SQL surface on a bounded
-# offline synthetic cell (SF=0.01, 12k trips; the builder forces synthesis and
-# fails on any network download). 25 SQL slugs map to DataFrame Q1..Q25;
-# airport-trips is classified legitimately empty (synthetic rate_code_id=1 vs
-# IN (2, 3) filter). Exits non-zero on any unclassified divergence.
 nyctaxi-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark nyctaxi
 
-# Enforced gate: TSBS DevOps DataFrame surface vs its own SQL surface on a
-# bounded offline cell (SF=0.01). 18 SQL slugs map to DataFrame Q1..Q18;
-# three threshold queries are classified legitimately empty (generator caps
-# usage_user at ~55, floors available_percent at ~17). Exits non-zero on any
-# unclassified divergence.
 tsbs-devops-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tsbs_devops
 
-# Enforced gate: TPC-H Skew DataFrame surface vs its own SQL surface on a
-# bounded deterministic cell (SF=0.01, seed 42). 22 SQL ids map to DataFrame
-# Q1..Q22; Q8 is classified legitimately empty (no ECONOMY ANODIZED STEEL
-# rows at any probed scale). Exits non-zero on any unclassified divergence.
 tpch-skew-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch_skew
 
-# Enforced gate: TPC-H DataFrame surface vs its own SQL surface on a bounded
-# cell (SF=0.01, unseeded-vs-unseeded). 22 SQL ids map to DataFrame Q1..Q22
-# with an empty baseline. Exits non-zero on any unclassified divergence.
 tpch-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpch
 
-# Staged report (NOT a blocking gate): full-99 TPC-DS SQL<->DataFrame
-# equivalence at SF=0.01 (~13s wall). Only Q38/Q88 currently pass
-# discriminating, so no blocking subset exists yet; this target feeds the
-# weekly scheduled path that tracks DF surface maturation toward one.
 tpcds-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds
 
-# Maintenance writer (#903 follow-up): drop known-divergence baseline entries that
-# no longer reproduce for ONE gate, in a reviewed change. Explicit/operator-driven -
-# the blocking gate run never prunes; only writes when the run is otherwise fully
-# clean, and is idempotent on a second run. Usage:
-#   make cross-surface-update-baseline BENCHMARK=h2odb
 cross-surface-update-baseline:
 	@test -n "$(BENCHMARK)" || { echo "Usage: make cross-surface-update-baseline BENCHMARK=<ssb|amplab|coffeeshop|clickbench|joinorder_synthetic|h2odb|read_primitives|flightdata|datavault>"; exit 1; }
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark $(BENCHMARK) --update-baseline
 
-# Scheduled-maintenance glue (cross-surface-baseline-stale-entry-autodetect):
-# runs EVERY enforced gate's own blocking check, reads its "previously-known
-# divergences now equivalent" report (never re-derived), and invokes the
-# EXISTING --update-baseline writer above for any gate with a resolved entry.
-# Local dry-run for what .github/workflows/cross-surface-baseline-autodetect.yml
-# runs on a schedule; safe to run any time (a no-op when nothing is resolved).
 cross-surface-baseline-autodetect:
 	uv run -- python _project/scripts/cross_surface_baseline_autodetect.py \
 		--json-out _project/cross-surface-baseline-autodetect/summary.json
 
-# Regenerate the benchmark correctness-oracle coverage map (which oracle, if any,
-# guards each shipped benchmark). Derived from the registry + provider/gate
-# registries; commit the refreshed _project/analysis/ artifacts.
 oracle-coverage-map:
 	uv run -- python _project/scripts/generate_oracle_coverage_map.py
 
-# Advisory CI guard: fail if the checked-in coverage map is stale (e.g. a new
-# benchmark was added without regenerating, hiding an UNGUARDED surface).
 oracle-coverage-map-check:
 	uv run -- python _project/scripts/generate_oracle_coverage_map.py --check
 
-# Cross-surface applicability drill-down (report mode): which dual-surface
-# unguarded benchmarks actually ship comparable DataFrame queries (cross-surface
-# gateable) vs which only support DataFrame loading (need a w2 fallback oracle).
 cross-surface-applicability-report:
 	uv run -- python _project/scripts/cross_surface_applicability_sweep.py
 
-# Real benchmark matrix across local SQL platforms x all benchmarks (heavy, opt-in)
 test-local-matrix:
 	uv run -- python -m pytest tests/integration/test_local_platform_benchmark_matrix.py -m stress -n 0 --tb=short -v
 	@echo "Tip: set BENCHBOX_SERVICE_LOCAL_MATRIX=1 to include Trino/Presto/Firebolt/PostgreSQL/TimescaleDB service-backed locals."
@@ -388,7 +220,6 @@ joinorder-verify-reference-results:
 		--queries "$(JOINORDER_QUERIES)" \
 		--reference "$(JOINORDER_REFERENCE)"
 
-# Database-specific testing
 test-duckdb:
 	uv run -- python -m pytest -m "duckdb" --tb=short
 
@@ -398,7 +229,6 @@ test-sqlite:
 test-pyspark:
 	./scripts/run_pyspark_tests.sh
 
-# Benchmark-specific testing
 test-read-primitives:
 	uv run -- python -m pytest -m "primitives" --tb=short
 
@@ -408,27 +238,21 @@ test-benchmarks:
 test-tpcds:
 	uv run -- python -m pytest -m "tpcds" --tb=short
 
-# Feature-specific testing
 test-olap:
 	uv run -- python -m pytest -m "olap" --tb=short
 
 test-window:
 	uv run -- python -m pytest -m "window_functions" --tb=short
 
-# CI/CD testing
-# Maintained broad local CI profile (literal root-text compatibility contract).
 test-ci:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-report=xml:coverage.xml --cov-fail-under=0 --timeout=300
 
-# Fast CI feedback (excludes cloud platform tests for speed)
 test-no-cloud:
 	uv run -- python -m pytest -m "not (slow or cloud_import)" --ignore=tests/unit/platforms/databricks --ignore=tests/unit/platforms/snowflake --ignore=tests/unit/platforms/bigquery --ignore=tests/unit/platforms/redshift --tb=short
 
-# Complete test suite (nightly/full validation)
 test-full:
 	uv run -- python -m pytest -m "not stress" --tb=short -v
 
-# Parallel testing
 test-parallel:
 	uv run -- python -m pytest -n auto --tb=short
 
@@ -437,14 +261,12 @@ test-parallel-fast:
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/platform-tests.mk
 
-# Coverage commands using pytest
 coverage-fast:
 	uv run -- python -m pytest -c pytest-ci.ini -m "fast and not (slow or stress or resource_heavy or live_integration or cloud_import)" --cov=benchbox --cov-report=term-missing:skip-covered --cov-fail-under=0 --timeout=120
 
 coverage-all:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
 
-# Full opt-in coverage requires the services and credentials used by live tests.
 coverage-opt-in-all:
 	uv run -- python -m pytest -c pytest-ci.ini --cov=benchbox --cov-branch --cov-report=term-missing:skip-covered --cov-report=html:htmlcov --cov-report=xml:coverage.xml --cov-fail-under=0
 
@@ -457,26 +279,21 @@ coverage-report:
 	uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=0
 
 
-# Cyclomatic complexity checks
 complexity-check:
 	uv run -- python _project/scripts/check_complexity.py
 
 complexity-report:
 	uv run -- python _project/scripts/check_complexity.py --no-fail --top 30
 
-# Strict type island for governance code owned by this policy. Production and
-# architecture islands remain governed by the repository-wide permissive pass.
 quality-governance-typecheck:
 	uv run ty check --error all _project/scripts/check_complexity.py
 
-# Install and development
 install:
 	uv sync
 
 develop:
 	uv sync --group dev
 
-# Clean build artifacts
 clean:
 	rm -rf build/
 	rm -rf dist/
@@ -490,7 +307,6 @@ clean:
 	find . -name '*.pyo' -delete
 	find . -name '.DS_Store' -delete
 
-# Linting (ruff + explorer token scan)
 lint:
 	uv run ruff check .
 	$(MAKE) comment-policy-check
@@ -498,34 +314,23 @@ lint:
 	$(MAKE) lint-explorer-tokens
 	$(MAKE) lint-site-theme-tokens
 
-# Reject a uv.lock schema-revision downgrade (an older local uv rewrites
-# revision 3 back to 2 as a silent side effect of any `uv add`/`uv lock`).
-# Compares HEAD:uv.lock against the working tree; also wired as a pre-commit
-# hook gated on uv.lock changes. See docs/development/development.md.
 .PHONY: uv-lock-revision-check
 uv-lock-revision-check:
 	uv run -- python _project/scripts/check_uv_lock_revision.py $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
-# SQLGlot repro retirement: re-run upstream repros when the locked sqlglot
-# version changed vs base; fails with retirement guidance on newly-passing repros.
 .PHONY: sqlglot-repro-retirement-check
 sqlglot-repro-retirement-check:
 	uv run -- python scripts/check_sqlglot_repro_retirement.py $(if $(BASE_REF),--base-ref "$(BASE_REF)",) --check
 
-# Dependency audit - checks that every declared dep has an import site or is allowlisted.
-# Fails if an unused dep is introduced. See _project/scripts/dependency_audit/.
 audit-deps:
 	uv run -- python _project/scripts/dependency_audit/check_deps.py
 
-# Regenerate the raw declared-dependency inventory from pyproject.toml.
 audit-raw:
 	uv run -- python _project/scripts/dependency_audit/parse_deps.py
 
-# Verify the committed raw inventory matches pyproject.toml. Fails on drift.
 audit-raw-check:
 	uv run -- python _project/scripts/dependency_audit/parse_deps.py --check
 
-# Validate that an audit report records the develop SHA it describes.
 audit-sha-check:
 	@test -n "$(FILE)" || { echo "Usage: make audit-sha-check FILE=<audit.md>"; exit 1; }
 	uv run --no-project -- python _project/scripts/audit_sha_check.py \
@@ -534,8 +339,6 @@ audit-sha-check:
 		$(if $(AUDIT_SHA_REQUIRE_CURRENT),--require-current $(AUDIT_SHA_REQUIRE_CURRENT),) \
 		"$(FILE)"
 
-# Reject product-source patterns that depend on Unix-only behavior or the
-# process locale. The scanner is stdlib-only; its default root is benchbox/.
 .PHONY: windows-antipatterns-check
 windows-antipatterns-check:
 	uv run -- python scripts/check_windows_antipatterns.py
@@ -550,40 +353,22 @@ comment-policy-strict:
 comment-policy-report:
 	uv run -- python scripts/check_comment_policy.py --mode report
 
-# Validate marker registration and the explicit marker-strategy policy.
 lint-markers:
 	uv run -- python -m pytest --collect-only -q -p no:warnings
 	uv run -- python -m pytest tests/unit/test_marker_strategy.py -q
 
-# Enforce the utils < core < platforms < cli import-layering convention and
-# the experimental/mcp isolation contracts (see .importlinter). Fails on any
-# newly introduced layering violation that isn't already an explicitly
-# named, justified exception in .importlinter's ignore_imports lists.
 lint-imports:
 	uv run -- lint-imports
 
-# Token-scan gate for the Results Explorer retheme: fails when raw Tailwind
-# palette literals (text-/bg-/border-/...-{slate|gray|...}-{50..950}) appear
-# under results-explorer/src outside an explicit allowlist marker. Stdlib-only
-# so no dependency sync is required before the gate runs.
 lint-explorer-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py
 
 lint-site-theme-tokens:
 	python3 _project/scripts/scan_explorer_tokens.py landing/shared landing/index.html landing/style.css landing/prompts/index.html landing/prompts/prompts.css docs/_templates/page.html docs/_static/custom.css results-explorer/index.html results-explorer/src/components/Layout.tsx
 
-# Stale-theme gate: fails when active Results Explorer source/tests or
-# unsuperseded analysis files revive the retired mixed-theme contract phrases.
-# Allowlist: inline `allow-stale-theme: <reason>` marker, or a supersession
-# header (Superseded / supersedes / supersession) in `_project/analysis/*`
-# historical archive files are excluded by design.
 lint-explorer-stale-theme:
 	python3 _project/scripts/scan_explorer_stale_theme.py
 
-# Validate a built Results Explorer read model against the snapshot invariants
-# (required columns, ranking/compare eligibility). Point SNAPSHOT at the built
-# .duckdb; defaults to the path docs.yml's pipeline writes. CI runs the same
-# script in .github/workflows/docs.yml after the explorer data build.
 SNAPSHOT ?= results-explorer/public/data/results.duckdb
 .PHONY: explorer-snapshot-check
 explorer-snapshot-check:
@@ -598,36 +383,14 @@ agent-instructions-check:
 agent-identity-check:
 	uv run -- python _project/scripts/agent_instruction_audit.py --check-git-identity
 
-# Merge-time guard. agent-identity-check reads the resolved config, which on a
-# CI runner is the runner's own identity and reveals nothing about the branch;
-# this inspects the commits themselves so agent authorship cannot reach develop.
 AGENT_IDENTITY_BASE_REF ?= origin/develop
 agent-commit-range-check:
 	@git fetch origin $(patsubst origin/%,%,$(AGENT_IDENTITY_BASE_REF)) --quiet 2>/dev/null || true
 	uv run -- python _project/scripts/agent_instruction_audit.py --check-commit-range $(AGENT_IDENTITY_BASE_REF)
 
-# skill-sync — materialize project-local skills with the vendored rsync
-# wrapper (tools/skill-sync, pinned at product v1.0.0-rc1). Selection is
-# tracked (skill-sync.conf); per-target provenance and hashes land next to
-# the payload (skill-sync.receipt / skill-sync.manifest). The `.claude/skills`
-# target is a TRACKED snapshot committed for cloud/CI parity — integrity
-# comes from PR review of the mirror diff, plus `skill-sync-check` and the
-# untracked-mirror drift guard
-# (`scripts/check_untracked_skill_mirrors.sh`). The `.agents/skills` mirror
-# (Codex/Gemini/Antigravity) stays gitignored and is regenerated locally per
-# developer. Override SKILL_SYNC to point at a different wrapper copy.
 SKILL_SYNC ?= tools/skill-sync
 
 skill-sync:
-	@# This recipe contains $$(MAKE), so make executes this whole logical line
-	@# even under `-n` (recursive dry-run passthrough). The guard below must
-	@# therefore stay in the SAME logical line: its `exit 0` is what stops
-	@# `make -n skill-sync` and `make -n guards-fix` from really executing
-	@# the apply and mutating the skill mirrors. Short flags arrive grouped
-	@# and sorted in MAKEFLAGS (`make -nw` becomes `wn`), so a bare-word
-	@# match misses them: scan every word for a bare `n` or a letter-only
-	@# cluster containing `n` instead. For a real read-only preview, run
-	@# `tools/skill-sync preview` directly.
 	@dry_run=""; \
 	for flag_word in $(MAKEFLAGS); do \
 		case "$$flag_word" in \
@@ -644,21 +407,7 @@ skill-sync:
 	$(MAKE) -s agent-write-preflight && \
 	"$(SKILL_SYNC)" apply && \
 	cp .claude/skills/skill-sync.config.yaml .agents/skills/skill-sync.config.yaml
-	@# The project-owned settings file lives at the path the skills read
-	@# (`.claude/skills/skill-sync.config.yaml`, tracked). The wrapper owns
-	@# only skill directories plus receipt/manifest, so the recipe mirrors the
-	@# same file into the untracked agents workspace for local parity.
 
-# Check covers the tracked mirror only: the gitignored selections (the whole
-# `.agents/skills` mirror and `.claude/skills/blog/`) are per-machine local
-# state regenerated via `make skill-sync` — fresh worktrees lack them entirely
-# and every catalog bump re-dirties them until a local sync runs, so gating on
-# them fails checkouts for reasons unrelated to the committed tree. Rows under
-# those two roots are therefore skipped; any pending add/modify/delete
-# elsewhere still fails, including a tracked path that merely matches some
-# unrelated repository-wide ignore pattern. Ignored-mirror self-consistency
-# stays covered by `skill-sync verify` inside `skill-integrity-check`.
-# A missing wrapper is a hard failure, never a skip-and-succeed.
 skill-sync-check:
 	@if [ ! -x "$(SKILL_SYNC)" ]; then \
 		echo "skill-sync wrapper not found or not executable at $(SKILL_SYNC); cannot verify the mirror (override with SKILL_SYNC=path/to/skill-sync)" >&2; \
@@ -682,10 +431,6 @@ skill-sync-check:
 	fi; \
 	echo "skill-sync-check: tracked mirror up to date."
 
-# Fail-closed local counterpart of ci.yml's required skill-integrity job. The
-# tool pin comes from the same policy module as CI; the vendored wrapper
-# needs no network, no Node, and no build, so verification runs directly
-# against the committed payload. A missing wrapper is a hard failure.
 skill-integrity-check:
 	@set -eu; \
 	uv run -- python scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf; \
@@ -696,7 +441,6 @@ skill-integrity-check:
 	$(MAKE) agent-commit-range-check; \
 	$(MAKE) artifact-hygiene
 
-# Duplicate code detection (AST structural clone detection)
 duplicate-check:
 	uv run -- python scripts/check_duplicate_code.py
 
@@ -706,9 +450,6 @@ duplicate-check-verbose:
 duplicate-check-json:
 	uv run -- python scripts/check_duplicate_code.py --json
 
-# Fail only when duplicated lines rose vs the merge-base of BASE_REF
-# (default origin/develop). CI sets BASE_REF to the PR base SHA.
-# Absolute threshold mode is `make duplicate-check`.
 duplicate-check-delta:
 	uv run -- python scripts/check_duplicate_code.py --delta-vs "$(if $(BASE_REF),$(BASE_REF),origin/develop)"
 
@@ -721,39 +462,9 @@ mutation-test:
 	@echo "--- Mutation test results ---"
 	uv run -- mutmut results
 
-##@ Guards / drift-guard remediation
-#
-# guards-fix-regen-target: a "drift-guard" class of CI checks -- dependency
-# inventory, oracle coverage map, parity fixtures, compat docs, UAT LOC
-# table, skill-sync -- each fails on drift against a checked-in artifact and
-# each has ONE known mechanical regen command. This target runs every regen
-# that exists, in one place, so agents stop rediscovering the right command
-# per guard from a hand-carried prompt.
-#
-# guards-fix ONLY regenerates artifacts -- it never edits allowlists,
-# ceilings, or curation lists. Each guard's CHECK target still fails CI on
-# drift; regen is remediation, not suppression. Never wire this into CI to
-# self-heal -- it is an operator command, run locally, with the diff reviewed
-# and committed by a human.
-#
-# Some CHECK guards in this class have NO regen mode (the fix is always a
-# reviewed hand edit, not a mechanical rewrite) -- guards-fix does not touch
-# them; it only echoes where to look:
-#   - module-size guard (tests/system/test_module_size_thresholds.py) --
-#     the failure message prints a ready-to-paste ALLOWLIST entry.
-#   - DDL governance drift (benchbox/sql_compat/inventory.py --check-ddl-drift)
-#     -- register the transform, add a _DDL_GOVERNANCE_TRANSFORMER_ALIASES
-#     alias, or add a _DDL_DRIFT_EXEMPTIONS entry.
-#   - release curation list (scripts/check_release_curation.py) -- classify
-#     the path as main-only (docs) or release-cut curated (Makefile), by hand.
 .PHONY: guards-fix
 guards-fix:
 	@echo "== guards-fix: regenerating every mechanically-regenerable drift-guard artifact =="
-	@# Enforce the linked-worktree write rule BEFORE the first regen rewrites a
-	@# checked-in artifact. skill-sync runs this guard too, but only after
-	@# several earlier write steps -- and `make skill-sync` itself fails
-	@# closed when the wrapper is absent, so this whole write target stays
-	@# guarded either way.
 	@$(MAKE) -s agent-write-preflight
 	@echo "-- dependency inventory (audit-raw) --"
 	@$(MAKE) -s audit-raw
@@ -768,13 +479,6 @@ guards-fix:
 	@echo "-- Makefile public contract inventory --"
 	@uv run -- python make/check_makefile_inventory.py --write
 	@echo "-- skill-sync (fail-closed: a missing wrapper aborts instead of no-op-ing) --"
-	@# Last regen step, contained: a failing skill-sync apply (e.g. an
-	@# unresolvable source rev in a fresh worktree) used to abort guards-fix
-	@# here, AFTER every other artifact had already been rewritten -- the
-	@# summary and the reviewable diff below never printed. Surface the failure
-	@# loudly and still finish the report; direct `make skill-sync` keeps its
-	@# hard failure, and genuine mirror drift is still enforced by
-	@# skill-sync-check in CI.
 	@status=0; $(MAKE) -s skill-sync || status=$$?; \
 	if [ "$$status" -ne 0 ]; then \
 		echo "guards-fix: WARNING - the skill-sync step FAILED (see its output above); every other drift-guard artifact was still regenerated. Fix and re-run 'make skill-sync' separately."; \
@@ -789,51 +493,6 @@ guards-fix:
 	git status --porcelain; \
 	exit "$$status"
 
-##@ CI Local Equivalents
-# These targets mirror GitHub Actions workflows for local validation
-
-# CI lint check - superset covering both lint.yml (release-branch gate) and
-# the ci.yml `lint` job (job id `code-lint`, the routine dev-PR gate), plus a
-# few extra local-only conveniences (lint-explorer-tokens,
-# lint-site-theme-tokens, skill-sync-check, spellcheck). Every guard the
-# ci.yml `lint` job runs (after dependency install) must also run here at the
-# COMMAND level, or tests/system/test_ci_lint_parity.py fails — see
-# docs/operations/ci-local-parity.md.
-#
-# Report-all: mirrors ci.yml's `lint-guard-summary` design. Every guard runs
-# to completion in one pass (no stopping at the first failure) with its
-# output streamed live as it runs; failures are collected into `failed` and
-# a single consolidated FAILED-guards list prints at the end, with a
-# nonzero exit iff at least one guard failed. `set +e` plus a `[ $$? -eq 0 ]`
-# check after each guard is what keeps this one shell session (the whole
-# recipe is one logical line via `\` continuations) going past a failing
-# guard instead of `make` aborting at the first nonzero exit.
-# Most guards below are equally meaningful whether `ci-lint` runs on a laptop
-# or on the ephemeral GitHub-hosted runner that develop-post-merge.yml uses
-# (they inspect the checked-out tree / installed venv / shipped registries,
-# none of which differ). A couple of guards instead read state that only
-# exists on a developer machine -- a resolved Git identity, a tool installed
-# at a hardcoded local path -- and either fail there for reasons unrelated to
-# the code under test, or worse, silently no-op and report success while
-# checking nothing. `_project/scripts/ci_lint_environment_gate.py` is the one
-# place that draws this boundary (a declarative table, not a per-guard inline
-# `if $GITHUB_ACTIONS` -- see its module docstring); a guard not listed there
-# always runs, on a runner exactly as it does locally.
-#
-# The gate reports its decision on stdout and the recipe skips only on the
-# exact token `SKIP`. Deliberately NOT `if <gate-command>; then`: every way of
-# failing to reach a decision (uv absent, broken venv, the script renamed, a
-# traceback) also exits non-zero, so using the exit status would make a broken
-# gate indistinguishable from a deliberate skip and silently drop the guard
-# with nothing recorded in `failed`. Anything other than `SKIP` runs the guard.
-#
-# The synthetic `GIT_CONFIG_*` identity that used to wrap agent-identity-check
-# here was removed with the gate: the guard no longer runs on a runner, so
-# nothing consumed it. Leaving it would have left
-# tests/system/test_ci_lint_parity.py asserting recipe text with no effect --
-# a vacuous pass inside the change whose whole purpose is removing vacuous
-# passes. That test now pins the gating instead.
-# The Make contract check is read-only here; guards-fix owns regeneration.
 ci-lint:
 	@echo "Running CI lint checks..."
 	@case " $(MAKEFLAGS) " in *" n "*|*" -n "*|*" --just-print "*) echo "Dry-run: ci-lint guards suppressed"; exit 0;; esac; \
@@ -921,23 +580,17 @@ ci-lint:
 	fi; \
 	echo "✅ CI lint checks passed"
 
-# CI test check - exact match for test.yml workflow (fast tests with coverage)
-# Note: -p pytest_cov re-enables pytest-cov which is disabled by default in pytest.ini
-# Suite-wide coverage threshold set to 70%. tests/conftest.py emits a separate
-# non-failing advisory warning below 80%; 70 is the blocking CI floor.
 ci-test:
 	@echo "Running CI test suite..."
 	uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=70
 	@echo "✅ CI test suite passed"
 
-# CI docs build - exact match for the ci.yml docs-build job
 ci-docs:
 	@echo "Running CI docs checks..."
 	@$(MAKE) docs-validate
 	@cd docs && uv run sphinx-build -b html -W --keep-going . _build/html
 	@echo "✅ CI docs build passed"
 
-# Security audit - exact match for test.yml security job
 security-audit:
 	@echo "Running security audit..."
 	@if [ -n "$(PIP_AUDIT_IGNORE_VULNS)" ]; then \
@@ -948,24 +601,6 @@ security-audit:
 	fi
 	@echo "✅ Security audit passed"
 
-# Spellcheck - exact match for docs.yml spellcheck job
-# node_modules is gitignored and only exists once someone runs the
-# results-explorer npm install, so leaving it unskipped made this gate pass in
-# CI (which never installs it) and fail locally on vendored typos - inverting
-# what a preflight is for. Keep any future vendored/generated tree out the same
-# way; do NOT skip a directory that holds tracked content.
-# Spellcheck scans the TRACKED file list rather than walking the working tree, so
-# a gitignored directory can never be scanned. Walking the tree made the gate
-# environment-dependent: it stayed green in CI and in fresh linked worktrees, but
-# failed in the maintainer's primary clone on gitignored paths that only exist
-# there. Deriving the file list from git fixes the class.
-#
-# --skip keeps only the FILENAME globs. Its directory entries are dropped on
-# purpose: codespell prunes directories while traversing, so a directory name in
-# --skip has no effect once explicit paths are passed. Hidden paths are excluded
-# as Git pathspecs too, preserving codespell's default hidden-directory filtering.
-# Tracked directories that must stay unscanned are excluded as Git pathspecs; the
-# remaining old directory list is gitignored, so `git ls-files` already excludes it.
 SPELLCHECK_SKIP_GLOBS := *.pyc,*.json,*.lock,*.svg,*.min.js,*.min.css,*.tpl,*.dst,*.tbl,*.dat,*.pdf
 SPELLCHECK_EXCLUDE_PATHS := \
 	':(exclude,glob).*'             ':(exclude,glob).*/**' \
@@ -981,7 +616,6 @@ spellcheck:
 		| xargs -0 uvx codespell --ignore-words=.codespell-ignore.txt --skip="$(SPELLCHECK_SKIP_GLOBS)"
 	@echo "✅ Spellcheck passed"
 
-# Linkcheck - exact match for docs.yml linkcheck job
 ci-linkcheck:
 	@echo "Running documentation link check..."
 	@cd docs && uv run sphinx-build -b linkcheck . _build/linkcheck
@@ -989,7 +623,6 @@ ci-linkcheck:
 	@cat docs/_build/linkcheck/output.txt 2>/dev/null || echo "No output file generated"
 	@echo "✅ Linkcheck passed"
 
-# Package build and install test - exact match for test.yml test-package job
 test-package:
 	@echo "Building and testing package installation..."
 	rm -rf dist/
@@ -1010,13 +643,11 @@ test-package:
 	uv run --isolated --no-project --with "$$wheel" -- benchbox --help > /dev/null
 	@echo "✅ Package test passed"
 
-# Integration smoke tests - exact match for test.yml integration-smoke job
 test-integration-smoke:
 	@echo "Running integration smoke tests..."
 	uv run -- python -m pytest tests/integration -m "platform_smoke or (integration and fast)" --tb=short
 	@echo "✅ Integration smoke tests passed"
 
-# Run all CI checks locally - ensures CI will pass before push
 ci-local:
 	@echo "========================================"
 	@echo "Running all CI checks locally..."
@@ -1041,15 +672,6 @@ ci-local:
 	@echo "✅ All CI checks passed!"
 	@echo "========================================"
 
-# --- Apple container Linux CI-parity sandbox (opt-in; Apple silicon + macOS 26) ---
-# Reproduce the Linux ci.yml gate locally inside a `container machine`. Motivated by a
-# MEASURED macOS<->Linux divergence: on identical DuckDB 1.3.2/arm64, TPC-H Q2/Q10/Q15
-# value digests differ, so `make test-correctness-gate` FAILS on a correct tree on Apple
-# silicon (the pinned digest references are Linux-generated). This wrapper is the only way
-# to validate that soundness gate pre-PR from a Mac. Purely additive and opt-in: a no-op on
-# non-Apple-silicon / non-macOS-26 hosts, and NEVER a CI or pr-open dependency. The target
-# prints one-time setup commands; parity rationale: docs/operations/release-guide.md. Override with
-# `make ci-linux CI_LINUX_CMD='make ci-local'`.
 CI_LINUX_MACHINE ?= benchbox-agent
 CI_LINUX_CMD ?= make test-correctness-gate
 .PHONY: ci-linux
@@ -1076,57 +698,29 @@ ci-linux:
 	echo "==> ci-linux: '$(CI_LINUX_CMD)' inside container machine '$(CI_LINUX_MACHINE)'"; \
 	container machine run -n $(CI_LINUX_MACHINE) -- bash -lc 'cd "$(CURDIR)" && $(CI_LINUX_CMD)'
 
-# Type checking
 typecheck:
 	uv run ty check
 
-# Backward-compatible alias for older local notes/scripts.
 typecheck-uv: typecheck
 
-# Import validation. Alias for the import-linter gate (lint-imports); the
-# previously-referenced scripts/validate_imports.py never existed, so the bare
-# target failed with file-not-found. CI uses lint-imports directly.
 validate-imports: lint-imports
 
-# Field-level schema validation for migrated YAML catalogs (see benchbox/core/catalog_schema.py).
 catalog-schema-check:
 	uv run -- python -m benchbox.core.catalog_schema
 
-# Dependency matrix / validation
 dependency-check:
 	uv run -- python -m benchbox.utils.dependency_validation $(ARGS)
-# Format code (ruff formatter)
 format:
 	uv run ruff format .
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/documentation.mk
 
 
-# Create distribution packages
 dist: clean
 	uv build
 
-# Run a specific test file
-# Usage: make run-test TEST=tests/specialized/test_tpch_minimal.py
 run-test:
 	uv run -- python $(TEST)
-
-# ---------------------------------------------------------------------------
-# Release flow (single-repo migration, version-branch model)
-# ---------------------------------------------------------------------------
-# These targets must be run from the public clone (origin -> BenchBox-dev/BenchBox).
-# Do NOT invoke from the legacy private clone — it has no `origin` remote.
-#
-# Flow: develop -> v$(VERSION) -> (squash) release -> tag release -> release.yml publishes
-#   develop is intentionally NOT modified post-release. Dev-only paths and
-#   deferred release surfaces (_project/ except the Explorer publication
-#   helpers, _blog/, agent configs, etc.) live on develop and are removed from
-#   the release branch by release-cut's curation step. The curated preview's
-#   results-data/, results-explorer/, and the three required publication
-#   helpers remain in the release tree. landing/ and docs/blog/ stay in the
-#   release tree.
-#
-# See docs/operations/release-guide.md and _project/decisions/single-repo-migration.md.
 
 RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 
@@ -1145,41 +739,12 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 		fi; \
 	fi
 
-# Cut a release branch from fetched origin/develop in one shot:
-#   1. Verify a clean linked worktree at origin/develop and create v$(VERSION).
-#   2. On v$(VERSION): bump version sources (scripts/update_version.py).
-#   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/release patch delta.
-#   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive.
-#   5. Gate on the changelog curation check (--check-curation).
-#   6. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
-#   7. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
-#   8. Merge origin/release with `-s ours` so the PR is mergeable and CI can run.
-#   9. Push, open PR vs release.
-#  10. Sweep stale v* branches on origin (option-c lifecycle).
-# Pre-conditions: on a clean linked worktree branch at fetched origin/develop
-# (new cut), or on v$(VERSION) with no release commit yet (resume).
-#
-# Steps 1-5 are idempotent, so an interrupted cut is resumed by re-running the
-# same command: the branch is reused, the bump and `uv lock` re-apply to the
-# same values, and an existing CHANGELOG.md section is left untouched. The
-# v0.3.1 cut died at step 3 twice and left exactly that half-applied state.
-# `make release-cut-abort VERSION=X.Y.Z` discards it instead.
-# Usage: make release-cut VERSION=X.Y.Z
 release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
 	sh scripts/release_cut_start.sh "$(VERSION)"
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
-	@# Refresh uv.lock now that pyproject.toml carries the new version, so the
-	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
-	@# aborted because the tracked lock was stale and the hook rewrote it).
 	uv lock
 	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release
-	@# The generated section is raw commit subjects across the whole
-	@# origin/release..HEAD delta (release lags develop by many releases), so it always
-	@# needs hand-curation. Open $$EDITOR when there is a terminal to open it in;
-	@# either way the --check-curation gate below decides, on the section's own
-	@# text, whether curation actually happened. The old gate tested only whether
-	@# EDITOR was set and stdin was a TTY, which `EDITOR=true` defeated.
 	@if [ -n "$$EDITOR" ] && [ -t 0 ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
@@ -1188,33 +753,15 @@ release-cut: .release-cut-tree-required
 		echo "    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)"; \
 	fi
 	uv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)
-	@# Curation FIRST so dev-only paths are never staged. Order matters: git rm
-	@# before git add ensures untracked files inside _project/ etc. don't end up
-	@# staged-for-add by a later git add.
-	@# Curation list: A3 of _project/decisions/single-repo-migration.md. The
-	@# Explorer is an intentional curated-preview exception: keep its corpus,
-	@# application, and only the three build-time helpers required by docs.yml.
-	@# --ignore-unmatch: git rm aborts the ENTIRE command when any one pathspec
-	@# is untracked, and a leading `-` would hide that, silently skipping all
-	@# curation on that line (v0.3.1 shipped uncurated because of this). With
-	@# --ignore-unmatch, unmatched paths are a no-op and any remaining failure
-	@# is real, so no `-` prefix: real failures must abort the cut.
 	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini tools
 	git rm -f --ignore-unmatch .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md
 	git rm -f --ignore-unmatch .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml
-	@# Tests that import _project/dev-only tooling, depend on development-only
-	@# fixtures, or enforce contracts for curated-out development surfaces cannot
-	@# collect or run on the release tree. The v0.4.0 release PR exposed the
-	@# additional paths below after the original v0.3.1 curation list had passed.
 	git rm -rf --ignore-unmatch tests/unit/scripts/explorer_pipeline tests/unit/explorer
 	git rm -f --ignore-unmatch tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py
 	git rm -f --ignore-unmatch tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py
 	git rm -f --ignore-unmatch tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py
 	git rm -f --ignore-unmatch tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py
-	@# The v0.4.1 release PR exposed these tests for PR landing, worktree, queue, tracker,
-	@# publication, and submission-workflow tooling; they import or read curated-away paths.
 	git rm -f --ignore-unmatch tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py
-	@# Post-curation guard: every curated path must be gone from the index.
 	@LEFTOVER=$$(git ls-files _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini .pre-commit-config.yaml .importlinter todo.config.yaml skill-sync.conf tools .gitattributes .coveragerc_core .dockerignore .env.example .mcp.json AGENTS.md CLAUDE.md GEMINI.md ANTIGRAVITY.md .github/workflows/results-explorer-browser.yml .github/workflows/seed-corpus.yml .github/workflows/sync-results-data-to-published.yml .github/workflows/validate-submission.yml tests/unit/scripts/explorer_pipeline tests/unit/explorer tests/uat/test_explorer_smoke.py tests/unit/release/test_ruleset_drift_review_coverage.py tests/unit/release/test_ruleset_review_enforcement.py tests/unit/scripts/test_blind_spot_tools.py tests/unit/scripts/test_build_joinorder_data.py tests/unit/scripts/test_check_complexity.py tests/unit/scripts/test_explorer_build_contract.py tests/unit/scripts/test_pr_review_followups.py tests/unit/scripts/test_reference_usage_audit.py tests/unit/scripts/test_scan_explorer_stale_theme.py tests/unit/scripts/test_scan_explorer_tokens.py tests/unit/scripts/test_shrink_rollup.py tests/unit/scripts/test_submission_workflow_waiver.py tests/unit/test_agent_write_preflight.py tests/unit/test_auto_merge_soundness_paths.py tests/unit/test_cross_surface_applicability.py tests/unit/test_oracle_coverage_map.py tests/unit/test_ruleset_drift.py tests/unit/test_self_binding_detector.py tests/unit/test_site_header_parity.py tests/unit/test_sync_results_workflow.py tests/unit/core/joinorder/test_canonical_queries.py tests/unit/core/test_platform_labels.py tests/unit/workflows/test_validate_submission_comment_security.py tests/unit/workflows/test_detect_orphaned_commits.py tests/unit/workflows/test_validate_submission_vendor_gate.py tests/integration/test_todo_db_standalone_compat_real.py tests/unit/core/equivalence/test_cross_surface_baseline_autodetect.py tests/unit/docs/test_architecture_decision_surfaces.py tests/unit/scripts/test_agent_instruction_audit.py tests/unit/scripts/test_audit_sha_check.py tests/unit/scripts/test_browser_gate_aggregate.py tests/unit/scripts/test_check_release_curation.py tests/unit/scripts/test_check_uv_lock_revision.py tests/unit/scripts/test_ci_lint_environment_boundary.py tests/unit/scripts/test_corpus_privacy_invariant.py tests/unit/scripts/test_dev_loop_pr_metrics.py tests/unit/scripts/test_fast_lane_ratchet_check.py tests/unit/scripts/test_green_unmerged_sweep.py tests/unit/scripts/test_guard_messages.py tests/unit/scripts/test_mirror_partial_validation_policy.py tests/unit/scripts/test_path_filter_decision.py tests/unit/scripts/test_results_explorer_corpus_migrate.py tests/unit/scripts/test_results_explorer_snapshot_invariants.py tests/unit/scripts/test_skill_sync_ci_policy.py tests/unit/scripts/test_soundness_drain_report.py tests/unit/scripts/test_fast_lane_ceiling_check.py tests/unit/scripts/test_timing_policy_check.py tests/unit/scripts/test_todo_db_shadow.py tests/unit/scripts/test_todo_db_standalone_compat.py tests/unit/scripts/test_todo_schema_migration_check.py tests/unit/scripts/test_todo_verification_lint.py tests/unit/scripts/test_todo_wrapper.py tests/unit/test_auto_merge_hold_is_durable.py tests/unit/test_release_infrastructure.py tests/unit/workflows/test_auto_merge_partial_stack_race.py tests/unit/workflows/test_develop_post_merge_gaps.py tests/unit/workflows/test_merge_group_triggers.py tests/unit/workflows/test_published_results_base_ci.py tests/unit/workflows/test_results_explorer_browser_gate.py tests/unit/workflows/test_results_explorer_dependency_audit.py tests/unit/workflows/test_seed_corpus_pr_base.py tests/unit/workflows/test_validate_submission_changed_bundles.py tests/unit/workflows/test_validate_submission_fail_open.py tests/integration/worktree/test_pr_process.py tests/integration/worktree/test_worktree_audit.py tests/integration/worktree/test_worktree_finish_preview.py tests/unit/scripts/test_migrate_clickhouse_labels.py tests/unit/scripts/test_pr_arm.py tests/unit/scripts/test_pr_ready_make.py tests/unit/scripts/test_pr_landing.py tests/unit/scripts/test_results_explorer_cpu_attestation_backfill.py tests/unit/scripts/test_todo_state_contract_check.py tests/unit/scripts/test_worktree_audit.py tests/unit/workflows/test_publication_preview.py tests/unit/workflows/test_queue_certification.py tests/integration/worktree/test_batch_skill_delivery.py tests/unit/scripts/publication/test_plan_reconciliation.py tests/unit/workflows/test_validate_submission_override_approval.py tests/unit/scripts/test_sqlite_extract_repro.py tests/unit/workflows/test_validate_submission_workflow_guard_mirror.py tests/unit/workflows/test_validate_submission_trusted_checkout.py tests/unit/workflows/test_validate_submission_corpus_allowlist.py tests/unit/workflows/test_corpus_trust_boundary.py tests/unit/scripts/test_branch_prune_merged.py tests/unit/docs/test_publication_architecture.py); \
 	if [ -n "$$LEFTOVER" ]; then \
 		echo "ERROR: release curation incomplete; development-only paths still tracked:" >&2; \
@@ -1228,38 +775,8 @@ release-cut: .release-cut-tree-required
 	@for required_file in _project/scripts/explorer_publish.py _project/scripts/results_explorer_snapshot_invariants.py; do \
 		test -f "$$required_file" && git ls-files --error-unmatch "$$required_file" >/dev/null || { echo "ERROR: curated Explorer publication helper is missing: $$required_file" >&2; exit 1; }; \
 	done
-	@# Stage only the files update_version.py + generate_changelog_entry.py +
-	@# uv lock write. Explicit list (not `git add -A`) to avoid staging
-	@# build/cache artifacts.
 	git add pyproject.toml uv.lock benchbox/__init__.py landing/index.html README.md docs/README.md benchbox/utils/VERSION_MANAGEMENT.md CHANGELOG.md
-	@# --no-verify: the curation above (git rm) already deleted
-	@# .pre-commit-config.yaml and _project/scripts/ (the repo:local hook
-	@# entrypoints) from this working tree. The pre-commit git hook is still
-	@# installed locally and would otherwise run against a config/entrypoints
-	@# that no longer exist, aborting this commit with a false failure on
-	@# every release cut. Nothing is skipped that matters: develop's PRs
-	@# already ran these hooks before this content was curated.
 	git commit --no-verify -m "Release v$(VERSION)"
-	@# Align release histories. release and develop have unrelated roots (Phase 4
-	@# filter-merge) and diverge permanently: release carries one squash commit per
-	@# release that develop never sees, and A4 step 6 (rebase develop onto release)
-	@# was removed by the 2026-04-27 amendment. So a branch cut cleanly from
-	@# develop is NOT mergeable into release — GitHub cannot compute a merge ref, the
-	@# PR sits at CONFLICTING, and *no CI runs at all*: neither validate-base nor
-	@# release-required-result ever trigger. Every cut before v0.3.1 (#711, #712,
-	@# #1029, #1043, #1072) fixed this by hand.
-	@#
-	@# `-s ours` records origin/release as a second parent while keeping the curated
-	@# release tree byte-for-byte; release-finalize's squash-merge then collapses
-	@# the branch to one commit, so this merge never reaches the release branch's
-	@# release-only ledger. Run AFTER the changelog step: --since-ref origin/release
-	@# computes the patch delta against a release branch that is not yet an ancestor
-	@# of this branch.
-	@#
-	@# --no-verify: merge fires pre-merge-commit (not pre-commit). That hook is not
-	@# in default_install_hook_types today, so this is defensive — but curation has
-	@# already deleted .pre-commit-config.yaml and the repo:local hook entrypoints,
-	@# so adding pre-merge-commit later would otherwise break every cut here.
 	@echo "==> Aligning release histories: merging origin/release into v$(VERSION) (strategy: ours)"
 	@RELEASE_TREE=$$(git rev-parse 'HEAD^{tree}') && \
 	git merge -s ours --no-verify --allow-unrelated-histories origin/release \
@@ -1271,12 +788,6 @@ release-cut: .release-cut-tree-required
 	fi
 	PRE_COMMIT_ALLOW_NO_CONFIG=1 git push -u origin v$(VERSION)
 	gh pr create --base release --head v$(VERSION) --title "Release v$(VERSION)" --body-file .github/RELEASE_PR_TEMPLATE.md
-	@# Option-c lifecycle: delete any prior release branches on origin (loop sweeps stale entries).
-	@# ls-remote patterns match the LAST path component, so 'v*' alone also matches
-	@# e.g. fix/validate-submission-... (bit the 2026-07-08 v0.3.1 re-cut). Filter full
-	@# refs against the release-branch shape, mirroring _RELEASE_BRANCH_RE in
-	@# scripts/generate_changelog_entry.py.
-	@# Use grep -Fxv (literal, full-line match) so version strings with `.` aren't treated as regex.
 	@for br in $$(git ls-remote --heads origin 'v*' | awk '$$2 ~ /^refs\/heads\/v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.+-]+)?$$/ {print $$2}' | sed 's|refs/heads/||' | grep -Fxv "v$(VERSION)"); do \
 		echo "==> Deleting prior release branch on origin: $$br"; \
 		PRE_COMMIT_ALLOW_NO_CONFIG=1 git push origin --delete "$$br" || true; \
@@ -1287,21 +798,10 @@ release-cut: .release-cut-tree-required
 	@echo "  2. Wait for the required release contexts: $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "  3. make release-finalize VERSION=$(VERSION)"
 
-# Discard a local, unpushed release cut: return to the creating worktree branch
-# and delete v$(VERSION). Use when a cut died partway through
-# (bumped versions, rewritten uv.lock, curated-away paths, no commit) and you
-# want to start over rather than resume with `make release-cut VERSION=X.Y.Z`.
-# Refuses after a commit, a pushed branch or tag, or untracked work. Published
-# release refs need explicit disposition; this target never moves them.
-# Usage: make release-cut-abort VERSION=X.Y.Z
 release-cut-abort:
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut-abort VERSION=X.Y.Z" && exit 1)
 	sh scripts/release_cut_abort.sh "$(VERSION)"
 
-# After release-cut's PR has the required contexts green: merge its exact
-# checked head, tag the confirmed merge commit, and push the tag. A rerun after
-# merge or tag creation resumes from hosted PR and tag state.
-# Usage: make release-finalize VERSION=X.Y.Z
 release-finalize:
 	@test -n "$(VERSION)" || (echo "Usage: make release-finalize VERSION=X.Y.Z" && exit 1)
 	uv run -- python scripts/release_finalize.py --version "$(VERSION)" --required-contexts "$(RELEASE_REQUIRED_CONTEXTS)"
@@ -1310,12 +810,6 @@ release-finalize:
 	@echo "Push-to-release jobs are post-merge signals; release publication relied on $(RELEASE_REQUIRED_CONTEXTS)."
 	@echo "develop is intentionally unchanged — dev-only paths persist on develop."
 
-# Tag-on-develop release flow. release-prep produces one ordinary PR diff (version
-# markers, uv.lock, CHANGELOG draft); release-check verifies the pre-tag state and
-# runs in the required CI classifier for release-content changes. Neither target
-# touches the release-cut path above or enables develop-tag publication.
-# Usage: make release-prep VERSION=X.Y.Z [SINCE_REF=<ref>]
-#        make release-check VERSION=X.Y.Z
 .PHONY: release-prep release-check
 release-prep:
 	@test -n "$(VERSION)" || (echo "Usage: make release-prep VERSION=X.Y.Z" && exit 1)
@@ -1325,24 +819,11 @@ release-check:
 	@test -n "$(VERSION)" || (echo "Usage: make release-check VERSION=X.Y.Z" && exit 1)
 	uv run --locked -- python scripts/release_flow.py check --version "$(VERSION)" $(if $(BASE_REF),--baseline-ref "$(BASE_REF)",)
 
-# =============================================================================
-# PR + worktree workflow
-# Solo-dev develop is PR-gated (CI must be green; linear history; squash).
-# These targets collapse the PR roundtrip to one command and let multiple
-# branches stay live in parallel via worktrees.
-# =============================================================================
-
 .PHONY: pr-arm pr-preflight pr-preflight-uncached .pr-preflight-route pr-preflight-focused-tests pr-preflight-fast-tests pr-content-guard skill-integrity-check pr-open pr-ready pr-arm-auto-merge pr-fanout pr-refresh pr-conflict-scan pr-status pr-review-followups pr-review-followups-list dev-loop-metrics shrink-rollup audit-sha-check agent-write-preflight worktree-create worktree-remove worktree-list branch-prune-merged blind-spots-list blind-spots-report blind-spots-sweep soundness-drain-report soundness-drain-self-test
 
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
 
-# Local gate before pushing. One classifier artifact selects the same product
-# and skill-integrity lanes as CI. Content-only, product, unknown, empty, and
-# structurally unsafe skill diffs retain the full historical ci-lint + content
-# guard + fast-test contract; only an approved pure skill-integrity diff uses
-# the focused pinned-verifier lane. CI coverage thresholds remain CI-only.
-# The uncached implementation is called by the receipt-bound wrapper below.
 pr-preflight-uncached:
 	@set -eu; \
 	DECISION=$$(mktemp); \
@@ -1354,10 +835,6 @@ pr-preflight-uncached:
 	$(MAKE) -s pr-preflight-medium-tests PATH_DECISION="$$DECISION"; \
 	$(MAKE) -s uat-artifact-hygiene
 
-# Canonical local preflight: the focused lane runs once, then the remaining
-# required lanes each classify the revalidated transaction input. The ordered
-# wrapper rejects drift between stages, and each stage gets its own
-# content-bound receipt; hosted required checks remain separate.
 pr-preflight:
 	@git fetch origin develop --quiet
 	uv run -- python scripts/local_validation.py ordered \
@@ -1365,10 +842,6 @@ pr-preflight:
 		--preflight-gate "required-pr-preflight" --preflight-cmd '$(MAKE) -s pr-preflight-uncached SKIP_FAST_TESTS=1' \
 		$(BATCH_ARGS)
 
-# Consume the classifier decision only; never reimplement path globs here.
-# Mixed skill/product diffs run both lanes. Skill plus safe content stays on
-# the two narrow lanes. Content-only remains on the full product preflight
-# until a separately authorized optimization exists.
 .pr-preflight-route:
 	@set -eu; \
 	[ -n "$(PATH_DECISION)" ] && [ -f "$(PATH_DECISION)" ] || { echo "PATH_DECISION is required" >&2; exit 2; }; \
@@ -1395,11 +868,6 @@ pr-preflight:
 		fi; \
 	fi
 
-# The historical full-preflight target runs pr-content-guard unless the
-# receipt-bound focused wrapper explicitly defers it to the required stage.
-# The needs-code-ci decision gates only the fast-test run below. Direct
-# invocation creates classifier artifacts when the parent preflight did not
-# already supply them.
 pr-preflight-focused-tests:
 	@$(MAKE) -s pr-preflight-fast-tests SKIP_CONTENT_GUARD=1
 
@@ -1429,19 +897,6 @@ pr-preflight-fast-tests:
 		echo "No code changes detected; skipping fast tests."; \
 	fi
 
-# Medium tier as its own receipt-bound preflight stage. Selects tests affected
-# by product paths while merge_group retains the full `make test-medium` tier.
-# Content-only and skill-integrity-only diffs skip it.
-# Identical trees reuse the receipt across worktrees without colliding on
-# the shared test lock. The stage fails pr-preflight on failure; there is
-# no skip flag. The gate invocation scrubs the preflight control variables
-# (PATH_DECISION, PATH_LISTS, SKIP_FAST_TESTS) from the environment and
-# blanks MAKEFLAGS: make exports command-line variables and smuggles their
-# assignments inside MAKEFLAGS, so a leak would make test-spawned makes take
-# the caller-supplied branch with no lists dir ("PATH_LISTS is required") or
-# flip the route into its skip branch (stale "already completed" line inside
-# the suite). BATCH_ARGS is deliberately not scrubbed so batch mode still
-# binds receipts.
 pr-preflight-medium-tests:
 	@set -eu; \
 	if [ -n "$(PATH_DECISION)" ]; then \
@@ -1461,16 +916,6 @@ pr-preflight-medium-tests:
 		echo "No code changes detected; skipping medium tier."; \
 	fi
 
-# Publication lane isolation is a diff-vs-base guard. The path classifier has
-# already produced the changed-path list for the PR, so this target consumes
-# that exact artifact instead of reimplementing path classification or asking
-# the working tree to infer a base. Keep it in the content guard, where
-# PATH_LISTS is mandatory and the caller has already selected the PR lanes.
-# Local validation singleflight. Runs CMD once per identical validated input
-# across worktrees; identical repeats reuse the recorded receipt instead of
-# re-executing and colliding on the shared test lock. Receipts never certify
-# hosted checks and never cross changed trees. Usage:
-#   make local-validation GATE=fast-tests CMD="pytest tests/unit -q"
 local-validation:
 	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
 	[ -n "$(CMD)" ] || { echo "CMD is required" >&2; exit 2; }; \
@@ -1480,20 +925,12 @@ local-validation-show:
 	@[ -n "$(GATE)" ] || { echo "GATE is required" >&2; exit 2; }; \
 	uv run -- python scripts/local_validation.py show --gate "$(GATE)" $(BATCH_ARGS) $(if $(CMD),-- $(CMD),)
 
-# Ordered local delivery path. The focused check and required preflight have
-# distinct receipt namespaces and the focused gate must finish first. A hook
-# that is not active prints SKIPPED at its boundary instead of looking like a
-# successful test invocation.
 FOCUSED_CMD ?= uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -q
 PREFLIGHT_CMD ?= make pr-preflight
 local-validation-path:
 	@echo "Running receipt-bound canonical preflight path (focused then required lanes)."
 	$(MAKE) -s pr-preflight $(BATCH_ARGS)
 
-# Revision/readiness transactions behind one helper (scripts/pr_landing.py).
-# The live PR targets below use the same exact-checkout arming path: start
-# records identity, withdraw disarms auto-merge before a revision, and ready
-# verifies the exact head and enqueues only after the helper re-reads the PR.
 pr-landing-start:
 	uv run -- python scripts/pr_landing.py --repo "$(or $(REPO),BenchBox-dev/BenchBox)" \
 		--worktree . --branch "$(or $(BRANCH),$(shell git branch --show-current))" \
@@ -1558,29 +995,6 @@ pr-content-guard:
 		echo "No docs paths changed."; \
 	fi
 
-# Push current branch and open a PR against develop. This does not arm
-# auto-merge by itself, so a follow-up commit pushed for review feedback cannot
-# race a merge. Arm with `make pr-arm` once the branch carries the review
-# fixes, or run `make pr-open READY=1` to open (or reuse) the PR and arm it in
-# one step. Arming enqueues the PR in the merge queue, which merges it when the
-# required checks pass.
-# Refuses to run from develop/release.
-#
-# Idempotent: safe to rerun. If a PR is already open for the branch, reuses it.
-# READY=1 arms through `make pr-arm`, which checks the live PR (hold label,
-# requested changes, unresolved review threads, draft state, head) before it
-# enqueues the exact local HEAD. READY=1 with EVIDENCE or BATCH keeps its
-# earlier meaning: the evidence transaction (`pr-ready`) for a reused PR.
-#
-# Pre-push warning: runs `git merge-tree` against every other open PR head
-# (pure git, ~1s, no CI) and prints any textual conflicts so you can coordinate
-# before landing. Warn-only — does not block the push.
-#
-# Currency: after fetching origin/develop, an ancestor-only branch is accepted
-# by the native queue only after the live ruleset checker proves the queue and
-# its required protections. The merge-tree probe still blocks genuine base
-# conflicts. If the queue is absent, unknown, or misconfigured, the existing
-# current-base gate remains in force; `pr-refresh` is the only refresh path.
 pr-open:
 	@set -eu; \
 	$(MAKE) -s agent-write-preflight; \
@@ -1678,13 +1092,6 @@ pr-open:
 		$(MAKE) -s pr-arm PR="$$PR_NUMBER" REPO="$$REPOSITORY" HEAD="$$(git rev-parse HEAD)"; \
 	fi
 
-# Runs the readiness transaction for an already-open PR. This compatibility
-# target retains the historical name, but cannot arm without caller-supplied
-# evidence for the exact checkout.
-# Honours the durable `no-auto-merge` hold label: before this check, the label
-# was only durable against paths that never arm (workflow + sweep) while the
-# one live arm path ignored it — #1626 was armed 52s after being labeled. See
-# _project/decisions/auto-merge-policy-consolidation-2026-08-06.md (D3).
 pr-arm-auto-merge:
 	@set -eu; \
 	[ -n "$(EVIDENCE)" ] || { echo "EVIDENCE is required; use pr-landing-ready with exact readiness evidence" >&2; exit 2; }; \
@@ -1703,17 +1110,6 @@ pr-arm-auto-merge:
 	$(MAKE) -s pr-landing-ready REPO="$$REPOSITORY" PR="$$PR_NUMBER" HEAD="$$EXPECTED_HEAD" \
 		EVIDENCE="$(EVIDENCE)" BATCH="$(BATCH)" ARM=1
 
-# Arms a PR for its exact head after a live hold check and enqueues it into the merge queue.
-# `make pr-arm` (PR=<n> optional, HEAD=<sha> optional) refuses without merging when a hold label,
-# a requested change, a draft or closed state, or a head other than local HEAD applies.
-# The values reach the helper through the environment, never as words in a shell command, so a value
-# such as `PR='7 --pr 8'` cannot add arguments. `_SET` tells an omitted variable from an empty one and
-# is computed before `override`, which makes a variable look defined. Make expands a recursive
-# command-line value when it exports it, so a `$(shell ...)` typed on the command line runs for every
-# target in this Makefile; that is the invoker's own input and is not something a wrapper can prevent.
-# The target-specific overrides keep PR, HEAD and REPO literal in this target's environment. A global
-# override would also change how every other target's recipe sees them (an unexpanded `$(cmd)` would
-# reach their shell), which test_pr_arm.py pins.
 PR_ARM_PR_SET := $(if $(filter undefined,$(origin PR)),,1)
 PR_ARM_HEAD_SET := $(if $(filter undefined,$(origin HEAD)),,1)
 PR_ARM_REPO_SET := $(if $(filter undefined,$(origin REPO)),,1)
@@ -1729,18 +1125,6 @@ pr-arm: export PR_ARM_REPO_SET := $(PR_ARM_REPO_SET)
 pr-arm:
 	@uv run -- python scripts/pr_arm.py
 
-# Arms an open PR for an exact HEAD. Without EVIDENCE or BATCH this is
-# `make pr-arm` for the PR; with either one it runs the readiness evidence
-# transaction (`pr-arm-auto-merge`), which also validates a registered batch.
-#
-# Auto-merge is not armed when `pr-open` creates a PR, because arming at creation is only
-# correct if nothing more will be pushed - and the usual reason something more
-# is pushed is review feedback, which arrives after the PR exists. A PR armed
-# at creation can satisfy its checks and merge while the follow-up commit is
-# still being written, leaving develop with a partial change and the rest
-# orphaned on a closed branch. That happened three times in one session
-# (#1503, #1521, #1531); the last two stranded the very commits that addressed
-# their own review findings.
 pr-ready:
 	@[ -n "$(PR)" ] || [ -n "$(URL)" ] || { echo "PR or URL is required" >&2; exit 2; }
 	@[ -n "$(HEAD)" ] || { echo "HEAD is required" >&2; exit 2; }
@@ -1762,8 +1146,6 @@ shrink-rollup:
 	@git fetch origin develop --quiet
 	@uv run --project _project/scripts -- python _project/scripts/shrink_rollup.py
 
-# Walk every worktree (except the main clone) and run `make pr-open` in each.
-# Use PR_FANOUT_JOBS to bound parallelism.
 pr-fanout:
 	@MAIN_CLONE=$$(dirname "$$(realpath "$$(git rev-parse --git-common-dir)")"); \
 	TMP=$$(mktemp); \
@@ -1782,13 +1164,6 @@ pr-fanout:
 	for log in "$$LOGDIR"/*.log; do [ -e "$$log" ] && cat "$$log"; done; \
 	exit $$STATUS
 
-# Refresh the current PR branch onto origin/develop, then run pr-open.
-# This is the stale-PR escape hatch when required checks must be current with
-# develop: GitHub can show a PR as CLEAN even though merge is waiting for a
-# branch update. pr-refresh does not arm on its own (pr-open arms only with
-# READY=1); run `make pr-arm` once the refreshed branch is pushed.
-# Run this one stale PR at a time; updating several branches at once can let
-# the first merge stale the others again under strict checks.
 pr-refresh:
 	@CURRENT=$$(git branch --show-current); \
 	case "$$CURRENT" in \
@@ -1798,17 +1173,6 @@ pr-refresh:
 	git merge --no-edit origin/develop && \
 	$(MAKE) -s pr-open
 
-# Pure-git pairwise textual-conflict probe. Caller passes BRANCH=<current>;
-# we compare HEAD against every other open PR head via `git merge-tree
-# --write-tree` and print warnings. Warn-only; does not exit non-zero. Used
-# internally by pr-open.
-#
-# Exit status is the signal: 0 clean, 1 conflict, >1 error (e.g. unrelated
-# histories). Bad refs also exit 1, hence the rev-parse guard above the probe.
-# Do not parse the deprecated three-arg `git merge-tree <base> <a> <b>`: its
-# `changed in both` / `added in both` / `removed in {local,remote}` lines are
-# informational trivial-merge headers, not conflicts, and its real conflict
-# markers are diff-prefixed (`+<<<<<<< .our`), so `^<<<<<<<` never matches.
 pr-conflict-scan:
 	@CURRENT="$(BRANCH)"; \
 	[ -n "$$CURRENT" ] || CURRENT=$$(git branch --show-current); \
@@ -1824,7 +1188,6 @@ pr-conflict-scan:
 		echo "  ⚠ textual conflict with PR #$$num ($$branch) in $$files — coordinate before landing"; \
 	done; true
 
-# Show open PRs against develop and their CI + auto-merge state.
 pr-status:
 	@if [ "$(ALL_OPEN)" = "1" ] || [ "$(ALL_OPEN)" = "true" ] || [ "$(ALL_OPEN)" = "yes" ]; then \
 		echo "All open develop PRs (bounded to $(PR_STATUS_ALL_OPEN_LIMIT)):"; \
@@ -1835,11 +1198,6 @@ pr-status:
 	gh pr list --base develop --state open --limit "$$LIMIT" --json number,title,headRefName,statusCheckRollup,autoMergeRequest \
 		--template '{{range .}}#{{.number}} {{.title}} ({{.headRefName}}){{"\n"}}  auto-merge: {{if .autoMergeRequest}}ON{{else}}OFF{{end}}{{"\n"}}  checks: {{range .statusCheckRollup}}{{.name}}={{.conclusion}} {{end}}{{"\n\n"}}{{end}}'
 
-# Discover candidate bot/agent review comments on merged PRs without making changes.
-# Also reports merged PRs whose Codex review hit usage limits and still need a
-# fresh @codex review trigger. Default --author filter is the
-# chatgpt-codex-connector bot; override with --author (or by editing
-# DEFAULT_REVIEW_AUTHORS in the script) to add other reviewers.
 pr-review-followups-list:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py list \
 		--base "$(PR_REVIEW_BASE)" \
@@ -1852,35 +1210,6 @@ pr-review-followups-list:
 		$(if $(PR_REVIEW_SINCE),--since "$(PR_REVIEW_SINCE)") \
 		$(if $(PR_REVIEW_UNTIL),--until "$(PR_REVIEW_UNTIL)")
 
-# One-comment-at-a-time follow-up loop for merged PR review findings from any
-# configured reviewer (default: chatgpt-codex-connector). The local executor is
-# the codex CLI but is isolated behind --executor-* flags. Each actioned
-# comment lands as its own commit *before* the GitHub marker reply is posted,
-# so a mid-sweep crash never leaves a phantom-actioned thread on GitHub. After
-# the loop, the routine runs pr-preflight and opens one PR through the normal
-# pr-open workflow.
-#
-# Useful overrides:
-#   PR_REVIEW_MAX_COMMENTS=N         cap an iteration batch
-#   PR_REVIEW_SINCE=YYYY-MM-DD       scope by merged-at date
-#   PR_REVIEW_EXECUTOR_MODEL=<name>  choose the executor model
-#   PR_REVIEW_REPLY=0                skip GitHub replies. Only the literals
-#                                    0|false|no disable; anything else
-#                                    (including "1" or "true") is treated as
-#                                    the default, so the reply is posted.
-#   PR_REVIEW_SUBMIT=0               skip final pr-open. Same accepted values
-#                                    as PR_REVIEW_REPLY above.
-#   PR_REVIEW_USAGE_LIMIT_RETRY=0    skip the top-level Codex usage-limit
-#                                    retry step. By default, the routine posts
-#                                    @codex review on merged PRs with no later
-#                                    trigger and keeps later-triggered PRs
-#                                    visible until a review result appears.
-#   PR_REVIEW_RESUME=1               re-drive the routine on a branch that
-#                                    already carries per-comment commits from
-#                                    a prior crashed sweep. Implies
-#                                    --allow-dirty and skips comments already
-#                                    committed locally. Only the literals
-#                                    1|true|yes enable it.
 pr-review-followups:
 	@uv run --project _project/scripts -- python _project/scripts/pr_review_followups.py run \
 		--base "$(PR_REVIEW_BASE)" \
@@ -1947,48 +1276,18 @@ include $(BENCHBOX_MAKEFILE_ROOT)make/worktrees.mk
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/worktree-maintenance.mk
 
-## branch-prune-merged: delete local branches whose PR already merged into
-## develop but that have no worktree attached. worktree-remove removes only
-## the exact worktree registration and deliberately leaves its local branch,
-## while plain `git checkout -b` branches have no worktree to remove.
-##
-## Requires `gh`. PRs squash-merge, so source-tip ancestry cannot prove
-## integration. The helper instead verifies the historical PR head from the
-## PR timeline plus commit list and requires the PR merge commit to be
-## reachable from a freshly fetched origin/develop (§7 in the evidence
-## contract).
-##
-## Deletes only when the local tip equals the historically proven PR head at
-## merge time. A branch re-created under an old merged branch's name, or
-## carrying commits pushed after the merge, is reported and kept rather
-## than force-deleted -- name alone is not proof the local work merged.
-## A local branch left behind that historical head is likewise kept.
-##
-## Run with DRY_RUN=1 to preview without deleting anything.
 branch-prune-merged:
 	@command -v gh >/dev/null 2>&1 || { echo "gh CLI required for branch-prune-merged" >&2; exit 1; }
 	@DRY_RUN='$(if $(filter 1,$(DRY_RUN)),1,$(if $(strip $(DRY_RUN)),invalid,))' \
 		uv run -- python scripts/branch_prune_merged.py
 
-# ----------------------------------------------------------------------
-# UAT framework (tests/uat/) — see _project/specs/uat-framework.md.
-# Operator-only; not exposed as `benchbox` CLI subcommands. UAT is a
-# project-developer concern, benchbox is a project-user concern.
-# ----------------------------------------------------------------------
 .PHONY: uat-cell uat-execute uat-validate uat-package uat-explorer-smoke uat-report uat-sweep uat-smoke uat-stress uat-bring-up uat-prepull uat-docker-cleanup uat-artifact-hygiene uat-gate-check
 
-# Local-artifact hygiene gate. No-op unless an external output root is
-# configured (BENCHBOX_OUTPUT_DIR or OUTPUT=); when it is, fails if the
-# worktree-local benchmark_runs/datagen holds artifacts that should have
-# landed under the external root (the 2026-06-01 datagen-leak incident).
-# Report-only: never deletes or moves artifacts.
-#   make uat-artifact-hygiene [OUTPUT=<root>] [THRESHOLD_BYTES=N]
 uat-artifact-hygiene:
 	@uv run --no-sync -- python -m tests.uat.artifact_hygiene \
 		$(if $(OUTPUT),--output "$(OUTPUT)",) \
 		$(if $(THRESHOLD_BYTES),--threshold-bytes "$(THRESHOLD_BYTES)",)
 
-# make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01
 uat-cell:
 	@if [ -z "$(PLATFORM)" ] || [ -z "$(BENCHMARK)" ] || [ -z "$(SCALE)" ]; then \
 		echo "Usage: make uat-cell PLATFORM=<name> BENCHMARK=<name> SCALE=<float>" >&2; \
@@ -2003,7 +1302,6 @@ uat-cell:
 		$(if $(TIMEOUT_S),--timeout-s "$(TIMEOUT_S)",) \
 		$(if $(LOG_DIR),--log-dir "$(LOG_DIR)",)
 
-# make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]
 uat-validate:
 	@if [ -z "$(RESULTS_DIR)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
 		echo "Usage: make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path> [FLOOR=0.80]" >&2; \
@@ -2014,7 +1312,6 @@ uat-validate:
 		--output-tsv "$(OUTPUT_TSV)" \
 		$(if $(FLOOR),--floor "$(FLOOR)",)
 
-# make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=0.01,0.1,1.0] [CROSS_SCALE_FLOOR=N]
 uat-report:
 	@if [ -z "$(CELLS_JSONL)" ] || [ -z "$(OUTPUT_TSV)" ]; then \
 		echo "Usage: make uat-report CELLS_JSONL=<path> OUTPUT_TSV=<path> [RUNGS=...] [CROSS_SCALE_FLOOR=N]" >&2; \
@@ -2026,7 +1323,6 @@ uat-report:
 		$(if $(RUNGS),--rungs "$(RUNGS)",) \
 		$(if $(CROSS_SCALE_FLOOR),--cross-scale-floor "$(CROSS_SCALE_FLOOR)",)
 
-# make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]
 uat-explorer-smoke:
 	@if [ -z "$(BUNDLES_DIR)" ] || [ -z "$(OUTPUT_DIR)" ] || [ -z "$(LOG_DIR)" ]; then \
 		echo "Usage: make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path> [BROWSERS=chromium]" >&2; \
@@ -2038,7 +1334,6 @@ uat-explorer-smoke:
 		--log-dir "$(LOG_DIR)" \
 		$(if $(BROWSERS),--browsers "$(BROWSERS)",)
 
-# make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS="r1.json r2.json ..."
 uat-package:
 	@if [ -z "$(CONFIG)" ] || [ -z "$(SUBMISSIONS_DIR)" ] || [ -z "$(RESULTS)" ]; then \
 		echo "Usage: make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS=\"r1.json r2.json ...\"" >&2; \
@@ -2051,7 +1346,6 @@ uat-package:
 
 UAT_BRING_UP_KNOWN_PLATFORMS := cedardb clickhouse-server databend doris influxdb lakesail pg-duckdb pg-mooncake postgresql presto questdb singlestore starrocks timescaledb trino velox
 
-# make uat-bring-up PLATFORM=<name> [TIMEOUT_S=300] [DRY_RUN=1] [BENCHMARK_RUNS_DIR=~/Developer/benchmark_runs]
 uat-bring-up:
 	$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)
 	@if [ -z "$(PLATFORM)" ]; then \
@@ -2064,14 +1358,6 @@ uat-bring-up:
 		$(if $(BENCHMARK_RUNS_DIR),--benchmark-runs-dir "$(BENCHMARK_RUNS_DIR)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
-# make uat-prepull PLATFORM=<name> [PREPULL_TIMEOUT_S=900] [DRY_RUN=1]
-# `compose pull --ignore-buildable` + `compose build` via the resolved engine,
-# project-scoped -- no health probe (compare uat-bring-up). Fetches images/
-# builds ahead of a sweep so a slow stack's first-run download doesn't eat
-# into cleanup.docker_start_timeout_s and present as a mysterious
-# skipped-unreachable platform. Reuses uat_bring_up.py --prepull-only rather
-# than a new script (same PLATFORM validation, project-name derivation,
-# resolved-engine identity print).
 uat-prepull:
 	$(if $(strip $(PLATFORM)),$(if $(filter $(PLATFORM),$(UAT_BRING_UP_KNOWN_PLATFORMS)),,$(error unknown platform '$(PLATFORM)'; supported: $(UAT_BRING_UP_KNOWN_PLATFORMS))),)
 	@if [ -z "$(PLATFORM)" ]; then \
@@ -2084,10 +1370,6 @@ uat-prepull:
 		$(if $(PREPULL_TIMEOUT_S),--prepull-timeout-s "$(PREPULL_TIMEOUT_S)",) \
 		$(if $(DRY_RUN),--dry-run,)
 
-# make uat-docker-cleanup [ENGINE=docker|container] [MODE=owned|images|max] [APPLY=1] [PREFIX=benchbox-uat]
-# ENGINE=container reclaims the Apple `container` store (~/Library/Application
-# Support/com.apple.container); MODE widens breadth owned<images<max. See
-# docs/operations/uat-framework.md "Container engine resolution".
 uat-docker-cleanup:
 	@uv run --no-sync -- python -m tests.uat._cli docker-cleanup \
 		$(if $(ENGINE),--engine "$(ENGINE)",) \
@@ -2095,7 +1377,6 @@ uat-docker-cleanup:
 		$(if $(PREFIX),--prefix "$(PREFIX)",) \
 		$(if $(APPLY),--apply,)
 
-# make uat-sweep CONFIG=tests/uat/configs/<name>.yaml [DRY_RUN=1]
 uat-sweep:
 	@if [ -z "$(CONFIG)" ]; then \
 		echo "Usage: make uat-sweep CONFIG=<path> [DRY_RUN=1]" >&2; \
@@ -2104,13 +1385,9 @@ uat-sweep:
 	@uv run --no-sync -- python -m tests.uat._cli sweep --config "$(CONFIG)" \
 		$(if $(DRY_RUN),--dry-run,)
 
-# make uat-smoke
-# Native TPCH SF 0.01 smoke loop; no Docker, package, or explorer phase.
 uat-smoke:
 	@uv run --no-sync -- python -m tests.uat._cli sweep --config tests/uat/configs/uat-smoke.yaml
 
-# make uat-stress [PLATFORM=] [BENCHMARK=] [SCALE=] [CONFIG=]
-# Canned stress preset using the UAT framework matrix runner.
 uat-stress:
 	@uv run --no-sync -- python -m tests.uat._cli stress \
 		$(if $(CONFIG),--config "$(CONFIG)",) \
@@ -2118,11 +1395,6 @@ uat-stress:
 		$(if $(BENCHMARK),--benchmark "$(BENCHMARK)",) \
 		$(if $(SCALE),--scale "$(SCALE)",)
 
-# make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]
-# Aggregates the three release-gate stage summaries (uat_gate_summary.json in
-# each stage's run dir) into _project/release-evidence/uat-gate-summary.json,
-# enforcing cross-stage Docker ordering and the mechanized APPROVE checklist.
-# Review and commit the evidence file yourself; nothing here touches git.
 uat-gate-check:
 	@if [ -z "$(STAGE1)" ] || [ -z "$(STAGE2)" ] || [ -z "$(STAGE3)" ]; then \
 		echo "Usage: make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir> [OUTPUT=<path>]" >&2; \
@@ -2134,7 +1406,6 @@ uat-gate-check:
 		--stage3 "$(STAGE3)" \
 		$(if $(OUTPUT),--output "$(OUTPUT)",)
 
-# make uat-execute CONFIG=tests/uat/configs/uat.yaml
 uat-execute:
 	@if [ -z "$(CONFIG)" ]; then \
 		echo "Usage: make uat-execute CONFIG=<path>" >&2; \

@@ -71,9 +71,6 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
     throw new LocalResultImportError("This file is not valid JSON.");
   }
   const bundle = objectOrError(parsed, "The JSON root must be an object.");
-  // Mirror benchbox.core.results.schema_policy.result_schema_version_value():
-  // Select by key presence so an explicit null is not silently replaced by a
-  // legacy alias; the server-side policy rejects conflicting or null values.
   const hasOwn = (key: string): boolean => Object.prototype.hasOwnProperty.call(bundle, key);
   const versionValue = hasOwn("result_schema_version")
     ? bundle.result_schema_version

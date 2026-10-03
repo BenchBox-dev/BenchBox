@@ -25,10 +25,8 @@ Snowflake is a cloud-native data warehouse with automatic scaling, multi-cluster
 ## Installation
 
 ```bash
-# Install Snowflake connector
 pip install snowflake-connector-python
 
-# Or via BenchBox extras
 pip install "benchbox[snowflake]"
 ```
 
@@ -99,7 +97,6 @@ revert a manually-installed version and how to work around it.
 ### Password Authentication
 
 ```bash
-# Basic password auth
 benchbox run --platform snowflake --benchmark tpch \
   --platform-option account=xy12345.us-east-1 \
   --platform-option user=benchbox_user \
@@ -109,14 +106,9 @@ benchbox run --platform snowflake --benchmark tpch \
 ### Key Pair Authentication
 
 ```bash
-# Generate key pair
 openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
 openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
 
-# Upload public key to Snowflake
-# ALTER USER benchbox_user SET RSA_PUBLIC_KEY='MII...';
-
-# Use key pair
 benchbox run --platform snowflake --benchmark tpch \
   --platform-option account=xy12345.us-east-1 \
   --platform-option user=benchbox_user \
@@ -137,8 +129,6 @@ benchbox run --platform snowflake --benchmark tpch \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 1 (warehouse comes from stored credentials
-# or SNOWFLAKE_WAREHOUSE)
 benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
 
@@ -148,8 +138,6 @@ The warehouse is not a `benchbox run` option. Set it once with
 ### With Tuning
 
 ```bash
-# Apply clustering and optimizations
-# (export SNOWFLAKE_WAREHOUSE=LARGE_WH first)
 benchbox run --platform snowflake --benchmark tpch --scale 10.0 \
   --tuning tuned
 ```
@@ -218,7 +206,6 @@ ALTER SESSION SET QUERY_TAG = 'benchbox:tpch:power:Q1';
 Files uploaded to user stage, then loaded via COPY INTO:
 
 ```bash
-# Auto-detected, no configuration needed
 benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
 
@@ -227,7 +214,6 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0
 For large scale factors, use external staging:
 
 ```bash
-# The cloud --output path becomes the external staging root
 benchbox run --platform snowflake --benchmark tpch --scale 100.0 \
   --output s3://bucket/benchbox/ \
   --table-mode external
@@ -259,28 +245,21 @@ benchbox run --platform snowflake --benchmark tpch --scale 1.0 \
 ### Authentication Failed
 
 ```bash
-# Verify account identifier format
-# Should be: <account_locator>.<region>.<cloud> or <orgname>-<account_name>
-# Examples: xy12345.us-east-1, xy12345.us-east-1.aws, myorg-myaccount
 
-# Test connection
 snowsql -a xy12345.us-east-1 -u benchbox_user
 ```
 
 ### Warehouse Not Found
 
 ```bash
-# List available warehouses
 snowsql -q "SHOW WAREHOUSES;"
 
-# Create warehouse if needed
 snowsql -q "CREATE WAREHOUSE BENCHMARK_WH WITH WAREHOUSE_SIZE = 'SMALL';"
 ```
 
 ### Insufficient Permissions
 
 ```sql
--- Grant required permissions
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE benchbox_role;
 GRANT CREATE DATABASE ON ACCOUNT TO ROLE benchbox_role;
 GRANT CREATE SCHEMA ON DATABASE benchbox TO ROLE benchbox_role;
@@ -289,7 +268,6 @@ GRANT CREATE SCHEMA ON DATABASE benchbox TO ROLE benchbox_role;
 ### Data Loading Timeout
 
 ```bash
-# Use a larger warehouse (SNOWFLAKE_WAREHOUSE) or external staging for big datasets
 benchbox run --platform snowflake --benchmark tpch --scale 100.0 \
   --output s3://bucket/benchbox/
 ```

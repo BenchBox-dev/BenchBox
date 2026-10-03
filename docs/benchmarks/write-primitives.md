@@ -31,10 +31,8 @@ The Write Primitives benchmark provides comprehensive testing of fundamental dat
 from benchbox import WritePrimitives
 import duckdb
 
-# Initialize benchmark
 bench = WritePrimitives(scale_factor=0.01)
 
-# Setup requires TPC-H data first
 from benchbox import TPCH
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
@@ -42,10 +40,8 @@ tpch.generate_data()
 conn = duckdb.connect(":memory:")
 tpch.load_data_to_database(conn)
 
-# Setup staging tables
 bench.setup(conn)
 
-# Execute a write operation
 result = bench.execute_operation("insert_single_row", conn)
 print(f"Success: {result.success}")
 print(f"Rows affected: {result.rows_affected}")
@@ -297,14 +293,10 @@ WHERE o_orderkey <= (SELECT CAST(MAX(o_orderkey) * 0.5 AS INTEGER) FROM orders);
 ## CLI Integration
 
 ```bash
-# List available benchmarks
 benchbox benchmarks list
 
-# Run Write Primitives benchmark
 benchbox run --benchmark write_primitives --platform duckdb --scale 0.01
 
-# Run specific operations (there are no --categories/--operations options;
-# select individual operations with --queries)
 benchbox run --benchmark write_primitives --platform duckdb \
     --queries insert_single_row,update_single_row_pk
 ```
@@ -429,7 +421,6 @@ Result object returned by `execute_operation` and `run_benchmark`.
 from benchbox import TPCH, WritePrimitives
 import duckdb
 
-# 1. Load TPC-H data
 tpch = TPCH(scale_factor=0.01, output_dir="_project/data")
 tpch.generate_data()
 
@@ -440,21 +431,16 @@ tpch.load_data_to_database(conn)
 ### Setup Staging Tables
 
 ```python
-# 2. Setup Write Primitives staging tables
 bench = WritePrimitives(scale_factor=0.01)
 setup_result = bench.setup(conn, force=True)
 
 print(f"Setup: {setup_result['success']}")
 print(f"Tables created: {len(setup_result['tables_created'])}")
-# Output:
-# Setup: True
-# Tables created: 16
 ```
 
 ### Execute Single Operation
 
 ```python
-# 3. Execute with automatic validation and cleanup
 result = bench.execute_operation("insert_single_row", conn)
 
 print(f"Operation: {result.operation_id}")
@@ -463,25 +449,17 @@ print(f"Rows affected: {result.rows_affected}")
 print(f"Write time: {result.write_duration_ms:.2f}ms")
 print(f"Validation passed: {result.validation_passed}")
 
-# Output:
-# Operation: insert_single_row
-# Success: True
-# Rows affected: 1
-# Write time: 2.45ms
-# Validation passed: True
 ```
 
 ### Run Full Benchmark
 
 ```python
-# 4. Run all operations
 results = bench.run_benchmark(conn)
 
-print(f"Total operations: {len(results)}")  # 112
+print(f"Total operations: {len(results)}")
 successful = [r for r in results if r.success]
 print(f"Successful: {len(successful)}")
 
-# Analyze results
 for result in results:
     print(f"{result.operation_id}: {result.write_duration_ms:.2f}ms")
 ```
@@ -489,10 +467,8 @@ for result in results:
 ### Filter by Category
 
 ```python
-# 5. Run only INSERT operations
 insert_results = bench.run_benchmark(conn, categories=["insert"])
 
-# 6. Run specific operations
 specific_ops = ["insert_single_row", "update_single_row_pk", "delete_single_row_pk"]
 results = bench.run_benchmark(conn, operation_ids=specific_ops)
 ```
@@ -588,7 +564,7 @@ tpch.load_data_to_database(conn)
 
 ```python
 bench = WritePrimitives(scale_factor=0.01)
-bench.setup(conn)  # Must call setup first
+bench.setup(conn)
 result = bench.execute_operation("insert_single_row", conn)
 ```
 
@@ -622,7 +598,6 @@ if not result.validation_passed:
 
 **Optimization**:
 ```python
-# Use smaller scale factors for faster testing
 bench = WritePrimitives(scale_factor=0.001)
 ```
 
@@ -653,11 +628,9 @@ For comprehensive database testing, use both benchmarks:
 ```python
 from benchbox import WritePrimitives, TransactionPrimitives
 
-# Test write operations (works on all platforms)
 write_bench = WritePrimitives(scale_factor=0.01)
 write_results = write_bench.run_benchmark(conn)
 
-# Test transactions (ACID-capable databases only)
 if platform_supports_acid:
     txn_bench = TransactionPrimitives(scale_factor=0.01)
     txn_results = txn_bench.run_benchmark(conn)
@@ -686,16 +659,13 @@ from benchbox.core.write_primitives.dataframe_operations import (
     get_dataframe_write_manager,
 )
 
-# Create manager for Polars
 manager = DataFrameWriteOperationsManager("polars-df")
 
-# Check capabilities
 caps = manager.get_capabilities()
 print(f"Supports UPDATE: {caps.supports_operation(WriteOperationType.UPDATE)}")
 print(f"Supports MERGE: {caps.supports_operation(WriteOperationType.MERGE)}")
 print(f"Supported compressions: {caps.supported_compressions}")
 
-# Execute BULK_LOAD operation
 result = manager.execute_bulk_load(
     source_path="/data/raw/orders.csv",
     target_path="/data/orders",
@@ -715,7 +685,6 @@ print(f"Duration: {result.duration_ms:.2f}ms")
 ```python
 import polars as pl
 
-# Create DataFrame with new rows
 new_orders = pl.DataFrame({
     "o_orderkey": [9999001, 9999002],
     "o_custkey": [12345, 12346],
@@ -723,7 +692,6 @@ new_orders = pl.DataFrame({
     "o_totalprice": [1500.00, 2500.00],
 })
 
-# Execute INSERT
 result = manager.execute_insert(
     table_path="/data/orders",
     dataframe=new_orders,
@@ -734,7 +702,6 @@ result = manager.execute_insert(
 ### UPDATE Operation (DataFrame)
 
 ```python
-# Execute UPDATE (Polars uses read-modify-write pattern)
 result = manager.execute_update(
     table_path="/data/orders",
     condition="o_orderstatus = 'P'",
@@ -747,7 +714,6 @@ print(f"Rows updated: {result.rows_affected}")
 ### DELETE Operation (DataFrame)
 
 ```python
-# Execute DELETE
 result = manager.execute_delete(
     table_path="/data/orders",
     condition="o_totalprice < 100",
@@ -759,14 +725,12 @@ print(f"Rows deleted: {result.rows_affected}")
 ### MERGE Operation (DataFrame)
 
 ```python
-# Create source DataFrame for merge
 source_df = pl.DataFrame({
-    "o_orderkey": [1, 2, 9999999],  # Mix of existing and new
+    "o_orderkey": [1, 2, 9999999],
     "o_custkey": [100, 200, 300],
     "o_totalprice": [1000.0, 2000.0, 3000.0],
 })
 
-# Execute MERGE (upsert)
 result = manager.execute_merge(
     table_path="/data/orders",
     source_dataframe=source_df,
@@ -785,15 +749,13 @@ from pyspark.sql import SparkSession
 
 spark = SparkSession.builder.appName("WritePrimitives").getOrCreate()
 
-# Create manager with SparkSession
 manager = DataFrameWriteOperationsManager("pyspark-df", spark_session=spark)
 
-# Execute BULK_LOAD with PySpark
 result = manager.execute_bulk_load(
     source_path="/data/raw/orders.parquet",
     target_path="/data/orders_delta",
     source_format="parquet",
-    target_format="delta",  # Use Delta Lake for ACID support
+    target_format="delta",
     compression="zstd",
     partition_columns=["o_orderpriority"],
 )
@@ -822,13 +784,10 @@ class DataFrameWriteResult:
 ## Testing
 
 ```bash
-# Run unit tests
 uv run -- python -m pytest tests/unit/benchmarks/test_write_primitives_core.py -v
 
-# Run integration tests
 uv run -- python -m pytest tests/integration/test_write_primitives_duckdb.py -v
 
-# Test basic functionality
 uv run -- python -c "from benchbox import WritePrimitives; bench = WritePrimitives(0.01); print(bench.get_benchmark_info())"
 ```
 

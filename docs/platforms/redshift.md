@@ -25,10 +25,8 @@ Amazon Redshift is a fully managed petabyte-scale data warehouse service in AWS.
 ## Installation
 
 ```bash
-# Install Redshift connector
 pip install redshift_connector boto3
 
-# Or via BenchBox extras
 pip install "benchbox[redshift]"
 ```
 
@@ -94,7 +92,6 @@ revert a manually-installed version and how to work around it.
 ### Standard Authentication
 
 ```bash
-# Username/password auth
 benchbox run --platform redshift --benchmark tpch --scale 1.0 \
   --platform-option host=cluster.abc123.us-east-1.redshift.amazonaws.com \
   --platform-option user=admin \
@@ -104,7 +101,6 @@ benchbox run --platform redshift --benchmark tpch --scale 1.0 \
 ### IAM Authentication
 
 ```bash
-# IAM database authentication
 export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
 export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 
@@ -117,7 +113,6 @@ benchbox run --platform redshift --benchmark tpch \
 ### Redshift Serverless
 
 ```bash
-# Serverless workgroup
 benchbox run --platform redshift --benchmark tpch \
   --platform-option workgroup_name=default \
   --platform-option database=dev
@@ -128,15 +123,12 @@ benchbox run --platform redshift --benchmark tpch \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform redshift --benchmark tpch --scale 1.0
 ```
 
 ### With S3 Staging
 
 ```bash
-# Configure S3 staging for COPY command
-# (the IAM role is part of the stored Redshift credentials)
 benchbox run --platform redshift --benchmark tpch --scale 100.0 \
   --output s3://your-bucket/benchbox/
 ```
@@ -144,7 +136,6 @@ benchbox run --platform redshift --benchmark tpch --scale 100.0 \
 ### With Tuning
 
 ```bash
-# Apply distribution and sort keys
 benchbox run --platform redshift --benchmark tpch --scale 10.0 \
   --tuning tuned
 ```
@@ -189,7 +180,6 @@ results = adapter.run_benchmark(benchmark)
 ### Serverless
 
 ```bash
-# Use serverless for variable workloads
 benchbox run --platform redshift --benchmark tpch \
   --platform-option workgroup_name=benchbox-wg
 ```
@@ -201,12 +191,10 @@ benchbox run --platform redshift --benchmark tpch \
 BenchBox applies distribution keys with `--tuning tuned`:
 
 ```sql
--- Key distribution for large tables
 CREATE TABLE lineitem (...)
 DISTKEY (l_orderkey)
 SORTKEY (l_shipdate);
 
--- All distribution for small tables
 CREATE TABLE nation (...)
 DISTSTYLE ALL;
 ```
@@ -214,11 +202,9 @@ DISTSTYLE ALL;
 ### Sort Keys
 
 ```sql
--- Compound sort key
 CREATE TABLE orders (...)
 COMPOUND SORTKEY (o_orderdate, o_custkey);
 
--- Interleaved sort key (for multiple filter columns)
 CREATE TABLE lineitem (...)
 INTERLEAVED SORTKEY (l_shipdate, l_receiptdate);
 ```
@@ -228,7 +214,6 @@ INTERLEAVED SORTKEY (l_shipdate, l_receiptdate);
 BenchBox uses dedicated queue for benchmark queries:
 
 ```bash
-# Configure WLM queue
 benchbox run --platform redshift --benchmark tpch \
   --platform-option query_group=benchbox \
   --platform-option concurrency_scaling=on
@@ -239,7 +224,6 @@ benchbox run --platform redshift --benchmark tpch \
 ### COPY from S3 (Recommended)
 
 ```bash
-# Configure S3 staging
 benchbox run --platform redshift --benchmark tpch --scale 10.0 \
   --output s3://bucket/benchbox/
 ```
@@ -247,15 +231,12 @@ benchbox run --platform redshift --benchmark tpch --scale 10.0 \
 ### IAM Role Setup
 
 ```bash
-# Create IAM role for COPY
 aws iam create-role --role-name RedshiftS3Access \
   --assume-role-policy-document file://trust-policy.json
 
-# Attach S3 read policy
 aws iam attach-role-policy --role-name RedshiftS3Access \
   --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
 
-# Associate with cluster
 aws redshift modify-cluster-iam-roles \
   --cluster-identifier my-cluster \
   --add-iam-roles arn:aws:iam::123456789:role/RedshiftS3Access
@@ -274,7 +255,6 @@ benchbox run --platform redshift --benchmark tpch --scale 0.01
 ### Concurrency Scaling
 
 ```bash
-# Enable concurrency scaling for burst capacity
 benchbox run --platform redshift --benchmark tpch \
   --platform-option concurrency_scaling=auto
 ```
@@ -282,17 +262,14 @@ benchbox run --platform redshift --benchmark tpch \
 ### Pause/Resume
 
 ```bash
-# Pause cluster when not in use
 aws redshift pause-cluster --cluster-identifier my-cluster
 
-# Resume before benchmark
 aws redshift resume-cluster --cluster-identifier my-cluster
 ```
 
 ### Serverless RPU
 
 ```bash
-# Set max RPU to control costs
 benchbox run --platform redshift --benchmark tpch \
   --platform-option workgroup_name=benchbox \
   --platform-option max_rpu=128
@@ -303,13 +280,10 @@ benchbox run --platform redshift --benchmark tpch \
 ### Connection Refused
 
 ```bash
-# Check cluster status
 aws redshift describe-clusters --cluster-identifier my-cluster
 
-# Verify security group allows your IP
 aws ec2 describe-security-groups --group-ids sg-xxx
 
-# Add your IP to security group
 aws ec2 authorize-security-group-ingress \
   --group-id sg-xxx \
   --protocol tcp \
@@ -320,14 +294,11 @@ aws ec2 authorize-security-group-ingress \
 ### COPY Failed
 
 ```bash
-# Check COPY errors
 SELECT * FROM stl_load_errors ORDER BY starttime DESC LIMIT 10;
 
-# Verify IAM role is attached
 aws redshift describe-clusters --cluster-identifier my-cluster \
   --query 'Clusters[0].IamRoles'
 
-# Test S3 access
 SELECT * FROM svl_s3list
 WHERE bucket = 'your-bucket';
 ```
@@ -335,7 +306,6 @@ WHERE bucket = 'your-bucket';
 ### Permission Denied
 
 ```sql
--- Grant required permissions
 GRANT CREATE ON DATABASE dev TO benchbox_user;
 GRANT CREATE ON SCHEMA public TO benchbox_user;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO benchbox_user;
@@ -344,20 +314,17 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO benchbox_user;
 ### Query Timeout
 
 ```bash
-# Increase statement timeout
 benchbox run --platform redshift --benchmark tpch \
-  --platform-option statement_timeout=3600000  # 1 hour in ms
+  --platform-option statement_timeout=3600000
 ```
 
 ### Disk Space Exceeded
 
 ```bash
-# Check disk usage
 SELECT owner, host, diskno, used, capacity
 FROM stv_partitions
 ORDER BY used DESC;
 
-# Vacuum to reclaim space
 VACUUM FULL lineitem;
 ```
 

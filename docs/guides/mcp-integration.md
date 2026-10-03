@@ -32,7 +32,6 @@ uv sync --extra mcp
 Before configuring your AI agent, verify the MCP server works:
 
 ```bash
-# Start the server (it will wait for input)
 uv run python -m benchbox.mcp
 ```
 
@@ -74,16 +73,12 @@ Choose your AI assistant below for setup instructions.
 Add BenchBox as an MCP server using the Claude Code CLI:
 
 ```bash
-# Using benchbox-mcp entry point (recommended if in PATH)
 claude mcp add benchbox --scope project -- benchbox-mcp
 
-# With custom MCP paths
 claude mcp add benchbox --scope project -- benchbox-mcp --results-dir /tmp/benchbox-results
 
-# Using uv (works from any directory with BenchBox installed)
 claude mcp add benchbox --scope project -- uv run python -m benchbox.mcp
 
-# User-scoped (available in all your projects)
 claude mcp add benchbox --scope user -- benchbox-mcp
 ```
 
@@ -120,10 +115,8 @@ Or using uv if `benchbox-mcp` isn't in PATH:
 #### Verifying Installation
 
 ```bash
-# List configured servers
 claude mcp list
 
-# Check server status in Claude Code
 /mcp
 ```
 
@@ -138,13 +131,10 @@ claude mcp list
 Add BenchBox as an MCP server using the Codex CLI:
 
 ```bash
-# Using the benchbox-mcp entry point (recommended)
 codex mcp add benchbox -- benchbox-mcp
 
-# With custom MCP paths
 codex mcp add benchbox -- benchbox-mcp --results-dir /tmp/benchbox-results
 
-# Or using uv if benchbox-mcp isn't in PATH
 codex mcp add benchbox -- uv run python -m benchbox.mcp
 ```
 
@@ -161,17 +151,14 @@ args = []
 #### Verifying Installation
 
 ```bash
-# List configured servers
 codex mcp list
 
-# Show specific server config
 codex mcp show benchbox
 ```
 
 #### Managing Servers
 
 ```bash
-# Remove a server
 codex mcp remove benchbox
 ```
 

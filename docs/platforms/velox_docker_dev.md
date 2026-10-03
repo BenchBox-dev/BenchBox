@@ -36,13 +36,11 @@ The entrypoint (`docker/velox/entrypoint.sh`) supports three modes: `connect` (S
 Run all commands from the **project root** - the build context must include the full BenchBox source tree:
 
 ```bash
-# Quick dev build (single arch, no push)
 docker build \
   --platform linux/amd64 \
   -f docker/velox/Dockerfile \
   -t benchbox-velox:dev .
 
-# Verify the build and confirm Velox loads
 docker run --rm benchbox-velox:dev python3 -c \
   "from benchbox.platforms.velox import VeloxAdapter; print('import OK')"
 ```
@@ -69,22 +67,18 @@ docker buildx build \
 The host runs `benchbox`; the container runs the Gluten-enabled Spark-Connect server. This is the most flexible workflow: you get the full host BenchBox CLI, local result files, and a clean separation between the client and the Spark+Velox backend.
 
 ```bash
-# 1. Start the server (detached)
 cd docker/velox
-export BENCHBOX_DATA_DIR=/absolute/path/to/your/data   # required -- no default, see below
+export BENCHBOX_DATA_DIR=/absolute/path/to/your/data
 docker compose up -d velox-connect
 
-# 2. Wait for the health check to pass (~60-90 s on a cold JVM)
-docker compose ps velox-connect       # watch Status become "healthy"
-docker compose logs -f velox-connect  # tail logs during startup
+docker compose ps velox-connect
+docker compose logs -f velox-connect
 
-# 3. Run benchbox on the host
 benchbox run --platform velox \
   --platform-option deployment=remote \
   --platform-option endpoint=sc://localhost:50051 \
   --benchmark tpch --scale 1.0
 
-# 4. Stop the server when done
 docker compose down velox-connect
 ```
 
@@ -103,7 +97,6 @@ Container: /Users/joe/Developer/BenchBox/benchmark_runs/tpch_sf1/lineitem.parque
 ```bash
 export BENCHBOX_DATA_DIR=/mnt/benchdata
 docker compose up -d velox-connect
-# Then run benchbox so the paths it sends are under /mnt/benchdata/
 ```
 
 The mount also stays a bare `${BENCHBOX_DATA_DIR}` reference with no inline default syntax at all, because [mocker](../operations/uat-framework.md) — the Apple-silicon local Docker-compatible engine used by `make test-docker-* CONTAINER_ENGINE=mocker` — supports neither a nested default (`${VAR:-${OTHER}}`) nor the `${VAR:?message}` required-variable form; it silently leaves either one unresolved instead of substituting or erroring.
@@ -120,15 +113,12 @@ Run BenchBox entirely inside the container using an in-process (local) Gluten se
 cd docker/velox
 export BENCHBOX_DATA_DIR=/absolute/path/to/your/data
 
-# TPC-H SF 0.01 smoke test
 docker compose run --rm velox-runner \
   --benchmark tpch --scale 0.01
 
-# TPC-H SF 1, specific queries
 docker compose run --rm velox-runner \
   --benchmark tpch --scale 1.0 --queries Q1,Q6,Q9,Q17
 
-# TPC-DS SF 10 (increase memory - see sizing below)
 VELOX_OFFHEAP=24g SPARK_DRIVER_MEM=8g \
 docker compose run --rm velox-runner \
   --benchmark tpcds --scale 10.0
@@ -206,7 +196,6 @@ VELOX_OFFHEAP=16g SPARK_DRIVER_MEM=8g docker compose up -d velox-connect
 For CI pipelines where Docker is available, the all-in-one runner is the simplest integration:
 
 ```yaml
-# GitHub Actions example
 - name: Build Velox image
   run: |
     docker build \

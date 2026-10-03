@@ -29,7 +29,8 @@ def test_corpus_allowlist_step_present_and_feeds_changed_paths() -> None:
 
     run = _collapse(step.get("run", ""))
     assert "--corpus-changed-paths" in run
-    assert "/tmp/corpus_changed_paths.txt" in run
+    assert '"$CORPUS_CHANGED_PATHS_FILE"' in run
+    assert "CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt" in WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "scripts/validate_submission.py" in run
     assert "results-data/bundles/**" in step["run"]
 

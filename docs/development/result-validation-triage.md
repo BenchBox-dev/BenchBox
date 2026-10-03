@@ -121,10 +121,9 @@ Run the two queries directly and record the maximum absolute difference:
 
 ```python
 import duckdb, datafusion
-# ... set up connections (see test_cross_platform.py fixtures for reference) ...
 duck_val = float(duck_rows[0][0])
 df_val   = float(df_rows[0][0])
-print(abs(duck_val - df_val))   # e.g. 6.2e-07
+print(abs(duck_val - df_val))
 ```
 
 Round the epsilon up to the nearest power of ten that comfortably covers
@@ -191,22 +190,18 @@ adapter or query-transformer change broke something.
 **Step 1 - Identify the culprit commit.**
 
 ```bash
-# Which commits touched the comparison platform's adapter?
 git log --oneline --since="7 days ago" -- benchbox/platforms/datafusion/ \
     benchbox/platforms/clickhouse/ benchbox/platforms/dataframe/polars_df.py
 
-# Narrow to the date the failure first appeared (check nightly run history).
 ```
 
 **Step 2 - Reproduce locally.**
 
 ```bash
-# Full node ID (fastest - runs one parametrized case):
 uv run -- python -m pytest \
     "tests/integration/validation/test_cross_platform.py::TestDuckDBDataFusion::test_query_results_match[Q14]" \
     -v -m live_integration
 
-# Or with -k keyword matching (runs all Q14 cases across classes):
 uv run -- python -m pytest tests/integration/validation/test_cross_platform.py \
     -v -m live_integration -k "TestDuckDBDataFusion and Q14"
 ```
@@ -223,10 +218,7 @@ Prefer a targeted fix in the adapter. Only revert if the fix is not
 straightforward or the change needs more context.
 
 ```bash
-# Option A - fix forward (preferred):
-# Edit the relevant platform module, verify locally, open a PR.
 
-# Option B - revert the offending commit:
 git revert <commit-sha> --no-edit
 git push private fix/revert-datafusion-regression
 gh pr create --repo joeharris76/benchbox-private \

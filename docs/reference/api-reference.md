@@ -18,7 +18,7 @@ from benchbox.base import BaseBenchmark
 
 class BaseBenchmark(ABC):
     def __init__(self, scale_factor: float = 1.0, output_dir: Optional[Path] = None):
-        """Initialize benchmark with scale factor and output directory."""
+        pass
 ```
 
 #### Methods
@@ -34,7 +34,6 @@ from benchbox import TPCH
 
 tpch = TPCH(scale_factor=0.1)
 data_files = tpch.generate_data()
-# Returns: [Path("customer.tbl"), Path("orders.tbl"), Path("lineitem.tbl"), ...]
 for file_path in data_files:
     table_name = file_path.stem
     print(f"Generated {table_name} at {file_path}")
@@ -48,7 +47,6 @@ Get all queries for this benchmark.
 **Example**:
 ```python
 queries = tpch.get_queries()
-# Returns: {1: "SELECT l_returnflag...", 2: "SELECT s_acctbal...", ...}
 ```
 
 ##### `get_query(query_id: Union[int, str]) -> str`
@@ -61,10 +59,8 @@ Get a specific query by ID.
 
 **Example**:
 ```python
-# Basic query
 query_1 = tpch.get_query(1)
 
-# String-based query ID (for some benchmarks)
 primitives_query = primitives.get_query("aggregation_basic")
 ```
 
@@ -81,7 +77,7 @@ Translate query to specific SQL dialect.
 ```python
 postgres_query = tpch.translate_query(1, "postgres")
 mysql_query = tpch.translate_query(1, "mysql")
-duckdb_query = tpch.translate_query(1, "duckdb")  # Recommended default
+duckdb_query = tpch.translate_query(1, "duckdb")
 ```
 
 ##### `get_create_tables_sql() -> str`
@@ -92,7 +88,6 @@ Get DDL statements to create benchmark tables.
 **Example**:
 ```python
 ddl = tpch.get_create_tables_sql()
-# Use with DuckDB (recommended)
 import duckdb
 conn = duckdb.connect(":memory:")
 conn.execute(ddl)
@@ -136,14 +131,12 @@ tpch = TPCH(scale_factor=1.0, output_dir=None)
 #### Example Usage
 
 ```python
-# Recommended DuckDB integration
 import duckdb
 from benchbox import TPCH
 
 conn = duckdb.connect(":memory:")
 tpch = TPCH(scale_factor=0.1)
 
-# Generate and load data
 data_files = tpch.generate_data()
 for file_path in data_files:
     table_name = file_path.stem
@@ -152,7 +145,6 @@ for file_path in data_files:
         SELECT * FROM read_csv('{file_path}', delimiter='|', header=false)
     """)
 
-# Run queries
 result = conn.execute(tpch.get_query(1)).fetchall()
 ```
 
@@ -193,7 +185,6 @@ Get list of available query categories.
 **Example**:
 ```python
 categories = primitives.get_query_categories()
-# Returns: ["aggregation", "join", "filter", "sort", ...]
 ```
 
 ##### `get_queries_by_category(category: str) -> Dict[str, str]`
@@ -254,13 +245,11 @@ All benchmarks accept these parameters:
 from pathlib import Path
 from benchbox import TPCH
 
-# Development configuration
 tpch_dev = TPCH(
     scale_factor=0.01,
     output_dir=Path("./benchmark_data")
 )
 
-# Production configuration
 tpch_prod = TPCH(
     scale_factor=1.0,
     output_dir=Path("/var/lib/benchbox")
@@ -279,11 +268,9 @@ DuckDB is the recommended database for BenchBox:
 import duckdb
 from benchbox import TPCH
 
-# Setup
 conn = duckdb.connect(":memory:")
 tpch = TPCH(scale_factor=0.1)
 
-# Load data
 data_files = tpch.generate_data()
 ddl = tpch.get_create_tables_sql()
 conn.execute(ddl)
@@ -295,8 +282,7 @@ for file_path in data_files:
         SELECT * FROM read_csv('{file_path}', delimiter='|', header=false)
     """)
 
-# Run queries (DuckDB uses ANSI SQL by default)
-for query_id in range(1, 6):  # First 5 queries
+for query_id in range(1, 6):
     result = conn.execute(tpch.get_query(query_id)).fetchall()
     print(f"Query {query_id}: {len(result)} rows")
 ```
@@ -306,13 +292,10 @@ for query_id in range(1, 6):  # First 5 queries
 For other databases, use SQL dialect translation:
 
 ```python
-# PostgreSQL (dialect translation only - adapter not yet available)
 postgres_query = tpch.translate_query(1, "postgres")
 
-# MySQL (dialect translation only - adapter not yet available)
 mysql_query = tpch.translate_query(1, "mysql")
 
-# SQLite (fully supported)
 sqlite_query = tpch.translate_query(1, "sqlite")
 ```
 
@@ -328,17 +311,13 @@ sqlite_query = tpch.translate_query(1, "sqlite")
 from benchbox import TPCH
 import time
 
-# Initialize
 tpch = TPCH(scale_factor=0.1)
 
-# Generate data
 data_files = tpch.generate_data()
 
-# Get and run queries
 queries = tpch.get_queries()
-for query_id, query_sql in list(queries.items())[:3]:  # First 3 queries
+for query_id, query_sql in list(queries.items())[:3]:
     start_time = time.time()
-    # Execute query with your database connection
     execution_time = time.time() - start_time
     print(f"Query {query_id}: {execution_time:.3f}s")
 ```
@@ -351,8 +330,7 @@ from benchbox import TPCH
 tpch = TPCH(scale_factor=0.01)
 data_files = tpch.generate_data()
 
-# Test different SQL dialects (note: translation != platform adapter)
-dialects = ["duckdb", "clickhouse", "sqlite"]  # Use supported platforms
+dialects = ["duckdb", "clickhouse", "sqlite"]
 for dialect in dialects:
     translated_query = tpch.translate_query(1, dialect)
     print(f"{dialect}: {len(translated_query)} chars")

@@ -32,7 +32,7 @@ def _submission_validation_run() -> str:
 
 def _evaluate_trust_gate(*, is_fork: str, base_ref: str | None, head_ref: str, pr_author: str) -> tuple[str, str]:
     run = _submission_validation_run()
-    prefix = run.split("# Trusted bot-created same-repo mirrors", maxsplit=1)[0]
+    prefix = run.split('_BASE_SHA="${BASE_SHA:-HEAD}"', maxsplit=1)[0]
     env = os.environ.copy()
     env.update({"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author})
     if base_ref is not None:

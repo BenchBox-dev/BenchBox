@@ -55,10 +55,8 @@ TPC benchmarks generate data in TBL format (pipe-delimited text files). Converti
 ### Basic Conversion
 
 ```bash
-# Generate TPC-H data first
 benchbox run --platform duckdb --benchmark tpch --scale 1 --phases generate
 
-# Convert to Parquet
 benchbox convert --input ./benchmark_runs/tpch_sf1 --format parquet
 ```
 
@@ -67,7 +65,6 @@ benchbox convert --input ./benchmark_runs/tpch_sf1 --format parquet
 ```python
 import duckdb
 
-# Connect and query Parquet files
 conn = duckdb.connect()
 result = conn.execute("""
     SELECT l_returnflag, SUM(l_extendedprice) as revenue
@@ -96,30 +93,23 @@ customer.parquet
 
 **Usage:**
 ```bash
-# Basic conversion
 benchbox convert --input ./data --format parquet
 
-# With Zstd compression (best ratio)
 benchbox convert --input ./data --format parquet --compression zstd
 
-# Partitioned by date
 benchbox convert --input ./data --format parquet --partition l_shipdate
 ```
 
 **Reading Parquet:**
 ```python
-# DuckDB
 conn.execute("SELECT * FROM read_parquet('customer.parquet')")
 
-# PyArrow
 import pyarrow.parquet as pq
 table = pq.read_table('customer.parquet')
 
-# Polars
 import polars as pl
 df = pl.read_parquet('customer.parquet')
 
-# Pandas
 import pandas as pd
 df = pd.read_parquet('customer.parquet')
 ```
@@ -145,21 +135,17 @@ uv add vortex-data
 
 **Usage:**
 ```bash
-# Basic conversion
 benchbox convert --input ./data --format vortex
 
-# With compression
 benchbox convert --input ./data --format vortex --compression zstd
 ```
 
 **Reading Vortex:**
 ```python
-# Python vortex library
 import vortex
 array = vortex.io.read('customer.vortex')
 table = array.to_arrow()
 
-# DuckDB (requires vortex extension)
 conn.execute("INSTALL vortex; LOAD vortex;")
 conn.execute("SELECT * FROM read_vortex('customer.vortex')")
 ```
@@ -191,34 +177,27 @@ uv add deltalake
 
 **Usage:**
 ```bash
-# Convert to Delta Lake
 benchbox convert --input ./data --format delta
 
-# With compression
 benchbox convert --input ./data --format delta --compression zstd
 ```
 
 **Reading Delta Lake:**
 ```python
-# Python deltalake library
 from deltalake import DeltaTable
 dt = DeltaTable('./customer')
 df = dt.to_pandas()
 
-# DuckDB (requires delta extension)
 conn.execute("INSTALL delta; LOAD delta;")
 conn.execute("SELECT * FROM delta_scan('./customer')")
 
-# Spark
 df = spark.read.format("delta").load("./customer")
 ```
 
 **Time Travel:**
 ```python
-# Query specific version
 dt = DeltaTable('./customer', version=0)
 
-# Query by timestamp
 dt = DeltaTable('./customer', as_of='2024-01-15T10:00:00')
 ```
 
@@ -250,22 +229,18 @@ uv add pyiceberg
 
 **Usage:**
 ```bash
-# Convert to Iceberg
 benchbox convert --input ./data --format iceberg
 
-# With partitioning
 benchbox convert --input ./data --format iceberg --partition l_shipdate
 ```
 
 **Reading Iceberg:**
 ```python
-# PyIceberg
 from pyiceberg.catalog import load_catalog
 catalog = load_catalog("local", **{"type": "sql", "uri": "sqlite:///catalog.db"})
 table = catalog.load_table("default.customer")
 df = table.scan().to_pandas()
 
-# Spark
 df = spark.read.format("iceberg").load("./customer")
 ```
 
@@ -292,16 +267,13 @@ customer/
 
 **Installation:**
 ```bash
-# Hudi requires PySpark with hudi-spark-bundle
 pip install pyspark
-# Configure Spark with: spark.jars.packages=org.apache.hudi:hudi-spark3.5-bundle_2.12:0.14.0
 ```
 
 **Usage:**
 Hudi operations require PySpark SQL. For direct Hudi support, use the Quanton platform:
 
 ```bash
-# Via Quanton platform (recommended)
 benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option table_format=hudi \
   --platform-option record_key=l_orderkey
@@ -309,14 +281,12 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
 
 **Reading Hudi:**
 ```python
-# PySpark
 spark = SparkSession.builder \
     .config("spark.jars.packages", "org.apache.hudi:hudi-spark3.5-bundle_2.12:0.14.0") \
     .getOrCreate()
 
 df = spark.read.format("hudi").load("./customer")
 
-# Incremental query (changes since last commit)
 df = spark.read.format("hudi") \
     .option("hoodie.datasource.query.type", "incremental") \
     .option("hoodie.datasource.read.begin.instanttime", "20240101000000") \
@@ -325,7 +295,6 @@ df = spark.read.format("hudi") \
 
 **Time Travel:**
 ```python
-# Query specific timestamp
 df = spark.read.format("hudi") \
     .option("as.of.instant", "20240115100000") \
     .load("./customer")
@@ -352,16 +321,12 @@ customer/
 
 **Installation:**
 ```bash
-# DuckLake is part of DuckDB >= 1.2.0, no separate installation needed
-# The ducklake extension is auto-installed on first use
 ```
 
 **Usage:**
 ```bash
-# Convert to DuckLake
 benchbox convert --input ./data --format ducklake
 
-# With compression
 benchbox convert --input ./data --format ducklake --compression zstd
 ```
 
@@ -371,23 +336,18 @@ import duckdb
 
 conn = duckdb.connect()
 
-# Install and load the ducklake extension
 conn.execute("INSTALL ducklake; LOAD ducklake;")
 
-# Attach DuckLake database
 conn.execute("""
     ATTACH 'ducklake:./customer/metadata.ducklake' AS ducklake_db
     (DATA_PATH './customer/data')
 """)
 
-# Query the table
 result = conn.execute("SELECT * FROM ducklake_db.main.customer").fetchdf()
 ```
 
 **Time Travel:**
 ```python
-# DuckLake supports querying historical snapshots
-# Query specific version (when supported by your DuckDB version)
 conn.execute("""
     SELECT * FROM ducklake_db.main.customer
     AT SNAPSHOT 'snapshot_id'
@@ -426,13 +386,10 @@ Delta Lake      | snappy    | 3,450     | 48s           | 0.34x
 ### Choosing Compression
 
 ```bash
-# Fast iteration during development
 benchbox convert --input ./data --format parquet --compression snappy
 
-# Production with best compression
 benchbox convert --input ./data --format parquet --compression zstd
 
-# Cloud storage (minimize transfer costs)
 benchbox convert --input ./data --format parquet --compression zstd
 ```
 
@@ -459,24 +416,18 @@ Partitioning is beneficial when:
 ### Partitioning Examples
 
 ```bash
-# Single partition column (date-based)
 benchbox convert --input ./data --format parquet --partition l_shipdate
-# Creates: lineitem/l_shipdate=1996-01-01/part-*.parquet
 
-# Multiple partition columns (hierarchical)
 benchbox convert --input ./data --format parquet \
     --partition l_returnflag --partition l_linestatus
-# Creates: lineitem/l_returnflag=N/l_linestatus=O/part-*.parquet
 ```
 
 ### Querying Partitioned Data
 
 ```sql
--- DuckDB: Hive partitioning
 SELECT * FROM read_parquet('./lineitem/**/*.parquet', hive_partitioning=true)
-WHERE l_shipdate = '1996-03-15';  -- Only reads relevant partition
+WHERE l_shipdate = '1996-03-15';
 
--- Partition pruning filters are pushed down automatically
 ```
 
 ## Platform Integration
@@ -488,14 +439,11 @@ import duckdb
 
 conn = duckdb.connect()
 
-# Parquet
 conn.execute("SELECT * FROM read_parquet('./data/*.parquet')")
 
-# Delta Lake
 conn.execute("INSTALL delta; LOAD delta;")
 conn.execute("SELECT * FROM delta_scan('./data/customer')")
 
-# DuckLake (native table format)
 conn.execute("INSTALL ducklake; LOAD ducklake;")
 conn.execute("""
     ATTACH 'ducklake:./data/customer/metadata.ducklake' AS ducklake_db
@@ -503,7 +451,6 @@ conn.execute("""
 """)
 conn.execute("SELECT * FROM ducklake_db.main.customer")
 
-# Partitioned Parquet
 conn.execute("""
     SELECT * FROM read_parquet('./lineitem/**/*.parquet', hive_partitioning=true)
     WHERE l_shipdate >= '1996-01-01'
@@ -515,13 +462,10 @@ conn.execute("""
 ```python
 import polars as pl
 
-# Parquet
 df = pl.read_parquet('./data/customer.parquet')
 
-# Delta Lake
 df = pl.read_delta('./data/customer')
 
-# Lazy evaluation for large datasets
 lf = pl.scan_parquet('./data/*.parquet')
 result = lf.filter(pl.col('c_acctbal') > 1000).collect()
 ```
@@ -535,42 +479,30 @@ spark = SparkSession.builder \
     .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
     .getOrCreate()
 
-# Parquet
 df = spark.read.parquet('./data/customer.parquet')
 
-# Delta Lake
 df = spark.read.format("delta").load('./data/customer')
 
-# Iceberg
 df = spark.read.format("iceberg").load('./data/customer')
 
-# Hudi
 df = spark.read.format("hudi").load('./data/customer')
 ```
 
 ### Databricks
 
 ```python
-# Parquet (auto-detected)
 df = spark.read.load('/mnt/data/customer.parquet')
 
-# Delta Lake (default format)
 df = spark.read.load('/mnt/data/customer')
 
-# Iceberg
 df = spark.read.format("iceberg").load('/mnt/data/customer')
 
-# Hudi
 df = spark.read.format("hudi").load('/mnt/data/customer')
 ```
 
 ### Onehouse Quanton
 
 ```python
-# Quanton supports all three table formats via Spark SQL
-# Use BenchBox CLI for streamlined access:
-# benchbox run --platform quanton --benchmark tpch \
-#   --platform-option table_format=hudi
 ```
 
 ## Best Practices
@@ -595,23 +527,18 @@ df = spark.read.format("hudi").load('/mnt/data/customer')
 ### 2. Compression Strategy
 
 ```bash
-# Development (fast iteration)
 --compression snappy
 
-# Production (storage optimization)
 --compression zstd
 
-# Cloud storage (minimize costs)
 --compression zstd
 ```
 
 ### 3. Validation
 
 ```bash
-# Always validate for TPC compliance
 benchbox convert --input ./data --format parquet --validate
 
-# Skip validation only for exploratory work
 benchbox convert --input ./data --format parquet --no-validate
 ```
 
@@ -675,10 +602,8 @@ If validation fails with row count mismatch:
 
 For very large scale factors (SF > 100):
 ```bash
-# Use Zstd for best compression
 benchbox convert --input ./data --format parquet --compression zstd
 
-# Skip validation if conversion is slow
 benchbox convert --input ./data --format parquet --no-validate
 ```
 

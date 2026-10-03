@@ -1,10 +1,7 @@
-/* Base layout variables; site-theme.css supplies semantic color tokens. */
 :root {
-    /* Typography */
     --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Fira Code', monospace;
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
 
-    /* Spacing */
     --space-xs: 0.25rem;
     --space-sm: 0.5rem;
     --space-md: 1rem;
@@ -13,13 +10,11 @@
     --space-2xl: 3rem;
     --space-3xl: 4rem;
 
-    /* Border radius */
     --radius-sm: 4px;
     --radius-md: 8px;
     --radius-lg: 12px;
 }
 
-/* Reset and Base Styles */
 * {
     margin: 0;
     padding: 0;
@@ -39,19 +34,16 @@ body {
     overflow-x: hidden;
 }
 
-/* Prevent horizontal overflow from sections */
 section {
     overflow-x: hidden;
 }
 
-/* Container */
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0 var(--space-lg);
 }
 
-/* Hero Section */
 .hero {
     padding: var(--space-3xl) 0;
     background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
@@ -168,7 +160,6 @@ section {
     background-color: var(--bg-tertiary);
 }
 
-/* Code Blocks */
 .code-block {
     background-color: var(--code-bg);
     border: 1px solid var(--code-border);
@@ -221,7 +212,6 @@ section {
     line-height: 1.5;
 }
 
-/* Sections */
 section {
     padding: var(--space-3xl) 0;
 }
@@ -238,7 +228,6 @@ section h2 {
     color: var(--text-primary);
 }
 
-/* Landing-page section navigation */
 .section-nav {
     position: sticky;
     top: 4rem;
@@ -300,7 +289,6 @@ section h2 {
     outline-offset: 4px;
 }
 
-/* Features Grid */
 .features {
     background-color: var(--bg-secondary);
 }
@@ -345,7 +333,6 @@ section h2 {
     line-height: 1.5;
 }
 
-/* Results Explorer Section */
 .results-explorer {
     background-color: var(--bg-secondary);
     border-top: 2px solid var(--border-primary);
@@ -697,7 +684,6 @@ section h2 {
     color: var(--text-secondary);
 }
 
-/* Section Headings */
 .section-heading {
     margin-top: var(--space-xl);
     margin-bottom: var(--space-md);
@@ -715,7 +701,6 @@ section h2 {
     background-color: var(--bg-primary);
 }
 
-/* Benchmarks Grid */
 .benchmarks-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
@@ -795,7 +780,6 @@ section h2 {
     color: var(--text-primary);
 }
 
-/* Platforms Section - Blue tinted background */
 .platforms {
     background-color: var(--platforms-bg) !important;
 }
@@ -823,7 +807,6 @@ section h2 {
     background-color: var(--platforms-card-bg-hover) !important;
 }
 
-/* Formats Section - Green/teal tinted background */
 .formats {
     background-color: var(--formats-bg) !important;
 }
@@ -873,7 +856,6 @@ section h2 {
     max-width: none;
 }
 
-/* MCP Section - Purple/violet tinted background */
 .mcp {
     background-color: var(--mcp-bg) !important;
 }
@@ -954,7 +936,6 @@ section h2 {
     border-color: var(--mcp-badge-bg-hover);
 }
 
-/* Installation Section */
 .install {
     background-color: var(--bg-primary);
 }
@@ -1011,7 +992,6 @@ section h2 {
     font-weight: bold;
 }
 
-/* Footer */
 .footer {
     background-color: var(--bg-tertiary);
     border-top: 1px solid var(--border-primary);
@@ -1072,7 +1052,6 @@ section h2 {
     margin: 0;
 }
 
-/* Responsive Design */
 @media (max-width: 768px) {
     .hero {
         padding: var(--space-2xl) 0;
@@ -1167,7 +1146,6 @@ section h2 {
         scroll-margin-top: 7.75rem;
     }
 
-    /* Code block mobile fixes */
     .code-block {
         max-width: 100%;
         border-radius: var(--radius-md);
@@ -1195,13 +1173,11 @@ section h2 {
         font-size: 0.75rem;
     }
 
-    /* MCP examples on mobile */
     .mcp-example {
         font-size: 0.75rem;
         word-break: break-word;
     }
 
-    /* Benchmark cards on mobile */
     .benchmark-card {
         padding: var(--space-md);
     }
@@ -1218,7 +1194,6 @@ section h2 {
         font-size: 0.7rem;
     }
 
-    /* Feature cards on mobile */
     .feature-card {
         padding: var(--space-lg);
     }
@@ -1231,14 +1206,12 @@ section h2 {
         font-size: 1.125rem;
     }
 
-    /* Section intros */
     .mcp-intro,
     .formats .section-intro {
         font-size: 1rem;
         padding: 0 var(--space-sm);
     }
 
-    /* Install section */
     .requirements {
         padding: var(--space-lg);
     }
@@ -1282,7 +1255,6 @@ section h2 {
         padding: var(--space-xs) var(--space-sm);
     }
 
-    /* Stack code header on very small screens */
     .code-header {
         flex-direction: column;
         align-items: flex-start;
@@ -1294,7 +1266,6 @@ section h2 {
     }
 }
 
-/* Extra small screens (320px and below) */
 @media (max-width: 360px) {
     .container {
         padding: 0 var(--space-sm);
@@ -1327,7 +1298,6 @@ section h2 {
     }
 }
 
-/* Smooth animations */
 @media (prefers-reduced-motion: no-preference) {
 
     .feature-card,
@@ -1337,14 +1307,12 @@ section h2 {
     }
 }
 
-/* Copy success state */
 .copy-btn.copied {
     background-color: var(--success-color);
     color: var(--success-fg);
     border-color: var(--success-color);
 }
 
-/* Code syntax highlighting adjustments for dark theme */
 .token.comment,
 .token.prolog,
 .token.doctype,

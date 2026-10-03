@@ -288,4 +288,3 @@ def test_drift_check_ignores_derived_inventory_difference() -> None:
     path_specs = run.split("PATHSPECS=(", 1)[1].split(")", 1)[0]
     assert "results-data/bundles" in path_specs
     assert "results-data/corpus-inventory.json" not in path_specs
-    assert "each branch regenerates its own" in run.lower()

@@ -7,13 +7,11 @@ Builds a `linux/amd64` image containing Apache Spark 4.0.2 with the Gluten Velox
 Run from the **project root** (the build context must include the full BenchBox source tree):
 
 ```bash
-# Quick dev build (single arch)
 docker build \
   --platform linux/amd64 \
   -f docker/velox/Dockerfile \
   -t benchbox-velox:dev .
 
-# Distribution build (requires docker buildx with a multi-arch builder)
 docker buildx build \
   --platform linux/amd64 \
   -f docker/velox/Dockerfile \
@@ -33,13 +31,10 @@ The Dockerfile downloads the official Apache Gluten 1.6.0 release tarball, verif
 ## Workflow A — Connect Mode (host client, container backend)
 
 ```bash
-# Start the server
 docker compose up -d velox-connect
 
-# Wait for healthy
-docker compose ps velox-connect   # Status should reach "healthy" in ~90s
+docker compose ps velox-connect
 
-# Run benchbox on the host
 benchbox run --platform velox \
   --platform-option deployment=remote \
   --platform-option endpoint=sc://localhost:50051 \
@@ -60,11 +55,9 @@ A nested default (`${VAR:-${OTHER}}`) and the `${VAR:?message}` required-variabl
 ## Workflow B — All-in-one Runner
 
 ```bash
-# TPC-H SF 1 inside the container
 docker compose run --rm velox-runner \
   --benchmark tpch --scale 1.0
 
-# TPC-DS, specific queries
 docker compose run --rm velox-runner \
   --benchmark tpcds --scale 10.0 \
   --queries Q1,Q6,Q17
@@ -94,7 +87,6 @@ Apache Gluten 1.6.0 publishes an `amd64`-only release jar. The Dockerfile and co
 - **For timing-valid benchmark runs on arm64:** use a native x86_64 Linux host.
 
 ```bash
-# Force amd64 explicitly (overrides host arch detection)
 VELOX_DOCKER_PLATFORM=linux/amd64 docker compose up -d velox-connect
 ```
 

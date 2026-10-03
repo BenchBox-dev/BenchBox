@@ -27,10 +27,8 @@ SQLite is useful in BenchBox for:
 ## Installation
 
 ```bash
-# SQLite is included with Python
 uv add benchbox
 
-# Or with pip
 pip install benchbox
 ```
 
@@ -73,14 +71,12 @@ benchbox run --platform sqlite --benchmark tpch --scale 0.1 \
 ### Quick Start
 
 ```bash
-# Small benchmark
 benchbox run --platform sqlite --benchmark tpch --scale 0.01
 ```
 
 ### With Optimizations
 
 ```bash
-# Optimized for read performance
 benchbox run --platform sqlite --benchmark tpch --scale 0.1 \
   --platform-option journal_mode=WAL \
   --platform-option cache_size=-64000 \
@@ -133,7 +129,6 @@ benchbox run --platform sqlite --benchmark tpch \
 Increase cache to reduce disk I/O:
 
 ```bash
-# 64 MB cache
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option cache_size=-64000
 ```
@@ -144,7 +139,7 @@ For large databases:
 
 ```bash
 benchbox run --platform sqlite --benchmark tpch \
-  --platform-option mmap_size=268435456  # 256 MB
+  --platform-option mmap_size=268435456
 ```
 
 ## Limitations
@@ -178,7 +173,6 @@ SQLite and DuckDB are optimized for different workload types:
 **Note:** Performance differences vary based on query characteristics, data size, and hardware. Run benchmarks with your specific workloads to compare.
 
 ```bash
-# Compare performance
 benchbox run --platform sqlite --benchmark tpch --scale 0.1
 benchbox run --platform duckdb --benchmark tpch --scale 0.1
 ```
@@ -188,15 +182,13 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1
 ### Database Locked
 
 ```bash
-# Wait for lock
 benchbox run --platform sqlite --benchmark tpch \
-  --platform-option busy_timeout=30000  # 30 seconds
+  --platform-option busy_timeout=30000
 ```
 
 ### Out of Memory
 
 ```bash
-# Use file-based temp storage
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option temp_store=FILE
 ```
@@ -204,7 +196,6 @@ benchbox run --platform sqlite --benchmark tpch \
 ### Slow Queries
 
 ```bash
-# Increase cache and use WAL
 benchbox run --platform sqlite --benchmark tpch \
   --platform-option cache_size=-128000 \
   --platform-option journal_mode=WAL \

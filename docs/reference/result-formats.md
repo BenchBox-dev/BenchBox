@@ -12,34 +12,26 @@ BenchBox exports benchmark results in multiple formats for analysis, visualizati
 ### Basic Export
 
 ```bash
-# Run benchmark and export results
 benchbox run --platform duckdb --benchmark tpch --scale 0.1
 
-# Results are automatically saved to benchmark_runs/results/
 ls benchmark_runs/results/
-# tpch_duckdb_sf0.01_20251212_143021.json
 ```
 
 ### Export to Other Formats
 
 ```bash
-# Export most recent result to CSV
 benchbox export --last --format csv
 
-# Export to multiple formats
 benchbox export --last --format csv --format html
 
-# Export a specific result file
 benchbox export benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json --format csv --format html
 ```
 
 ### Custom Output Directory
 
 ```bash
-# Local directory
 benchbox run --platform duckdb --benchmark tpch --output ./my_results/
 
-# Cloud storage
 benchbox run --platform snowflake --benchmark tpch --output s3://bucket/results/
 ```
 
@@ -399,10 +391,8 @@ Q3,1230,10,SUCCESS,,1,0
 HTML export generates a standalone report with formatted tables.
 
 ```bash
-# Generate HTML report from most recent result
 benchbox export --last --format html
 
-# Export a specific result file to HTML
 benchbox export benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json --format html
 ```
 
@@ -418,16 +408,12 @@ The HTML report includes:
 Use `benchbox visualize` to generate ASCII charts from any result file:
 
 ```bash
-# Auto-detect latest result and render all applicable charts
 benchbox visualize
 
-# Visualize a specific result file
 benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json
 
-# Specific chart type
 benchbox visualize benchmark_runs/results/*.json --chart-type performance_bar
 
-# Save plain-text output to file
 benchbox visualize benchmark_runs/results/*.json --no-color > charts.txt
 ```
 
@@ -441,16 +427,13 @@ See the [Visualization Guide](../visualization/overview.md) for chart types, tem
 import json
 from pathlib import Path
 
-# Load result file
 result_file = Path("benchmark_runs/results/tpch_duckdb_sf0.01_20251212_143021.json")
 with result_file.open() as f:
     results = json.load(f)
 
-# Access metrics
 print(f"Power at Size: {results['summary']['tpc_metrics']['power_at_size']}")
 print(f"Total time: {results['summary']['timing']['total_ms']}ms")
 
-# Access query details
 for query in results['queries']:
     print(f"{query['id']}: {query['ms']}ms")
 ```
@@ -461,15 +444,12 @@ for query in results['queries']:
 import pandas as pd
 import json
 
-# Load JSON
 with open("benchmark_runs/results/tpch_duckdb_sf0.01_*.json") as f:
     results = json.load(f)
 
-# Convert queries to DataFrame
 queries = results['queries']
 df = pd.DataFrame(queries)
 
-# Analyze
 print(df.describe())
 print(df.groupby('id')['ms'].mean())
 ```
@@ -479,10 +459,8 @@ print(df.groupby('id')['ms'].mean())
 ```python
 import pandas as pd
 
-# Load query results
 df = pd.read_csv("benchmark_runs/results/tpch_duckdb_sf0.01_queries.csv")
 
-# Quick analysis
 print(f"Total queries: {len(df)}")
 print(f"Mean execution time: {df['ms'].mean():.2f}ms")
 print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
@@ -493,13 +471,10 @@ print(f"Slowest query: {df.loc[df['ms'].idxmax(), 'id']}")
 ### CLI Visualization
 
 ```bash
-# Render all applicable charts for a result file
 benchbox visualize benchmark_runs/results/tpch_duckdb_sf0.01_*.json
 
-# Compare multiple platforms
 benchbox visualize duckdb_result.json sqlite_result.json --template head_to_head
 
-# Per-query histogram (auto-splits for large benchmarks)
 benchbox visualize tpcds_result.json --chart-type query_histogram
 ```
 
@@ -510,15 +485,12 @@ from benchbox.core.visualization import ResultPlotter
 from benchbox.core.visualization.ascii import BarChart
 from benchbox.core.visualization.ascii.bar_chart import BarData
 
-# Load results from JSON files
 plotter = ResultPlotter.from_sources(["results/duckdb.json", "results/sqlite.json"])
 
-# Render a bar chart
 bar_data = [BarData(label=r.platform, value=r.total_time_ms or 0) for r in plotter.results]
 chart = BarChart(data=bar_data, title="Platform Comparison")
 print(chart.render())
 
-# Export to plain-text file
 from benchbox.core.visualization.exporters import export_ascii
 
 export_ascii(
@@ -592,12 +564,7 @@ from benchbox.core.results.exporter import ResultExporter
 from benchbox.core.results.anonymization import AnonymizationConfig
 
 config = AnonymizationConfig(
-    # Scopes pseudonyms derived from raw values to your organization, so the
-    # same machine publishes different pseudonyms under different salts.
-    # See the salt-rotation note below for what this does *not* cover.
     machine_id_salt="your-org-salt",
-    # Extra regexes stripped from free-text fields, on top of the built-in
-    # IP / email / SSN patterns.
     custom_sanitizers={r"\bacct-\d+\b": "[REDACTED]"},
 )
 
@@ -640,12 +607,10 @@ idempotent — and the pass-through happens *before* the salt is consulted:
 a = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-A"))
 b = AnonymizationManager(AnonymizationConfig(machine_id_salt="org-B"))
 
-a.anonymize_result_payload({"machine_id": raw})   # machine_9ba319f754a5
-b.anonymize_result_payload({"machine_id": raw})   # machine_ac228f1f75af  (differs)
+a.anonymize_result_payload({"machine_id": raw})
+b.anonymize_result_payload({"machine_id": raw})
 
-# But B re-anonymizing A's already-published bundle:
 b.anonymize_result_payload({"machine_id": "machine_9ba319f754a5"})
-# -> machine_9ba319f754a5   (unchanged; B's salt is never applied)
 ```
 
 So changing the salt does **not** re-pseudonymize an already-anonymized corpus.
@@ -667,11 +632,9 @@ paths and host details, so treat them as private and do not submit them.
 import json
 import pandas as pd
 
-# Load results
 with open("results.json") as f:
     results = json.load(f)
 
-# Flatten to table
 queries = []
 for q in results['queries']:
     queries.append({
@@ -684,18 +647,14 @@ for q in results['queries']:
 
 df = pd.DataFrame(queries)
 
-# Upload to warehouse
-# df.to_sql('benchmark_queries', engine, if_exists='append')
 ```
 
 ### CI/CD Integration
 
 ```bash
-# Run benchmark and check threshold
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 \
   --output ./results/
 
-# Parse results in CI script
 uv run -- python -c "
 import json
 import sys
@@ -704,7 +663,7 @@ with open('results/tpch_duckdb_sf0.01_*.json') as f:
     results = json.load(f)
 
 power = results['summary']['tpc_metrics']['power_at_size']
-if power < 50:  # Performance threshold
+if power < 50:
     print(f'FAIL: Power@Size {power} below threshold 50')
     sys.exit(1)
 print(f'PASS: Power@Size {power}')

@@ -18,35 +18,27 @@ BenchBox supports benchmarking PostgreSQL analytical extensions as first-class p
 Each extension has a Docker Compose file for easy setup:
 
 ```bash
-# Start one extension at a time:
 cd docker/postgres-extensions/
 
-# pg_duckdb - DuckDB-accelerated analytics on PostgreSQL heap tables
 docker compose -f docker-compose.pg-duckdb.yaml up -d
 
-# pg_mooncake - Native columnstore with DuckDB execution
 docker compose -f docker-compose.pg-mooncake.yaml up -d
 
-# TimescaleDB - Time-series hypertables with compression
 docker compose -f docker-compose.timescaledb.yaml up -d
 ```
 
 Then run benchmarks:
 
 ```bash
-# pg_duckdb
 benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01 \
   --platform-option host=localhost --platform-option password=benchbox
 
-# pg_mooncake
 benchbox run --platform pg-mooncake --benchmark tpch --scale 0.01 \
   --platform-option host=localhost --platform-option password=benchbox
 
-# TimescaleDB
 benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0 \
   --platform-option host=localhost --platform-option password=benchbox
 
-# Vanilla PostgreSQL (for baseline comparison)
 benchbox run --platform postgresql --benchmark tpch --scale 0.01 \
   --platform-option host=localhost --platform-option password=benchbox
 ```
@@ -69,7 +61,6 @@ You can query conflicts programmatically:
 from benchbox.core.platform_registry import PlatformRegistry
 
 conflicts = PlatformRegistry.get_platform_conflicts("pg-duckdb")
-# Returns: ["pg-mooncake"]
 ```
 
 ## Architecture Pattern
@@ -100,16 +91,12 @@ Each extension adapter inherits from `PostgreSQLAdapter` and overrides specific 
 Compare analytical query performance across storage and execution strategies:
 
 ```bash
-# Baseline: vanilla PostgreSQL
 benchbox run --platform postgresql --benchmark tpch --scale 1.0
 
-# pg_duckdb: DuckDB execution on heap tables (no storage change)
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0
 
-# pg_mooncake: DuckDB execution on columnstore tables (storage + execution)
 benchbox run --platform pg-mooncake --benchmark tpch --scale 1.0
 
-# Native DuckDB: standalone columnar database
 benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```
 

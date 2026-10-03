@@ -42,9 +42,6 @@ describe("formatFunding", () => {
     expect(formatFunding("unspecified")).toBe("No funding information provided");
   });
 
-  // Unlike formatTrustLabel, a missing value maps to "unspecified" rather than
-  // "unknown": `unspecified` is the producer default, so absent and declared
-  // carry the same meaning.
   it("returns 'unspecified' for null/empty values", () => {
     expect(formatFunding(null)).toBe("No funding information provided");
     expect(formatFunding("")).toBe("No funding information provided");
@@ -67,10 +64,6 @@ describe("formatValidationStatus", () => {
     expect(formatValidationStatus(null)).toBe("unknown");
   });
 
-  // Full status set from benchbox/core/results/status.py
-  // NON_CLEAN_VALIDATION_STATUSES - the raw enum used to be impossible for a
-  // reader to interpret (e.g. a bare "not_run" chip); every one of these must
-  // now render plain language.
   it("humanizes every NON_CLEAN_VALIDATION_STATUSES value", () => {
     expect(formatValidationStatus("failed")).toBe("failed");
     expect(formatValidationStatus("interrupted")).toBe("interrupted");
@@ -160,8 +153,6 @@ describe("formatBenchmarkLabel", () => {
   it("marks the historical star_schema source while keeping ssb canonical", () => {
     expect(formatBenchmarkLabel("star_schema")).toBe("SSB (historical source)");
     expect(formatBenchmarkLabel("ssb")).toBe("SSB");
-    // The two slugs MUST yield distinguishable labels; that's the whole
-    // point of this helper.
     expect(formatBenchmarkLabel("star_schema")).not.toBe(formatBenchmarkLabel("ssb"));
   });
 

@@ -58,17 +58,12 @@ would make pseudonymous identifiers inconsistent across your submissions.
 Use `uv run -- benchbox submit` to create a submission package:
 
 ```bash
-# Package the most recent result
 uv run -- benchbox submit --last --output ./submission
 
-# Show exact result paths if you need to choose a specific run
-# (--paths writes one path per line to stdout, safe to pipe to xargs)
 uv run -- benchbox results --paths --limit 25
 
-# Or specify a result file directly
 uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
-# Preview what would be packaged (no files written)
 uv run -- benchbox submit --last --dry-run
 ```
 
@@ -245,13 +240,10 @@ You can validate your bundle before opening a PR. Run validation through
 `uv run -- python` so it uses the same environment as BenchBox.
 
 ```bash
-# Validate a specific bundle
 uv run -- python scripts/validate_submission.py path/to/result.json
 
-# Validate all bundles in a directory
 uv run -- python scripts/validate_submission.py results-data/bundles/
 
-# Verify the inventory is current before you open the PR
 uv run -- python scripts/generate_corpus_inventory.py --check
 ```
 

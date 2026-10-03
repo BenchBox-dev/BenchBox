@@ -19,49 +19,41 @@ The unified test runner consolidates functionality from the individual test runn
 ### Using Makefile Commands (Recommended)
 
 ```bash
-# Use convenient Makefile targets for common scenarios
-make test                # Run default test suite (fast tests)
-make test-all           # Run all tests
-make test-unit          # Run unit tests only
-make test-integration   # Run integration tests only
-make test-tpch          # Run TPC-H tests only
-make coverage           # Run tests with coverage
+make test
+make test-all
+make test-unit
+make test-integration
+make test-tpch
+make coverage
 ```
 
 ### Basic Usage with Unified Test Runner
 
 ```bash
-# Run all unit tests
 uv run -- python tests/utilities/unified_test_runner.py --mode unit
 
-# Run TPCH tests with coverage
 uv run -- python tests/utilities/unified_test_runner.py --benchmark tpch --coverage
 
-# Run integration tests in parallel
 uv run -- python tests/utilities/unified_test_runner.py --mode integration --parallel --workers 4
 ```
 
 ### Direct pytest Usage
 
 ```bash
-# Run tests directly with pytest and markers
-uv run -- python -m pytest -m unit                    # Unit tests only
-uv run -- python -m pytest -m "tpch and fast"          # Fast TPC-H tests
-uv run -- python -m pytest -m "integration and duckdb" # DuckDB integration tests
-uv run -- python -m pytest --cov=benchbox             # Tests with coverage
+uv run -- python -m pytest -m unit
+uv run -- python -m pytest -m "tpch and fast"
+uv run -- python -m pytest -m "integration and duckdb"
+uv run -- python -m pytest --cov=benchbox
 ```
 
 ### Advanced Marker Combinations
 
 ```bash
-# Run specific benchmarks with speed filtering
 uv run -- python -m pytest -m "tpch and fast and not slow"
 
-# Database-specific testing
 uv run -- python -m pytest -m "duckdb and unit"
 uv run -- python -m pytest -m "sqlite and integration"
 
-# Feature-specific testing
 uv run -- python -m pytest -m "olap or advanced_sql"
 ```
 
@@ -116,63 +108,44 @@ uv run -- python -m pytest -m "olap or advanced_sql"
 
 ### Quick Development Testing
 ```bash
-# Fast unit tests for active development
 make test-fast
-# or
 uv run -- python -m pytest -m fast
 
-# Test specific benchmark during development
 make test-tpch
-# or
 uv run -- python -m pytest -m tpch
 
-# Unit tests with verbose output
 uv run -- python -m pytest -m unit -v
 ```
 
 ### CI/CD Pipeline
 ```bash
-# Comprehensive CI testing
 make test-ci
-# or
 uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)"
 
-# Run tests with coverage for CI
 make coverage-report
-# or
 uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=xml --junit-xml=test-results.xml
 
-# Include stress and live tests only when their services and credentials are available
 make coverage-opt-in-all
 
-# Explicit full-tree parallel testing (requires live services and credentials)
 make test-parallel
-# or
 uv run -- python -m pytest -n auto --tb=short
 ```
 
 ### Integration Validation
 ```bash
-# DuckDB integration testing
 make test-duckdb
-# or
 uv run -- python -m pytest -m duckdb
 
-# Full integration test suite
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# Integration with coverage
 uv run -- python -m pytest -m integration --cov=benchbox
 ```
 
 ### Performance Testing
 ```bash
-# Run performance tests only
 uv run -- python -m pytest -m performance
 
-# Fast performance tests
 uv run -- python -m pytest -m "performance and fast"
 ```
 
@@ -180,34 +153,25 @@ uv run -- python -m pytest -m "performance and fast"
 
 ### From `run_tpch_tests.py`
 ```bash
-# Old way
 python tests/run_tpch_tests.py
 
-# New way
 make test-tpch
-# or
 uv run -- python -m pytest -m tpch
 ```
 
 ### From `run_tpcds_tests.py`
 ```bash
-# Old way
 python tests/run_tpcds_tests.py minimal
 
-# New way
 make test-tpcds
-# or
 uv run -- python -m pytest -m "tpcds and fast"
 ```
 
 ### From `run_coverage.py`
 ```bash
-# Old way
 python tests/run_coverage.py --report html
 
-# New way
 make coverage-html
-# or
 uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
 

@@ -177,7 +177,6 @@ benchbox --version
 
 ```bash
 pip install "benchbox[duckdb,polars]"
-# or, to restore the previous all-inclusive install:
 pip install "benchbox[all]"
 ```
 

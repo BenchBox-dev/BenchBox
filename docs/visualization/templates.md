@@ -156,7 +156,7 @@ benchbox visualize baseline.json current.json --template comparison
 
 **Command:**
 ```bash
-benchbox visualize  # Uses latest result automatically
+benchbox visualize
 ```
 
 **Ideal for:**
@@ -246,12 +246,9 @@ benchbox visualize results/*.json --template executive_summary
 Templates set defaults but can be overridden:
 
 ```bash
-# Use flagship template with dark theme
 benchbox visualize results/*.json --template flagship --theme dark
 
-# Use head_to_head template with no colors (for piping)
 benchbox visualize a.json b.json --template head_to_head --no-color > comparison.txt
 
-# Use trends template with ASCII-only characters
 benchbox visualize results/*.json --template trends --no-unicode
 ```

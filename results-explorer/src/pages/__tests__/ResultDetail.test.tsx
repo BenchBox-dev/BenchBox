@@ -1,13 +1,3 @@
-/**
- * Tests for ResultDetail page - median-first contract.
- *
- * Cases:
- *   (a) Default table rows match display_timings.length (not queries.length)
- *   (b) sample_count cell matches display_timings[i].sample_count
- *   (c) Opening the "Individual samples" expander reveals the raw queries table
- *   (d) QueryTimingChart bar count matches display_timings.length
- */
-
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { DetailResult } from "@/types";
@@ -24,10 +14,6 @@ vi.mock("@/lib/duckdbQueries", async () => {
 
 import { getDetailResult, getPrimaryMetricForBenchmark, resolveShortId } from "@/lib/duckdbQueries";
 import { ResultDetail } from "@/pages/ResultDetail";
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
 
 function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
   return {
@@ -79,10 +65,6 @@ function makeDetail(overrides: Partial<DetailResult> = {}): DetailResult {
     ...overrides,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("ResultDetail - median-first contract", () => {
   beforeEach(() => {
@@ -140,15 +122,11 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    // Header should show display_timings count
     expect(screen.getByText("Query timings (2)")).toBeTruthy();
     await waitFor(() => expect(document.title).toBe("TPC-H · DuckDB · SF0.1 · BenchBox Results"));
 
-    // The pass table reports the same per-query median next to the passes it
-    // was reduced from, so the three-column median table would only repeat it.
     const passes = screen.getByRole("region", { name: "Passes within this run" });
     expect(within(passes).getAllByText(/Warm median/i).length).toBeGreaterThan(0);
-    // header + Q1 + Q2 + the run totals row
     expect(within(passes).getAllByRole("row")).toHaveLength(4);
     expect(screen.queryByTestId("detail-timings-scroll-container")).toBeNull();
   });
@@ -180,10 +158,8 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    // Both queries have sample_count = 3; the "Samples" column header exists
     expect(screen.getByText(/^Samples/)).toBeTruthy();
     const sampleCells = screen.getAllByText("3");
-    // At least 2 cells showing "3" (one per query in display_timings)
     expect(sampleCells.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -200,15 +176,11 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    // The expander summary is present
     const expander = screen.getByText(/Individual samples \(6\)/i);
     expect(expander).toBeTruthy();
 
-    // The raw "Status" column header is hidden until expanded (inside <details>)
-    // After expanding, it should appear
     fireEvent.click(expander);
 
-    // Now the raw Duration column is visible. Values carry their own shared units.
     expect(screen.getAllByText(/^Duration/i).length).toBeGreaterThan(0);
   });
 
@@ -293,7 +265,6 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    // Every applicable chart is on the page at once; none is behind a control.
     expect(screen.getByTestId("chart-panel-long")).toBeTruthy();
     expect(screen.queryByRole("tablist")).toBeNull();
     expect(screen.getByTestId("chart-panel-chart-query_histogram")).toBeTruthy();
@@ -310,7 +281,6 @@ describe("ResultDetail - median-first contract", () => {
 
     expect(summary).toHaveTextContent("Primary metric · higher is better");
     expect(summary).toHaveTextContent("Power score");
-    // Run identity and the page's actions belong to the shared page header.
     expect(header).toHaveTextContent("Public ID r1");
     expect(within(header).getByRole("link", { name: "Find a run to compare" })).toHaveAttribute("href", "/results/query?pick=r1");
     expect(summary.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -388,9 +358,6 @@ describe("ResultDetail - median-first contract", () => {
   });
 
   it("does not render a Download plans link when plans were not actually published (w1 regression)", async () => {
-    // Source-side has_plans is true but the explorer pipeline excludes
-    // *.plans.json from bundle discovery, so the published file does not
-    // exist. Pre-w1 the link rendered and 404'd; post-w1 it must not render.
     vi.mocked(getDetailResult).mockResolvedValue(makeDetail({ has_plans: true }));
 
     render(<ResultDetail resultId="r1" />);
@@ -398,10 +365,6 @@ describe("ResultDetail - median-first contract", () => {
 
     expect(screen.queryAllByRole("link", { name: "Download plans" })).toHaveLength(0);
   });
-
-  // -------------------------------------------------------------------------
-  // Funding disclosure (chip + legend)
-  // -------------------------------------------------------------------------
 
   it("renders the funding chip alongside the trust badge when funding is disclosed", async () => {
     vi.mocked(getDetailResult).mockResolvedValue(
@@ -411,8 +374,6 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    // Orthogonal axes: a vendor-supplied result can still be employer-funded,
-    // and each renders its own independent element.
     expect(document.querySelector('[data-role="funding"]')?.textContent).toBe("Employer funded");
     expect(document.querySelector('[data-role="trust"]')?.textContent).toBe("Vendor");
   });
@@ -433,11 +394,6 @@ describe("ResultDetail - median-first contract", () => {
 
     expect(screen.getByRole("button", { name: /What do these labels mean\?/i })).toBeTruthy();
   });
-
-  // -------------------------------------------------------------------------
-  // Accepted-override header badge: an overridden run is never a clean pass,
-  // even when the recorded validation status alone would hide this badge.
-  // -------------------------------------------------------------------------
 
   it("badges an accepted override in the header even when validation passed", async () => {
     vi.mocked(getDetailResult).mockResolvedValue(

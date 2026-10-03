@@ -1,12 +1,3 @@
-# Shared path rules for the develop PR CI classifier.
-#
-# The classifier fails closed: every changed path must match `safe-content`
-# or the explicitly governed `skill-integrity` class before product code CI
-# can be skipped. Any other non-code-ci path, including a new top-level area,
-# is treated as unknown code. `safe-content` lists prose-only extensions, not
-# directories. Directories like `docs/` and `_project/` mix prose with
-# executable code (Sphinx config, extension modules, helper scripts) — those
-# code paths must run lint/type/test like any other code.
 safe-content:
   - "_project/blind-spots/**"
   - "_project/decisions/**"
@@ -14,8 +5,6 @@ safe-content:
   - "_project/notes/**"
   - "_project/research/**"
   - "_project/planning/**"
-  # Historical machine-generated tracker snapshots. Data, not authored prose,
-  # so they remain safe-content but NOT content-guard.
   - "_project/todo-db-export/**"
   - "_blog/**.md"
   - "_blog/**.rst"
@@ -32,10 +21,6 @@ safe-content:
   - "CLAUDE.md"
   - "AGENTS.md"
 
-# Documentation-only changes are validated by the content guard. The guard
-# patterns intentionally stay broader than `safe-content` so a docs change
-# that touches both prose and Sphinx code still triggers docs-validate
-# alongside the full PR tier.
 content-guard:
   - "_project/blind-spots/**"
   - "_project/decisions/**"
@@ -49,12 +34,6 @@ content-guard:
   - "CLAUDE.md"
   - "AGENTS.md"
 
-# Explicit code paths. Unknown paths also fall through to `code-ci` because
-# the classifier fails closed when no `safe-content` pattern matches. The
-# `docs/**.{py,js,css,html,jinja,j2}` and explicit `docs/conf.py` /
-# `docs/Makefile` / `docs/_extensions/**` / `docs/_static/**` /
-# `docs/_templates/**` patterns route the Sphinx machinery (which is
-# executable Python and templates, not prose) through full lint/type/test.
 code-ci:
   - "benchbox/**"
   - "tests/**"
@@ -82,15 +61,12 @@ code-ci:
   - "docs/**.jinja"
   - "docs/**.j2"
   - "docs/agent/**"
-  # This Markdown file is executable CI input: audit-raw-check parses it as
-  # the dependency allowlist/inventory, so prose-only routing is unsafe.
   - "docs/development/dependency-audit-raw.md"
   - "docs/operations/agent-instruction*.md"
   - "pyproject.toml"
   - "uv.lock"
   - "Makefile"
   - ".github/workflows/**"
-  # Self-protection: editing the classifier rules must always receive full CI.
   - ".github/path-filters.yml"
   - ".pre-commit-config.yaml"
   - ".claude/commands/**"
@@ -102,23 +78,11 @@ code-ci:
   - ".gitignore"
   - ".gitattributes"
 
-# Extra path-filter groups (beyond the three core buckets above). Each key
-# here becomes a `<group>-needed` boolean output from ci-paths, computed by
-# path_filter_decision.py, so a ci.yml job can gate on
-# `needs.ci-paths.outputs.<group>-needed == 'true'` without inventing a
-# second classifier. Most extra groups only select an additional job. The
-# skill-integrity group is also a first-class specialized class: when no
-# explicit/unknown code path or structural manifest change exists, its paths
-# are excluded from product CI and receive the dedicated integrity lane.
-
 skill-integrity:
   - ".claude/skills/**"
   - "skill-sync.conf"
   - "tools/skill-sync"
 
-# Packaging-metadata changes: build/install/audit signal (package-smoke,
-# dependency-audit jobs in ci.yml) only needs to run when one of these
-# changed. See tracker item `pr-gate-package-and-audit-promotion`.
 packaging:
   - "pyproject.toml"
   - "MANIFEST.in"
@@ -127,17 +91,11 @@ packaging:
   - "benchbox/__init__.py"
   - "uv.lock"
 
-# Results-explorer visualization / CLI<->explorer parity source changes:
-# gates the parity-check job in ci.yml. See
-# tracker item `parity-check-develop-ring`.
 viz:
   - "results-explorer/**"
   - "tests/parity/**"
   - "_project/scripts/explorer_pipeline/**"
 
-# Results Explorer unit-test contract. Keep this broader than the frontend
-# source tree: read-model/build-contract, curated data, fixture generators,
-# and publication workflow changes can all invalidate Vitest expectations.
 explorer-vitest:
   - "results-explorer/**"
   - "_project/scripts/explorer_pipeline/**"
@@ -151,14 +109,9 @@ explorer-vitest:
   - "tests/unit/core/tuning/fixtures/tuning_mode_vocabulary.yaml"
   - "tests/parity/fixtures/chart_ids.json"
 
-# Results Explorer source-only token contract. This intentionally stays
-# narrower than explorer-vitest: the token scan is about the public source
-# surface, not e2e fixtures, read-model inputs, or publication scripts.
 explorer-tokens:
   - "results-explorer/src/**"
 
-# Public site theme token contract. The scan reads these files directly, so it
-# must run when any of them changes even if no Explorer source file changed.
 site-theme:
   - "landing/shared/**"
   - "landing/style.css"

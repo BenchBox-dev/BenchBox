@@ -46,13 +46,10 @@ Quick Example
     from benchbox.tpch import TPCH
     from benchbox.platforms import DuckDBAdapter
 
-    # Create benchmark instance
     benchmark = TPCH(scale_factor=0.01)
 
-    # Generate data files
     data_files = benchmark.generate_data()
 
-    # Run with platform adapter
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 

@@ -129,26 +129,26 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class CompatibilityContext:
-    platform: str           # e.g. "starrocks", "clickhouse"
-    platform_version: str | None  # e.g. "3.2.1"; None if not known
-    benchmark: str          # e.g. "h2odb", "write_primitives"
-    query_id: str | None    # e.g. "Q9"; None for non-query phases
-    phase: Phase            # one of the provisional Phase enum values
+    platform: str
+    platform_version: str | None
+    benchmark: str
+    query_id: str | None
+    phase: Phase
     mode: Literal["sql", "dataframe"]
-    dialect: str | None     # sqlglot dialect string; None for non-SQL paths
+    dialect: str | None
 ```
 
 ### SupportLevel
 
 ```python
 class SupportLevel(str, Enum):
-    NATIVE              = "NATIVE"               # works without modification
-    TRANSLATED          = "TRANSLATED"           # requires sqlglot translation
-    REWRITTEN           = "REWRITTEN"            # requires additional AST/string rewrite
-    INFORMATIONAL       = "INFORMATIONAL"        # runs; a platform guarantee is not enforced (renamed from DEGRADED)
-    SKIPPED_QUERY       = "SKIPPED_QUERY"        # query omitted from result set
-    SKIPPED_DDL_FRAGMENT = "SKIPPED_DDL_FRAGMENT" # auxiliary DDL suppressed; workload runs
-    BLOCKED             = "BLOCKED"              # platform×benchmark combination unsupported
+    NATIVE              = "NATIVE"
+    TRANSLATED          = "TRANSLATED"
+    REWRITTEN           = "REWRITTEN"
+    INFORMATIONAL       = "INFORMATIONAL"
+    SKIPPED_QUERY       = "SKIPPED_QUERY"
+    SKIPPED_DDL_FRAGMENT = "SKIPPED_DDL_FRAGMENT"
+    BLOCKED             = "BLOCKED"
 ```
 
 > **Addendum (2026-04-26):** `DEGRADED` was renamed to `INFORMATIONAL` and `SKIPPED` was split
@@ -158,9 +158,9 @@ class SupportLevel(str, Enum):
 
 ```python
 class FailureMode(str, Enum):
-    NONE                 = "NONE"       # no failure expected
+    NONE                 = "NONE"
     SYNTAX_ERROR         = "SYNTAX_ERROR"
-    SILENT_CORRUPTION    = "SILENT_CORRUPTION"   # runs, wrong results (e.g. StarRocks PK)
+    SILENT_CORRUPTION    = "SILENT_CORRUPTION"
     UNSUPPORTED_FEATURE  = "UNSUPPORTED_FEATURE"
     PERFORMANCE_REGRESSION = "PERFORMANCE_REGRESSION"
 ```
@@ -188,30 +188,29 @@ class SkipQueryPayload:
 
 @dataclass(frozen=True)
 class SelectVariantPayload:
-    variant_key: str   # key into the benchmark's variant dict (e.g. "clickhouse")
-    variant_sql: str   # the actual SQL text already in the target dialect
+    variant_key: str
+    variant_sql: str
 
 @dataclass(frozen=True)
 class RewriteQueryPayload:
-    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    transformer_id: str
     description: str
 
 @dataclass(frozen=True)
 class RewriteDDLPayload:
-    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    transformer_id: str
     description: str
 
 @dataclass(frozen=True)
 class SetSessionPolicyPayload:
-    settings: tuple[tuple[str, str], ...]   # key-value pairs emitted before query
-    issue_url: str | None                   # link documenting why AST rewrite is not viable
+    settings: tuple[tuple[str, str], ...]
+    issue_url: str | None
 
 @dataclass(frozen=True)
 class PostTranslatePayload:
-    transformer_id: str   # registry key → Callable[[str], str] at runtime
+    transformer_id: str
     description: str
 
-# NATIVE action carries no payload - use None
 CompatPayload = Union[
     BlockBenchmarkPayload,
     SkipQueryPayload,
@@ -220,7 +219,7 @@ CompatPayload = Union[
     RewriteDDLPayload,
     SetSessionPolicyPayload,
     PostTranslatePayload,
-    None,  # NATIVE
+    None,
 ]
 ```
 
@@ -229,12 +228,12 @@ CompatPayload = Union[
 ```python
 @dataclass(frozen=True)
 class CompatibilityDecision:
-    rule_id: str              # "{phase}.{platform}.{scope}.{slug}"
+    rule_id: str
     action: CompatAction
     support_level: SupportLevel
     failure_mode: FailureMode
-    payload: CompatPayload    # typed per action; None for NATIVE
-    reason: str               # human-readable rationale
+    payload: CompatPayload
+    reason: str
 ```
 
 ### Structured Capability Example - StarRocks PK
@@ -243,7 +242,6 @@ Capabilities are **not** bare booleans. The StarRocks PK rule is the canonical e
 StarRocks silently ignores PKs whose columns are not the first N columns of the table.
 
 ```python
-# Expressed as a CompatibilityDecision with a typed, hashable payload:
 CompatibilityDecision(
     rule_id="schema_emit.starrocks.pk.first_n_columns_only",
     action=CompatAction.REWRITE_DDL,
@@ -309,16 +307,7 @@ def compat_local(
     platform_specific: bool,
     reason: str,
 ) -> Callable:
-    """Mark a callable as containing legitimate local platform-specific rendering.
-
-    This exempts the callable from the compat_lint "unregistered dialect branch" rule.
-    It does NOT register a rule in the registry.
-
-    Args:
-        kind: Category of local rendering - type_mapping, storage_layout, or rendering
-        platform_specific: True if the branch is specific to one platform
-        reason: Why this is legitimate local rendering, not unregistered policy
-    """
+    pass
 ```
 
 ### When to Use @compat_local vs Register a Rule
@@ -523,7 +512,6 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True)
 class PhasedDecision:
-    """One resolved decision keyed by (query_id | None, Phase)."""
     query_id: str | None
     phase: Phase
     decision: CompatibilityDecision
@@ -532,13 +520,9 @@ class PhasedDecision:
 class CompilationPlan:
     platform: str
     benchmark: str
-    # Outer key: query_id (None = applies to all queries in this phase)
-    # Inner key: Phase
-    # Value: the winning CompatibilityDecision after specificity resolution
     decisions: dict[tuple[str | None, Phase], CompatibilityDecision] = field(default_factory=dict)
 
     def get(self, query_id: str | None, phase: Phase) -> CompatibilityDecision | None:
-        """Return the decision for (query_id, phase), falling back to (None, phase)."""
         return self.decisions.get((query_id, phase)) or self.decisions.get((None, phase))
 ```
 

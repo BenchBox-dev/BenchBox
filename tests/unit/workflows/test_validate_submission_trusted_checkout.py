@@ -75,7 +75,8 @@ def test_corpus_paths_producer_is_atomic_and_fails_closed():
         or 'mv "$TMP" "$CORPUS_CHANGED_PATHS_FILE"' in run
     )
     assert ': > "' in run
-    assert "$BASE_SHA...$MERGE_SHA" in run or "${BASE_SHA}...${MERGE_SHA}" in run
+    assert '"$EFFECTIVE_BASE...$EFFECTIVE_MERGE"' in run
+    assert 'EFFECTIVE_BASE="$BASE_SHA"' in run and 'EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"' in run
     assert "git diff" in run and ("results-data/corpus" in run or "results-data/bundles" in run)
     assert 'rm -f "$CORPUS_CHANGED_PATHS_FILE' in run or 'rm -f "$TMP"' in run
     text = WORKFLOW_PATH.read_text(encoding="utf-8")

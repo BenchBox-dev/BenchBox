@@ -1,6 +1,6 @@
 type: duckdb
 connection:
-  database: ":memory:"  # Use in-memory database
+  database: ":memory:"
   pool_size: 1
 settings:
   memory_limit: "4GB"

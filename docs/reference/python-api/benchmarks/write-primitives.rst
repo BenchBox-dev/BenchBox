@@ -29,7 +29,6 @@ Quick Start
     from benchbox import TPCH, WritePrimitives
     import duckdb
 
-    # 1. Load TPC-H data first (required)
     tpch = TPCH(scale_factor=1.0)
     tpch.generate_data()
 
@@ -37,11 +36,9 @@ Quick Start
     adapter = tpch.create_adapter("duckdb")
     adapter.load_data(tpch, conn, tpch.output_dir)
 
-    # 2. Setup Write Primitives
     bench = WritePrimitives(scale_factor=1.0)
     bench.setup(conn)
 
-    # 3. Execute operations
     result = bench.execute_operation("insert_single_row", conn)
     print(f"Success: {result.success}, Time: {result.write_duration_ms:.2f}ms")
 
@@ -167,7 +164,6 @@ Truncate and repopulate staging tables to initial state.
 
 .. code-block:: python
 
-    # Reset after validation failures
     bench.reset(conn)
 
 **teardown(connection) -> None**
@@ -178,7 +174,6 @@ Drop all staging tables.
 
 .. code-block:: python
 
-    # Cleanup when done
     bench.teardown(conn)
 
 Operation Execution Methods
@@ -225,13 +220,10 @@ Run multiple operations.
 
 .. code-block:: python
 
-    # Run all operations
     results = bench.run_benchmark(conn)
 
-    # Run only INSERT operations
     insert_results = bench.run_benchmark(conn, categories=["insert"])
 
-    # Run specific operations
     specific_ops = ["insert_single_row", "update_single_row_pk"]
     results = bench.run_benchmark(conn, operation_ids=specific_ops)
 
@@ -285,7 +277,6 @@ Get list of available categories.
 .. code-block:: python
 
     categories = bench.get_operation_categories()
-    # Output: ['insert', 'update', 'delete', 'ddl', 'transaction']
 
 **get_queries(dialect=None) -> dict[str, str]**
 
@@ -418,7 +409,6 @@ Complete Workflow
     from benchbox import TPCH, WritePrimitives
     import duckdb
 
-    # 1. Load TPC-H data first
     tpch = TPCH(scale_factor=1.0)
     tpch.generate_data()
 
@@ -426,25 +416,21 @@ Complete Workflow
     adapter = tpch.create_adapter("duckdb")
     adapter.load_data(tpch, conn, tpch.output_dir)
 
-    # 2. Setup Write Primitives
     bench = WritePrimitives(scale_factor=1.0)
     setup_result = bench.setup(conn, force=True)
     print(f"Setup: {setup_result['success']}")
     print(f"Tables: {setup_result['tables_created']}")
 
-    # 3. Execute single operation
     result = bench.execute_operation("insert_single_row", conn)
     print(f"Success: {result.success}")
     print(f"Time: {result.write_duration_ms:.2f}ms")
     print(f"Validation: {result.validation_passed}")
 
-    # 4. Run all operations
     results = bench.run_benchmark(conn)
     print(f"Total: {len(results)}")
     successful = [r for r in results if r.success]
     print(f"Successful: {len(successful)}")
 
-    # 5. Cleanup
     bench.teardown(conn)
 
 Category-Based Testing
@@ -452,7 +438,6 @@ Category-Based Testing
 
 .. code-block:: python
 
-    # Test each category separately
     categories = bench.get_operation_categories()
 
     for category in categories:
@@ -463,7 +448,6 @@ Category-Based Testing
             status = "✓" if result.success else "✗"
             print(f"  {status} {result.operation_id}: {result.write_duration_ms:.2f}ms")
 
-        # Reset between categories
         bench.reset(conn)
 
 Performance Analysis
@@ -474,7 +458,6 @@ Performance Analysis
     import time
     from statistics import mean, median
 
-    # Run multiple iterations for stable timing
     operation_id = "insert_single_row"
     iterations = 10
     times = []
@@ -484,7 +467,6 @@ Performance Analysis
         if result.success:
             times.append(result.write_duration_ms)
 
-        # Reset between iterations
         if i < iterations - 1:
             bench.reset(conn)
 
@@ -500,7 +482,6 @@ Error Handling and Recovery
 
 .. code-block:: python
 
-    # Handle operation failures
     result = bench.execute_operation("insert_batch_values_10", conn)
 
     if not result.success:
@@ -508,11 +489,9 @@ Error Handling and Recovery
         if result.cleanup_warning:
             print(f"Cleanup warning: {result.cleanup_warning}")
 
-        # Reset to recover
         print("Resetting staging tables...")
         bench.reset(conn)
 
-    # Handle validation failures
     if not result.validation_passed:
         print("Validation failed:")
         for val_result in result.validation_results:
@@ -521,7 +500,6 @@ Error Handling and Recovery
                 print(f"  Expected: {val_result['expected_rows']}")
                 print(f"  Actual: {val_result['actual_rows']}")
 
-        # Reset and retry
         bench.reset(conn)
         result = bench.execute_operation("insert_batch_values_10", conn)
 
@@ -532,11 +510,9 @@ Best Practices
 
    .. code-block:: python
 
-       # Wrong: Will fail
        bench = WritePrimitives()
-       bench.setup(conn)  # Error: TPC-H tables not found
+       bench.setup(conn)
 
-       # Correct: Load TPC-H first
        tpch = TPCH(scale_factor=1.0)
        tpch.generate_data()
        adapter = tpch.create_adapter("duckdb")
@@ -556,20 +532,17 @@ Best Practices
 
    .. code-block:: python
 
-       # Automatic rollback cleanup
        result = bench.execute_operation("insert_single_row", conn, use_transaction=True)
 
-       # Manual cleanup (for DDL operations)
        result = bench.execute_operation("ddl_create_table_simple", conn, use_transaction=False)
 
 4. **Reset Between Test Runs**
 
    .. code-block:: python
 
-       # Reset to ensure clean state
        for operation_id in ["insert_single_row", "update_single_row_pk"]:
            result = bench.execute_operation(operation_id, conn)
-           bench.reset(conn)  # Clean slate for next operation
+           bench.reset(conn)
 
 5. **Validate and Handle Errors**
 
@@ -654,14 +627,11 @@ DataFrameWriteOperationsManager
         get_dataframe_write_manager,
     )
 
-    # Create manager
     manager = DataFrameWriteOperationsManager("polars-df")
 
-    # Check capabilities
     caps = manager.get_capabilities()
     print(f"Supports UPDATE: {caps.supports_operation(WriteOperationType.UPDATE)}")
 
-    # Execute BULK_LOAD
     result = manager.execute_bulk_load(
         source_path="/data/raw/orders.csv",
         target_path="/data/orders",
@@ -714,7 +684,7 @@ Platform capabilities for write operations:
         maintenance_caps: DataFrameMaintenanceCapabilities | None
         supports_bulk_load: bool = True
         supports_compression: bool = True
-        supported_compressions: list[str]  # e.g., ["zstd", "snappy", "gzip"]
+        supported_compressions: list[str]
         supports_partitioning: bool = False
         supports_sorting: bool = True
 

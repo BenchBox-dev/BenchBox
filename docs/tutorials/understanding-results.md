@@ -15,10 +15,8 @@ After running a benchmark, BenchBox produces:
 ## Viewing Results
 
 ```bash
-# Show latest result summary
 benchbox results --limit 1
 
-# Export detailed JSON
 benchbox export --last --format json --output-dir ./results
 ```
 
@@ -98,11 +96,9 @@ Price/Performance = (Platform Cost) / QphH
 ## Comparing Results
 
 ```bash
-# Run on two platforms
 benchbox run --platform duckdb --benchmark tpch --output duckdb.json
 benchbox run --platform sqlite --benchmark tpch --output sqlite.json
 
-# Compare results
 benchbox compare duckdb.json sqlite.json
 ```
 
@@ -139,9 +135,7 @@ If a query is unexpectedly slow:
 4. **Check validation** - Ensure correct results
 
 ```bash
-# Export query SQL for analysis
 benchbox run --dry-run ./analysis --platform duckdb --benchmark tpch
-# Queries are in ./analysis/queries/
 ```
 
 ## Next Steps

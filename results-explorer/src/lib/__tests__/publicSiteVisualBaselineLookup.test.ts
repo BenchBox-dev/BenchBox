@@ -50,7 +50,6 @@ function fakeGithub(
   const calls: string[] = [];
   const github = async (path: string) => {
     calls.push(path);
-    // Like the real endpoint: 30 jobs per page unless per_page says otherwise (maximum 100).
     const jobsMatch = path.match(/\/actions\/runs\/(\d+)\/jobs(?:\?(.*))?$/);
     if (jobsMatch) {
       const query = new URLSearchParams(jobsMatch[2] ?? "");
@@ -183,7 +182,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
     findTrustedBaseline({ github: github as never, repository: REPO, baseSha: BASE });
 
   it("uses the candidate of a finished CI leader, the case that used to be ignored while a follower waited", async () => {
-    // The leader's CI run finished and uploaded its candidate before the follower started waiting.
     const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], { 10: queueRun({ path: CI }) });
     expect(await find(github)).toMatchObject({ source: "merge-queue", artifact: { id: 1 } });
   });
@@ -241,7 +239,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
     const visual = (status: string, conclusion: string) => ({ name: VISUAL, status, conclusion });
 
     it("finds a successful visual job beyond the endpoint's default page of 30", async () => {
-      // CI declares more than 30 jobs, so the visual job can be on the second default page.
       const { github, calls } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
         10: [...filler(40), visual("completed", "success")],
       });
@@ -265,7 +262,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
     });
 
     it("does not trust a leader when a later duplicate of the visual job failed", async () => {
-      // Every job carrying the name must have succeeded, so a collision cannot launder a failure.
       const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
         10: [visual("completed", "success"), ...filler(120), visual("completed", "failure")],
       });
@@ -281,8 +277,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
     });
 
     it("does not trust a successful visual job when the bound hides a failing duplicate", async () => {
-      // The prefix read before the bound holds a success, but the failure sits beyond it, so the
-      // evidence is incomplete and must not count as success.
       const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
         10: [visual("completed", "success"), ...filler(MAX_JOB_PAGES * JOBS_PAGE_SIZE - 1), visual("completed", "failure")],
       });
@@ -290,7 +284,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
     });
 
     it("does not trust a leader when a later page holds a malformed job entry", async () => {
-      // A success on the first page must not be enough when a later page cannot be read in full.
       const { github } = fakeGithub([{ id: 1, name: NAME, runId: 10 }], leader, {
         10: [visual("completed", "success"), ...filler(JOBS_PAGE_SIZE - 1), {} as never],
       });
@@ -299,7 +292,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
   });
 
   it("never trusts a CI leader that finished without succeeding, even if its visual job passed", async () => {
-    // A failed group is ejected and its followers rebuilt on a new base, so its candidate is moot.
     const { github } = fakeGithub(
       [{ id: 1, name: NAME, runId: 10 }],
       { 10: queueRun({ path: CI, conclusion: "failure" }) },
@@ -314,7 +306,6 @@ describe("findTrustedBaseline with merge-queue leaders validated by the CI workf
     ["a run from a fork head repository", { head_repository: { full_name: "someone/BenchBox" } }],
     ["a run of another workflow", { path: ".github/workflows/test.yml" }],
   ])("does not trust an unfinished visual job reported by %s", async (_label, overrides) => {
-    // The artifact name is untrusted, so the producing run is vetted before its jobs are read.
     const { github, calls } = fakeGithub(
       [{ id: 1, name: NAME, runId: 10 }],
       { 10: queueRun({ path: CI, status: "in_progress", conclusion: null, ...overrides }) },
@@ -405,7 +396,6 @@ describe("baselineShaOrder", () => {
     expect(order[0]).toBe(BASE);
     expect(order).not.toContain("not-a-sha");
     expect(new Set(order).size).toBe(order.length);
-    // Covers every SHA the classifier can emit (base plus 25 ancestors).
     expect(order.length).toBe(MAX_BASELINE_SHAS);
   });
 });
@@ -463,7 +453,6 @@ describe("waitForTrustedBaseline", () => {
     expect(result.artifact).toBeUndefined();
     expect(now()).toBeGreaterThanOrEqual(1_800_000);
     expect(now()).toBeLessThan(1_800_000 + 60_000);
-    // Short retries, then about one lookup per minute: bounded API use per follower.
     expect(result.attempts).toBeLessThan(45);
   });
 

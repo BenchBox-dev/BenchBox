@@ -37,7 +37,6 @@ promotes them into `develop`'s curated release-preview corpus.
 
 ```bash
 gh workflow run seed-corpus.yml
-# optional: -f benchmark=tpch
 ```
 
 After the develop PR merges, confirm the mirror draft against

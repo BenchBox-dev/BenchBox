@@ -253,17 +253,13 @@ LIMIT 25;
 ```python
 from benchbox import ClickBench
 
-# Initialize ClickBench benchmark
 clickbench = ClickBench(scale_factor=1.0, output_dir="clickbench_data")
 
-# Generate web analytics data
 data_files = clickbench.generate_data()
 
-# Get all 43 benchmark queries
 queries = clickbench.get_queries()
 print(f"Generated {len(queries)} ClickBench queries")
 
-# Get specific query
 count_query = clickbench.get_query("Q1")
 print(count_query)
 ```
@@ -271,16 +267,13 @@ print(count_query)
 ### Data Generation and Loading
 
 ```python
-# Generate ClickBench data at different scales
 clickbench_small = ClickBench(scale_factor=0.01, output_dir="clickbench_small")
 data_files = clickbench_small.generate_data()
 
-# Check generated data
 hits_file = clickbench_small.output_dir / "hits.csv"
 size_mb = hits_file.stat().st_size / (1024 * 1024)
 print(f"Generated hits data: {size_mb:.2f} MB")
 
-# Get schema information
 schema = clickbench_small.get_schema()
 print(f"HITS table has {len(schema[0]['columns'])} columns")
 ```
@@ -304,16 +297,13 @@ import duckdb
 from benchbox import ClickBench
 import time
 
-# Initialize and generate data
 clickbench = ClickBench(scale_factor=0.01, output_dir="clickbench_tiny")
 data_files = clickbench.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("clickbench.duckdb")
 schema_sql = clickbench.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load hits data
 hits_file = clickbench.output_dir / "hits.csv"
 print(f"Loading data from {hits_file}...")
 
@@ -330,7 +320,6 @@ load_time = time.time() - load_start
 row_count = conn.execute("SELECT COUNT(*) FROM hits").fetchone()[0]
 print(f"Loaded {row_count:,} rows in {load_time:.2f} seconds")
 
-# Run ClickBench query categories
 query_categories = {
     'basic_agg': ['Q1', 'Q2', 'Q3', 'Q4', 'Q5'],
     'grouping': ['Q8', 'Q9', 'Q10', 'Q13', 'Q16'],
@@ -367,7 +356,6 @@ for category, query_ids in query_categories.items():
 
 conn.close()
 
-# Print summary
 total_time = sum(
     r['time'] for cat_results in results.values()
     for r in cat_results.values()
@@ -394,7 +382,6 @@ class ClickBenchPerformanceTester:
         self.connection = connection
 
     def benchmark_query_category(self, category: str, iterations: int = 3) -> Dict:
-        """Benchmark specific ClickBench query categories."""
         categories = {
             'scan': ['Q1', 'Q2', 'Q7'],
             'aggregation': ['Q3', 'Q4', 'Q5', 'Q6'],
@@ -447,10 +434,8 @@ class ClickBenchPerformanceTester:
         return results
 
     def run_complete_benchmark(self) -> Dict:
-        """Run all ClickBench categories and return systematic results."""
         complete_results = {}
 
-        # Test each category
         categories = ['scan', 'aggregation', 'grouping', 'string', 'complex', 'analytics']
         for category in categories:
             print(f"\\nRunning {category.upper()} queries...")
@@ -461,7 +446,6 @@ class ClickBenchPerformanceTester:
                 print(f"Error in {category} category: {e}")
                 complete_results[category] = {'error': str(e)}
 
-        # Calculate summary statistics
         all_times = []
         successful_queries = 0
         total_queries = 0
@@ -489,7 +473,6 @@ class ClickBenchPerformanceTester:
         return complete_results
 
     def _geometric_mean(self, values: List[float]) -> float:
-        """Calculate geometric mean of execution times."""
         if not values:
             return 0.0
 
@@ -500,7 +483,6 @@ class ClickBenchPerformanceTester:
         return product ** (1.0 / len(values))
 
     def analyze_column_performance(self) -> Dict:
-        """Analyze performance across different column types and operations."""
         column_tests = [
             ('integer_scan', 'SELECT COUNT(*) FROM hits WHERE RegionID > 1000'),
             ('string_scan', "SELECT COUNT(*) FROM hits WHERE SearchPhrase LIKE '%google%'"),
@@ -537,10 +519,8 @@ class ClickBenchPerformanceTester:
 
         return results
 
-# Usage
 performance_tester = ClickBenchPerformanceTester(clickbench, conn)
 
-# Test individual categories
 scan_results = performance_tester.benchmark_query_category('scan')
 grouping_results = performance_tester.benchmark_query_category('grouping')
 
@@ -548,11 +528,9 @@ print("\\nCategory Performance Summary:")
 print(f"Scan Queries: {scan_results}")
 print(f"Grouping Queries: {grouping_results}")
 
-# Run complete benchmark
 complete_results = performance_tester.run_complete_benchmark()
 print(f"\\nComplete Benchmark Summary: {complete_results.get('summary', 'No summary available')}")
 
-# Analyze column performance
 column_results = performance_tester.analyze_column_performance()
 print(f"\\nColumn Performance Analysis: {column_results}")
 ```
@@ -563,14 +541,11 @@ print(f"\\nColumn Performance Analysis: {column_results}")
 import clickhouse_connect
 from benchbox import ClickBench
 
-# Initialize ClickHouse for appropriate performance
 client = clickhouse_connect.get_client(host='localhost', port=8123)
 clickbench = ClickBench(scale_factor=1.0, output_dir="clickbench_data")
 
-# Generate data
 data_files = clickbench.generate_data()
 
-# Create ClickHouse table with appropriate settings
 create_table_sql = """
 CREATE TABLE hits (
     WatchID UInt64,
@@ -686,12 +661,10 @@ SAMPLE BY intHash32(UserID);
 
 client.execute(create_table_sql)
 
-# Load data using ClickHouse CSV import
 hits_file = clickbench.output_dir / "hits.csv"
 with open(hits_file, 'rb') as f:
     client.insert_file('hits', f, fmt='CSV')
 
-# Run all 43 ClickBench queries
 print("Running all 43 ClickBench queries on ClickHouse...")
 
 query_results = {}
@@ -716,7 +689,6 @@ for i in range(1, 44):
         query_results[query_id] = {'error': str(e)}
         print(f"{query_id}: ERROR - {str(e)[:50]}...")
 
-# Calculate performance statistics
 successful_queries = [r for r in query_results.values() if 'time' in r]
 if successful_queries:
     total_time = sum(r['time'] for r in successful_queries)
@@ -789,14 +761,12 @@ if successful_queries:
 clickbench = ClickBench(
     scale_factor=1.0,
     output_dir="clickbench_data",
-    # Data generation options
-    date_range_days=365,     # Range of event dates
-    user_count=10000000,     # Number of unique users
-    enable_compression=True,  # Compress output files
-    # Performance options
-    partition_by_date=True,  # Partition by EventDate
-    create_indices=True,     # Create performance indices
-    optimize_for_analytics=True  # Analytics-configured generation
+    date_range_days=365,
+    user_count=10000000,
+    enable_compression=True,
+    partition_by_date=True,
+    create_indices=True,
+    optimize_for_analytics=True
 )
 ```
 
@@ -826,21 +796,17 @@ clickbench = ClickBench(
 
 **Issue: Slow string operations**
 ```sql
--- Solution: Create appropriate indices and use configured string functions
 CREATE INDEX idx_hits_search_phrase ON hits(SearchPhrase);
 CREATE INDEX idx_hits_url ON hits USING hash(URL);
 
--- Use database-specific string optimizations
-SELECT COUNT(*) FROM hits WHERE SearchPhrase ILIKE '%google%';  -- Case-insensitive
+SELECT COUNT(*) FROM hits WHERE SearchPhrase ILIKE '%google%';
 ```
 
 **Issue: Memory exhaustion on complex queries**
 ```sql
--- Solution: Optimize memory usage and use incremental processing
-SET max_memory_usage = 10000000000;  -- 10GB limit
-SET max_bytes_before_external_group_by = 5000000000;  -- External sorting
+SET max_memory_usage = 10000000000;
+SET max_bytes_before_external_group_by = 5000000000;
 
--- Break down complex queries
 SELECT * FROM (
     SELECT RegionID, COUNT(*) as cnt FROM hits GROUP BY RegionID
 ) WHERE cnt > 1000;
@@ -850,26 +816,21 @@ SELECT * FROM (
 
 **Issue: Slow data loading**
 ```python
-# Solution: Use configured loading strategies
 clickbench = ClickBench(
     scale_factor=1.0,
     output_dir="clickbench_data",
-    compression='gzip',      # Compress for faster I/O
-    batch_size=100000,       # Optimize batch size
-    parallel_loading=True    # Use parallel loading
+    compression='gzip',
+    batch_size=100000,
+    parallel_loading=True
 )
 ```
 
 **Issue: Schema mismatches across databases**
 ```sql
--- Solution: Use database-specific schema adaptations
--- For PostgreSQL
 ALTER TABLE hits ALTER COLUMN EventTime TYPE TIMESTAMP;
 
--- For MySQL
 ALTER TABLE hits MODIFY COLUMN Title TEXT CHARACTER SET utf8mb4;
 
--- For DuckDB
 ALTER TABLE hits ALTER COLUMN ResolutionWidth TYPE USMALLINT;
 ```
 

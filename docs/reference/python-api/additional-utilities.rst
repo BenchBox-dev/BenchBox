@@ -44,16 +44,14 @@ Quick Start
         format_schema_name
     )
 
-    # Format scale factors
-    print(format_scale_factor(1.0))    # "sf1"
-    print(format_scale_factor(0.1))    # "sf01"
-    print(format_scale_factor(0.01))   # "sf001"
-    print(format_scale_factor(10.0))   # "sf10"
+    print(format_scale_factor(1.0))
+    print(format_scale_factor(0.1))
+    print(format_scale_factor(0.01))
+    print(format_scale_factor(10.0))
 
-    # Format names
-    print(format_benchmark_name("tpch", 1.0))      # "tpch_sf1"
-    print(format_data_directory("tpcds", 0.1))     # "tpcds_sf01_data"
-    print(format_schema_name("ssb", 10.0))         # "ssb_sf10"
+    print(format_benchmark_name("tpch", 1.0))
+    print(format_data_directory("tpcds", 0.1))
+    print(format_schema_name("ssb", 10.0))
 
 API Reference
 ~~~~~~~~~~~~~
@@ -81,19 +79,16 @@ API Reference
 
 .. code-block:: python
 
-    # Integer values >= 1
-    format_scale_factor(1.0)    # "sf1"
-    format_scale_factor(10.0)   # "sf10"
-    format_scale_factor(100.0)  # "sf100"
+    format_scale_factor(1.0)
+    format_scale_factor(10.0)
+    format_scale_factor(100.0)
 
-    # Decimal values < 1
-    format_scale_factor(0.1)    # "sf01"
-    format_scale_factor(0.01)   # "sf001"
-    format_scale_factor(0.001)  # "sf0001"
+    format_scale_factor(0.1)
+    format_scale_factor(0.01)
+    format_scale_factor(0.001)
 
-    # Non-integer values >= 1
-    format_scale_factor(1.5)    # "sf15"
-    format_scale_factor(2.25)   # "sf225"
+    format_scale_factor(1.5)
+    format_scale_factor(2.25)
 
 .. py:function:: benchbox.utils.scale_factor.format_benchmark_name(benchmark_name: str, scale_factor: float) -> str
 
@@ -111,9 +106,9 @@ API Reference
 
 .. code-block:: python
 
-    format_benchmark_name("tpch", 1.0)    # "tpch_sf1"
-    format_benchmark_name("tpcds", 0.1)   # "tpcds_sf01"
-    format_benchmark_name("ssb", 10.0)    # "ssb_sf10"
+    format_benchmark_name("tpch", 1.0)
+    format_benchmark_name("tpcds", 0.1)
+    format_benchmark_name("ssb", 10.0)
 
 .. py:function:: benchbox.utils.scale_factor.format_data_directory(benchmark_name: str, scale_factor: float) -> str
 
@@ -131,9 +126,9 @@ API Reference
 
 .. code-block:: python
 
-    format_data_directory("tpch", 1.0)    # "tpch_sf1_data"
-    format_data_directory("tpcds", 0.1)   # "tpcds_sf01_data"
-    format_data_directory("ssb", 10.0)    # "ssb_sf10_data"
+    format_data_directory("tpch", 1.0)
+    format_data_directory("tpcds", 0.1)
+    format_data_directory("ssb", 10.0)
 
 .. py:function:: benchbox.utils.scale_factor.format_schema_name(benchmark_name: str, scale_factor: float) -> str
 
@@ -151,9 +146,9 @@ API Reference
 
 .. code-block:: python
 
-    format_schema_name("tpch", 1.0)    # "tpch_sf1"
-    format_schema_name("tpcds", 0.1)   # "tpcds_sf01"
-    format_schema_name("ssb", 10.0)    # "ssb_sf10"
+    format_schema_name("tpch", 1.0)
+    format_schema_name("tpcds", 0.1)
+    format_schema_name("ssb", 10.0)
 
 Usage Examples
 ~~~~~~~~~~~~~~
@@ -169,12 +164,10 @@ Consistent File Naming
     benchmark = "tpch"
     scale_factor = 1.0
 
-    # Create data directory with consistent naming
     data_dir = Path("data") / format_data_directory(benchmark, scale_factor)
     data_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Data directory: {data_dir}")
-    # Output: data/tpch_sf1_data
 
 Database Schema Naming
 """"""""""""""""""""""
@@ -184,7 +177,6 @@ Database Schema Naming
     from benchbox.utils.scale_factor import format_schema_name
 
     def create_benchmark_schema(conn, benchmark, scale_factor):
-        """Create database schema with consistent naming."""
         schema_name = format_schema_name(benchmark, scale_factor)
 
         conn.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
@@ -193,7 +185,6 @@ Database Schema Naming
         print(f"Created schema: {schema_name}")
 
     create_benchmark_schema(conn, "tpch", 1.0)
-    # Output: Created schema: tpch_sf1
 
 Result File Naming
 """"""""""""""""""
@@ -204,7 +195,6 @@ Result File Naming
     from benchbox.utils.scale_factor import format_benchmark_name
 
     def save_results(results, benchmark, scale_factor):
-        """Save results with consistent naming."""
         name = format_benchmark_name(benchmark, scale_factor)
         filename = f"results_{name}.json"
 
@@ -214,7 +204,6 @@ Result File Naming
         print(f"Saved results to: {filename}")
 
     save_results(benchmark_results, "tpcds", 0.1)
-    # Output: Saved results to: results_tpcds_sf01.json
 
 Dependency Validation Utilities
 --------------------------------
@@ -245,11 +234,9 @@ Quick Start
         validate_dependency_versions
     )
 
-    # Load dependency files
     pyproject_data = _load_toml(Path("pyproject.toml"))
     lock_data = _load_toml(Path("uv.lock"))
 
-    # Validate dependencies
     problems = validate_dependency_versions(pyproject_data, lock_data)
 
     if problems:
@@ -342,13 +329,10 @@ The dependency validation utilities include a CLI tool for CI/CD integration:
 
 .. code-block:: bash
 
-    # Validate dependencies
     python -m benchbox.utils.dependency_validation
 
-    # Display compatibility matrix
     python -m benchbox.utils.dependency_validation --matrix
 
-    # Use custom paths
     python -m benchbox.utils.dependency_validation \
         --pyproject path/to/pyproject.toml \
         --lock path/to/uv.lock
@@ -366,7 +350,6 @@ CI/CD Integration
 
 .. code-block:: python
 
-    # ci_check_dependencies.py
     import sys
     from pathlib import Path
     from benchbox.utils.dependency_validation import (
@@ -375,7 +358,6 @@ CI/CD Integration
     )
 
     def check_dependencies():
-        """Validate dependencies in CI/CD pipeline."""
         try:
             pyproject = _load_toml(Path("pyproject.toml"))
             lock = _load_toml(Path("uv.lock"))
@@ -403,9 +385,6 @@ Pre-commit Hook
 
 .. code-block:: bash
 
-    #!/bin/bash
-    # .git/hooks/pre-commit
-
     echo "Validating dependencies..."
     python -m benchbox.utils.dependency_validation
 
@@ -428,7 +407,6 @@ Documentation Generation
     from pathlib import Path
 
     def generate_dependency_docs():
-        """Generate dependency documentation."""
         pyproject = _load_toml(Path("pyproject.toml"))
         lock = _load_toml(Path("uv.lock"))
 
@@ -472,7 +450,6 @@ Quick Start
 
     from benchbox.utils.system_info import get_system_info
 
-    # Get system information
     info = get_system_info()
 
     print(f"OS: {info.os_name} {info.os_version}")
@@ -700,7 +677,6 @@ Benchmark Environment Documentation
     from benchbox.utils.system_info import get_system_info
 
     def document_environment(benchmark_results):
-        """Add system information to benchmark results."""
         info = get_system_info()
 
         benchmark_results["environment"] = {
@@ -730,7 +706,6 @@ Resource Monitoring
     from benchbox.utils.system_info import get_memory_info, get_cpu_info
 
     def monitor_resources(duration_seconds=60):
-        """Monitor system resources during benchmark."""
         samples = []
         end_time = time.time() + duration_seconds
 
@@ -749,10 +724,8 @@ Resource Monitoring
 
         return samples
 
-    # Monitor during benchmark
     samples = monitor_resources(duration_seconds=30)
 
-    # Calculate statistics
     avg_memory = sum(s["memory_used_gb"] for s in samples) / len(samples)
     avg_cpu = sum(s["cpu_percent"] for s in samples) / len(samples)
 
@@ -767,7 +740,6 @@ System Requirements Check
     from benchbox.utils.system_info import get_system_info, get_memory_info
 
     def check_system_requirements(min_memory_gb=8, min_cores=4):
-        """Check if system meets benchmark requirements."""
         info = get_system_info()
         memory = get_memory_info()
 
@@ -811,12 +783,10 @@ Scale Factor Utilities
 
    .. code-block:: python
 
-       # Good: Consistent naming
        from benchbox.utils.scale_factor import format_data_directory
-       data_dir = format_data_directory("tpch", 1.0)  # "tpch_sf1_data"
+       data_dir = format_data_directory("tpch", 1.0)
 
-       # Avoid: Manual formatting
-       data_dir = f"tpch_{1.0}_data"  # Inconsistent
+       data_dir = f"tpch_{1.0}_data"
 
 2. **Apply to All Artifacts**: Use for files, directories, schemas, results
 
@@ -827,7 +797,6 @@ Dependency Validation
 
    .. code-block:: bash
 
-       # .github/workflows/test.yml
        - name: Validate dependencies
          run: python -m benchbox.utils.dependency_validation
 

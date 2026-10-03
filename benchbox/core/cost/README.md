@@ -175,14 +175,13 @@ The framework provides user-facing warnings in the `warnings` array:
 Phase costs now include timing information for better cost analysis:
 
 ```python
-# Example: Understanding concurrent execution costs
 phase_cost = {
     "phase_name": "throughput_test",
-    "total_cost": 12.40,                    # Sum of all 88 queries
-    "query_count": 88,                      # 4 streams × 22 queries
-    "wall_clock_duration_seconds": 300.0,   # 5 minutes actual runtime
-    "concurrent_streams": 4,                # Queries ran concurrently
-    "effective_cost_per_hour": 148.80       # $12.40 / (300/3600) = $148.80/hr
+    "total_cost": 12.40,
+    "query_count": 88,
+    "wall_clock_duration_seconds": 300.0,
+    "concurrent_streams": 4,
+    "effective_cost_per_hour": 148.80
 }
 ```
 
@@ -197,9 +196,8 @@ All cost estimates include pricing version tracking:
 
 ```python
 platform_details = {
-    "pricing_version": "2026.09",      # YYYY.MM format
-    "pricing_date": "unknown",         # No file-level refresh date tracked
-    # ... other platform details
+    "pricing_version": "2026.09",
+    "pricing_date": "unknown",
 }
 ```
 
@@ -220,10 +218,10 @@ When benchmark data is loaded, storage costs are automatically estimated:
 
 ```python
 storage_estimate = {
-    "storage_cost": 0.1534,          # Prorated for duration
-    "storage_tb": 4.87,              # Data size in TB
-    "price_per_tb_month": 23.00,     # Monthly storage rate
-    "duration_hours": 1.0,           # Storage duration
+    "storage_cost": 0.1534,
+    "storage_tb": 4.87,
+    "price_per_tb_month": 23.00,
+    "duration_hours": 1.0,
     "note": "Platform-specific notes..."
 }
 ```
@@ -286,7 +284,6 @@ the vendor table; for what the calculator charges, see `pricing_data.yaml`.
 ```python
 resource_usage = {"credits_used": 0.5}
 config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
-# Cost = 0.5 credits × $2.00 = $1.00
 ```
 
 ### BigQuery
@@ -312,9 +309,8 @@ config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
 
 **Example**:
 ```python
-resource_usage = {"bytes_billed": 1024**4}  # 1 TiB
+resource_usage = {"bytes_billed": 1024**4}
 config = {"location": "us"}
-# Cost = 1 TiB × $6.25 = $6.25
 ```
 
 **No free-tier modeling**: BenchBox charges the on-demand list rate from byte
@@ -357,9 +353,8 @@ Scan-priced platforms report the unit actually billed, per
 
 **Example**:
 ```python
-resource_usage = {"execution_time_seconds": 3600}  # 1 hour
+resource_usage = {"execution_time_seconds": 3600}
 config = {"node_type": "ra3.4xlarge", "node_count": 4, "region": "us-east-1"}
-# Cost = 1 hour × 4 nodes × $3.26 = $13.04
 ```
 
 ### Databricks
@@ -396,14 +391,13 @@ config = {"node_type": "ra3.4xlarge", "node_count": 4, "region": "us-east-1"}
 
 **Example**:
 ```python
-resource_usage = {"execution_time_seconds": 1800}  # 30 minutes
+resource_usage = {"execution_time_seconds": 1800}
 config = {
     "cloud": "aws",
     "tier": "premium",
-    "workload_type": "sql_compute",  # billed at the SQL Pro rate
-    "cluster_size_dbu_per_hour": 8.0,  # Medium warehouse
+    "workload_type": "sql_compute",
+    "cluster_size_dbu_per_hour": 8.0,
 }
-# Cost = 0.5 hours × 8 DBU/hour × $0.55 = $2.20
 ```
 
 ## Concurrent Query Cost Semantics
@@ -633,7 +627,6 @@ from benchbox.core.results.exporter import ResultExporter
 
 exporter = ResultExporter()
 exporter.export_result(benchmark_results, output_file)
-# Cost estimation added automatically before JSON export
 ```
 
 ### Manual Cost Estimation
@@ -643,10 +636,8 @@ You can also manually add cost estimation:
 ```python
 from benchbox.core.cost.integration import add_cost_estimation_to_results
 
-# Automatic config extraction from results.platform_info
 updated_results = add_cost_estimation_to_results(benchmark_results)
 
-# Or with explicit config override
 platform_config = {
     "edition": "enterprise",
     "cloud": "azure",
@@ -663,18 +654,16 @@ updated_results = add_cost_estimation_to_results(
 Override platform configuration for what-if scenarios:
 
 ```python
-# Test cost with different warehouse size
 snowflake_config = {
     "edition": "standard",
     "cloud": "aws",
     "region": "us-east-1",
-    "warehouse_size": "X-LARGE",  # Override extracted size
+    "warehouse_size": "X-LARGE",
 }
 
-# Test cost with different pricing tier
 databricks_config = {
     "cloud": "aws",
-    "tier": "enterprise",  # Test enterprise pricing
+    "tier": "enterprise",
     "workload_type": "sql_compute",
     "cluster_size_dbu_per_hour": 16.0,
 }
@@ -735,25 +724,21 @@ Cost information is included in the JSON export (schema v1.1):
 Platform adapters must populate `resource_usage` with required fields:
 
 ```python
-# Snowflake
 resource_usage = {
-    "credits_used": 0.5,  # Required
-    "bytes_scanned": 1024000,  # Optional
+    "credits_used": 0.5,
+    "bytes_scanned": 1024000,
 }
 
-# BigQuery
 resource_usage = {
-    "bytes_billed": 1024**4,  # Required (or bytes_processed)
+    "bytes_billed": 1024**4,
 }
 
-# Redshift
 resource_usage = {
-    "execution_time_seconds": 3600,  # Required
+    "execution_time_seconds": 3600,
 }
 
-# Databricks
 resource_usage = {
-    "execution_time_seconds": 1800,  # Required (or dbu_consumed)
+    "execution_time_seconds": 1800,
 }
 ```
 
@@ -764,30 +749,22 @@ Validation automatically logs warnings for missing required fields.
 Configuration is validated before cost calculation:
 
 ```python
-# Snowflake - requires edition, cloud, region
 config = {
     "edition": "standard",
     "cloud": "aws",
-    # Missing "region" - validation will warn
 }
 
-# BigQuery - requires location
 config = {
-    # Missing "location" - validation will warn
 }
 
-# Redshift - requires node_type, node_count, region
 config = {
     "node_type": "ra3.4xlarge",
     "node_count": 4,
-    # Missing "region" - validation will warn
 }
 
-# Databricks - requires cloud, tier, workload_type, cluster_size_dbu_per_hour
 config = {
     "cloud": "aws",
     "tier": "premium",
-    # Missing "workload_type" and "cluster_size_dbu_per_hour" - validation will warn
 }
 ```
 
@@ -858,14 +835,12 @@ the audit trail of what rate actually produced each estimate.
 The framework has comprehensive test coverage:
 
 ```bash
-# Run all cost framework tests
 pytest tests/unit/core/cost/
 
-# Run specific test suites
-pytest tests/unit/core/cost/test_calculator.py      # Cost calculations
-pytest tests/unit/core/cost/test_integration.py     # Integration tests
-pytest tests/unit/core/cost/test_validation.py      # Resource usage validation
-pytest tests/unit/core/cost/test_config_validation.py  # Config validation
+pytest tests/unit/core/cost/test_calculator.py
+pytest tests/unit/core/cost/test_integration.py
+pytest tests/unit/core/cost/test_validation.py
+pytest tests/unit/core/cost/test_config_validation.py
 ```
 
 Test coverage includes:

@@ -20,10 +20,8 @@ TimescaleDB is a PostgreSQL extension for time-series workloads with hypertables
 Use deployment mode colon syntax with `--platform`:
 
 ```bash
-# Self-hosted (default)
 benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0
 
-# TigerData managed cloud
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.01
 ```
 
@@ -62,12 +60,11 @@ export TIMESCALE_SERVICE_URL='postgres://tsdbadmin:password@abc123.tsdb.cloud.ti
 ### Option B: Individual Environment Variables
 
 ```bash
-# Primary (preferred)
 export TIGERDATA_HOST='abc123.rc8ft3nbrw.tsdb.cloud.timescale.com'
 export TIGERDATA_PASSWORD='your-password'
-export TIGERDATA_USER='tsdbadmin'        # optional (default: tsdbadmin)
-export TIGERDATA_PORT='5432'             # optional (default: 5432)
-export TIGERDATA_DATABASE='tsdb'         # optional (default: tsdb)
+export TIGERDATA_USER='tsdbadmin'
+export TIGERDATA_PORT='5432'
+export TIGERDATA_DATABASE='tsdb'
 
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.01 --non-interactive
 ```
@@ -97,13 +94,10 @@ CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 ## Common Commands
 
 ```bash
-# TPC-H smoke on TigerData cloud
 benchbox run --platform timescaledb:cloud --benchmark tpch --scale 0.01 --phases power --non-interactive
 
-# TSBS on self-hosted TimescaleDB
 benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0 --non-interactive
 
-# Self-hosted with compression options
 benchbox run --platform timescaledb --benchmark tsbs-devops --scale 1.0 \
   --platform-option chunk_interval='1 day' \
   --platform-option compression_enabled=true \
@@ -133,10 +127,8 @@ TigerData cloud requires TLS. BenchBox defaults cloud mode to `sslmode=require`.
 ## Troubleshooting
 
 ```bash
-# Verify TimescaleDB extension
 psql -c "SELECT extversion FROM pg_extension WHERE extname = 'timescaledb';"
 
-# Check cloud connectivity manually
 psql "$TIGERDATA_SERVICE_URL"
 ```
 

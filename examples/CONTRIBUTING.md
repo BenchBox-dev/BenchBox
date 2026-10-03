@@ -84,41 +84,19 @@ examples/
 
 Every example should follow this structure:
 
+Describe what the example demonstrates, when to use it and its prerequisites
+in the directory README. Source files carry no explanatory comments or
+docstrings; see the [comment policy](../docs/development/comment-policy.md).
+
 ```python
-#!/usr/bin/env python3
-"""Brief One-Line Description
-
-Multi-paragraph detailed description of what this example demonstrates,
-when to use it, and what you'll learn.
-
-Useful for:
-- Use case 1
-- Use case 2
-- Use case 3
-
-Prerequisites:
-- Dependency 1 (if any)
-- Environment variable requirements
-- Platform setup steps
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 import argparse
 import sys
 from pathlib import Path
 
-# Standard library imports first
-# Third-party imports second
-# BenchBox imports last
-
 def main():
-    """Main entry point with clear steps."""
-    # 1. Parse arguments
-    # 2. Validate inputs
-    # 3. Execute benchmark
-    # 4. Display results
     pass
 
 if __name__ == "__main__":
@@ -137,7 +115,7 @@ if __name__ == "__main__":
 Every example must include:
 
 1. **Shebang line:** `#!/usr/bin/env python3`
-2. **Module docstring:** Triple-quoted, multi-paragraph
+2. **README entry:** Description, use cases and prerequisites in the directory README
 3. **Copyright notice:** MIT License
 4. **CLI support:** `argparse` or `--help` flag
 5. **Error handling:** Try-except with user-friendly messages
@@ -155,12 +133,11 @@ Every example must include:
 - **Formatting tool:** `ruff format`
 - **Linting:** `ruff check` must pass
 - **Type hints:** Required for function signatures
-- **Docstrings:** Required for modules and functions
+- **Comments and docstrings:** None; follow the [comment policy](../docs/development/comment-policy.md)
 
 ### Error Handling
 
 ```python
-# ✅ Good - User-friendly error messages
 try:
     result = execute_benchmark(config)
 except MissingCredentialsError as e:
@@ -168,7 +145,6 @@ except MissingCredentialsError as e:
     print("Set DATABRICKS_TOKEN environment variable")
     sys.exit(1)
 
-# ❌ Bad - Bare exception, no context
 try:
     result = execute_benchmark(config)
 except Exception:
@@ -179,7 +155,6 @@ except Exception:
 ### Output Formatting
 
 ```python
-# ✅ Good - Clear status indicators and context
 print("==" * 30)
 print("Running TPC-H Power Test")
 print("==" * 30)
@@ -187,7 +162,6 @@ print(f"✅ Data generated: {data_size_mb} MB")
 print(f"✅ Schema created: {table_count} tables")
 print(f"⚠️  Running 22 queries (this may take a few minutes)...")
 
-# ❌ Bad - Unclear, no visual hierarchy
 print("Running test")
 print("Done")
 ```
@@ -264,7 +238,7 @@ When adding a new example, update `examples/MAPPING.md`:
 **Target audience:** First-time users, tutorial walkthrough
 
 **Characteristics:**
-- Step-by-step with comments
+- Step-by-step structure
 - Minimal configuration
 - Clear progression (local → cloud → intermediate)
 - ~50-100 lines each
@@ -367,7 +341,7 @@ When adding a new example, update `examples/MAPPING.md`:
 **Characteristics:**
 - YAML configuration files
 - Copy-paste ready
-- Comments explain each setting
+- The directory README explains each setting
 - Platform-specific and benchmark-specific
 
 **Structure:**
@@ -390,7 +364,7 @@ tunings/
 Before submitting a pull request:
 
 - [ ] File follows naming convention
-- [ ] Module docstring with description, use cases, prerequisites
+- [ ] Description, use cases and prerequisites in the directory README
 - [ ] Copyright notice included
 - [ ] Shebang line (`#!/usr/bin/env python3`)
 - [ ] CLI arguments supported (`argparse`)
@@ -431,7 +405,6 @@ if args.dry_run:
     result = dry_run.execute_dry_run(benchmark_config, system_profile, database_config)
     print(f"✅ Dry-run artifacts saved to: {args.dry_run}")
 else:
-    # Normal execution
     result = executor.run_benchmark(config)
 ```
 
@@ -485,7 +458,7 @@ def validate_databricks_credentials():
 
 When removing or significantly changing an example:
 
-1. **Add deprecation notice** to file docstring (1 release cycle)
+1. **Add deprecation notice** to the directory README (1 release cycle)
 2. **Update documentation** to point to replacement
 3. **Remove file** and update MAPPING.md
 4. **Update navigation** in relevant READMEs

@@ -20,26 +20,21 @@ All examples in the parent directories demonstrate programmatic usage. This READ
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
-# 1. Create benchmark
 benchmark = TPCH(
     scale_factor=0.01,
     output_dir="./data",
     force_regenerate=False
 )
 
-# 2. Generate data
 benchmark.generate_data()
 
-# 3. Create platform adapter
 adapter = DuckDBAdapter(database_path=":memory:")
 
-# 4. Run benchmark
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="power"
 )
 
-# 5. Access results
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.total_queries}")
 ```
@@ -71,54 +66,42 @@ See: [use_cases/](../use_cases/) directory
 ### Benchmark Creation
 
 ```python
-# TPC-H
 from benchbox.tpch import TPCH
 benchmark = TPCH(scale_factor=0.1, output_dir="./data")
 
-# TPC-DS
 from benchbox.tpcds import TPCDS
 benchmark = TPCDS(scale_factor=0.1, output_dir="./data")
 
-# Other benchmarks available:
-# - TPCDI, SSB, ClickBench, AMPLab, H2ODB, JoinOrder, ReadPrimitives, WritePrimitives, TPCHavoc, CoffeeShop
 ```
 
 ### Platform Adapters
 
 ```python
-# DuckDB
 from benchbox.platforms.duckdb import DuckDBAdapter
 adapter = DuckDBAdapter(database_path=":memory:")
 
-# SQLite
 from benchbox.platforms.sqlite import SQLiteAdapter
 adapter = SQLiteAdapter(database_path="./db.sqlite")
 
-# ClickHouse
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 adapter = ClickHouseAdapter(host="localhost", port=9000)
 
-# Cloud platforms: Databricks, BigQuery, Snowflake, Redshift
-# See getting_started/cloud/ for examples
 ```
 
 ### Running Benchmarks
 
 ```python
-# Full benchmark
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="power"
 )
 
-# Query subset
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="power",
     query_subset=["1", "6", "12"]
 )
 
-# With custom configuration
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="throughput",
@@ -129,18 +112,15 @@ results = adapter.run_benchmark(
 ### Result Processing
 
 ```python
-# Access overall metrics
 print(results.total_execution_time)
 print(results.total_queries)
 print(results.successful_queries)
 print(results.average_query_time)
 
-# Iterate over query results
 for query_result in results.query_results:
     print(f"{query_result.query_name}: {query_result.execution_time:.3f}s")
 
-# Export results
-results_dict = results.model_dump()  # Convert to dictionary
+results_dict = results.model_dump()
 import json
 with open("results.json", "w") as f:
     json.dump(results_dict, f, indent=2)
@@ -181,11 +161,9 @@ from benchbox.base import BaseBenchmark
 
 class MyBenchmark(BaseBenchmark):
     def generate_data(self):
-        # Custom data generation
         pass
 
     def get_query(self, query_id, params=None):
-        # Custom query retrieval
         pass
 ```
 
@@ -261,7 +239,6 @@ def run_performance_test():
     adapter = DuckDBAdapter(database_path=":memory:")
     results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-    # Store results
     import json
     with open("/tmp/results.json", "w") as f:
         json.dump(results.model_dump(), f)

@@ -183,6 +183,24 @@ so both delta and absolute gates pass. The historical failure remains useful
 evidence that the delta gate caught a real regression and governance did not
 weaken or absorb it.
 
+## Cross-surface known-divergence baseline
+
+`benchbox/core/equivalence/cross_surface_baseline.yaml` lists the cells that the
+cross-surface SQL and DataFrame equivalence gates tolerate. Each entry is a
+`<gate>: {<query>_<backend>: <reason>}` mapping for one understood, verified and
+non-discriminating presentational difference. It is not a general ignore list:
+an entry mutes regressions on that exact cell.
+
+The gate fails when an entry stops reproducing its divergence, so stale entries
+cannot mask a different regression on the same key. Prune them with
+`make cross-surface-update-baseline BENCHMARK=<gate>`, which removes only entries
+that no longer reproduce and refuses to write when the run has any other failure.
+
+An entry that needs an executable acceptance predicate, such as a
+`ClassifiedDivergence` pinned to a column position, numeric bound or error text,
+stays in `benchbox/core/equivalence/cross_surface.py`. Each gate merges its
+section of this file with its in-code entries.
+
 ## Rejected alternatives and deferrals
 
 | Alternative | Why rejected |

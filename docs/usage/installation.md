@@ -11,16 +11,12 @@ reaches end of life in October 2027.
 ## 1. Install BenchBox
 
 ```bash
-# Recommended: uv (modern package management)
 uv add benchbox
 
-# Alternative (pip-compatible)
 uv pip install benchbox
 
-# Traditional pip (uses the active Python environment)
 python -m pip install benchbox
 
-# pipx for a dedicated CLI environment
 pipx install benchbox
 ```
 
@@ -53,11 +49,9 @@ Stable DuckDB releases remain the default. To test the current
 DuckDB extra and then select the preview package explicitly:
 
 ```bash
-# uv project
 uv add benchbox --extra duckdb
 uv add --prerelease=allow "duckdb==1.6.0.dev379"
 
-# Active pip environment
 python -m pip install "benchbox[duckdb]" "duckdb==1.6.0.dev379"
 ```
 
@@ -80,23 +74,18 @@ For managed Spark platforms, use provider-specific extras to install only the de
 | `[cloud-spark]` | All cloud Spark platforms | All of the above |
 
 ```bash
-# AWS users: Install only AWS Spark dependencies
 uv add benchbox --extra cloud-spark-aws
 
-# Multi-cloud: Install all cloud Spark dependencies
 uv add benchbox --extra cloud-spark
 
-# Combine with other extras
 uv add benchbox --extra cloud-spark-aws --extra athena
 ```
 
 ### Combining Extras
 
 ```bash
-# Recommended: Enable all cloud platforms and ClickHouse
 uv add benchbox --extra cloud --extra clickhouse
 
-# Alternative (pip-compatible)
 uv pip install "benchbox[cloud,clickhouse]"
 ```
 
@@ -124,13 +113,10 @@ The command prints the current BenchBox version and validates that `pyproject.to
 `benchbox check-deps` inspects optional connectors and suggests install commands.
 
 ```bash
-# Overview of all platforms
 uv run -- benchbox check-deps
 
-# Detailed matrix with extras guidance
 uv run -- benchbox check-deps --matrix
 
-# Focus on a single platform
 uv run -- benchbox check-deps --platform snowflake --verbose
 ```
 

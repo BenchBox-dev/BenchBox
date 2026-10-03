@@ -137,17 +137,13 @@ Full table operations:
 ```python
 from benchbox import NYCTaxi
 
-# Initialize NYC Taxi benchmark
 nyctaxi = NYCTaxi(scale_factor=1.0, output_dir="nyctaxi_data")
 
-# Download/generate data
 data_files = nyctaxi.generate_data()
 
-# Get all benchmark queries
 queries = nyctaxi.get_queries()
 print(f"Generated {len(queries)} NYC Taxi queries")
 
-# Get specific query
 hourly_query = nyctaxi.get_query("trips-per-hour")
 print(hourly_query)
 ```
@@ -155,12 +151,11 @@ print(hourly_query)
 ### Configuring Data Year and Months
 
 ```python
-# Use specific year and months
 nyctaxi_2023 = NYCTaxi(
     scale_factor=0.1,
     output_dir="nyctaxi_2023",
     year=2023,
-    months=[1, 2, 3]  # Q1 only
+    months=[1, 2, 3]
 )
 data_files = nyctaxi_2023.generate_data()
 ```
@@ -171,11 +166,9 @@ data_files = nyctaxi_2023.generate_data()
 import duckdb
 from benchbox import NYCTaxi
 
-# Initialize and generate data
 nyctaxi = NYCTaxi(scale_factor=0.1, output_dir="nyctaxi_small")
 data_files = nyctaxi.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("nyctaxi.duckdb")
 schema_sql = nyctaxi.get_create_tables_sql(dialect="duckdb")
 
@@ -183,7 +176,6 @@ for stmt in schema_sql.split(";"):
     if stmt.strip():
         conn.execute(stmt)
 
-# Load data efficiently with DuckDB
 zones_file = nyctaxi.tables["taxi_zones"]
 trips_file = nyctaxi.tables["trips"]
 
@@ -197,7 +189,6 @@ conn.execute(f"""
     SELECT * FROM read_csv('{trips_file}', header=true)
 """)
 
-# Run queries
 queries = nyctaxi.get_queries()
 
 for query_id, query_sql in list(queries.items())[:5]:
@@ -214,7 +205,6 @@ from benchbox import NYCTaxi
 
 nyctaxi = NYCTaxi(scale_factor=0.01)
 
-# Get queries by category
 temporal_queries = nyctaxi.get_queries_by_category("temporal")
 print(f"Temporal queries: {temporal_queries}")
 
@@ -224,7 +214,6 @@ print(f"Geographic queries: {geographic_queries}")
 financial_queries = nyctaxi.get_queries_by_category("financial")
 print(f"Financial queries: {financial_queries}")
 
-# Get detailed query info
 info = nyctaxi.get_query_info("trips-per-hour")
 print(f"Query info: {info}")
 ```
@@ -244,7 +233,6 @@ Configure NYC Taxi data generation via `--benchmark-option KEY=VALUE`:
 Options accept hyphenated aliases (e.g. `taxi-types` for `taxi_types`).
 
 ```bash
-# Load only yellow and green trips from Jan-Mar 2022
 benchbox run --platform duckdb --benchmark nyctaxi --scale 1 \
   --benchmark-option taxi_types=yellow,green \
   --benchmark-option year=2022 \
@@ -405,9 +393,7 @@ The NYC Taxi data exhibits realistic patterns:
 
 **Issue**: Unable to download TLC data (network restrictions, rate limiting)
 ```python
-# Solution: Use synthetic data fallback (automatic)
 nyctaxi = NYCTaxi(scale_factor=0.1)
-# Benchmark will automatically generate synthetic data if download fails
 data_files = nyctaxi.generate_data()
 ```
 
@@ -415,7 +401,6 @@ data_files = nyctaxi.generate_data()
 
 **Issue**: Out of memory during data generation
 ```python
-# Solution: Process in smaller chunks using months
 for month in [1, 2, 3]:
     nyctaxi = NYCTaxi(
         scale_factor=10.0,
@@ -423,16 +408,13 @@ for month in [1, 2, 3]:
         months=[month]
     )
     data_files = nyctaxi.generate_data()
-    # Process and unload before next month
 ```
 
 ### Query Date Range Issues
 
 **Issue**: Queries return no results
 ```python
-# Solution: Ensure query date parameters match generated data
-nyctaxi = NYCTaxi(year=2023, months=[1])  # January 2023
-# Queries will be parameterized for Jan 1-31, 2023
+nyctaxi = NYCTaxi(year=2023, months=[1])
 ```
 
 ## Related Documentation

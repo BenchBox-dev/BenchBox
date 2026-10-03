@@ -69,10 +69,10 @@ re-measure references this field rather than recomputing it).
 ## Running locally
 
 ```bash
-uv run -- python _project/scripts/soundness_drain_report.py            # human digest, read-only
-uv run -- python _project/scripts/soundness_drain_report.py --json      # machine-readable, read-only
-uv run -- python _project/scripts/soundness_drain_report.py --apply     # also syncs the label + pinned issue
-uv run -- python _project/scripts/soundness_drain_report.py --self-test # fixture-only, no network
+uv run -- python _project/scripts/soundness_drain_report.py
+uv run -- python _project/scripts/soundness_drain_report.py --json
+uv run -- python _project/scripts/soundness_drain_report.py --apply
+uv run -- python _project/scripts/soundness_drain_report.py --self-test
 ```
 
 Auth is a short token-source chain, never a long-lived PAT: `GITHUB_TOKEN`

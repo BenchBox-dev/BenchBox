@@ -28,9 +28,7 @@ These images are essential - users choose chart types based on visual examples.
 
 **Generation approach:**
 ```bash
-# Generate sample data first, then capture terminal screenshots:
 benchbox visualize samples/*.json --chart-type performance_bar
-# Screenshot the terminal output for each chart type
 ```
 
 ---

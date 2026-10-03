@@ -93,8 +93,6 @@ Decision rules:
        def myplatform_strip_foreign_keys(self, stmt: str) -> str:
            return strip_foreign_keys(stmt)
 
-       # optimize_table_definition() is inherited; transformers are dispatched
-       # automatically in registration order — no manual wiring needed.
    ```
 
    If the adapter must keep a local create/load path instead, set

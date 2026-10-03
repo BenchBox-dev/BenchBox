@@ -18,10 +18,8 @@ Amazon EMR Serverless is AWS's serverless deployment option for running Apache S
 ## Installation
 
 ```bash
-# Install with EMR Serverless support
 uv add benchbox --extra emr-serverless
 
-# Dependencies installed: boto3
 ```
 
 ## Prerequisites
@@ -40,16 +38,12 @@ uv add benchbox --extra emr-serverless
 ### Environment Variables
 
 ```bash
-# Required
 export EMR_S3_STAGING_DIR=s3://your-bucket/benchbox/
 export EMR_EXECUTION_ROLE_ARN=arn:aws:iam::123456789012:role/EMRServerlessRole
 
-# Application (one of these required)
-export EMR_APPLICATION_ID=00f12345abc67890  # Existing application
-# OR
-export EMR_CREATE_APPLICATION=true          # Create new application
+export EMR_APPLICATION_ID=00f12345abc67890
+export EMR_CREATE_APPLICATION=true
 
-# Optional
 export AWS_REGION=us-east-1
 export EMR_DATABASE=benchbox
 export EMR_RELEASE_LABEL=emr-7.0.0
@@ -58,19 +52,16 @@ export EMR_RELEASE_LABEL=emr-7.0.0
 ### CLI Usage
 
 ```bash
-# Basic usage with existing application
 benchbox run --platform emr-serverless --benchmark tpch --scale 1.0 \
   --platform-option application_id=00f12345abc67890 \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option execution_role_arn=arn:aws:iam::123456789012:role/EMRRole
 
-# Create new application
 benchbox run --platform emr-serverless --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option execution_role_arn=arn:aws:iam::123456789012:role/EMRRole \
   --platform-option create_application=true
 
-# Dry-run to preview queries
 benchbox run --platform emr-serverless --benchmark tpch --dry-run ./preview \
   --platform-option s3_staging_dir=s3://bucket/benchbox/ \
   --platform-option execution_role_arn=arn:aws:iam::123456789012:role/EMRRole
@@ -94,7 +85,6 @@ benchbox run --platform emr-serverless --benchmark tpch --dry-run ./preview \
 ```python
 from benchbox.platforms.aws import EMRServerlessAdapter
 
-# Initialize with existing application
 adapter = EMRServerlessAdapter(
     application_id="00f12345abc67890",
     s3_staging_dir="s3://my-bucket/benchbox/",
@@ -103,7 +93,6 @@ adapter = EMRServerlessAdapter(
     database="tpch_benchmark",
 )
 
-# Or create new application
 adapter = EMRServerlessAdapter(
     s3_staging_dir="s3://my-bucket/benchbox/",
     execution_role_arn="arn:aws:iam::123456789012:role/EMRRole",
@@ -111,19 +100,15 @@ adapter = EMRServerlessAdapter(
     application_name="benchbox-tpch",
 )
 
-# Create database in Glue Data Catalog
 adapter.create_schema("tpch_sf1")
 
-# Load data to S3 and create Glue tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query (submitted as job run)
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Clean up (optionally stops application)
 adapter.close()
 ```
 

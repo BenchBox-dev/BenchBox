@@ -19,13 +19,10 @@ Apache Spark is the most widely deployed distributed computing framework for lar
 ## Installation
 
 ```bash
-# Install PySpark
 pip install pyspark
 
-# Or with specific version
 pip install pyspark==3.5.0
 
-# For Delta Lake support
 pip install delta-spark
 ```
 
@@ -34,11 +31,9 @@ pip install delta-spark
 ### Environment Variables
 
 ```bash
-# Spark configuration
 export SPARK_HOME=/path/to/spark
 export PYSPARK_PYTHON=python3
 
-# For distributed mode
 export SPARK_MASTER=spark://master:7077
 ```
 
@@ -70,7 +65,6 @@ benchbox run --platform spark --benchmark tpch --scale 1.0 \
 ### Local Mode
 
 ```bash
-# Run locally with all cores
 benchbox run --platform spark --benchmark tpch --scale 0.1 \
   --platform-option master="local[*]"
 ```
@@ -78,7 +72,6 @@ benchbox run --platform spark --benchmark tpch --scale 0.1 \
 ### Cluster Mode
 
 ```bash
-# Run on Spark cluster
 benchbox run --platform spark --benchmark tpch --scale 10.0 \
   --platform-option master=spark://master:7077 \
   --platform-option num_executors=10 \
@@ -91,14 +84,12 @@ benchbox run --platform spark --benchmark tpch --scale 10.0 \
 from benchbox import TPCH
 from benchbox.platforms.spark import SparkAdapter
 
-# Initialize adapter
 adapter = SparkAdapter(
     master="local[*]",
     driver_memory="4g",
     app_name="TPC-H Benchmark",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -110,7 +101,6 @@ results = adapter.run_benchmark(benchmark)
 ```python
 from benchbox.platforms.spark import SparkAdapter
 
-# Initialize with Delta Lake
 adapter = SparkAdapter(
     master="local[*]",
     table_format="delta",
@@ -129,19 +119,16 @@ Best for development and small datasets:
 
 ```bash
 benchbox run --platform spark --benchmark tpch --scale 0.1 \
-  --platform-option master="local[4]"  # 4 cores
+  --platform-option master="local[4]"
 ```
 
 ### Standalone Cluster
 
 ```bash
-# Start master
 $SPARK_HOME/sbin/start-master.sh
 
-# Start workers
 $SPARK_HOME/sbin/start-worker.sh spark://master:7077
 
-# Run benchmark
 benchbox run --platform spark --benchmark tpch --scale 10.0 \
   --platform-option master=spark://master:7077
 ```
@@ -222,7 +209,6 @@ benchbox run --platform spark --benchmark tpch \
 Spark provides detailed physical and logical plans:
 
 ```python
-# Get query plan
 spark.sql("SELECT ...").explain(extended=True)
 ```
 
@@ -237,7 +223,6 @@ spark.sql("SELECT ...").explain(extended=True)
 ### Out of Memory
 
 ```python
-# Increase memory
 adapter = SparkAdapter(
     driver_memory="8g",
     executor_memory="16g",
@@ -250,7 +235,6 @@ adapter = SparkAdapter(
 ### Shuffle Spill
 
 ```python
-# Reduce shuffle partition size
 adapter = SparkAdapter(
     spark_config={
         "spark.sql.shuffle.partitions": "400",
@@ -262,10 +246,8 @@ adapter = SparkAdapter(
 ### Connection to Master Failed
 
 ```bash
-# Verify master is running
-curl http://master:8080  # Web UI
+curl http://master:8080
 
-# Check firewall rules
 ```
 
 ## Related Documentation

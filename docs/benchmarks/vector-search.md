@@ -45,14 +45,11 @@ kNN, and approximate (ANN) search over synthetic embedding data.
 ## Usage
 
 ```bash
-# Default: 128-dimensional vectors, SF=1 (~1M vectors)
 benchbox run --platform duckdb --benchmark vector_search --scale 1.0
 
-# Smaller vectors for quick tests
 benchbox run --platform duckdb --benchmark vector_search --scale 0.1 \
   --benchmark-option dimensions=64
 
-# Higher-dimensional embeddings
 benchbox run --platform duckdb --benchmark vector_search --scale 1.0 \
   --benchmark-option dimensions=768
 ```

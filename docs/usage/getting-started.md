@@ -13,7 +13,6 @@ Follow these steps to install BenchBox, verify your environment, and run a repro
 2. Ensure DuckDB can create temporary files in your working directory. No other services are required for the quick start.
 
 ```bash
-# Optional: create an isolated project directory
 mkdir benchbox-demo && cd benchbox-demo
 ```
 
@@ -77,13 +76,10 @@ The results display shows timing, validation status, and per-query metrics from 
 Share your results in different formats without re-running the benchmark:
 
 ```bash
-# Export to CSV for spreadsheet analysis
 uv run -- benchbox export --last --format csv
 
-# Generate HTML report for sharing with team
 uv run -- benchbox export --last --format html --output-dir ./reports/
 
-# Export to all formats
 uv run -- benchbox export --last --format json --format csv --format html
 ```
 
@@ -100,10 +96,8 @@ BenchBox also supports benchmarking DataFrame libraries using their native APIs.
 ### Quick Start with DataFrames
 
 ```bash
-# Polars DataFrame (included in base install)
 uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
-# Pandas DataFrame (requires extra)
 uv add benchbox --extra pandas
 uv run -- benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 ```
@@ -111,9 +105,8 @@ uv run -- benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 ### Compare SQL vs DataFrame
 
 ```bash
-# Run the same benchmark with different paradigms
-uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.1     # SQL
-uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.1  # DataFrame
+uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.1
+uv run -- benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
 
 For more details, see the [DataFrame Platforms Guide](../platforms/dataframe.md).

@@ -24,10 +24,8 @@ pg_duckdb is a PostgreSQL extension that embeds DuckDB's columnar-vectorized ana
 pg_duckdb supports two deployment modes, selectable via the colon syntax:
 
 ```bash
-# Self-hosted (default) - PostgreSQL with pg_duckdb extension
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0
 
-# MotherDuck mode - hybrid local+cloud queries
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
 
@@ -48,10 +46,8 @@ Connect pg_duckdb to MotherDuck for hybrid queries:
 **MotherDuck Configuration:**
 
 ```bash
-# Set MotherDuck token
 export MOTHERDUCK_TOKEN=your-token-here
 
-# Run benchmark with MotherDuck hybrid mode
 benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ```
 
@@ -101,26 +97,21 @@ docker run -d --name pg-duckdb \
   -p 5432:5432 \
   pgduckdb/pgduckdb:18-v1.1.1
 
-# Verify extension
 psql -h localhost -U postgres -c "CREATE EXTENSION pg_duckdb;"
 ```
 
 ## Quick Start
 
 ```bash
-# Basic TPC-H benchmark
 benchbox run --platform pg-duckdb --benchmark tpch --scale 0.01
 
-# With custom connection
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option host=pgduckdb.example.com \
   --platform-option password=secret
 
-# Disable force execution (let PostgreSQL choose when to use DuckDB)
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option force_execution=false
 
-# Configure parallel scan threads
 benchbox run --platform pg-duckdb --benchmark tpch --scale 1.0 \
   --platform-option postgres_scan_threads=8
 ```

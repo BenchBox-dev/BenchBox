@@ -25,10 +25,8 @@ Databricks provides a unified lakehouse platform combining data lakes with wareh
 ## Installation
 
 ```bash
-# Install Databricks SQL connector
 pip install databricks-sql-connector databricks-sdk
 
-# Or via BenchBox extras
 pip install "benchbox[databricks]"
 ```
 
@@ -119,7 +117,6 @@ revert a manually-installed version and how to work around it.
 ### Personal Access Token
 
 ```bash
-# Generate token: User Settings > Developer > Access Tokens
 export DATABRICKS_TOKEN=dapi1234567890abcdef
 
 benchbox run --platform databricks --benchmark tpch --scale 1.0
@@ -128,7 +125,6 @@ benchbox run --platform databricks --benchmark tpch --scale 1.0
 ### OAuth (M2M)
 
 ```bash
-# Service principal authentication
 export DATABRICKS_CLIENT_ID=your_client_id
 export DATABRICKS_CLIENT_SECRET=your_client_secret
 
@@ -139,7 +135,6 @@ benchbox run --platform databricks --benchmark tpch \
 ### Azure AD (Azure Databricks)
 
 ```bash
-# Azure Active Directory token
 export ARM_CLIENT_ID=your_client_id
 export ARM_CLIENT_SECRET=your_client_secret
 export ARM_TENANT_ID=your_tenant_id
@@ -153,14 +148,12 @@ benchbox run --platform databricks --benchmark tpch \
 ### Basic Benchmark
 
 ```bash
-# TPC-H on SQL Warehouse
 benchbox run --platform databricks --benchmark tpch --scale 1.0
 ```
 
 ### With Unity Catalog
 
 ```bash
-# Specify catalog and schema
 benchbox run --platform databricks --benchmark tpch --scale 10.0 \
   --platform-option catalog=benchmarks \
   --platform-option schema=tpch_sf10
@@ -169,7 +162,6 @@ benchbox run --platform databricks --benchmark tpch --scale 10.0 \
 ### With Tuning
 
 ```bash
-# Apply Delta Lake optimizations
 benchbox run --platform databricks --benchmark tpch --scale 10.0 \
   --tuning tuned
 ```
@@ -210,13 +202,10 @@ results = adapter.run_benchmark(benchmark)
 BenchBox applies Delta optimizations with `--tuning tuned`:
 
 ```sql
--- Optimize file layout
 OPTIMIZE lineitem ZORDER BY (l_shipdate);
 
--- Clustering (liquid clustering)
 ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey);
 
--- Vacuum old versions
 VACUUM lineitem RETAIN 0 HOURS;
 ```
 
@@ -230,7 +219,6 @@ runs); see `docs/reference/result-formats.md`.
 Photon is automatically enabled on SQL Warehouses:
 
 ```bash
-# Verify Photon is enabled
 benchbox run --platform databricks --benchmark tpch --scale 1.0 \
   --platform-option check_photon=true
 ```
@@ -246,7 +234,6 @@ BenchBox disables caching for accurate benchmarks by using unique query tags.
 Data uploaded to managed volumes, then loaded via COPY INTO:
 
 ```bash
-# Automatic with UC enabled
 benchbox run --platform databricks --benchmark tpch --scale 1.0
 ```
 
@@ -255,7 +242,6 @@ benchbox run --platform databricks --benchmark tpch --scale 1.0
 For large datasets, use external cloud storage:
 
 ```bash
-# Configure external staging
 benchbox run --platform databricks --benchmark tpch --scale 100.0 \
   --output s3://bucket/benchbox/
 ```
@@ -277,8 +263,6 @@ benchbox run --platform databricks --benchmark tpch --scale 1.0 \
 Configure warehouses to auto-stop:
 
 ```sql
--- Set via UI or API
--- Warehouse Settings > Auto Stop > 10 minutes
 ```
 
 ### Serverless Warehouses
@@ -295,30 +279,22 @@ benchbox run --platform databricks --benchmark tpch \
 ### Authentication Failed
 
 ```bash
-# Verify token is valid
 curl -H "Authorization: Bearer $DATABRICKS_TOKEN" \
   https://your-workspace.cloud.databricks.com/api/2.0/clusters/list
 
-# Check token expiration
-# Tokens expire after 90 days by default
 ```
 
 ### SQL Warehouse Not Found
 
 ```bash
-# List warehouses via API
 curl -H "Authorization: Bearer $DATABRICKS_TOKEN" \
   https://your-workspace.cloud.databricks.com/api/2.0/sql/warehouses
 
-# Verify http_path format
-# SQL Warehouse: /sql/1.0/warehouses/<warehouse_id>
-# Cluster: /sql/protocolv1/o/<org_id>/<cluster_id>
 ```
 
 ### Unity Catalog Access Denied
 
 ```sql
--- Grant catalog access
 GRANT USE CATALOG ON CATALOG benchmarks TO `user@company.com`;
 GRANT CREATE SCHEMA ON CATALOG benchmarks TO `user@company.com`;
 ```
@@ -326,11 +302,8 @@ GRANT CREATE SCHEMA ON CATALOG benchmarks TO `user@company.com`;
 ### Volume Upload Failed
 
 ```bash
-# Verify volume exists and has write access
-# Create volume if needed (SQL Warehouse)
 CREATE VOLUME IF NOT EXISTS benchmarks.staging.uploads;
 
-# Grant permissions
 GRANT WRITE VOLUME ON VOLUME benchmarks.staging.uploads TO `user@company.com`;
 ```
 

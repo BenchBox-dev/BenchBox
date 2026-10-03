@@ -30,12 +30,10 @@ Export and analyze benchmark results:
     from benchbox.platforms.duckdb import DuckDBAdapter
     from benchbox.core.results.exporter import ResultExporter
 
-    # Run benchmark
     benchmark = TPCH(scale_factor=0.01)
     adapter = DuckDBAdapter()
     results = adapter.run_benchmark(benchmark)
 
-    # Export results
     exporter = ResultExporter(output_dir="benchmark_results")
     exported_files = exporter.export_result(results, formats=["json", "csv", "html"])
 
@@ -140,9 +138,6 @@ Export benchmark results to multiple formats with anonymization support.
 
        exporter = ResultExporter()
        files = exporter.export_result(results, formats=["json", "csv", "html"])
-       # {'json': Path('tpch_sf001_duckdb_20250112_120000.json'),
-       #  'csv': Path('tpch_sf001_duckdb_20250112_120000.csv'),
-       #  'html': Path('tpch_sf001_duckdb_20250112_120000.html')}
 
 .. method:: list_results() -> list[dict[str, Any]]
 
@@ -169,10 +164,6 @@ Export benchmark results to multiple formats with anonymization support.
 
        exporter = ResultExporter()
        exporter.show_results_summary()
-       # Output:
-       # Exported Results (15 total)
-       # Output directory: /path/to/results
-       # [Rich table with benchmark, timestamp, duration, queries, status]
 
 .. method:: compare_results(baseline_path, current_path) -> dict[str, Any]
 
@@ -194,7 +185,6 @@ Export benchmark results to multiple formats with anonymization support.
            Path("current_results.json")
        )
 
-       # Check overall performance
        perf = comparison['performance_changes']['average_query_time']
        print(f"Average query time: {perf['change_percent']:.2f}% change")
        if perf['improved']:
@@ -300,14 +290,11 @@ Collect detailed timing information during query execution.
        collector = TimingCollector()
 
        with collector.time_query("Q1", "Pricing Summary Report") as timing:
-           # Execute query
            result = connection.execute(query)
 
-           # Record metrics
            timing["metrics"]["rows_returned"] = len(result)
            timing["metrics"]["bytes_processed"] = result.nbytes
 
-       # Timing automatically captured
        timings = collector.get_completed_timings()
        print(f"Query executed in {timings[0].execution_time:.3f}s")
 
@@ -465,17 +452,13 @@ Analyze timing data to provide insights and statistics.
 
        analysis = analyzer.analyze_query_performance()
 
-       # Basic stats
        print(f"Mean time: {analysis['basic_stats']['mean']:.3f}s")
 
-       # Percentiles
        print(f"P95: {analysis['percentiles'][95]:.3f}s")
 
-       # Status breakdown
        print(f"Successful: {analysis['status_breakdown']['SUCCESS']}")
        print(f"Failed: {analysis['status_breakdown'].get('ERROR', 0)}")
 
-       # Throughput
        throughput = analysis.get('throughput_metrics', {})
        if throughput:
            print(f"Mean throughput: {throughput['mean_rows_per_second']:.0f} rows/s")
@@ -495,10 +478,8 @@ Analyze timing data to provide insights and statistics.
 
    .. code-block:: python
 
-       # IQR method (default)
        outliers_iqr = analyzer.identify_outliers(method="iqr", factor=1.5)
 
-       # Z-score method
        outliers_zscore = analyzer.identify_outliers(method="zscore", factor=3.0)
 
        for outlier in outliers_iqr:
@@ -521,11 +502,9 @@ Analyze timing data to provide insights and statistics.
        current_analyzer = TimingAnalyzer(current_timings)
        comparison = current_analyzer.compare_query_performance(baseline_timings)
 
-       # Overall performance change
        mean_change = comparison['performance_change']['mean']
        print(f"Mean time change: {mean_change['change_percent']:.2f}%")
 
-       # Regression assessment
        regression = comparison['regression_analysis']
        if regression['is_regression']:
            print(f"⚠️ Performance regression detected ({regression['severity']})")
@@ -776,7 +755,6 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
        manager = AnonymizationManager()
        machine_id = manager.get_anonymous_machine_id()
        print(f"Anonymous ID: {machine_id}")
-       # Output: machine_a1b2c3d4e5f6g7h8
 
 .. method:: anonymize_result_payload(payload) -> dict[str, Any]
 
@@ -829,7 +807,6 @@ Manage anonymization of benchmark results for privacy-preserving sharing.
        text = "Contact john@example.com or call 192.168.1.1"
        cleaned = manager.remove_pii(text)
        print(cleaned)
-       # Output: "Contact [REDACTED] or call [REDACTED]"
 
 .. note::
 
@@ -902,7 +879,6 @@ Configuration for result anonymization.
         AnonymizationManager
     )
 
-    # Custom configuration
     config = AnonymizationConfig(
         machine_id_salt="your-org-salt",
         custom_sanitizers={
@@ -957,15 +933,6 @@ Display benchmark results in standardized format.
     }
 
     display_results(result_data, verbosity=1)
-    # Output:
-    # Benchmark: TPCH
-    # Scale Factor: 0.01
-    # Platform: duckdb
-    # Benchmark Status: PASSED
-    # Queries: 22/22 successful
-    # Query Execution Time: 12.35s
-    # Average Query Time: 0.56s
-    # ✅ TPCH benchmark completed!
 
 Usage Examples
 --------------
@@ -983,13 +950,11 @@ Full workflow from benchmark execution to comparison:
     from benchbox.core.results.timing import TimingAnalyzer
     from pathlib import Path
 
-    # Run baseline benchmark
     print("Running baseline benchmark...")
     benchmark = TPCH(scale_factor=0.01)
     adapter = DuckDBAdapter()
     baseline_results = adapter.run_benchmark(benchmark)
 
-    # Export baseline
     exporter = ResultExporter(output_dir="results", anonymize=True)
     baseline_files = exporter.export_result(
         baseline_results,
@@ -997,22 +962,18 @@ Full workflow from benchmark execution to comparison:
     )
     baseline_json = baseline_files["json"]
 
-    # Run current benchmark (after code changes)
     print("\nRunning current benchmark...")
     current_results = adapter.run_benchmark(benchmark)
 
-    # Export current
     current_files = exporter.export_result(
         current_results,
         formats=["json", "csv", "html"]
     )
     current_json = current_files["json"]
 
-    # Compare results
     print("\nComparing results...")
     comparison = exporter.compare_results(baseline_json, current_json)
 
-    # Analyze comparison
     perf_changes = comparison["performance_changes"]
     for metric, change in perf_changes.items():
         print(f"\n{metric.replace('_', ' ').title()}:")
@@ -1021,11 +982,9 @@ Full workflow from benchmark execution to comparison:
         print(f"  Change: {change['change_percent']:+.2f}%")
         print(f"  Status: {'✅ Improved' if change['improved'] else '❌ Regressed'}")
 
-    # Export comparison report
     report_path = exporter.export_comparison_report(comparison)
     print(f"\nComparison report: {report_path}")
 
-    # Summary
     summary = comparison.get("summary", {})
     print(f"\n{'='*60}")
     print(f"Overall Assessment: {summary.get('overall_assessment', 'unknown')}")
@@ -1047,10 +1006,8 @@ Collect and analyze detailed query timing:
     )
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create timing collector
     collector = TimingCollector(enable_detailed_timing=True)
 
-    # Execute queries with timing
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
@@ -1062,24 +1019,18 @@ Collect and analyze detailed query timing:
 
     for query_id, sql in queries.items():
         with collector.time_query(query_id, f"Query {query_id}") as timing:
-            # Phase 1: Parse
             with collector.time_phase(query_id, "parse"):
-                # Simulated parse phase
                 pass
 
-            # Phase 2: Execute
             with collector.time_phase(query_id, "execute"):
                 result = conn.execute(sql).fetchall()
 
-            # Record metrics
             collector.record_metric(query_id, "rows_returned", len(result))
             collector.record_metric(query_id, "tables_accessed", ["lineitem"])
 
-    # Analyze timings
     timings = collector.get_completed_timings()
     analyzer = TimingAnalyzer(timings)
 
-    # Basic statistics
     stats = analyzer.get_basic_statistics()
     print("Basic Statistics:")
     print(f"  Total queries: {stats['count']}")
@@ -1087,19 +1038,16 @@ Collect and analyze detailed query timing:
     print(f"  Median time: {stats['median']:.3f}s")
     print(f"  Std dev: {stats['stdev']:.3f}s")
 
-    # Percentiles
     percentiles = analyzer.get_percentiles([50, 90, 95, 99])
     print("\nPercentiles:")
     for p, value in percentiles.items():
         print(f"  P{int(p)}: {value:.3f}s")
 
-    # Performance analysis
     analysis = analyzer.analyze_query_performance()
     print("\nTiming Phases:")
     for phase, phase_stats in analysis["timing_phases"].items():
         print(f"  {phase}: {phase_stats['mean']:.3f}s avg")
 
-    # Identify outliers
     outliers = analyzer.identify_outliers(method="iqr", factor=1.5)
     if outliers:
         print("\nOutliers detected:")
@@ -1119,8 +1067,6 @@ Export results with full anonymization:
         AnonymizationManager
     )
 
-    # Configure strict anonymization (path, hostname, and username handling
-    # always applies - see the note above - so only the surviving knobs are set)
     anon_config = AnonymizationConfig(
         machine_id_salt="your-org-salt",
         custom_sanitizers={
@@ -1129,17 +1075,14 @@ Export results with full anonymization:
         }
     )
 
-    # Create exporter with anonymization
     exporter = ResultExporter(
         output_dir="public_results",
         anonymize=True,
         anonymization_config=anon_config
     )
 
-    # Export with anonymization
     files = exporter.export_result(results, formats=["json", "html"])
 
-    # Verify anonymization: confirm the exported payload carries no public-path leaks
     import json
 
     from benchbox.core.results.anonymization import find_public_path_leaks
@@ -1168,7 +1111,6 @@ Automated regression detection across benchmark runs:
     from pathlib import Path
 
     def check_for_regressions(baseline_file: Path, current_file: Path) -> bool:
-        """Check for performance regressions."""
         exporter = ResultExporter()
         comparison = exporter.compare_results(baseline_file, current_file)
 
@@ -1176,7 +1118,6 @@ Automated regression detection across benchmark runs:
             print(f"❌ Comparison failed: {comparison['error']}")
             return False
 
-        # Check overall performance
         perf_changes = comparison.get("performance_changes", {})
         mean_change = perf_changes.get("average_query_time", {})
 
@@ -1186,11 +1127,9 @@ Automated regression detection across benchmark runs:
 
         change_pct = mean_change["change_percent"]
 
-        # Regression threshold: >10% slower
         if change_pct > 10:
             print(f"❌ REGRESSION DETECTED: {change_pct:+.2f}% slower")
 
-            # Show regressed queries
             query_comparisons = comparison.get("query_comparisons", [])
             regressed = [
                 q for q in query_comparisons
@@ -1198,7 +1137,7 @@ Automated regression detection across benchmark runs:
             ]
 
             print(f"\nRegressed queries ({len(regressed)}):")
-            for q in regressed[:5]:  # Show top 5
+            for q in regressed[:5]:
                 print(f"  {q['query_id']}: {q['change_percent']:+.2f}%")
 
             return False
@@ -1211,7 +1150,6 @@ Automated regression detection across benchmark runs:
             print(f"✓ No significant change: {change_pct:+.2f}%")
             return True
 
-    # Usage in CI/CD
     baseline = Path("baseline/tpch_sf001_duckdb.json")
     current = Path("current/tpch_sf001_duckdb.json")
 
@@ -1229,7 +1167,6 @@ Best Practices
 
        from benchbox.core.results.exporter import ResultExporter
 
-       # Export after every benchmark run
        exporter = ResultExporter(output_dir="results")
        exporter.export_result(results, formats=["json", "csv"])
 
@@ -1239,10 +1176,8 @@ Best Practices
 
    .. code-block:: python
 
-       # For public sharing
        public_exporter = ResultExporter(anonymize=True)
 
-       # For internal use
        internal_exporter = ResultExporter(anonymize=False)
 
 3. **Track Baselines for Regression Detection**
@@ -1251,11 +1186,9 @@ Best Practices
 
    .. code-block:: python
 
-       # Save baseline
        baseline_exporter = ResultExporter(output_dir="baselines")
        baseline_exporter.export_result(results, formats=["json"])
 
-       # Compare against baseline regularly
        comparison = exporter.compare_results(baseline_path, current_path)
 
 4. **Use Detailed Timing for Optimization**
@@ -1264,16 +1197,13 @@ Best Practices
 
    .. code-block:: python
 
-       # Enable detailed timing
        collector = TimingCollector(enable_detailed_timing=True)
 
-       # Analyze timing phases
        analyzer = TimingAnalyzer(timings)
        analysis = analyzer.analyze_query_performance()
 
-       # Identify bottlenecks
        for phase, stats in analysis["timing_phases"].items():
-           if stats["mean"] > 1.0:  # Phases taking >1s
+           if stats["mean"] > 1.0:
                print(f"Bottleneck: {phase} taking {stats['mean']:.2f}s")
 
 5. **Monitor for Outliers**
@@ -1289,7 +1219,6 @@ Best Practices
            print("Investigating outliers:")
            for outlier in outliers:
                print(f"  {outlier.query_id}: {outlier.execution_time:.3f}s")
-               # Investigate cause...
 
 Common Issues
 -------------
@@ -1319,13 +1248,10 @@ Missing Timing Data
 
 .. code-block:: python
 
-    # Enable detailed timing
     collector = TimingCollector(enable_detailed_timing=True)
 
-    # Ensure timing phases are recorded
     with collector.time_query("Q1") as timing:
         with collector.time_phase("Q1", "execute"):
-            # Execute query
             pass
 
 Anonymization Validation Failures
@@ -1337,7 +1263,6 @@ Anonymization Validation Failures
 
 .. code-block:: python
 
-    # Add custom sanitizers
     from benchbox.core.results.anonymization import (
         AnonymizationConfig,
         AnonymizationManager,
@@ -1352,7 +1277,6 @@ Anonymization Validation Failures
 
     manager = AnonymizationManager(config)
 
-    # Re-anonymize the payload under test with the stricter config.
     payload_under_test = {"working_dir": "/home/alice/project", "rows": 100}
     anonymized = manager.anonymize_result_payload(payload_under_test)
 

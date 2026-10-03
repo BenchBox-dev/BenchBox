@@ -30,10 +30,8 @@ Choose the platform that best fits your specific requirements. See the [Platform
 ## Installation
 
 ```bash
-# Install BenchBox with the DuckDB extra
 uv add benchbox --extra duckdb
 
-# Or with pip
 pip install "benchbox[duckdb]"
 ```
 
@@ -93,10 +91,8 @@ revert a manually-installed version and how to work around it.
 ### Quick Start
 
 ```bash
-# Minimal benchmark
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
-# With specific queries
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
   --queries Q1,Q6,Q17
 ```
@@ -115,7 +111,6 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1 \
 ### With Tuning
 
 ```bash
-# Apply optimizations (indexes, etc.)
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
   --tuning tuned
 ```
@@ -126,10 +121,8 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
 from benchbox import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# In-memory database
 adapter = DuckDBAdapter()
 
-# Or persistent
 adapter = DuckDBAdapter(database="./benchmarks.duckdb")
 
 benchmark = TPCH(scale_factor=0.1)
@@ -161,7 +154,6 @@ for sf in scales:
 ### Thread Configuration
 
 ```bash
-# Control parallelism
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option threads=4
 ```
@@ -169,7 +161,6 @@ benchbox run --platform duckdb --benchmark tpch \
 ### Memory Limits
 
 ```bash
-# Limit memory usage
 benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
   --platform-option memory_limit=8GB
 ```
@@ -190,14 +181,12 @@ DuckDB supports fast data loading from multiple formats:
 ### Default
 
 ```bash
-# Data is generated as .tbl flat files (zstd-compressed by default) and loaded automatically
 benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```
 
 ### Pre-generated Data
 
 ```bash
-# Generate data separately, then run benchmark with pre-generated data
 benchbox datagen --benchmark tpch --scale 1.0 --output ./data/tpch
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 --output ./data/tpch
 ```
@@ -210,7 +199,6 @@ For testing queries without loading:
 import duckdb
 
 conn = duckdb.connect()
-# Query Parquet files directly
 result = conn.execute("""
     SELECT count(*) FROM read_parquet('lineitem/*.parquet')
 """).fetchone()
@@ -231,7 +219,6 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.01
 For benchmarks, in-memory is fastest:
 
 ```bash
-# Default - no database option needed
 benchbox run --platform duckdb --benchmark tpch --scale 1.0
 ```
 
@@ -240,12 +227,10 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0
 When iterating on queries, persist the database:
 
 ```bash
-# Load once
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
   --phases generate,load \
   --platform-option database=./dev.duckdb
 
-# Run queries multiple times
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
   --phases power \
   --platform-option database=./dev.duckdb
@@ -256,7 +241,6 @@ benchbox run --platform duckdb --benchmark tpch --scale 1.0 \
 Test at similar scale to production platforms:
 
 ```bash
-# If planning to run SF 100 on Snowflake, test at SF 1-10 on DuckDB
 benchbox run --platform duckdb --benchmark tpch --scale 10.0
 ```
 
@@ -265,7 +249,6 @@ benchbox run --platform duckdb --benchmark tpch --scale 10.0
 ### Out of Memory
 
 ```bash
-# Increase memory or use spilling
 benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
   --platform-option memory_limit=16GB \
   --platform-option temp_directory=/tmp/duckdb
@@ -274,7 +257,6 @@ benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
 ### Slow Queries
 
 ```bash
-# Check thread count
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option threads=$(nproc)
 ```
@@ -290,8 +272,6 @@ adapter = DuckDBAdapter(database_path=":memory:", progress_bar=True)
 ### Database Locked
 
 ```bash
-# Only one connection allowed for write operations
-# Close other DuckDB connections or use a new database path
 benchbox run --platform duckdb --benchmark tpch \
   --platform-option database=./new_benchmark.duckdb
 ```
@@ -299,10 +279,8 @@ benchbox run --platform duckdb --benchmark tpch \
 ### Disk Space for Temp Files
 
 ```bash
-# Check temp directory space
 df -h /tmp
 
-# Use different temp location
 benchbox run --platform duckdb --benchmark tpch --scale 10.0 \
   --platform-option temp_directory=/data/tmp
 ```

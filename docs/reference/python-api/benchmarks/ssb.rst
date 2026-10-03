@@ -28,13 +28,10 @@ Quick Start
     from benchbox.ssb import SSB
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark
     benchmark = SSB(scale_factor=1.0)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on platform
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
@@ -91,16 +88,13 @@ Get a specific SSB query.
 
 .. code-block:: python
 
-    # Get Flight 1 query
     q1_1 = benchmark.get_query("Q1.1")
 
-    # Get with custom parameters
     q2_1 = benchmark.get_query("Q2.1", params={
         "category": "MFGR#12",
         "region": "AMERICA"
     })
 
-    # Get Flight 3 query
     q3_1 = benchmark.get_query("Q3.1")
 
 Parameters:
@@ -122,11 +116,9 @@ Get all SSB benchmark queries.
 
 .. code-block:: python
 
-    # Get all queries
     queries = benchmark.get_queries()
-    print(f"Total queries: {len(queries)}")  # 13 queries
+    print(f"Total queries: {len(queries)}")
 
-    # Get with dialect translation
     queries_ch = benchmark.get_queries(dialect="clickhouse")
 
 Parameters:
@@ -159,13 +151,10 @@ Get CREATE TABLE SQL for all SSB tables.
 
 .. code-block:: python
 
-    # Standard SQL
     create_sql = benchmark.get_create_tables_sql()
 
-    # With dialect
     create_sql_ch = benchmark.get_create_tables_sql(dialect="clickhouse")
 
-    # With tuning configuration
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
     tuning = UnifiedTuningConfiguration(...)
     create_sql_tuned = benchmark.get_create_tables_sql(tuning_config=tuning)
@@ -190,12 +179,10 @@ Tests basic aggregation and filtering on the fact table.
 
 .. code-block:: python
 
-    # Flight 1 focuses on fact table scan performance
     flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 
     for query_id in flight_1_queries:
         query = benchmark.get_query(query_id)
-        # Execute query...
 
 **Query Characteristics**:
 
@@ -210,7 +197,6 @@ Tests dimension table joins and drill-down analysis.
 
 .. code-block:: python
 
-    # Flight 2 tests star schema join performance
     flight_2_queries = ["Q2.1", "Q2.2", "Q2.3"]
 
     for query_id in flight_2_queries:
@@ -218,7 +204,6 @@ Tests dimension table joins and drill-down analysis.
             "category": "MFGR#12",
             "region": "AMERICA"
         })
-        # Execute query...
 
 **Query Characteristics**:
 
@@ -233,12 +218,10 @@ Tests complex multi-dimension analysis with customer geography.
 
 .. code-block:: python
 
-    # Flight 3 tests complex star joins
     flight_3_queries = ["Q3.1", "Q3.2", "Q3.3", "Q3.4"]
 
     for query_id in flight_3_queries:
         query = benchmark.get_query(query_id)
-        # Execute query...
 
 **Query Characteristics**:
 
@@ -254,12 +237,10 @@ Tests complex aggregation with profit calculations.
 
 .. code-block:: python
 
-    # Flight 4 tests analytical queries with calculations
     flight_4_queries = ["Q4.1", "Q4.2", "Q4.3"]
 
     for query_id in flight_4_queries:
         query = benchmark.get_query(query_id)
-        # Execute query...
 
 **Query Characteristics**:
 
@@ -278,17 +259,13 @@ Basic Benchmark Run
     from benchbox.ssb import SSB
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark with scale factor 1
     benchmark = SSB(scale_factor=1.0)
 
-    # Generate data
     benchmark.generate_data()
 
-    # Run on DuckDB
     adapter = DuckDBAdapter()
     results = benchmark.run_with_platform(adapter)
 
-    # Print results
     print(f"Benchmark: {results.benchmark_name}")
     print(f"Total time: {results.total_execution_time:.2f}s")
     print(f"Queries: {results.successful_queries}/{results.total_queries}")
@@ -308,11 +285,9 @@ Flight-Based Execution
     adapter = DuckDBAdapter()
     conn = adapter.create_connection()
 
-    # Load data
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Run Flight 1 (Simple Aggregation)
     print("Flight 1: Simple Aggregation")
     flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
 
@@ -338,7 +313,6 @@ Parameterized Query Execution
 
     benchmark = SSB(scale_factor=1.0)
 
-    # Define custom parameters
     custom_params = {
         "year": 1993,
         "year_month": 199401,
@@ -355,7 +329,6 @@ Parameterized Query Execution
         "brand": "MFGR#2221"
     }
 
-    # Get queries with custom parameters
     q1_1 = benchmark.get_query("Q1.1", params=custom_params)
     q2_1 = benchmark.get_query("Q2.1", params=custom_params)
 
@@ -374,13 +347,11 @@ Complete Flight Benchmark
     benchmark = SSB(scale_factor=1.0)
     adapter = DuckDBAdapter()
 
-    # Setup
     benchmark.generate_data()
     conn = adapter.create_connection()
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Define all flights
     flights = {
         "Flight 1": ["Q1.1", "Q1.2", "Q1.3"],
         "Flight 2": ["Q2.1", "Q2.2", "Q2.3"],
@@ -388,7 +359,6 @@ Complete Flight Benchmark
         "Flight 4": ["Q4.1", "Q4.2", "Q4.3"]
     }
 
-    # Run all flights
     all_results = {}
 
     for flight_name, query_ids in flights.items():
@@ -412,7 +382,6 @@ Complete Flight Benchmark
 
         all_results[flight_name] = flight_results
 
-    # Summary
     print("\n" + "="*60)
     print("SSB Benchmark Summary")
     print("="*60)
@@ -464,26 +433,20 @@ Columnar Database Optimization
     from benchbox.ssb import SSB
     from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-    # SSB is ideal for columnar databases
     benchmark = SSB(scale_factor=10.0)
     adapter = ClickHouseAdapter(host="localhost")
 
-    # Generate and load data
     benchmark.generate_data()
     conn = adapter.create_connection()
 
-    # Create schema with columnar optimizations
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Add columnar-specific optimizations
     conn.execute("""
-        -- Optimize fact table for columnar access
         ALTER TABLE lineorder
         ORDER BY (lo_orderdate, lo_custkey, lo_partkey);
     """)
 
-    # Run Flight 1 (benefits most from columnar storage)
     flight_1_queries = ["Q1.1", "Q1.2", "Q1.3"]
     for query_id in flight_1_queries:
         query = benchmark.get_query(query_id)
@@ -513,7 +476,7 @@ Scale Factor Comparison
 
         results_data.append({
             "scale_factor": sf,
-            "data_size_mb": sf * 500,  # Approximate
+            "data_size_mb": sf * 500,
             "total_time": results.total_execution_time,
             "avg_query_time": results.average_query_time,
             "queries_per_sec": results.total_queries / results.total_execution_time

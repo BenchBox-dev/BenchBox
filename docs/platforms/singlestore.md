@@ -23,49 +23,40 @@ SingleStore is deployed as both a fully managed cloud service (Helios) and as a 
 ## Quick Start
 
 ```bash
-# Install singlestoredb dependency
 uv add singlestoredb
 
-# Or install via the SingleStore extra
 uv add benchbox --extra singlestore
 
-# Configure connection (SingleStore must be running)
 export SINGLESTORE_HOST=localhost
 export SINGLESTORE_PORT=3306
 export SINGLESTORE_USER=root
 export SINGLESTORE_PASSWORD=your_password
 
-# Run TPC-H benchmark
 benchbox run --platform singlestore --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start (Self-Managed)
 
 ```bash
-# Start SingleStore with Docker
 docker run -d --name singlestoredb \
     -e ROOT_PASSWORD="your_password" \
     -p 3306:3306 \
     ghcr.io/singlestore-labs/singlestoredb-dev:latest
 
-# Verify connectivity
 mysql -h 127.0.0.1 -P 3306 -u root -p -e "SELECT @@memsql_version"
 
-# Run TPC-H benchmark
 benchbox run --platform singlestore --benchmark tpch --scale 0.01
 ```
 
 ### Helios (Cloud) Connection
 
 ```bash
-# Set Helios endpoint from your workspace connection string
 export SINGLESTORE_HOST=xyz123.singlestore.com
 export SINGLESTORE_PORT=3306
 export SINGLESTORE_USER=admin
 export SINGLESTORE_PASSWORD=your_helios_password
 export SINGLESTORE_DATABASE=benchbox
 
-# Run TPC-H benchmark
 benchbox run --platform singlestore --benchmark tpch --scale 1
 ```
 

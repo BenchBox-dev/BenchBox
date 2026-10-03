@@ -64,19 +64,11 @@ function makeSummary(overrides: Partial<BenchmarkSummary> = {}): BenchmarkSummar
 
 describe("SparklineTable", () => {
   it("gives the platform column only the width its content needs, not the leftover row space", () => {
-    // Audit finding: at 1280px the platform cell rendered at 718px (mostly
-    // empty) while the bar cell was squeezed into 389px. The platform column
-    // should shrink to its content instead of soaking up unclaimed table
-    // width, and the geomean bar column should carry the row's dominant
-    // share of it.
     const { container } = render(<SparklineTable summary={makeSummary()} />);
 
     const headerCells = Array.from(container.querySelectorAll("thead th"));
     const platformHeader = headerCells[0]!;
     expect(platformHeader.className).toContain("w-px");
-    // Nowrap only from `sm` up - a long duplicate-platform cohort label must
-    // still be able to wrap below `sm`, or the table is forced into
-    // horizontal scroll on a narrow pane (see SparklineTable.tsx).
     expect(platformHeader.className).toContain("whitespace-normal");
     expect(platformHeader.className).toContain("sm:whitespace-nowrap");
 
@@ -86,9 +78,6 @@ describe("SparklineTable", () => {
     expect(platformCell.className).toContain("w-px");
     expect(platformCell.className).toContain("whitespace-normal");
     expect(platformCell.className).toContain("sm:whitespace-nowrap");
-    // The bar cell carries an explicit, dominant width share of the row -
-    // specifically 2/5, not just any fraction (w-1/3 would also match a
-    // looser `/w-\d+\/\d+/` pattern without locking in this value).
     expect(barCell.className).toContain("w-2/5");
   });
 

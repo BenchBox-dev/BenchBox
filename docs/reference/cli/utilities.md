@@ -19,16 +19,12 @@ Check dependency status and provide installation guidance for different platform
 ### Usage Examples
 
 ```bash
-# Overview of all platform dependencies
 benchbox check-deps
 
-# Check specific platform
 benchbox check-deps --platform databricks
 
-# Show detailed installation matrix
 benchbox check-deps --matrix
 
-# Verbose output with recommendations
 benchbox check-deps --verbose
 ```
 
@@ -88,10 +84,8 @@ Validate BenchBox configuration files for syntax and completeness.
 ### Usage Examples
 
 ```bash
-# Validate default configuration
 benchbox validate
 
-# Validate specific configuration file
 benchbox validate --config ./custom-config.yaml
 ```
 
@@ -130,16 +124,12 @@ uv run _project/scripts/validate_results.py <path> [options]
 ### Examples
 
 ```bash
-# Validate all results for a specific benchmark
 uv run _project/scripts/validate_results.py benchmark_runs/results/ --benchmark tpch
 
-# Validate a single result file with verbose output
 uv run _project/scripts/validate_results.py benchmark_runs/results/tpch_duckdb_sf1.json --verbose
 
-# Machine-readable JSON output for CI pipelines
 uv run _project/scripts/validate_results.py benchmark_runs/results/ --json
 
-# Strict mode - treat warnings as failures
 uv run _project/scripts/validate_results.py benchmark_runs/results/ --fail-on-warn
 ```
 

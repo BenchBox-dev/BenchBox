@@ -49,33 +49,21 @@ This guide provides information for developers who want to contribute to BenchBo
 BenchBox uses `pytest` for testing. Run tests using either `make` commands or direct `pytest`:
 
 ```bash
-# Fast tests for quick feedback
 make test
-# or
 uv run -- python -m pytest -m fast
 
-# Full test suite
 make test-all
-# or
 uv run -- python -m pytest
 
-# Unit tests only
 make test-unit
-# or
 uv run -- python -m pytest -m unit
 
-# Integration tests
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# With coverage (fast tests only - quick feedback)
 make coverage-fast
-# or routine coverage (excludes stress/resource-heavy/live tests)
 make coverage-all
-# or full tree including opt-in stress/resource-heavy/live tests (needs services + credentials)
 make coverage-opt-in-all
-# or
 uv run -- python -m pytest --cov=benchbox --cov-report=term-missing
 ```
 
@@ -83,11 +71,9 @@ Linting and formatting run through Ruff:
 
 ```bash
 make format
-# or
 uv run ruff format .
 
 make lint
-# or
 uv run ruff check .
 ```
 
@@ -95,7 +81,6 @@ Type checking is available via:
 
 ```bash
 make typecheck
-# or
 uv run ty check
 ```
 

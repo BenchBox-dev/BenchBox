@@ -67,17 +67,17 @@ jobs:
       artifact_id: ${{ steps.prepare_tx.outputs.artifact_id }}
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Fetch publication journal
         shell: bash
@@ -202,7 +202,7 @@ jobs:
 
       - name: Upload transaction permit artifact
         if: inputs.reconcile_transaction_id == ''
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-permit-${{ steps.prepare_tx.outputs.transaction_id }}
           path: transaction-artifacts/
@@ -229,17 +229,17 @@ jobs:
       page_url: ${{ steps.pages_deploy.outputs.page_url }}
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Fetch publication journal
         shell: bash
@@ -247,7 +247,7 @@ jobs:
           git fetch origin refs/heads/publication:refs/heads/publication || true
 
       - name: Download transaction permit
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: publication-permit-${{ needs.prepare.outputs.transaction_id }}
           path: transaction-artifacts
@@ -287,9 +287,6 @@ jobs:
           test -n "$PRODUCER_RUN_ID" || { echo "::error::candidate artifact has no producing run"; exit 1; }
           gh api "repos/${{ github.repository }}/actions/runs/$PRODUCER_RUN_ID" > candidate-validation/run.json
           gh api "repos/${{ github.repository }}/actions/artifacts/$CANDIDATE_ARTIFACT_ID/zip" > candidate-validation/candidate.zip
-          # Re-resolve the protected tip after the approval wait: the
-          # candidate stays valid while built from the tip or a recent
-          # ancestor of it, so queued approvals survive merge-queue landings.
           git fetch --no-tags origin develop:refs/remotes/origin/develop
           CURRENT_DEVELOP_SHA=$(git rev-parse refs/remotes/origin/develop)
           PARENT_ARGS=()
@@ -337,7 +334,7 @@ jobs:
       - name: Upload Pages artifact
         if: needs.prepare.outputs.kind == 'promotion'
         id: upload_pages
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
           name: publication-pages-${{ needs.prepare.outputs.generation }}
           path: site
@@ -345,7 +342,7 @@ jobs:
 
       - name: Retain candidate receipts for verification and audit
         if: needs.prepare.outputs.kind == 'promotion'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-candidate-receipts-${{ needs.prepare.outputs.transaction_id }}
           path: candidate-receipts/
@@ -365,7 +362,7 @@ jobs:
 
       - name: Deploy to GitHub Pages via Pages adapter
         id: pages_deploy
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         env:
           DEPLOYED_ARTIFACT_ID: ${{ needs.prepare.outputs.kind == 'rollback' && needs.prepare.outputs.artifact_id || steps.upload_pages.outputs.artifact_id }}
         with:
@@ -380,11 +377,6 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 artifact_id: deployedArtifactId,
-                // The provider resolves pages_build_version as a commit, so
-                // this must be a pushed commit (the run's source), never the
-                // journal's dangling write-intent OID: an unresolvable
-                // version makes the provider reject the create request.
-                // Intent correlation stays in the journal's write record.
                 pages_build_version: '${{ github.sha }}',
               }
             });
@@ -395,8 +387,6 @@ jobs:
             let pageUrl = result.page_url || 'https://benchbox.dev';
             let lastObserved = 'none';
             if (result.id) {
-              // 60 x 10s = 10 minutes. GitHub Pages deployments normally reach a
-              // terminal state in seconds, but CDN purge and file sync can lag.
               const maxPolls = 60;
               for (let i = 0; i < maxPolls; i++) {
                 try {
@@ -490,17 +480,17 @@ jobs:
       name: publication-attestation
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Fetch publication journal
         shell: bash
@@ -510,7 +500,7 @@ jobs:
       - name: Download candidate receipts
         if: needs.prepare.outputs.kind == 'promotion'
         continue-on-error: true
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: publication-candidate-receipts-${{ needs.prepare.outputs.transaction_id }}
           path: candidate-receipts
@@ -673,7 +663,7 @@ jobs:
             --output-tx transaction-artifacts/tx_verified.json
 
       - name: Upload attested live receipt
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-live-receipt-${{ needs.prepare.outputs.generation }}
           path: transaction-artifacts/live-receipt.json
@@ -706,17 +696,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Fetch publication journal
         shell: bash

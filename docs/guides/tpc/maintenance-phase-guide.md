@@ -101,11 +101,9 @@ from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 from pathlib import Path
 
-# Generate benchmark data
 benchmark = TPCH(scale_factor=1.0, output_dir=Path("./tpch_data"))
 benchmark.generate_data()
 
-# CORRECT WORKFLOW: Power → Throughput → Maintenance → [RELOAD REQUIRED]
 print("Step 1: Load fresh database...")
 adapter = DuckDBAdapter(database_path="tpch.duckdb", force_recreate=True)
 
@@ -174,11 +172,9 @@ from benchbox.tpcds import TPCDS
 from benchbox.platforms.duckdb import DuckDBAdapter
 from pathlib import Path
 
-# Generate benchmark data
 benchmark = TPCDS(scale_factor=1.0, output_dir=Path("./tpcds_data"))
 benchmark.generate_data()
 
-# CORRECT WORKFLOW: Power → Throughput → Maintenance → [RELOAD REQUIRED]
 print("Step 1: Load fresh database...")
 adapter = DuckDBAdapter(database_path="tpcds.duckdb", force_recreate=True)
 
@@ -237,11 +233,9 @@ BenchBox queries actual sales records before generating returns, ensuring all re
 Instead of hardcoded FK ranges, BenchBox queries dimension tables at runtime:
 
 ```python
-# Example: Get valid date range
 cursor = connection.execute("SELECT MIN(D_DATE_SK), MAX(D_DATE_SK) FROM DATE_DIM")
 min_date, max_date = cursor.fetchone()
 
-# Use actual range for FK generation
 date_sk = random.randint(min_date, max_date)
 ```
 
@@ -263,17 +257,15 @@ BenchBox includes automatic retry logic for transient FK violations:
 All insert operations use batched multi-row INSERT statements for ~100x performance improvement:
 
 ```sql
--- Before: 1000 individual INSERT statements
 INSERT INTO STORE_SALES (...) VALUES (?, ?, ?, ...)
 INSERT INTO STORE_SALES (...) VALUES (?, ?, ?, ...)
 ... (998 more times)
 
--- After: 10 batched multi-row INSERT statements (100 rows each)
 INSERT INTO STORE_SALES (...) VALUES
-  (?, ?, ?, ...),  -- Row 1
-  (?, ?, ?, ...),  -- Row 2
+  (?, ?, ?, ...),
+  (?, ?, ?, ...),
   ...
-  (?, ?, ?, ...)   -- Row 100
+  (?, ?, ?, ...)
 ```
 
 **Batched DELETE Operations:**
@@ -281,13 +273,11 @@ INSERT INTO STORE_SALES (...) VALUES
 RF2 deletes use batched IN clauses instead of individual DELETE statements:
 
 ```sql
--- Before: 1500 individual DELETE statements
 DELETE FROM LINEITEM WHERE L_ORDERKEY = ?
 DELETE FROM LINEITEM WHERE L_ORDERKEY = ?
 ... (1498 more times)
 
--- After: 1 batched DELETE statement
-DELETE FROM LINEITEM WHERE L_ORDERKEY IN (?, ?, ?, ... -- 1500 keys)
+DELETE FROM LINEITEM WHERE L_ORDERKEY IN (?, ?, ?, ...
 ```
 
 This provides ~750x performance improvement for delete operations.
@@ -328,14 +318,11 @@ Power and Throughput queries execute against the **modified dataset**, producing
 
 **Example:**
 ```sql
--- Before Maintenance: Returns original count
-SELECT COUNT(*) FROM orders;  -- Result: 1,500,000
+SELECT COUNT(*) FROM orders;
 
--- After RF1 (inserted 1,500 orders): Returns modified count
-SELECT COUNT(*) FROM orders;  -- Result: 1,501,500 ❌ DIFFERENT!
+SELECT COUNT(*) FROM orders;
 
--- After RF2 (deleted 1,500 orders): Returns modified count
-SELECT COUNT(*) FROM orders;  -- Result: 1,500,000 (but different rows!)
+SELECT COUNT(*) FROM orders;
 ```
 
 Even if row counts match after both RF1 and RF2, the **actual data is different** - you deleted old orders and inserted new ones!
@@ -367,56 +354,39 @@ The official TPC specifications explicitly require:
 ### Workflow 1: Power + Throughput Only (No Maintenance)
 
 ```python
-# Generate data
 benchmark.generate_data()
 
-# Load fresh database
 adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
 
-# Run read-only tests (can repeat without reload)
 power_result = adapter.run_benchmark(benchmark, test_execution_type="power")
 throughput_result = adapter.run_benchmark(benchmark, test_execution_type="throughput")
 
-# Database unchanged - can run more tests without reload
 ```
 
 ### Workflow 2: Full Official Benchmark (All Three Tests)
 
 ```python
-# Generate data
 benchmark.generate_data()
 
-# Step 1: Load fresh database
 adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
 
-# Step 2: Run Power test on clean data
 power_result = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-# Step 3: Run Throughput test on same clean data (no reload needed between Power and Throughput)
 throughput_result = adapter.run_benchmark(benchmark, test_execution_type="throughput")
 
-# Step 4: Run Maintenance test (can run immediately, no reload needed before Maintenance)
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 
-# Database now modified - MUST reload before running Power/Throughput again!
-# To run more tests:
-# adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
-# power_result = adapter.run_benchmark(benchmark, test_execution_type="power")
 ```
 
 ### Workflow 3: Maintenance Only (Testing ETL Performance)
 
 ```python
-# Generate data
 benchmark.generate_data()
 
-# Load fresh database
 adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
 
-# Run Maintenance test
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 
-# To run again: must reload!
 adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
 maintenance_result_2 = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 ```
@@ -424,17 +394,14 @@ maintenance_result_2 = adapter.run_benchmark(benchmark, test_execution_type="mai
 ### Workflow 4: Investigating Query Changes After Maintenance
 
 ```python
-# Load fresh database and run a query
 adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
 result_before = adapter.execute("SELECT COUNT(*), SUM(o_totalprice) FROM orders")
 print(f"Before: {result_before}")
 
-# Run Maintenance test
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 
-# Query again (will show different results!)
 result_after = adapter.execute("SELECT COUNT(*), SUM(o_totalprice) FROM orders")
-print(f"After: {result_after}")  # ⚠️ Different values!
+print(f"After: {result_after}")
 ```
 
 ## CLI Usage
@@ -442,27 +409,22 @@ print(f"After: {result_after}")  # ⚠️ Different values!
 ### Running Individual Tests
 
 ```bash
-# Power test only
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 --phases power
 
-# Throughput test only
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 --phases throughput
 
-# Maintenance test only (requires reload before rerunning)
 benchbox run --platform duckdb --benchmark tpch --scale 1.0 --phases load,maintenance
 ```
 
 ### Correct Workflow
 
 ```bash
-# All three tests in correct sequence (no reload needed before Maintenance)
 benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 1.0 \
   --phases generate,load,power,throughput,maintenance
 
-# To run Power/Throughput again after Maintenance: must reload!
 benchbox run \
   --platform duckdb \
   --benchmark tpch \
@@ -473,27 +435,22 @@ benchbox run \
 ### Incorrect Workflows ❌
 
 ```bash
-# ❌ WRONG: Running Maintenance between Power and Throughput
 benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 1.0 \
   --phases generate,load,power,maintenance,throughput
-# Throughput runs on modified data! ❌
 
-# ❌ WRONG: Running all three tests without reload
 benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 1.0 \
   --phases generate,load,power,throughput,maintenance
-# Then trying to run Power again without reload
 benchbox run \
   --platform duckdb \
   --benchmark tpch \
   --scale 1.0 \
   --phases power
-# Runs on modified data from Maintenance! ❌
 ```
 
 ## Troubleshooting
@@ -512,10 +469,8 @@ benchbox run \
 
 ```python
 for i in range(5):
-    # Reload fresh data
     adapter = DuckDBAdapter(database_path="benchmark.duckdb", force_recreate=True)
 
-    # Run Maintenance test
     result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
     print(f"Run {i+1}: {result.total_execution_time:.2f}s")
 ```
@@ -523,7 +478,6 @@ for i in range(5):
 ### "How do I verify my database was modified?"
 
 ```python
-# Check row counts before and after
 before = adapter.execute("SELECT COUNT(*) FROM orders")[0][0]
 
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
@@ -606,16 +560,12 @@ A: No. Reload is mandatory for valid results. Budget time accordingly.
 A: Yes! This can speed up testing:
 
 ```python
-# Create snapshot after initial load
 adapter.create_snapshot("clean_data")
 
-# Run tests
 power_result = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-# Restore from snapshot (faster than full reload)
 adapter.restore_snapshot("clean_data")
 
-# Run Maintenance
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 ```
 

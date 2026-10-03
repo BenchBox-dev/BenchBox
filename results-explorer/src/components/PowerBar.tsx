@@ -1,14 +1,3 @@
-// ---------------------------------------------------------------------------
-// PowerBar - horizontal bar chart of TPC Power@Size scores
-//
-// Higher score = better.  Only renders when platforms have power_score data.
-// Sorts bars locally by power_score descending so the visual order is reliable
-// regardless of BenchmarkSummary ordering (upstream order depends on the
-// benchmark family and can change; a local sort keeps this chart stable).
-//
-// Python reference: textcharts.bar_chart (performance_bar / power_bar variant)
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
@@ -21,7 +10,7 @@ const LABEL_W = 160;
 const ROW_H = 36;
 const AXIS_H = 32;
 const PADDING_TOP = 8;
-const VALUE_TRAIL = 72; // space after bar for value label
+const VALUE_TRAIL = 72;
 
 interface Props {
   summary: BenchmarkSummary;
@@ -97,9 +86,6 @@ export function PowerBar({ summary }: Props) {
               >
                 <title>{`${row.fullLabel}: ${valueText} QphH`}</title>
               </rect>
-              {/* Wide rows trail the value after the bar; compact rows park it at
-                  the end of the label line, where a long bar cannot push it off
-                  the right edge. */}
               <text
                 x={layout.labelAbove ? w : layout.plotX + barW + 6}
                 y={layout.labelAbove ? y + layout.labelBaseline : midY + 4}
@@ -122,7 +108,6 @@ export function PowerBar({ summary }: Props) {
           );
         })}
 
-        {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + rows.length * layout.rowHeight})`}>
           <line x1={layout.plotX} y1={0} x2={layout.plotX + plotW} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {(layout.compactTicks ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.75, 1]).map((f) => {

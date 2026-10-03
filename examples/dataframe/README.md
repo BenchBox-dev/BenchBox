@@ -14,10 +14,8 @@ BenchBox supports native DataFrame benchmarking alongside traditional SQL databa
 ## Prerequisites
 
 ```bash
-# Install DataFrame platforms
 pip install polars pandas
 
-# Generate benchmark data (required for execution)
 benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases load
 benchbox run --platform duckdb --benchmark tpcds --scale 1 --phases load
 ```
@@ -66,7 +64,6 @@ BenchBox uses a family-based architecture for DataFrame support:
 
 ### Expression Family (Polars, PySpark, DataFusion)
 ```python
-# Declarative style with expression objects
 result = (
     df.filter(col('shipdate') <= lit(cutoff))
     .group_by('status')
@@ -76,7 +73,6 @@ result = (
 
 ### Pandas Family (Pandas, cuDF, Dask)
 ```python
-# Imperative style with string-based column access
 filtered = df[df['shipdate'] <= cutoff]
 result = filtered.groupby('status').agg({'quantity': 'sum'})
 ```
@@ -86,13 +82,10 @@ result = filtered.groupby('status').agg({'quantity': 'sum'})
 For production benchmarking, use the BenchBox CLI:
 
 ```bash
-# Polars DataFrame mode
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 
-# Pandas DataFrame mode
 benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 
-# Compare results
 benchbox compare results_polars.json results_pandas.json
 ```
 

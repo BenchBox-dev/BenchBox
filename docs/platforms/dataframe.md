@@ -35,10 +35,8 @@ Traditionally, comparing these approaches required:
 BenchBox provides **unified TPC-H benchmarking** across both paradigms:
 
 ```bash
-# SQL mode - queries executed via SQL
 benchbox run --platform duckdb --benchmark tpch --scale 1
 
-# DataFrame mode - queries executed via native DataFrame API
 benchbox run --platform polars-df --benchmark tpch --scale 1
 ```
 
@@ -89,39 +87,29 @@ Infrastructure is in place for these platforms:
 ### Installation
 
 ```bash
-# Polars DataFrame (recommended - core dependency)
-# Already included in base BenchBox installation
 
-# Pandas DataFrame
 uv add benchbox --extra pandas
 
-# PySpark DataFrame
 uv add benchbox --extra pyspark
 
-# Install all DataFrame platforms
 uv add benchbox --extra dataframe-all
 ```
 
 ### Running Your First DataFrame Benchmark
 
 ```bash
-# Run TPC-H on Polars DataFrame
 benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
-# Run TPC-H on Pandas DataFrame
 benchbox run --platform pandas-df --benchmark tpch --scale 0.01
 
-# Run TPC-H on PySpark DataFrame (local mode)
 benchbox run --platform pyspark-df --benchmark tpch --scale 0.01
 ```
 
 ### Comparing SQL vs DataFrame
 
 ```bash
-# SQL mode (Polars SQL interface)
 benchbox run --platform polars --benchmark tpch --scale 0.1
 
-# DataFrame mode (Polars expression API)
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
 
@@ -138,7 +126,6 @@ Python DataFrame libraries cluster into two syntactic families based on API desi
 Libraries using string-based column access and imperative style:
 
 ```python
-# Pandas-style syntax
 df = df[df['l_shipdate'] <= cutoff]
 result = df.groupby(['l_returnflag', 'l_linestatus']).agg({
     'l_quantity': 'sum',
@@ -153,7 +140,6 @@ result = df.groupby(['l_returnflag', 'l_linestatus']).agg({
 Libraries using expression objects and declarative style:
 
 ```python
-# Expression-style syntax
 result = (
     df.filter(col('l_shipdate') <= lit(cutoff))
     .group_by('l_returnflag', 'l_linestatus')
@@ -246,7 +232,6 @@ The Read Primitives benchmark provides comprehensive DataFrame support:
 - **Categories**: aggregation, filter, groupby, orderby, window, qualify, broadcast, string, and more
 
 ```bash
-# Run Read Primitives on Polars DataFrame
 benchbox run --platform polars-df --benchmark read-primitives --scale 0.01
 ```
 
@@ -274,7 +259,6 @@ BenchBox implements all 22 TPC-H queries for DataFrame platforms:
 
 ```python
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q1: Pricing Summary Report."""
     lineitem = ctx.get_table("lineitem")
     col, lit = ctx.col, ctx.lit
 
@@ -298,7 +282,6 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
 
 ```python
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TPC-H Q1: Pricing Summary Report."""
     lineitem = ctx.get_table("lineitem")
 
     cutoff = pd.to_datetime("1998-12-01") - pd.Timedelta(days=90)
@@ -356,10 +339,8 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
 ## Available Databases
 
 ```bash
-# Check which DataFrame platforms are installed
 benchbox profile
 
-# Detailed platform status
 python -c "from benchbox.platforms.dataframe import format_platform_status_table; print(format_platform_status_table())"
 ```
 
@@ -385,26 +366,20 @@ BenchBox provides a comprehensive tuning system for DataFrame platforms that all
 ### Quick Start with Tuning
 
 ```bash
-# Use auto-detected optimal settings based on your system
 benchbox run --platform polars-df --benchmark tpch --scale 1 --tuning auto
 
-# Use a custom tuning configuration file
 benchbox run --platform polars-df --benchmark tpch --tuning ./my_tuning.yaml
 ```
 
 ### CLI Commands
 
 ```bash
-# View recommended settings for your system
 benchbox tuning defaults --platform polars
 
-# Create a sample tuning configuration
 benchbox tuning init --platform polars --output polars_tuning.yaml
 
-# Validate a configuration file
 benchbox tuning validate polars_tuning.yaml --platform polars
 
-# List supported platforms
 benchbox tuning platforms
 ```
 
@@ -614,10 +589,8 @@ BenchBox validates your tuning configuration and reports issues at three levels:
 Validate your configuration before running:
 
 ```bash
-# Validate a configuration file
 benchbox tuning validate my_config.yaml --platform polars
 
-# Output includes issues and suggestions
 ✓ Configuration valid
 ⚠ WARNING: streaming_mode enabled without chunk_size - consider setting chunk_size
 ℹ INFO: Consider enabling lazy_evaluation for improved efficiency
@@ -664,12 +637,10 @@ The context provides table access and expression helpers:
 ```python
 from benchbox.core.dataframe import DataFrameContext
 
-# Table access
 df = ctx.get_table("lineitem")
 
-# Expression builders (expression family)
-col = ctx.col      # Column reference
-lit = ctx.lit      # Literal value
+col = ctx.col
+lit = ctx.lit
 ```
 
 ### DataFrameQuery Class

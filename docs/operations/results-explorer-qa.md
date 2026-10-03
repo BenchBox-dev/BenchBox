@@ -225,7 +225,7 @@ After the required `develop_sha:` frontmatter, append one block per finding to a
   page: <home | benchmark | platform | result | compare | query | layout | 404>
   url: <full URL bar at the moment of the finding>
   browser: <chromium-147 | firefox-148 | webkit-... | other>
-  status: <P | F | Q>            # Pass, Fail, open Question
+  status: <P | F | Q>
   what_i_did: |
     <one to three sentences, action-by-action>
   what_i_expected: |
@@ -237,8 +237,8 @@ After the required `develop_sha:` frontmatter, append one block per finding to a
       <paste any console output, or "none">
     network: |
       <paste any non-2xx responses with URL + status, or "none">
-    screenshot: "none"   # screenshots are not retained in git; keep them locally and reference "none" here unless a durable path is agreed
-  severity: <blocker | major | minor | nit>   # only for F and Q; omit for P
+    screenshot: "none"
+  severity: <blocker | major | minor | nit>
   notes: |
     <anything else — repro flakiness, only-on-cold-load, etc.>
 ```

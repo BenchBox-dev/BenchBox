@@ -21,16 +21,12 @@ benchbox download-answers [OPTIONS]
 ## Usage Examples
 
 ```bash
-# Download both TPC-H and TPC-DS answer files
 benchbox download-answers
 
-# Download only TPC-H
 benchbox download-answers --benchmark tpch
 
-# Force re-download
 benchbox download-answers --force
 
-# Show where answer files are cached
 benchbox download-answers --show-cache-dir
 benchbox download-answers --show-cache-dir --benchmark tpch
 ```

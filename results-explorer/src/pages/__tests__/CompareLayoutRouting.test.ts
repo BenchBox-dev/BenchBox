@@ -1,10 +1,3 @@
-/**
- * Routing by selection shape (w1).
- *
- * Selection COUNT picks the layout, so nobody has to choose a page before
- * choosing runs, and the existing `?ids=` grammar keeps working untouched.
- */
-
 import { describe, expect, it } from "vitest";
 
 import { compareLayoutForSelection, isWithinTieBand, shouldShowMultiRunStandings } from "@/pages/Compare";
@@ -28,9 +21,6 @@ describe("compareLayoutForSelection", () => {
   });
 
   it("treats ids that alias to one run as one run, not a head-to-head", () => {
-    // Two ids resolving to the same result is one run. Rendering that as a
-    // head-to-head would compare a run against itself and report a 1.00x
-    // speedup as though it meant something.
     expect(compareLayoutForSelection(["a", "a"])).toEqual({ kind: "within_run", resultId: "a" });
   });
 
@@ -47,7 +37,6 @@ describe("compareLayoutForSelection", () => {
   });
 
   it("preserves selection order in the routed run list", () => {
-    // Baseline defaults to the first selected run, so order is meaningful.
     expect(compareLayoutForSelection(["b", "a"])).toEqual({
       kind: "head_to_head",
       runIds: ["b", "a"],
@@ -57,8 +46,6 @@ describe("compareLayoutForSelection", () => {
 
 describe("the headline tie band", () => {
   it("treats a ratio that rounds to 1.00x as a tie", () => {
-    // The failure this prevents: a 1.002x rendered as "1.00x" under a
-    // "vs slowest" label reads as an advantage that the data does not support.
     expect(isWithinTieBand(1.002)).toBe(true);
     expect(isWithinTieBand(0.998)).toBe(true);
     expect(isWithinTieBand(1)).toBe(true);
@@ -75,9 +62,6 @@ describe("the headline tie band", () => {
   });
 
   it("reuses the decision summary's threshold rather than a second one", () => {
-    // Two thresholds would eventually disagree, and a page that headlines a
-    // win while its own summary calls the same pair a tie is worse than
-    // either behaviour alone.
     expect(isWithinTieBand(1 + COMPARE_TIE_THRESHOLD * 0.99)).toBe(true);
     expect(isWithinTieBand(1 + COMPARE_TIE_THRESHOLD * 1.01)).toBe(false);
   });

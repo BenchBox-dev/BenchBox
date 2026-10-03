@@ -19,10 +19,8 @@ Amazon Athena is AWS's serverless interactive query service for analyzing data d
 ## Installation
 
 ```bash
-# Install required dependencies
 pip install pyathena boto3
 
-# Or via BenchBox extras
 pip install "benchbox[athena]"
 ```
 
@@ -31,12 +29,10 @@ pip install "benchbox[athena]"
 ### Environment Variables
 
 ```bash
-# AWS credentials
 export AWS_ACCESS_KEY_ID=your_access_key
 export AWS_SECRET_ACCESS_KEY=your_secret_key
 export AWS_DEFAULT_REGION=us-east-1
 
-# Or use AWS profile
 export AWS_PROFILE=your-profile
 ```
 
@@ -67,7 +63,6 @@ benchbox run --platform athena --benchmark tpch --scale 1.0 \
 ### Basic Benchmark Run
 
 ```bash
-# Run TPC-H on Athena
 benchbox run --platform athena --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://my-bucket/athena-results/ \
   --platform-option database=benchmarks
@@ -79,7 +74,6 @@ benchbox run --platform athena --benchmark tpch --scale 1.0 \
 from benchbox import TPCH
 from benchbox.platforms.athena import AthenaAdapter
 
-# Initialize adapter
 adapter = AthenaAdapter(
     region="us-east-1",
     workgroup="primary",
@@ -88,7 +82,6 @@ adapter = AthenaAdapter(
     s3_data_dir="s3://my-bucket/benchmark-data/",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
@@ -99,7 +92,6 @@ results = adapter.run_benchmark(benchmark)
 Skip CTAS materialization and register external tables directly over staged Parquet:
 
 ```bash
-# External mode: query over S3 Parquet without materializing native tables
 benchbox run --platform athena --benchmark tpch --scale 1.0 \
   --table-mode external \
   --platform-option staging_root=s3://my-bucket/benchbox/
@@ -113,7 +105,6 @@ with `--tuning tuned`.
 BenchBox stages benchmark data to S3 before querying:
 
 ```bash
-# Specify data location
 benchbox run --platform athena --benchmark tpch --scale 1.0 \
   --output s3://my-bucket/benchmarks/tpch_sf1/
 ```
@@ -145,10 +136,9 @@ the documented regions and $9 per TB in `sa-east-1`. Optimize costs with:
 Set query data scan limits in your workgroup:
 
 ```bash
-# Create workgroup with cost controls
 aws athena create-work-group \
   --name benchbox \
-  --configuration "BytesScannedCutoffPerQuery=10737418240"  # 10 GB limit
+  --configuration "BytesScannedCutoffPerQuery=10737418240"
 ```
 
 ### Cost Estimation
@@ -167,7 +157,6 @@ Rough planning figures at the current list price (`benchbox/core/cost/pricing_da
 ### Use Partitioning
 
 ```sql
--- Create partitioned table
 CREATE EXTERNAL TABLE lineitem (...)
 PARTITIONED BY (l_shipdate STRING)
 STORED AS PARQUET
@@ -199,32 +188,22 @@ benchbox run --platform athena --benchmark tpch \
 ### Access Denied
 
 ```bash
-# Verify S3 permissions
 aws s3 ls s3://your-bucket/
 
-# Check IAM policy includes:
-# - s3:GetObject
-# - s3:ListBucket
-# - s3:PutObject (for results)
-# - athena:StartQueryExecution
-# - glue:GetTable, glue:GetDatabase
 ```
 
 ### Query Timeout
 
 ```bash
-# For long-running queries, increase timeout
 benchbox run --platform athena --benchmark tpcds \
-  --platform-option query_timeout=1800  # 30 minutes
+  --platform-option query_timeout=1800
 ```
 
 ### Data Not Found
 
 ```bash
-# Verify Glue table exists
 aws glue get-table --database-name benchmarks --name lineitem
 
-# Run MSCK REPAIR for partitioned tables
 MSCK REPAIR TABLE lineitem;
 ```
 

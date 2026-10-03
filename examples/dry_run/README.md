@@ -33,10 +33,8 @@ python basic_dry_run.py
 
 **Run it:**
 ```bash
-# First run a dry-run
 benchbox run --dry-run ./my_preview --platform duckdb --benchmark tpch --scale 0.01
 
-# Then analyze it
 python analyze_dry_run_output.py ./my_preview
 ```
 
@@ -106,15 +104,12 @@ preview_directory/
 ## CLI Dry-Run Examples
 
 ```bash
-# Basic dry-run
 benchbox run --dry-run ./preview --platform duckdb --benchmark tpch --scale 0.1
 
-# Multiple benchmarks
 for bm in tpch tpcds ssb; do
   benchbox run --dry-run ./preview_$bm --platform duckdb --benchmark $bm --scale 0.01
 done
 
-# With tuning preview
 benchbox run --dry-run ./preview_tuned --platform duckdb --benchmark tpch --scale 0.1 --tuning
 ```
 

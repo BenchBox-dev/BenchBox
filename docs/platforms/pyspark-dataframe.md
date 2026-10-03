@@ -40,16 +40,12 @@ BenchBox defaults to DataFrame mode for historical compatibility. Use `--mode sq
 ## Installation
 
 ```bash
-# Install PySpark DataFrame support
 uv add benchbox --extra pyspark
 
-# Or with pip
 pip install "benchbox[pyspark]"
 
-# Or install PySpark directly
 pip install pyspark pyarrow
 
-# Verify installation
 python -c "from pyspark.sql import SparkSession; print('PySpark available')"
 ```
 
@@ -60,10 +56,8 @@ python -c "from pyspark.sql import SparkSession; print('PySpark available')"
 ### DataFrame Mode
 
 ```bash
-# Run TPC-H on PySpark DataFrame (local mode)
 scripts/with_supported_java.sh benchbox run --platform pyspark-df --benchmark tpch --scale 0.01
 
-# With custom memory allocation
 scripts/with_supported_java.sh benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
   --platform-option driver_memory=8g
 ```
@@ -71,11 +65,9 @@ scripts/with_supported_java.sh benchbox run --platform pyspark-df --benchmark tp
 ### SQL Mode
 
 ```bash
-# Run TPC-H power phase via Spark SQL
 scripts/with_supported_java.sh benchbox run --platform pyspark --mode sql --benchmark tpch --scale 0.01 \
   --phases power --non-interactive
 
-# Create a warehouse directory and Delta tables
 scripts/with_supported_java.sh benchbox run --platform pyspark --mode sql --benchmark tpch --scale 1 \
   --platform-option warehouse_dir=./spark_warehouse \
   --platform-option table_format=delta
@@ -97,16 +89,12 @@ scripts/with_supported_java.sh benchbox run --platform pyspark --mode sql --benc
 Specifies the Spark cluster to connect to:
 
 ```bash
-# Local mode with all cores
 --platform-option master="local[*]"
 
-# Local mode with 4 cores
 --platform-option master="local[4]"
 
-# Standalone cluster
 --platform-option master="spark://hostname:7077"
 
-# YARN cluster
 --platform-option master="yarn"
 ```
 
@@ -115,7 +103,6 @@ Specifies the Spark cluster to connect to:
 Memory allocated to the driver process:
 
 ```bash
-# Increase for large scale factors
 benchbox run --platform pyspark-df --benchmark tpch --scale 10 \
   --platform-option driver_memory=16g
 ```
@@ -125,11 +112,9 @@ benchbox run --platform pyspark-df --benchmark tpch --scale 10 \
 Number of partitions for shuffle operations (joins, aggregations):
 
 ```bash
-# Match to CPU cores for local mode
 benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
   --platform-option shuffle_partitions=8
 
-# Higher for cluster mode
 --platform-option shuffle_partitions=200
 ```
 
@@ -138,7 +123,6 @@ benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
 Adaptive Query Execution optimizes queries at runtime:
 
 ```bash
-# Disable for deterministic benchmarking
 benchbox run --platform pyspark-df --benchmark tpch --scale 1 \
   --platform-option enable_aqe=false
 ```
@@ -178,7 +162,6 @@ Set `JAVA_HOME` to the desired JDK before running BenchBox. Verify with:
 
 ```bash
 java -version
-# openjdk version "21.0.2" 2024-01-16
 ```
 
 ## Scale Factor Guidelines
@@ -214,7 +197,6 @@ PySpark can handle very large datasets due to distributed execution:
 
 1. **Optimize shuffle partitions** for your workload:
    ```bash
-   # For local mode, match CPU cores
    --platform-option shuffle_partitions=8
    ```
 
@@ -235,11 +217,9 @@ PySpark can handle very large datasets due to distributed execution:
 ### CLI
 
 ```bash
-# TPC-H smoke run with SQL mode
 benchbox run --platform pyspark --mode sql --benchmark tpch --scale 0.01 \
   --phases power --non-interactive
 
-# Generate + load data without executing queries
 benchbox run --platform pyspark --mode sql --benchmark tpch --scale 0.1 \
   --phases generate,load --output ./tpch_sf01 --non-interactive
 ```
@@ -258,7 +238,6 @@ adapter = PySparkSQLAdapter(
 conn = adapter.create_connection()
 adapter.configure_for_benchmark(conn, "tpch")
 
-# Run SQL directly
 result = adapter.execute_query(conn, "SELECT COUNT(*) FROM lineitem", "Qcount", benchmark_type="tpch")
 print(result["rows_returned"])
 
@@ -275,7 +254,7 @@ Best for development and small-scale testing:
 from benchbox.platforms.dataframe import PySparkDataFrameAdapter
 
 adapter = PySparkDataFrameAdapter(
-    master="local[*]",  # All local cores
+    master="local[*]",
     driver_memory="4g",
 )
 ```
@@ -321,15 +300,12 @@ PySpark queries use expression-based operations:
 ```python
 from pyspark.sql import functions as F
 
-# TPC-H Q6: Forecasting Revenue Change
 def q6_pyspark_impl(ctx: DataFrameContext) -> Any:
     lineitem = ctx.get_table("lineitem")
 
-    # Date range filter
     start_date = ctx.cast_date(ctx.lit("1994-01-01"))
     end_date = ctx.cast_date(ctx.lit("1995-01-01"))
 
-    # Apply filters
     result = (
         lineitem
         .filter(ctx.col("l_shipdate") >= start_date)
@@ -365,7 +341,6 @@ from benchbox.platforms.dataframe import PySparkDataFrameAdapter
 
 adapter = PySparkDataFrameAdapter(master="local[4]")
 
-# Create window expressions
 row_num = adapter.window_row_number(
     order_by=[("sale_date", True)],
     partition_by=["category"]
@@ -378,7 +353,7 @@ running_total = adapter.window_sum(
 )
 
 rank = adapter.window_rank(
-    order_by=[("revenue", False)],  # Descending
+    order_by=[("revenue", False)],
     partition_by=["region"]
 )
 ```
@@ -401,10 +376,8 @@ java.lang.OutOfMemoryError: Java heap space
 PySpark has JVM startup overhead (~3-5 seconds). For rapid iteration:
 
 ```bash
-# Use Polars for quick tests
 benchbox run --platform polars-df --benchmark tpch --scale 0.01
 
-# Use PySpark for production scale
 benchbox run --platform pyspark-df --benchmark tpch --scale 10
 ```
 
@@ -415,7 +388,6 @@ If you see port binding errors:
 ```python
 adapter = PySparkDataFrameAdapter(
     master="local[*]",
-    # Configure different ports
     **{"spark.ui.port": "4050"}
 )
 ```
@@ -427,10 +399,9 @@ Always close the adapter when done:
 ```python
 adapter = PySparkDataFrameAdapter(master="local[4]")
 try:
-    # Run queries...
     pass
 finally:
-    adapter.close()  # Stops SparkSession
+    adapter.close()
 ```
 
 Or use context manager pattern in your code.
@@ -440,7 +411,6 @@ Or use context manager pattern in your code.
 ```python
 from benchbox.platforms.dataframe import PySparkDataFrameAdapter
 
-# Create adapter with custom configuration
 adapter = PySparkDataFrameAdapter(
     working_dir="./benchmark_data",
     master="local[*]",
@@ -451,28 +421,22 @@ adapter = PySparkDataFrameAdapter(
     verbose=True,
 )
 
-# Create context and load tables
 ctx = adapter.create_context()
 adapter.load_tables(ctx, data_dir="./tpch_data")
 
-# Execute SQL query directly
 df = adapter.sql("SELECT * FROM lineitem WHERE l_quantity > 10")
 result = adapter.collect(df)
 
-# Execute DataFrame query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)
 
-# Convert to pandas for analysis
 pandas_df = adapter.to_pandas(df)
 
-# Get query plan for debugging
 plan = adapter.get_query_plan(df)
 print(plan["physical"])
 
-# Always close when done
 adapter.close()
 ```
 

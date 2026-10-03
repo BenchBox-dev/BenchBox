@@ -50,7 +50,6 @@ DataFrame platforms are organized into two families based on their API style:
 Uses `col()` and `lit()` functions with method chaining:
 
 ```python
-# Polars, PySpark, DataFusion
 df.filter(col("amount") > lit(100)).group_by("customer").agg(col("amount").sum())
 ```
 
@@ -61,7 +60,6 @@ df.filter(col("amount") > lit(100)).group_by("customer").agg(col("amount").sum()
 Uses string column access and boolean indexing:
 
 ```python
-# Pandas, Dask, cuDF
 df[df["amount"] > 100].groupby("customer")["amount"].sum()
 ```
 
@@ -86,20 +84,16 @@ benchmark_runs/datagen/
 DataFrame platforms support performance tuning:
 
 ```bash
-# View platform defaults
 benchbox tuning defaults --platform polars
 
-# Auto-detect optimal settings
 benchbox run --platform polars-df --benchmark tpch --tuning auto
 
-# Custom configuration
 benchbox run --platform polars-df --benchmark tpch --tuning ./tuning.yaml
 ```
 
 Example tuning file:
 
 ```yaml
-# tuning.yaml
 platform: polars
 settings:
   parallelism:
@@ -135,13 +129,10 @@ results = benchmark.run_dataframe(adapter)
 Run the same benchmark on both paradigms:
 
 ```bash
-# SQL execution
 benchbox run --platform duckdb --benchmark tpch --scale 1 --output sql_results.json
 
-# DataFrame execution
 benchbox run --platform polars-df --benchmark tpch --scale 1 --output df_results.json
 
-# Compare results
 benchbox compare sql_results.json df_results.json
 ```
 

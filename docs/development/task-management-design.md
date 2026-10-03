@@ -81,7 +81,7 @@ nothing equivalent. This is your competitive advantage - keep it.
 **1. Add stable `id` field (required)**
 
 ```yaml
-id: motherduck-platform-adapter   # matches filename slug
+id: motherduck-platform-adapter
 ```
 
 Every item gets a stable identifier that matches its filename slug.
@@ -93,7 +93,7 @@ doesn't break references).
 
 ```yaml
 deps:
-  needs: ["fix-dataframe-parameter-parity"]   # I can't start until these are done
+  needs: ["fix-dataframe-parameter-parity"]
 ```
 
 - Uses slugs (stable IDs), not file paths
@@ -233,7 +233,6 @@ Agent picks up `motherduck-platform-adapter`. YAML has `w3` ready and
 `w4` blocked (w1, w2 are done; w4 still needs w3).
 
 ```python
-# Agent creates TodoWrite tasks:
 TodoWrite([
     {"content": "Handle md: connection string syntax (w3)",
      "activeForm": "Implementing md: connection string handling",
@@ -333,9 +332,6 @@ Marks a work unit complete and auto-cascades:
 
 ```bash
 $ uv run _project/scripts/todo_cli.py done motherduck-platform-adapter w3
-# Updates w3.status=done in YAML
-# Reports: w4 is now ready (all deps satisfied)
-# If all work units done: prompts to complete the TODO item
 ```
 
 ### CLI: `todo_cli.py check-graph`
@@ -356,13 +352,11 @@ $ uv run _project/scripts/todo_cli.py check-graph
 ### New fields in TODO_SCHEMA.yaml
 
 ```yaml
-# Add to required fields
 id:
   type: string
   pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
   description: "Stable identifier matching filename slug"
 
-# Replace 'tasks' with 'work'
 work:
   type: array
   items:
@@ -386,7 +380,6 @@ work:
       notes:
         type: string
 
-# New deferred list
 deferred:
   type: array
   items:
@@ -398,7 +391,6 @@ deferred:
       reason:
         type: string
 
-# Replace 'dependencies' with 'deps'
 deps:
   type: object
   properties:
@@ -603,7 +595,7 @@ ready_items:
 blocked_items:
   - id: implement-dataframe-benchmarks
     priority: Medium
-    blocked_by: ["fix-dataframe-parameter-parity"]  # derived from deps.needs
+    blocked_by: ["fix-dataframe-parameter-parity"]
     reason: "1 unresolved dependency"
 ```
 

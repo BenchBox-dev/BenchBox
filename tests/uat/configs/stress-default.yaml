@@ -1,9 +1,3 @@
-# TEMPLATE — copy and edit for sweep-specific runs.
-#
-# Default stress preset for the framework-owned stress-test use case:
-# one scale, no validate/package/explorer phases. PLATFORM=, BENCHMARK=,
-# and SCALE= make-vars override the typed matrix config at CLI dispatch.
-
 name: "stress-default"
 description: "Stress preset — verify 'does it run?' across the (platform, benchmark) matrix"
 
@@ -35,8 +29,6 @@ preflight:
 cleanup:
   preserve_datagen: true
   prune_databases: true
-  # Default stress behavior matches the historical externally managed Docker flow:
-  # UAT probes local TCP ports and skips unreachable Docker-backed platforms.
   docker_manage_platforms: false
   docker_platform_switch: "off"
   docker_project_prefix: "benchbox-uat"

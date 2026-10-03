@@ -3,12 +3,9 @@ import type { ComponentChildren } from "preact";
 interface FacetChipProps {
   selected: boolean;
   onToggle: () => void;
-  /** Visible chip label. */
   children: ComponentChildren;
-  /** Optional running count, rendered to the right of the label. */
   count?: number;
   disabled?: boolean;
-  /** Visual title shown on hover and read by screen readers via the button. */
   title?: string;
 }
 

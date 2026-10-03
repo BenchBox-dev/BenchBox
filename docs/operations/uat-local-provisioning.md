@@ -37,7 +37,7 @@ Before a timed sweep, pre-fetch a slow stack's images/build ahead of time so a
 first-run download doesn't eat into `cleanup.docker_start_timeout_s`:
 
 ```bash
-make uat-prepull PLATFORM=<platform>   # compose pull --ignore-buildable + compose build
+make uat-prepull PLATFORM=<platform>
 ```
 
 - `cedardb` — `localhost:5435`, compose file `docker/cedardb/docker-compose.yml`.

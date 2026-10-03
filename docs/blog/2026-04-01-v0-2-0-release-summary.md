@@ -72,15 +72,12 @@ Now, wheel installs detect missing answer files at validation time and fetch the
 For air-gapped or restricted environments:
 
 ```bash
-# Pre-populate the answer file cache on a machine with access
 benchbox download-answers --benchmark tpch
 benchbox download-answers --benchmark tpcds
-benchbox download-answers --benchmark all     # both at once
+benchbox download-answers --benchmark all
 
-# Check where cached files are stored
 benchbox download-answers --show-cache-dir
 
-# Disable auto-download entirely
 export BENCHBOX_NO_DOWNLOAD=1
 ```
 

@@ -44,7 +44,6 @@ We split the extraction into three phases. The first two improved BenchBox's arc
 ```python
 @dataclass
 class ChartOptions:
-    # ... width, height, color, unicode, theme ...
     scale_factor_formatter: Callable[[float], str] | None = field(default=None, repr=False)
 ```
 
@@ -59,8 +58,7 @@ We scaffolded a standalone `textcharts` package with a src layout, a `py.typed` 
 Back in BenchBox, the original `ascii/` modules became thin compatibility shims, small re-export files that preserved the old import paths, each about three lines long:
 
 ```python
-"""Compatibility shim, delegates to textcharts.histogram."""
-from textcharts.histogram import *  # noqa: F401, F403
+from textcharts.histogram import *
 ```
 
 The 17 shim files totaled just 60 lines, and BenchBox's 568 visualization tests passed without modification on the first run because the shims preserved every existing import path.
@@ -84,7 +82,6 @@ This turned out to be the unexpected payoff. Once the library stood on its own, 
 Each rename forced BenchBox to make its data transformation explicit. Where chart classes had previously accepted benchmark-shaped data silently through field names, the dispatch layer in `ascii_runtime.py` now explicitly maps BenchBox's domain concepts to generic chart fields:
 
 ```python
-# BenchBox domain (query_id, execution_time_ms) -> textcharts (label, value)
 histogram_data.append(
     HistogramBar(label=query_id, value=mean_latency, platform=platform)
 )

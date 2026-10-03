@@ -115,11 +115,8 @@ describe("DistributionBox label disambiguation (finding #7)", () => {
     const labels = Array.from(container.querySelectorAll("text"))
       .map((node) => node.textContent ?? "")
       .filter((text) => text.includes("DataFusion"));
-    // Four runs, four unique labels.
     expect(labels.length).toBeGreaterThanOrEqual(4);
     expect(new Set(labels).size).toBe(labels.length);
-    // Each label still includes the date or short-id disambiguator from the
-    // RunIdentity formatter; the truncation does not collapse to a common prefix.
     const collapsed = labels.filter((label) => label.startsWith("DataFusion v53.0.0 …"));
     expect(collapsed.length).toBe(0);
   });
@@ -130,8 +127,6 @@ describe("DistributionBox label disambiguation (finding #7)", () => {
       .map((node) => node.textContent ?? "")
       .filter((text) => text.includes("DataFusion"));
     expect(titles.length).toBeGreaterThanOrEqual(4);
-    // Titles include the run date qualifier even when the visible label is
-    // a fallback short-id form.
     expect(titles.some((title) => title.includes("2026-05-06"))).toBe(true);
   });
 });

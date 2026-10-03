@@ -209,7 +209,7 @@ def test_apply_evidence_updates_is_line_local(scratch_copy):
     revised = generator.apply_evidence_updates(text, [update])
     assert "      us-east-1: '0.26'" in revised
     assert revised.count("us-east-1: '0.26'") == 1
-    assert "# Vendor pricing observations" in revised
+    assert sum(a != b for a, b in zip(text.splitlines(), revised.splitlines(), strict=True)) == 1
     with pytest.raises(generator.PricingGeneratorError):
         stale = generator.EvidenceUpdate(("redshift_node_prices", "nodes", "dc2.large"), "us-east-1", "0.25", "0.27")
         generator.apply_evidence_updates(revised, [stale])

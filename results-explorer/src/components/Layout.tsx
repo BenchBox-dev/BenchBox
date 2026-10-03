@@ -29,10 +29,6 @@ export function Layout({ children }: LayoutProps) {
 }
 
 function Header() {
-  // Subscribe to preact-router URL changes so client-side `route()` calls
-  // re-render this component. `useRouter()` works from outside the Router
-  // tree by registering a forced-update setter when the consumed context
-  // is the default value.
   useRouter();
   const rawUrl = typeof window === "undefined" ? "/results/" : getCurrentUrl();
   const currentPath = rawUrl.split("?")[0]!.split("#")[0]!;
@@ -99,8 +95,6 @@ function Header() {
       </div>
       <div class="border-t border-[var(--bb-border-default)] bg-[var(--bb-surface-hero-muted)] text-[var(--bb-fg-primary)]">
         <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          {/* Keep every route reachable as the viewport narrows or the page is
-              zoomed; wrapping also avoids creating document-level overflow. */}
           <nav
             aria-label="Results Explorer"
             data-testid="results-explorer-nav"
@@ -230,9 +224,6 @@ function ThemeIcon({ option }: { option: ThemeChoice }) {
   }
 }
 
-// Roving-tabindex radiogroup per the WAI-ARIA radio pattern: only the
-// checked option is in the tab order; arrow keys move focus and selection
-// together; Home/End jump to the first/last option.
 function ThemeFooterControl() {
   const { choice, setChoice } = useThemeChoice();
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);

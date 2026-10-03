@@ -1,8 +1,3 @@
-# DuckDB Primitives Tuned Configuration
-# This configuration enables all DuckDB-supported optimizations for Primitives Benchmark
-# Provides maximum performance with constraints and table-level tunings enabled
-# Note: Primitives benchmark uses TPC-H schema and data generation
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

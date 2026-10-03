@@ -1,10 +1,3 @@
-// ---------------------------------------------------------------------------
-// TuningVerificationBadge - renders the ADR-1 tuning verified-state
-// (tuning_validation_status) as a StatusBadge. applied_verified is the only
-// state earned via the post-load introspection receipt's corroboration; the
-// rest are the honest execution-derived applied-ledger statuses.
-// ---------------------------------------------------------------------------
-
 import { StatusBadge, type StatusTone } from "./StatusBadge";
 
 interface VerificationEntry {

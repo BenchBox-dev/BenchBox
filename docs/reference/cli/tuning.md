@@ -92,10 +92,8 @@ Generate sample unified tuning configurations for specific platforms.
 ### Usage Examples
 
 ```bash
-# Create sample tuning for Databricks (writes databricks_tuning.yaml)
 benchbox tuning init --platform databricks
 
-# Create with custom output path
 benchbox tuning init --platform snowflake \
   --output ./configs/snowflake-tuning.yaml
 ```
@@ -109,16 +107,12 @@ Use `--mode dataframe` (or let it auto-detect from the platform name).
 ### Create DataFrame Tuning Configuration
 
 ```bash
-# Create sample Polars tuning config (auto-detects DataFrame mode)
 benchbox tuning init --platform polars
 
-# Create with smart defaults based on your system
 benchbox tuning init --platform polars --smart-defaults
 
-# Explicit DataFrame mode with profile
 benchbox tuning init --platform pandas --mode dataframe --profile memory-constrained
 
-# Custom output path
 benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
 ```
 

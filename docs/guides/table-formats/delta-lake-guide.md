@@ -159,10 +159,8 @@ As of January 2026, DuckDB's delta-rs extension:
 DuckDB Delta support is read-only. BenchBox generates Delta tables using the deltalake Python library, then queries with DuckDB. This workflow is useful for testing Delta read performance across platforms.
 
 ```bash
-# Install delta extension (one-time)
 duckdb -c "INSTALL delta; LOAD delta;"
 
-# Run with Delta Lake format
 benchbox run --platform duckdb --benchmark tpch --scale 1 --table-format delta
 ```
 
@@ -205,15 +203,12 @@ Results are comparable across implementations when using the same Delta protocol
 4. **Use VACUUM before benchmarks**: Remove old versions for clean baseline
 
 ```bash
-# Enable Z-ORDER clustering after load (default on Databricks)
 benchbox run --platform databricks --benchmark tpch --table-format delta \
   --platform-option databricks_clustering_strategy=z_order
 
-# Skip clustering (measure raw load performance)
 benchbox run --platform databricks --benchmark tpch --table-format delta \
   --platform-option databricks_clustering_strategy=none
 
-# Use Liquid Clustering on specific columns
 benchbox run --platform databricks --benchmark tpch --table-format delta \
   --platform-option databricks_clustering_strategy=liquid_clustering \
   --platform-option liquid_clustering_columns=l_shipdate,l_orderkey

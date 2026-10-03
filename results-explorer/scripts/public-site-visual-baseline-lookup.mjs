@@ -1,67 +1,15 @@
-/**
- * Locate the visual baseline for one base SHA.
- *
- * Two producers are trusted, and both capture the exact tree named by the SHA:
- *
- * - protected develop: a `push` or `workflow_dispatch` Documentation run on
- *   `develop`, uploaded after the commit landed;
- * - merge-queue candidate: a `merge_group` run of the CI workflow (which
- *   validates queue groups and uploads the candidate) or of the Documentation
- *   workflow, on a `gh-readonly-queue/develop/*` branch in this repository,
- *   uploaded only after that group passed its own exact-base comparison. A queue
- *   follower's `merge_group.base_sha` is the leader group's head, and the
- *   follower can only merge on top of that head, so the candidate is the exact
- *   tree it lands on. A CI leader's full run lasts as long as its slowest
- *   unrelated job, which can exceed the follower's wait, so a leader that has not
- *   finished is trusted once its own visual-regression job has succeeded: that
- *   job is what gates the candidate upload.
- *
- * Callers may pass site-equivalent SHAs after the base: first-parent ancestors
- * whose public-site inputs are byte-identical to the base (computed by the
- * workflow classifier). They render the same site, so their baseline is the
- * base's baseline. The exact base is always tried first, and the first SHA in
- * order that has a trusted artifact wins.
- *
- * Artifact names alone are untrusted because pull_request runs can upload any
- * name, so every candidate is checked against its producing run. For the same
- * SHA a protected develop artifact wins; across SHAs every landed develop
- * baseline wins over any merge-queue candidate, because a queue capture is a
- * speculative tree that may never land.
- */
-
 export const DOCS_WORKFLOW_PATH = ".github/workflows/docs.yml";
 export const CI_WORKFLOW_PATH = ".github/workflows/ci.yml";
-// Merge-queue groups are validated, and their candidate baseline uploaded, by the CI workflow.
-// The Documentation workflow only captures protected develop pushes, so develop stays docs-only.
 export const MERGE_QUEUE_WORKFLOW_PATHS = [DOCS_WORKFLOW_PATH, CI_WORKFLOW_PATH];
 export const VISUAL_JOB_NAME = "Public-site visual regression";
 export const MERGE_QUEUE_BRANCH_PREFIX = "gh-readonly-queue/develop/";
 export const ARTIFACT_PAGE_SIZE = 100;
-// The jobs endpoint returns 30 jobs by default and the CI workflow declares more than that, so the
-// visual job can sit on a later page. Request the maximum page size and follow pages.
 export const JOBS_PAGE_SIZE = 100;
 export const MAX_JOB_PAGES = 5;
 export const LEGACY_BASELINE_NAME = "public-site-visual-baseline";
-// Bounds GitHub API use per lookup pass while several queue groups poll.
-// Must cover every SHA the classifier can emit (base plus 25 ancestors).
 export const MAX_BASELINE_SHAS = 26;
 export const MAX_ARTIFACT_PAGES = 5;
 
-/**
- * Classify the run that uploaded a baseline; returns "develop", "merge-queue", or undefined.
- *
- * Develop runs are not required to have `head_sha === baseSha`: a recovery
- * `workflow_dispatch` runs on the develop head while capturing an older
- * `baseline_source_sha`. The SHA-bound artifact name and the downloaded
- * manifest's `source_sha` bind those artifacts instead. A merge-queue run
- * has no recovery mode, so it must have run on exactly the requested SHA.
- */
-/**
- * Runs must have completed successfully. An in-progress or failed run's
- * artifact was never certified by a passing comparison, so trusting it would
- * let an uncertified tree certify a merge. Completed-then-cancelled runs are
- * also rejected: only success means the comparison passed.
- */
 export function trustedBaselineSource(run, { repository, baseSha }) {
   if (!run) return undefined;
   if (run.status !== "completed" || run.conclusion !== "success") return undefined;
@@ -77,10 +25,6 @@ export function trustedBaselineSource(run, { repository, baseSha }) {
   return undefined;
 }
 
-/**
- * True for a `merge_group` run of a trusted workflow on this repository's develop queue at exactly
- * the requested SHA, whatever its status. Callers add their own status requirement.
- */
 export function isQueueLeaderRun(run, { repository, baseSha }) {
   return Boolean(
     run &&
@@ -101,21 +45,15 @@ async function listRunJobs(github, repository, runId) {
       `/repos/${repository}/actions/runs/${runId}/jobs?per_page=${JOBS_PAGE_SIZE}&page=${page}`,
     );
     if (!Array.isArray(data?.jobs)) throw new Error("GitHub API returned an invalid job list");
-    // An entry that cannot be read is not a job that passed, so a malformed one invalidates the list.
     if (!data.jobs.every((job) => typeof job?.name === "string" && typeof job.status === "string")) {
       throw new Error("GitHub API returned an invalid job entry");
     }
     jobs.push(...data.jobs);
     if (data.jobs.length < JOBS_PAGE_SIZE) return jobs;
   }
-  // Every allowed page was full, so jobs beyond the bound were never read and the list is incomplete.
   throw new Error(`Run ${runId} has more than ${MAX_JOB_PAGES * JOBS_PAGE_SIZE} jobs`);
 }
 
-/**
- * True only when the run has a visual job and every job carrying that name completed successfully.
- * An unreadable job list is not evidence of success, and neither is a name that matches no job.
- */
 async function visualJobSucceeded(github, repository, runId) {
   try {
     const visualJobs = (await listRunJobs(github, repository, runId)).filter((job) => job.name === VISUAL_JOB_NAME);
@@ -131,7 +69,6 @@ export function baselineNames(baseSha) {
   return [`public-site-visual-baseline-${baseSha}`, LEGACY_BASELINE_NAME];
 }
 
-/** Normalize the ordered SHA list: exact base first, unique, well-formed, bounded. */
 export function baselineShaOrder(baseSha, candidateShas = []) {
   const ordered = [];
   for (const sha of [baseSha, ...candidateShas]) {
@@ -176,9 +113,6 @@ async function trustedFromCandidates(github, repository, sha, candidates) {
     ) {
       if (await visualJobSucceeded(github, repository, runId)) source = "develop";
     }
-    // A leader group that has not finished: its other jobs can run far longer than a follower is
-    // willing to wait, but its candidate is only uploaded after its own visual job passed.
-    // A run that finished without succeeding is never trusted.
     if (!source && isQueueLeaderRun(run, { repository, baseSha: sha }) && run.status !== "completed") {
       if (await visualJobSucceeded(github, repository, runId)) source = "merge-queue";
     }
@@ -188,14 +122,8 @@ async function trustedFromCandidates(github, repository, sha, candidates) {
   return queueCandidate;
 }
 
-/**
- * One lookup pass. Returns `{ artifact, source, baselineSha }` or undefined; API errors propagate.
- *
- * `candidateShas` are site-equivalent ancestors of `baseSha`, nearest first.
- */
 export async function findTrustedBaseline({ github, repository, baseSha, candidateShas = [] }) {
   const shas = baselineShaOrder(baseSha, candidateShas);
-  // The legacy unsuffixed name is listed once and matched to SHAs by run head.
   const legacy = await listValidArtifacts(github, repository, LEGACY_BASELINE_NAME);
   const namedBySha = await Promise.all(
     shas.map((sha) => listValidArtifacts(github, repository, `public-site-visual-baseline-${sha}`)),
@@ -203,9 +131,6 @@ export async function findTrustedBaseline({ github, repository, baseSha, candida
   let queueCandidate;
   for (const [index, sha] of shas.entries()) {
     const found = await trustedFromCandidates(github, repository, sha, [...namedBySha[index], ...legacy]);
-    // A trusted merge-queue candidate for the exact base wins at once. For an
-    // ancestor, a queue capture of a speculative head is not a landed tree, so
-    // keep walking in case a landed develop baseline exists further down.
     if (!found) continue;
     if (found.source === "develop" || sha === baseSha) return found;
     if (!queueCandidate) queueCandidate = found;
@@ -213,15 +138,6 @@ export async function findTrustedBaseline({ github, repository, baseSha, candida
   return queueCandidate;
 }
 
-/**
- * Poll until a trusted baseline appears or the deadline passes.
- *
- * `minAttempts` keeps the short retry for transient API errors even when no
- * wait is configured; `waitMs` bounds the total time spent waiting for a
- * leader group or develop push to publish the exact base. After the short
- * retries, polling slows to `waitDelayMs` so several waiting followers stay
- * well inside the per-repository GITHUB_TOKEN API budget.
- */
 export async function waitForTrustedBaseline({
   github,
   repository,

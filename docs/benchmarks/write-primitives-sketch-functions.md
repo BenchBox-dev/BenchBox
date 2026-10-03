@@ -371,7 +371,6 @@ environment) and run:
 
 ```bash
 uv add benchbox --extra clickhouse-local
-# Existing BenchBox development checkout:
 uv add chdb
 ```
 
@@ -472,17 +471,17 @@ The shape mirrors operation-level `platform_overrides`:
 ```yaml
 operations:
   - id: sketch_query_theta_union_merge
-    write_sql: "SELECT datasketch_theta_estimate(...) FROM ..."  # default (DuckDB)
+    write_sql: "SELECT datasketch_theta_estimate(...) FROM ..."
     platform_overrides:
       clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."
     validation_queries:
       - id: scalar_bounds
-        sql: "SELECT datasketch_theta_estimate(...) FROM ..."   # default
+        sql: "SELECT datasketch_theta_estimate(...) FROM ..."
         expected_value_min: 14500
         expected_value_max: 15500
         platform_overrides:
-          clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."  # ClickHouse-native validation
-          redshift: null                                        # explicit skip
+          clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."
+          redshift: null
 ```
 
 Resolution rules (see `_resolve_validation_sql` in `benchmark.py`):
@@ -534,7 +533,6 @@ def merge_extract(path):
     return float(estimate)
 
 merge = manager.execute_aggregate_merge(target_path, merge_extract)
-# merge.metrics["aggregate_value"] holds the extracted scalar
 ```
 
 The manager owns timing, durability (Parquet write to a target dir),

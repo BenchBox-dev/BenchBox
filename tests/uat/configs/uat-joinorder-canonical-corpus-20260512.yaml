@@ -1,4 +1,3 @@
-# TEMPLATE - canonical JoinOrder corpus backfill for Issue #289.
 name: "uat-joinorder-canonical-corpus-20260512"
 description: "Full canonical JoinOrder SF=1 UAT and local-stage corpus backfill"
 

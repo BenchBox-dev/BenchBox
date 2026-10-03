@@ -24,35 +24,27 @@ Apache Doris is used in production by Baidu, Xiaomi, ByteDance, JD.com, Meituan,
 ## Quick Start
 
 ```bash
-# Install PyMySQL dependency
 uv add pymysql
 
-# Or install via the Doris extra
 uv add benchbox --extra doris
 
-# Configure connection (Doris must be running)
 export DORIS_HOST=localhost
 export DORIS_PORT=9030
 
-# Run TPC-H benchmark
 benchbox run --platform doris --benchmark tpch --scale 0.01
 ```
 
 ### Docker Quick Start
 
 ```bash
-# Start the repo-managed Apache Doris 4.0.3 stack and wait for FE+BE readiness
 docker compose -f docker/doris/docker-compose.yml up --wait
 
-# Point BenchBox at the mapped Doris ports
 export DORIS_HOST=localhost
 export DORIS_PORT=19031
 export DORIS_HTTP_PORT=18030
 
-# Verify connectivity
 mysql -h 127.0.0.1 -P 19031 -u root -e "SELECT 1"
 
-# Run benchmark
 benchbox run --platform doris --benchmark tpch --scale 1.0
 ```
 
@@ -170,13 +162,10 @@ The Duplicate Key model is optimal for TPC-H and TPC-DS workloads because:
 ### Basic Benchmarks
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform doris --benchmark tpch --scale 1.0
 
-# TPC-DS at scale factor 10
 benchbox run --platform doris --benchmark tpcds --scale 10.0
 
-# Run specific queries only
 benchbox run --platform doris --benchmark tpch --queries Q1,Q6,Q17
 ```
 
@@ -207,7 +196,6 @@ benchbox run --platform doris --benchmark tpch --scale 1.0 \
 ### Dry Run (Preview)
 
 ```bash
-# Preview execution plan without running
 benchbox run --platform doris --benchmark tpch --scale 1.0 --dry-run ./preview
 ```
 
@@ -299,7 +287,6 @@ The adapter automatically applies session-level optimizations when running bench
 Choosing effective distribution keys is critical for Doris query performance:
 
 ```sql
--- Hash distribution on frequently joined columns
 CREATE TABLE lineitem (
     l_orderkey BIGINT,
     l_partkey BIGINT,
@@ -318,10 +305,8 @@ DISTRIBUTED BY HASH(l_orderkey) BUCKETS 16;
 Doris supports secondary indexes for accelerating point queries and filter predicates:
 
 ```sql
--- Bloom filter index for high-cardinality columns
 ALTER TABLE lineitem SET ("bloom_filter_columns" = "l_orderkey, l_partkey");
 
--- Bitmap index for low-cardinality columns
 CREATE INDEX idx_shipmode ON lineitem (l_shipmode) USING BITMAP;
 ```
 
@@ -330,7 +315,6 @@ CREATE INDEX idx_shipmode ON lineitem (l_shipmode) USING BITMAP;
 For frequently joined tables, colocate groups ensure data locality:
 
 ```sql
--- Create colocate group for TPC-H tables
 CREATE TABLE orders (
     o_orderkey BIGINT,
     ...

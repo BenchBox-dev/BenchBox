@@ -21,10 +21,8 @@ BenchBox generates benchmark data as Parquet files once, then every platform rea
 Use `--table-mode` to control how data is registered before query execution:
 
 ```bash
-# Default: materialize native tables
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --table-mode native
 
-# External registration over files (views/external tables)
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --table-mode external
 ```
 
@@ -33,13 +31,10 @@ benchbox run --platform duckdb --benchmark tpch --scale 0.1 --table-mode externa
 ## Quick Comparison: DuckDB vs SQLite
 
 ```bash
-# Run on DuckDB
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output duckdb_results.json
 
-# Run on SQLite (uses same generated data)
 benchbox run --platform sqlite --benchmark tpch --scale 0.1 --output sqlite_results.json
 
-# Compare results
 benchbox compare duckdb_results.json sqlite_results.json
 ```
 
@@ -62,14 +57,11 @@ DuckDB completed in 3.7x less time
 Compare local and cloud performance:
 
 ```bash
-# Local baseline
 benchbox run --platform duckdb --benchmark tpch --scale 1 --output local.json
 
-# Cloud (requires credentials)
 benchbox run --platform snowflake --benchmark tpch --scale 1 --output snowflake.json
 benchbox run --platform bigquery --benchmark tpch --scale 1 --output bigquery.json
 
-# Cloud external-mode examples (file-backed registration)
 benchbox run --platform snowflake --benchmark tpch --scale 1 --table-mode external \
   --platform-option staging_root=s3://bucket/benchbox/ --output snowflake_external.json
 benchbox run --platform athena --benchmark tpch --scale 1 --table-mode external \
@@ -77,7 +69,6 @@ benchbox run --platform athena --benchmark tpch --scale 1 --table-mode external 
 benchbox run --platform bigquery --benchmark tpch --scale 1 --table-mode external \
   --platform-option staging_root=gs://bucket/benchbox/ --output bigquery_external.json
 
-# Multi-way comparison
 benchbox compare local.json snowflake.json bigquery.json
 ```
 
@@ -101,13 +92,10 @@ See [Platform Documentation](../platforms/index.md) for setup guides.
 Compare SQL and DataFrame execution:
 
 ```bash
-# SQL execution
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output sql.json
 
-# DataFrame execution (Polars)
 benchbox run --platform polars-df --benchmark tpch --scale 0.1 --output polars.json
 
-# Compare paradigms
 benchbox compare sql.json polars.json
 ```
 
@@ -116,11 +104,9 @@ benchbox compare sql.json polars.json
 ### Use Same Scale Factor
 
 ```bash
-# Correct: same scale factor
 benchbox run --platform duckdb --benchmark tpch --scale 1
 benchbox run --platform snowflake --benchmark tpch --scale 1
 
-# Incorrect: different scale factors (not comparable)
 benchbox run --platform duckdb --benchmark tpch --scale 0.1
 benchbox run --platform snowflake --benchmark tpch --scale 10
 ```
@@ -140,10 +126,8 @@ done
 First run includes caching overhead. For warm comparisons:
 
 ```bash
-# Warm up (discard first run)
 benchbox run --platform duckdb --benchmark tpch
 
-# Measured run
 benchbox run --platform duckdb --benchmark tpch --output results.json
 ```
 
@@ -152,8 +136,6 @@ benchbox run --platform duckdb --benchmark tpch --output results.json
 For systematic platform evaluation:
 
 ```python
-#!/usr/bin/env python3
-"""Compare TPC-H across platforms."""
 import subprocess
 import json
 
@@ -173,7 +155,6 @@ for platform in PLATFORMS:
     with open(output) as f:
         results[platform] = json.load(f)
 
-# Compare total times
 for platform, data in results.items():
     total = data.get("summary", {}).get("total_time_seconds", 0)
     print(f"{platform}: {total:.1f}s")

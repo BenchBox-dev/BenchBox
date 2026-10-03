@@ -154,7 +154,6 @@ from benchbox.utils.verbosity import VerbosityMixin
 class MyClass(VerbosityMixin):
     def debug_operation(self):
         self.log_debug_info("Operation Context")
-        # Automatically includes version information
 ```
 
 ### Error Context
@@ -165,7 +164,6 @@ All CLI errors automatically include version information for debugging:
 from benchbox.cli.exceptions import BenchboxCLIError
 
 raise BenchboxCLIError("Something went wrong")
-# Automatically includes version in error details
 ```
 
 ## Integration Points
@@ -203,7 +201,7 @@ from benchbox.cli.exceptions import ErrorContext, BenchboxCLIError
 context = ErrorContext(
     operation="benchmark_execution",
     stage="data_loading",
-    include_version_info=True  # Automatic version inclusion
+    include_version_info=True
 )
 ```
 
@@ -255,13 +253,10 @@ When imports fail, version information helps identify compatibility issues:
 For comprehensive debugging:
 
 ```bash
-# Enable debug logging
 export BENCHBOX_LOG_LEVEL=DEBUG
 
-# Run with verbose output
 uv run benchbox run --benchmark tpch --scale 0.01 -vv
 
-# Check version consistency
 uv run -- python -c "from benchbox.utils.version import format_version_report; print(format_version_report())"
 ```
 

@@ -201,25 +201,21 @@ For comprehensive documentation of each category:
 ### Prerequisites
 
 ```bash
-# Install BenchBox
 uv add benchbox
 
-# For specific platforms, install extras
-uv add benchbox --extra databricks  # Databricks examples
-uv add benchbox --extra bigquery    # BigQuery examples
-uv add benchbox --extra snowflake   # Snowflake examples
+uv add benchbox --extra databricks
+uv add benchbox --extra bigquery
+uv add benchbox --extra snowflake
 ```
 
 ### Run a Getting Started Example
 
 ```bash
-# DuckDB (no configuration needed)
 cd examples/getting_started/local
 python duckdb_tpch_power.py
 
-# Cloud platform (requires credentials)
 cd examples/getting_started/cloud
-python databricks_tpch_power.py  # Set DATABRICKS_* env vars first
+python databricks_tpch_power.py
 ```
 
 ### Run a Feature Example

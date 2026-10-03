@@ -134,39 +134,28 @@ These commands serve different purposes:
 ## Examples
 
 ```bash
-# Package a specific result file
 uv run -- benchbox submit results/tpch_sf1_duckdb.json
 
-# Package the most recent result
 uv run -- benchbox submit --last
 
-# Print exact result paths (one per line, pipeable), then package one result by path
 uv run -- benchbox results --paths
 uv run -- benchbox submit benchmark_runs/results/tpch_sf001_duckdb_20260401_120000.json --output ./submission
 
-# Or loop over every recent result
 uv run -- benchbox results --paths --limit 100 \
   | xargs -n1 -I{} uv run -- benchbox submit {} --output ./submissions
 
-# Package the most recent TPC-H result
 uv run -- benchbox submit --last --benchmark tpch
 
-# Preview what would be packaged (no files written)
 uv run -- benchbox submit --last --dry-run
 
-# Use a custom output directory
 uv run -- benchbox submit --last --output ./my-submission
 
-# Log in for hosted submission
 uv run -- benchbox auth login
 
-# Upload to hosted API and wait for publication
 uv run -- benchbox submit --last --service
 
-# Upload to staging without waiting for publication
 uv run -- benchbox submit --last --service https://staging.benchbox.dev/v1 --no-wait
 
-# Show hosted submission history
 uv run -- benchbox results --submitted
 ```
 

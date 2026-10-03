@@ -139,10 +139,8 @@ Each segment can use different compression, enabling fine-grained optimization.
 ### DuckDB Extension
 
 ```bash
-# Install vortex extension (one-time)
 duckdb -c "INSTALL vortex; LOAD vortex;"
 
-# Query Vortex files
 SELECT * FROM read_vortex('customer.vortex')
 ```
 
@@ -196,29 +194,24 @@ For production benchmarks, we recommend Parquet. For exploration and DuckDB-spec
 ### Installation
 
 ```bash
-# Install vortex Python library
 uv add vortex-data
 ```
 
 ### Running Benchmarks
 
 ```bash
-# Convert data to Vortex format
 benchbox convert --input ./data --format vortex
 
-# Run benchmark with Vortex on DuckDB
 benchbox run --platform duckdb --benchmark tpch --table-format vortex --scale 1
 ```
 
 ### Reading Vortex Files
 
 ```python
-# Python vortex library
 import vortex
 array = vortex.io.read('customer.vortex')
 table = array.to_arrow()
 
-# DuckDB (requires extension)
 conn.execute("INSTALL vortex; LOAD vortex;")
 conn.execute("SELECT * FROM read_vortex('customer.vortex')")
 ```

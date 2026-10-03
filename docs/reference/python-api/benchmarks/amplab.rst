@@ -28,11 +28,9 @@ Quick Start
     from benchbox.amplab import AMPLab
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Create benchmark
     benchmark = AMPLab(scale_factor=0.1)
     benchmark.generate_data()
 
-    # Run benchmark
     adapter = DuckDBAdapter()
     results = adapter.run_benchmark(benchmark)
 
@@ -109,19 +107,16 @@ Get specific AMPLab query with optional parameters.
 
 .. code-block:: python
 
-    # Scan query with custom threshold
     scan_query = benchmark.get_query("1", params={
         'pagerank_threshold': 1500
     })
 
-    # Join query with date range
     join_query = benchmark.get_query("2", params={
         'start_date': '2000-01-01',
         'end_date': '2000-01-03',
         'limit_rows': 100
     })
 
-    # Analytics query with filters
     analytics_query = benchmark.get_query("3", params={
         'search_term': 'google',
         'min_visits': 10
@@ -137,7 +132,6 @@ Get all eight AMPLab queries.
 
     queries = benchmark.get_queries()
     print(f"Available queries: {list(queries.keys())}")
-    # Output: ['1', '1a', '2', '2a', '3', '3a', '4', '5']
 
 Usage Examples
 --------------
@@ -150,11 +144,9 @@ Basic Benchmark Execution
     from benchbox.amplab import AMPLab
     from benchbox.platforms.duckdb import DuckDBAdapter
 
-    # Initialize with testing scale
     benchmark = AMPLab(scale_factor=0.1)
     data_files = benchmark.generate_data()
 
-    # Run with DuckDB
     adapter = DuckDBAdapter(memory_limit="4GB")
     results = adapter.run_benchmark(benchmark)
 
@@ -178,7 +170,6 @@ Query Type Testing
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Test query types
     query_types = {
         'Scan': ['1', '1a'],
         'Join': ['2', '2a'],
@@ -213,7 +204,6 @@ Performance Comparison
     from benchbox.platforms.duckdb import DuckDBAdapter
     from benchbox.core.results.timing import TimingCollector, TimingAnalyzer
 
-    # Test across scale factors
     scale_factors = [0.01, 0.1, 0.5]
 
     for sf in scale_factors:
@@ -227,7 +217,6 @@ Performance Comparison
         adapter.create_schema(benchmark, conn)
         adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-        # Time scan query
         scan_query = benchmark.get_query("1", params={'pagerank_threshold': 1000})
 
         start = time.time()
@@ -244,14 +233,11 @@ Best Practices
 
    .. code-block:: python
 
-       # Development
-       dev = AMPLab(scale_factor=0.01)  # ~100 MB
+       dev = AMPLab(scale_factor=0.01)
 
-       # Testing
-       test = AMPLab(scale_factor=0.1)  # ~1 GB
+       test = AMPLab(scale_factor=0.1)
 
-       # Production
-       prod = AMPLab(scale_factor=1.0)  # ~10 GB
+       prod = AMPLab(scale_factor=1.0)
 
 2. **Parameterize Queries**
 
@@ -272,13 +258,10 @@ Best Practices
 
    .. code-block:: python
 
-       # Test scan performance
        scan_queries = ['1', '1a']
 
-       # Test join performance
        join_queries = ['2', '2a']
 
-       # Test analytics performance
        analytics_queries = ['3', '3a', '4', '5']
 
 See Also
