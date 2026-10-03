@@ -104,3 +104,7 @@ test('path.join on an absolute root is an absolute script operand', () => {
   const relative = 'import {join} from "node:path"; const gen = join(base, "gen.mjs"); spawnSync(process.execPath, [gen]);';
   assert.equal(scan('a.mjs', relative)[0].kind, 'coverage-error');
 });
+test('required path module resolves script operands', () => {
+  const source = 'const path = require("node:path"); const adapter = path.resolve(__dirname, "x.cjs"); spawnSync("node", [adapter]);';
+  assert.deepEqual(scan('a.cjs', source), []);
+});

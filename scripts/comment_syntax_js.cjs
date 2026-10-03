@@ -57,6 +57,14 @@ function scan(name, source) {
         for (const element of node.name.elements) imports.set(element.name.getText(tree), (element.propertyName || element.name).getText(tree));
       }
     }
+    if (ts.isVariableDeclaration(node) && node.initializer && ts.isCallExpression(node.initializer)
+        && node.initializer.expression.getText(tree) === 'require' && node.initializer.arguments.length === 1
+        && ts.isStringLiteral(node.initializer.arguments[0]) && ['path', 'node:path'].includes(node.initializer.arguments[0].text)) {
+      if (ts.isIdentifier(node.name)) pathModules.set(node.name.text, node.initializer.arguments[0].text);
+      if (ts.isObjectBindingPattern(node.name)) {
+        for (const element of node.name.elements) pathImports.set(element.name.getText(tree), (element.propertyName || element.name).getText(tree));
+      }
+    }
     if (ts.isCallExpression(node) || ts.isNewExpression(node)) calls.push(node);
     if (ts.isPropertyAssignment(node) && node.name.getText(tree) === 'sql') sqlProperties.push(node.initializer);
     if (ts.isStringLiteralLike(node) || ts.isRegularExpressionLiteral(node) || ts.isJsxText(node)
