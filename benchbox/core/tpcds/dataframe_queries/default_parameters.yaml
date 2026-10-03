@@ -357,25 +357,18 @@
   month: 12
   year: 2001
 50:
-  channel: store channel
-  days: 30
   month: 9
   year: 2000
 51:
   dms: 1212
-  months:
-  - 1
-  - 2
-  - 3
-  - 4
-  year: 2001
 52:
   month: 12
   year: 1998
 53:
   dms: 1212
-  month: 11
 54:
+  category: Women
+  class: maternity
   month: 4
   year: 2000
 55:
@@ -393,15 +386,10 @@
 57:
   year: 2000
 58:
-  day: 1
   sales_date: '1998-02-19'
-  year: 2000
 59:
   d_month_seq: 1185
-  year: 1999
 60:
-  categories:
-  - Children
   category: Children
   gmt_offset: -6.0
   month: 9
@@ -413,13 +401,8 @@
   year: 1999
 62:
   dms: 1212
-  months:
-  - 11
-  - 12
-  year: 1999
 63:
   dms: 1212
-  month: 11
 64:
   colors:
   - maroon

@@ -68,11 +68,61 @@ def _q49(values: Mapping[str, str]) -> dict[str, Any]:
     return {"year": year, "month": month}
 
 
+def _q50(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month}
+
+
+def _dms(values: Mapping[str, str]) -> int:
+    # The SQL spans [DMS] through [DMS]+11 (to +23 for Q59); the implementations add the offsets.
+    return int(values["DMS.01"])
+
+
+def _dms_window(values: Mapping[str, str]) -> dict[str, Any]:
+    # Q51, Q53, Q62 and Q63 take one month sequence and read it as ``dms``.
+    return {"dms": _dms(values)}
+
+
+def _q54(values: Mapping[str, str]) -> dict[str, Any]:
+    # CINDX only picks CATEGORY and CLASS from the categories distribution; the SQL receives the names.
+    year, month = _year_and_month(values)
+    return {"year": year, "month": month, "category": values["CATEGORY.01"], "class": values["CLASS.01"]}
+
+
+def _q58(values: Mapping[str, str]) -> dict[str, Any]:
+    # YEAR only bounds the draw of SALES_DATE; the SQL receives the date.
+    return {"sales_date": values["SALES_DATE.01"]}
+
+
+def _q59(values: Mapping[str, str]) -> dict[str, Any]:
+    return {"d_month_seq": _dms(values)}
+
+
+def _q60(values: Mapping[str, str]) -> dict[str, Any]:
+    year, month = _year_and_month(values)
+    # GMT is a whole number of hours in the fips_county distribution; the SQL compares it with a decimal column.
+    return {"year": year, "month": month, "category": values["CATEGORY.01"], "gmt_offset": int(values["GMT.01"])}
+
+
 def _q93(values: Mapping[str, str]) -> dict[str, Any]:
     return {"reason": values["REASON.01"]}
 
 
-ADAPTERS: dict[int, Adapter] = {39: _q39, 44: _q44, 49: _q49, 93: _q93}
+ADAPTERS: dict[int, Adapter] = {
+    39: _q39,
+    44: _q44,
+    49: _q49,
+    50: _q50,
+    51: _dms_window,
+    53: _dms_window,
+    54: _q54,
+    58: _q58,
+    59: _q59,
+    60: _q60,
+    62: _dms_window,
+    63: _dms_window,
+    93: _q93,
+}
 
 
 def adapter_query_ids() -> tuple[int, ...]:

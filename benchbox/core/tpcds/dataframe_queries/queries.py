@@ -212,8 +212,10 @@ def _manufacturer_month_expression(
     )
     with_avg = grouped.with_columns(ctx.window_avg(alias, partition_by=[id_col]).alias(avg_alias))
     # SQL keeps rows where ABS(sum-avg)/avg > 0.1 with avg > 0 (else NULL, filtered out).
+    # The period column only separates the groups; the SQL does not select it.
     return (
         with_avg.filter((col(avg_alias) > lit(0)) & ((col(alias) - col(avg_alias)).abs() / col(avg_alias) > lit(0.1)))
+        .select([id_col, alias, avg_alias])
         .sort(list(sort_by))
         .limit(100)
     )
@@ -255,7 +257,8 @@ def _manufacturer_month_pandas(
     grouped = filtered.groupby([id_col, period_col], as_index=False).agg(**{alias: (value_col, "sum")})
     grouped[avg_alias] = grouped.groupby(id_col)[alias].transform("mean")
     kept = grouped[(grouped[avg_alias] > 0) & ((grouped[alias] - grouped[avg_alias]).abs() / grouped[avg_alias] > 0.1)]
-    return kept.sort_values(list(sort_by)).head(100)
+    # The period column only separates the groups; the SQL does not select it.
+    return kept[[id_col, alias, avg_alias]].sort_values(list(sort_by)).head(100)
 
 
 def _item_category_sales_expression(
@@ -4152,6 +4155,17 @@ def q36_pandas_impl(ctx: DataFrameContext) -> Any:
 # =============================================================================
 
 
+def _q51_running_total(ctx: DataFrameContext, item_key: str) -> Any:
+    """SQL's running SUM over the day sums of one item: a day whose sum is NULL repeats the total so far.
+
+    The total stays NULL until the item has had a day with a value, which is what the SQL window gives.
+    """
+    col, lit = ctx.col, ctx.lit
+    seen = ctx.when(col("daily_sales").is_not_null()).then(1).otherwise(0).cum_sum().over([item_key])
+    total = col("daily_sales").fill_null(0).cum_sum().over([item_key])
+    return ctx.when(seen > lit(0)).then(total).otherwise(lit(None))
+
+
 def q51_expression_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q51: Cumulative Web/Store Sales (Expression Family).
 
@@ -4175,13 +4189,18 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
         web_sales.filter(col("ws_item_sk").is_not_null())
         .join(dates, left_on="ws_sold_date_sk", right_on="d_date_sk")
         .group_by(["ws_item_sk", "d_date"])
-        .agg(col("ws_sales_price").sum().alias("daily_sales"))
+        .agg(
+            ctx.when(col("ws_sales_price").count() > lit(0))
+            .then(col("ws_sales_price").sum())
+            .otherwise(lit(None))
+            .alias("daily_sales")
+        )
     )
 
     # Add cumulative sum
     web_v1 = (
         web_base.sort(["ws_item_sk", "d_date"])
-        .with_columns(col("daily_sales").cum_sum().over(["ws_item_sk"]).alias("cume_sales"))
+        .with_columns(_q51_running_total(ctx, "ws_item_sk").alias("cume_sales"))
         .select(
             col("ws_item_sk").alias("item_sk"),
             col("d_date"),
@@ -4194,12 +4213,17 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
         store_sales.filter(col("ss_item_sk").is_not_null())
         .join(dates, left_on="ss_sold_date_sk", right_on="d_date_sk")
         .group_by(["ss_item_sk", "d_date"])
-        .agg(col("ss_sales_price").sum().alias("daily_sales"))
+        .agg(
+            ctx.when(col("ss_sales_price").count() > lit(0))
+            .then(col("ss_sales_price").sum())
+            .otherwise(lit(None))
+            .alias("daily_sales")
+        )
     )
 
     store_v1 = (
         store_base.sort(["ss_item_sk", "d_date"])
-        .with_columns(col("daily_sales").cum_sum().over(["ss_item_sk"]).alias("cume_sales"))
+        .with_columns(_q51_running_total(ctx, "ss_item_sk").alias("cume_sales"))
         .select(
             col("ss_item_sk").alias("item_sk"),
             col("d_date"),
@@ -4253,6 +4277,11 @@ def q51_expression_impl(ctx: DataFrameContext) -> Any:
     )
 
 
+def _q51_running_total_pandas(base: Any, item_key: str) -> Any:
+    """SQL's running SUM over the day sums of one item (see ``_q51_running_total``)."""
+    return base.groupby(item_key)["daily_sales"].cumsum().groupby(base[item_key], sort=False).ffill()
+
+
 def q51_pandas_impl(ctx: DataFrameContext) -> Any:
     """TPC-DS Q51: Cumulative Web/Store Sales (Pandas Family)."""
     params = get_parameters(51)
@@ -4268,9 +4297,11 @@ def q51_pandas_impl(ctx: DataFrameContext) -> Any:
     web_merged = web_sales[web_sales["ws_item_sk"].notna()].merge(
         dates[["d_date_sk", "d_date"]], left_on="ws_sold_date_sk", right_on="d_date_sk"
     )
-    web_base = web_merged.groupby(["ws_item_sk", "d_date"], as_index=False).agg(daily_sales=("ws_sales_price", "sum"))
+    web_base = web_merged.groupby(["ws_item_sk", "d_date"], as_index=False).agg(
+        daily_sales=("ws_sales_price", lambda values: values.sum(min_count=1))
+    )
     web_base = web_base.sort_values(["ws_item_sk", "d_date"])
-    web_base["cume_sales"] = web_base.groupby("ws_item_sk")["daily_sales"].cumsum()
+    web_base["cume_sales"] = _q51_running_total_pandas(web_base, "ws_item_sk")
     web_v1 = web_base[["ws_item_sk", "d_date", "cume_sales"]].rename(columns={"ws_item_sk": "item_sk"})
 
     # Store CTE
@@ -4278,10 +4309,10 @@ def q51_pandas_impl(ctx: DataFrameContext) -> Any:
         dates[["d_date_sk", "d_date"]], left_on="ss_sold_date_sk", right_on="d_date_sk"
     )
     store_base = store_merged.groupby(["ss_item_sk", "d_date"], as_index=False).agg(
-        daily_sales=("ss_sales_price", "sum")
+        daily_sales=("ss_sales_price", lambda values: values.sum(min_count=1))
     )
     store_base = store_base.sort_values(["ss_item_sk", "d_date"])
-    store_base["cume_sales"] = store_base.groupby("ss_item_sk")["daily_sales"].cumsum()
+    store_base["cume_sales"] = _q51_running_total_pandas(store_base, "ss_item_sk")
     store_v1 = store_base[["ss_item_sk", "d_date", "cume_sales"]].rename(columns={"ss_item_sk": "item_sk"})
 
     # Full outer join
