@@ -27,7 +27,7 @@ from check_comment_policy import (
     source_paths,
 )
 from comment_payloads import stdin_language
-from comment_syntax import Finding, javascript_requests, python_findings, scan, source_language, sql_comments
+from comment_syntax import Finding, javascript_requests, language, python_findings, scan, source_language, sql_comments
 from run_comment_policy import TRUSTED_FILES, parser_environment, resolve_base
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
@@ -1869,7 +1869,6 @@ def test_path_backed_command_operands_preserve_argument_roles(source: str, expec
         'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c/foo"), code])',
         'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c\\\\foo"), code])',
         'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path(root) / "script.py"), code])',
-        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path(__file__).parent / "script.py"), code])',
         'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("\\\\").parent / "-cprint(1)" / "x# hidden")])',
     ],
 )
@@ -2476,3 +2475,61 @@ def test_unknown_division_html_sink_stays_unresolved() -> None:
 def test_c_include_targets_are_not_comments() -> None:
     findings = scan("a.c", '#include <stdio.h>\n#include "local.h"\nint x; /* note */\n', "c")
     assert [(f.line, f.text) for f in findings] == [(3, "/* note */")]
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "expected"),
+    [
+        ("tests/a.jsonl", '{"a": 1}\n\n{"b": [2]}\n', []),
+        ("tests/a.xml", "<a><!-- note --><b/></a>\n", [(1, "<!-- note -->")]),
+        ("docs/CNAME", "example.org\n", []),
+    ],
+)
+def test_data_formats_have_adapters(path: str, source: str, expected: list) -> None:
+    findings = scan(path, source, language(path))
+    assert [(f.line, f.text) for f in findings] == expected
+
+
+def test_invalid_json_line_is_a_coverage_error() -> None:
+    findings = scan("tests/a.jsonl", '{"a": 1}\n# not json\n', "jsonl")
+    assert [f.kind for f in findings] == ["coverage-error"]
+
+
+@pytest.mark.parametrize("path", ["tests/parity/fixtures/.gitkeep", "docs/operations/key.pem"])
+def test_inert_data_files_are_not_sources(path: str) -> None:
+    assert language(path) is None
+
+
+def test_reviewed_process_argv_is_exact() -> None:
+    from comment_execution import REVIEWED_PROCESS_ARGV
+
+    path, argv = next(key for key in REVIEWED_PROCESS_ARGV if key[0] == "benchbox/core/tpch/streams.py")
+    source = f"import subprocess\ncmd = {argv}\nsubprocess.run(cmd)\n"
+    assert not [f for f in scan(path, source, "python", {}) if f.kind == "payload-error"]
+    assert [f.kind for f in scan("other.py", source, "python", {})] == ["payload-error"]
+    edited = source.replace("'-p'", "'-c'")
+    assert [f.kind for f in scan(path, edited, "python", {})] == ["payload-error"]
+
+
+def test_reviewed_process_argv_entries_match_current_sources() -> None:
+    from comment_execution import REVIEWED_PROCESS_ARGV, PythonBindings
+
+    for path, argv in REVIEWED_PROCESS_ARGV:
+        tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+        bindings = PythonBindings(tree)
+        assert any(isinstance(node, ast.Call) and bindings.reviewed_argv(path, node) for node in ast.walk(tree)), (
+            path,
+            argv,
+        )
+
+
+def test_absolute_literal_path_executable_is_resolved() -> None:
+    source = "import subprocess\nfrom pathlib import Path\nhelper = Path('/usr/libexec/java_home')\nsubprocess.run([str(helper), '-v', '17'])\n"
+    assert scan("a.py", source, "python", {}) == []
+
+
+def test_module_file_path_script_operand_is_resolved() -> None:
+    source = "import subprocess, sys\nfrom pathlib import Path\nscript = Path(__file__).parent / 'run.py'\nsubprocess.run([sys.executable, str(script)])\n"
+    assert scan("a.py", source, "python", {}) == []
+    rebound = "__file__ = '-c'\n" + source
+    assert [f.kind for f in scan("a.py", rebound, "python", {})] == ["payload-error"]

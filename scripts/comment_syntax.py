@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import io
+import json
 import re
 import shlex
 import tokenize
@@ -71,6 +72,8 @@ LANGUAGES = {
     ".java": "java",
     ".properties": "properties",
     ".json": "json",
+    ".jsonl": "jsonl",
+    ".xml": "xml",
     ".tf": "terraform",
     ".r": "r",
     ".tpl": "unsupported",
@@ -122,6 +125,7 @@ DATA_SUFFIXES = {
     ".ttf",
     ".map",
     ".snap",
+    ".pem",
 }
 
 
@@ -142,8 +146,10 @@ def language(path: str) -> str | None:
         return "ini"
     if name.startswith(".env"):
         return "bash"
-    if name == "skill-sync.conf":
+    if name == "skill-sync.conf" or name == "CNAME":
         return "line-config"
+    if name.startswith(".") and name in DATA_SUFFIXES:
+        return None
     if path == "tools/skill-sync":
         return "bash"
     if name.lower() in {"makefile", "gnumakefile"} or name.startswith("Makefile."):
@@ -393,6 +399,8 @@ def python_executable_findings(path: str, tree: ast.AST, scopes: list[tuple[int,
         if payload is None:
             continue
         expression, lang, text = payload
+        if (text is None or lang == "unsupported") and bindings.reviewed_argv(path, node):
+            continue
         symbol = next((name for start, end, name in reversed(scopes) if start <= node.lineno <= end), "")
         if text is None or lang == "unsupported":
             result.append(
@@ -509,6 +517,32 @@ def template_coverage(path: str, source: str, lang: str) -> list[Finding]:
     return []
 
 
+def mask_embedded_sources(path: str, source: str, lang: str) -> str:
+    if lang == "bash":
+        lines = source.splitlines(keepends=True)
+        for start, _, text, _, _ in shell_payloads(path, source, include_data=True):
+            for index in range(start - 1, start - 1 + len(text.splitlines())):
+                lines[index] = re.sub(r"[^\n]", " ", lines[index])
+        return "".join(lines) + "\n"
+    if lang in {"html", "html+jinja"}:
+        return re.sub(
+            r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)",
+            lambda m: m.group(1) + re.sub(r"[^\n]", " ", m.group(2)) + m.group(3),
+            source,
+            flags=re.I | re.S,
+        )
+    return source
+
+
+def validate_json_lines(source: str) -> None:
+    for index, line in enumerate(source.splitlines(), 1):
+        if line.strip():
+            try:
+                json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid JSON line {index}") from exc
+
+
 def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     try:
         if source.startswith("#!"):
@@ -527,21 +561,12 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
         nested.extend(template_coverage(path, source, lang))
         if lang in {"notebook", "examples"}:
             return nested
-        if lang == "bash":
-            lines = source.splitlines(keepends=True)
-            for start, _, text, _, _ in shell_payloads(path, source, include_data=True):
-                for index in range(start - 1, start - 1 + len(text.splitlines())):
-                    lines[index] = re.sub(r"[^\n]", " ", lines[index])
-            source = "".join(lines) + "\n"
-        if lang in {"html", "html+jinja"}:
-            source = re.sub(
-                r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)",
-                lambda m: m.group(1) + re.sub(r"[^\n]", " ", m.group(2)) + m.group(3),
-                source,
-                flags=re.I | re.S,
-            )
+        source = mask_embedded_sources(path, source, lang)
         if lang == "unsupported":
             raise ValueError("source language has no registered adapter")
+        if lang == "jsonl":
+            validate_json_lines(source)
+            return nested
         if lang == "line-config":
             return [
                 Finding(path, index, "comment", text)

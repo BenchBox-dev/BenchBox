@@ -6,6 +6,85 @@ from collections import defaultdict
 
 from comment_payloads import command_words, inline_source_index
 
+REVIEWED_PROCESS_ARGV: dict[tuple[str, str], str] = {
+    (
+        "_project/scripts/build_joinorder_data.py",
+        "[container_cli(), 'rm', '-f', container_name]",
+    ): "container_cli() returns BENCHBOX_CONTAINER_CLI or docker; this call removes a container",
+    (
+        "benchbox/core/tpcds/generator/runner.py",
+        "[str(self.dsdgen_exe), '-verbose', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-child', str(chunk_id), '-parallel', str(self.parallel)]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+    (
+        "benchbox/core/tpcds/generator/runner.py",
+        "[str(self.dsdgen_exe), '-verbose', '-force', '-terminate', 'n', '-scale', str(self.scale_factor)]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+    (
+        "benchbox/core/tpcds/generator/streaming.py",
+        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', parent_table, '-child', str(chunk_id), '-parallel', str(self.parallel)]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+    (
+        "benchbox/core/tpcds/generator/streaming.py",
+        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', parent_table]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+    (
+        "benchbox/core/tpcds/generator/streaming.py",
+        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', table_name, '-child', str(chunk_id), '-parallel', str(self.parallel), '-FILTER', 'Y']",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+    (
+        "benchbox/core/tpcds/generator/streaming.py",
+        "[str(self.dsdgen_exe), '-verbose' if self.verbose else '-quiet', '-force', '-terminate', 'n', '-scale', str(self.scale_factor), '-table', table_name]",
+    ): "self.dsdgen_exe is the bundled TPC-DS dsdgen data generator binary",
+    (
+        "benchbox/core/tpch/generator.py",
+        "[str(dbgen_exe), '-vf', '-s', str(self.scale_factor)]",
+    ): "the executable is the bundled TPC-H dbgen data generator binary",
+    (
+        "benchbox/core/tpch/generator.py",
+        "[str(self.dbgen_exe), '-vf', '-s', str(self.scale_factor), '-S', str(chunk_id), '-C', str(self.parallel)]",
+    ): "the executable is the bundled TPC-H dbgen data generator binary",
+    (
+        "benchbox/core/tpch/generator.py",
+        "[str(self.dbgen_exe), '-vf', '-s', str(self.scale_factor)]",
+    ): "the executable is the bundled TPC-H dbgen data generator binary",
+    (
+        "benchbox/core/tpch/generator.py",
+        "[str(self.dbgen_exe), '-z', '-q', '-f', '-s', str(self.scale_factor), '-T', table_code]",
+    ): "the executable is the bundled TPC-H dbgen data generator binary",
+    (
+        "benchbox/core/tpch/streams.py",
+        "[str(qgen_exe), '-p', str(stream_id + 1), '-s', str(self.scale_factor), '-r', str(self.rng_seed + stream_id), '-o', str(work_dir)]",
+    ): "qgen_exe is the bundled TPC-H qgen query generator binary",
+    (
+        "scripts/_render_blog_charts.py",
+        "['uv', 'run', '--project', str(ROOT), *cmd]",
+    ): "uv runs the textcharts CLI; every CHARTS command starts with textcharts",
+    (
+        "scripts/capture_chart_images.py",
+        "[str(CHROME), '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-web-security', f'--window-size={width},{height}', f'--screenshot={out_path}', '--hide-scrollbars', f'file://{tmp_html}']",
+    ): "CHROME is the headless Chrome browser binary",
+    (
+        "scripts/capture_release_heroes.py",
+        "[str(CHROME), '--headless=new', '--disable-gpu', '--no-sandbox', '--disable-web-security', f'--window-size={width},{height}', f'--screenshot={out_path}', '--hide-scrollbars', '--run-all-compositor-stages-before-draw', '--virtual-time-budget=8000', target]",
+    ): "CHROME is the headless Chrome browser binary",
+    (
+        "scripts/heavy_tier_needed.py",
+        "[sys.executable, '-I', '-S', str(root / PREDICATE_REPO_PATH), '--stdin', '--format', 'github-output']",
+    ): "Python runs the soundness predicate script file; no -c or -m source",
+    (
+        "scripts/run_comment_policy.py",
+        "['node', '--test', str(root / 'tests/unit/scripts/test_comment_syntax_js.cjs')]",
+    ): "node --test runs the native parser test file; no inline source",
+    (
+        "scripts/validate_todo_indexes.py",
+        "[sys.executable, str(repo_root / '_project' / 'scripts' / script), '--strict']",
+    ): "Python runs the named index-check script files; no -c or -m source",
+    (
+        "scripts/verify_mcp_conformance.py",
+        "['node', str(conformance), 'server', '--url', url, '--scenario', scenario, '--spec-version', protocol_version]",
+    ): "node runs the MCP conformance CLI script file; no inline source",
+}
+
 
 class PythonBindings:
     def __init__(self, tree: ast.AST) -> None:
@@ -83,6 +162,10 @@ class PythonBindings:
             if owner and owner.startswith("module:"):
                 return owner.removeprefix("module:") + "." + node.attr
         return None
+
+    def reviewed_argv(self, path: str, node: ast.Call) -> bool:
+        command = node.args[0] if node.args else next((kw.value for kw in node.keywords if kw.arg == "args"), None)
+        return command is not None and (path, ast.unparse(self.dereference(command))) in REVIEWED_PROCESS_ARGV
 
     def payload(self, node: ast.Call) -> tuple[ast.AST, str, str | None] | None:
         actor = self.actor(node.func)
@@ -230,8 +313,24 @@ class PythonBindings:
         seen |= {node}
         if isinstance(node, ast.Call):
             if self.actor(node.func) == "pathlib.Path":
+                if (
+                    len(node.args) == 1
+                    and not node.keywords
+                    and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == "__file__"
+                    and self.lookup(node.args[0]) == (False, None)
+                ):
+                    return "absolute"
                 value = self.literal(node.args[0]) if len(node.args) == 1 and not node.keywords else None
                 return "absolute" if value and value.startswith("/") else "relative"
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "with_name"
+                and len(node.args) == 1
+                and not node.keywords
+                and self.literal(node.args[0])
+            ):
+                return self.path_kind(node.func.value, seen)
             if (
                 isinstance(node.func, ast.Attribute)
                 and node.func.attr in {"resolve", "absolute"}
@@ -268,8 +367,21 @@ class PythonBindings:
             and not value.keywords
         ):
             path = self.dereference(value.args[0])
-            if isinstance(path, ast.BinOp) and isinstance(path.op, ast.Div) and self.path_kind(path) == "absolute":
-                suffix = self.literal(path.right)
+            if (
+                isinstance(path, ast.Call)
+                and self.actor(path.func) == "pathlib.Path"
+                and len(path.args) == 1
+                and not path.keywords
+                and (self.literal(path.args[0]) or "").startswith("/")
+            ):
+                return self.literal(path.args[0])
+            leaf = None
+            if isinstance(path, ast.BinOp) and isinstance(path.op, ast.Div):
+                leaf = path.right
+            elif isinstance(path, ast.Call) and isinstance(path.func, ast.Attribute) and path.func.attr == "with_name":
+                leaf = path.args[0] if path.args else None
+            if leaf is not None and self.path_kind(path) == "absolute":
+                suffix = self.literal(leaf)
                 basename = suffix.replace("\\", "/").rsplit("/", 1)[-1] if suffix else ""
                 if basename and not basename.startswith("-"):
                     return "/" + basename
