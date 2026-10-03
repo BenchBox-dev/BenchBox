@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "rule": "small-scale-floor",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "At SF 0.01 the fastest BigQuery transaction operation takes about 2.4 s, almost all of it fixed DML job and transaction overhead rather than data volume. Expected for BigQuery at this scale.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/5a7e9146aca358bab3fb4c7a9ab156ef1d9834f5/results-data/CORPUS_NOTES.md#live-cloud-corpus-2026-10-02",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "transaction_primitives_sf001_bigquery_sql_20261001_205304_209908db"
+  ]
+}

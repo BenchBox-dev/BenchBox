@@ -1,0 +1,8 @@
+{
+  "bundle_file": "nyctaxi_sf10_snowflake_sql_20261001_102124_4c662b94.json",
+  "bundle_hash": "6a44b05019663363e3960a8f5f61ca9f195a5f76e9256d4d4269bc6a1d997143",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}
