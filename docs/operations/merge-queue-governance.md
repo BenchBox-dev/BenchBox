@@ -25,7 +25,7 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 | `docs` | `.github/workflows/ci.yml` | Sphinx build with warnings as errors, example validation, and spell check on docs changes. |
 | `landing` | `.github/workflows/ci.yml` | Site theme token scan on landing changes. |
 | `tooling` | `.github/workflows/ci.yml` | Every event. Content guard, skill integrity, and audit checks by path. |
-| `oracle-review` | Reports on the pull request head | Passes only when the Codex connector app has reviewed the current head of a result-affecting pull request. A new push changes the head, so it needs a new review. Pending for more than four hours means the connector is down, and the owner reviews the change. |
+| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes only when the Codex connector app has reviewed the current head of a result-affecting pull request. A new push changes the head, so it needs a new review. Pending for more than four hours means the connector is down, and the owner reviews the change. |
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
@@ -53,7 +53,7 @@ make pr-open
 make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
-- `make pr-open` opens or reuses the pull request. While trunk has been red for more than 30 minutes, it refuses any pull request that is not a revert (see section 5).
+- `make pr-open` opens or reuses the pull request. It refuses a branch that is not a revert when the newest completed `trunk.yml` run on `develop` failed more than 30 minutes ago (see section 5).
 - `make pr-ready` verifies the exact checkout, live PR identity, review state, required checks, holds, and readiness evidence before arming auto-merge.
 - Once the required checks are green on the head, GitHub merges the pull request.
 
@@ -77,7 +77,7 @@ When a trunk run fails, the culprit is reverted first and fixed afterwards:
 make trunk-revert PR=<number>
 ```
 
-While trunk has been red for more than 30 minutes, `make pr-open` refuses any pull request that is not a revert, so nothing new stacks on a broken tip. A trunk that stays red for more than two hours with no revert pull request open needs the owner to revert the culprit.
+`make pr-open` refuses a branch that is not a revert when the newest completed `trunk.yml` run on `develop` failed more than 30 minutes ago (`scripts/trunk_revert.py gate`), so nothing new stacks on a broken tip. That rule is enforced. A trunk that stays red for more than two hours with no revert pull request open is a risk signal for the owner, who should revert the culprit; nothing enforces the two-hour figure.
 
 More than one medium-tier shard kill a day means the shard's memory sampler output should be read for the test that is growing a worker.
 
@@ -87,7 +87,7 @@ If a trunk failure is traced to a pull request that was green on an older base, 
 
 ## 6. Nightly Run
 
-`.github/workflows/nightly.yml` runs once a day (06:00 UTC) and on dispatch. It covers what no required check runs: the full Python and operating-system compatibility matrix, the slow-tier observation, the integration and table-format jobs, packaging, and the green-unmerged sweep that reports pull requests that are green but were never armed. A nightly failure never blocks a merge.
+`.github/workflows/nightly.yml` runs once a day (06:00 UTC) and on dispatch. It runs the slow and scheduled checks that no required check covers, plus the advisory ruleset drift check, which no longer runs in `ci.yml` (it ran only in merge groups) and is also run by hand after a settings change. A nightly failure never blocks a merge.
 
 ---
 
