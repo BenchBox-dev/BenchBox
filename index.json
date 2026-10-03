@@ -7215,10 +7215,10 @@
     },
     "dlv2-f0-stabilize-queue-and-open-prs": {
       "claim": {
-        "expires_at": "2026-10-03T15:29:03Z",
-        "generation": "fe0a72e1d5bb419d8228b108d00ca1a0",
+        "expires_at": "2026-10-04T18:07:25Z",
+        "generation": "aff5a6882e5749c9a77cf52f74969c9b",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:303c674b74ec54e1807d1df3"
+        "worker": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486"
       },
       "needs": [],
       "priority": "critical",
