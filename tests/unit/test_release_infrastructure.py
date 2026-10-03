@@ -845,7 +845,6 @@ class TestReleaseInfrastructure:
             "tests/unit/scripts/test_ci_lint_environment_boundary.py",
             "tests/unit/scripts/test_corpus_privacy_invariant.py",
             "tests/unit/scripts/test_dev_loop_pr_metrics.py",
-            "tests/unit/scripts/test_fast_lane_ratchet_check.py",
             "tests/unit/scripts/test_green_unmerged_sweep.py",
             "tests/unit/scripts/test_guard_messages.py",
             "tests/unit/scripts/test_mirror_partial_validation_policy.py",
@@ -874,7 +873,7 @@ class TestReleaseInfrastructure:
             "tests/unit/workflows/test_validate_submission_changed_bundles.py",
             "tests/unit/workflows/test_validate_submission_fail_open.py",
         }
-        assert len(v040_missed_paths) == 38
+        assert len(v040_missed_paths) == 37
         assert v040_missed_paths <= curated_paths, (
             "release-cut is missing tests that had to be curated manually in the v0.4.0 release PR: "
             f"{sorted(v040_missed_paths - curated_paths)}"
@@ -1149,12 +1148,15 @@ class TestReleaseInfrastructure:
             for hook in repo.get("hooks", [])
             if hook.get("id") == "pr-preflight-fast-tests"
         )
-        entry = hook["entry"]
+        entry_script = tmp_path / "hook-entry.sh"
+        entry_script.write_text(hook["entry"], encoding="utf-8")
 
         skipped_env = os.environ.copy()
         skipped_env.pop("BENCHBOX_PREPUSH", None)
         skipped_env["BENCHBOX_VALIDATION_RECEIPTS_DIR"] = str(tmp_path / "skipped-receipts")
-        skipped = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env)
+        skipped = subprocess.run(
+            ["bash", str(entry_script)], cwd=REPO_ROOT, capture_output=True, text=True, env=skipped_env
+        )
         assert skipped.returncode == 0
         assert "SKIPPED" in skipped.stdout
 
@@ -1168,7 +1170,9 @@ class TestReleaseInfrastructure:
         active_env.update(
             {"BENCHBOX_PREPUSH": "1", "HOOK_TRACE": str(trace), "PATH": f"{bin_dir}:{active_env['PATH']}"}
         )
-        active = subprocess.run(["bash", "-c", entry], cwd=REPO_ROOT, capture_output=True, text=True, env=active_env)
+        active = subprocess.run(
+            ["bash", str(entry_script)], cwd=REPO_ROOT, capture_output=True, text=True, env=active_env
+        )
         assert active.returncode == 0, active.stderr
         assert "local-validation" in trace.read_text(encoding="utf-8")
         assert "GATE=local-focused-check" in trace.read_text(encoding="utf-8")

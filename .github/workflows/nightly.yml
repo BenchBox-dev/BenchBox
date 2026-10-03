@@ -1020,13 +1020,6 @@ jobs:
               validate_stream_count,
               validate_stream_success,
           )
-
-          # Narrow window: the timestamp captured immediately before the sweep
-          # step above, not a full-hour lookback -- see that step's comment.
-          # The capture step writes UTC (date -u); strptime yields a naive
-          # datetime whose .timestamp() would otherwise be read as LOCAL, so
-          # anchor it to UTC explicitly -- correct on any runner TZ, not just
-          # ubuntu-latest's UTC.
           started_after = datetime.datetime.strptime(
               os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
           ).replace(tzinfo=timezone.utc)
@@ -1052,20 +1045,11 @@ jobs:
               print(f'::error::{reason}')
               sys.exit(1)
           print(f'OK: stream count and per-stream success both verified ({result_path})')
-          # Throughput@Size floor (relative model -- see
-          # docs/operations/uat-framework.md 'Throughput performance floor').
-          # Additive to the stream-count hard gate above: a floor failure
-          # never masks or replaces a stream-count failure. With no baseline
-          # configured this only reports the observed value for future
-          # baseline accumulation and never fails: a threshold set before a
-          # stable baseline exists manufactures false failures.
           tpc_metrics = (result_json.get('summary') or {}).get('tpc_metrics') or {}
           observed = tpc_metrics.get('throughput_at_size')
           print(f'::notice::Throughput@Size observed: {observed!r} (duckdb/tpch-sf1)')
           import math
           floor_median = os.environ.get('THROUGHPUT_FLOOR_MEDIAN')
-          # `or` (not a get-default): a defined-but-empty variable must fall
-          # back too, otherwise float('') fails the gate on valid input.
           floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION') or '0.2'
           if floor_median:
               try:
@@ -1196,43 +1180,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply
-
-  fast-lane-ratchet-check:
-    # Auto-ratchet signal for the fast-lane test-count ceiling (see
-    # fast-lane-decouple-ceiling-contention-2 and
-    # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
-    # ci.yml's guard-fast-lane-ceiling step uses and, when headroom drops below
-    # the warning threshold, files/updates ONE marker-tagged tracking issue
-    # with the current numbers and the exact edit to make -- it does NOT
-    # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no
-    # required checks; same known constraint green_unmerged_sweep.py's own
-    # docstring notes). A ceiling bump stays a deliberate human/agent PR;
-    # this job only surfaces the need before the next test-adding PR
-    # collides with the cap.
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Run fast-lane ceiling ratchet check
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply
 
   ruleset-drift:
     name: ruleset-drift
