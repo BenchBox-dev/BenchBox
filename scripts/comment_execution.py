@@ -130,10 +130,56 @@ class PythonBindings:
                 "duckdb": "sql",
             }.get(program or "")
         )
-        flag = next(
-            (index for index, word in enumerate(words[1:], 1) if word in {"-c", "-e", "--eval", "--command", "-lc"}),
-            None,
-        )
-        if flag is not None and flag + 1 < len(args) and (language or program is None):
-            return args[flag + 1], language or "unsupported", words[flag + 1]
+        if language is None and program is not None:
+            return None
+        inline_flags = {
+            "python": {"-c"},
+            "bash": {"-c", "-lc"},
+            "javascript": {"-e", "--eval"},
+            "sql": {"-c", "--command"},
+        }.get(language, {"-c", "-e", "--eval", "--command", "-lc"})
+        python_flags = {
+            "-b",
+            "-bb",
+            "-B",
+            "-d",
+            "-E",
+            "-i",
+            "-I",
+            "-O",
+            "-OO",
+            "-P",
+            "-q",
+            "-R",
+            "-s",
+            "-S",
+            "-u",
+            "-v",
+            "-x",
+        }
+        index = 1
+        while index < len(words):
+            word = words[index]
+            if word in inline_flags:
+                if index + 1 < len(args):
+                    return args[index + 1], language or "unsupported", words[index + 1]
+                return args[index], language or "unsupported", None
+            if language == "python":
+                if word == "-m" or word == "--" or (word and not word.startswith("-")):
+                    return None
+                if word is None or (word not in python_flags and not word.startswith(("-W", "-X"))):
+                    return args[index], "unsupported", None
+            if language == "bash" and word in {"-o", "+o"}:
+                if index + 1 >= len(words) or words[index + 1] is None:
+                    return args[index], "unsupported", None
+                index += 2
+                continue
+            if language == "bash" and (word == "--" or (word and not word.startswith("-"))):
+                return None
+            if language == "python" and word in {"-W", "-X"}:
+                if index + 1 >= len(words) or words[index + 1] is None:
+                    return args[index], "unsupported", None
+                index += 2
+            else:
+                index += 1
         return None

@@ -1203,6 +1203,47 @@ def test_python_executable_strings_reach_scanner(source: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess, sys\nsubprocess.run([sys.executable, "-m", "pytest", "-c", config])',
+        'import subprocess\nsubprocess.run(["python3", "probe.py", "-c", config])',
+        'import subprocess\nsubprocess.run(["python3", "--", "probe.py", "-c", config])',
+        'import subprocess\nsubprocess.run(["pytest", "-c", config])',
+    ],
+)
+def test_application_options_are_not_executable_source(source: str) -> None:
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["bash", "-e", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["bash", "+o", "pipefail", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["python3", "-W", "ignore", "-X", "dev", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["python3", "-I", "-B", "-c", "# explanation"])',
+    ],
+)
+def test_interpreter_options_preserve_inline_source_scanning(source: str) -> None:
+    assert [finding.text for finding in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run([program, "-c", source])',
+        'import subprocess\nsubprocess.run(["python3", option, "-c", source])',
+        'import subprocess\nsubprocess.run(["python3", "--unknown", "-c", source])',
+        'import subprocess\nsubprocess.run(["python3", "-W", option, "-c", source])',
+    ],
+)
+def test_unknown_inline_process_source_still_fails_visibly(source: str) -> None:
+    findings = python_findings("a.py", source)
+    assert [finding.kind for finding in findings] == ["payload-error"]
+
+
+@pytest.mark.parametrize(
     "source", ["exec(source)", 'code = code + "text"\nexec(code)', 'code = "before"\ncode = "after"\nexec(code)']
 )
 def test_python_unresolved_execution_fails_visibly(source: str) -> None:
