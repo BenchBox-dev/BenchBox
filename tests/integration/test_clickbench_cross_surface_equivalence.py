@@ -39,9 +39,6 @@ pytestmark = [
 ]
 
 
-# Takes 30-60s on GitHub runners, so the medium lane's 60s cap killed it on
-# develop (trunk run 37155175127, medium-test shard 1, both attempts). The
-# marker overrides the CLI --timeout=60 so the test runs to completion.
 @pytest.mark.timeout(180)
 def test_clickbench_dataframe_surface_equivalent_to_sql(tmp_path):
     """Every ClickBench DataFrame query (both backends) must match its own SQL surface."""
