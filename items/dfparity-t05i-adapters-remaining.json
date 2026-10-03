@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Every query above has an adapter, or is shown to draw nothing that reaches the SQL BenchBox runs, with evidence",
+    "PENDING_ADAPTER is empty; the literal-fallback lint and completeness test pass",
+    "Each bound query matches DuckDB on both families at SF 0.01 and 0.1 for the default draw and several other seeds/streams, or the divergence is fixed at its cause"
+  ],
+  "description": "The t06 lint (branch feat/tpcds-literal-fallback-lint, e82f89910) found 33 queries with no adapter whose dsqgen draws reach the SQL. The inventory classified them as 'a' only because its name heuristic matched defaults-file keys. Q4, Q9, Q11, Q19, Q46 and Q68 already have adapters on local fix branches. Remaining 27: 2, 5, 6, 15, 28, 29, 30, 42, 43, 47, 48, 52, 55, 56, 57, 61, 64, 69, 72, 75, 77, 78, 80, 81, 94, 95, 96. Q5, Q47, Q57, Q77, Q80, Q94 and Q95 read no parameters at all, so their drawn values are hard-coded in the implementations. The lint pins these in PENDING_ADAPTER, which may only shrink.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T16:12:58Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1634eaa4dcd84233b8df5f5a9887ed88",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    }
+  ]
+}
