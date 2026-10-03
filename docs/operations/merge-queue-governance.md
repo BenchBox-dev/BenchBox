@@ -19,7 +19,7 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 
 | Required Context | Workflow Path | Contract |
 |---|---|---|
-| `core` | `.github/workflows/ci.yml` | Lint, type checks, fast tests, and parity gates for the pull request head. The heavy tier (medium-test, correctness-gate, plan-capture-gate, DataFusion integration, and the macOS and Windows TPC-H binary-framing matrix) is skipped on `pull_request` unless a carve-out applies (soundness paths, packaging paths); `trunk.yml` runs the medium tier and the correctness gate on `develop` after each merge. |
+| `core` | `.github/workflows/ci.yml` | Lint, type checks, fast tests, and parity gates for the pull request head. The heavy tier (medium-test, correctness-gate, required-local-cases, plan-capture-gate, DataFusion integration, and the macOS and Windows TPC-H binary-framing matrix) is skipped on `pull_request` unless a carve-out applies (soundness paths, packaging paths); `trunk.yml` runs the medium tier, the correctness gate and `required-local-cases` on `develop` after each merge. |
 | `explorer` | `.github/workflows/ci.yml` | Token scan, Vitest, CLI-versus-explorer parity, and the blocking Chromium suite on explorer changes. Reports success on unaffected paths. |
 | `results-data` | `.github/workflows/ci.yml` | Corpus inventory and validation, submission validator sync, and corpus contract tests on results-data changes. |
 | `docs` | `.github/workflows/ci.yml` | Sphinx build with warnings as errors, example validation, and spell check on docs changes. |
@@ -68,7 +68,7 @@ If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbo
 
 ## 5. Trunk Run and Revert
 
-`.github/workflows/trunk.yml` runs on every push to `develop`: the fast lane (with its ungraced ceiling), the four-shard medium tier, and the correctness gate. It is the test of `develop` in its merged state. Runs queue behind each other and one pending run is kept, so busy hours batch. It is not a required check.
+`.github/workflows/trunk.yml` runs on every push to `develop`: the fast lane (with its ungraced ceiling), the four-shard medium tier, the correctness gate, and the `required-local-cases` job (`make test-required-local-cases`, which fails the run if a required local-engine case skips). It is the test of `develop` in its merged state. Runs queue behind each other and one pending run is kept, so busy hours batch. It is not a required check.
 
 When a trunk run fails, the culprit is reverted first and fixed afterwards:
 
