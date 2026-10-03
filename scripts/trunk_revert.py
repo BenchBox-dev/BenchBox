@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""Revert a merged pull request on develop, and gate new PRs while trunk is red.
-
-`revert` opens a revert PR for a merged pull request: it creates `fix/revert-<n>`
-from `origin/develop`, reverts the squash-merge commit, and opens the PR.
-`gate` refuses a new, non-revert branch when the newest completed `trunk.yml`
-run on develop failed more than the grace period ago, so a broken trunk is fixed
-or reverted before more work lands on it.
-
-Every command is built as an argument list; a PR title is never interpolated
-into a shell.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -54,10 +42,6 @@ def _parse_time(value: str) -> datetime:
 
 
 def trunk_red_since(run: Runner = live_run, repo: str = REPOSITORY) -> datetime | None:
-    """Return when the newest completed trunk run finished if it failed, else None.
-
-    Raises TrunkError when no runs exist or they cannot be listed or parsed.
-    """
     code, out = run(
         ["gh", "run", "list", "--repo", repo, "--workflow", TRUNK_WORKFLOW, "--branch", BASE_BRANCH]
         + ["--limit", "5", "--json", RUN_FIELDS]
@@ -90,7 +74,6 @@ def trunk_gate(
     now: datetime | None = None,
     grace: timedelta = GRACE,
 ) -> str | None:
-    """Return a refusal message when trunk has been red past the grace period."""
     if branch.startswith(REVERT_PREFIX):
         return None
     try:
@@ -165,7 +148,7 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description="Revert a merged PR on develop, or gate new PRs while trunk is red.")
     sub = parser.add_subparsers(dest="command", required=True)
     rev = sub.add_parser("revert", help="open a revert PR for a merged PR")
     rev.add_argument("--pr", type=int, required=True)

@@ -1,5 +1,3 @@
-"""Tests for scripts/trunk_revert.py: revert a merged PR and gate new PRs on a red trunk."""
-
 from __future__ import annotations
 
 import importlib.util
