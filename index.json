@@ -909,7 +909,7 @@
       ],
       "priority": "medium-high",
       "status": "open",
-      "title": "Decision gate: choose what replaces the 27 autodoc API reference pages now that docstrings are deprecated"
+      "title": "Decision gate: define authored API contracts as the source of truth that replaces the 27 autodoc pages"
     },
     "astro-site-10-spike-and-go-gate": {
       "claim": null,
