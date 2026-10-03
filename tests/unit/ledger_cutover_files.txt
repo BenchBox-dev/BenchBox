@@ -129,6 +129,7 @@ tests/unit/scripts/test_todo_state_contract_check.py
 tests/unit/scripts/test_todo_state_workflow.py
 tests/unit/scripts/test_tpcds_divergence_report.py
 tests/unit/scripts/test_tpcds_platform_identity.py
+tests/unit/scripts/test_trunk_revert.py
 tests/unit/scripts/test_update_version.py
 tests/unit/scripts/test_validate_submission.py
 tests/unit/scripts/test_validate_submission_corpus_allowlist.py
@@ -142,7 +143,6 @@ tests/unit/test_release_canary_incident.py
 tests/unit/test_release_canary_sharding.py
 tests/unit/test_release_infrastructure.py
 tests/unit/test_release_readiness.py
-tests/unit/workflows/test_binary_manifest_workflow.py
 tests/unit/workflows/test_corpus_cutover.py
 tests/unit/workflows/test_corpus_event_bridge.py
 tests/unit/workflows/test_corpus_trust_boundary.py
