@@ -15,16 +15,6 @@ Key API translations:
 - sort(descending=): Translates to orderBy() with asc()/desc() on PySpark
 - col().sum()/mean()/count(): Works on all platforms via UnifiedExpr
 
-DataFusion Compatibility Notes:
-    The DataFusion support includes experimental AST parsing for handling
-    aggregate arithmetic expressions. This was originally tested with
-    DataFusion 43.0.0 and re-validated against 53.0.0. If a future DataFusion
-    release changes the underlying error-message format this relies on,
-    `_get_datafusion_ast_string()` now raises `DataFusionASTFormatError`
-    (naming the installed DataFusion version and the unrecognized error
-    text) instead of silently falling back to unchanged-expression behavior.
-    See _get_datafusion_ast_string() for details.
-
 Copyright 2026 Joe Harris / BenchBox Project
 
 Licensed under the MIT License. See LICENSE file in the project root for details.
