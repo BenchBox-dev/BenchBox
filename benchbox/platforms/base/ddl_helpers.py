@@ -110,37 +110,6 @@ _LEADING_COMMA_RE = re.compile(r"(\()\s*,\s*")
 
 
 def strip_primary_keys(stmt: str) -> str:
-    """Remove PRIMARY KEY constraint clauses from a CREATE TABLE statement.
-
-    Handles both table-level ``PRIMARY KEY (col_a, coalesce(col_b, 0))`` (with
-    arbitrary nesting inside the argument list) and inline column-level
-    ``col_name TYPE PRIMARY KEY``. Named constraints such as
-    ``CONSTRAINT pk PRIMARY KEY (id)`` are stripped with the constraint name.
-    The table-level form is stripped with a
-    character-level depth counter so that expressions such as
-    ``PRIMARY KEY ("a", coalesce(b, 0))`` are handled correctly — a plain
-    ``[^)]*`` regex would stop at the first ``)`` inside ``coalesce``.
-
-    After removal, trailing commas before the closing parenthesis are cleaned
-    up by the same ``_TRAILING_COMMA_RE`` used in ``strip_foreign_keys``.
-
-    Non-CREATE-TABLE statements and statements with no PRIMARY KEY keyword
-    pass through unchanged.
-
-    Limitation - string-literal false positive:
-        The regexes are not SQL-string-aware. If a CREATE TABLE statement
-        contains the token ``PRIMARY KEY`` inside a string literal (for example
-        a column ``COMMENT``), that substring can be matched and stripped. All
-        current callers invoke this helper from benchmark CREATE TABLE
-        pipelines and no benchmark schema in the suite uses such literals, so
-        production exposure is zero.
-
-    Args:
-        stmt: A single SQL statement string.
-
-    Returns:
-        Statement with PK clauses removed, or original if none found.
-    """
     if "PRIMARY KEY" not in stmt.upper():
         return stmt
 

@@ -139,6 +139,18 @@ SingleStore has four DDL_OPTIMIZE rules applied in this order:
 Rule file: `benchbox/sql_compat/rules/ddl_optimize/singlestore_ddl_rewrites.py`
 Adapter:   `benchbox/platforms/singlestore.py` — `SingleStoreAdapter` inherits `BaseDdlOptimizer`
 
+## DDL helper input constraint
+
+`strip_primary_keys` and `strip_foreign_keys` are text transformations for
+benchmark `CREATE TABLE` statements. Primary-key removal handles inline,
+table-level, named, and composite constraints, including nested expressions
+in the column list. Both helpers clean trailing commas and return the original
+statement when no matching constraint is present. They are not SQL string-literal parsers:
+an occurrence of a constraint phrase inside a quoted literal can be mistaken
+for a clause and removed. Callers must apply them only to schema statements
+whose literals do not contain the relevant constraint phrase. The benchmark
+schema emitters satisfy that constraint.
+
 ## Multi-rule platforms and resolve() vs resolve_all()
 
 Platforms with **multiple** rules at the same `(phase, platform)` key (like

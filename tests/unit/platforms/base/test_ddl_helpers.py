@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from benchbox.platforms.base.ddl_helpers import strip_foreign_keys, strip_primary_keys, strip_with_properties
@@ -10,6 +12,7 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 # ---------------------------------------------------------------------------
 # strip_with_properties
@@ -135,8 +138,10 @@ class TestStripPrimaryKeys:
         result = strip_primary_keys(sql)
         assert result == "CREATE TABLE t (a INT)"
 
-    def test_comment_literal_primary_key_limitation_is_documented(self):
-        assert "string-literal false positive" in (strip_primary_keys.__doc__ or "")
+    def test_primary_key_helper_input_constraint_is_in_compat_reference(self):
+        reference = (_REPO_ROOT / "benchbox" / "sql_compat" / "README.md").read_text(encoding="utf-8")
+        assert "not SQL string-literal parsers" in reference
+        assert "Callers must apply them only to schema statements" in reference
 
 
 # ---------------------------------------------------------------------------

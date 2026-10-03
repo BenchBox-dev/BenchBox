@@ -79,6 +79,17 @@ benchbox run --platform singlestore --benchmark tpch --scale 1
 | Password | `SINGLESTORE_PASSWORD` | *(empty)* | Database password |
 | Database | `SINGLESTORE_DATABASE` | *(auto-generated)* | Target database |
 
+## Credential Validation
+
+`benchbox setup --platform singlestore` saves the entered connection settings
+even when validation fails. BenchBox marks those credentials invalid and reports
+the validation error so that you can correct the server or network problem and
+then retry without entering every value again:
+
+```bash
+benchbox setup --platform singlestore --validate-only
+```
+
 ## Columnstore Tables
 
 BenchBox creates all benchmark fact tables as columnstore tables for optimal analytical performance. Columnstore tables use columnar storage on leaf nodes, dramatically improving scan and aggregation performance compared to the default rowstore.
