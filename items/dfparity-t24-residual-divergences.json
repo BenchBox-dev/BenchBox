@@ -4,7 +4,7 @@
     "Each fix states its cause with evidence and does not change another query's status in the per-query probe",
     "Comparator strictness and the SQL reference are unchanged"
   ],
-  "context": "2026-10-03 findings from the adapter batches (branch feat/tpcds-adapters-batch-b, SF 0.01, SQL and binding at the same seed): seeds 7 and 2024 show pandas-only NULL vs NaN divergences. Q18 pandas: 'Value mismatch at row 0, column 4. Original: None, Variant: nan; also columns [5..10]' (filter matches nothing; SQL returns the all-NULL grand-total rollup row). Q27 pandas: 'Original: None, Variant: nan; also columns [5]' (groups with all-NULL averages). Polars matched in every case. Untested: Q25 stddev_samp on a one-row group (SQL NULL, pandas NaN). Q23, Q25 (non-default seeds) and Q31 are empty at SF 0.01 for every seed tried; they need a discriminating cell (t19). The gate binds only seed None / stream 0, so a multi-seed probe is needed to see these.",
+  "context": "2026-10-03 findings from the adapter batches. (1) Branch feat/tpcds-adapters-batch-b, SF 0.01, SQL and binding at the same seed: at seeds 7 and 2024, pandas-only NULL vs NaN divergences. Q18 pandas: 'Value mismatch at row 0, column 4. Original: None, Variant: nan; also columns [5..10]'. The filter matches nothing, and SQL returns the all-NULL grand-total rollup row. Q27 pandas: 'Original: None, Variant: nan; also columns [5]' (groups with all-NULL averages). Polars matched in every case. Untested: Q25 stddev_samp on a one-row group (SQL NULL, pandas NaN). Q23, Q25 (non-default seeds) and Q31 are empty at SF 0.01 for every seed tried and need a discriminating cell (t19). (2) Branch feat/tpcds-adapters-batch-f: Q92, and Q32 by the same code, diverge at seed 12, stream 0 (SQL 3007.5, DataFrame NULL). _excess_discount_expression and _excess_discount_pandas average the discount over all items in the window, while the SQL correlates the subquery per item (ws_item_sk = i_item_sk). Fix: compute the per-item average and join on item, in both families. Edit only after batches c and f land (both touch these helpers). (3) The gate binds only seed None / stream 0, so a multi-seed probe is needed to see any of these (t20 now requires one).",
   "description": "After every query binds the dsqgen values (t05a-h), some cells will still diverge for reasons other than parameters: implementation logic, shared helpers (helper_query_specs.yaml, query_specs.yaml, rollup_helper.py, channel_helper.py, channel_mappings.yaml), multi-channel unions, ROLLUP grouping sets, windows, NULL and decimal semantics. Using the t14 report at the gate scale (about SF 0.1, per t20), fix each at its cause, preferring the shared helper over per-query copies, or classify it with evidence. No item owned this work before: t20 requires zero unclassified divergences but nothing fixed them. Guardrails: SQL reference unchanged; comparator tolerance 1e-10 and NULL vs NaN unchanged; NULL order fixed in implementations (D4); tie canonicalization only where t14 proves a true tie; no known_divergences entries. queries.py PRs serialize with any other queries.py PR.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "09fb9818638c46ee9d41ca6966f50177",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T14:11:44Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "adfe22d7deb34732bed918da91b40162",
       "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
