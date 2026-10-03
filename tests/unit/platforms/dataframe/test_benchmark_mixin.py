@@ -54,7 +54,7 @@ class DummyAdapter(BenchmarkExecutionMixin):
 class DummyPandasProfiledAdapter(DummyAdapter):
     family = "pandas"
 
-    def __init__(self, *, query_plan=None) -> None:  # noqa: ANN001
+    def __init__(self, *, query_plan=None) -> None:
         super().__init__()
         self._query_plan = query_plan
         self.profiled_called = False
@@ -557,7 +557,7 @@ def test_collect_skip_query_ids_no_platform_skips_method():
 
 
 class _StubTPCDSQueryManager:
-    def get_query(self, query_id, seed=None, variant=None):  # noqa: ANN001
+    def get_query(self, query_id, seed=None, variant=None):
         _ = (query_id, seed, variant)
         return "SELECT 1"
 

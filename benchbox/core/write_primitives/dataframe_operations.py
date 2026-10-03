@@ -813,7 +813,7 @@ def pyspark_supports_approx_top_k(spark_session: Any) -> bool:
     if (major, minor) < (4, 1):
         return False
     try:
-        from pyspark.sql import functions as F  # noqa: F401, N812
+        from pyspark.sql import functions as F  # noqa: N812
 
         return hasattr(F, "approx_top_k_accumulate")
     except ImportError:

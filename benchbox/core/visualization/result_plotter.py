@@ -76,7 +76,7 @@ class _NormalizedResultAdapter:
     def scale_factor(self) -> float:
         sf = self._result.scale_factor
         try:
-            return float(sf)  # type: ignore[arg-type]
+            return float(sf)
         except (TypeError, ValueError):
             return 0.0
 
@@ -92,7 +92,7 @@ class ResultPlotter:
             raise VisualizationError("No results provided for visualization.")
         self.results = list(results)
         adapters = [_NormalizedResultAdapter(r) for r in self.results]
-        labels = disambiguate_platform_labels(adapters)  # type: ignore[arg-type]
+        labels = disambiguate_platform_labels(adapters)
         for result, label in zip(self.results, labels):
             result.platform = label
         self._sort_results_by_version()

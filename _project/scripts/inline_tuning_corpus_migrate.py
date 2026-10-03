@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2026 Joe Harris / BenchBox Project
 
 # Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -14,8 +13,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from benchbox.core.results.canonical_json import canonical_json_text  # noqa: E402
-from benchbox.core.results.schema import inline_tuning_artifacts  # noqa: E402
+from benchbox.core.results.canonical_json import canonical_json_text
+from benchbox.core.results.schema import inline_tuning_artifacts
 
 CORPUS_ROOT = REPO_ROOT / "results-data" / "bundles"
 RETIRED_SUFFIXES = (".tuning.json", ".applied.json")

@@ -2797,7 +2797,7 @@ class TestSnowflakeIdempotentLoad:
                 raise Exception("Stage '@%LINEITEM' does not exist or not authorized")
             _StatefulSnowflakeCursor.execute(cursor, sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
 
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
@@ -2893,7 +2893,7 @@ class TestSnowflakeIdempotentLoad:
                 raise RuntimeError("network down")
             real_execute(sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
         try:
@@ -2916,7 +2916,7 @@ class TestSnowflakeIdempotentLoad:
                 raise RuntimeError("warehouse suspended")
             real_execute(sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
         try:
@@ -2937,7 +2937,7 @@ class TestSnowflakeIdempotentLoad:
                 raise Exception("Table 'LINEITEM' does not exist or not authorized")
             real_execute(sql)
 
-        cursor.execute = _execute  # type: ignore[method-assign]
+        cursor.execute = _execute
         path = tmp_path / "lineitem.tbl"
         path.write_bytes(b"1|one|\n")
         try:

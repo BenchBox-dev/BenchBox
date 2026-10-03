@@ -65,7 +65,7 @@ class TPCDSOBTQueryManager:
         for name, param in converted.parameters.items():
             value = parameters.get(name, param.default)
             replacement = param.render(value)
-            sql = self.converter._param_pattern(name).sub(replacement, sql)  # noqa: SLF001
+            sql = self.converter._param_pattern(name).sub(replacement, sql)
         return sql
 
     def _get_converted(self, query_id: int | str) -> Any:

@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 try:
-    import deltalake  # noqa: F401
+    import deltalake
 
     DELTA_AVAILABLE = True
 except ImportError:
@@ -18,7 +18,7 @@ try:
 
     PYARROW_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
+    pa = None
     PYARROW_AVAILABLE = False
 
 

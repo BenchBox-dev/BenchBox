@@ -326,10 +326,10 @@ class _DefaultNativeExpr:
     def __rtruediv__(self, other):
         return _DefaultNativeExpr(("rdiv", getattr(other, "value", other), self.value))
 
-    def __eq__(self, other):  # noqa: PLR0124
+    def __eq__(self, other):
         return _DefaultNativeExpr(("eq", self.value, getattr(other, "value", other)))
 
-    def __ne__(self, other):  # noqa: PLR0124
+    def __ne__(self, other):
         return _DefaultNativeExpr(("ne", self.value, getattr(other, "value", other)))
 
     def __lt__(self, other):
@@ -575,8 +575,8 @@ def test_unified_expr_default_branches_cover_core_methods():
     assert isinstance(expr * 2, uf.UnifiedExpr)
     assert isinstance(expr / 3, uf.UnifiedExpr)
     assert isinstance(3 / expr, uf.UnifiedExpr)
-    assert isinstance(expr == other, uf.UnifiedExpr)  # noqa: PLR0124
-    assert isinstance(expr != other, uf.UnifiedExpr)  # noqa: PLR0124
+    assert isinstance(expr == other, uf.UnifiedExpr)
+    assert isinstance(expr != other, uf.UnifiedExpr)
     assert isinstance(expr < other, uf.UnifiedExpr)
     assert isinstance(expr <= other, uf.UnifiedExpr)
     assert isinstance(expr > other, uf.UnifiedExpr)

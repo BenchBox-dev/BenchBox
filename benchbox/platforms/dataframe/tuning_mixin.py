@@ -82,7 +82,7 @@ class TuningConfigurableMixin(ABC):
         if applied_settings:
             logger.debug(f"Tuning applied to {self.platform_name}: {len(applied_settings)} settings")
 
-    def _apply_tuning(self) -> None:  # noqa: B027 - intentional hook pattern
+    def _apply_tuning(self) -> None:
         pass
 
     @property

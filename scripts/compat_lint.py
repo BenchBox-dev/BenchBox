@@ -34,7 +34,7 @@ def _compat_local_ranges(tree: ast.Module) -> list[tuple[int, int]]:
         if not hasattr(node, "end_lineno"):
             continue
         if any(_is_compat_local(dec) for dec in node.decorator_list):
-            ranges.append((node.lineno, node.end_lineno))  # type: ignore[attr-defined]
+            ranges.append((node.lineno, node.end_lineno))
     return ranges
 
 

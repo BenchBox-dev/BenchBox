@@ -162,7 +162,7 @@ class TestMockBaseBenchmarkAbstractMethods:
         benchmark = MockBaseBenchmark()
 
         with pytest.raises(TypeError, match="scale_factor must be a number"):
-            benchmark._validate_scale_factor_type("1.0")  # type: ignore[arg-type]
+            benchmark._validate_scale_factor_type("1.0")
 
     def test_initialize_benchmark_implementation_passes_common_options(self):
 

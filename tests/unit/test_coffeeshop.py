@@ -365,7 +365,7 @@ class _MockCursor:
     def __init__(self):
         self.last_query: str | None = None
 
-    def execute(self, sql: str, params: list[str] | None = None):  # type: ignore[override]
+    def execute(self, sql: str, params: list[str] | None = None):
         self.last_query = sql
         return [("ok",)]
 
@@ -383,8 +383,8 @@ class _MockConnection:
     def cursor(self):
         return self.cursor_obj
 
-    def executescript(self, sql: str):  # pragma: no cover - unused in tests
+    def executescript(self, sql: str):  # pragma: no cover
         self.cursor_obj.last_query = sql
 
-    def commit(self):  # pragma: no cover - unused in tests
+    def commit(self):  # pragma: no cover
         pass

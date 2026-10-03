@@ -24,7 +24,7 @@ try:
     )
 except ImportError:
     PANDAS_AVAILABLE = False
-    pd = None  # type: ignore[assignment]
+    pd = None
 
 
 @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="Pandas not installed")

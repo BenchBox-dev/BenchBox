@@ -10,7 +10,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from _project.scripts.generate_oracle_coverage_map import (  # noqa: E402
+from _project.scripts.generate_oracle_coverage_map import (
     INDEPENDENCE_NONE,
     INDEPENDENCE_SELF,
     INDEPENDENCE_SEMI,

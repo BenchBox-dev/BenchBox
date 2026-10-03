@@ -318,7 +318,7 @@ def _validate_clickhouse_options(platform: str, normalized: Mapping[str, object]
 def _memory_size_bytes(value: str) -> float | None:
     if not MEMORY_LIMIT_PATTERN.fullmatch(value):
         return None
-    number, unit = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([A-Za-z]+)", value).groups()  # type: ignore[union-attr]
+    number, unit = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)([A-Za-z]+)", value).groups()
     multipliers = {"B": 1, "KB": 1 << 10, "MB": 1 << 20, "GB": 1 << 30, "TB": 1 << 40}
     return float(number) * multipliers[unit.upper()]
 
@@ -449,7 +449,7 @@ def validate_platform_options(platform: str, options: Mapping[str, object] | Non
             raise MCPValidationError(f"Platform option '{name}' is not authorized for MCP")
         parsed = spec.parse(name, raw_value)
         if spec.kind == "string" and name in {"memory_limit", "driver_memory", "offheap_size"}:
-            parsed = _validate_memory_limit(name, parsed)  # type: ignore[arg-type]
+            parsed = _validate_memory_limit(name, parsed)
         if name == "liquid_clustering_columns" and not IDENTIFIER_LIST_PATTERN.fullmatch(str(parsed)):
             raise MCPValidationError(f"Platform option '{name}' contains invalid identifiers")
         normalized[name] = parsed

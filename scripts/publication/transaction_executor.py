@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""Canonical CLI and execution engine for publication transactions.
-
-Drives the transactional publication lifecycle:
-- prepare: validates candidate bytes or restore source, queries journal, generates canonical permit
-- authenticate-approval: validates the protected GitHub environment approval
-- record-prepared: atomically reserves generation and commits 'prepared' state to the journal via CAS
-- start-write: creates unique intent commit OID, records 'write-started' in journal
-- acknowledge-write: records provider deployment outcome in journal ('write-acknowledged')
-- record-verification: records probe results and attestation ('externally-verified')
-- finalize: atomically advances durable head to 'durable'
-- record-failure: escalates transaction to 'recovery-required' or 'terminal-failure'
-"""
 
 from __future__ import annotations
 
@@ -84,11 +72,6 @@ def _write_json(path: Path | str, data: dict[str, Any]) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "w", encoding="utf-8") as f:
         f.write(canonical_json(data) + "\n")
-
-
-# ---------------------------------------------------------------------------
-# 1. Prepare
-# ---------------------------------------------------------------------------
 
 
 def cmd_prepare(args: argparse.Namespace) -> int:  # noqa: C901
@@ -175,7 +158,7 @@ def cmd_prepare(args: argparse.Namespace) -> int:  # noqa: C901
             target=target,
             generation=generation,
             parent_transaction_id=parent_tx_id,
-            approval={},  # Filled upon approval authentication
+            approval={},
             controller=controller,
             owner=owner,
             content=content,
@@ -232,7 +215,6 @@ def cmd_prepare(args: argparse.Namespace) -> int:  # noqa: C901
     if args.output_tx:
         _write_json(args.output_tx, tx.to_dict())
 
-    # Emit output variables for GitHub Actions
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a", encoding="utf-8") as f:
@@ -254,7 +236,6 @@ def cmd_prepare(args: argparse.Namespace) -> int:  # noqa: C901
 
 
 def cmd_resume(args: argparse.Namespace) -> int:
-    """Create a permit for a prepared rollback after operator reconciliation."""
     repo_path = Path(args.repo_path).resolve()
     journal_state = journal.read_journal_state(repo_path, ref=args.ref)
     tx = journal.read_transaction(repo_path, args.transaction_id, ref=args.ref)
@@ -297,7 +278,6 @@ def cmd_resume(args: argparse.Namespace) -> int:
 
 
 def cmd_reconcile(args: argparse.Namespace) -> int:
-    """Prepare outputs for an active promotion in recovery-required for forward reconciliation."""
     repo_path = Path(args.repo_path).resolve()
     journal_state = journal.read_journal_state(repo_path, ref=args.ref)
     tx = journal.read_transaction(repo_path, args.transaction_id, ref=args.ref)
@@ -324,11 +304,6 @@ def cmd_reconcile(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# 2. Authenticate Approval
-# ---------------------------------------------------------------------------
-
-
 def authenticate_approval_record(
     permit: dict[str, Any],
     run_id: str,
@@ -337,8 +312,6 @@ def authenticate_approval_record(
     token: str | None = None,
     simulated_approval: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Authenticate maintainer approval for the given permit and run."""
-    # Defect D5 / Section 5: Run attempt > 1 is strictly forbidden
     if run_attempt > 1:
         raise TransactionError(
             f"Writer run attempt {run_attempt} > 1 is forbidden: "
@@ -418,11 +391,6 @@ def cmd_authenticate_approval(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# 3. Record Prepared
-# ---------------------------------------------------------------------------
-
-
 def cmd_record_prepared(args: argparse.Namespace) -> int:
     repo_path = Path(args.repo_path).resolve()
     permit = _load_json(args.permit)
@@ -466,11 +434,6 @@ def cmd_record_prepared(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# 4. Start Write
-# ---------------------------------------------------------------------------
-
-
 def cmd_start_write(args: argparse.Namespace) -> int:
     repo_path = Path(args.repo_path).resolve()
     journal_state = journal.read_journal_state(repo_path, ref=args.ref)
@@ -479,11 +442,6 @@ def cmd_start_write(args: argparse.Namespace) -> int:
     if tx.state not in (STATE_PREPARED, STATE_ROLLBACK_WRITE_STARTED):
         raise TransactionError(f"Cannot start write from state {tx.state}")
 
-    # Create a unique write-intent commit on the repository. The intent OID
-    # stays a journal-internal correlator: the provider resolves
-    # pages_build_version as a commit, so the workflow sends the run's
-    # pushed source SHA on the wire instead (an unpushed intent OID makes
-    # the provider reject the create request).
     msg = f"write-intent: transaction {tx.transaction_id} gen {tx.generation}"
     tree_oid = subprocess.run(
         ["git", "rev-parse", f"{journal_state.tip_commit_oid}^{{tree}}"],
@@ -539,7 +497,6 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         commit_message=f"transaction: start write {tx.transaction_id} with intent {intent_commit_oid[:8]}",
     )
 
-    # Emit output for GitHub Actions
     github_output = os.environ.get("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a", encoding="utf-8") as f:
@@ -554,11 +511,6 @@ def cmd_start_write(args: argparse.Namespace) -> int:
         f"Started write for {tx.transaction_id}: intent={intent_commit_oid} pages_build_version={pages_build_version}"
     )
     return 0
-
-
-# ---------------------------------------------------------------------------
-# 5. Acknowledge Write
-# ---------------------------------------------------------------------------
 
 
 def cmd_acknowledge_write(args: argparse.Namespace) -> int:
@@ -585,17 +537,11 @@ def cmd_acknowledge_write(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# 6. Record Verification
-# ---------------------------------------------------------------------------
-
-
 def fetch_pages_deployment_status(
     repo: str,
     deployment_id: str,
     token: str | None = None,
 ) -> str:
-    """Fetch Pages deployment status from the GitHub API for a specific deployment ID or SHA."""
     if not token:
         raise TransactionError("GitHub token is required to fetch Pages deployment status via API")
     url = f"https://api.github.com/repos/{repo}/pages/deployments/{deployment_id}"
@@ -634,15 +580,7 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
         "verifier_sha": args.verifier_sha or os.environ.get("GITHUB_SHA", "0" * 40),
         "attestation": attestation,
     }
-    # Forward reconciliation of a recovery-required transaction additionally
-    # requires live provider evidence: the Pages deployment status fetched from
-    # the provider API for this transaction's controller SHA. Caller-supplied
-    # status strings are never accepted; without a token the live lookup fails
-    # closed instead of trusting an unverified claim.
     if tx.state == STATE_RECOVERY_REQUIRED and tx.kind == KIND_PROMOTION:
-        # Deployment identity derives from the journal, never from caller
-        # arguments: the CAS transition requires this same value, so only the
-        # transaction's own deployment can reconcile it forward.
         pages_deployment_id = (tx.controller or {}).get("workflow_sha")
         if not pages_deployment_id:
             raise TransactionError("Recovery reconciliation requires the transaction's controller workflow SHA")
@@ -680,11 +618,6 @@ def cmd_record_verification(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# 7. Finalize Durable
-# ---------------------------------------------------------------------------
-
-
 def cmd_finalize(args: argparse.Namespace) -> int:
     repo_path = Path(args.repo_path).resolve()
     journal_state = journal.read_journal_state(repo_path, ref=args.ref)
@@ -717,11 +650,6 @@ def cmd_finalize(args: argparse.Namespace) -> int:
 
     print(f"Finalized transaction {tx.transaction_id} as durable head at gen {tx.generation}")
     return 0
-
-
-# ---------------------------------------------------------------------------
-# 8. Record Failure / Escalation
-# ---------------------------------------------------------------------------
 
 
 def cmd_record_failure(args: argparse.Namespace) -> int:
@@ -763,7 +691,6 @@ def cmd_record_failure(args: argparse.Namespace) -> int:
 
 
 def _transaction_age_seconds(tx: transaction.Transaction) -> float | None:
-    """Return the age of the durable transaction event when it is parseable."""
     timestamp = tx.event.get("timestamp") if isinstance(tx.event, dict) else None
     if not timestamp:
         return None
@@ -779,7 +706,6 @@ def _resolve_watchdog_action(
     journal_state: journal.JournalState,
     barrier_evidence: str | None,
 ) -> tuple[str, str, str]:
-    """Resolve (action, status, reason) for active transaction during watchdog scan."""
     age_seconds = _transaction_age_seconds(tx)
     if age_seconds is not None and age_seconds > WATCHDOG_MAX_AGE_MINUTES * 60:
         return (
@@ -905,11 +831,6 @@ def cmd_watchdog_scan(args: argparse.Namespace) -> int:
     return 0
 
 
-# ---------------------------------------------------------------------------
-# Main CLI Parser
-# ---------------------------------------------------------------------------
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=CLI_DESCRIPTION,
@@ -917,7 +838,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    # prepare
     p_prep = sub.add_parser("prepare", help="Prepare a transaction permit")
     p_prep.add_argument("--kind", choices=[KIND_PROMOTION, KIND_ROLLBACK, KIND_LEGACY_RECOVERY], default=KIND_PROMOTION)
     p_prep.add_argument("--target-repo", default="BenchBox-dev/BenchBox")
@@ -944,7 +864,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_prep.add_argument("--output-tx", default=None)
     p_prep.set_defaults(func=cmd_prepare)
 
-    # authenticate-approval
     p_auth = sub.add_parser("authenticate-approval", help="Authenticate GitHub environment approval")
     p_auth.add_argument("--permit", required=True)
     p_auth.add_argument("--run-id", default=None)
@@ -955,7 +874,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_auth.add_argument("--output-approval", default=None)
     p_auth.set_defaults(func=cmd_authenticate_approval)
 
-    # record-prepared
     p_rec_prep = sub.add_parser("record-prepared", help="Record prepared transaction in journal")
     p_rec_prep.add_argument("--permit", required=True)
     p_rec_prep.add_argument("--approval", required=True)
@@ -965,7 +883,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_rec_prep.add_argument("--output-tx", default=None)
     p_rec_prep.set_defaults(func=cmd_record_prepared)
 
-    # start-write
     p_start = sub.add_parser("start-write", help="Record write-started in journal")
     p_start.add_argument("--transaction-id", required=True)
     p_start.add_argument("--ref", default=journal.DEFAULT_REF)
@@ -978,7 +895,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_start.add_argument("--output-tx", default=None)
     p_start.set_defaults(func=cmd_start_write)
 
-    # acknowledge-write
     p_ack = sub.add_parser("acknowledge-write", help="Record write-acknowledged in journal")
     p_ack.add_argument("--transaction-id", required=True)
     p_ack.add_argument("--provider-response", required=True)
@@ -987,7 +903,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_ack.add_argument("--output-tx", default=None)
     p_ack.set_defaults(func=cmd_acknowledge_write)
 
-    # record-verification
     p_ver = sub.add_parser("record-verification", help="Record externally-verified in journal")
     p_ver.add_argument("--transaction-id", required=True)
     p_ver.add_argument("--probe-report", required=True)
@@ -1001,7 +916,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_ver.add_argument("--output-tx", default=None)
     p_ver.set_defaults(func=cmd_record_verification)
 
-    # finalize
     p_fin = sub.add_parser("finalize", help="Advance durable head in journal")
     p_fin.add_argument("--transaction-id", required=True)
     p_fin.add_argument("--ref", default=journal.DEFAULT_REF)
@@ -1009,7 +923,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_fin.add_argument("--output-tx", default=None)
     p_fin.set_defaults(func=cmd_finalize)
 
-    # record-failure
     p_fail = sub.add_parser("record-failure", help="Record failure in journal")
     p_fail.add_argument("--transaction-id", required=True)
     p_fail.add_argument("--code", required=True)
@@ -1020,7 +933,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_fail.add_argument("--output-tx", default=None)
     p_fail.set_defaults(func=cmd_record_failure)
 
-    # watchdog-scan
     p_watch = sub.add_parser("watchdog-scan", help="Scan journal state without changing it")
     p_watch.add_argument("--repo-path", default=".")
     p_watch.add_argument("--ref", default=journal.DEFAULT_REF)
@@ -1030,7 +942,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_watch.add_argument("--output-json", default=None)
     p_watch.set_defaults(func=cmd_watchdog_scan)
 
-    # resume an operator-reconciled rollback
     p_resume = sub.add_parser("resume", help="Create a permit for a prepared rollback")
     p_resume.add_argument("--transaction-id", required=True)
     p_resume.add_argument("--ref", default=journal.DEFAULT_REF)
@@ -1039,7 +950,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_resume.add_argument("--output-tx", required=True)
     p_resume.set_defaults(func=cmd_resume)
 
-    # reconcile an operator-reconciled promotion
     p_rec = sub.add_parser("reconcile", help="Prepare an active post-send failed promotion for forward reconciliation")
     p_rec.add_argument("--transaction-id", required=True)
     p_rec.add_argument("--ref", default=journal.DEFAULT_REF)

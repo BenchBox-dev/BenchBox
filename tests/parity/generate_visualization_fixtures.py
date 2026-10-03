@@ -828,7 +828,7 @@ def build_cdf_ecdf_fixture() -> None:
 
 
 def build_chart_ids_fixture() -> None:
-    from benchbox.core.visualization.chart_types import ALL_CHART_TYPES  # noqa: PLC0415
+    from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
 
     ids = list(ALL_CHART_TYPES)
     out = FIXTURES_DIR / "chart_ids.json"
@@ -854,7 +854,7 @@ BUILDERS = [
 
 
 def main(out_dir: pathlib.Path | None = None) -> None:
-    global FIXTURES_DIR  # noqa: PLW0603
+    global FIXTURES_DIR
     if out_dir is not None:
         FIXTURES_DIR = out_dir
     FIXTURES_DIR.mkdir(parents=True, exist_ok=True)

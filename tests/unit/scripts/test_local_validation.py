@@ -1104,13 +1104,13 @@ def test_wait_on_fd_windows_uses_msvcrt(tmp_path: Path, monkeypatch: pytest.Monk
     fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
     calls: list[tuple[int, int]] = []
     fake = types.ModuleType("msvcrt")
-    fake.LK_NBLCK = 1  # type: ignore[attr-defined]
-    fake.LK_UNLCK = 0  # type: ignore[attr-defined]
+    fake.LK_NBLCK = 1
+    fake.LK_UNLCK = 0
 
     def fake_locking(fd_arg: int, mode: int, nbytes: int) -> None:
         calls.append((mode, nbytes))
 
-    fake.locking = fake_locking  # type: ignore[attr-defined]
+    fake.locking = fake_locking
     monkeypatch.setitem(sys.modules, "msvcrt", fake)
     monkeypatch.setattr(lv.sys, "platform", "win32")
     try:
@@ -1150,7 +1150,7 @@ def test_wait_on_fd_windows_retries_contention(tmp_path: Path, monkeypatch: pyte
     lock = tmp_path / "win-contended.lock"
     fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
     fake = types.ModuleType("msvcrt")
-    fake.LK_NBLCK = 1  # type: ignore[attr-defined]
+    fake.LK_NBLCK = 1
     calls = 0
 
     def locking(_fd: int, _mode: int, _nbytes: int) -> None:
@@ -1159,7 +1159,7 @@ def test_wait_on_fd_windows_retries_contention(tmp_path: Path, monkeypatch: pyte
         if calls == 1:
             raise OSError(errno.EACCES, "lock held")
 
-    fake.locking = locking  # type: ignore[attr-defined]
+    fake.locking = locking
     monkeypatch.setitem(sys.modules, "msvcrt", fake)
     monkeypatch.setattr(lv.sys, "platform", "win32")
     monkeypatch.setattr(lv.time, "sleep", lambda _seconds: None)
@@ -1179,7 +1179,7 @@ def test_wait_on_fd_windows_propagates_non_contention_error(
     lock = tmp_path / "win-invalid.lock"
     fd = os.open(str(lock), os.O_CREAT | os.O_RDWR, 0o644)
     fake = types.ModuleType("msvcrt")
-    fake.LK_NBLCK = 1  # type: ignore[attr-defined]
+    fake.LK_NBLCK = 1
     calls = 0
 
     def locking(_fd: int, _mode: int, _nbytes: int) -> None:
@@ -1187,7 +1187,7 @@ def test_wait_on_fd_windows_propagates_non_contention_error(
         calls += 1
         raise OSError(failure_errno, "lock failed")
 
-    fake.locking = locking  # type: ignore[attr-defined]
+    fake.locking = locking
     monkeypatch.setitem(sys.modules, "msvcrt", fake)
     monkeypatch.setattr(lv.sys, "platform", "win32")
     try:

@@ -22,7 +22,7 @@ try:
     _MONITORING_AVAILABLE = True
 except ImportError:
     _MONITORING_AVAILABLE = False
-    PerformanceMonitor = None  # type: ignore[assignment,misc]
+    PerformanceMonitor = None
 
 
 class BenchmarkProgress:
@@ -36,7 +36,7 @@ class BenchmarkProgress:
 
         self.monitor: PerformanceMonitor | None = None
         if enable_monitoring and _MONITORING_AVAILABLE:
-            self.monitor = PerformanceMonitor()  # type: ignore[misc]
+            self.monitor = PerformanceMonitor()
 
         self.progress = Progress(
             SpinnerColumn(),

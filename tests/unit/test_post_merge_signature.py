@@ -10,7 +10,7 @@ _SCRIPTS_DIR = str(Path(__file__).resolve().parents[2] / "scripts")
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from post_merge_signature import (  # noqa: E402
+from post_merge_signature import (
     SignatureError,
     attribution_action,
     build_incident_artifact,

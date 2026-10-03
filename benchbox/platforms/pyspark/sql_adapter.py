@@ -60,11 +60,11 @@ class PySparkSQLAdapter(SparkAdapter):
             )
 
             return spark
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:  # pragma: no cover
             logger.error("Failed to create PySpark SQL session: %s", exc)
             raise
 
-    def close_connection(self, connection: Any) -> None:  # type: ignore[override]
+    def close_connection(self, connection: Any) -> None:
         try:
             if self._session_claimed:
                 SparkSessionManager.release()

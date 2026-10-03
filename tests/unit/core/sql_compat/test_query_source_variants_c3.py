@@ -11,7 +11,7 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.query_source.vector_search_variants  # noqa: F401
+import benchbox.sql_compat.rules.query_source.vector_search_variants
 from benchbox.sql_compat.registry import REGISTRY
 
 

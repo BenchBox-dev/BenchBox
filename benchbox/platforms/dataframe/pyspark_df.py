@@ -25,16 +25,16 @@ if PYSPARK_AVAILABLE:
     from pyspark.sql.types import StringType, StructField, StructType
     from pyspark.sql.window import Window
 
-    F = spark_functions  # noqa: N816 - industry convention for PySpark
+    F = spark_functions
 else:
-    DataFrame = Any  # type: ignore[assignment,misc]
-    SparkSession = Any  # type: ignore[assignment,misc]
-    Column = Any  # type: ignore[assignment,misc]
-    F = None  # type: ignore[assignment,misc]
-    Window = Any  # type: ignore[assignment,misc]
-    StringType = Any  # type: ignore[assignment,misc]
-    StructField = Any  # type: ignore[assignment,misc]
-    StructType = Any  # type: ignore[assignment,misc]
+    DataFrame = Any
+    SparkSession = Any
+    Column = Any
+    F = None
+    Window = Any
+    StringType = Any
+    StructField = Any
+    StructType = Any
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
 from benchbox.platforms.dataframe.expression_family import (

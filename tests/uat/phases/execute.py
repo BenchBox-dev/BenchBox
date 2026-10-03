@@ -220,7 +220,7 @@ def run_execute(
                         log_dir=log_dir,
                         benchmark_runs_dir=benchmark_runs_dir,
                     )
-                except Exception as exc:  # noqa: BLE001 - re-raised after annotation
+                except Exception as exc:
                     _annotate_disk_floor_abort(
                         exc,
                         skipped_unreachable=skipped_unreachable,
@@ -868,7 +868,7 @@ def _topological_sort(
             ready = next(b for b in benchmarks if b in pending)
         pending.remove(ready)
         out.append(ready)
-        for dependent in dependents.get(ready, ()):  # pragma: no branch - tiny loop
+        for dependent in dependents.get(ready, ()):  # pragma: no branch
             indegree[dependent] -= 1
     return out
 
@@ -973,22 +973,22 @@ def _annotate_disk_floor_abort(
 ) -> None:
     if not hasattr(exc, "skipped_unreachable_count"):
         try:
-            exc.skipped_unreachable_count = len(skipped_unreachable)  # type: ignore[attr-defined]
+            exc.skipped_unreachable_count = len(skipped_unreachable)
         except (AttributeError, TypeError):
             pass
     if not hasattr(exc, "startup_failed_count"):
         try:
-            exc.startup_failed_count = len(startup_failed)  # type: ignore[attr-defined]
+            exc.startup_failed_count = len(startup_failed)
         except (AttributeError, TypeError):
             pass
     if not hasattr(exc, "died_mid_platform_count"):
         try:
-            exc.died_mid_platform_count = len(died_mid_platform)  # type: ignore[attr-defined]
+            exc.died_mid_platform_count = len(died_mid_platform)
         except (AttributeError, TypeError):
             pass
     if not hasattr(exc, "compatibility_pruned"):
         try:
-            exc.compatibility_pruned = compatibility_pruned  # type: ignore[attr-defined]
+            exc.compatibility_pruned = compatibility_pruned
         except (AttributeError, TypeError):
             pass
 
@@ -1137,7 +1137,7 @@ def _describe_platform_vm_request(platform: str) -> str:
         return "unknown (no compose spec)"
     try:
         limits = docker_assets.compose_declared_memory_limits(spec)
-    except Exception as exc:  # noqa: BLE001 - decoration must never abort the sweep
+    except Exception as exc:
         return f"unknown (could not read declared limits: {exc})"
     if not limits:
         return "no declared memory limit (engine default)"

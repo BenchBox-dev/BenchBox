@@ -6,7 +6,6 @@ from typing import Any
 from benchbox.core.visualization.exceptions import VisualizationError
 
 RESULT_AWARE_ONLY_CHART_TYPES = frozenset({"power_bar"})
-"""Semantic chart IDs that require normalized BenchBox results instead of raw primitive data."""
 
 
 def export_ascii(
@@ -307,7 +306,6 @@ _CHART_BUILDERS: dict[str, Any] = {
 }
 
 PRIMITIVE_ASCII_CHART_TYPES: tuple[str, ...] = tuple(_CHART_BUILDERS)
-"""Data-first ASCII chart IDs supported by render_ascii_chart()."""
 
 
 def render_ascii_chart(

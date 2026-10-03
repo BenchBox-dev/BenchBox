@@ -53,9 +53,9 @@ class DatabaseConnection:
             if hasattr(self.connection, "execute"):
                 logger.debug(f"Executing query with direct execute method: {truncated}")
                 if parameters is None:
-                    self.cursor = self.connection.execute(query)  # type: ignore[call-non-callable]
+                    self.cursor = self.connection.execute(query)
                 else:
-                    self.cursor = self.connection.execute(query, parameters)  # type: ignore[call-non-callable]
+                    self.cursor = self.connection.execute(query, parameters)
                 return self.cursor
 
             if hasattr(self.connection, "cursor"):

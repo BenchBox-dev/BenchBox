@@ -93,9 +93,9 @@ def _kill_process_tree(proc: subprocess.Popen[str]) -> None:
     try:
         if hasattr(os, "killpg"):
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-        else:  # pragma: no cover - Windows
+        else:  # pragma: no cover
             proc.kill()
-    except (ProcessLookupError, PermissionError):  # pragma: no cover - already reaped
+    except (ProcessLookupError, PermissionError):  # pragma: no cover
         proc.kill()
 
 

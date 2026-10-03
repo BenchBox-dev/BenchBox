@@ -130,7 +130,7 @@ def _instantiate(benchmark_id: str) -> tuple[Any | None, float | None, str, str]
     for scale in _INSTANTIATE_SCALES:
         try:
             return cls(scale_factor=scale), scale, "", bounded_scale_error
-        except Exception as exc:  # noqa: BLE001 - record why instantiation failed, do not crash the sweep
+        except Exception as exc:
             last_error = f"{type(exc).__name__}: {exc}"
             if abs(float(scale) - _INSTANTIATE_SCALES[0]) < 1e-9:
                 bounded_scale_error = last_error
@@ -147,7 +147,7 @@ def classify_applicability(benchmark_id: str) -> tuple[str, dict[str, Any]]:
 
     try:
         df_ids = [str(q) for q in registry.get_query_ids()]
-    except Exception as exc:  # noqa: BLE001 - a registry read error is a finding, not a crash
+    except Exception as exc:
         return BLOCKED, {"error": f"registry {type(exc).__name__}: {exc}"}
 
     instance, used_scale, error, bounded_scale_error = _instantiate(benchmark_id)

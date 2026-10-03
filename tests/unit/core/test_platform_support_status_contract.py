@@ -53,7 +53,7 @@ def _expected_snapshot() -> dict[str, dict[str, int]]:
     metadata = PlatformRegistry.get_all_platform_metadata()
     expected: dict[str, dict[str, int]] = {}
     for status in _EXPECTED_STATUSES:
-        platforms = PlatformRegistry.get_platforms_by_support_status(status)  # type: ignore[arg-type]
+        platforms = PlatformRegistry.get_platforms_by_support_status(status)
         sql = 0
         df = 0
         for name in platforms:

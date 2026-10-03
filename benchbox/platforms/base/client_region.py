@@ -21,7 +21,7 @@ _MAX_IMDS_BODY_BYTES = 8192
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN202
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
 

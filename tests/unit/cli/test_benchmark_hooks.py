@@ -108,16 +108,16 @@ class TestBenchmarkOptionSpec:
 
 @pytest.fixture(autouse=True, scope="module")
 def _register_real_benchmark_specs():
-    import benchbox.core.datavault.benchmark  # noqa: F401
-    import benchbox.core.flightdata.benchmark  # noqa: F401
-    import benchbox.core.joinorder.benchmark  # noqa: F401
-    import benchbox.core.joinorder_synthetic.benchmark  # noqa: F401
-    import benchbox.core.nyctaxi.benchmark  # noqa: F401
-    import benchbox.core.tpcdi.benchmark  # noqa: F401
-    import benchbox.core.tpcds_obt.benchmark  # noqa: F401
-    import benchbox.core.tpch_skew.benchmark  # noqa: F401
-    import benchbox.core.tsbs_devops.benchmark  # noqa: F401
-    import benchbox.core.vector_search.benchmark  # noqa: F401
+    import benchbox.core.datavault.benchmark
+    import benchbox.core.flightdata.benchmark
+    import benchbox.core.joinorder.benchmark
+    import benchbox.core.joinorder_synthetic.benchmark
+    import benchbox.core.nyctaxi.benchmark
+    import benchbox.core.tpcdi.benchmark
+    import benchbox.core.tpcds_obt.benchmark
+    import benchbox.core.tpch_skew.benchmark
+    import benchbox.core.tsbs_devops.benchmark
+    import benchbox.core.vector_search.benchmark
 
 
 @pytest.fixture(autouse=True)
@@ -372,7 +372,7 @@ class TestBenchmarkOptionParamType:
 
 class TestRealBenchmarkSpecs:
     def test_nyctaxi_specs_registered(self):
-        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark  # noqa: F401
+        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("nyctaxi")
         assert "taxi_types" in specs
@@ -381,7 +381,7 @@ class TestRealBenchmarkSpecs:
         assert "seed" in specs
 
     def test_nyctaxi_taxi_types_parser(self):
-        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark  # noqa: F401
+        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
         from benchbox.core.nyctaxi.schema import TaxiType
 
         specs = BenchmarkHookRegistry.list_option_specs("nyctaxi")
@@ -389,7 +389,7 @@ class TestRealBenchmarkSpecs:
         assert result == [TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV]
 
     def test_tsbs_devops_specs_registered(self):
-        from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark  # noqa: F401
+        from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("tsbs_devops")
         assert "num_hosts" in specs
@@ -398,21 +398,21 @@ class TestRealBenchmarkSpecs:
         assert "start_time" in specs
 
     def test_tpch_skew_specs_registered(self):
-        from benchbox.core.tpch_skew.benchmark import TPCHSkewBenchmark  # noqa: F401
+        from benchbox.core.tpch_skew.benchmark import TPCHSkewBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("tpch_skew")
         assert "skew_preset" in specs
         assert specs["skew_preset"].default == "moderate"
 
     def test_vector_search_specs_registered(self):
-        from benchbox.core.vector_search.benchmark import VectorSearchBenchmark  # noqa: F401
+        from benchbox.core.vector_search.benchmark import VectorSearchBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("vector_search")
         assert "dimensions" in specs
         assert specs["dimensions"].default == 128
 
     def test_joinorder_force_regenerate_documents_download_cost(self):
-        from benchbox.core.joinorder.benchmark import JoinOrderBenchmark  # noqa: F401
+        from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("joinorder")
         help_text = specs["force_regenerate"].help

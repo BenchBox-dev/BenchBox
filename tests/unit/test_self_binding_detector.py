@@ -13,7 +13,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from _project.scripts.detect_self_binding import (  # noqa: E402
+from _project.scripts.detect_self_binding import (
     build_column_table_index,
     find_self_binding_candidates,
 )

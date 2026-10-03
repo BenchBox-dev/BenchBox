@@ -24,8 +24,8 @@ try:
     )
 except ImportError:
     DATAFUSION_DF_AVAILABLE = False
-    datafusion = None  # type: ignore[assignment]
-    pa = None  # type: ignore[assignment]
+    datafusion = None
+    pa = None
 
 
 @pytest.mark.skipif(not DATAFUSION_DF_AVAILABLE, reason="DataFusion not installed")

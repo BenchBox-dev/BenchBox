@@ -957,7 +957,7 @@ class TestDorisIdentifierValidation:
 class TestDorisValidation:
     def test_validate_platform_capabilities(self):
         try:
-            import pymysql  # noqa: F401
+            import pymysql
         except ImportError:
             pytest.skip("pymysql not installed")
 

@@ -104,7 +104,7 @@ def test_concurrent_fetch_downloads_once_and_reuses(tmp_path: Path) -> None:
         barrier.wait()
         try:
             results[tag] = fetch_data("test", manifest_path, out_dir, downloader=fake_downloader)
-        except BaseException as exc:  # noqa: BLE001 — surfaced via assert below
+        except BaseException as exc:
             errors[tag] = exc
 
     threads = [threading.Thread(target=worker, args=(t,)) for t in ("a", "b")]

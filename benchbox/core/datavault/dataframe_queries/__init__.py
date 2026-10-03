@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.datavault.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.datavault.dataframe_queries import queries as _queries
 from benchbox.core.datavault.dataframe_queries.registry import (
     DATAVAULT_DATAFRAME_QUERIES,
     get_datavault_query,

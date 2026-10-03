@@ -9,7 +9,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from _project.scripts.cross_surface_applicability_sweep import (  # noqa: E402
+from _project.scripts.cross_surface_applicability_sweep import (
     ABANDONED,
     ARTIFACT,
     BLOCKED,

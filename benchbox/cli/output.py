@@ -247,7 +247,7 @@ class ConsoleResultFormatter:
         console.print("\n[bold yellow]Query Details:[/bold yellow]")
 
         normalized: list[dict[str, Any]] = []
-        for entry in results.query_results:  # type: ignore[assignment]
+        for entry in results.query_results:
             if isinstance(entry, dict):
                 normalized.append(entry)
                 continue

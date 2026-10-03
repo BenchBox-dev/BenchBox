@@ -56,9 +56,9 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     default_display_name = ""
     default_driver_package = ""
     platform_config_fields: tuple[str, ...] = ()
-    common_platform_config_fields = tuple(  # noqa: SIM905
+    common_platform_config_fields = tuple(
         "host port catalog username password http_scheme verify_ssl ssl_cert_path "  # noqa: SIM905
-        "session_properties query_timeout table_format staging_root schema".split()  # noqa: SIM905
+        "session_properties query_timeout table_format staging_root schema".split()
     )
     supported_tuning_type_names: tuple[str, ...] = ()
     qualify_analyze_table = False

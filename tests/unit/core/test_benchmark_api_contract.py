@@ -227,7 +227,7 @@ def test_benchmark_support_status_metadata_matches_contract_map() -> None:
     assert "joinorder_synthetic" not in list_public_benchmark_ids()
 
     with pytest.raises(ValueError, match="Unknown benchmark support_status"):
-        get_benchmarks_by_support_status("unknown")  # type: ignore[arg-type]
+        get_benchmarks_by_support_status("unknown")
 
     contract_doc = PUBLIC_CONTRACTS_DOC.read_text()
     assert "Benchmark support status: **6** stable, **11** beta, **5** experimental" in contract_doc

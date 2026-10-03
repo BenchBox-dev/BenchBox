@@ -32,7 +32,7 @@ try:
     from psycopg import sql as psql
 except ImportError:
     psycopg = None
-    psql = None  # type: ignore[assignment]
+    psql = None
 
 
 _INTERVAL_PATTERN = re.compile(

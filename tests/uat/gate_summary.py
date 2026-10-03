@@ -106,7 +106,7 @@ def read_gate_summary(path: Path) -> GateSummary:
     payload = dict(payload)
     payload["accounting"] = accounting
     known = {f.name for f in fields(GateSummary)}
-    return GateSummary(**{k: v for k, v in payload.items() if k in known})  # type: ignore[arg-type]
+    return GateSummary(**{k: v for k, v in payload.items() if k in known})
 
 
 @dataclass(frozen=True)
@@ -190,10 +190,7 @@ def build_combined_evidence(
 
     stage_artifact_digests: dict[str, dict[str, str | None]] | None = None
     if all(s.artifact_digests is not None for s in stage_summaries):
-        stage_artifact_digests = {
-            s.config_name: dict(s.artifact_digests)  # type: ignore[arg-type]
-            for s in stage_summaries
-        }
+        stage_artifact_digests = {s.config_name: dict(s.artifact_digests) for s in stage_summaries}
 
     return CombinedGateEvidence(
         verdict=verdict,

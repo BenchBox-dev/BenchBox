@@ -214,7 +214,7 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         for legacy in self._LEGACY_STAGING_MANIFEST_TABLES:
             try:
                 connection.execute(f"DROP TABLE IF EXISTS {self._quote_identifier(legacy)}")
-            except Exception:  # noqa: BLE001 - cleanup only; never fail setup over cruft
+            except Exception:
                 pass
 
     def _staging_provenance_key(self) -> tuple[str, str, str]:
@@ -321,7 +321,7 @@ class TransactionalBenchmarkBase(GeneratorOutputDirMixin, BaseBenchmark, Operati
         results: list[ResultT] = []
         for op_id in operations:
             result = self.execute_operation(op_id, connection)
-            results.append(result)  # type: ignore[arg-type]
+            results.append(result)
 
             status = "✓" if result.success and result.validation_passed else "✗"
             self.log_verbose(

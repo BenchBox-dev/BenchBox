@@ -43,7 +43,7 @@ def build_tpcds_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceDat
             expression_impl=_bound(query.expression_impl, number, parameters),
         )
 
-    _dataframe_query.bindings = bindings  # type: ignore[attr-defined]
+    _dataframe_query.bindings = bindings
 
     benchmark = TPCDS(scale_factor=scale_factor, output_dir=Path(output_dir))
     benchmark.generate_data()

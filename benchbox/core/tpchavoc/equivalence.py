@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 from benchbox.core.tpchavoc.validation import ValidationError
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
+if TYPE_CHECKING:  # pragma: no cover
     from benchbox import TPCH
 
 EQUIVALENCE_SCALE = 0.1
@@ -85,7 +85,7 @@ def find_divergences(
             original = normalize(
                 connection.execute(transform_for_engine(strip_top_n(canonical_query(query_id)))).fetchall()
             )
-        except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
+        except Exception as exc:
             divergences.append(Divergence(query_id, 0, f"canonical query failed: {exc}"))
             continue
         if not original:
@@ -112,7 +112,7 @@ def find_divergences(
                 benchmark.validate_variant_equivalence(query_id, variant_id, original, variant_rows)
             except ValidationError as exc:
                 divergences.append(Divergence(query_id, variant_id, str(exc)))
-            except Exception as exc:  # noqa: BLE001 - surface execution/sort errors as divergences
+            except Exception as exc:
                 divergences.append(Divergence(query_id, variant_id, f"error: {exc}"))
     return divergences
 
@@ -570,5 +570,5 @@ def _sort_key(key: str) -> tuple[int, int]:
     return int(query), int(variant)
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry point
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

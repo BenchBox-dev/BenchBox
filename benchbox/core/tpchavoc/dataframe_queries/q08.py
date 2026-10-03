@@ -1,12 +1,6 @@
-"""TPC-Havoc DataFrame variants for Q8.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements 10 structurally diverse variants of TPC-H Q8 (National Market Share).
-Q8 is a 7-table join computing market share by year.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,8 +14,6 @@ from benchbox.core.tpch.dataframe_queries import (
 )
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_FILTER, build_yaml_variants
 
-# v1: baseline
-
 
 def q8_v1_expression_impl(ctx: DataFrameContext) -> Any:
     return _q8_expr_base(ctx)
@@ -29,9 +21,6 @@ def q8_v1_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q8_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q8_pandas_base(ctx)
-
-
-# v2: pre-filter - filter part and orders by date before joining
 
 
 def q8_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -54,7 +43,6 @@ def q8_v2_expression_impl(ctx: DataFrameContext) -> Any:
 
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
-    # Pre-filter part and orders
     filtered_part = part.filter(col("p_type") == lit(target_type))
     filtered_orders = orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") <= lit(end_date)))
 
@@ -126,18 +114,12 @@ def q8_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     return result[["o_year", "mkt_share"]].sort_values("o_year")
 
 
-# v3: column prune
-
-
 def q8_v3_expression_impl(ctx: DataFrameContext) -> Any:
     return _q8_expr_base(ctx)
 
 
 def q8_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q8_pandas_base(ctx)
-
-
-# v4: intermediate vars
 
 
 def q8_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -189,9 +171,6 @@ def q8_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q8_pandas_base(ctx)
 
 
-# v5: pre-compute derived
-
-
 def q8_v5_expression_impl(ctx: DataFrameContext) -> Any:
     return _q8_expr_base(ctx)
 
@@ -226,7 +205,6 @@ def q8_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined.merge(region, left_on="n_regionkey", right_on="r_regionkey")
     joined = joined[joined["r_name"] == target_region].copy()
 
-    # Pre-compute derived
     joined["o_year"] = joined["o_orderdate"].dt.year
     joined["volume"] = joined["l_extendedprice"] * (1 - joined["l_discount"])
 
@@ -238,9 +216,6 @@ def q8_v5_pandas_impl(ctx: DataFrameContext) -> Any:
     result["nation_volume"] = result["nation_volume"].fillna(0)
     result["mkt_share"] = result["nation_volume"] / result["total_volume"]
     return result[["o_year", "mkt_share"]].sort_values("o_year")
-
-
-# v6: chained style
 
 
 def q8_v6_expression_impl(ctx: DataFrameContext) -> Any:
@@ -279,9 +254,6 @@ def q8_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q8_pandas_base(ctx)
 
 
-# v7: join reorder - start from lineitem instead of part
-
-
 def q8_v7_expression_impl(ctx: DataFrameContext) -> Any:
     part = ctx.get_table("part")
     supplier = ctx.get_table("supplier")
@@ -302,7 +274,6 @@ def q8_v7_expression_impl(ctx: DataFrameContext) -> Any:
 
     n2 = nation.select(col("n_nationkey").alias("n2_nationkey"), col("n_name").alias("nation"))
 
-    # Swapped: start from lineitem→part instead of part→lineitem
     return (
         lineitem.join(part.filter(col("p_type") == lit(target_type)), left_on="l_partkey", right_on="p_partkey")
         .join(supplier, left_on="l_suppkey", right_on="s_suppkey")
@@ -332,18 +303,12 @@ def q8_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q8_pandas_base(ctx)
 
 
-# v8: filter combination - combine region and date filters
-
-
 def q8_v8_expression_impl(ctx: DataFrameContext) -> Any:
     return q8_v2_expression_impl(ctx)
 
 
 def q8_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     return q8_v2_pandas_impl(ctx)
-
-
-# v9: explicit sort
 
 
 def q8_v9_expression_impl(ctx: DataFrameContext) -> Any:
@@ -394,9 +359,6 @@ def q8_v9_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q8_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q8_pandas_base(ctx)
-
-
-# v10: alternative formula - volume = price - price*disc
 
 
 def q8_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -477,7 +439,6 @@ def q8_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined[joined["r_name"] == target_region].copy()
 
     joined["o_year"] = joined["o_orderdate"].dt.year
-    # Alternative formula
     joined["volume"] = joined["l_extendedprice"] - joined["l_extendedprice"] * joined["l_discount"]
 
     yearly = joined.groupby("o_year", as_index=False).agg(total_volume=("volume", "sum"))
@@ -488,9 +449,6 @@ def q8_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     result["nation_volume"] = result["nation_volume"].fillna(0)
     result["mkt_share"] = result["nation_volume"] / result["total_volume"]
     return result[["o_year", "mkt_share"]].sort_values("o_year")
-
-
-# Registry
 
 
 Q8_VARIANTS = build_yaml_variants(__file__, globals(), 8, JOIN_AGG_FILTER)

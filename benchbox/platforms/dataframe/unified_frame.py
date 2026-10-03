@@ -635,14 +635,14 @@ class UnifiedExpr:
             return UnifiedExpr(other_expr / df_f.nullif(self._expr, df_lit(0)))
         return UnifiedExpr(other_expr / self._expr)
 
-    def __eq__(self, other: Any) -> UnifiedExpr:  # type: ignore[override]
+    def __eq__(self, other: Any) -> UnifiedExpr:
         other_expr = other._expr if isinstance(other, UnifiedExpr) else other
         result = UnifiedExpr(self._expr == other_expr)
         result._eq_left = self
         result._eq_right = other if isinstance(other, UnifiedExpr) else UnifiedExpr(other_expr)
         return result
 
-    def __ne__(self, other: Any) -> UnifiedExpr:  # type: ignore[override]
+    def __ne__(self, other: Any) -> UnifiedExpr:
         return UnifiedExpr(self._expr != self._unwrap(other))
 
     def __lt__(self, other: Any) -> UnifiedExpr:

@@ -1,5 +1,3 @@
-"""SSB DataFrame query implementations."""
-
 from __future__ import annotations
 
 from csv import reader
@@ -20,17 +18,14 @@ _JOIN_KEYS = {
 
 
 def _items(value: str) -> list[str]:
-    """Split a comma-separated token list into non-empty entries."""
     return [item for item in value.split(",") if item]
 
 
 def _query_params(query_id: str) -> dict[str, Any]:
-    """Return cached default parameter values for a query."""
     return get_parameters(query_id).params
 
 
 def _expr_join(ctx: DataFrameContext, joins: str) -> Any:
-    """Build an expression-table join chain from compact join descriptors."""
     frame = ctx.get_table("lineorder")
     for table in _items(joins):
         left_on, right_on = _JOIN_KEYS[table]
@@ -39,7 +34,6 @@ def _expr_join(ctx: DataFrameContext, joins: str) -> Any:
 
 
 def _pandas_join(ctx: DataFrameContext, joins: str) -> Any:
-    """Build a pandas join chain from compact join descriptors."""
     frame = ctx.get_table("lineorder")
     for table in _items(joins):
         left_on, right_on = _JOIN_KEYS[table]
@@ -48,7 +42,6 @@ def _pandas_join(ctx: DataFrameContext, joins: str) -> Any:
 
 
 def _expr_filter(ctx: DataFrameContext, filters: str, params: dict[str, Any]) -> Any:
-    """Apply compact filter descriptors against the expression query plan."""
     col, lit = ctx.col, ctx.lit
     condition = None
     for column, op, names in (item.split(":") for item in filters.split(";") if item):
@@ -70,7 +63,6 @@ def _expr_filter(ctx: DataFrameContext, filters: str, params: dict[str, Any]) ->
 
 
 def _pandas_filter(frame: Any, filters: str, params: dict[str, Any]) -> Any:
-    """Apply compact filter descriptors against a pandas merge chain."""
     mask = None
     for column, op, names in (item.split(":") for item in filters.split(";") if item):
         values = [params[name] for name in names.split(",")]
@@ -91,7 +83,6 @@ def _pandas_filter(frame: Any, filters: str, params: dict[str, Any]) -> Any:
 
 
 def _sort_kwargs(sort: str, descending: str, *, pandas: bool) -> dict[str, Any]:
-    """Convert compact sort metadata into backend-specific sort kwargs."""
     columns = _items(sort)
     flags = [item == "True" for item in _items(descending)]
     if pandas:

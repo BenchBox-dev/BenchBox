@@ -9,7 +9,7 @@ import pyarrow.parquet as pq
 import pytest
 
 try:
-    import datafusion  # noqa: F401
+    import datafusion
 
     HAS_DATAFUSION = True
 except ImportError:

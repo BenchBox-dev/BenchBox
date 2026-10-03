@@ -70,7 +70,7 @@ def _load_json(path: Path) -> tuple[Any, bytes]:
 def _public_companion_payload(path: Path, payload: Any, manager: AnonymizationManager) -> Any:
     if path.name.endswith(".tuning.json") and isinstance(payload, dict):
         return manager.anonymize_tuning_payload(payload)
-    return manager.anonymize_result_payload(payload)  # type: ignore[arg-type]
+    return manager.anonymize_result_payload(payload)
 
 
 def _manifest_path(bundle_path: Path) -> Path | None:

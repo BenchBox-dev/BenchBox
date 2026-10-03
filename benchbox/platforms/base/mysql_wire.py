@@ -276,7 +276,7 @@ class MySqlWireLifecycleMixin:
         except Exception:
             try:
                 conn.close()
-            except Exception as close_error:  # noqa: BLE001 - preserve setup failure
+            except Exception as close_error:
                 self.logger.debug("Failed to close stream connection after setup error: %r", close_error)
             raise
 

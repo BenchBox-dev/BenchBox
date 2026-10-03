@@ -71,7 +71,7 @@ class _FunctionHasher(ast.NodeVisitor):
         self._process(node)
         self.generic_visit(node)
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self._process(node)
         self.generic_visit(node)
 

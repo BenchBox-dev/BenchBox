@@ -226,7 +226,7 @@ class ReadPrimitivesBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, D
                         }
                     )
 
-            iterations_list: list[dict[str, Any]] = query_results["iterations"]  # type: ignore[assignment]
+            iterations_list: list[dict[str, Any]] = query_results["iterations"]
             successful_iterations = [iter_result for iter_result in iterations_list if iter_result["success"]]
             if successful_iterations:
                 successful_times = [iter_result["time"] for iter_result in successful_iterations]

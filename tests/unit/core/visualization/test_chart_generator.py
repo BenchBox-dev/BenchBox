@@ -38,7 +38,7 @@ def test_generate_comparison_charts_empty_results_returns_empty(tmp_path):
 
 
 def test_generate_comparison_charts_exports_supported_chart_types(monkeypatch, tmp_path):
-    def _render_single_ascii_chart(results, chart_type, options, subtitle=None):  # noqa: ARG001
+    def _render_single_ascii_chart(results, chart_type, options, subtitle=None):
         return f"{chart_type}:ok"
 
     monkeypatch.setattr(

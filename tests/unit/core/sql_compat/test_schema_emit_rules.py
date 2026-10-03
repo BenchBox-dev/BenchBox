@@ -11,8 +11,8 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.schema_emit.nyctaxi_ddl  # noqa: F401
-import benchbox.sql_compat.rules.schema_emit.tsbs_devops_ddl  # noqa: F401
+import benchbox.sql_compat.rules.schema_emit.nyctaxi_ddl
+import benchbox.sql_compat.rules.schema_emit.tsbs_devops_ddl
 from benchbox.sql_compat.registry import REGISTRY
 
 

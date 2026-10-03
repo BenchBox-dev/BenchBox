@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import benchbox.cli.platform_defaults  # noqa: F401  -- registers the option specs at import
+import benchbox.cli.platform_defaults
 from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.platforms.manifest import PLATFORM_MANIFEST
 
@@ -30,7 +30,7 @@ def _module_to_platform_key() -> dict[str, str]:
         mapping.setdefault(entry.adapter.module, entry.key)
         try:
             importlib.import_module(entry.adapter.module)
-        except Exception:  # pragma: no cover - optional driver not installed
+        except Exception:  # pragma: no cover
             pass
     return mapping
 

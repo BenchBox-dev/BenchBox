@@ -40,7 +40,7 @@ class TestLintingConsolidation:
         assert "E" in selected_rules
         assert "W" in selected_rules
         assert "F" in selected_rules
-        assert "I" in selected_rules  # isort
+        assert "I" in selected_rules
 
         assert "isort" in ruff_config["lint"]
 

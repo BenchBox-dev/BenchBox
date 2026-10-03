@@ -52,7 +52,7 @@ def await_quiescence(throughput_result: Any, timeout: float) -> bool:
     if isinstance(resources, list) and done_ids:
         resources.append(f"Termination observed for streams {sorted(done_ids)}.")
 
-    throughput_result._outstanding_futures = remaining  # type: ignore[attr-defined]
+    throughput_result._outstanding_futures = remaining
 
     if remaining:
         return False

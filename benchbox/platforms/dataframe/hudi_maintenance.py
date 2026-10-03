@@ -15,7 +15,7 @@ try:
 
     PYSPARK_AVAILABLE = True
 except ImportError:
-    SparkSession = None  # type: ignore[assignment, misc]
+    SparkSession = None
     PYSPARK_AVAILABLE = False
 
 from benchbox.core.dataframe.maintenance_interface import (

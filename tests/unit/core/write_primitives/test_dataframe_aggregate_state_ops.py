@@ -236,7 +236,7 @@ class TestAggregatePersistStorageValidation:
 
         caps = DataFrameWriteCapabilities(platform_name="polars", supports_aggregate_persist=True)
         manager = _make_manager_with_caps(caps)
-        builder = lambda: pl.DataFrame({"group": ["a", "b"], "sketch": [b"\x01\x02", b"\x03\x04"]})  # noqa: E731
+        builder = lambda: pl.DataFrame({"group": ["a", "b"], "sketch": [b"\x01\x02", b"\x03\x04"]})
 
         target = tmp_path / "state"
         result = manager.execute_aggregate_persist(target, builder, compression="zstd")

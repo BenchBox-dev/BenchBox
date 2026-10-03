@@ -41,7 +41,7 @@ class TestSortColumn:
     def test_invalid_order_raises(self) -> None:
 
         with pytest.raises(ValueError, match="Must be 'asc' or 'desc'"):
-            SortColumn(name="col", order="ascending")  # type: ignore
+            SortColumn(name="col", order="ascending")
 
     def test_to_dict(self) -> None:
 

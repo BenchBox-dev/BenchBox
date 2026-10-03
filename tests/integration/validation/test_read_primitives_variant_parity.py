@@ -152,11 +152,11 @@ def clickhouse_session(read_primitives_tpch_parquet_dir):
 
 
 def _duckdb_rows(conn: object, sql: str) -> list[tuple[Any, ...]]:
-    return [tuple(row) for row in conn.execute(sql).fetchall()]  # type: ignore[union-attr]
+    return [tuple(row) for row in conn.execute(sql).fetchall()]
 
 
 def _datafusion_rows(ctx: object, sql: str) -> list[tuple[Any, ...]]:
-    batches = ctx.sql(sql).collect()  # type: ignore[attr-defined]
+    batches = ctx.sql(sql).collect()
     rows: list[tuple[Any, ...]] = []
     for batch in batches:
         for row_index in range(batch.num_rows):
@@ -170,7 +170,7 @@ def _clickhouse_rows(sess: object, sql: str) -> list[tuple[Any, ...]]:
     pyarrow = pytest.importorskip("pyarrow", reason="pyarrow not installed")
     ipc = pytest.importorskip("pyarrow.ipc", reason="pyarrow.ipc not installed")
 
-    result = sess.query(sql, "Arrow")  # type: ignore[attr-defined]
+    result = sess.query(sql, "Arrow")
     if result.has_error():
         raise RuntimeError(result.error_message())
     table = ipc.open_file(pyarrow.BufferReader(result.bytes())).read_all()

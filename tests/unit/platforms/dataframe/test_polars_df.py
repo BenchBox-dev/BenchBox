@@ -24,7 +24,7 @@ try:
     )
 except ImportError:
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
+    pl = None
 
 
 @pytest.mark.skipif(not POLARS_AVAILABLE, reason="Polars not installed")

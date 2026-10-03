@@ -20,12 +20,12 @@ from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import (
     CsvDialect,
-    DataSourceResolver,  # noqa: F401 - tests patch this module-local name; shared loader resolves it dynamically.
+    DataSourceResolver,  # noqa: F401
     prepare_local_load_file,
     resolve_csv_dialect,
 )
 from .base.mysql_wire import MySqlWireLifecycleMixin, NoOpTableTuningMixin, build_database_config
-from .base.sql_execution import execute_sql_query  # noqa: F401 - tests patch this module-local execution hook.
+from .base.sql_execution import execute_sql_query  # noqa: F401
 
 SINGLESTORE_DIALECT = "mysql"
 

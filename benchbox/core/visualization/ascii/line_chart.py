@@ -1,1 +1,1 @@
-from textcharts.line_chart import *  # noqa: F401, F403
+from textcharts.line_chart import *  # noqa: F403

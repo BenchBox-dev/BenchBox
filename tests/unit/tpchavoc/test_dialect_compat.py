@@ -48,7 +48,7 @@ def test_postgres_alias_variants_inline_having_and_where_references():
 
 
 def test_postgres_alias_rules_cover_each_family_platform():
-    import benchbox.sql_compat.rules.query_adapter.postgres_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.postgres_tpchavoc_rewrites
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
 
@@ -129,7 +129,7 @@ def test_clickhouse_filter_rewrite_rejects_unhandled_aggregate_shapes():
 
 
 def test_clickhouse_filter_rules_cover_each_deployment_mode():
-    import benchbox.sql_compat.rules.query_adapter.clickhouse_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.clickhouse_tpchavoc_rewrites
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
 
@@ -155,7 +155,7 @@ def test_datafusion_empty_group_variants_drop_grouping_and_unskip():
 
 
 def test_datafusion_empty_group_rules_cover_both_variants():
-    import benchbox.sql_compat.rules.query_adapter.datafusion_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.datafusion_tpchavoc_rewrites
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
 

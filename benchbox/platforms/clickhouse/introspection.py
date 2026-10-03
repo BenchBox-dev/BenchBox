@@ -44,7 +44,7 @@ class ClickHouseTuningIntrospector:
         for row in relevant_rows:
             try:
                 name, sorting_key, partition_key = row[0], row[1], row[2]
-            except Exception:  # pragma: no cover - defensive on row shape
+            except Exception:  # pragma: no cover
                 continue
             if sorting_key:
                 objects.append(

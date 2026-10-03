@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.worktree_audit import (  # noqa: E402
+from _project.scripts.worktree_audit import (
     STRUCTURAL_BASES,
     _parse_worktree_porcelain_entries,
     are_descendants_integrated,
@@ -29,11 +29,11 @@ from _project.scripts.worktree_audit import (  # noqa: E402
     resolve_github_token,
     resolve_repository_identity,
 )
-from scripts.branch_prune_merged import (  # noqa: E402
+from scripts.branch_prune_merged import (
     RepositoryIdentity as BranchPruneRepositoryIdentity,
     get_historical_head_at_merge,
 )
-from scripts.worktree_lifecycle_metadata import (  # noqa: E402
+from scripts.worktree_lifecycle_metadata import (
     WorktreeLifecycleMetadata,
     read_metadata,
 )

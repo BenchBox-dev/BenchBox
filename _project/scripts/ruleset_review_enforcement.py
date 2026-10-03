@@ -216,7 +216,7 @@ def _fetch_branch_rules(repo: str, branch: str, token: str) -> list[dict[str, An
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )
-    with urllib.request.urlopen(request, timeout=30) as response:  # noqa: S310 (fixed api.github.com host)
+    with urllib.request.urlopen(request, timeout=30) as response:
         return extract_rules(json.loads(response.read().decode("utf-8")))
 
 

@@ -448,7 +448,7 @@ class TestExpressionFamilyAdapterAbstract:
                 return "Incomplete"
 
         with pytest.raises(TypeError, match="abstract"):
-            IncompleteAdapter()  # type: ignore[abstract]
+            IncompleteAdapter()
 
 
 class TestQueryIntegration:

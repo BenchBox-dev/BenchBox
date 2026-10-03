@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from _project.scripts.auto_merge_soundness_paths import any_soundness_path  # noqa: E402
+from _project.scripts.auto_merge_soundness_paths import any_soundness_path
 
 CLI_DESCRIPTION = (
     "One cohesive revision/readiness/queue/follow-up helper behind the Make PR targets.\n"
@@ -1376,7 +1376,7 @@ def _followup_locked(directory: Path, key: str) -> BinaryIO:
     import fcntl
 
     directory.mkdir(parents=True, exist_ok=True)
-    handle = open(_legacy_followup_path(directory, key).with_suffix(".lock"), "a+b")  # noqa: PTH123
+    handle = open(_legacy_followup_path(directory, key).with_suffix(".lock"), "a+b")
     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
     return handle
 

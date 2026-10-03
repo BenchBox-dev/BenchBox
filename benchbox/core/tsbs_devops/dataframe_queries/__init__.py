@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.tsbs_devops.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.tsbs_devops.dataframe_queries import queries as _queries
 from benchbox.core.tsbs_devops.dataframe_queries.registry import (
     TSBS_DEVOPS_DATAFRAME_QUERIES,
     get_tsbs_devops_query,

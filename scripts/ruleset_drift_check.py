@@ -17,7 +17,7 @@ DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
 
 sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 
-from ruleset_review_enforcement import (  # noqa: E402
+from ruleset_review_enforcement import (
     TAG_RULESET_ENFORCED,
     extract_rules,
     review_enforcement_findings,

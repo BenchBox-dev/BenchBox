@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 RESULT_SOURCES: tuple[str, ...] = ("internal", "community", "vendor")
-"""Producer categories. ``internal`` = BenchBox maintainers, ``community`` =
-arms-length contributor, ``vendor`` = the platform vendor itself."""
 
 DEFAULT_RESULT_SOURCE = "internal"
 
@@ -46,8 +44,6 @@ FUNDING_SOURCES: tuple[str, ...] = (
     "grant",
     "unspecified",
 )
-"""How the run was paid for. ``unspecified`` is the default when a producer does
-not declare funding."""
 
 DEFAULT_FUNDING = "unspecified"
 

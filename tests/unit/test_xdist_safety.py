@@ -74,10 +74,10 @@ def test_rewrite_numprocesses_args_uses_last_numprocesses_occurrence() -> None:
 
 
 def test_suppress_xdist_worker_title_patches_only_exec_namespace(monkeypatch: pytest.MonkeyPatch) -> None:
-    outer_title_fn = lambda title: "OUTER_FRAME"  # noqa: E731
+    outer_title_fn = lambda title: "OUTER_FRAME"
     monkeypatch.setitem(globals(), "worker_title", outer_title_fn)
 
-    original_title_fn = lambda title: "INNER_FRAME"  # noqa: E731
+    original_title_fn = lambda title: "INNER_FRAME"
     fake_remote_globals = {
         "__name__": "__channelexec__",
         "worker_title": original_title_fn,
@@ -97,7 +97,7 @@ def test_suppress_xdist_worker_title_patches_only_exec_namespace(monkeypatch: py
 def test_suppress_xdist_worker_title_ignores_non_exec_frames(monkeypatch: pytest.MonkeyPatch) -> None:
     from tests.conftest import _suppress_xdist_worker_title
 
-    original_title_fn = lambda title: "NOT_XDIST"  # noqa: E731
+    original_title_fn = lambda title: "NOT_XDIST"
     monkeypatch.setitem(globals(), "worker_title", original_title_fn)
 
     _suppress_xdist_worker_title()

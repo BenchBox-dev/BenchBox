@@ -251,7 +251,7 @@ def _handle_gate_check(args: argparse.Namespace) -> int:
     for summary, stage_dir in zip(summaries, [p.parent for p in stage_paths]):
         if summary.artifact_digests is None:
             continue
-        for key, expected in summary.artifact_digests.items():  # type: ignore[union-attr]
+        for key, expected in summary.artifact_digests.items():
             actual = _digest_for_stage_file(stage_dir, key)
             if actual != expected:
                 actual_label = actual if actual is not None else "absent"

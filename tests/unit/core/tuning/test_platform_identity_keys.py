@@ -33,7 +33,7 @@ class _StubAdapter(PlatformAdapter):
         self._display_name = display_name
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - shim
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod
@@ -232,10 +232,10 @@ class _MetadataStubAdapter:
             self.canonical_platform_type = canonical_platform_type
         self.platform_config = {}
 
-    def create_connection(self, **_kwargs):  # pragma: no cover - not reached
+    def create_connection(self, **_kwargs):  # pragma: no cover
         return Mock()
 
-    def close_connection(self, _conn):  # pragma: no cover - not reached
+    def close_connection(self, _conn):  # pragma: no cover
         return None
 
 
@@ -252,9 +252,9 @@ class TestMetadataPersistsCanonicalKey:
         )
 
         captured: dict[str, Any] = {"records": None}
-        manager.create_metadata_table = lambda: True  # type: ignore[method-assign]
-        manager.clear_tunings = lambda _bn=None: True  # type: ignore[method-assign]
-        manager._batch_insert_records = lambda records: captured.__setitem__("records", records)  # type: ignore[method-assign]
+        manager.create_metadata_table = lambda: True
+        manager.clear_tunings = lambda _bn=None: True
+        manager._batch_insert_records = lambda records: captured.__setitem__("records", records)
 
         assert manager.save_tunings(tunings) is True
         assert captured["records"]

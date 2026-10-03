@@ -19,10 +19,10 @@ try:
     HAS_DATAFUSION = True
 except ImportError:
     HAS_DATAFUSION = False
-    datafusion = None  # type: ignore[assignment]
-    pa = None  # type: ignore[assignment]
-    UnifiedExpr = None  # type: ignore[assignment]
-    UnifiedLazyFrame = None  # type: ignore[assignment]
+    datafusion = None
+    pa = None
+    UnifiedExpr = None
+    UnifiedLazyFrame = None
 
 
 @pytest.fixture()

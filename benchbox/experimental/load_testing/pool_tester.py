@@ -17,28 +17,20 @@ logger = logging.getLogger(__name__)
 @dataclass
 class PoolTestConfig:
     connection_factory: Callable[[], Any]
-    """Factory creating new database connections."""
 
     health_check_query: str = "SELECT 1"
-    """Simple query to verify connection health."""
 
     execute_query: Callable[[Any, str], bool] | None = None
-    """Optional function to execute query: (connection, sql) -> success."""
 
     max_connections_to_test: int = 100
-    """Maximum connections to attempt acquiring."""
 
     connection_acquire_timeout: float = 30.0
-    """Timeout for acquiring a single connection."""
 
     hold_connection_seconds: float = 1.0
-    """How long to hold each connection during stress test."""
 
     ramp_step_size: int = 10
-    """Number of connections to add in each ramp step."""
 
     ramp_step_delay_seconds: float = 0.5
-    """Delay between ramp steps."""
 
 
 @dataclass

@@ -51,10 +51,10 @@ try:
     _MONITORING_AVAILABLE = True
 except ImportError:
     _MONITORING_AVAILABLE = False
-    PerformanceMonitor = None  # type: ignore[assignment,misc]
-    ResourceMonitor = None  # type: ignore[assignment,misc]
+    PerformanceMonitor = None
+    ResourceMonitor = None
 
-    def attach_snapshot_to_result(*_args: Any, **_kwargs: Any) -> None:  # type: ignore[misc]
+    def attach_snapshot_to_result(*_args: Any, **_kwargs: Any) -> None:
         pass
 
 
@@ -100,7 +100,7 @@ def _resolve_manifest_allowed_names(benchmark: Any, config: BenchmarkConfig) -> 
             alias = getter()
         except NotImplementedError:
             alias = None
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:  # pragma: no cover
             logger.warning(
                 "data sharing alias resolution failed for %s: %s",
                 getattr(benchmark, "__class__", type(benchmark)).__name__,
@@ -195,7 +195,7 @@ def _run_postload_validation(
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
         engine = DatabaseValidationEngine()
         return engine.validate_loaded_data(connection, benchmark_config.name.lower(), benchmark_config.scale_factor)
-    except Exception as exc:  # pragma: no cover - defensive safeguard
+    except Exception as exc:  # pragma: no cover
         return ValidationResult(
             is_valid=False,
             errors=[f"Post-load validation failed: {exc}"],
@@ -206,7 +206,7 @@ def _run_postload_validation(
         if connection is not None:
             try:
                 connection_lifecycle.close_connection(connection)
-            except Exception:  # pragma: no cover - defensive safeguard
+            except Exception:  # pragma: no cover
                 pass
 
 
@@ -1100,7 +1100,7 @@ def _setup_lifecycle_monitor(
     database_config: DatabaseConfig | None,
 ) -> tuple[PerformanceMonitor | None, ResourceMonitor | None]:
     if monitor is None and _MONITORING_AVAILABLE:
-        monitor = PerformanceMonitor()  # type: ignore[misc]
+        monitor = PerformanceMonitor()
 
     resource_monitor: ResourceMonitor | None = None
     if enable_resource_monitoring and monitor is not None:
@@ -1241,7 +1241,7 @@ def run_benchmark_lifecycle(
     if benchmark_instance is None or get_benchmark_metadata(benchmark_config.name) is not None:
         validate_scale_factor(benchmark_config.name, benchmark_config.scale_factor)
     benchmark = benchmark_instance or get_benchmark_instance(benchmark_config, system_profile)
-    if isinstance(benchmark, VerbosityMixin):  # type: ignore[arg-type]
+    if isinstance(benchmark, VerbosityMixin):
         benchmark.apply_verbosity(verbosity_settings)
 
     output_dir_handler = _resolve_output_dir_handler(benchmark, output_root)

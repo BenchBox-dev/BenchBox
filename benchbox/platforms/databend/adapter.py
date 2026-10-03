@@ -32,12 +32,12 @@ from benchbox.utils.dependencies import (
 )
 
 try:
-    import databend_driver  # noqa: F401
+    import databend_driver
 
     DATABEND_AVAILABLE = True
 except ImportError:
     DATABEND_AVAILABLE = False
-    databend_driver = None  # type: ignore[assignment]
+    databend_driver = None
 
 
 class DatabendAdapter(PlatformAdapter):

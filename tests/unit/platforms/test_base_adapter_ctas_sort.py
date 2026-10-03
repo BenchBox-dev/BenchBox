@@ -24,33 +24,33 @@ class _BaseCtasTestAdapter(PlatformAdapter):
         return "duckdb"
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - test shim
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]):  # pragma: no cover - test shim
+    def from_config(cls, config: dict[str, Any]):  # pragma: no cover
         return cls(**config)
 
-    def create_connection(self, **connection_config) -> Any:  # pragma: no cover - test shim
+    def create_connection(self, **connection_config) -> Any:  # pragma: no cover
         return Mock()
 
-    def create_schema(self, benchmark, connection: Any) -> float:  # pragma: no cover - test shim
+    def create_schema(self, benchmark, connection: Any) -> float:  # pragma: no cover
         return 0.0
 
-    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:  # pragma: no cover - test shim
+    def apply_platform_optimizations(self, platform_config, connection: Any) -> None:  # pragma: no cover
         return None
 
     def apply_constraint_configuration(
         self, primary_key_config, foreign_key_config, connection: Any
-    ) -> None:  # pragma: no cover - test shim
+    ) -> None:  # pragma: no cover
         return None
 
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
-    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:  # pragma: no cover - test shim
+    ) -> tuple[dict[str, int], float, dict[str, Any] | None]:  # pragma: no cover
         return {}, 0.0, None
 
-    def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:  # pragma: no cover - test shim
+    def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:  # pragma: no cover
         return None
 
     def execute_query(
@@ -62,7 +62,7 @@ class _BaseCtasTestAdapter(PlatformAdapter):
         scale_factor: float | None = None,
         validate_row_count: bool = True,
         stream_id: int | None = None,
-    ) -> dict[str, Any]:  # pragma: no cover - test shim
+    ) -> dict[str, Any]:  # pragma: no cover
         return {"query_id": query_id, "status": "SUCCESS", "execution_time_seconds": 0.0, "rows_returned": 0}
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[Any]) -> str | list[str] | None:

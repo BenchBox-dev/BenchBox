@@ -993,7 +993,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
                 df_time_ms=80.0,
             )
 
-        bm._compare_query = _fake_compare_query  # type: ignore[method-assign]
+        bm._compare_query = _fake_compare_query
 
         with patch.object(bm, "_build_summary", return_value="summary") as build_summary:
             summary = bm.run_comparison("duckdb", "polars-df", tmp_path)
@@ -1004,8 +1004,8 @@ class TestSQLVsDataFrameBenchmarkExecution:
 
     def test_compare_query_success_records_row_match(self, tmp_path):
         bm = self._benchmark()
-        bm._run_sql_query = MagicMock(return_value=(110.0, 4))  # type: ignore[method-assign]
-        bm._run_df_query = MagicMock(return_value=(90.0, 4))  # type: ignore[method-assign]
+        bm._run_sql_query = MagicMock(return_value=(110.0, 4))
+        bm._run_df_query = MagicMock(return_value=(90.0, 4))
 
         result = bm._compare_query("Q1", "duckdb", "polars-df", tmp_path)
 
@@ -1015,7 +1015,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
 
     def test_compare_query_error_returns_error_result(self, tmp_path):
         bm = self._benchmark()
-        bm._run_sql_query = MagicMock(side_effect=RuntimeError("boom"))  # type: ignore[method-assign]
+        bm._run_sql_query = MagicMock(side_effect=RuntimeError("boom"))
 
         result = bm._compare_query("Q1", "duckdb", "polars-df", tmp_path)
 

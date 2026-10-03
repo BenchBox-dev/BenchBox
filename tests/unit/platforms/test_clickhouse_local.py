@@ -19,11 +19,11 @@ pytestmark = [
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from tests.utilities.optional_engines import require_chdb  # noqa: E402
+from tests.utilities.optional_engines import require_chdb
 
 require_chdb()
 
-from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient  # noqa: E402
+from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient
 
 
 class TestClickHouseEmbeddedMode:

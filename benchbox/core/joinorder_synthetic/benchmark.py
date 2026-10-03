@@ -178,7 +178,7 @@ class JoinOrderSyntheticBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return f"JoinOrderSyntheticBenchmark(scale_factor={self.scale_factor}, queries={self.get_query_count()})"
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
 )

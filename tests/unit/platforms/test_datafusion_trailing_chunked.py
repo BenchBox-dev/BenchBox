@@ -56,15 +56,15 @@ _VARIANTS = [
 
 
 try:
-    import pyarrow as pa  # noqa: F401
+    import pyarrow as pa
     import pyarrow.parquet as pq
 
     _PYARROW = True
-except ImportError:  # pragma: no cover - pyarrow is a hard dependency in practice
+except ImportError:  # pragma: no cover
     _PYARROW = False
 
 try:
-    import datafusion  # noqa: F401
+    import datafusion
 
     from benchbox.platforms.dataframe.datafusion_df import (
         DATAFUSION_DF_AVAILABLE,

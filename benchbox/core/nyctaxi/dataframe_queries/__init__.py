@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.nyctaxi.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.nyctaxi.dataframe_queries import queries as _queries
 from benchbox.core.nyctaxi.dataframe_queries.registry import (
     NYCTAXI_DATAFRAME_QUERIES,
     get_nyctaxi_query,

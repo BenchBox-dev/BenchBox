@@ -171,7 +171,7 @@ class TestDataVaultBenchmarkEdgeCases:
 
     def test_tpch_source_dir_default_output_dir(self) -> None:
         bm = DataVaultBenchmark(scale_factor=0.01)
-        bm.output_dir = None  # type: ignore[assignment]
+        bm.output_dir = None
         bm._tpch_source_dir = None
         src = bm.tpch_source_dir
         assert "tpch_" in src.name
@@ -323,7 +323,7 @@ class TestDataVaultBenchmarkEdgeCases:
 
     def test_generate_data_output_dir_none_raises(self) -> None:
         bm = DataVaultBenchmark(scale_factor=0.01)
-        bm.output_dir = None  # type: ignore[assignment]
+        bm.output_dir = None
         with pytest.raises(ValueError, match="output_dir must be set"):
             bm.generate_data()
 

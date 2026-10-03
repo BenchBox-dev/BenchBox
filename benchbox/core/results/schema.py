@@ -437,7 +437,7 @@ def _dataset_identity_fields(result: BenchmarkResults) -> dict[str, str]:
             return {}
         repo_root = Path(__file__).resolve().parents[3]
         manifest = load_manifest(repo_root / str(manifest_rel))
-    except Exception as exc:  # pragma: no cover - identity is best-effort for export
+    except Exception as exc:  # pragma: no cover
         logger.warning("Unable to load dataset identity for %s: %s", benchmark_id, exc)
         return {}
     return {

@@ -30,7 +30,7 @@ try:
 except ImportError:
     POLARS_AVAILABLE = False
     pl = None
-    PolarsDataFrameAdapter = None  # type: ignore
+    PolarsDataFrameAdapter = None
 
 try:
     from pyspark.sql import SparkSession
@@ -40,8 +40,8 @@ try:
     PYSPARK_AVAILABLE = True
 except ImportError:
     PYSPARK_AVAILABLE = False
-    SparkSession = None  # type: ignore
-    PySparkDataFrameAdapter = None  # type: ignore
+    SparkSession = None
+    PySparkDataFrameAdapter = None
 
 try:
     import datafusion
@@ -51,8 +51,8 @@ try:
     DATAFUSION_AVAILABLE = True
 except ImportError:
     DATAFUSION_AVAILABLE = False
-    datafusion = None  # type: ignore
-    DataFusionDataFrameAdapter = None  # type: ignore
+    datafusion = None
+    DataFusionDataFrameAdapter = None
 
 
 @pytest.fixture(scope="module")

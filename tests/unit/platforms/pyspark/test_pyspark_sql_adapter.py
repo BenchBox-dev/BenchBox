@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    import pyspark  # noqa: F401
+    import pyspark
 
     PYSPARK_AVAILABLE = True
 except ImportError:
@@ -25,8 +25,8 @@ if PYSPARK_AVAILABLE:
     from benchbox.platforms.pyspark import sql_adapter
     from benchbox.platforms.pyspark.sql_adapter import PySparkSQLAdapter
 else:
-    sql_adapter = None  # type: ignore
-    PySparkSQLAdapter = None  # type: ignore
+    sql_adapter = None
+    PySparkSQLAdapter = None
 
 
 @pytest.fixture

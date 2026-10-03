@@ -59,7 +59,7 @@ def test_uncompressed_streams_only_dat_files(temp_dir: Path):
 
 def test_prune_stale_table_artifacts_removes_conflicting_variants_only(temp_dir: Path):
     generator = _make_generator(compression_enabled=True)
-    generator._known_table_names = lambda: ["store_sales"]  # type: ignore[method-assign]
+    generator._known_table_names = lambda: ["store_sales"]
     generator.parallel = 1
 
     stale_files = [
@@ -87,7 +87,7 @@ def test_prune_stale_table_artifacts_removes_conflicting_variants_only(temp_dir:
 
 def test_prune_stale_table_artifacts_keeps_prefix_neighbor_table_shards(temp_dir: Path):
     generator = _make_generator(compression_enabled=True)
-    generator._known_table_names = lambda: ["customer", "customer_address"]  # type: ignore[method-assign]
+    generator._known_table_names = lambda: ["customer", "customer_address"]
     generator.parallel = 2
 
     (temp_dir / "customer_1_2.dat").write_text("stale")
@@ -102,7 +102,7 @@ def test_prune_stale_table_artifacts_keeps_prefix_neighbor_table_shards(temp_dir
 
 def test_prune_stale_table_artifacts_removes_compressed_when_uncompressed_mode(temp_dir: Path):
     generator = _make_generator(compression_enabled=False)
-    generator._known_table_names = lambda: ["store_sales"]  # type: ignore[method-assign]
+    generator._known_table_names = lambda: ["store_sales"]
     generator.parallel = 1
 
     stale_compressed = temp_dir / "store_sales.dat.zst"

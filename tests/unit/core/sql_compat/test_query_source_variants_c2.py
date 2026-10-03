@@ -11,8 +11,8 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.query_source.nyctaxi_variants  # noqa: F401
-import benchbox.sql_compat.rules.query_source.tpcdi_variants  # noqa: F401
+import benchbox.sql_compat.rules.query_source.nyctaxi_variants
+import benchbox.sql_compat.rules.query_source.tpcdi_variants
 from benchbox.sql_compat.registry import REGISTRY
 
 _NYCTAXI_STARROCKS_RULES = [

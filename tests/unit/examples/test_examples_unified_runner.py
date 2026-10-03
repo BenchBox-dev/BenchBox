@@ -64,7 +64,7 @@ sys.modules.setdefault("benchbox.cli.commands.platform", types.ModuleType("bench
 
 examples_dir = Path(__file__).parent.parent.parent.parent / "examples"
 sys.path.insert(0, str(examples_dir))
-import unified_runner  # noqa: E402
+import unified_runner
 
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig
 

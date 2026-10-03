@@ -447,7 +447,7 @@ def test_graphql_fetch_paginates_comments_inside_each_thread() -> None:
     }
 
     class PaginatedGraphqlRunner(RecordingRunner):
-        def run(self, args, input_text=None):  # type: ignore[override]
+        def run(self, args, input_text=None):
             self.commands.append(list(args))
             payload = next_payload if any("query($thread:" in arg for arg in args) else initial_payload
             return subprocess.CompletedProcess(list(args), 0, json.dumps(payload), "")
@@ -468,7 +468,7 @@ def test_graphql_fetch_paginates_comments_inside_each_thread() -> None:
 
 def test_write_mode_refuses_rest_fallback_without_thread_state() -> None:
     class GraphqlFailureRunner(RecordingRunner):
-        def run(self, args, input_text=None):  # type: ignore[override]
+        def run(self, args, input_text=None):
             self.commands.append(list(args))
             return subprocess.CompletedProcess(list(args), 1, "", "GraphQL unavailable")
 
@@ -909,7 +909,7 @@ def test_check_executor_version_rejects_too_old_release(logical_codex_command) -
 
 def test_check_executor_version_surfaces_missing_binary(logical_codex_command) -> None:
     class MissingBinaryRunner(RecordingRunner):
-        def run(self, args, input_text=None):  # type: ignore[override]
+        def run(self, args, input_text=None):
             self.commands.append(list(args))
             raise FileNotFoundError("codex")
 
@@ -1335,7 +1335,7 @@ def test_reply_to_comment_retries_transient_gh_failure_then_succeeds() -> None:
             super().__init__()
             self.gh_responses = [transient, success]
 
-        def run(self, args, input_text=None):  # type: ignore[override]
+        def run(self, args, input_text=None):
             argv = list(args)
             self.commands.append(argv)
             self.inputs.append(input_text)
@@ -1376,7 +1376,7 @@ def test_reply_to_comment_does_not_retry_permanent_4xx() -> None:
     sleeps: list[float] = []
 
     class GhPermFailRunner(RecordingRunner):
-        def run(self, args, input_text=None):  # type: ignore[override]
+        def run(self, args, input_text=None):
             argv = list(args)
             self.commands.append(argv)
             self.inputs.append(input_text)

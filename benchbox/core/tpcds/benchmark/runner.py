@@ -512,7 +512,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         if variant is not None:
             composite_id = f"{query_id}{variant}"
             try:
-                return self.query_manager.dsqgen.generate(  # type: ignore[attr-defined]
+                return self.query_manager.dsqgen.generate(
                     composite_id,
                     seed=actual_seed,
                     scale_factor=actual_scale_factor,

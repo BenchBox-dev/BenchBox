@@ -781,7 +781,7 @@ class TPCDISourceDataGenerator:
 
         return str(file_path)
 
-    def generate_data_quality_issues(self, file_path: str, issue_rate: float = 0.05) -> str:  # noqa: ARG002
+    def generate_data_quality_issues(self, file_path: str, issue_rate: float = 0.05) -> str:
 
         return file_path
 

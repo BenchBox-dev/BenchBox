@@ -112,7 +112,7 @@ def _expected_results_has_value_digests(benchmark_id: str) -> bool:
             from benchbox.core.expected_results.loader import load_tpch_value_digests
 
             return bool(load_tpch_value_digests(1.0))
-    except Exception:  # pragma: no cover - absence simply means cardinality-only
+    except Exception:  # pragma: no cover
         return False
     return False
 

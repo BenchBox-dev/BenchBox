@@ -531,7 +531,7 @@ def test_corrupted_runtime_fallthrough_to_autoinstall(tmp_path, monkeypatch):
     assert resolution.runtime_strategy == DriverRuntimeStrategy.CURRENT_PROCESS.value
 
 
-from benchbox.utils.runtime_env import _iter_site_packages  # noqa: E402
+from benchbox.utils.runtime_env import _iter_site_packages
 
 
 class TestIterSitePackages:

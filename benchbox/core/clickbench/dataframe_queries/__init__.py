@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.clickbench.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.clickbench.dataframe_queries import queries as _queries
 from benchbox.core.clickbench.dataframe_queries.registry import (
     CLICKBENCH_DATAFRAME_QUERIES,
     get_clickbench_query,

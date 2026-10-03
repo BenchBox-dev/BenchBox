@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2026 Joe Harris / BenchBox Project
 
 # Licensed under the MIT License. See LICENSE file in the project root for details.
@@ -17,20 +16,20 @@ from typing import Any, Optional
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    import duckdb  # type: ignore[import-untyped]
+    import duckdb
 
     DUCKDB_AVAILABLE = True
 except ImportError:
     DUCKDB_AVAILABLE = False
-    duckdb = None  # type: ignore[assignment]
+    duckdb = None
 
 try:
-    import benchbox  # type: ignore[import-untyped]
+    import benchbox
 
     BENCHBOX_AVAILABLE = True
 except ImportError:
     BENCHBOX_AVAILABLE = False
-    benchbox = None  # type: ignore[assignment]
+    benchbox = None
 
 
 class ValidationResult(Enum):

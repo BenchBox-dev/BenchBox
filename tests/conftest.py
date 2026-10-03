@@ -373,5 +373,5 @@ def pytest_terminal_summary(terminalreporter, config, exitstatus) -> None:
                 "-",
                 f"WARNING: Test coverage {total:.2f}% is below threshold {threshold:.0f}%",
             )
-    except Exception as e:  # pragma: no cover - best-effort warning path
+    except Exception as e:  # pragma: no cover
         terminalreporter.write_line(f"Note: Coverage warning check skipped: {e}")

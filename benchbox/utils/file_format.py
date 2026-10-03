@@ -149,9 +149,9 @@ def has_trailing_delimiter(
 
     if column_names is not None:
         expected = len(column_names)
-        checker = lambda line: len(line.rstrip("\n").split(delimiter)) > expected  # noqa: E731
+        checker = lambda line: len(line.rstrip("\n").split(delimiter)) > expected
     else:
-        checker = lambda line: line.rstrip("\n").endswith(delimiter)  # noqa: E731
+        checker = lambda line: line.rstrip("\n").endswith(delimiter)
 
     return _check_first_nonempty_line(path, checker, CompressionError, CompressionManager)
 

@@ -45,7 +45,7 @@ except ImportError:
 
 try:
     from benchbox.core.results.anonymization import find_public_path_leaks
-except ImportError:  # pragma: no cover - published-results keeps a slim package mirror.
+except ImportError:  # pragma: no cover
     _PRIVATE_LOCAL_PATH_RE = re.compile(
         r"(?<![A-Za-z0-9_])(?:"
         r"(?:~|/Users|/home|/root|/private/var|/var/folders|/var/run|/Volumes)/[^\s'\",;)]*"

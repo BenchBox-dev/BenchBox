@@ -21,7 +21,7 @@ pytestmark = [
 ]
 
 try:
-    from pyspark.sql import SparkSession  # noqa: F401
+    from pyspark.sql import SparkSession
 
     PYSPARK_AVAILABLE = True
 except ImportError:

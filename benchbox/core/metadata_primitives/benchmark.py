@@ -883,8 +883,8 @@ class MetadataPrimitivesBenchmark(BaseBenchmark):
         adapter: Any,
         benchmark_config: Any,
         query_filter: set[str] | None = None,
-        monitor: Any | None = None,  # noqa: ARG002
-        run_options: Any | None = None,  # noqa: ARG002
+        monitor: Any | None = None,
+        run_options: Any | None = None,
     ) -> list[dict[str, Any]]:
         platform_name = adapter.platform_name
         spark_session = getattr(ctx, "spark_session", None) or getattr(adapter, "spark", None)

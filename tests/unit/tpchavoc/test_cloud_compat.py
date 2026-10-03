@@ -121,8 +121,8 @@ def test_databricks_reuses_spark_variant_rewrites():
 
 
 def test_registry_describes_runtime_rewrites():
-    import benchbox.sql_compat.rules.query_adapter.cloud_tpchavoc_rewrites  # noqa: F401
-    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.cloud_tpchavoc_rewrites
+    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
 

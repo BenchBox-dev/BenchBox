@@ -164,7 +164,7 @@ def run_chart(result_files: Sequence[Path], chart_type: str, no_color: bool) -> 
 
 
 def ansi_to_html(ansi_text: str) -> str:
-    from ansi2html import Ansi2HTMLConverter  # type: ignore[import]
+    from ansi2html import Ansi2HTMLConverter
 
     converter = Ansi2HTMLConverter(inline=True, scheme="ansi2html", dark_bg=True)
     return converter.convert(ansi_text, full=False)
@@ -202,7 +202,7 @@ def save_png(html_content: str, out_path: Path, text: str, width: int = 960) -> 
 
 
 def crop_to_content(png_path: Path) -> None:
-    from PIL import Image  # type: ignore[import]
+    from PIL import Image
 
     img = Image.open(png_path).convert("RGB")
     pixels = img.load()

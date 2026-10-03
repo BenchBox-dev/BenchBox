@@ -733,8 +733,8 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
         adapter: Any,
         benchmark_config: Any,
         query_filter: set[str] | None = None,
-        monitor: Any | None = None,  # noqa: ARG002
-        run_options: Any | None = None,  # noqa: ARG002
+        monitor: Any | None = None,
+        run_options: Any | None = None,
     ) -> list[dict[str, Any]]:
         from benchbox.core.transaction_primitives.dataframe_operations import (
             TransactionOperationType,
@@ -865,7 +865,7 @@ class TransactionPrimitivesBenchmark(TransactionalBenchmarkBase["OperationResult
                     _t0 = time.perf_counter()
                     try:
                         result = op_callable()
-                    except Exception as exc:  # noqa: BLE001
+                    except Exception as exc:
                         output.append(
                             {
                                 "query_id": query_id,

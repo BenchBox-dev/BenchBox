@@ -520,7 +520,7 @@ def _derive_execution_type(phases: list[str]) -> str:
     return map_phases_to_execution_type(phases)
 
 
-from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging  # noqa: E402
+from benchbox.cli.verbose_logging import setup_verbose_logging as setup_verbose_logging
 
 
 def _apply_cli_adapter(s: types.SimpleNamespace) -> None:

@@ -1,38 +1,4 @@
 #!/usr/bin/env python3
-"""Validate Results Explorer compatibility against the current read model.
-
-This CLI tool verifies that the Results Explorer SPA and its artifacts
-maintain compatibility with the current corpus DuckDB read-model schema
-(v11). It also validates hermetic, content-addressed Explorer application
-artifact bundles.
-
-Usage:
-    # Run schema compatibility checks only (v11 only):
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-only
-
-    # Validate an Explorer build artifact directory or archive:
-    uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist
-
-    # Validate with required manifest (fail-closed):
-    uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist --require-manifest
-
-    # Generate content-addressed manifest and checksums in artifact directory:
-    uv run -- python scripts/publication/check_explorer_compat.py --artifact results-explorer/dist --generate-manifest
-
-    # Validate a specific DuckDB database snapshot file:
-    uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb
-
-    # Check specific schema versions (only 11 is supported):
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 10
-
-    # Output machine-readable JSON:
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json
-
-Exit codes:
-    0 - All compatibility and artifact checks passed
-    1 - Compatibility or artifact validation failed
-    2 - CLI argument or environment error
-"""
 
 from __future__ import annotations
 
@@ -84,8 +50,6 @@ CLI_DESCRIPTION = (
     "    2 - CLI argument or environment error\n"
 )
 
-# Import canonical read-model version from contract. Fall back to 10 if
-# contract is unavailable (e.g. during isolated test import).
 try:
     from _project.scripts.explorer_pipeline.contract import (
         EXPLORER_BUILD_CONTRACT_VERSION as _CONTRACT_VERSION,
@@ -100,7 +64,6 @@ except ImportError:
     CURRENT_SCHEMA_VERSION: int = 11
     CONTRACT_VERSION: str = "6"
 
-# Canonical DuckDB type normalisation for schema validation comparisons
 _TYPE_ALIASES: dict[str, str] = {
     "varchar": "VARCHAR",
     "text": "VARCHAR",
@@ -119,14 +82,9 @@ _TYPE_ALIASES: dict[str, str] = {
 
 
 def normalize_type(type_str: str) -> str:
-    """Normalize DuckDB data type string for contract comparison."""
     clean = type_str.strip().lower()
     return _TYPE_ALIASES.get(clean, clean.upper())
 
-
-# ---------------------------------------------------------------------------
-# Schema Definitions
-# ---------------------------------------------------------------------------
 
 TABLE_COLUMNS_V9: dict[str, dict[str, str]] = {
     "metadata": {
@@ -377,10 +335,6 @@ REQUIRED_VIEWS_V10: list[str] = list(REQUIRED_VIEWS_V9)
 
 REQUIRED_VIEWS_V11: list[str] = list(REQUIRED_VIEWS_V10)
 
-# Columns the frontend selects by name from views (not just the underlying
-# tables). A snapshot whose `results` table carries these columns but whose
-# view omits them would pass the table and view-existence checks yet fail
-# with a binder error on every load of that surface.
 REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
     "result_detail_metrics": [
         "override_rules",
@@ -392,14 +346,12 @@ REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
 
 
 def get_table_columns_for_version(version: int) -> dict[str, dict[str, str]]:
-    """Return the expected table column map for a given read-model version."""
     if version in SUPPORTED_SCHEMA_VERSIONS and version in SCHEMA_REGISTRY:
         return SCHEMA_REGISTRY[version]
     raise ValueError(f"Unsupported schema version: {version}")
 
 
 def get_views_for_version(version: int) -> list[str]:
-    """Return required view names for a schema version."""
     if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"Unsupported schema version: {version}")
     if version >= 11:
@@ -408,49 +360,39 @@ def get_views_for_version(version: int) -> list[str]:
 
 
 def get_indexes_for_version(version: int) -> list[tuple[str, str, list[str]]]:
-    """Return required index definitions for a schema version."""
     if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"Unsupported schema version: {version}")
     return list(REQUIRED_INDEXES_V10)
 
 
 def generate_schema_ddl(version: int) -> list[str]:
-    """Generate canonical DDL statements to construct a schema for a specific version."""
     columns_map = get_table_columns_for_version(version)
     ddl_statements: list[str] = []
 
-    # Metadata
     ddl_statements.append("CREATE TABLE metadata (read_model_version INTEGER NOT NULL);")
 
-    # result_environment
     env_cols = ", ".join(f"{c} {t}" for c, t in columns_map["result_environment"].items())
     ddl_statements.append(f"CREATE TABLE result_environment ({env_cols}, PRIMARY KEY (result_id));")
 
-    # result_phase_durations
     ddl_statements.append(
         "CREATE TABLE result_phase_durations (result_id VARCHAR NOT NULL, phase VARCHAR NOT NULL, "
         "duration_s DOUBLE NOT NULL, PRIMARY KEY (result_id, phase));"
     )
 
-    # result_basis_availability (v9 only)
     if "result_basis_availability" in columns_map:
         rba_cols = ", ".join(f"{c} {t}" for c, t in columns_map["result_basis_availability"].items())
         ddl_statements.append(f"CREATE TABLE result_basis_availability ({rba_cols}, PRIMARY KEY (result_id));")
 
-    # results
     res_cols = ", ".join(f"{c} {t}" for c, t in columns_map["results"].items())
     ddl_statements.append(f"CREATE TABLE results ({res_cols}, PRIMARY KEY (result_id));")
 
-    # query_display_timings
     qdt_cols = ", ".join(f"{c} {t}" for c, t in columns_map["query_display_timings"].items())
     ddl_statements.append(f"CREATE TABLE query_display_timings ({qdt_cols}, PRIMARY KEY (result_id, query_id));")
 
-    # query_executions
     qe_cols = ", ".join(f"{c} {t}" for c, t in columns_map["query_executions"].items())
     ddl_statements.append(f"CREATE TABLE query_executions ({qe_cols});")
     ddl_statements.append("CREATE INDEX idx_query_executions_result ON query_executions (result_id);")
 
-    # benchmark_matrix_cells
     bmc_cols = ", ".join(f"{c} {t}" for c, t in columns_map["benchmark_matrix_cells"].items())
     ddl_statements.append(
         f"CREATE TABLE benchmark_matrix_cells ({bmc_cols}, PRIMARY KEY (benchmark, scale_factor, phase, result_id, query_id));"
@@ -459,7 +401,6 @@ def generate_schema_ddl(version: int) -> list[str]:
         "CREATE INDEX idx_matrix_cells_cohort ON benchmark_matrix_cells (benchmark, scale_factor, phase);"
     )
 
-    # benchmark_rankings
     br_cols = ", ".join(f"{c} {t}" for c, t in columns_map["benchmark_rankings"].items())
     ddl_statements.append(
         f"CREATE TABLE benchmark_rankings ({br_cols}, PRIMARY KEY (benchmark, scale_factor, phase, result_id));"
@@ -468,22 +409,18 @@ def generate_schema_ddl(version: int) -> list[str]:
         "CREATE INDEX idx_benchmark_rankings_cohort ON benchmark_rankings (benchmark, scale_factor, phase);"
     )
 
-    # cohort_metadata
     cm_cols = ", ".join(f"{c} {t}" for c, t in columns_map["cohort_metadata"].items())
     ddl_statements.append(f"CREATE TABLE cohort_metadata ({cm_cols}, PRIMARY KEY (cohort_key, result_id));")
     ddl_statements.append("CREATE INDEX idx_cohort_metadata_key ON cohort_metadata (cohort_key);")
     ddl_statements.append("CREATE INDEX idx_cohort_metadata_platform ON cohort_metadata (cohort_key, platform_id);")
 
-    # meta_leaderboard
     ddl_statements.append(
         "CREATE TABLE meta_leaderboard (platform_id VARCHAR PRIMARY KEY, platform VARCHAR NOT NULL, "
         "avg_rank DOUBLE, n_cohorts INTEGER NOT NULL);"
     )
 
-    # short_ids
     ddl_statements.append("CREATE TABLE short_ids (short_id VARCHAR PRIMARY KEY, result_id VARCHAR NOT NULL UNIQUE);")
 
-    # Views
     env_select_cols = [f"e.{col}" for col in columns_map["result_environment"] if col != "result_id"]
     env_proj = ", ".join(env_select_cols)
     if env_proj:
@@ -496,10 +433,6 @@ def generate_schema_ddl(version: int) -> list[str]:
 
     return ddl_statements
 
-
-# ---------------------------------------------------------------------------
-# Test Queries executed by Results Explorer Frontend
-# ---------------------------------------------------------------------------
 
 CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
     ("Read model version probe", "SELECT read_model_version FROM metadata"),
@@ -560,13 +493,7 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# In-Memory & Database Schema Verification
-# ---------------------------------------------------------------------------
-
-
 def create_in_memory_schema(version: int) -> Any:
-    """Create an in-memory DuckDB database for a specific schema version."""
     import duckdb
 
     con = duckdb.connect(":memory:")
@@ -578,10 +505,8 @@ def create_in_memory_schema(version: int) -> Any:
 
 
 def validate_database_schema(con: Any, expected_version: int | None = None) -> list[str]:
-    """Validate that a DuckDB connection conforms to the read-model schema contract."""
     errors: list[str] = []
 
-    # Check metadata table and version
     meta_row = None
     try:
         meta_row = con.execute("SELECT read_model_version FROM metadata").fetchone()
@@ -602,7 +527,6 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
 
     expected_tables = get_table_columns_for_version(version_to_check)
 
-    # Introspect existing tables
     existing_tables_rows = con.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' AND table_type = 'BASE TABLE'"
     ).fetchall()
@@ -612,7 +536,6 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     if missing_tables:
         errors.append(f"missing required tables for v{version_to_check}: {', '.join(missing_tables)}")
 
-    # Introspect columns for present tables
     for table, expected_cols in expected_tables.items():
         if table not in existing_tables:
             continue
@@ -625,7 +548,6 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
         if missing_cols:
             errors.append(f"table '{table}' missing required columns: {', '.join(missing_cols)}")
 
-    # Check views
     expected_views = get_views_for_version(version_to_check)
     existing_views_rows = con.execute(
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' AND table_type = 'VIEW'"
@@ -635,9 +557,6 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     if missing_views:
         errors.append(f"missing required views for v{version_to_check}: {', '.join(missing_views)}")
 
-    # Views that exist must also expose the columns the frontend selects by
-    # name; a view that drops one fails at read time despite passing the
-    # table and view-existence checks above.
     if version_to_check >= 11:
         for view, required_cols in REQUIRED_VIEW_COLUMNS_V11.items():
             if view not in existing_views:
@@ -654,7 +573,6 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
 
 
 def validate_database_queries(con: Any, version: int) -> list[str]:
-    """Execute standard explorer read queries to ensure binder and execution compatibility."""
     errors: list[str] = []
     for label, sql in CORE_EXPLORER_QUERIES:
         try:
@@ -665,7 +583,6 @@ def validate_database_queries(con: Any, version: int) -> list[str]:
 
 
 def check_schema_compatibility(versions: Sequence[int] | None = None) -> dict[int, list[str]]:
-    """Test schema construction and query compatibility across specified schema versions."""
     versions_to_test = versions or SUPPORTED_SCHEMA_VERSIONS
     results: dict[int, list[str]] = {}
 
@@ -689,13 +606,7 @@ def check_schema_compatibility(versions: Sequence[int] | None = None) -> dict[in
     return results
 
 
-# ---------------------------------------------------------------------------
-# Artifact Bundle Verification & Content Addressing
-# ---------------------------------------------------------------------------
-
-
 def compute_file_sha256(path: Path) -> str:
-    """Compute SHA-256 hex digest of a file."""
     hasher = hashlib.sha256()
     with open(path, "rb") as f:
         while chunk := f.read(65536):
@@ -707,11 +618,6 @@ def compute_directory_checksums(
     directory: Path,
     exclude_names: set[str] | None = None,
 ) -> dict[str, str]:
-    """Compute relative-path to SHA-256 mapping for all files in a directory.
-
-    Exclude set is anchored to root-relative POSIX paths (e.g. ``manifest.json``,
-    ``SHA256SUMS`` at the artifact root), not bare filenames at any depth.
-    """
     excludes = exclude_names or {"manifest.json", "SHA256SUMS"}
     checksums: dict[str, str] = {}
     for p in sorted(directory.rglob("*")):
@@ -724,7 +630,6 @@ def compute_directory_checksums(
 
 
 def compute_content_address(checksums: dict[str, str]) -> str:
-    """Compute deterministic overall bundle content address from file checksums."""
     hasher = hashlib.sha256()
     for rel_path in sorted(checksums.keys()):
         hasher.update(f"{rel_path}:{checksums[rel_path]}\n".encode())
@@ -735,12 +640,6 @@ def generate_artifact_manifest(
     artifact_dir: Path,
     write: bool = False,
 ) -> dict[str, Any]:
-    """Generate bundle manifest with content address and checksums.
-
-    If write is True, writes ``manifest.json`` and ``SHA256SUMS`` into ``artifact_dir``.
-    Manifest embeds the read-model version, supported versions, contract version,
-    and GitHub provenance (sha/ref/event) for downstream verification.
-    """
     checksums = compute_directory_checksums(artifact_dir)
     content_addr = compute_content_address(checksums)
 
@@ -769,11 +668,6 @@ def generate_artifact_manifest(
 
 
 def _extract_artifact_archive(artifact_path: Path) -> tuple[Path | None, list[str]]:
-    """Extract a zip/tar artifact archive to a temp directory.
-
-    Returns (temp_dir, errors). temp_dir is None when extraction was not
-    possible; in that case errors is non-empty.
-    """
     temp_dir = Path(tempfile.mkdtemp(prefix="explorer_artifact_"))
     if zipfile.is_zipfile(artifact_path):
         with zipfile.ZipFile(artifact_path) as zf:
@@ -788,7 +682,6 @@ def _extract_artifact_archive(artifact_path: Path) -> tuple[Path | None, list[st
 
 
 def _validate_index_html(target_dir: Path) -> list[str]:
-    """Verify index.html exists, is non-empty, and looks like an HTML document."""
     errors: list[str] = []
     index_html = target_dir / "index.html"
     if not index_html.is_file():
@@ -803,7 +696,6 @@ def _validate_index_html(target_dir: Path) -> list[str]:
 
 
 def _validate_bundle_files(all_files: list[Path], target_dir: Path) -> tuple[list[str], list[Path], list[Path]]:
-    """Verify JS/CSS bundle presence and flag empty files. Returns (errors, js_files, css_files)."""
     errors: list[str] = []
     js_files = [p for p in all_files if p.is_file() and p.suffix == ".js"]
     css_files = [p for p in all_files if p.is_file() and p.suffix == ".css"]
@@ -825,7 +717,6 @@ def _validate_manifest_json(
     content_addr: str,
     require_manifest: bool = False,
 ) -> list[str]:
-    """Validate manifest.json content-address and per-file checksums."""
     errors: list[str] = []
     manifest_file = target_dir / "manifest.json"
     if not manifest_file.is_file():
@@ -842,7 +733,6 @@ def _validate_manifest_json(
                 f"manifest content_address mismatch: recorded {manifest_data.get('content_address')}, "
                 f"computed {content_addr}"
             )
-        # Validate embedded provenance fields when present; require read_model_version
         if "read_model_version" not in manifest_data:
             errors.append("manifest missing 'read_model_version' field")
         elif manifest_data.get("read_model_version") != CURRENT_SCHEMA_VERSION:
@@ -867,7 +757,6 @@ def _validate_sha256sums(
     target_dir: Path,
     require_manifest: bool = False,
 ) -> list[str]:
-    """Validate the SHA256SUMS checksum manifest."""
     errors: list[str] = []
     sha256sums_file = target_dir / "SHA256SUMS"
     if not sha256sums_file.is_file():
@@ -900,7 +789,6 @@ def validate_artifact_bundle(
     artifact_path: Path,
     require_manifest: bool = False,
 ) -> tuple[list[str], dict[str, Any] | None]:
-    """Validate an Explorer application artifact directory or archive."""
     errors: list[str] = []
     bundle_metadata: dict[str, Any] | None = None
 
@@ -948,13 +836,7 @@ def validate_artifact_bundle(
     return errors, bundle_metadata
 
 
-# ---------------------------------------------------------------------------
-# CLI Parser and Execution
-# ---------------------------------------------------------------------------
-
-
 def build_parser() -> argparse.ArgumentParser:
-    """Build CLI argument parser."""
     parser = argparse.ArgumentParser(
         description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1008,11 +890,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _parse_schema_versions_arg(raw: str) -> list[int] | None:
-    """Parse --schema-versions into a list of ints, or None on malformed input."""
     try:
         if raw.strip().lower() == "all":
             return list(SUPPORTED_SCHEMA_VERSIONS)
-        # Empty string should be treated as malformed, not as wildcard
         if raw.strip() == "":
             return None
         return [int(v.strip()) for v in raw.split(",") if v.strip()]
@@ -1021,7 +901,6 @@ def _parse_schema_versions_arg(raw: str) -> list[int] | None:
 
 
 def _run_database_check(db_path: Path) -> dict[str, Any] | None:
-    """Validate a DuckDB snapshot file. Returns None if the path does not exist."""
     if not db_path.is_file():
         return None
 
@@ -1045,16 +924,9 @@ def _run_artifact_check(
     generate_manifest: bool,
     require_manifest: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any] | None]:
-    """Validate an Explorer artifact bundle, optionally generating its manifest first."""
     manifest_info = None
     if generate_manifest:
-        # Generation is separate from verification; generate manifest and return.
-        # Caller decides whether to also verify in a separate step.
         manifest_info = generate_artifact_manifest(artifact_path, write=True)
-        # For backward compatibility, when generating we do not also require manifest
-        # in the same invocation (would be circular). Return a synthetic pass for
-        # the generation step; verification should be done via a separate
-        # --require-manifest invocation.
         artifact_errors, bundle_info = validate_artifact_bundle(artifact_path, require_manifest=False)
         artifact_check = {
             "path": str(artifact_path),
@@ -1075,7 +947,6 @@ def _run_artifact_check(
 
 
 def _print_text_report(output_data: dict[str, Any], schema_versions: Sequence[int], overall_passed: bool) -> None:
-    """Render the human-readable compatibility report to stdout/stderr."""
     print("=== Results Explorer Compatibility & Artifact Verification ===")
     print(f"Current read-model version: v{CURRENT_SCHEMA_VERSION}")
     print(f"Supported versions: {', '.join(f'v{v}' for v in SUPPORTED_SCHEMA_VERSIONS)}")
@@ -1120,7 +991,6 @@ def _print_text_report(output_data: dict[str, Any], schema_versions: Sequence[in
 
 
 def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
-    """CLI main entrypoint."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -1156,7 +1026,6 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
         "schema_checks": {},
     }
 
-    # 1. Multi-version schema compatibility checks
     schema_results = check_schema_compatibility(schema_versions)
     for v, errors in schema_results.items():
         passed = len(errors) == 0
@@ -1167,7 +1036,6 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
             "errors": errors,
         }
 
-    # 2. Database path validation if provided
     if args.db_path:
         db_check = _run_database_check(args.db_path)
         if db_check is None:
@@ -1177,7 +1045,6 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
             overall_passed = False
         output_data["database_check"] = db_check
 
-    # 3. Artifact validation if provided
     if args.artifact:
         if not args.artifact.exists():
             print(f"Error: Artifact path not found: {args.artifact}", file=sys.stderr)
@@ -1186,9 +1053,7 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
             print("Error: --generate-manifest requires a directory for --artifact", file=sys.stderr)
             return 2
 
-        # Separate generate from verify: generate writes manifest, verify checks it.
         if args.generate_manifest:
-            # Generation mode: write manifest, then do a non-required validation for basic bundle health
             artifact_check, manifest_info = _run_artifact_check(
                 args.artifact, generate_manifest=True, require_manifest=False
             )
@@ -1208,7 +1073,6 @@ def main(argv: Sequence[str] | None = None) -> int:  # noqa: C901
 
     output_data["status"] = "passed" if overall_passed else "failed"
 
-    # Display results
     if args.json:
         print(json.dumps(output_data, indent=2))
     elif not args.quiet or not overall_passed:

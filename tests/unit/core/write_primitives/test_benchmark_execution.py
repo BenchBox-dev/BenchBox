@@ -1101,21 +1101,21 @@ class TestDataFrameSqlParity:
         monkeypatch.setattr(
             wp_benchmark,
             "_select_dataframe_operation_ids",
-            lambda query_filter=None: operation_ids,  # noqa: ARG005
+            lambda query_filter=None: operation_ids,
         )
 
         monkeypatch.setattr("benchbox.platforms.duckdb.DuckDBAdapter.create_connection", lambda self, **_: object())
         monkeypatch.setattr(
             "benchbox.platforms.duckdb.DuckDBAdapter.create_schema",
-            lambda self, benchmark, connection: 0.0,  # noqa: ARG005
+            lambda self, benchmark, connection: 0.0,
         )
         monkeypatch.setattr(
             "benchbox.platforms.duckdb.DuckDBAdapter.load_data",
-            lambda self, benchmark, connection, data_dir: ({}, 0.0, None),  # noqa: ARG005
+            lambda self, benchmark, connection, data_dir: ({}, 0.0, None),
         )
         monkeypatch.setattr(
             "benchbox.platforms.duckdb.DuckDBAdapter.close_connection",
-            lambda self, connection: None,  # noqa: ARG005
+            lambda self, connection: None,
         )
 
         results_by_id = {
@@ -1158,7 +1158,7 @@ class TestDataFrameSqlParity:
         monkeypatch.setattr(
             wp_benchmark,
             "execute_operation",
-            lambda op_id, connection: results_by_id[op_id],  # noqa: ARG005
+            lambda op_id, connection: results_by_id[op_id],
         )
 
         sql_results = wp_benchmark.run_benchmark(connection=object(), operation_ids=operation_ids)
@@ -1200,21 +1200,21 @@ class TestDataFrameSqlParity:
         monkeypatch.setattr("benchbox.platforms.duckdb.DuckDBAdapter.create_connection", lambda self, **_: object())
         monkeypatch.setattr(
             "benchbox.platforms.duckdb.DuckDBAdapter.create_schema",
-            lambda self, benchmark, connection: 0.0,  # noqa: ARG005
+            lambda self, benchmark, connection: 0.0,
         )
         monkeypatch.setattr(
             "benchbox.platforms.duckdb.DuckDBAdapter.load_data",
-            lambda self, benchmark, connection, data_dir: ({}, 0.0, None),  # noqa: ARG005
+            lambda self, benchmark, connection, data_dir: ({}, 0.0, None),
         )
         monkeypatch.setattr(
             "benchbox.platforms.duckdb.DuckDBAdapter.close_connection",
-            lambda self, connection: None,  # noqa: ARG005
+            lambda self, connection: None,
         )
 
         monkeypatch.setattr(
             wp_benchmark,
             "execute_operation",
-            lambda op_id, connection: OperationResult(  # noqa: ARG005
+            lambda op_id, connection: OperationResult(
                 operation_id=op_id,
                 success=True,
                 write_duration_ms=1.0,

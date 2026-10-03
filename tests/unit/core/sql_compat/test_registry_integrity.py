@@ -123,7 +123,7 @@ def test_ddl_optimize_rule_payload_is_populated(platform: str, rule_id_prefix: s
 
 
 def test_synapse_ddl_optimize_rule_uses_canonical_platform_key():
-    import benchbox.sql_compat.rules.ddl_optimize.synapse_ddl_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.ddl_optimize.synapse_ddl_rewrites
 
     ctx = CompatibilityContext(
         platform="synapse",

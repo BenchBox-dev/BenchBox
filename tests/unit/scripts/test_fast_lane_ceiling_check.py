@@ -236,7 +236,7 @@ def test_check_fast_lane_policy_warns_below_headroom_threshold(
 ) -> None:
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("9950/9950 tests collected"))
     policy = {"enabled": True, "max_fast_tests": 10000}
-    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)
     out = capsys.readouterr().out
     assert violations == []
     assert "FAST_LANE_WARNING: headroom 50 below 100" in out
@@ -249,7 +249,7 @@ def test_check_fast_lane_policy_no_warning_above_threshold(
 ) -> None:
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("9000/9000 tests collected"))
     policy = {"enabled": True, "max_fast_tests": 10000}
-    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)
     out = capsys.readouterr().out
     assert violations == []
     assert "FAST_LANE_WARNING" not in out
@@ -262,7 +262,7 @@ def test_check_fast_lane_policy_raises_when_collect_cannot_run(monkeypatch: pyte
     policy = {"enabled": True, "max_fast_tests": 10000, "forbidden_marker_expressions": ["stress"]}
 
     with pytest.raises(mod.FastLaneCollectError) as excinfo:
-        mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+        mod._check_fast_lane_policy(Path("/nonexistent"), policy)
 
     message = str(excinfo.value)
     assert "could not run pytest --collect-only" in message
@@ -280,7 +280,7 @@ def test_check_fast_lane_policy_still_reports_a_real_breach(monkeypatch: pytest.
     monkeypatch.setattr(mod, "_run_pytest_collect", _fake_collect("25810/28000 tests collected"))
     policy = {"enabled": True, "max_fast_tests": 10}
 
-    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+    violations = mod._check_fast_lane_policy(Path("/nonexistent"), policy)
 
     assert any("exceeds limit 10" in v for v in violations), violations
 
@@ -298,7 +298,7 @@ def test_check_fast_lane_policy_preserves_breaches_before_intersection_failure(
     policy = {"enabled": True, "max_fast_tests": 10, "forbidden_marker_expressions": ["stress"]}
 
     with pytest.raises(mod.FastLaneCollectError) as excinfo:
-        mod._check_fast_lane_policy(Path("/nonexistent"), policy)  # type: ignore[arg-type]
+        mod._check_fast_lane_policy(Path("/nonexistent"), policy)
 
     assert any("exceeds limit 10" in v for v in excinfo.value.violations)
 

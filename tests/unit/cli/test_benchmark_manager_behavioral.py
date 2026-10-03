@@ -204,7 +204,7 @@ def test_show_sample_queries_handles_empty_query_registry(monkeypatch: pytest.Mo
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
-    class _Benchmark:  # noqa: B903 - test stub, not domain model
+    class _Benchmark:  # noqa: B903
         queries: dict[str, str] = {}
 
         def __init__(self, scale_factor: float):
@@ -221,7 +221,7 @@ def test_show_sample_queries_truncates_long_sql(monkeypatch: pytest.MonkeyPatch,
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
-    class _Benchmark:  # noqa: B903 - test stub, not domain model
+    class _Benchmark:  # noqa: B903
         queries = {"Q1": "SELECT 1\n" * 200}
 
         def __init__(self, scale_factor: float):

@@ -198,9 +198,9 @@ class TPCDIQueryManager(ParameterizedQueryManager):
 
     def translate_query_text(self, query: str, dialect: str) -> str:
         try:
-            import sqlglot  # type: ignore[import-untyped]
+            import sqlglot
 
-            translated = sqlglot.transpile(query, read="ansi", write=dialect)  # type: ignore[attr-defined]
+            translated = sqlglot.transpile(query, read="ansi", write=dialect)
             return translated[0] if translated else query
         except ImportError:
             raise ImportError(

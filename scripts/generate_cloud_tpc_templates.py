@@ -13,10 +13,10 @@ CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
 if str(CHECKOUT_ROOT) not in sys.path:
     sys.path.insert(0, str(CHECKOUT_ROOT))
 
-from benchbox.core.tuning.platform_capabilities import (  # noqa: E402
+from benchbox.core.tuning.platform_capabilities import (
     map_candidate_to_platform,
 )
-from benchbox.core.tuning.workload_profiles import (  # noqa: E402
+from benchbox.core.tuning.workload_profiles import (
     load_tpc_tuning_profile,
 )
 

@@ -311,7 +311,7 @@ class TPCHSkewBenchmark(TPCHBenchmark):
         return descriptions[preset_lower]
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
 )

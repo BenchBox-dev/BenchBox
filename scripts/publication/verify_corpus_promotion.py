@@ -135,14 +135,14 @@ def _verify_bijection_and_privacy(accepted_ref: str, ledger_seed: Path) -> list[
             errors.extend(f"Corpus bijection: {e}" for e in bijection_errors)
     except BijectionError as exc:
         errors.append(f"Corpus bijection failed: {exc}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Corpus bijection check failed: {e}")
 
     try:
         privacy_findings = scan_directory_for_privacy(REPO_ROOT / "publication" / "out" / "site")
         if privacy_findings:
             errors.extend(f"Privacy: {f}" for f in privacy_findings[:5])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Privacy scan failed: {e}")
     return errors
 
@@ -156,14 +156,14 @@ def _verify_compat_and_site() -> list[str]:
         for version, compat_errors in results.items():
             if compat_errors:
                 errors.append(f"Explorer compatibility failed for v{version}: {compat_errors}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Explorer compatibility check failed: {e}")
 
     try:
         site_errors = verify_site_directory(REPO_ROOT / "publication" / "out" / "site")
         if site_errors:
             errors.append(f"Shadow site verification: {site_errors[:3]}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Shadow site verification failed: {e}")
     return errors
 

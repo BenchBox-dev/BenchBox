@@ -96,7 +96,7 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
     def _extract_tar_zst(archive_path: Path, output_dir: Path) -> None:
         try:
             import zstandard as zstd
-        except ImportError as exc:  # pragma: no cover - dependency is required by pyproject
+        except ImportError as exc:  # pragma: no cover
             raise RuntimeError("zstandard is required to extract canonical JoinOrder data") from exc
 
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -237,7 +237,7 @@ class JoinOrderBenchmark(TranslatableQueryMixin, BaseBenchmark):
         return f"JoinOrderBenchmark(scale_factor={self.scale_factor}, queries={self.get_query_count()})"
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
 )

@@ -26,7 +26,7 @@ CLI_DESCRIPTION = "Generate `results-data/corpus-inventory.json` from schema-v2 
 
 try:
     from benchbox.core.results.provenance import DEFAULT_FUNDING, FUNDING_SOURCES, SOURCE_TO_TRUST_LABEL
-except ImportError:  # pragma: no cover - slim published-results branch.
+except ImportError:  # pragma: no cover
     FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
     DEFAULT_FUNDING = "unspecified"
     SOURCE_TO_TRUST_LABEL = {

@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import queue_certification  # noqa: E402
+import queue_certification
 
 CLI_DESCRIPTION = (
     "Decide whether the develop tip is already covered before an hourly sweep.\n"

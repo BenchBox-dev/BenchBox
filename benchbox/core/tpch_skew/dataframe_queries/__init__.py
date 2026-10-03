@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.tpch_skew.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.tpch_skew.dataframe_queries import queries as _queries
 from benchbox.core.tpch_skew.dataframe_queries.registry import (
     TPCH_SKEW_DATAFRAME_QUERIES,
     get_tpch_skew_query,

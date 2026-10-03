@@ -9,11 +9,11 @@ try:
     from polars.testing import assert_frame_equal
 
     from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE, PolarsDataFrameAdapter
-except ImportError:  # pragma: no cover - dependency-gated tests
+except ImportError:  # pragma: no cover
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
-    assert_frame_equal = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment]
+    pl = None
+    assert_frame_equal = None
+    PolarsDataFrameAdapter = None
 
 from benchbox.core.benchmark_registry import BENCHMARK_METADATA
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory

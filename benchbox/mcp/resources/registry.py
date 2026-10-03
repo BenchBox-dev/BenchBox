@@ -1,13 +1,6 @@
-"""Resource registration for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides read-only access to BenchBox metadata through MCP resources.
-
-This module uses the core benchmark registry for all benchmark metadata.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 def _build_benchmarks_list() -> str:
-    """Build JSON response listing all available benchmarks."""
     all_benchmarks = get_all_benchmarks()
     benchmarks = [
         {
@@ -49,7 +41,6 @@ def _build_benchmarks_list() -> str:
 
 
 def _get_benchmark_query_ids(benchmark_lower: str, name: str) -> list[str]:
-    """Attempt to load query IDs for a benchmark."""
     query_ids: list[str] = []
     try:
         benchmark_class = get_public_benchmark_class(benchmark_lower)
@@ -66,14 +57,6 @@ def _get_benchmark_query_ids(benchmark_lower: str, name: str) -> list[str]:
 
 
 def _build_benchmark_detail(name: str) -> str:
-    """Projection of the canonical benchmark payload for the resource surface.
-
-    Resources keep their own flatter field names (`query_count`/`query_ids`
-    rather than the tool's nested `queries` object) and their own field set --
-    they carry `estimated_time_minutes`, which the tool does not, and omit the
-    tool's `schema` block. What they no longer do is walk the registry a second
-    time to build them.
-    """
     payload = build_benchmark_payload(name)
 
     if not payload["found"]:
@@ -92,9 +75,6 @@ def _build_benchmark_detail(name: str) -> str:
             "category": payload["category"],
             "support_status": payload["support_status"],
             "query_count": payload["query_count"],
-            # Deliberately NOT truncated: the tool caps ids at 30 for response
-            # size, but a resource read is the documented way to get the full
-            # list, and TPC-DS-scale benchmarks have far more than 30.
             "query_ids": payload["query_ids"],
             "scale_factors": payload["scale_factors"],
             "complexity": payload["complexity"],
@@ -106,7 +86,6 @@ def _build_benchmark_detail(name: str) -> str:
 
 
 def _build_platforms_list() -> str:
-    """Projection of the canonical platform payloads for the resource surface."""
     platforms = [
         {
             "name": platform["name"],
@@ -123,7 +102,6 @@ def _build_platforms_list() -> str:
 
 
 def _build_platform_detail(name: str) -> str:
-    """Build JSON response with detailed platform information."""
     from benchbox.core.platform_registry import PlatformRegistry
 
     all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -161,7 +139,6 @@ def _build_platform_detail(name: str) -> str:
 
 
 def _parse_result_file_metadata(file_path: Path) -> dict | None:
-    """Parse a single result file into run metadata, or None on failure."""
     try:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
@@ -181,7 +158,6 @@ def _parse_result_file_metadata(file_path: Path) -> dict | None:
 
 
 def _build_recent_results(results_dir: Path) -> str:
-    """Build JSON response listing recent benchmark results."""
     if not results_dir.exists():
         return json.dumps(
             {
@@ -203,7 +179,6 @@ def _build_recent_results(results_dir: Path) -> str:
 
 
 def _build_system_profile() -> str:
-    """Build JSON response with system profile information."""
     import platform
 
     import psutil
@@ -264,40 +239,29 @@ GET_SYSTEM_PROFILE_RESOURCE_DESCRIPTION = "Get current system profile informatio
 
 
 def register_all_resources(mcp: MCPServer, *, results_dir: PathProvider) -> None:
-    """Register all MCP resources with the server.
-
-    Args:
-        mcp: The MCPServer instance to register resources with.
-    """
 
     @mcp.resource("benchbox://benchmarks", description=LIST_BENCHMARKS_RESOURCE_DESCRIPTION)
     def list_benchmarks_resource() -> str:
-        """List all available benchmarks."""
         return _build_benchmarks_list()
 
     @mcp.resource("benchbox://benchmarks/{name}", description=GET_BENCHMARK_RESOURCE_DESCRIPTION)
     def get_benchmark_resource(name: str) -> str:
-        """Get detailed information about a specific benchmark."""
         return _build_benchmark_detail(name)
 
     @mcp.resource("benchbox://platforms", description=LIST_PLATFORMS_RESOURCE_DESCRIPTION)
     def list_platforms_resource() -> str:
-        """List all available database platforms."""
         return _build_platforms_list()
 
     @mcp.resource("benchbox://platforms/{name}", description=GET_PLATFORM_RESOURCE_DESCRIPTION)
     def get_platform_resource(name: str) -> str:
-        """Get detailed information about a specific platform."""
         return _build_platform_detail(name)
 
     @mcp.resource("benchbox://results/recent", description=GET_RECENT_RESULTS_RESOURCE_DESCRIPTION)
     def get_recent_results_resource() -> str:
-        """Get list of recent benchmark results."""
         return _build_recent_results(resolve_path_provider(results_dir).expanduser())
 
     @mcp.resource("benchbox://system/profile", description=GET_SYSTEM_PROFILE_RESOURCE_DESCRIPTION)
     def get_system_profile_resource() -> str:
-        """Get current system profile information."""
         return _build_system_profile()
 
     logger.info("Registered MCP resources")

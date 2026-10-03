@@ -76,10 +76,10 @@ class TestReadPrimitivesDataGenerator:
             def __truediv__(self, other: str) -> "FakeCloudPath":
                 return FakeCloudPath(f"{self.value}/{other}")
 
-            def __str__(self) -> str:  # pragma: no cover - debugging helper
+            def __str__(self) -> str:  # pragma: no cover
                 return self.value
 
-            def __repr__(self) -> str:  # pragma: no cover - debugging helper
+            def __repr__(self) -> str:  # pragma: no cover
                 return f"FakeCloudPath({self.value!r})"
 
             def __eq__(self, other: object) -> bool:

@@ -34,14 +34,14 @@ from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
-    PlatformAdapterConnection,  # noqa: F401 - re-exported for external imports
-    PlatformAdapterCursor,  # noqa: F401 - re-exported for external imports
+    PlatformAdapterConnection,  # noqa: F401
+    PlatformAdapterCursor,  # noqa: F401
     StreamConnectionCapability,
     _make_stream_cursor,
-    _NoCloseProxy,  # noqa: F401 - re-exported for external imports
-    check_isolation_capability,  # noqa: F401 - re-exported for external imports
-    require_throughput_stream_capability,  # noqa: F401 - re-exported for execution drivers
-    resolve_stream_connection_capability,  # noqa: F401 - re-exported for manifest sweep
+    _NoCloseProxy,  # noqa: F401
+    check_isolation_capability,  # noqa: F401
+    require_throughput_stream_capability,  # noqa: F401
+    resolve_stream_connection_capability,  # noqa: F401
 )
 from benchbox.platforms.base.data_loading import SchemaHelpersMixin
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
@@ -53,8 +53,8 @@ from benchbox.platforms.base.models import (
 )
 from benchbox.platforms.base.phase_tracking import (
     PhaseTrackingMixin,
-    _extract_table_names,  # noqa: F401 - re-exported for backward compat
-    _resolve_benchmark_table_names,  # noqa: F401 - re-exported for backward compat
+    _extract_table_names,  # noqa: F401
+    _resolve_benchmark_table_names,
 )
 from benchbox.platforms.base.result_capture import ResultCaptureMixin
 from benchbox.platforms.base.sorted_ingestion import SortedIngestionMixin
@@ -68,8 +68,8 @@ from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 try:
     from benchbox.core.results.models import (
         BenchmarkResults,
-        ExecutionPhases,  # noqa: F401 - re-exported via __init__.py
-        QueryDefinition,  # noqa: F401 - re-exported via __init__.py
+        ExecutionPhases,
+        QueryDefinition,
     )
 except ImportError:
     BenchmarkResults = None
@@ -360,7 +360,7 @@ class PlatformAdapter(
         try:
             if use_per_table_loop:
                 per_table_ms = {}
-                analyze_table = self.analyze_table  # type: ignore[attr-defined]
+                analyze_table = self.analyze_table
                 for table_name in names:
                     table_start = mono_time()
                     analyze_table(connection, table_name)
@@ -729,7 +729,7 @@ class PlatformAdapter(
                 pass
             try:
                 self.close_connection(connection)
-            except Exception as exc:  # noqa: BLE001 - deferred cleanup must not crash a worker
+            except Exception as exc:
                 self.logger.warning("Deferred benchmark connection cleanup failed: %r", exc)
 
         threading.Thread(
@@ -776,7 +776,7 @@ class PlatformAdapter(
             self._link_probe_timed_out = bool(
                 (self._client_link_metadata or {}).get("collection_error_class") == "TimeoutError"
             )
-        except Exception as exc:  # noqa: BLE001 - collection must never break a run
+        except Exception as exc:
             self.logger.warning("Client-link metadata collection failed: %r", exc)
             self._link_probe_timed_out = False
             self._client_link_metadata = {
@@ -869,7 +869,7 @@ class PlatformAdapter(
         introspector = None
         try:
             introspector = self.get_tuning_introspector()
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover
             self.logger.debug("tuning introspector lookup degraded: %s", exc)
         if introspector is None:
             return status, None

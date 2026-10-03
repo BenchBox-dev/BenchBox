@@ -25,7 +25,7 @@ try:
         TableLoadingStats,
         ValidationPhase,
     )
-except ImportError:  # pragma: no cover - models always present in real install
+except ImportError:  # pragma: no cover
     DataGenerationPhase = None
     DataLoadingPhase = None
     SchemaCreationPhase = None

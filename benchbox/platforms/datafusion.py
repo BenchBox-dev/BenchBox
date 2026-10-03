@@ -12,16 +12,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 try:
+    import datafusion as _datafusion
     from datafusion import SessionConfig, SessionContext
 
-    try:
-        from datafusion import RuntimeEnv
-    except ImportError:
-        from datafusion import RuntimeEnvBuilder as RuntimeEnv
+    if hasattr(_datafusion, "RuntimeEnv"):
+        RuntimeEnv = _datafusion.RuntimeEnv
+    elif hasattr(_datafusion, "RuntimeEnvBuilder"):
+        RuntimeEnv = _datafusion.RuntimeEnvBuilder
+    else:
+        raise ImportError("datafusion provides neither RuntimeEnv nor RuntimeEnvBuilder")
 except ImportError:
-    SessionContext = None  # type: ignore[assignment, misc]
-    SessionConfig = None  # type: ignore[assignment, misc]
-    RuntimeEnv = None  # type: ignore[assignment, misc]  # ty: ignore[conflicting-declarations]
+    SessionContext = None
+    SessionConfig = None
+    RuntimeEnv = None
 
 from benchbox.core.dataframe.schema_utils import extract_schema_columns
 from benchbox.core.errors import PlanCaptureError

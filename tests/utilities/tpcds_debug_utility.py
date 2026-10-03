@@ -12,8 +12,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from benchbox.core.tpcds.c_tools import DSQGenBinary  # noqa: E402
-from benchbox.core.tpcds.queries import TPCDSQueryManager  # noqa: E402
+from benchbox.core.tpcds.c_tools import DSQGenBinary
+from benchbox.core.tpcds.queries import TPCDSQueryManager
 
 
 def test_dsqgen_binary():

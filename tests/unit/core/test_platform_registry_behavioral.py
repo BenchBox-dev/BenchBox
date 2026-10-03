@@ -196,7 +196,7 @@ class TestAdapterRegistration:
 
         monkeypatch.setattr(PlatformRegistry, "_adapters", {})
         with pytest.raises(TypeError, match="must subclass PlatformAdapter"):
-            PlatformRegistry.register_adapter("duckdb", NotAnAdapter)  # type: ignore[arg-type]
+            PlatformRegistry.register_adapter("duckdb", NotAnAdapter)
 
     def test_registration_rejects_alias_or_builtin_without_adapter(self, monkeypatch):
         from benchbox.platforms.duckdb import DuckDBAdapter

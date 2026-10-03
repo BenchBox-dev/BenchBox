@@ -49,7 +49,7 @@ def wrapped(name, package=None):
     return mod
 
 importlib.import_module = wrapped
-import benchbox.core.benchmark_registry  # noqa: F401
+import benchbox.core.benchmark_registry
 print(len(calls))
 """
     result = subprocess.run([sys.executable, "-c", script], text=True, capture_output=True, check=True)

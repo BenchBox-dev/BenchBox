@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import pr_landing  # noqa: E402
+import pr_landing
 
 CLI_DESCRIPTION = "Arm a pull request for its exact head after a live check that nothing holds it."
 

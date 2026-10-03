@@ -1,11 +1,6 @@
-"""Prompt registration for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides reusable prompt templates for AI analysis of benchmark results.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -17,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 def _build_analyze_results_prompt(benchmark: str, platform: str, focus: str | None) -> str:
-    """Build the analyze_results prompt text."""
     focus_text = ""
     if focus:
         focus_text = f"\nPay special attention to {focus} in your analysis."
@@ -38,7 +32,6 @@ Format your analysis with clear sections and include specific timing data."""
 
 
 def _build_compare_platforms_prompt(benchmark: str, platforms: str, scale_factor: float) -> str:
-    """Build the compare_platforms prompt text."""
     platform_list = [p.strip() for p in platforms.split(",")]
 
     return f"""Compare {benchmark.upper()} benchmark performance across these platforms:
@@ -62,7 +55,6 @@ Use tables and specific metrics to support your analysis."""
 
 
 def _build_regressions_prompt(baseline_run: str | None, comparison_run: str | None, threshold_percent: float) -> str:
-    """Build the identify_regressions prompt text."""
     if baseline_run and comparison_run:
         return f"""Analyze performance regressions between two benchmark runs.
 
@@ -97,7 +89,6 @@ Provide analysis including:
 
 
 def _build_benchmark_planning_prompt(use_case: str, platforms: str | None, time_budget_minutes: int) -> str:
-    """Build the benchmark_planning prompt text."""
     return f"""Help plan a benchmark strategy for the following requirements:
 
 Use Case: {use_case}
@@ -124,7 +115,6 @@ Consider tradeoffs between:
 
 
 def _build_troubleshoot_prompt(error_message: str | None, platform: str | None, benchmark: str | None) -> str:
-    """Build the troubleshoot_failure prompt text."""
     context = []
     if error_message:
         context.append(f"Error Message: {error_message}")
@@ -159,7 +149,6 @@ Provide:
 
 
 def _build_benchmark_run_prompt(platform: str, benchmark: str, scale_factor: float, queries: str | None) -> str:
-    """Build the benchmark_run prompt text."""
     queries_text = ""
     if queries:
         queries_text = f"\nQuery subset: {queries}"
@@ -187,7 +176,6 @@ If any step fails, provide diagnostic information and suggest fixes."""
 
 
 def _build_platform_tuning_prompt(platform: str, workload: str | None) -> str:
-    """Build the platform_tuning prompt text."""
     workload_text = ""
     if workload:
         workload_text = f"\nWorkload characteristics: {workload}"
@@ -257,11 +245,6 @@ PLATFORM_TUNING_DESCRIPTION = "Get tuning recommendations for a platform. (platf
 
 
 def register_all_prompts(mcp: MCPServer) -> None:
-    """Register all MCP prompts with the server.
-
-    Args:
-        mcp: The MCPServer instance to register prompts with.
-    """
 
     @mcp.prompt(description=ANALYZE_RESULTS_DESCRIPTION)
     def analyze_results(
@@ -269,7 +252,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         platform: str = "duckdb",
         focus: str | None = None,
     ) -> str:
-        """Analyze benchmark results. (benchmark=tpch, platform=duckdb, focus=optional)"""
         return _build_analyze_results_prompt(benchmark, platform, focus)
 
     @mcp.prompt(description=COMPARE_PLATFORMS_DESCRIPTION)
@@ -278,7 +260,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         platforms: str = "duckdb,polars-df",
         scale_factor: float = 0.01,
     ) -> str:
-        """Compare performance across platforms. (benchmark=tpch, platforms=duckdb,polars-df, scale_factor=0.01)"""
         return _build_compare_platforms_prompt(benchmark, platforms, scale_factor)
 
     @mcp.prompt(description=IDENTIFY_REGRESSIONS_DESCRIPTION)
@@ -287,7 +268,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         comparison_run: str | None = None,
         threshold_percent: float = 10.0,
     ) -> str:
-        """Find performance regressions between runs. (baseline_run, comparison_run, threshold_percent=10)"""
         return _build_regressions_prompt(baseline_run, comparison_run, threshold_percent)
 
     @mcp.prompt(description=BENCHMARK_PLANNING_DESCRIPTION)
@@ -296,7 +276,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         platforms: str | None = None,
         time_budget_minutes: int = 30,
     ) -> str:
-        """Plan a benchmark strategy. (use_case=testing|production|comparison, platforms, time_budget_minutes=30)"""
         return _build_benchmark_planning_prompt(use_case, platforms, time_budget_minutes)
 
     @mcp.prompt(description=TROUBLESHOOT_FAILURE_DESCRIPTION)
@@ -305,7 +284,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         platform: str | None = None,
         benchmark: str | None = None,
     ) -> str:
-        """Diagnose benchmark failures. (error_message, platform, benchmark)"""
         return _build_troubleshoot_prompt(error_message, platform, benchmark)
 
     @mcp.prompt(description=BENCHMARK_RUN_DESCRIPTION)
@@ -315,7 +293,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         scale_factor: float = 0.01,
         queries: str | None = None,
     ) -> str:
-        """Execute a planned benchmark. (platform=duckdb, benchmark=tpch, scale_factor=0.01, queries=optional)"""
         return _build_benchmark_run_prompt(platform, benchmark, scale_factor, queries)
 
     @mcp.prompt(description=PLATFORM_TUNING_DESCRIPTION)
@@ -323,7 +300,6 @@ def register_all_prompts(mcp: MCPServer) -> None:
         platform: str = "duckdb",
         workload: str | None = None,
     ) -> str:
-        """Get tuning recommendations for a platform. (platform=duckdb, workload=optional)"""
         return _build_platform_tuning_prompt(platform, workload)
 
     logger.info("Registered MCP prompts")

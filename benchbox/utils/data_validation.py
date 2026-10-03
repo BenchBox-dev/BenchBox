@@ -267,7 +267,7 @@ class BenchmarkDataValidator:
                         total += sum(1 for _ in g)
                 elif compression == "zstd":
                     try:
-                        import zstandard as zstd  # type: ignore
+                        import zstandard as zstd
 
                         dctx = zstd.ZstdDecompressor()
                         with open(f, "rb") as fh, dctx.stream_reader(fh) as reader:

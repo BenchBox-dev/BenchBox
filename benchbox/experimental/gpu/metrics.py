@@ -199,7 +199,7 @@ class GPUMetricsCollector:
             return samples
 
         try:
-            import cupy  # type: ignore
+            import cupy
 
             device_count = cupy.cuda.runtime.getDeviceCount()
             for i in range(device_count):
@@ -316,7 +316,7 @@ class GPUMemoryTracker:
 
     def _get_current_memory_mb(self) -> int:
         try:
-            import cupy  # type: ignore
+            import cupy
 
             mem_info = cupy.cuda.Device(self.device_index).mem_info
             free_mem, total_mem = mem_info

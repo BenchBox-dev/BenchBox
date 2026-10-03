@@ -66,11 +66,6 @@ _DATE_INTERVAL_RE = re.compile(
 )
 _DATE_NOW_RE = re.compile(r"DATE\s*\(\s*['\"]now['\"]\s*\)", re.IGNORECASE)
 DATAFRAME_ETL_TABLE_DIR = "dataframe-etl-tables"
-"""Directory (under output_dir) holding DataFrame-mode ETL tables.
-
-DataFrame ETL writes tables here instead of the caller CWD so runs do not
-scatter relative directories; paths from earlier releases that wrote to the
-CWD are not migrated automatically."""
 
 _DOUBLE_COUNT_RE = re.compile(
     r"\(\s*SELECT\s+COUNT\s*\(\s*\*\s*\)\s+FROM\s+\(\s*(?:(?:/\*[^*]*\*/|--[^\n]*)\s*)?"
@@ -305,7 +300,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             if registry_decision is not None:
                 if registry_decision.action is not CompatAction.SELECT_VARIANT:
                     return query_sql
-                variant_sql = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                variant_sql = registry_decision.payload.variant_sql
             else:
                 variant_sql = platform_variants[query_id]
 
@@ -2306,7 +2301,7 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return customer_files
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_bool,

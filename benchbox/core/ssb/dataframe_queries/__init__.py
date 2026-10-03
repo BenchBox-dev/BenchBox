@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.ssb.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.ssb.dataframe_queries import queries as _queries
 from benchbox.core.ssb.dataframe_queries.registry import (
     SSB_DATAFRAME_QUERIES,
     get_ssb_query,

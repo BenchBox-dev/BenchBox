@@ -27,7 +27,7 @@ class _TrackingAdapter(PlatformAdapter):
         self.drop_calls: list[dict[str, Any]] = []
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - shim
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod

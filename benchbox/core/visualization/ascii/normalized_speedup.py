@@ -1,1 +1,1 @@
-from textcharts.normalized_speedup import *  # noqa: F401, F403
+from textcharts.normalized_speedup import *  # noqa: F403

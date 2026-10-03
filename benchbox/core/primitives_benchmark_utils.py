@@ -99,7 +99,7 @@ def table_exists(
     except ValueError as exc:
         log_verbose(f"Invalid table name '{table_name}': {exc}")
         return False
-    except Exception as exc:  # pragma: no cover - exercised via benchmark tests
+    except Exception as exc:  # pragma: no cover
         error_msg = str(exc).lower()
         if any(
             phrase in error_msg

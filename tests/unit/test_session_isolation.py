@@ -31,7 +31,7 @@ def test_cli_invocation_owns_quiet_and_provider_state() -> None:
     @click.command()
     def command():
         printing.set_quiet(True)
-        ci._config_provider = installed  # type: ignore[assignment]
+        ci._config_provider = installed
         assert printing.is_quiet()
         assert ci._config_provider is installed
         raise click.ClickException("intentional failure")

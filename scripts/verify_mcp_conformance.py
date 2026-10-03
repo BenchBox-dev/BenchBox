@@ -45,7 +45,7 @@ EXPECTED_WARNING_IDS: tuple[str, ...] = ()
 
 
 def _run(command: list[str], *, cwd: Path | None = None, timeout: int = 600) -> None:
-    subprocess.run(command, cwd=cwd, check=True, timeout=timeout)  # noqa: S603
+    subprocess.run(command, cwd=cwd, check=True, timeout=timeout)
 
 
 def _parse_result_ids(output: str, status: str) -> list[str]:
@@ -86,7 +86,7 @@ def _prepare_conformance(checkout: Path) -> Path:
     _run(["git", "remote", "add", "origin", CONFORMANCE_REPOSITORY], cwd=checkout)
     _run(["git", "fetch", "--quiet", "--depth=1", "origin", CONFORMANCE_REVISION], cwd=checkout)
     _run(["git", "checkout", "--quiet", "--detach", "FETCH_HEAD"], cwd=checkout)
-    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=checkout, text=True).strip()  # noqa: S603
+    revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=checkout, text=True).strip()
     if revision != CONFORMANCE_REVISION:
         raise RuntimeError("Conformance checkout revision mismatch")
     _run(["npm", "ci", "--ignore-scripts"], cwd=checkout)
@@ -108,7 +108,7 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
             "--spec-version",
             protocol_version,
         ]
-        result = subprocess.run(command, capture_output=True, text=True, timeout=600)  # noqa: S603
+        result = subprocess.run(command, capture_output=True, text=True, timeout=600)
         output = (result.stdout or "") + (result.stderr or "")
         qualified_failed = _qualify_result_ids(_parse_result_ids(output, "FAILURE"), scenario)
         qualified_warnings = _qualify_result_ids(_parse_result_ids(output, "WARNING"), scenario)
@@ -140,7 +140,7 @@ def _run_protocol_gate(url: str, protocol_version: str, workspace: Path) -> None
 
 def _run_inspector(url: str) -> None:
     metadata = json.loads(
-        subprocess.check_output(  # noqa: S603
+        subprocess.check_output(
             [
                 "npm",
                 "view",
@@ -186,9 +186,9 @@ def _run_automated_acceptance() -> None:
 
 
 def _write_evidence(path: Path, protocol_version: str) -> None:
-    if subprocess.check_output(["git", "status", "--porcelain"], text=True).strip():  # noqa: S603
+    if subprocess.check_output(["git", "status", "--porcelain"], text=True).strip():
         raise RuntimeError("Refusing to write production evidence from a dirty worktree")
-    source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()  # noqa: S603
+    source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     automated = dict.fromkeys(sorted(AUTOMATED_GATES), True)
     automated["multiworker"] = False
     payload = {
@@ -221,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="benchbox-mcp-conformance-") as temp:
         workspace = Path(temp)
         with (workspace / "server.log").open("wb") as server_log:
-            process = subprocess.Popen(  # noqa: S603
+            process = subprocess.Popen(
                 [
                     sys.executable,
                     "-m",

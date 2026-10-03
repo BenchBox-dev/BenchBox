@@ -128,7 +128,7 @@ class TestResolveStreamConnectionCapability:
 
     def test_non_capability_declaration_fails_loudly(self):
         class _Broken(_BareAdapter):
-            stream_connection_capability = "independent_connection"  # type: ignore[assignment]
+            stream_connection_capability = "independent_connection"
 
         with pytest.raises(RuntimeError, match="not a StreamConnectionCapability"):
             resolve_stream_connection_capability(_Broken())

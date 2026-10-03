@@ -15,7 +15,7 @@ CANONICAL = "benchbox.core.results.anonymization"
 @pytest.fixture(scope="module")
 def slim_leak_detector():
     saved = sys.modules.get(CANONICAL, ...)
-    sys.modules[CANONICAL] = None  # type: ignore[assignment]
+    sys.modules[CANONICAL] = None
     try:
         spec = importlib.util.spec_from_file_location(
             "_validate_submission_slim", ROOT / "scripts/validate_submission.py"
@@ -27,7 +27,7 @@ def slim_leak_detector():
         if saved is ...:
             del sys.modules[CANONICAL]
         else:
-            sys.modules[CANONICAL] = saved  # type: ignore[assignment]
+            sys.modules[CANONICAL] = saved
 
     detector = module.find_public_path_leaks
     assert detector.__module__ == "_validate_submission_slim", "fixture did not exercise the slim fallback"
@@ -91,7 +91,7 @@ VERSION_MATRIX = [
 @pytest.fixture(scope="module")
 def slim_version_helper():
     saved = sys.modules.get(BUNDLE_POLICY_CANONICAL, ...)
-    sys.modules[BUNDLE_POLICY_CANONICAL] = None  # type: ignore[assignment]
+    sys.modules[BUNDLE_POLICY_CANONICAL] = None
     try:
         spec = importlib.util.spec_from_file_location("_bundle_slim", ROOT / "benchbox/validation/bundle.py")
         assert spec is not None and spec.loader is not None
@@ -101,7 +101,7 @@ def slim_version_helper():
         if saved is ...:
             del sys.modules[BUNDLE_POLICY_CANONICAL]
         else:
-            sys.modules[BUNDLE_POLICY_CANONICAL] = saved  # type: ignore[assignment]
+            sys.modules[BUNDLE_POLICY_CANONICAL] = saved
 
     helper = module.result_schema_version_value
     assert helper.__module__ == "_benchbox_schema_policy", "fixture did not exercise the slim file-load path"

@@ -28,9 +28,9 @@ try:
 
     ICEBERG_AVAILABLE = True
 except ImportError:
-    Catalog = None  # type: ignore[assignment, misc]
-    load_catalog = None  # type: ignore[assignment]
-    Table = None  # type: ignore[assignment, misc]
+    Catalog = None
+    load_catalog = None
+    Table = None
     ICEBERG_AVAILABLE = False
 
 try:
@@ -38,7 +38,7 @@ try:
 
     PYARROW_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
+    pa = None
     PYARROW_AVAILABLE = False
 
 from benchbox.core.dataframe.maintenance_interface import (
@@ -346,7 +346,7 @@ class IcebergMaintenanceOperations(BaseDataFrameMaintenanceOperations):
             rows_inserted = len(new_rows)
 
             if rows_inserted > 0:
-                import pandas as pd  # noqa: PLC0415  (lazy adapter import)
+                import pandas as pd
 
                 insert_data: dict[str, Any] = {}
                 for column in target_arrow.schema.names:

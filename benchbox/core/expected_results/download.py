@@ -128,7 +128,7 @@ def _safe_extract_tar(archive_path: Path, dest_dir: Path) -> None:
         if sys.version_info >= (3, 12):
             tf.extractall(dest_dir, filter="data")
         else:
-            tf.extractall(dest_dir)  # noqa: S202
+            tf.extractall(dest_dir)
 
 
 def _is_cache_warm(cache_dir: Path, glob_pattern: str) -> bool:

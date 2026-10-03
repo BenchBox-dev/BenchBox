@@ -48,7 +48,7 @@ class TestTPCHSkewFacadeGetQuery:
     def test_query_id_string_raises_type_error(self):
         b = TPCHSkew(scale_factor=0.01)
         with pytest.raises(TypeError):
-            b.get_query("6")  # type: ignore
+            b.get_query("6")
 
     def test_valid_query_returns_string(self):
         b = TPCHSkew(scale_factor=0.01)
@@ -58,7 +58,7 @@ class TestTPCHSkewFacadeGetQuery:
     def test_invalid_scale_factor_in_get_query_raises_type_error(self):
         b = TPCHSkew(scale_factor=0.01)
         with pytest.raises(TypeError):
-            b.get_query(1, scale_factor="bad")  # type: ignore
+            b.get_query(1, scale_factor="bad")
 
     def test_zero_scale_factor_in_get_query_raises_value_error(self):
         b = TPCHSkew(scale_factor=0.01)
@@ -68,7 +68,7 @@ class TestTPCHSkewFacadeGetQuery:
     def test_non_int_seed_raises_type_error(self):
         b = TPCHSkew(scale_factor=0.01)
         with pytest.raises(TypeError):
-            b.get_query(1, seed="x")  # type: ignore
+            b.get_query(1, seed="x")
 
 
 class TestTPCHSkewStaticMethods:

@@ -13,12 +13,12 @@ from typing import Any, Callable, Optional, TypeVar
 T = TypeVar("T")
 
 try:
-    import duckdb  # type: ignore[import-untyped]
+    import duckdb
 
     DUCKDB_AVAILABLE = True
 except ImportError:
     DUCKDB_AVAILABLE = False
-    duckdb = None  # type: ignore[assignment]
+    duckdb = None
 
 
 def assert_valid_sql(sql: str, connection=None) -> None:

@@ -535,7 +535,7 @@ def _docstring_line_ranges(tree: ast.Module) -> set[int]:
             and isinstance(first.value.value, str)
             and hasattr(first, "end_lineno")
         ):
-            for ln in range(first.lineno, first.end_lineno + 1):  # type: ignore[attr-defined]
+            for ln in range(first.lineno, first.end_lineno + 1):
                 docstring_lines.add(ln)
     return docstring_lines
 
@@ -602,7 +602,7 @@ def _reclassify_inside_type_mapping(entries: list[InventoryEntry], tree: ast.Mod
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.name in _TYPE_MAP_FUNC_NAMES and hasattr(node, "end_lineno"):
-                ranges.append((node.lineno, node.end_lineno))  # type: ignore[attr-defined]
+                ranges.append((node.lineno, node.end_lineno))
     if not ranges:
         return
     for entry in entries:

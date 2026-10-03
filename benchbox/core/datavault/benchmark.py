@@ -304,7 +304,7 @@ class DataVaultBenchmark(TranslatableQueryMixin, BaseBenchmark):
 
     def cleanup(self) -> None:
         if self._tpch_generator is not None and hasattr(self._tpch_generator, "cleanup"):
-            self._tpch_generator.cleanup()  # type: ignore[call-non-callable]
+            self._tpch_generator.cleanup()
         super().cleanup()
 
     def __enter__(self) -> "DataVaultBenchmark":
@@ -315,7 +315,7 @@ class DataVaultBenchmark(TranslatableQueryMixin, BaseBenchmark):
         return False
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
 )

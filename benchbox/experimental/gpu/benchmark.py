@@ -396,7 +396,7 @@ class GPUBenchmark(BaseBenchmark):
         start_time = time.perf_counter()
         try:
             try:
-                from dask_sql import Context  # type: ignore
+                from dask_sql import Context
 
                 c = Context()
                 c.create_table("data", cudf_df)

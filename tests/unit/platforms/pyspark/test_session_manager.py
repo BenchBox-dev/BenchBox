@@ -256,7 +256,7 @@ def _session_config(**overrides) -> SparkSessionConfig:
         "extra_configs": (),
     }
     params.update(overrides)
-    return SparkSessionConfig(**params)  # type: ignore[arg-type]
+    return SparkSessionConfig(**params)
 
 
 class TestCreateSessionAqeKeys:

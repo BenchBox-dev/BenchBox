@@ -58,7 +58,7 @@ def _assert_explain_all(translated: dict[str, str], ddl_statements: str, dialect
                 connection.execute(f"EXPLAIN QUERY PLAN {sql}")
         finally:
             connection.close()
-    else:  # pragma: no cover - parametrized dialects are duckdb/sqlite only
+    else:  # pragma: no cover
         raise AssertionError(f"No EXPLAIN harness for {dialect}")
 
 
@@ -122,7 +122,7 @@ def test_get_query_with_dialect_still_rejects_params(job_benchmark: JoinOrderBen
         job_benchmark.get_query("1a", params={"x": 1}, dialect="duckdb")
 
 
-def test_facade_passes_dialect_through(tmp_path) -> None:  # noqa: ANN001
+def test_facade_passes_dialect_through(tmp_path) -> None:
     from benchbox.joinorder import JoinOrder
 
     facade = JoinOrder(output_dir=str(tmp_path))

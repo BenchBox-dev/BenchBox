@@ -1,10 +1,3 @@
-"""Unit tests for the GitHub Pages deployment adapter (scripts/publication/pages.cjs).
-
-Drives the adapter via tests/unit/scripts/publication/pages_adapter_harness.cjs
-to test input validation, OIDC token acquisition/masking, provider POST/GET/cancel,
-allowlisted response filtering, and secret redaction.
-"""
-
 from __future__ import annotations
 
 import json
@@ -69,7 +62,6 @@ def test_create_deployment_success(artifact_id: int | str) -> None:
     assert "unauthorized_field" not in res
     assert "secret-token-abc" in result["masked_secrets"]
 
-    # Verify request was correctly shaped
     reqs = result["recorded_requests"]
     assert len(reqs) == 1
     assert reqs[0]["route"] == "POST /repos/{owner}/{repo}/pages/deployments"
@@ -180,10 +172,8 @@ def test_create_response_does_not_fabricate_provider_acknowledgement() -> None:
 @pytest.mark.parametrize(
     ("status", "expected"),
     [
-        # Terminal success
         ("succeed", "terminal-success"),
         ("SUCCEED", "terminal-success"),
-        # Terminal failure
         ("deployment_failed", "terminal-failure"),
         ("deployment_content_failed", "terminal-failure"),
         ("deployment_attempt_error", "terminal-failure"),
@@ -191,14 +181,12 @@ def test_create_response_does_not_fabricate_provider_acknowledgement() -> None:
         ("deployment_cancelled", "terminal-failure"),
         ("payment_required", "terminal-failure"),
         ("not_found", "terminal-failure"),
-        # Non-terminal
         ("pending", "pending"),
         ("deployment_in_progress", "pending"),
         ("syncing_files", "pending"),
         ("finished_file_sync", "pending"),
         ("updating_pages", "pending"),
         ("purging_cdn", "pending"),
-        # Unrecognized values do not resolve to either outcome
         ("", "unknown"),
         ("some_future_status", "unknown"),
         ("SUCCESS", "unknown"),
@@ -211,8 +199,6 @@ def test_classify_deployment_status(status: str, expected: str) -> None:
 
 
 def test_classify_deployment_status_matches_sanitized_provider_value() -> None:
-    """A live `succeed` deployment is upper-cased by sanitizeStatusResponse to
-    `SUCCEED`; the classifier must recognize that first-poll value as success."""
     status_result = run_harness(
         {
             "action": "status",

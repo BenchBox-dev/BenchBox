@@ -20,7 +20,7 @@ try:
     PSUTIL_AVAILABLE = True
 except ImportError:
     PSUTIL_AVAILABLE = False
-    psutil = None  # type: ignore[assignment]
+    psutil = None
 
 if TYPE_CHECKING:
     pass

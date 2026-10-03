@@ -11,7 +11,7 @@ from typing import Any, Literal
 from rich.prompt import Prompt
 from rich.table import Table
 
-import benchbox.cli.platform_defaults as _platform_defaults  # noqa: F401  # registers builders
+import benchbox.cli.platform_defaults as _platform_defaults  # noqa: F401
 from benchbox.core.databases.manager import check_connection as core_check_connection
 from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.core.results.platform_options import sanitize_platform_options
@@ -265,7 +265,7 @@ class DatabaseManager:
         )
 
         if execution_mode and execution_mode in ("sql", "dataframe"):
-            config.execution_mode = execution_mode  # type: ignore[assignment]
+            config.execution_mode = execution_mode
 
         config.options.update(self.verbosity.to_config())
         return config

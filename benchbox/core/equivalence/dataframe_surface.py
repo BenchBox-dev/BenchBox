@@ -85,15 +85,15 @@ def find_surface_divergences(
     for query_id in query_ids:
         try:
             reference = reference_rows(query_id)
-        except Exception as exc:  # noqa: BLE001 - a diagnostic must report, not crash, on a bad query
+        except Exception as exc:
             divergences.append(SurfaceDivergence(query_id, reference_failure_cell, f"reference query failed: {exc}"))
             continue
         for cell, check in candidate_cells(query_id):
             try:
                 check(reference)
-            except validation_error as exc:  # type: ignore[misc] - configurable mismatch type
+            except validation_error as exc:
                 divergences.append(SurfaceDivergence(query_id, cell, str(exc)))
-            except Exception as exc:  # noqa: BLE001 - surface execution errors as divergences
+            except Exception as exc:
                 divergences.append(SurfaceDivergence(query_id, cell, f"error: {exc}"))
     return divergences
 

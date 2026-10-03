@@ -217,7 +217,7 @@ class TestPostgreSQLIndependentConnectionIsolatesSessions:
                     try:
                         wrapper.connection.execute("SELECT pg_sleep(1)")
                         results[name] = elapsed_seconds(start)
-                    except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                    except BaseException as exc:
                         errors[name] = exc
 
                 thread_a = threading.Thread(target=run, args=("a", stream_a))
@@ -289,7 +289,7 @@ class TestSQLiteSharedCursorConcurrentUse:
                         counts[name] = row_counts
                     finally:
                         wrapper.close()
-                except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                except BaseException as exc:
                     errors[name] = exc
 
             threads = [threading.Thread(target=run, args=(name,)) for name in ("a", "b")]
@@ -333,7 +333,7 @@ class TestSQLiteSharedCursorConcurrentUse:
                         if rows != [(10,)]:
                             with lock:
                                 wrong.append(rows)
-                except BaseException as exc:  # noqa: BLE001 - surfaced via errors dict below
+                except BaseException as exc:
                     with lock:
                         errors[name] = exc
 

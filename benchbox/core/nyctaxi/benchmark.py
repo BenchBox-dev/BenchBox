@@ -350,7 +350,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
                 registry_decision = REGISTRY.resolve(ctx)
                 if registry_decision is not None:
                     if registry_decision.action is CompatAction.SELECT_VARIANT:
-                        variant_template = registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                        variant_template = registry_decision.payload.variant_sql
                     else:
                         continue
                 else:
@@ -525,7 +525,7 @@ class NYCTaxiBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, BaseBenc
         return rows_loaded
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_enum_list,

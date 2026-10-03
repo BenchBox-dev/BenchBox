@@ -56,7 +56,7 @@ class TestSortColumn:
     def test_frozen(self):
         sc = SortColumn(name="x")
         with pytest.raises(AttributeError):
-            sc.name = "y"  # type: ignore[misc]
+            sc.name = "y"
 
 
 class TestDataOrganizationConfig:
@@ -474,7 +474,7 @@ class TestSortedParquetWriterOpenTableFormatOptions:
                 self.output_dir = kwargs["output_dir"]
 
         class _FakeConverter:
-            def convert(self, source_files, table_name, schema, options):  # noqa: ARG002
+            def convert(self, source_files, table_name, schema, options):
                 output = options.output_dir / table_name
                 output.mkdir(parents=True, exist_ok=True)
                 return SimpleNamespace(output_files=[output])

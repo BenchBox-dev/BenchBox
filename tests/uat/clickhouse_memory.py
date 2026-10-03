@@ -426,7 +426,7 @@ def _http_query(
     )
     token = base64.b64encode(f"{username}:{password}".encode()).decode("ascii")
     request.add_header("Authorization", f"Basic {token}")
-    with urllib.request.urlopen(request, timeout=timeout_s) as response:  # noqa: S310 - fixed loopback endpoint
+    with urllib.request.urlopen(request, timeout=timeout_s) as response:
         return response.read().decode("utf-8", errors="replace")
 
 
@@ -806,5 +806,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     return completed.returncode
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised by operator wrapper
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

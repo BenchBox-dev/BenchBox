@@ -18,9 +18,9 @@ try:
 
     DASK_AVAILABLE = True
 except ImportError:
-    dd = None  # type: ignore[assignment]
-    Client = None  # type: ignore[assignment,misc]
-    LocalCluster = None  # type: ignore[assignment,misc]
+    dd = None
+    Client = None
+    LocalCluster = None
     DASK_AVAILABLE = False
 
 try:
@@ -28,7 +28,7 @@ try:
 
     PANDAS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
+    pd = None
     PANDAS_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
@@ -441,7 +441,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
         if self._client is not None:
             try:
-                info["scheduler_address"] = self._client.scheduler.address  # type: ignore[union-attr]
+                info["scheduler_address"] = self._client.scheduler.address
                 info["n_active_workers"] = len(self._client.scheduler_info()["workers"])
             except Exception as e:
                 logger.debug(f"Failed to get scheduler info: {e}")
@@ -493,7 +493,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
         is_named_agg = any(isinstance(v, tuple) for v in regular_aggs.values())
 
-        if is_named_agg:  # noqa: SIM108
+        if is_named_agg:
             result = df.groupby(by_list, **kwargs).agg(**regular_aggs)
         else:
             result = df.groupby(by_list, **kwargs).agg(regular_aggs)

@@ -39,7 +39,7 @@ class _FakeCursor:
         self._sink.append(str(statement))
         return f"cursor-result::{statement}"
 
-    def close(self) -> None:  # pragma: no cover - transparency check
+    def close(self) -> None:  # pragma: no cover
         return None
 
 

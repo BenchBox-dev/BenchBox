@@ -228,7 +228,7 @@ def _copy_to_cloud(files: list[Path], destination: str) -> None:
         cloud_path = create_path_handler(f"{base}/{file.name}")
         if not hasattr(cloud_path, "write_bytes"):
             raise RuntimeError(f"Cloud destination does not support direct writes: {destination}")
-        cloud_path.write_bytes(file.read_bytes())  # type: ignore[attr-defined]
+        cloud_path.write_bytes(file.read_bytes())
 
 
 def _copy_to_adls(files: list[Path], destination: str) -> None:

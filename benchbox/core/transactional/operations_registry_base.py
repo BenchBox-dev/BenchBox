@@ -17,7 +17,7 @@ class OperationsRegistryBase(Generic[OperationT]):
     def _build_category_index(operations: dict[str, OperationT]) -> dict[str, list[str]]:
         category_index: dict[str, list[str]] = {}
         for operation_id, operation in operations.items():
-            category = operation.category.lower()  # type: ignore[attr-defined]
+            category = operation.category.lower()
             category_index.setdefault(category, []).append(operation_id)
         return category_index
 

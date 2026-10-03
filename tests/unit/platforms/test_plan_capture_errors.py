@@ -33,7 +33,7 @@ class DummyAdapter(PlatformAdapter):
         super().__init__(**config)
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - not used in tests
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod
@@ -171,7 +171,7 @@ def test_capture_timeout_returns_promptly() -> None:
         release_explain.wait(timeout=30)
         return "PLAN"
 
-    adapter.get_query_plan = hanging_explain  # type: ignore[method-assign]
+    adapter.get_query_plan = hanging_explain
 
     start = time.monotonic()
     try:
@@ -199,7 +199,7 @@ def test_capture_timeout_strict_mode_raises_promptly() -> None:
         release_explain.wait(timeout=30)
         return "PLAN"
 
-    adapter.get_query_plan = hanging_explain  # type: ignore[method-assign]
+    adapter.get_query_plan = hanging_explain
 
     start = time.monotonic()
     try:
@@ -403,7 +403,7 @@ class _FakeCursor:
     def execute(self, _sql: str) -> None:
         raise self._error
 
-    def fetchall(self):  # pragma: no cover - never reached after execute raises
+    def fetchall(self):  # pragma: no cover
         return []
 
     def close(self) -> None:

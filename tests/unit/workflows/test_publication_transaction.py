@@ -287,7 +287,7 @@ def test_isolated_job_promotion_contract(tmp_path: Path, monkeypatch: pytest.Mon
     def mock_partial_urlopen(req: Any, timeout: float = 30) -> _MockHTTPResponse:
         url = req.full_url if hasattr(req, "full_url") else str(req)
         if url.endswith("/results/data/results.duckdb"):
-            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)  # type: ignore[arg-type]
+            raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
         return _MockHTTPResponse(root_bytes, status=200)
 
     monkeypatch.setattr(urllib.request, "urlopen", mock_partial_urlopen)

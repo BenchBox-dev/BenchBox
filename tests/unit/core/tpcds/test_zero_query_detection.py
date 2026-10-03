@@ -87,9 +87,9 @@ def _make_empty_stream_benchmark():
     def _always_fail(query_id, **kwargs):
         raise RuntimeError("dsqgen unavailable")
 
-    bench.get_query = _always_fail  # type: ignore[attr-defined]
+    bench.get_query = _always_fail
 
-    bench.get_queries = dict  # type: ignore[attr-defined]
+    bench.get_queries = dict
 
     return bench
 
@@ -109,7 +109,7 @@ def test_zero_query_generation_returns_failed_result_not_completed():
     import benchbox.core.tpcds.streams as streams_module
 
     original_fn = streams_module.create_standard_streams
-    streams_module.create_standard_streams = _empty_streams  # type: ignore[attr-defined]
+    streams_module.create_standard_streams = _empty_streams
     try:
         power = TPCDSPowerTest(
             benchmark=bench,

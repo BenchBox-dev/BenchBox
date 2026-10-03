@@ -75,7 +75,7 @@ def _write_parquet_to_copy(data_file: Path, copy: Any, *, include_header: bool =
     try:
         import pyarrow.csv as arrow_csv
         import pyarrow.parquet as pq
-    except ImportError as exc:  # pragma: no cover - pyarrow is a project dependency
+    except ImportError as exc:  # pragma: no cover
         raise RuntimeError("pyarrow is required to load Parquet files into PostgreSQL-family adapters") from exc
 
     write_options = arrow_csv.WriteOptions(include_header=include_header, quoting_style="all_valid")

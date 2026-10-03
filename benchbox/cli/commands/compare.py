@@ -841,7 +841,7 @@ def _build_platform_runner():
     ):
         try:
             info = get_benchmark_metadata(benchmark) or {}
-        except Exception:  # pragma: no cover - registry lookup is advisory only
+        except Exception:  # pragma: no cover
             info = {}
 
         options: dict[str, Any] = {}

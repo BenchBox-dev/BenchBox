@@ -12,8 +12,8 @@ from enum import Enum
 from typing import Any, Callable
 
 try:
-    import psutil  # type: ignore
-except ImportError:  # pragma: no cover - exercised via patched fallback
+    import psutil
+except ImportError:  # pragma: no cover
     psutil = None
 
 logger = logging.getLogger(__name__)

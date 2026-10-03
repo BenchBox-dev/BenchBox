@@ -93,7 +93,7 @@ def git_changed_paths(base_ref: str) -> list[str]:
 
 
 def write_github_output(path: Path, decision: dict[str, object]) -> None:
-    units: dict[str, bool] = decision["units"]  # type: ignore[assignment]
+    units: dict[str, bool] = decision["units"]
     lines = [f"unit-{unit}={'true' if units[unit] else 'false'}" for unit in UNITS]
     lines.append(f"code-tests-needed={'true' if decision['code_tests_needed'] else 'false'}")
     lines.append(f"run-all-units={'true' if decision['run_all'] else 'false'}")
@@ -102,8 +102,8 @@ def write_github_output(path: Path, decision: dict[str, object]) -> None:
 
 
 def write_summary(path: Path, decision: dict[str, object]) -> None:
-    units: dict[str, bool] = decision["units"]  # type: ignore[assignment]
-    unit_paths: dict[str, list[str]] = decision["unit_paths"]  # type: ignore[assignment]
+    units: dict[str, bool] = decision["units"]
+    unit_paths: dict[str, list[str]] = decision["unit_paths"]
     rows = ["### CI units", "", "| unit | runs | changed paths |", "| --- | --- | ---: |"]
     for unit in UNITS:
         rows.append(f"| {unit} | {'yes' if units[unit] else 'no'} | {len(unit_paths[unit])} |")
@@ -112,7 +112,7 @@ def write_summary(path: Path, decision: dict[str, object]) -> None:
         rows.append("All units run (self-protection path or empty change set).")
     if decision["unowned_paths"]:
         rows.append("")
-        rows.append("Unowned paths routed to core: " + ", ".join(f"`{p}`" for p in decision["unowned_paths"][:20]))  # type: ignore[index]
+        rows.append("Unowned paths routed to core: " + ", ".join(f"`{p}`" for p in decision["unowned_paths"][:20]))
     with path.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(rows) + "\n")
 

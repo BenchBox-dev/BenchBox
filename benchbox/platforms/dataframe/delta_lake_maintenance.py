@@ -15,8 +15,8 @@ try:
 
     DELTA_AVAILABLE = True
 except ImportError:
-    DeltaTable = None  # type: ignore[assignment, misc]
-    write_deltalake = None  # type: ignore[assignment]
+    DeltaTable = None
+    write_deltalake = None
     DELTA_AVAILABLE = False
 
 try:
@@ -24,7 +24,7 @@ try:
 
     PYARROW_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
+    pa = None
     PYARROW_AVAILABLE = False
 
 from benchbox.core.dataframe.maintenance_interface import (

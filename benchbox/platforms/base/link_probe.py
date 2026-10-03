@@ -112,7 +112,7 @@ def probe_statement_overhead(
                     "median": round(statistics.median(samples), 3),
                 },
             }
-        except Exception as exc:  # noqa: BLE001 - probe must never raise
+        except Exception as exc:
             outcome["result"] = _allowlisted_error(exc)
 
     worker = threading.Thread(target=_sample, name="benchbox-link-probe", daemon=True)

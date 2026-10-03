@@ -16,7 +16,7 @@ class _FakeStdin:
     def __init__(self, is_tty: bool) -> None:
         self._is_tty = is_tty
 
-    def isatty(self) -> bool:  # pragma: no cover - invoked by tests
+    def isatty(self) -> bool:  # pragma: no cover
         return self._is_tty
 
 

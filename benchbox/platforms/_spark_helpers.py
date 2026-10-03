@@ -261,15 +261,11 @@ class SparkLikeAdapterMixin:
         foreign_key_config: Any,
         connection: Any,
     ) -> None:
-        platform = self.platform_name  # type: ignore[attr-defined]
+        platform = self.platform_name
         if primary_key_config and primary_key_config.enabled:
-            self.logger.info(  # type: ignore[attr-defined]
-                f"Primary key constraints enabled for {platform} (informational only, not enforced)"
-            )
+            self.logger.info(f"Primary key constraints enabled for {platform} (informational only, not enforced)")
         if foreign_key_config and foreign_key_config.enabled:
-            self.logger.info(  # type: ignore[attr-defined]
-                f"Foreign key constraints enabled for {platform} (informational only, not enforced)"
-            )
+            self.logger.info(f"Foreign key constraints enabled for {platform} (informational only, not enforced)")
 
     def apply_unified_tuning(self, unified_config: Any, connection: Any) -> None:
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
@@ -281,30 +277,28 @@ class SparkLikeAdapterMixin:
             return
 
         spark = connection
-        platform = self.platform_name  # type: ignore[attr-defined]
+        platform = self.platform_name
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if hasattr(platform_config, "spark") and platform_config.spark:
             for key, value in platform_config.spark.items():
                 try:
                     spark.conf.set(f"spark.{key}", str(value))
-                    self.logger.debug(f"Applied {platform} config: spark.{key} = {value}")  # type: ignore[attr-defined]
+                    self.logger.debug(f"Applied {platform} config: spark.{key} = {value}")
                 except Exception as exc:
-                    self.logger.warning(  # type: ignore[attr-defined]
-                        f"Failed to apply {platform} config spark.{key}: {exc}"
-                    )
+                    self.logger.warning(f"Failed to apply {platform} config spark.{key}: {exc}")
                     self._record_spark_conf_ledger(ledger, key, value, applied=False, error=exc)
                     continue
                 self._record_spark_conf_ledger(ledger, key, value, applied=True)
 
-        self.logger.info(f"{platform} platform optimizations applied")  # type: ignore[attr-defined]
+        self.logger.info(f"{platform} platform optimizations applied")
 
     def apply_olap_runtime_conf(self, connection: Any, benchmark_type: str, platform_label: str) -> None:
         apply_spark_olap_runtime_conf(
             connection,
             benchmark_type,
-            adaptive_enabled=self.adaptive_enabled,  # type: ignore[attr-defined]
-            spark_config=self.spark_config,  # type: ignore[attr-defined]
-            logger=self.logger,  # type: ignore[attr-defined]
+            adaptive_enabled=self.adaptive_enabled,
+            spark_config=self.spark_config,
+            logger=self.logger,
             platform_label=platform_label,
         )
 
@@ -322,7 +316,7 @@ class SparkLikeAdapterMixin:
                 mechanism="spark_session_config",
                 error=error,
             )
-        except Exception:  # pragma: no cover - capture must never break a run
+        except Exception:  # pragma: no cover
             pass
 
 

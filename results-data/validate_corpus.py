@@ -45,7 +45,7 @@ def _load_bundle(bundle: pathlib.Path) -> dict:
     try:
         with open(bundle, encoding="utf-8") as handle:
             return json.load(handle)
-    except Exception as exc:  # noqa: BLE001 - any read failure is fatal here
+    except Exception as exc:
         raise CorpusReadError(f"ERROR reading {bundle}: {exc}") from exc
 
 
@@ -53,7 +53,7 @@ def _cohort_key(payload: dict) -> CohortKey:
     try:
         benchmark_id = payload["benchmark"]["id"]
         scale_factor = str(payload["benchmark"].get("scale_factor", ""))
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise CorpusReadError(f"ERROR missing cohort fields: {exc}") from exc
     return (benchmark_id, scale_factor)
 
@@ -77,7 +77,7 @@ def _comparison_identity(bundle: pathlib.Path, payload: dict) -> str:
                     if candidate and str(candidate) != "unknown":
                         version = candidate
                         break
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise CorpusReadError(f"ERROR reading platform identity from {bundle}: {exc}") from exc
     identity = str(platform)
     if version and str(version) != "unknown":
@@ -89,7 +89,7 @@ def parse_run_date(payload: dict, *, bundle: pathlib.Path | None = None) -> _dt.
     label = f" in {bundle}" if bundle is not None else ""
     try:
         timestamp = payload["run"]["timestamp"]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise CorpusReadError(f"ERROR missing run.timestamp{label}: {exc}") from exc
     if not isinstance(timestamp, str):
         raise CorpusReadError(f"ERROR unparseable run.timestamp{label}: {timestamp!r}")

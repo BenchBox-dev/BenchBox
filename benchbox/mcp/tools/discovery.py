@@ -142,7 +142,7 @@ def _system_profile_impl() -> dict[str, Any]:
     from benchbox.core.system import SystemProfiler, collect_system_profile_with_recommendations
 
     _ = SystemProfiler
-    return collect_system_profile_with_recommendations()  # type: ignore[return-value]
+    return collect_system_profile_with_recommendations()
 
 
 def _filter_dependency_groups(all_groups: dict, platform: str | None) -> dict | dict[str, Any]:

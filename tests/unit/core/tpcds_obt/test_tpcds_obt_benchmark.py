@@ -67,8 +67,8 @@ def test_generate_data_invokes_generator_and_transformer(tmp_path: Path) -> None
     )
     stub_generator = StubGenerator(tmp_path)
     stub_transformer = StubTransformer(tmp_path)
-    benchmark._data_generator = stub_generator  # type: ignore[assignment]
-    benchmark._obt_transformer = stub_transformer  # type: ignore[assignment]
+    benchmark._data_generator = stub_generator
+    benchmark._obt_transformer = stub_transformer
 
     result = benchmark.generate_data(output_format="dat")
 
@@ -90,8 +90,8 @@ def test_generate_data_default_format_is_parquet(tmp_path: Path) -> None:
     )
     stub_generator = StubGenerator(tmp_path)
     stub_transformer = StubTransformer(tmp_path)
-    benchmark._data_generator = stub_generator  # type: ignore[assignment]
-    benchmark._obt_transformer = stub_transformer  # type: ignore[assignment]
+    benchmark._data_generator = stub_generator
+    benchmark._obt_transformer = stub_transformer
 
     result = benchmark.generate_data()
 

@@ -17,7 +17,7 @@ from typing import Iterable
 try:
     from importlib import metadata as importlib_metadata
 except ImportError:  # pragma: no cover
-    import importlib_metadata  # type: ignore[assignment]
+    import importlib_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -396,7 +396,7 @@ def ensure_driver_version(
                     runtime_path=None,
                     runtime_python_executable=sys.executable,
                 )
-        except Exception as exc:  # pragma: no cover - exercised in tests via mocks
+        except Exception as exc:  # pragma: no cover
             last_error = exc
             logger.warning("Driver auto-install command failed: %s", exc)
 

@@ -47,7 +47,7 @@ def _results(**overrides: object) -> BenchmarkResults:
         "failed_queries": 0,
     }
     base.update(overrides)
-    return BenchmarkResults(**base)  # type: ignore[arg-type]
+    return BenchmarkResults(**base)
 
 
 class TestSnowflakeWarehouseCreditsPerHour:
@@ -367,12 +367,6 @@ class TestSnowflakeEstimatedConcurrencyWarning:
 class TestSnowflakeNestedEditionShape:
     def test_configuration_nested_edition_reaches_the_cost_model(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
-        """Pin the adapter-realistic shape: edition under configuration.
-
-        The adapter reports operator config under
-        ``platform_info["configuration"]``; extraction must find the edition
-        there without a top-level copy.
-        """
         results = _results(
             platform_info={
                 "platform_type": "snowflake",

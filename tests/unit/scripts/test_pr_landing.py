@@ -92,7 +92,7 @@ def _evidence(head: str = HEAD, **over: object) -> landing.ReadyEvidence:
         "check_runs": _green_checks(head),
     }
     base.update(over)
-    return landing.ReadyEvidence(**base)  # type: ignore[arg-type]
+    return landing.ReadyEvidence(**base)
 
 
 def _canonical_batch(repo: Path, head: str) -> dict[str, object]:

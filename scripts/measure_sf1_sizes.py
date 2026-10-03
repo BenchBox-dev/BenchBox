@@ -59,7 +59,6 @@ class SizeRecord:
 
 
 _RECORD_CACHE: dict[str, SizeRecord] = {}
-"""Per-process memo of successful measurements, keyed by benchmark id."""
 
 
 GENERATORS: list[tuple[str, str, str, dict]] = [
@@ -313,7 +312,7 @@ def measure_one(benchmark: str) -> SizeRecord:
             record.error = "generator emitted no measurable files"
         else:
             _RECORD_CACHE[benchmark] = record
-    except Exception as exc:  # noqa: BLE001 - record per-benchmark failures as data
+    except Exception as exc:
         record.error = f"{type(exc).__name__}: {exc}"
         record.elapsed_seconds = round(elapsed_seconds(start), 1)
         traceback.print_exc()

@@ -204,7 +204,7 @@ def validate_athena_credentials(
         return False, f"pyathena not installed. Run: {get_install_command('athena')}"
 
     try:
-        import boto3  # noqa: F401 - needed for Athena operations
+        import boto3  # noqa: F401
     except ImportError:
         from benchbox.utils.dependencies import get_install_command
 

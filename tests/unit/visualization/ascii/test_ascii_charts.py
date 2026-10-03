@@ -369,7 +369,7 @@ class TestPowerBarRenderer:
         import benchbox.core.visualization.ascii_runtime as runtime
 
         original = runtime.BarChart
-        runtime.BarChart = _CapturingBarChart  # type: ignore[assignment]
+        runtime.BarChart = _CapturingBarChart
         try:
             results = [
                 make_normalized_result(platform="Slow", benchmark="tpcds", scale_factor=10, power_at_size=100.0),
@@ -378,7 +378,7 @@ class TestPowerBarRenderer:
             ]
             _render_power_bar(results, ChartOptions(use_color=False), {})
         finally:
-            runtime.BarChart = original  # type: ignore[assignment]
+            runtime.BarChart = original
 
         best = [d for d in captured if d.is_best]
         worst = [d for d in captured if d.is_worst]
@@ -402,7 +402,7 @@ class TestPowerBarRenderer:
         import benchbox.core.visualization.ascii_runtime as runtime
 
         original = runtime.BarChart
-        runtime.BarChart = _CapturingBarChart  # type: ignore[assignment]
+        runtime.BarChart = _CapturingBarChart
         try:
             _render_power_bar(
                 [make_normalized_result(platform="Only", benchmark="tpcds", scale_factor=10, power_at_size=500.0)],
@@ -410,7 +410,7 @@ class TestPowerBarRenderer:
                 {},
             )
         finally:
-            runtime.BarChart = original  # type: ignore[assignment]
+            runtime.BarChart = original
 
         assert captured[0].is_best is True
         assert not any(d.is_worst for d in captured)

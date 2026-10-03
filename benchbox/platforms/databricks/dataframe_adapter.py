@@ -24,11 +24,11 @@ try:
     _databricks_connect_error: str | None = None
 except ImportError:
     DATABRICKS_CONNECT_AVAILABLE = False
-    DatabricksSession = None  # type: ignore[assignment,misc]
+    DatabricksSession = None
     _databricks_connect_error = None
-except Exception as exc:  # pragma: no cover - defensive guard
+except Exception as exc:  # pragma: no cover
     DATABRICKS_CONNECT_AVAILABLE = False
-    DatabricksSession = None  # type: ignore[assignment,misc]
+    DatabricksSession = None
     _databricks_connect_error = str(exc)
 
 try:
@@ -41,9 +41,9 @@ try:
     PYSPARK_AVAILABLE = True
 except ImportError:
     PYSPARK_AVAILABLE = False
-    SparkDataFrame = Any  # type: ignore[assignment,misc]
-    SparkSession = Any  # type: ignore[assignment,misc]
-    F = None  # type: ignore[assignment]
+    SparkDataFrame = Any
+    SparkSession = Any
+    F = None
 
 
 class DatabricksDataFrameAdapter(DatabricksAdapter):

@@ -55,10 +55,10 @@ try:
     from google.cloud.exceptions import NotFound
 except ImportError:
 
-    class NotFound(Exception):  # type: ignore[no-redef]
+    class NotFound(Exception):
         pass
 
-    class TooManyRequests(Exception):  # type: ignore[no-redef]
+    class TooManyRequests(Exception):
         pass
 
 

@@ -666,7 +666,7 @@ class _FileAnalyzer(ast.NodeVisitor):
         self.function_env = outer_env
         self.function_assigned = outer_assigned
 
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # noqa: N802
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.visit_FunctionDef(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -678,7 +678,7 @@ class _FileAnalyzer(ast.NodeVisitor):
         self._mark_target_assigned(node.target)
         self.generic_visit(node)
 
-    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:  # noqa: N802
+    def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
         self.visit_For(node)
 
     def visit_With(self, node: ast.With | ast.AsyncWith) -> None:
@@ -687,7 +687,7 @@ class _FileAnalyzer(ast.NodeVisitor):
                 self._mark_target_assigned(item.optional_vars)
         self.generic_visit(node)
 
-    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:  # noqa: N802
+    def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
         self.visit_With(node)
 
     def _mark_target_assigned(self, target: ast.AST) -> None:

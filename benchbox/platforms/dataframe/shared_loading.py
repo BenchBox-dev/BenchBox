@@ -72,7 +72,7 @@ def _declared_column_types(
 
     try:
         schema = get_benchmark_schema_columns(benchmark)
-    except Exception:  # noqa: BLE001 - schema hooks are heterogeneous across benchmarks
+    except Exception:
         return {}
 
     table_schema = schema.get(table_name.lower()) or schema.get(table_name)

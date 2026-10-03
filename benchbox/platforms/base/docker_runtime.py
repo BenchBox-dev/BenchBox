@@ -115,7 +115,7 @@ def docker_request_from_config(
 
 
 def _default_docker_runner(args: Sequence[str]) -> DockerCommandResult:
-    completed = subprocess.run(  # noqa: S603 - args are fixed Docker CLI tokens assembled internally.
+    completed = subprocess.run(
         list(args),
         check=False,
         capture_output=True,
@@ -138,7 +138,7 @@ def _run_docker_command(runner: DockerCommandRunner, args: Sequence[str]) -> dic
         return {"stdout": "", "error": "docker_timeout", "message": "Docker CLI command timed out"}
     except PermissionError as exc:
         return {"stdout": "", "error": "permission_denied", "message": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive boundary around optional metadata collection
+    except Exception as exc:  # pragma: no cover
         return {"stdout": "", "error": type(exc).__name__, "message": str(exc)}
 
     if result.returncode != 0:

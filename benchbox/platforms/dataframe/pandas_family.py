@@ -48,7 +48,7 @@ def _schema_column_types(
         from benchbox.core.dataframe.schema_utils import get_benchmark_schema_columns
 
         schema = get_benchmark_schema_columns(benchmark)
-    except Exception:  # noqa: BLE001 - a schema lookup must never break data loading
+    except Exception:
         return None
     if not schema:
         return None
@@ -401,7 +401,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         return self.concat(list(dataframes))
 
     def rename_columns(self, df: DF, mapping: dict[str, str]) -> DF:
-        return df.rename(columns=mapping)  # type: ignore[attr-defined]
+        return df.rename(columns=mapping)
 
     def merge(
         self,
@@ -439,22 +439,22 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
             left_on=left_on,
             right_on=right_on,
             how=how,
-        )  # type: ignore[return-value]
+        )
 
     def scalar(self, df: DF, column: str | None = None) -> Any:
         if hasattr(df, "compute"):
-            df = df.compute()  # type: ignore[attr-defined]
+            df = df.compute()
 
-        row_count = len(df)  # type: ignore[arg-type]
+        row_count = len(df)
         if row_count == 0:
             raise ValueError("Cannot extract scalar from empty DataFrame")
         if row_count > 1:
             raise ValueError(f"Expected exactly one row, got {row_count}")
 
         if column is not None:
-            return df[column].iloc[0]  # type: ignore[index]
+            return df[column].iloc[0]
 
-        return df.iloc[0, 0]  # type: ignore[index]
+        return df.iloc[0, 0]
 
     def scalar_to_df(self, data: dict[str, Any]) -> DF:
         return self._create_single_row_df(data)
@@ -462,7 +462,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
     def _create_single_row_df(self, data: dict[str, Any]) -> DF:
         import pandas as pd
 
-        return pd.DataFrame({k: [v] for k, v in data.items()})  # type: ignore[return-value]
+        return pd.DataFrame({k: [v] for k, v in data.items()})
 
     def groupby_size(
         self,
@@ -471,7 +471,7 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         name: str = "size",
     ) -> DF:
         by_list = [by] if isinstance(by, str) else list(by)
-        return df.groupby(by_list).size().reset_index(name=name)  # type: ignore[attr-defined, return-value]
+        return df.groupby(by_list).size().reset_index(name=name)
 
     def groupby_agg(
         self,
@@ -484,9 +484,9 @@ class PandasFamilyAdapter(BenchmarkExecutionMixin, TuningConfigurableMixin, ABC,
         is_named_agg = any(isinstance(v, tuple) for v in agg_spec.values())
 
         if is_named_agg:
-            return df.groupby(by, as_index=as_index, **kwargs).agg(**agg_spec)  # type: ignore[return-value]
+            return df.groupby(by, as_index=as_index, **kwargs).agg(**agg_spec)
         else:
-            return df.groupby(by, as_index=as_index, **kwargs).agg(agg_spec)  # type: ignore[return-value]
+            return df.groupby(by, as_index=as_index, **kwargs).agg(agg_spec)
 
     def create_context(self) -> PandasFamilyContext[DF]:
         self._context = PandasFamilyContext(self)

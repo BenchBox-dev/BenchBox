@@ -336,7 +336,7 @@ def scan_lane_files(
         cached = _walk_lane_files(lane, repo_root)
         _scan_cache[key] = cached
     base_files, unreadable = cached
-    scan_lane_files._last_unreadable = list(unreadable)  # type: ignore[attr-defined]
+    scan_lane_files._last_unreadable = list(unreadable)
     files = dict(base_files)
 
     if extra_files:
@@ -476,7 +476,7 @@ def verify_lane_isolation(  # noqa: C901
     details: dict[str, Any] = {}
 
     lane_files = scan_lane_files(lane, repo_root=repo_root)
-    unreadable = getattr(scan_lane_files, "_last_unreadable", [])  # type: ignore[attr-defined]
+    unreadable = getattr(scan_lane_files, "_last_unreadable", [])
     if unreadable:
         errors.append(f"unreadable lane files for '{lane}': {unreadable}")
         details["unreadable_files"] = unreadable

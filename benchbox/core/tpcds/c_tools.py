@@ -681,13 +681,13 @@ class DSQGenBinary:
         cleaned_sql = re.sub(r"\n\s+", "\n", cleaned_sql)
 
         try:
-            import sqlglot  # type: ignore[import-untyped]
+            import sqlglot
 
             for source_dialect in ["postgres", "mysql", "sqlite", None]:
                 try:
-                    parsed = sqlglot.parse_one(cleaned_sql, dialect=source_dialect)  # type: ignore[attr-defined]
+                    parsed = sqlglot.parse_one(cleaned_sql, dialect=source_dialect)
                     if parsed:
-                        transpiled = parsed.sql(dialect="postgres", pretty=True)  # type: ignore[attr-defined]
+                        transpiled = parsed.sql(dialect="postgres", pretty=True)
                         if transpiled and len(transpiled.strip()) > 0:
                             cleaned_sql = transpiled
                             break

@@ -91,7 +91,7 @@ def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: di
         if text:
             log_fh.write(text if text.endswith("\n") else text + "\n")
         log_fh.write(f"[uat] diagnostic re-run exit_code={rerun.exit_code} timed_out={rerun.timed_out}\n")
-    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask the original failure
+    except Exception as exc:
         log_fh.write(f"[uat] diagnostic re-run error {type(exc).__name__}: {exc}\n")
 
 

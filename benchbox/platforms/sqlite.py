@@ -191,7 +191,7 @@ class SQLiteAdapter(PlatformAdapter):
         return "SQLite"
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # type: ignore[override]
+    def add_cli_arguments(parser) -> None:
         if not hasattr(parser, "add_argument"):
             return
         try:
@@ -217,7 +217,7 @@ class SQLiteAdapter(PlatformAdapter):
             pass
 
     @classmethod
-    def from_config(cls, config: dict[str, Any]):  # type: ignore[override]
+    def from_config(cls, config: dict[str, Any]):
         from pathlib import Path
 
         from benchbox.utils.database_naming import generate_database_filename

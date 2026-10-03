@@ -362,7 +362,7 @@ def handle_help_callback(ctx: click.Context, param: click.Parameter, value: str 
         cmd = ctx.command
         if hasattr(cmd, "format_help_all"):
             formatter = ctx.make_formatter()
-            cmd.format_help_all(ctx, formatter)  # type: ignore[call-non-callable]
+            cmd.format_help_all(ctx, formatter)
             click.echo(formatter.getvalue(), color=ctx.color)
         else:
             click.echo(ctx.get_help(), color=ctx.color)
@@ -370,14 +370,14 @@ def handle_help_callback(ctx: click.Context, param: click.Parameter, value: str 
     elif topic == "examples":
         cmd = ctx.command
         if hasattr(cmd, "_show_examples"):
-            cmd._show_examples(ctx)  # type: ignore[call-non-callable]
+            cmd._show_examples(ctx)
         else:
             click.echo("No examples available.", color=ctx.color)
         ctx.exit(0)
     elif topic == "benchmarks":
         cmd = ctx.command
         if hasattr(cmd, "_show_benchmark_options"):
-            cmd._show_benchmark_options(ctx)  # type: ignore[call-non-callable]
+            cmd._show_benchmark_options(ctx)
         else:
             click.echo("No benchmark options available.", color=ctx.color)
         ctx.exit(0)

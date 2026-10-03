@@ -48,7 +48,7 @@ class _DatagenBenchmark(BaseBenchmark):
     def get_queries(self) -> dict[str, str]:
         return {}
 
-    def get_query(self, query_id, *, params=None) -> str:  # pragma: no cover - unsupported path
+    def get_query(self, query_id, *, params=None) -> str:  # pragma: no cover
         raise ValueError(f"Query {query_id} not found")
 
 

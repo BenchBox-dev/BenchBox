@@ -120,8 +120,8 @@ class TestValidateSparkIdentifier:
 
     def test_rejects_empty_and_non_string(self) -> None:
         assert validate_spark_identifier("") is False
-        assert validate_spark_identifier(None) is False  # type: ignore[arg-type]
-        assert validate_spark_identifier(42) is False  # type: ignore[arg-type]
+        assert validate_spark_identifier(None) is False
+        assert validate_spark_identifier(42) is False
 
     def test_rejects_injection_payloads(self) -> None:
         assert validate_spark_identifier("a-b") is False

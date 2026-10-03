@@ -32,7 +32,7 @@ checker = _load_script()
 class TestVersionParsing:
     def test_parses_locked_version(self):
         text = 'name = "sqlglot"\nversion = "30.18.0"\n'
-        assert checker._LOCK_VERSION_RE.search(text).group(1) == "30.18.0"  # type: ignore[union-attr]
+        assert checker._LOCK_VERSION_RE.search(text).group(1) == "30.18.0"
 
     def test_live_lockfile_has_version(self):
         assert checker.locked_sqlglot_version(None) is not None

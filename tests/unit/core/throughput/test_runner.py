@@ -438,7 +438,7 @@ class TestStreamRunnerNonBlockingShutdown:
     def test_cooperative_cancel_with_real_set_event_still_cancels(self) -> None:
 
         def slow_stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            cancel_event = cfg._stream_cancel_events[stream_id]  # type: ignore[attr-defined]
+            cancel_event = cfg._stream_cancel_events[stream_id]
             assert cancel_event.wait(timeout=1.0), "StreamRunner did not signal cooperative cancellation"
             return _make_stream_result(stream_id)
 

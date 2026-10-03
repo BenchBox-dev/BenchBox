@@ -16,8 +16,8 @@ try:
     POLARS_AVAILABLE = True
 except ImportError:
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment, misc]
+    pl = None
+    PolarsDataFrameAdapter = None
 
 from benchbox.core.read_primitives.dataframe_queries import (
     REGISTRY,

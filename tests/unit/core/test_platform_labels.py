@@ -35,7 +35,7 @@ class TestPlatformLabelAgreement:
         d1 = DetailResult.model_validate({**base, "result_id": "r1", "driver_version": "1.0.0"})
         d2 = DetailResult.model_validate({**base, "result_id": "r2", "driver_version": "1.2.0"})
 
-        pipeline_labels = disambiguate_platform_labels([d1, d2])  # type: ignore[arg-type]
+        pipeline_labels = disambiguate_platform_labels([d1, d2])
 
         cli_results = [
             make_normalized_result(platform="DuckDB", platform_version="1.0.0"),
@@ -72,7 +72,7 @@ class TestPlatformLabelAgreement:
         }
         d1 = DetailResult.model_validate({**base, "result_id": "r1"})
 
-        assert disambiguate_platform_labels([d1]) == ["DuckDB"]  # type: ignore[arg-type]
+        assert disambiguate_platform_labels([d1]) == ["DuckDB"]
 
         plotter = ResultPlotter([make_normalized_result(platform="DuckDB")])
         assert plotter.results[0].platform == "DuckDB"

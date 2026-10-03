@@ -24,44 +24,28 @@ def _default_store_path() -> Path:
 @dataclass
 class PublicationRecord:
     pub_id: str
-    """Unique publication ID (12-char hex derived from source path + timestamp)."""
 
     source_path: str
-    """Absolute path to the original schema-v2 result bundle (.json file)."""
 
     destination: str
-    """Storage destination: a directory path or cloud URI prefix (s3://, gs://, etc)."""
 
     reference: str
-    """Truthful, durable reference to the published artifact.
-
-    - Local filesystem: file:///abs/path/to/bundle.json
-    - Cloud storage: full cloud URI (e.g., s3://bucket/prefix/bundle.json)
-    """
 
     label: str
-    """Trust / provenance label (e.g., 'maintainer-run', 'community-submission')."""
 
     published_at: str
-    """ISO-8601 timestamp of the publication."""
 
     benchmark: str = ""
-    """Benchmark name extracted from the result bundle."""
 
     platform: str = ""
-    """Platform name extracted from the result bundle."""
 
     scale_factor: float = 1.0
-    """Scale factor extracted from the result bundle."""
 
     dataset_version: str | None = None
-    """Logical dataset version from the benchmark data manifest, when present."""
 
     manifest_hash: str | None = None
-    """Logical manifest hash from the benchmark data manifest, when present."""
 
     data_archive_hash: str | None = None
-    """Aggregate data archive hash from the benchmark data manifest, when present."""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

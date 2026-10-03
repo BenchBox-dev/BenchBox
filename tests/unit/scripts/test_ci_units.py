@@ -21,7 +21,7 @@ def rules() -> dict[str, list[str]]:
 
 def needed(paths: list[str], rules: dict[str, list[str]]) -> set[str]:
     decision = classify_units(paths, rules)
-    return {unit for unit, on in decision["units"].items() if on}  # type: ignore[union-attr]
+    return {unit for unit, on in decision["units"].items() if on}
 
 
 @pytest.mark.parametrize(
@@ -67,21 +67,21 @@ def test_independent_units_do_not_pull_core(rules: dict[str, list[str]]) -> None
 
 def test_unowned_path_fails_closed_to_core(rules: dict[str, list[str]]) -> None:
     decision = classify_units(["brand-new-top-level/thing.bin"], rules)
-    assert decision["units"]["core"] is True  # type: ignore[index]
+    assert decision["units"]["core"] is True
     assert decision["unowned_paths"] == ["brand-new-top-level/thing.bin"]
 
 
 def test_empty_change_set_runs_every_unit(rules: dict[str, list[str]]) -> None:
     decision = classify_units([], rules)
     assert decision["run_all"] is True
-    assert all(decision["units"][unit] for unit in UNITS)  # type: ignore[index]
+    assert all(decision["units"][unit] for unit in UNITS)
 
 
 @pytest.mark.parametrize("path", [".github/workflows/ci.yml", ".github/ci-units.yml", "scripts/ci_units.py"])
 def test_self_protection_runs_every_unit(path: str, rules: dict[str, list[str]]) -> None:
     decision = classify_units([path], rules)
     assert decision["run_all"] is True
-    assert all(decision["units"][unit] for unit in UNITS)  # type: ignore[index]
+    assert all(decision["units"][unit] for unit in UNITS)
 
 
 def test_code_tests_needed_covers_core_and_tooling(rules: dict[str, list[str]]) -> None:

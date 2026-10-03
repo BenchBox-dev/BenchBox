@@ -23,7 +23,7 @@ pytestmark = [
 
 
 try:
-    import pandas  # noqa: F401
+    import pandas
 
     HAS_PANDAS = True
 except ImportError:

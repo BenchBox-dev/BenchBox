@@ -1,1 +1,1 @@
-from textcharts.base import *  # noqa: F401, F403
+from textcharts.base import *  # noqa: F403

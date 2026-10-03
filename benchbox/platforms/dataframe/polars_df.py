@@ -13,7 +13,7 @@ try:
 
     POLARS_AVAILABLE = True
 except ImportError:
-    pl = None  # type: ignore[assignment]
+    pl = None
     POLARS_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration

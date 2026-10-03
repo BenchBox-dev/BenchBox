@@ -39,7 +39,7 @@ def test_result_schema_version_value_rejects_conflicting_aliases() -> None:
 
 @pytest.mark.parametrize("not_a_dict", [None, "2.2", 22, ["2.2"]])
 def test_result_schema_version_value_rejects_non_dicts(not_a_dict: object) -> None:
-    assert result_schema_version_value(not_a_dict) is None  # type: ignore[arg-type]
+    assert result_schema_version_value(not_a_dict) is None
 
 
 def _write_bundle(tmp_path: Path, data: dict) -> Path:

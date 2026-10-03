@@ -19,7 +19,7 @@ try:
 
     PathLike = Union[Path, CloudPath]
 except ImportError:
-    PathLike = Path  # type: ignore[misc,assignment]
+    PathLike = Path
 
 NUM_QUERY_VECTORS = 100
 

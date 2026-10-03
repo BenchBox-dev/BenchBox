@@ -156,7 +156,7 @@ class TPCHThroughputTest:
                             scale_factor=config.scale_factor,
                         )
                     )
-                except Exception as exc:  # noqa: BLE001 - deferred to per-query fault isolation
+                except Exception as exc:
                     sql_list.append(exc)
             return stream_id, sql_list
 

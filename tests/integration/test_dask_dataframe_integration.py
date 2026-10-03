@@ -16,7 +16,7 @@ pytestmark = [
 
 
 try:
-    import dask.dataframe as dd  # noqa: F401
+    import dask.dataframe as dd
 
     dask_available = True
 except ImportError:

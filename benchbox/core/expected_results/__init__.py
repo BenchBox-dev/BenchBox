@@ -8,8 +8,8 @@ logger = logging.getLogger(__name__)
 
 _providers_registered = False
 
-from benchbox.core.expected_results import tpcds_results, tpch_results  # noqa: F401, E402
-from benchbox.core.expected_results.registry import get_registry  # noqa: E402
+from benchbox.core.expected_results import tpcds_results, tpch_results
+from benchbox.core.expected_results.registry import get_registry
 
 
 def register_all_providers():

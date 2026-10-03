@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "scripts" / "_chart_data"
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from capture_chart_images import (  # noqa: E402
+from capture_chart_images import (
     HTML_TEMPLATE,
     PRIMARY_OUT,
     ansi_to_html,

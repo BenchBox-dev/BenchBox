@@ -25,7 +25,7 @@ class ClickHouseServerAdapter(ClickHouseAdapter):
     def from_config(cls, config: dict[str, Any]) -> ClickHouseServerAdapter:
         config = dict(config)
         config["deployment_mode"] = "server"
-        return super().from_config(config)  # type: ignore[return-value]
+        return super().from_config(config)
 
 
 __all__ = ["ClickHouseServerAdapter"]

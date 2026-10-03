@@ -448,7 +448,7 @@ class VectorSearchQueryManager:
             registry_decision = REGISTRY.resolve(ctx)
             if registry_decision is not None:
                 if registry_decision.action is CompatAction.SELECT_VARIANT:
-                    return registry_decision.payload.variant_sql  # type: ignore[union-attr]
+                    return registry_decision.payload.variant_sql
                 if registry_decision.action is CompatAction.SKIP_QUERY:
                     reason = getattr(registry_decision.payload, "reason", None) or registry_decision.reason
                     raise QuerySkippedError(
@@ -456,7 +456,7 @@ class VectorSearchQueryManager:
                         f"for platform version '{platform_version or 'unknown'}': {reason}"
                     )
 
-            return legacy_sql  # type: ignore[return-value]
+            return legacy_sql
 
         return self._queries[key]
 

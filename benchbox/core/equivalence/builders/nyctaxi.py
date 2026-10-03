@@ -46,7 +46,7 @@ def _force_offline_synthesis(downloader: NYCTaxiDataDownloader) -> None:
     def _synthetic_only(self: NYCTaxiDataDownloader, url: str, writer: Any, start_trip_id: int) -> int:
         return self._generate_synthetic_month(writer, start_trip_id)
 
-    downloader._process_parquet_file = _synthetic_only.__get__(downloader)  # type: ignore[method-assign]
+    downloader._process_parquet_file = _synthetic_only.__get__(downloader)
 
 
 NYCTAXI_GATE_SEED = 42
@@ -83,7 +83,7 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
     def _forbidden_urlretrieve(*args: object, **kwargs: object) -> object:
         raise AssertionError("nyctaxi gate must not touch the network")
 
-    urllib.request.urlretrieve = _forbidden_urlretrieve  # type: ignore[method-assign]
+    urllib.request.urlretrieve = _forbidden_urlretrieve
     try:
         benchmark.generate_data()
     finally:

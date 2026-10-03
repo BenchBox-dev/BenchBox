@@ -1,5 +1,3 @@
-"""YAML loader for TPC-Havoc DataFrame variant registries."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence

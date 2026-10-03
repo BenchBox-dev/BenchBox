@@ -9,7 +9,7 @@ import sys
 import pytest
 
 try:
-    import pyiceberg  # noqa: F401
+    import pyiceberg
 
     ICEBERG_AVAILABLE = True
 except ImportError:
@@ -20,7 +20,7 @@ try:
 
     PYARROW_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
+    pa = None
     PYARROW_AVAILABLE = False
 
 IS_WINDOWS = sys.platform == "win32"

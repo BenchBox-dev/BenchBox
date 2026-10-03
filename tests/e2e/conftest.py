@@ -247,4 +247,4 @@ def find_latest_result(
     return files[0] if files else None
 
 
-import subprocess  # noqa: E402
+import subprocess

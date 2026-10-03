@@ -14,7 +14,7 @@ def build_tpch_skew_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfac
     from benchbox.tpch_skew import TPCHSkew
 
     def _dataframe_query(query_id: str) -> object:
-        import benchbox.core.dataframe.benchmark_suite  # noqa: F401  # break circular import
+        import benchbox.core.dataframe.benchmark_suite  # noqa: F401
         from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
         from benchbox.core.tpch_skew.dataframe_queries import TPCH_SKEW_DATAFRAME_QUERIES
 

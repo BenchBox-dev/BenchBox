@@ -85,9 +85,9 @@ class StreamRunner:
 
             if cooperative_cancel:
                 cancel_events = {stream_id: threading.Event() for stream_id in range(config.num_streams)}
-                config._stream_cancel_events = cancel_events  # type: ignore[attr-defined]
+                config._stream_cancel_events = cancel_events
             else:
-                config._stream_cancel_events = {}  # type: ignore[attr-defined]
+                config._stream_cancel_events = {}
 
             for stream_id in range(config.num_streams):
                 future = executor.submit(
@@ -205,7 +205,7 @@ class StreamRunner:
                 )
             )
 
-            result._outstanding_futures = outstanding_futures  # type: ignore[attr-defined]
+            result._outstanding_futures = outstanding_futures
             result.cleanup_state = "outstanding" if result.outstanding_stream_ids else "complete"
 
     @staticmethod

@@ -100,7 +100,7 @@ def current_successful_deployment(deployments: list[dict[str, Any]]) -> tuple[di
 
 def sha256_url(url: str) -> tuple[str, int, dict[str, str]]:
     request = urllib.request.Request(url, headers={"User-Agent": "BenchBox-publication-baseline/1"})
-    with urllib.request.urlopen(request, timeout=60) as response:  # noqa: S310 - fixed HTTPS production URL
+    with urllib.request.urlopen(request, timeout=60) as response:
         payload = response.read()
         headers = {key.lower(): value for key, value in response.headers.items()}
     return hashlib.sha256(payload).hexdigest(), len(payload), headers

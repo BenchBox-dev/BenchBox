@@ -228,5 +228,5 @@ def main(argv: list[str] | None = None) -> int:
     return 1
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised via the make gate
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

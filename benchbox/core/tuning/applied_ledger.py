@@ -97,14 +97,14 @@ def _split_sql_script(script: Any) -> list[str]:
         if pending and "".join(pending).strip():
             statements.append("".join(pending).strip())
         return statements
-    except Exception:  # pragma: no cover - defensive fallback for non-SQLite runtimes
+    except Exception:  # pragma: no cover
         return [text]
 
 
 def _is_recordable_statement(statement: Any) -> bool:
     try:
         text = str(statement).lstrip().lstrip("(").lstrip().lower()
-    except Exception:  # pragma: no cover - defensive; never drop on uncertainty
+    except Exception:  # pragma: no cover
         return True
     return not text.startswith(_READBACK_PREFIXES)
 
@@ -356,6 +356,6 @@ def recording_connection(
         return connection
     try:
         return RecordingConnection(connection, ledger, phase, statement_filter)
-    except Exception as exc:  # pragma: no cover - defensive
+    except Exception as exc:  # pragma: no cover
         logger.debug("applied-ledger connection wrap degraded: %s", exc)
         return connection

@@ -196,7 +196,7 @@ def validate_platform_surfaces() -> list[str]:
 
 def _mode_label(capabilities: object) -> str:
     if not isinstance(capabilities, dict):
-        capabilities = dict(capabilities)  # type: ignore[arg-type]
+        capabilities = dict(capabilities)
     modes = []
     if capabilities.get("supports_sql"):
         modes.append("SQL")

@@ -85,7 +85,7 @@ def _restore_sweep_sigterm_shim(previous: object | None) -> None:
         return
     restore_to = signal.SIG_DFL if previous is None else previous
     try:
-        signal.signal(signal.SIGTERM, restore_to)  # type: ignore[arg-type]
+        signal.signal(signal.SIGTERM, restore_to)
     except (ValueError, OSError, TypeError):
         pass
 
@@ -125,7 +125,7 @@ def _cell_datagen_dir(benchmark_runs_dir: Path | str | None, benchmark: str, sca
         from benchbox.utils.output_path import normalize_output_root
 
         normalized = normalize_output_root(str(Path(benchmark_runs_dir) / "datagen"), benchmark, scale)
-    except Exception:  # pragma: no cover - path resolution is advisory here
+    except Exception:  # pragma: no cover
         return None
     return Path(normalized) if normalized else None
 

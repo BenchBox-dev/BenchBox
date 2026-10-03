@@ -25,7 +25,7 @@ from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import (
     CsvDialect,
-    DataSourceResolver,  # noqa: F401 - tests patch this module-local name; shared loader resolves it dynamically.
+    DataSourceResolver,  # noqa: F401
     FileFormatRegistry,
     GzipHandler,
     NoCompressionHandler,
@@ -95,9 +95,9 @@ _CREATE_TABLE_RE = re.compile(
     r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`\"]?(\w+)[`\"]?\s*\(",
     re.IGNORECASE,
 )
-_KNOWN_SQL_TYPES = frozenset(  # noqa: SIM905
+_KNOWN_SQL_TYPES = frozenset(
     "int integer bigint smallint tinyint largeint float double decimal numeric string text varchar char boolean "
-    "bool date datetime timestamp time json jsonb array map struct bitmap hll blob binary varbinary".split()  # noqa: SIM905
+    "bool date datetime timestamp time json jsonb array map struct bitmap hll blob binary varbinary".split()
 )
 _COL_DEF_RE = re.compile(r'[`"]?(\w+)[`"]?\s+(\w+)', re.MULTILINE)
 _NON_KEY_DORIS_TYPES = frozenset({"time", "json", "jsonb", "blob", "binary", "hll", "bitmap"})

@@ -11,8 +11,8 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.query_adapter.clickhouse_session_policy  # noqa: F401
-import benchbox.sql_compat.rules.query_adapter.datafusion_query_rewrites  # noqa: F401
+import benchbox.sql_compat.rules.query_adapter.clickhouse_session_policy
+import benchbox.sql_compat.rules.query_adapter.datafusion_query_rewrites
 from benchbox.sql_compat.registry import REGISTRY
 
 

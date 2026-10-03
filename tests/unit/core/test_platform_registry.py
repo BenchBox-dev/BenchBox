@@ -436,7 +436,7 @@ class TestPlatformRegistry:
         assert "clickhouse" in PlatformRegistry.get_platforms_by_support_status("deprecated")
 
         with pytest.raises(ValueError, match="Unknown support_status"):
-            PlatformRegistry.get_platforms_by_support_status("unknown")  # type: ignore[arg-type]
+            PlatformRegistry.get_platforms_by_support_status("unknown")
 
     @patch("benchbox.core.platform_registry.importlib.import_module")
     def test_optional_adapter_diagnostics_available(self, mock_import):

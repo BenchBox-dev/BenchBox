@@ -988,7 +988,7 @@ class DryRunExecutor:
             return f"Standard sequential execution ({query_count} queries)"
 
 
-def preview_benchmark_run(  # noqa: C901
+def preview_benchmark_run(
     platform: str,
     benchmark: str,
     scale_factor: float,

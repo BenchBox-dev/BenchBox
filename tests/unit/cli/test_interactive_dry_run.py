@@ -259,7 +259,7 @@ class TestGenerateCLICommand:
 class TestDisplayInteractivePreview:
     def _create_mock_database_config(self, platform_type="duckdb", execution_mode="sql"):
 
-        class MockDatabaseConfig:  # noqa: B903 - test stub, not domain model
+        class MockDatabaseConfig:  # noqa: B903
             def __init__(self):
                 self.type = platform_type
                 self.execution_mode = execution_mode

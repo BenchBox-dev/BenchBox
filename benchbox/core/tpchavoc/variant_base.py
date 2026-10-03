@@ -22,7 +22,7 @@ class StaticSQLVariant(VariantGenerator):
         super().__init__(variant_id, description)
         self._sql = sql
 
-    def generate(self, base_query: str, params: dict[str, Any] | None = None) -> str:  # noqa: ARG002
+    def generate(self, base_query: str, params: dict[str, Any] | None = None) -> str:
         sql = self._sql
         for key, value in (params or {}).items():
             sql = sql.replace("{" + key + "}", str(value))

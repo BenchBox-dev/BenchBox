@@ -107,8 +107,8 @@ class TestPowerTestExecution:
             mock_cursor.fetchall = Mock(return_value=[(1,)])
             return mock_cursor
 
-        fail_once_on_execute.invocations = 0  # type: ignore[attr-defined]
-        fail_once_on_execute.failed = False  # type: ignore[attr-defined]
+        fail_once_on_execute.invocations = 0
+        fail_once_on_execute.failed = False
 
         with patch.object(power_test, "_preflight_validate_generation", return_value=None):
             power_test.connection.execute.side_effect = fail_once_on_execute

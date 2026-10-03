@@ -26,9 +26,9 @@ try:
     PYSPARK_VERSION = pyspark.__version__
 except ImportError:
     PYSPARK_AVAILABLE = False
-    PYSPARK_VERSION = None  # type: ignore[assignment]
-    pyspark = None  # type: ignore[assignment]
-    SparkSession = Any  # type: ignore[assignment,misc]
+    PYSPARK_VERSION = None
+    pyspark = None
+    SparkSession = Any
 
 logger = logging.getLogger(__name__)
 

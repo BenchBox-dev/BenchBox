@@ -55,7 +55,7 @@ def test_non_raising_expression_returns_none():
 
 
 def test_non_expr_object_returns_none_without_raising():
-    assert uf._get_datafusion_ast_string("id") is None  # type: ignore[arg-type]
+    assert uf._get_datafusion_ast_string("id") is None
 
 
 def test_recognized_format_still_extracts_ast_string():

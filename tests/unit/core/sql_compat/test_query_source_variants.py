@@ -11,8 +11,8 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.query_source.coffeeshop_variants  # noqa: F401
-import benchbox.sql_compat.rules.query_source.h2odb_variants  # noqa: F401
+import benchbox.sql_compat.rules.query_source.coffeeshop_variants
+import benchbox.sql_compat.rules.query_source.h2odb_variants
 from benchbox.sql_compat.registry import REGISTRY
 
 

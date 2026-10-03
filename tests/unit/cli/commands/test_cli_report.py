@@ -1,5 +1,3 @@
-"""Unit tests for report CLI command."""
-
 from __future__ import annotations
 
 import json
@@ -26,7 +24,6 @@ def create_test_result(
     timestamp: datetime | None = None,
     geometric_mean_ms: float = 100.0,
 ):
-    """Report-test defaults delegating to shared factory."""
     return make_benchmark_results(
         benchmark_name=benchmark,
         platform=platform,
@@ -43,10 +40,7 @@ def create_test_result(
 
 
 class TestReportStats:
-    """Tests for benchbox report stats command."""
-
     def test_stats_empty_database(self, tmp_path):
-        """Test stats command with empty database."""
         runner = CliRunner()
         db_path = tmp_path / "test.db"
 
@@ -57,7 +51,6 @@ class TestReportStats:
         assert "0" in result.output
 
     def test_stats_with_data(self, tmp_path):
-        """Test stats command with data."""
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
         db.store_result(create_test_result(execution_id="stat-1"))
@@ -67,14 +60,11 @@ class TestReportStats:
         result = runner.invoke(cli, ["report", "stats", "--db-path", str(db_path)])
 
         assert result.exit_code == 0
-        assert "2" in result.output  # Total Results
+        assert "2" in result.output
 
 
 class TestReportList:
-    """Tests for benchbox report list command."""
-
     def test_list_empty_database(self, tmp_path):
-        """Test list command with empty database."""
         runner = CliRunner()
         db_path = tmp_path / "test.db"
 
@@ -84,7 +74,6 @@ class TestReportList:
         assert "No results found" in result.output
 
     def test_list_with_results(self, tmp_path):
-        """Test list command with results."""
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
         db.store_result(create_test_result(execution_id="list-1", platform="DuckDB"))
@@ -97,7 +86,6 @@ class TestReportList:
         assert "TPC-H" in result.output
 
     def test_list_with_platform_filter(self, tmp_path):
-        """Test list command with platform filter."""
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
         db.store_result(create_test_result(execution_id="f1", platform="DuckDB"))
@@ -116,10 +104,7 @@ class TestReportList:
 
 
 class TestReportRankings:
-    """Tests for benchbox report rankings command."""
-
     def test_rankings_no_data(self, tmp_path):
-        """Test rankings command with no matching data."""
         runner = CliRunner()
         db_path = tmp_path / "test.db"
 
@@ -141,7 +126,6 @@ class TestReportRankings:
         assert "No results found" in result.output
 
     def test_rankings_with_data(self, tmp_path):
-        """Test rankings command with data."""
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
         now = datetime.now(timezone.utc)
@@ -189,10 +173,7 @@ class TestReportRankings:
 
 
 class TestReportTrends:
-    """Tests for benchbox report trends command."""
-
     def test_trends_no_data(self, tmp_path):
-        """Test trends command with no matching data."""
         runner = CliRunner()
         db_path = tmp_path / "test.db"
 
@@ -217,10 +198,7 @@ class TestReportTrends:
 
 
 class TestReportRegressions:
-    """Tests for benchbox report regressions command."""
-
     def test_regressions_no_data(self, tmp_path):
-        """Test regressions command with no data."""
         runner = CliRunner()
         db_path = tmp_path / "test.db"
 
@@ -234,15 +212,11 @@ class TestReportRegressions:
 
 
 class TestReportImport:
-    """Tests for benchbox report import command."""
-
     def test_import_directory(self, tmp_path):
-        """Test importing results from a directory."""
         db_path = tmp_path / "test.db"
         results_dir = tmp_path / "results"
         results_dir.mkdir()
 
-        # Create test result file using v2.0 schema format
         result_data = make_v2_result_dict(
             version="2.0",
             benchmark_id="tpc_h",
@@ -267,7 +241,6 @@ class TestReportImport:
         assert "Imported: 1" in result.output
 
     def test_import_nonexistent_directory(self, tmp_path):
-        """Test importing from nonexistent directory."""
         runner = CliRunner()
         db_path = tmp_path / "test.db"
 
@@ -276,14 +249,11 @@ class TestReportImport:
             ["report", "import", "/nonexistent/path", "--db-path", str(db_path)],
         )
 
-        assert result.exit_code != 0  # Should fail
+        assert result.exit_code != 0
 
 
 class TestReportHelp:
-    """Tests for report command help."""
-
     def test_report_help(self):
-        """Test report command help message."""
         runner = CliRunner()
         result = runner.invoke(cli, ["report", "--help"])
 
@@ -296,7 +266,6 @@ class TestReportHelp:
         assert "stats" in result.output
 
     def test_rankings_help(self):
-        """Test rankings subcommand help."""
         runner = CliRunner()
         result = runner.invoke(cli, ["report", "rankings", "--help"])
 

@@ -32,7 +32,7 @@ def _results(**overrides: object) -> BenchmarkResults:
         "failed_queries": 0,
     }
     base.update(overrides)
-    return BenchmarkResults(**base)  # type: ignore[arg-type]
+    return BenchmarkResults(**base)
 
 
 def _platform_config(result: BenchmarkResults) -> dict:

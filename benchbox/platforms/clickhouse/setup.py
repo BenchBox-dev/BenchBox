@@ -5,7 +5,6 @@ import os
 import re
 from typing import Any
 
-"""Setup and connection routines for ClickHouse."""
 from ._dependencies import ClickHouseClient
 from .client import ClickHouseCloudClient, ClickHouseLocalClient
 

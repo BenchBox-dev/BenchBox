@@ -69,7 +69,7 @@ HTML_TEMPLATE = """\
 
 
 def ansi_to_html(ansi_text: str) -> str:
-    from ansi2html import Ansi2HTMLConverter  # type: ignore[import]
+    from ansi2html import Ansi2HTMLConverter
 
     converter = Ansi2HTMLConverter(inline=True, scheme="ansi2html", dark_bg=True)
     return converter.convert(ansi_text, full=False)
@@ -118,7 +118,7 @@ def render_url_to_png(url: str, out_path: Path, width: int = 1280, height: int =
 
 
 def crop_to_content(png_path: Path, bg=(26, 30, 36), tolerance: int = 4, pad: int = 32) -> None:
-    from PIL import Image  # type: ignore[import]
+    from PIL import Image
 
     img = Image.open(png_path).convert("RGB")
     pixels = img.load()

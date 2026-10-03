@@ -1,14 +1,8 @@
-"""TPC-DS DataFrame query registry.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the central registry for TPC-DS DataFrame queries,
-following the same pattern as TPC-H but with TPC-DS-specific parameters.
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -17,7 +11,6 @@ from typing import Callable
 
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
-# TPC-DS DataFrame Query Registry
 TPCDS_DATAFRAME_QUERIES = QueryRegistry("tpcds")
 
 

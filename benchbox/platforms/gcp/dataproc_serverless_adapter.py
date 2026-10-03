@@ -1,34 +1,6 @@
-"""GCP Dataproc Serverless platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Dataproc Serverless is Google Cloud's fully managed, auto-scaling Spark service.
-Unlike traditional Dataproc clusters, Serverless eliminates cluster management
-entirely - you submit batches and GCP handles all infrastructure automatically.
-
-Key Features:
-- No cluster management: Submit batches, GCP provisions resources automatically
-- Auto-scaling: Resources scale based on workload demands
-- Fast startup: Sub-minute batch startup vs minutes for clusters
-- Cost-effective: Pay only for actual compute time, no idle cluster costs
-- GCS integration: Native Google Cloud Storage support
-
-Usage:
-    from benchbox.platforms.gcp import DataprocServerlessAdapter
-
-    adapter = DataprocServerlessAdapter(
-        project_id="my-project",
-        region="us-central1",
-        gcs_staging_dir="gs://my-bucket/benchbox-data",
-    )
-
-    # Run TPC-H benchmark
-    adapter.create_schema("tpch_sf1")
-    adapter.load_data(["lineitem", "orders", ...], source_dir)
-    result = adapter.execute_query("SELECT * FROM lineitem LIMIT 10")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -81,11 +53,6 @@ def _script_argument(value: str) -> str:
 
 
 class DataprocBatchState:
-    """Dataproc Serverless batch state constants.
-
-    Reference: https://cloud.google.com/dataproc-serverless/docs/reference/rpc/google.cloud.dataproc.v1#google.cloud.dataproc.v1.Batch.State
-    """
-
     STATE_UNSPECIFIED = "STATE_UNSPECIFIED"
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -94,44 +61,16 @@ class DataprocBatchState:
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
 
-    # Terminal states
     TERMINAL_STATES = {SUCCEEDED, FAILED, CANCELLED}
 
-    # Success state
     SUCCESS_STATES = {SUCCEEDED}
 
 
 class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkExternalTableMixin, PlatformAdapter):
-    """GCP Dataproc Serverless platform adapter.
-
-    Dataproc Serverless is Google Cloud's fully managed Spark service that
-    eliminates cluster management. Batches are submitted and GCP automatically
-    provisions and scales the required resources.
-
-    Execution Model:
-    - Batches are submitted via the Batch Controller API
-    - GCP provisions Spark resources automatically
-    - Results are written to GCS and retrieved after batch completion
-    - No cluster to manage, start, or stop
-
-    Key Features:
-    - Zero cluster management
-    - Sub-minute batch startup
-    - Automatic resource scaling
-    - Integration with GCS, BigQuery, and Bigtable
-    - Spark 3.x with Delta Lake support
-
-    Billing:
-    - Per-second billing for actual compute time
-    - No idle costs (unlike persistent clusters)
-    - Pricing: ~$0.06/vCPU-hour, ~$0.0065/GB-hour
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-    # CloudSparkConfigMixin: Uses Dataproc Serverless-optimized config
     cloud_platform = CloudPlatform.DATAPROC_SERVERLESS
 
     def __init__(
@@ -149,21 +88,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Dataproc Serverless adapter.
-
-        Args:
-            project_id: GCP project ID (required).
-            region: GCP region for batch execution (default: us-central1).
-            gcs_staging_dir: GCS path for data staging (required, e.g., gs://bucket/path).
-            database: Hive database name (default: benchbox).
-            runtime_version: Dataproc Serverless runtime version (default: 2.1).
-            service_account: Service account email for batch execution.
-            network_uri: VPC network URI (optional, uses default if not provided).
-            subnetwork_uri: Subnetwork URI (optional).
-            timeout_minutes: Batch timeout in minutes (default: 60).
-            spark_config: Additional Spark configuration properties.
-            **kwargs: Additional platform options.
-        """
         if not GOOGLE_CLOUD_AVAILABLE:
             deps_satisfied, missing = check_platform_dependencies("dataproc-serverless")
             if not deps_satisfied:
@@ -187,22 +111,18 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         self.timeout_minutes = timeout_minutes
         self.table_format = table_format or "parquet"
 
-        # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
         try:
             self._staging = CloudSparkStaging.from_uri(self.gcs_staging_dir)
         except Exception as e:
             logger.warning(f"Failed to initialize GCS staging: {e}")
 
-        # Clients (lazy initialization)
         self._batch_client: Any = None
         self._storage_client: Any = None
 
-        # Metrics tracking
         self._query_count = 0
         self._total_batch_time_seconds = 0.0
 
-        # Benchmark configuration (set via configure_for_benchmark)
         self._benchmark_type: str | None = None
         self._scale_factor: float = 1.0
         self._spark_config: dict[str, str] = spark_config or {}
@@ -210,7 +130,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         super().__init__(**kwargs)
 
     def _get_batch_client(self) -> Any:
-        """Get or create Dataproc Batch Controller client."""
         if self._batch_client is None:
             self._batch_client = dataproc_v1.BatchControllerClient(
                 client_options={"api_endpoint": f"{self.region}-dataproc.googleapis.com:443"}
@@ -218,20 +137,11 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         return self._batch_client
 
     def _get_storage_client(self) -> Any:
-        """Get or create GCS storage client."""
         if self._storage_client is None:
             self._storage_client = storage.Client(project=self.project_id)
         return self._storage_client
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Return platform metadata.
-
-        Args:
-            connection: Not used (Dataproc Serverless manages sessions internally).
-
-        Returns:
-            Dict with platform information including name, version, and capabilities.
-        """
         return {
             "platform": "dataproc-serverless",
             "display_name": "Google Cloud Dataproc Serverless",
@@ -247,19 +157,9 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         }
 
     def create_connection(self, **kwargs: Any) -> Any:
-        """Verify GCP connectivity and permissions.
-
-        Returns:
-            Dict with connection status and project info.
-
-        Raises:
-            ConfigurationError: If GCP connection fails.
-        """
         try:
-            # Verify batch API access by listing batches (will fail if no permissions)
             client = self._get_batch_client()
 
-            # List batches to verify permissions (empty result is fine)
             parent = f"projects/{self.project_id}/locations/{self.region}"
             request = dataproc_v1.ListBatchesRequest(parent=parent, page_size=1)
             client.list_batches(request=request)
@@ -275,16 +175,9 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
             raise ConfigurationError(f"Failed to connect to Dataproc Serverless: {e}") from e
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create Hive database if it doesn't exist.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection metadata; not used by Dataproc Serverless.
-        """
         start_time = mono_time()
         database = self.database
 
-        # Create database via a Spark SQL batch
         create_db_query = f"CREATE DATABASE IF NOT EXISTS {database}"
         self._submit_spark_sql_batch(create_db_query, wait_for_completion=True)
         logger.info(f"Database '{database}' created or already exists")
@@ -295,15 +188,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         query: str,
         wait_for_completion: bool = True,
     ) -> tuple[str, str]:
-        """Submit a Spark SQL batch to Dataproc Serverless.
-
-        Args:
-            query: SQL query to execute.
-            wait_for_completion: Whether to wait for batch completion.
-
-        Returns:
-            Tuple of (batch_id, final_state).
-        """
         client = self._get_batch_client()
 
         batch_id = f"benchbox-{uuid.uuid4().hex[:12]}"
@@ -311,11 +195,9 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
 
         job_script = Path(__file__).with_name("_dataproc_query.py").read_text(encoding="utf-8")
 
-        # Upload script to GCS
         script_path = f"{self.gcs_staging_dir}/scripts/{batch_id}.py"
         self._upload_to_gcs(script_path, job_script)
 
-        # Build batch configuration
         batch = {
             "pyspark_batch": {
                 "main_python_file_uri": script_path,
@@ -327,7 +209,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
             },
         }
 
-        # Add service account if specified
         if self.service_account:
             batch["environment_config"] = {
                 "execution_config": {
@@ -335,7 +216,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
                 }
             }
 
-        # Add network configuration if specified
         if self.network_uri or self.subnetwork_uri:
             if "environment_config" not in batch:
                 batch["environment_config"] = {"execution_config": {}}
@@ -362,15 +242,8 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
             return batch_id, DataprocBatchState.PENDING
 
     def _upload_to_gcs(self, gcs_path: str, content: str) -> None:
-        """Upload content to GCS.
-
-        Args:
-            gcs_path: Full GCS path (gs://bucket/path).
-            content: Content to upload.
-        """
         client = self._get_storage_client()
 
-        # Parse GCS path
         if gcs_path.startswith("gs://"):
             gcs_path = gcs_path[5:]
         bucket_name, blob_name = gcs_path.split("/", 1)
@@ -380,14 +253,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         blob.upload_from_string(content)
 
     def _retrieve_results(self, batch_id: str) -> list[dict[str, Any]]:
-        """Retrieve batch results from GCS.
-
-        Args:
-            batch_id: The batch ID.
-
-        Returns:
-            List of result rows as dicts.
-        """
         client = self._get_storage_client()
         results_prefix = f"{self.gcs_prefix}/results/{batch_id}/"
 
@@ -398,7 +263,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         for blob in blobs:
             if blob.name.endswith(".json"):
                 content = blob.download_as_string()
-                # Spark JSON output is newline-delimited JSON
                 for line in content.decode().strip().split("\n"):
                     if line:
                         results.append(json.loads(line))
@@ -411,16 +275,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Upload benchmark data to GCS and create Hive tables.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection metadata; not used by Dataproc Serverless.
-            data_dir: Local directory containing table data files.
-
-        Returns:
-            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
-        """
         start_time = mono_time()
         source_path = Path(data_dir)
         tables = _resolve_benchmark_table_names(benchmark)
@@ -428,13 +282,11 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         if not source_path.exists():
             raise ConfigurationError(f"Source directory not found: {data_dir}")
 
-        # Check if tables already exist in GCS
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in GCS staging, skipping upload")
             table_uris = {table: self._staging.get_table_uri(table) for table in tables}
             return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
-        # Upload using cloud-spark staging infrastructure
         if self._staging:
             logger.info(f"Uploading {len(tables)} tables to GCS staging")
             self._staging.upload_tables(
@@ -443,7 +295,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
                 file_format=file_format,
             )
 
-        # Create Hive external tables via Serverless batches
         table_uris = {}
         for table in tables:
             table_uri = f"{self.gcs_staging_dir}/tables/{table}"
@@ -460,7 +311,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
     def _register_external_table(self, table_name: str, location: str, file_format: str) -> None:
-        """Register one external table over staged files via a Spark SQL batch."""
         self._validate_external_identifier(table_name, "table name")
         self._validate_external_identifier(self.database, "database name")
         safe_location = self._escape_external_location(location)
@@ -487,16 +337,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a SQL query on Dataproc Serverless.
-
-        Args:
-            connection: Active connection metadata; not used by Dataproc Serverless.
-            query: SQL query to execute.
-            query_id: Query identifier.
-
-        Returns:
-            Standard query result dictionary.
-        """
         start_time = mono_time()
         try:
             batch_id, state = self._submit_spark_sql_batch(query, wait_for_completion=True)
@@ -527,18 +367,12 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
             }
 
     def close(self) -> None:
-        """Clean up resources."""
         logger.info(f"Dataproc Serverless session closed. Executed {self._query_count} batches.")
         if self._total_batch_time_seconds > 0:
             logger.info(f"Total batch time: {self._total_batch_time_seconds:.1f}s")
 
     @staticmethod
     def add_cli_arguments(parser: Any) -> None:
-        """Add Dataproc Serverless-specific CLI arguments.
-
-        Args:
-            parser: Argument parser to add arguments to.
-        """
         group = parser.add_argument_group("Dataproc Serverless Options")
         group.add_argument(
             "--project-id",
@@ -584,14 +418,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> DataprocServerlessAdapter:
-        """Create adapter from configuration dict.
-
-        Args:
-            config: Configuration dictionary.
-
-        Returns:
-            Configured DataprocServerlessAdapter instance.
-        """
         params = {
             "project_id": config.get("project_id"),
             "region": config.get("region", "us-central1"),
@@ -605,7 +431,6 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
             "table_format": config.get("table_format"),
         }
 
-        # Pass through tuning provenance/config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -618,17 +443,5 @@ class DataprocServerlessAdapter(CloudSparkConfigMixin, SparkTuningMixin, SparkEx
 
         return cls(**params)
 
-    # configure_for_benchmark is inherited from CloudSparkConfigMixin
-
-    # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
-    # and apply_constraint_configuration are inherited from SparkTuningMixin
-
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Dataproc Serverless.
-
-        Dataproc Serverless uses Spark SQL for query execution.
-
-        Returns:
-            The dialect string "spark".
-        """
         return "spark"

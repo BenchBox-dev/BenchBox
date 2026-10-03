@@ -36,7 +36,7 @@ class _DummyAdapter(PlatformAdapter):
     def platform_name(self) -> str:
         return "DummyDB"
 
-    def get_target_dialect(self) -> str:  # type: ignore[override]
+    def get_target_dialect(self) -> str:
         return "duckdb"
 
     def create_connection(self, **connection_config):

@@ -19,7 +19,7 @@ try:
 
     PYARROW_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
+    pa = None
     PYARROW_AVAILABLE = False
 
 logger = logging.getLogger(__name__)

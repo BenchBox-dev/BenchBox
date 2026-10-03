@@ -658,7 +658,7 @@ def test_medium_runner_uses_file_targets_and_scrubs_changed_paths(
     calls: list[tuple[list[str], dict[str, str]]] = []
 
     def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
-        calls.append((command, kwargs["env"]))  # type: ignore[arg-type]
+        calls.append((command, kwargs["env"]))
         return subprocess.CompletedProcess(command, 0)
 
     monkeypatch.setattr(canary_impact.subprocess, "run", fake_run)

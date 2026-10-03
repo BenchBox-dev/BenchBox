@@ -94,7 +94,7 @@ def test_databend_platform_doc_uses_platform_options() -> None:
 
 
 def test_databend_documented_boolean_options_are_registered() -> None:
-    import benchbox.platforms  # noqa: F401 - registers the platform option specs
+    import benchbox.platforms
     from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 
     parsed = PlatformHookRegistry.parse_options("databend", [("ssl", "false"), ("disable_result_cache", "false")])

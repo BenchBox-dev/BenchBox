@@ -132,7 +132,7 @@ def test_multi_writer_pattern_drives_duckdb_writers_and_readers(tmp_path: Path) 
         try:
             connection.execute(sql)
             return (True, 1, None)
-        except Exception as exc:  # noqa: BLE001 - surfaced as stream failure
+        except Exception as exc:
             return (False, 0, str(exc))
 
     with duckdb.connect(db_path) as anchor:

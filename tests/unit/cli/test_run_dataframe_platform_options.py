@@ -16,7 +16,7 @@ from benchbox.core.schemas import DatabaseConfig
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
-import benchbox.cli.platform_defaults  # noqa: E402,F401
+import benchbox.cli.platform_defaults
 
 pytestmark = [
     pytest.mark.unit,

@@ -121,7 +121,7 @@ def test_rewrite_rule_ids_cover_transformer_ids():
 
 
 def test_spark_tpchavoc_rules_registered():
-    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites
     from benchbox.sql_compat.context import Phase
     from benchbox.sql_compat.registry import REGISTRY
 
@@ -139,7 +139,7 @@ def test_spark_tpchavoc_rules_registered():
 
 @pytest.mark.parametrize("variant_id", SCALAR_IDS + EMPTY_IDS + DUAL_IDS)
 def test_spark_tpchavoc_rule_resolution(variant_id: str):
-    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites
     from benchbox.sql_compat.actions import CompatAction
     from benchbox.sql_compat.context import CompatibilityContext, Phase
     from benchbox.sql_compat.decision import RewriteQueryPayload
@@ -162,7 +162,7 @@ def test_spark_tpchavoc_rule_resolution(variant_id: str):
 
 
 def test_spark_tpchavoc_unlisted_variant_has_no_rule():
-    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites  # noqa: F401
+    import benchbox.sql_compat.rules.query_adapter.spark_tpchavoc_rewrites
     from benchbox.sql_compat.context import CompatibilityContext, Phase
     from benchbox.sql_compat.registry import REGISTRY
 

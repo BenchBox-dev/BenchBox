@@ -33,7 +33,7 @@ from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionM
 try:
     from pyspark.sql import SparkSession
 except ImportError:
-    SparkSession = None  # type: ignore[assignment,misc]
+    SparkSession = None
 
 _GLUTEN_PLUGIN_CLASS = "org.apache.gluten.GlutenPlugin"
 _COLUMNAR_SHUFFLE_MANAGER = "org.apache.spark.shuffle.sort.ColumnarShuffleManager"

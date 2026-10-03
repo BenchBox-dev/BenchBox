@@ -49,7 +49,7 @@ def _make_generator(tmp_path: Path, subdir: str, max_workers: int, seed: int = S
     gen.base_securities = DIMS["num_securities"]
     gen.base_accounts = DIMS["num_accounts"]
     gen.base_trades = NUM_TRADES
-    gen.compress_existing_file = lambda path, remove_original=True: path  # type: ignore[method-assign]
+    gen.compress_existing_file = lambda path, remove_original=True: path
     return gen
 
 

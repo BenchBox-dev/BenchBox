@@ -47,7 +47,7 @@ def _get_cloud_path_type() -> type[Any] | None:
     if _CLOUD_PATH_TYPE is None:
         try:
             cloud_path_type = importlib.import_module("cloudpathlib").CloudPath
-        except ImportError:  # pragma: no cover - dependency optional
+        except ImportError:  # pragma: no cover
             return None
         _CLOUD_PATH_TYPE = cloud_path_type
     return _CLOUD_PATH_TYPE
@@ -97,7 +97,7 @@ def _normalise_to_root(root: Path | CloudPath, path: PathLike) -> tuple[Path | C
         try:
             rel = resolved.relative_to(local_root)
             return resolved, rel.as_posix()
-        except (ValueError, TypeError, AttributeError):  # pragma: no cover - provider specific edge cases
+        except (ValueError, TypeError, AttributeError):  # pragma: no cover
             return resolved, resolved.path
 
     try:
@@ -117,8 +117,8 @@ def resolve_compression_metadata(source: Any) -> dict[str, Any]:
 
     if hasattr(source, "should_use_compression"):
         try:
-            enabled = bool(source.should_use_compression())  # type: ignore[attr-defined]
-        except Exception:  # pragma: no cover - defensive fallback
+            enabled = bool(source.should_use_compression())
+        except Exception:  # pragma: no cover
             enabled = False
 
     if enabled:
@@ -163,7 +163,7 @@ class DataGenerationManifest:
     @property
     def manifest_path(self) -> Path | CloudPath:
 
-        return self._root / MANIFEST_FILENAME  # type: ignore[operator]
+        return self._root / MANIFEST_FILENAME
 
     def add_entry(
         self,
@@ -182,8 +182,8 @@ class DataGenerationManifest:
         size = size_bytes
         if size is None and hasattr(resolved, "stat"):
             try:
-                size = int(resolved.stat().st_size)  # type: ignore[union-attr]
-            except Exception:  # pragma: no cover - stat may fail on some providers
+                size = int(resolved.stat().st_size)
+            except Exception:  # pragma: no cover
                 size = 0
 
         entry = ManifestTableEntry(
@@ -276,7 +276,7 @@ class DataGenerationManifest:
         if isinstance(target, Path):
             target.parent.mkdir(parents=True, exist_ok=True)
 
-        with target.open("w", encoding="utf-8") as fh:  # type: ignore[union-attr]
+        with target.open("w", encoding="utf-8") as fh:
             json.dump(manifest, fh, indent=2, sort_keys=False)
             fh.write("\n")
 

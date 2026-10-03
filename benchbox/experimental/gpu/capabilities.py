@@ -227,7 +227,7 @@ def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
     libraries: dict[str, str] = {}
 
     try:
-        import cudf  # type: ignore
+        import cudf
 
         libraries["cudf"] = cudf.__version__
         rapids_available = True
@@ -236,7 +236,7 @@ def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
         pass
 
     try:
-        import cuml  # type: ignore
+        import cuml
 
         libraries["cuml"] = cuml.__version__
         rapids_available = True
@@ -246,14 +246,14 @@ def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
         pass
 
     try:
-        import cugraph  # type: ignore
+        import cugraph
 
         libraries["cugraph"] = cugraph.__version__
     except ImportError:
         pass
 
     try:
-        import rmm  # type: ignore
+        import rmm
 
         libraries["rmm"] = rmm.__version__
     except ImportError:
@@ -304,7 +304,7 @@ def detect_gpu() -> GPUInfo:
 
         if info.cudf_available and not info.available:
             try:
-                import cupy  # type: ignore
+                import cupy
 
                 device_count = cupy.cuda.runtime.getDeviceCount()
                 if device_count > 0:

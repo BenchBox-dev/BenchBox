@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from benchbox.core.coffeeshop.dataframe_queries import queries as _queries  # noqa: F401
+from benchbox.core.coffeeshop.dataframe_queries import queries as _queries
 from benchbox.core.coffeeshop.dataframe_queries.registry import (
     COFFEESHOP_DATAFRAME_QUERIES,
     get_coffeeshop_query,

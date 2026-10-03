@@ -22,7 +22,7 @@ try:
     from benchbox.platforms.dataframe.polars_df import POLARS_AVAILABLE, PolarsDataFrameAdapter
 except ImportError:
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
+    pl = None
 
 try:
     from benchbox.platforms.dataframe.dask_df import DASK_AVAILABLE, DaskDataFrameAdapter

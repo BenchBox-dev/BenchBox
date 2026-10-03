@@ -15,7 +15,7 @@ try:
     )
 except ImportError:
     CANONICAL_JOINORDER_QUERIES = {}
-    _CanonicalQueryManager = None  # type: ignore[assignment]
+    _CanonicalQueryManager = None
 
 
 class JoinOrderQueryManager:

@@ -49,10 +49,10 @@ class TestMockSysModules:
             pytest.skip("datafusion already imported on this worker; eviction path not exercisable")
         pytest.importorskip("datafusion")
         with _mock_sys_modules({"pyspark": MagicMock(), "pyspark.sql": MagicMock()}):
-            import datafusion  # noqa: F401
+            import datafusion
 
             assert "datafusion" in sys.modules
-        import datafusion  # noqa: F401  -- must not panic
+        import datafusion
 
         assert "datafusion" in sys.modules
 

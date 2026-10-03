@@ -54,14 +54,14 @@ class WindowsAntipatternsVisitor(ast.NodeVisitor):
         self.violations.append(
             Violation(
                 file=self.path,
-                line=node.lineno,  # type: ignore[attr-defined]
-                col=node.col_offset,  # type: ignore[attr-defined]
+                line=node.lineno,
+                col=node.col_offset,
                 code=code,
                 message=message,
             )
         )
 
-    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+    def visit_Call(self, node: ast.Call) -> None:
         self._check_os_access(node)
         self._check_getattr_signal(node)
         self._check_read_text_encoding(node)
@@ -125,7 +125,7 @@ class WindowsAntipatternsVisitor(ast.NodeVisitor):
             f"use getattr(signal, '{sig_name}', None) or guard with `if hasattr(signal, '{sig_name}')`",
         )
 
-    def visit_Attribute(self, node: ast.Attribute) -> None:  # noqa: N802
+    def visit_Attribute(self, node: ast.Attribute) -> None:
         self._check_unix_signal(node)
         self.generic_visit(node)
 
@@ -236,7 +236,7 @@ def _extract_hasattr_signal_from_node(n: ast.AST) -> str | None:
         and isinstance(n.args[1], ast.Constant)
         and n.args[1].value in _UNIX_SIGNALS
     ):
-        return n.args[1].value  # type: ignore[return-value]
+        return n.args[1].value
     return None
 
 
@@ -254,7 +254,7 @@ def _getattr_signal_in_call(node: ast.Call) -> str | None:
         and isinstance(node.args[1], ast.Constant)
         and node.args[1].value in _UNIX_SIGNALS
     ):
-        return node.args[1].value  # type: ignore[return-value]
+        return node.args[1].value
     return None
 
 
@@ -297,22 +297,22 @@ def _collect_guarded_signal_lines(tree: ast.AST) -> set[tuple[int, str]]:
     guarded: set[tuple[int, str]] = set()
 
     class _HasattrFinder(ast.NodeVisitor):
-        def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+        def visit_Call(self, node: ast.Call) -> None:
             sig = _hasattr_signal_in_call(node) or _getattr_signal_in_call(node)
             if sig:
                 guarded.add((node.lineno, sig))
             self.generic_visit(node)
 
-        def visit_If(self, node: ast.If) -> None:  # noqa: N802
+        def visit_If(self, node: ast.If) -> None:
             guard_signals = _guard_signals_from_if_test(node.test)
             if guard_signals:
                 for sig_name in guard_signals:
                     for child in ast.walk(node):
                         if hasattr(child, "lineno"):
-                            guarded.add((child.lineno, sig_name))  # type: ignore[attr-defined]
+                            guarded.add((child.lineno, sig_name))
             self.generic_visit(node)
 
-        def visit_Try(self, node: ast.Try) -> None:  # noqa: N802
+        def visit_Try(self, node: ast.Try) -> None:
             if any(_handler_catches_attr_error(h) for h in node.handlers):
                 for child in _iter_signal_attrs(node.body):
                     guarded.add((child.lineno, child.attr))

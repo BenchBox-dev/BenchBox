@@ -24,7 +24,7 @@ class ClickHouseLocalAdapter(ClickHouseAdapter):
     def from_config(cls, config: dict[str, Any]) -> ClickHouseLocalAdapter:
         config = dict(config)
         config["deployment_mode"] = "local"
-        return super().from_config(config)  # type: ignore[return-value]
+        return super().from_config(config)
 
 
 __all__ = ["ClickHouseLocalAdapter"]

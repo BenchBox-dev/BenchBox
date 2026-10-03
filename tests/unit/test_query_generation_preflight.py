@@ -20,7 +20,7 @@ def _mk_tpcds_power(raise_on_ids=None):
             raise RuntimeError(f"Template substitution error for q{query_id}")
         return f"SELECT {query_id}"
 
-    bench.get_query = _get_query  # type: ignore[attr-defined]
+    bench.get_query = _get_query
     power = TPCDSPowerTest(benchmark=bench, connection_factory=lambda: Mock(), scale_factor=0.01)
     return power
 
@@ -37,7 +37,7 @@ def _mk_tpch_power(raise_on_ids=None):
             raise RuntimeError(f"QGen error for q{query_id}")
         return f"SELECT {query_id}"
 
-    bench.get_query = _get_query  # type: ignore[attr-defined]
+    bench.get_query = _get_query
     power = TPCHPowerTest(benchmark=bench, connection=Mock(), scale_factor=0.01)
     return power
 
@@ -106,7 +106,7 @@ def test_tpcds_throughput_preflight_detects_generation_failures(monkeypatch):
             raise RuntimeError("Template substitution error for q7")
         return sql
 
-    thr.benchmark.translate_query_text = _translate  # type: ignore[attr-defined]
+    thr.benchmark.translate_query_text = _translate
 
     with pytest.raises(RuntimeError) as ei:
         thr.run()

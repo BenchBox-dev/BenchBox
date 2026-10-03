@@ -20,7 +20,7 @@ pytestmark = [
 
 def _patch_no_psutil():
     saved = sys.modules.get("psutil")
-    sys.modules["psutil"] = None  # type: ignore[assignment]
+    sys.modules["psutil"] = None
 
     class _Ctx:
         def __enter__(self):

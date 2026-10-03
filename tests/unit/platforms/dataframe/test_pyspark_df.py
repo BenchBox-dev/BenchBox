@@ -37,8 +37,8 @@ if PYSPARK_AVAILABLE:
 
     from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 else:
-    SparkSession = None  # type: ignore[assignment,misc]
-    PySparkDataFrameAdapter = None  # type: ignore[assignment,misc]
+    SparkSession = None
+    PySparkDataFrameAdapter = None
 
 
 @pytest.mark.skipif(_SKIP_PYSPARK, reason=_SKIP_REASON)

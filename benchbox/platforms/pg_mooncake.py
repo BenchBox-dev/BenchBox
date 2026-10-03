@@ -23,7 +23,7 @@ try:
     from psycopg import sql as psycopg_sql
 except ImportError:
     psycopg = None
-    psycopg_sql = None  # type: ignore[assignment]
+    psycopg_sql = None
 
 
 class PgMooncakeAdapter(PostgreSQLAdapter):

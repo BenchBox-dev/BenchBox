@@ -109,7 +109,7 @@ def collect_system_profile_with_recommendations() -> dict[str, object]:
 
         _has_psutil = True
     except ImportError:
-        _has_psutil = False  # type: ignore[assignment]
+        _has_psutil = False
 
     profiler = SystemProfiler()
     profile = profiler.get_system_profile()

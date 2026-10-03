@@ -333,10 +333,10 @@ class StarRocksWorkloadMixin:
             self.logger.debug(f"Failed to get existing tables: {e}")
             return []
 
-    _RESERVED_ALIAS_WORDS: frozenset[str] = frozenset(  # noqa: SIM905
+    _RESERVED_ALIAS_WORDS: frozenset[str] = frozenset(
         "character rank order group key value values partition range rows select table column columns index database "
         "schema status type default primary unique current_date current_time current_timestamp interval match natural "
-        "dense_rank row_number percent_rank cume_dist ntile lead lag".split()  # noqa: SIM905
+        "dense_rank row_number percent_rank cume_dist ntile lead lag".split()
     )
 
     _ALIAS_RE = re.compile(r"\bAS\s+(\w+)\b", re.IGNORECASE)
@@ -369,9 +369,9 @@ class StarRocksWorkloadMixin:
             )
         return result
 
-    _SQL_KEYWORDS = frozenset(  # noqa: SIM905
+    _SQL_KEYWORDS = frozenset(
         "WHERE HAVING GROUP ORDER LIMIT UNION EXCEPT INTERSECT JOIN INNER LEFT RIGHT FULL CROSS ON AND OR NOT THEN "
-        "ELSE END CASE WHEN SELECT FROM AS IS IN NULL TRUE FALSE BETWEEN LIKE ILIKE SIMILAR".split()  # noqa: SIM905
+        "ELSE END CASE WHEN SELECT FROM AS IS IN NULL TRUE FALSE BETWEEN LIKE ILIKE SIMILAR".split()
     )
 
     def _inject_missing_subquery_aliases(self, query: str) -> str:  # noqa: C901

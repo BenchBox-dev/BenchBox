@@ -23,14 +23,14 @@ try:
 
     DATAFUSION_DF_AVAILABLE = True
 except ImportError:
-    datafusion = None  # type: ignore[assignment]
-    SessionContext = None  # type: ignore[assignment]
-    SessionConfig = None  # type: ignore[assignment]
-    Window = None  # type: ignore[assignment]
-    col = None  # type: ignore[assignment]
-    lit = None  # type: ignore[assignment]
-    f = None  # type: ignore[assignment]
-    pa = None  # type: ignore[assignment]
+    datafusion = None
+    SessionContext = None
+    SessionConfig = None
+    Window = None
+    col = None
+    lit = None
+    f = None
+    pa = None
     DATAFUSION_DF_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration

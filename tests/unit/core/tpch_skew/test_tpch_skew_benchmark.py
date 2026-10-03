@@ -145,7 +145,7 @@ class TestTPCHSkewTopLevel:
             benchmark.get_query(23)
 
         with pytest.raises(TypeError, match="integer"):
-            benchmark.get_query("1")  # type: ignore
+            benchmark.get_query("1")
 
     def test_get_skew_info(self):
 
@@ -258,7 +258,7 @@ class TestCompareWithUniform:
             benchmark.compare_with_uniform(mock_adapter, queries=[1, 23])
 
         with pytest.raises(ValueError, match="Invalid query IDs"):
-            benchmark.compare_with_uniform(mock_adapter, queries=["1", 2])  # type: ignore
+            benchmark.compare_with_uniform(mock_adapter, queries=["1", 2])
 
     def test_compare_with_uniform_validation_invalid_iterations(self):
 

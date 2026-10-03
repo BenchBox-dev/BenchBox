@@ -81,12 +81,12 @@ def write_tree(root: Path, version: str = VERSION) -> Path:
     return root
 
 
-def ok_runner(argv, cwd):  # noqa: ARG001
+def ok_runner(argv, cwd):
     return 0, ""
 
 
 def failing_runner(script_name: str):
-    def runner(argv, cwd):  # noqa: ARG001
+    def runner(argv, cwd):
         if any(Path(part).name == script_name for part in argv):
             return 1, f"{script_name} failed"
         return 0, ""
@@ -190,7 +190,7 @@ def test_check_pins_an_explicit_lock_baseline(tree: Path) -> None:
     expected = subprocess.check_output(["git", "rev-parse", "refs/tags/v1.2.2"], cwd=tree, text=True).strip()
     seen = []
 
-    def runner(argv, cwd):  # noqa: ARG001
+    def runner(argv, cwd):
         seen.append(list(argv))
         return 0, ""
 
@@ -298,7 +298,7 @@ def test_check_fails_when_a_delegated_check_fails(tree: Path, script_name: str, 
 def test_dependency_bounds_check_blocks_on_cap_reached(tree: Path) -> None:
     seen: list[list[str]] = []
 
-    def runner(argv, cwd):  # noqa: ARG001
+    def runner(argv, cwd):
         seen.append(list(argv))
         return 0, ""
 
@@ -386,7 +386,7 @@ def test_prep_updates_every_marker_and_drafts_the_changelog(
 def test_prep_stops_at_the_first_failing_step(tree: Path) -> None:
     calls: list[list[str]] = []
 
-    def runner(argv, cwd):  # noqa: ARG001
+    def runner(argv, cwd):
         calls.append(list(argv))
         if argv[0] == "git":
             return 0, "a" * 40
@@ -400,7 +400,7 @@ def test_prep_stops_at_the_first_failing_step(tree: Path) -> None:
 def test_prep_passes_the_requested_lower_bound_to_the_changelog_step(tree: Path) -> None:
     calls: list[list[str]] = []
 
-    def runner(argv, cwd):  # noqa: ARG001
+    def runner(argv, cwd):
         calls.append(list(argv))
         return 0, ""
 

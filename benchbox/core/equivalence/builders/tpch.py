@@ -10,7 +10,7 @@ def build_tpch_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData
     from benchbox.tpch import TPCH
 
     def _dataframe_query(query_id: str) -> object:
-        import benchbox.core.dataframe.benchmark_suite  # noqa: F401  # break circular import
+        import benchbox.core.dataframe.benchmark_suite  # noqa: F401
         from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, set_scale_factor_for_benchmark
 
         set_scale_factor_for_benchmark("tpch", scale_factor)

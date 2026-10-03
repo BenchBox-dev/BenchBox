@@ -56,47 +56,24 @@ class StreamResult:
 @dataclass
 class ConcurrentLoadConfig:
     query_factory: Callable[[int], tuple[str, str]]
-    """Factory returning (query_id, sql) for stream iteration index."""
 
     role_factories: dict[str, Callable[[int], tuple[str, str]]] | None = field(default=None, kw_only=True)
-    """Optional per-role query factories for role-aware patterns.
-
-    Maps a stream role (e.g. "writer", "reader") to the factory used for
-    streams launched in that role. When a pattern phase declares `roles`
-    targets, launched streams use the matching role factory; phases without
-    role targets keep using `query_factory`. Every role named by the
-    pattern must have a factory entry.
-    """
 
     connection_factory: Callable[[], Any]
-    """Factory creating new database connections.
-
-    Must return an independent, thread-confined connection per call: one
-    stream owns its connection for its whole lifetime and closes it on
-    exit. Never return a shared connection; concurrent streams closing or
-    writing through the same handle corrupts every in-flight stream.
-    """
 
     execute_query: Callable[[Any, str], tuple[bool, int | None, str | None]]
-    """Function to execute query: (connection, sql) -> (success, rows, error)."""
 
     pattern: WorkloadPattern = field(default_factory=lambda: SteadyPattern(1, 60))
-    """Workload pattern defining concurrency over time."""
 
     queries_per_stream: int = 10
-    """Number of queries each stream executes."""
 
     query_timeout_seconds: float = 300.0
-    """Timeout for individual query execution."""
 
     collect_resource_metrics: bool = True
-    """Whether to collect CPU/memory metrics during execution."""
 
     resource_sample_interval: float = 1.0
-    """Interval between resource metric samples in seconds."""
 
     track_queue_times: bool = True
-    """Whether to track time queries spend waiting in queue."""
 
 
 @dataclass
@@ -349,7 +326,7 @@ class ConcurrentLoadExecutor:
         for future in as_completed(draining):
             try:
                 self._stream_results.append(future.result())
-            except Exception as e:  # noqa: BLE001 - record per-stream failures as data
+            except Exception as e:
                 stream_id = futures[future][0]
                 self._stream_results.append(
                     StreamResult(

@@ -15,15 +15,15 @@ from pathlib import Path
 from typing import Any, Optional
 
 try:
-    import sqlglot  # type: ignore[import-untyped]
-    from sqlglot import parse_one, transpile  # type: ignore[import-untyped]
-    from sqlglot.errors import ParseError  # type: ignore[import-untyped]
+    import sqlglot
+    from sqlglot import parse_one, transpile
+    from sqlglot.errors import ParseError
 
     SQLGLOT_AVAILABLE = True
 except ImportError:
-    sqlglot = None  # type: ignore[assignment]
-    parse_one = None  # type: ignore[assignment]
-    transpile = None  # type: ignore[assignment]
+    sqlglot = None
+    parse_one = None
+    transpile = None
     ParseError = Exception
     SQLGLOT_AVAILABLE = False
 

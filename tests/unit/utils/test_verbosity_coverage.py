@@ -38,7 +38,7 @@ def test_mixin_logger_contract_and_apply_behavior(caplog: pytest.LogCaptureFixtu
         _ = inst.logger
 
     with pytest.raises(TypeError, match="logging.Logger"):
-        inst.logger = object()  # type: ignore[assignment]
+        inst.logger = object()
 
     inst.logger = logging.getLogger("benchbox.test.verbosity")
     inst.apply_verbosity(VerbositySettings(level=1, verbose_enabled=True, quiet=False))

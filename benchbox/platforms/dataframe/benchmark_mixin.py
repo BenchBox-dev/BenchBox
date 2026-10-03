@@ -189,7 +189,7 @@ def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[st
     }
     try:
         region_info = discover_client_region(client_config)
-    except Exception as exc:  # noqa: BLE001 - discovery must never break a run
+    except Exception as exc:
         logger.warning("DataFrame client-link discovery failed: %r", exc)
         return None
     if not region_info.get("client_region") and not region_info.get("client_cloud"):
@@ -860,7 +860,7 @@ class BenchmarkExecutionMixin:
         skip_query_ids: set[str] = set()
 
         if benchmark_instance and hasattr(benchmark_instance, "get_dataframe_skip_queries"):
-            raw_skip_ids = benchmark_instance.get_dataframe_skip_queries()  # type: ignore[no-untyped-call]
+            raw_skip_ids = benchmark_instance.get_dataframe_skip_queries()
             skip_query_ids = {str(query_id).strip().upper() for query_id in raw_skip_ids}
 
         if (
@@ -1125,7 +1125,7 @@ class BenchmarkExecutionMixin:
 
         try:
             dag = parser.parse_explain_output(query_id, plan_text)
-        except Exception as exc:  # noqa: BLE001 - parser failure must fall back, never abort
+        except Exception as exc:
             logger.debug("DataFrame plan parse failed for %s on %s: %s", query_id, platform, exc)
             return captured_plan
 

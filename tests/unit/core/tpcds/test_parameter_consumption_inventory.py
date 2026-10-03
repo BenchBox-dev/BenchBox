@@ -176,7 +176,7 @@ def _template_usage(text: str) -> tuple[dict[str, set[int]], bool, dict[str, set
 def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) -> tuple[set[str], bool]:
     import pandas as pd
 
-    import benchbox.core.dataframe.benchmark_suite  # noqa: F401  (import order guard)
+    import benchbox.core.dataframe.benchmark_suite
     from benchbox.core.tpcds.dataframe_queries import get_tpcds_query, queries as query_module
     from benchbox.core.tpcds.dataframe_queries.parameters import TPCDSParameters
 
@@ -202,7 +202,7 @@ def _read_keys(query_id: int, family: str, defaults: dict[int, dict[str, Any]]) 
         implementation = query.expression_impl if family == "expression" else query.pandas_impl
         signal.setitimer(signal.ITIMER_REAL, _RUN_SECONDS, _RETRY_SECONDS)
         implementation(_Stub())
-    except Exception:  # noqa: BLE001 - a partial read is still evidence; completeness is reported
+    except Exception:
         complete = False
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)

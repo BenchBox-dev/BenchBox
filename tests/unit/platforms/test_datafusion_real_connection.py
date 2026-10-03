@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 try:
-    import datafusion  # noqa: F401
+    import datafusion
 
     HAS_DATAFUSION = True
 except ImportError:

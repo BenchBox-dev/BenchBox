@@ -16,8 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from _project.scripts import dev_loop_pr_metrics as metrics  # noqa: E402
-from scripts import path_filter_decision as path_filter  # noqa: E402
+from _project.scripts import dev_loop_pr_metrics as metrics
+from scripts import path_filter_decision as path_filter
 
 DEFAULT_MANIFEST = Path(__file__).with_name("ci-waste-remeasure-2026-08-31-manifest.json")
 PR_EVENTS = frozenset({"pull_request", "pull_request_target"})

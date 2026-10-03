@@ -11,8 +11,8 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.ddl_optimize.starrocks_ddl_rewrites  # noqa: F401
-import benchbox.sql_compat.rules.query_adapter.starrocks_query_rewrites  # noqa: F401
+import benchbox.sql_compat.rules.ddl_optimize.starrocks_ddl_rewrites
+import benchbox.sql_compat.rules.query_adapter.starrocks_query_rewrites
 from benchbox.sql_compat.registry import REGISTRY
 
 

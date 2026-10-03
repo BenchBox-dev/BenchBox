@@ -16,10 +16,10 @@ try:
 
     DEPS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
-    pl = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment]
-    list_clickbench_queries = None  # type: ignore[assignment]
+    pd = None
+    pl = None
+    PolarsDataFrameAdapter = None
+    list_clickbench_queries = None
     DEPS_AVAILABLE = False
 
 pytestmark = [

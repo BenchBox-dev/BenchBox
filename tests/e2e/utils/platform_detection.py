@@ -150,7 +150,7 @@ def requires_platform(platform: str, reason: str | None = None) -> Callable[[F],
                 pytest.skip(skip_reason)
             return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 
@@ -165,7 +165,7 @@ def requires_dataframe(platform: str, reason: str | None = None) -> Callable[[F]
                 pytest.skip(skip_reason)
             return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 
@@ -180,7 +180,7 @@ def requires_gpu(reason: str | None = None) -> Callable[[F], F]:
                 pytest.skip(skip_reason)
             return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 
@@ -195,7 +195,7 @@ def requires_cloud_credentials(platform: str, reason: str | None = None) -> Call
                 pytest.skip(skip_reason)
             return func(*args, **kwargs)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator
 

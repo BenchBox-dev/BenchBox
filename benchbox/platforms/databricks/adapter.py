@@ -116,7 +116,7 @@ def _first_column(row: Any) -> Any:
     if isinstance(row, (str, bytes)):
         return row
     try:
-        return row[0]  # type: ignore[index]
+        return row[0]
     except Exception:
         return row
 
@@ -137,7 +137,7 @@ def _unwrap_current_version_struct(row: Any) -> Any:
         if len(row) == 0:
             return None
         try:
-            if "dbsql_version" in row or "dbr_version" in row:  # type: ignore[operator]
+            if "dbsql_version" in row or "dbr_version" in row:
                 return row
         except Exception:
             pass
@@ -170,12 +170,12 @@ def _struct_fields_from_object(payload: Any) -> dict[str, Any] | None:
     for key in _CURRENT_VERSION_KEYS:
         try:
             try:
-                present = key in payload  # type: ignore[operator]
+                present = key in payload
             except Exception:
                 present = False
             if present:
                 try:
-                    values[key] = payload[key]  # type: ignore[index]
+                    values[key] = payload[key]
                 except Exception:
                     values[key] = getattr(payload, key, None)
             else:
@@ -194,7 +194,7 @@ def _parse_current_version_payload(payload: Any) -> dict[str, str | None] | None
         if len(payload) == 0:
             return None
         try:
-            if "dbsql_version" in payload or "dbr_version" in payload:  # type: ignore[operator]
+            if "dbsql_version" in payload or "dbr_version" in payload:
                 pass
             else:
                 payload = payload[0]
@@ -2711,7 +2711,7 @@ class DatabricksAdapter(PlatformAdapter):
                 properties.append(f"{option} = '{field}'")
         return properties
 
-    def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:  # noqa: C901
+    def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
         clustering_strategy = self._resolve_databricks_clustering_strategy()
         effective_config = self.get_effective_tuning_configuration()
         platform_opts = getattr(effective_config, "platform_optimizations", None)

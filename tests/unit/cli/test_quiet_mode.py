@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from click.testing import CliRunner
 
-import benchbox.cli.commands.run  # noqa: F401  ensure the module is loaded
-import benchbox.cli.main  # noqa: F401
+import benchbox.cli.commands.run
+import benchbox.cli.main
 from benchbox.cli.main import cli
 from benchbox.utils.printing import get_console, quiet_console, set_quiet
 

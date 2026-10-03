@@ -197,7 +197,7 @@ def _scan_tpchavoc() -> int:
             try:
                 sql = benchmark.get_query(key)
                 found = find_self_binding_candidates(sql, index)
-            except Exception as exc:  # noqa: BLE001 - advisory tool must not crash on one query
+            except Exception as exc:
                 print(f"  {key}: SKIP ({type(exc).__name__}: {exc})")
                 continue
             if found:
@@ -217,5 +217,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry point
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

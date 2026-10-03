@@ -59,7 +59,7 @@ def _tpch_sql(query_number: int) -> str:
 
 
 def _fetchall_as_tuples(conn: object, sql: str) -> list[tuple]:
-    result = conn.execute(sql)  # type: ignore[union-attr]
+    result = conn.execute(sql)
     return [tuple(row) for row in result.fetchall()]
 
 

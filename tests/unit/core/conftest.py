@@ -18,10 +18,10 @@ class MockExpr:
     def __lt__(self, other: object) -> MockExpr:
         return self
 
-    def __eq__(self, other: object) -> MockExpr:  # type: ignore[override]
+    def __eq__(self, other: object) -> MockExpr:
         return self
 
-    def __ne__(self, other: object) -> MockExpr:  # type: ignore[override]
+    def __ne__(self, other: object) -> MockExpr:
         return self
 
     def __and__(self, other: object) -> MockExpr:

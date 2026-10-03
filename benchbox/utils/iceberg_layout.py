@@ -53,11 +53,8 @@ _METADATA_VERSION_RE = re.compile(r"(\d+)-.*\.metadata\.json")
 @dataclass
 class RelocatedIcebergGraph:
     metadata_location: str
-    """Destination URI of the rewritten current metadata file."""
     graph_files: dict[str, Path] = field(default_factory=dict)
-    """Destination-relative path -> local staged file, for every rewritten graph file."""
     data_files: list[str] = field(default_factory=list)
-    """Table-relative paths of data files to upload unchanged."""
 
 
 def relocate_iceberg_table(

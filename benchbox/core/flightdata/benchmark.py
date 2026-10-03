@@ -269,7 +269,7 @@ class FlightDataBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return rows_loaded
 
 
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_bool,

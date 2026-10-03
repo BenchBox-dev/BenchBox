@@ -21,7 +21,7 @@ class _Resp:
         self.status_code = status_code
         self._body = body
 
-    def __enter__(self):  # noqa: D401
+    def __enter__(self):
         return self
 
     def __exit__(self, *exc):

@@ -15,7 +15,7 @@ try:
     )
 except ImportError:
     POLARS_AVAILABLE = False
-    pl = None  # type: ignore[assignment]
+    pl = None
 
 from benchbox.core.tpch.dataframe_queries import get_query, list_query_ids
 

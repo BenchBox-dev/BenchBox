@@ -591,7 +591,7 @@ class TestRunBenchmarkTool:
                                 if not hasattr(Adapter, "from_config"):
                                     built = Adapter(**prepared)
                                 else:
-                                    built = Adapter.from_config(cfg)  # type: ignore[arg-type]
+                                    built = Adapter.from_config(cfg)
                                 _assert_effective_consumer_value(platform, option_name, built, attr, value)
                                 observed += 1
                             except ImportError as ie:

@@ -18,11 +18,11 @@ try:
 
     DEPS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
-    pl = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment]
-    UnifiedLazyFrame = Any  # type: ignore[assignment,misc]
-    UnifiedPandasFrame = Any  # type: ignore[assignment,misc]
+    pd = None
+    pl = None
+    PolarsDataFrameAdapter = None
+    UnifiedLazyFrame = Any
+    UnifiedPandasFrame = Any
     DEPS_AVAILABLE = False
 
 pytestmark = [

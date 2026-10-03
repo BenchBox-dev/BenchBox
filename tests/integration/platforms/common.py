@@ -104,7 +104,7 @@ class _DatabricksCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._results[0] if self._results else None
 
-    def close(self) -> None:  # pragma: no cover - simple stub
+    def close(self) -> None:  # pragma: no cover
         return None
 
 
@@ -167,7 +167,7 @@ def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str =
 
         adapter_module.databricks_sql = sql_module
         adapter_module.DatabricksConnection = _DatabricksConnection
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -341,7 +341,7 @@ def install_google_cloud_stubs(
     client._storage_client = _StorageClient(client.state)
 
     bigquery_module = types.ModuleType("google.cloud.bigquery")
-    bigquery_module.Client = lambda project, location=None, credentials=None: client  # type: ignore[assignment]
+    bigquery_module.Client = lambda project, location=None, credentials=None: client
     bigquery_module.Dataset = Dataset
     bigquery_module.LoadJobConfig = LoadJobConfig
     bigquery_module.QueryJobConfig = QueryJobConfig
@@ -351,7 +351,7 @@ def install_google_cloud_stubs(
     bigquery_module.__version__ = "0.1.0"
 
     storage_module = types.ModuleType("google.cloud.storage")
-    storage_module.Client = lambda project=None, credentials=None: client._storage_client  # type: ignore[assignment]
+    storage_module.Client = lambda project=None, credentials=None: client._storage_client
 
     exceptions_module = types.ModuleType("google.cloud.exceptions")
     exceptions_module.NotFound = NotFound
@@ -389,7 +389,7 @@ def install_google_cloud_stubs(
         monkeypatch.setattr(adapter_module, "NotFound", NotFound)
         monkeypatch.setattr(adapter_module, "Conflict", Conflict, raising=False)
         monkeypatch.setattr(adapter_module, "google_auth", auth_module)
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return client.state
@@ -438,7 +438,7 @@ class _RedshiftCursor:
     def fetchall(self) -> list[tuple[Any, ...]]:
         return list(self._results)
 
-    def close(self) -> None:  # pragma: no cover - trivial stub
+    def close(self) -> None:  # pragma: no cover
         return None
 
 
@@ -513,7 +513,7 @@ def install_redshift_stubs(
         adapter_module.redshift_connector = redshift_module
         adapter_module.psycopg = psycopg_module
         adapter_module.boto3 = boto3_module
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -560,7 +560,7 @@ class _SnowflakeCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._results[0] if self._results else None
 
-    def close(self) -> None:  # pragma: no cover - trivial stub
+    def close(self) -> None:  # pragma: no cover
         return None
 
 
@@ -604,7 +604,7 @@ def install_snowflake_stub(monkeypatch) -> SnowflakeStubState:
         adapter_module.snowflake = root_module
         adapter_module.DictCursor = None
         adapter_module.SnowflakeError = errors_module.Error
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -667,7 +667,7 @@ class _AthenaCursor:
     def fetchone(self) -> tuple[Any, ...] | None:
         return self._results[0] if self._results else None
 
-    def close(self) -> None:  # pragma: no cover - trivial stub
+    def close(self) -> None:  # pragma: no cover
         return None
 
 
@@ -690,7 +690,7 @@ class _GluePaginator:
     def __init__(self, state: AthenaStubState) -> None:
         self._state = state
 
-    def paginate(self, DatabaseName: str) -> Iterable[dict[str, Any]]:  # noqa: N803 - boto3 API
+    def paginate(self, DatabaseName: str) -> Iterable[dict[str, Any]]:
         return [{"TableList": []}]
 
 
@@ -703,21 +703,21 @@ class _GlueClient:
         self._state = state
         self._databases: set[str] = set()
 
-    def get_database(self, Name: str) -> dict[str, Any]:  # noqa: N803 - boto3 API
+    def get_database(self, Name: str) -> dict[str, Any]:
         if Name not in self._databases:
             raise _EntityNotFoundError(f"Database {Name} not found")
         return {"Database": {"Name": Name}}
 
-    def create_database(self, DatabaseInput: dict[str, Any]) -> dict[str, Any]:  # noqa: N803 - boto3 API
+    def create_database(self, DatabaseInput: dict[str, Any]) -> dict[str, Any]:
         name = DatabaseInput["Name"]
         self._databases.add(name)
         self._state.databases_created.append(name)
         return {"Database": DatabaseInput}
 
-    def delete_database(self, Name: str) -> None:  # noqa: N803 - boto3 API
+    def delete_database(self, Name: str) -> None:
         self._databases.discard(Name)
 
-    def delete_table(self, DatabaseName: str, Name: str) -> None:  # noqa: N803 - boto3 API
+    def delete_table(self, DatabaseName: str, Name: str) -> None:
         pass
 
     def get_paginator(self, operation: str) -> _GluePaginator:
@@ -784,7 +784,7 @@ def install_athena_stubs(
         adapter_module.boto3 = boto3_module
         adapter_module.athena_connect = athena_connect
         adapter_module.AthenaCursor = _AthenaCursor
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -890,14 +890,14 @@ def install_clickhouse_stub(
 
         deps_module.ClickHouseClient = StubClient
         deps_module.ClickHouseError = ClickHouseError
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     try:
         import benchbox.platforms.clickhouse.setup as setup_module
 
         setup_module.ClickHouseClient = StubClient
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -1000,7 +1000,7 @@ def install_trino_stub(
 
         adapter_module.trino = trino_module
         adapter_module.BasicAuthentication = BasicAuthentication
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -1103,7 +1103,7 @@ def install_presto_stub(
 
         adapter_module.prestodb = prestodb_module
         adapter_module.PrestoBasicAuthentication = PrestoBasicAuthentication
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -1205,7 +1205,7 @@ def install_postgresql_stub(
         import benchbox.platforms.postgresql as adapter_module
 
         adapter_module.psycopg = psycopg_module
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state
@@ -2120,7 +2120,7 @@ def install_doris_stub(
 
         adapter_module.pymysql = pymysql_module
         adapter_module._requests = None
-    except ImportError:  # pragma: no cover - defensive
+    except ImportError:  # pragma: no cover
         pass
 
     return state

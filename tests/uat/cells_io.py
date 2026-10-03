@@ -218,7 +218,7 @@ def coerce_accounting_count(value: object, default: int = 0) -> int:
 
 def coerce_accounting_count_with_validity(value: object, default: int = 0) -> tuple[int, bool]:
     try:
-        return int(value), True  # type: ignore[arg-type]
+        return int(value), True
     except (TypeError, ValueError):
         return default, False
 

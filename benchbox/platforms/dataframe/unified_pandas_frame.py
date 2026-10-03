@@ -205,8 +205,8 @@ class UnifiedPandasGroupBy(Generic[DF]):
 
     def _native_groupby(self) -> Any:
         if _is_dask_df(self._df):
-            return self._df.groupby(self._by, **self._kwargs)  # type: ignore[union-attr]
-        return self._df.groupby(self._by, as_index=self._as_index, **self._kwargs)  # type: ignore[union-attr]
+            return self._df.groupby(self._by, **self._kwargs)
+        return self._df.groupby(self._by, as_index=self._as_index, **self._kwargs)
 
     def __getitem__(self, key: str | list[str]) -> Any:
         return self._native_groupby()[key]

@@ -14,7 +14,7 @@ try:
 
     PANDAS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
+    pd = None
     PANDAS_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration

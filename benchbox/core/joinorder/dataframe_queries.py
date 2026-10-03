@@ -1,28 +1,6 @@
-"""Canonical JoinOrder Benchmark DataFrame queries for Expression and Pandas families.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements all 113 canonical JoinOrder query IDs through the restricted JOB
-SQL-to-DataFrame translator in this module.
-
-The canonical JoinOrder Benchmark is based on "How Good Are Query Optimizers, Really?"
-(VLDB 2015) and uses the 21-table IMDb 2013 schema. The key translation
-challenge is converting implicit cross-joins (comma-separated FROM clauses
-with WHERE join conditions) into explicit .join() chains.
-
-NOTE: Unlike the SQL version which stresses query optimizer join ordering,
-the DataFrame version defines an explicit join sequence. The intent shifts
-from optimizer stress-testing to measuring multi-join execution performance
-across platforms with identical join sequences. That fixed plan is produced by
-``_plan_join_sequence`` (a pure function of the query's SQL topology, shared by
-both executors) and pinned by tests/unit/core/joinorder/test_dataframe_join_plan_shape.py,
-so the "fixed plan, not cost-reordered" semantic cannot silently drift -- a
-property row-equality oracle tests cannot detect.
-
-Each query returns MIN aggregations over filtered multi-table joins.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -42,19 +20,13 @@ if TYPE_CHECKING:
 
 
 class QueryImpl(Protocol):
-    """A DataFrame query implementation: takes a context, returns a frame."""
-
     def __call__(self, ctx: DataFrameContext) -> Any: ...
 
 
-# Generated impls register here (keyed by "q<id>_<family>_impl") instead of
-# mutating module globals, so the registry build is statically typed and the
-# generated names stay resolvable. See __getattr__ for name-based access.
 _IMPLS: dict[str, QueryImpl] = {}
 
 
 def __getattr__(name: str) -> QueryImpl:
-    """Resolve factory-built impl names from the registry (PEP 562)."""
     if name in _IMPLS:
         return _IMPLS[name]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -68,7 +40,7 @@ _QUERY_MANAGER = JoinOrderQueryManager()
 
 def _schema_columns() -> dict[str, list[str]]:
     schema = JoinOrderSchema()
-    tables = schema._tables  # noqa: SLF001 - internal benchmark module consuming its schema definition.
+    tables = schema._tables
     return {
         table: [column_def.split()[0] for column_def in table_def["columns"]] for table, table_def in tables.items()
     }
@@ -161,14 +133,6 @@ def _select_min_columns(tree: exp.Select) -> list[tuple[str, str, str]]:
 
 
 class _JoinStep(NamedTuple):
-    """One join in the fixed left-deep sequence.
-
-    ``existing_*`` is the key on the already-joined result; ``new_*`` is the key
-    on the table being added. ``predicate_index`` indexes into the query's
-    join-equality predicates, or is ``-1`` for a (canonically unreachable)
-    cross-join fallback over a disconnected join graph.
-    """
-
     existing_alias: str
     existing_column: str
     new_alias: str
@@ -177,16 +141,6 @@ class _JoinStep(NamedTuple):
 
 
 def _plan_join_sequence(tables: list[tuple[str, str]], join_predicates: list[exp.Expression]) -> list[_JoinStep]:
-    """Deterministic left-deep join order derived purely from SQL topology.
-
-    JoinOrder DataFrame mode does NOT cost-reorder joins -- reordering is the
-    SQL optimizer's job, which the DataFrame path deliberately does not exercise
-    (see the module docstring). The sequence anchors on the first FROM-clause
-    table and, at each step, takes the first WHERE-clause join predicate (in
-    textual order) connecting an already-joined alias to a remaining one. This
-    is the single source of truth shared by both executors, so the measured
-    operation stays multi-join *execution* with a fixed plan.
-    """
     anchor = tables[0][0]
     joined = {anchor}
     remaining = [alias for alias, _table in tables[1:]]
@@ -206,8 +160,6 @@ def _plan_join_sequence(tables: list[tuple[str, str]], join_predicates: list[exp
                 remaining.remove(left_alias)
                 break
         else:
-            # Disconnected join graph: no canonical JOB query reaches this, but
-            # fall back to the next remaining table in SQL order (deterministic).
             new_alias = remaining[0]
             steps.append(_JoinStep(anchor, "", new_alias, "", -1))
             joined.add(new_alias)
@@ -249,8 +201,6 @@ def _expression_condition(ctx: DataFrameContext, node: exp.Expression) -> Any:
         return _expr_value(ctx, node.this).is_in([_literal_value(value) for value in node.expressions])
     if isinstance(node, exp.Like):
         matched = _expr_value(ctx, node.this).str.contains(_like_pattern_to_regex(_literal_value(node.expression)))
-        # sqlglot 30.18+ parses NOT LIKE as Like(negate=True) instead of
-        # Not(Like(...)); honor the flag so negation is never dropped.
         return ~matched if node.args.get("negate") else matched
     if isinstance(node, exp.Is):
         expr = _expr_value(ctx, node.this)
@@ -391,9 +341,6 @@ def _pandas_condition(frame: pd.DataFrame, node: exp.Expression) -> Any:
             .astype("string")
             .str.contains(_like_pattern_to_regex(_literal_value(node.expression)), regex=True, na=pd.NA)
         )
-        # sqlglot 30.18+ parses NOT LIKE as Like(negate=True) instead of
-        # Not(Like(...)); honor the flag so negation is never dropped.
-        # (~ preserves pd.NA, which _filter_pandas maps to False via fillna.)
         return ~matched if node.args.get("negate") else matched
     if isinstance(node, exp.Is):
         value = _pandas_value(frame, node.this)
@@ -472,11 +419,6 @@ def _execute_joinorder_pandas_query(ctx: DataFrameContext, query_id: str) -> pd.
     )
 
 
-# ===========================================================================
-# Generated DataFrame implementations
-# ===========================================================================
-
-
 def _make_generated_expression_impl(query_id: str) -> QueryImpl:
     def _impl(ctx: DataFrameContext) -> Any:
         return _execute_joinorder_expression_query(ctx, query_id)
@@ -497,10 +439,6 @@ for _query_id in CANONICAL_JOINORDER_QUERIES:
     _IMPLS[f"q{_query_id}_expression_impl"] = _make_generated_expression_impl(_query_id)
     _IMPLS[f"q{_query_id}_pandas_impl"] = _make_generated_pandas_impl(_query_id)
 
-
-# ===========================================================================
-# Registry
-# ===========================================================================
 
 JOINORDER_DATAFRAME_QUERIES = QueryRegistry("JoinOrder DataFrame")
 
@@ -563,20 +501,14 @@ for _query in _QUERIES:
 
 
 def get_dataframe_queries() -> QueryRegistry:
-    """Get the canonical JoinOrder DataFrame query registry.
-
-    The registry contains DataFrame implementations for all 113 canonical query IDs.
-    """
     return JOINORDER_DATAFRAME_QUERIES
 
 
 def get_implemented_dataframe_query_ids() -> list[str]:
-    """Return query IDs with real DataFrame translations."""
     return list(IMPLEMENTED_DATAFRAME_QUERY_IDS)
 
 
 def get_untranslated_dataframe_query_ids() -> list[str]:
-    """Return canonical query IDs that are not available in DataFrame mode."""
     return list(UNTRANSLATED_DATAFRAME_QUERY_IDS)
 
 

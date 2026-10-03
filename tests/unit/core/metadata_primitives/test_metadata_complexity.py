@@ -106,12 +106,12 @@ class TestMetadataComplexityConfig:
 
     def test_type_complexity_from_string(self):
 
-        config = MetadataComplexityConfig(type_complexity="nested")  # type: ignore
+        config = MetadataComplexityConfig(type_complexity="nested")
         assert config.type_complexity == TypeComplexity.NESTED
 
     def test_constraint_density_from_string(self):
 
-        config = MetadataComplexityConfig(constraint_density="sparse")  # type: ignore
+        config = MetadataComplexityConfig(constraint_density="sparse")
         assert config.constraint_density == ConstraintDensity.SPARSE
 
     def test_to_dict(self):

@@ -352,11 +352,11 @@ class TestLakeSailDataFrameAdapterLifecycle:
         df.createOrReplaceTempView.assert_called_once_with("orders")
 
 
-from types import SimpleNamespace  # noqa: E402
-from unittest.mock import MagicMock, patch  # noqa: E402
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-import benchbox.platforms.dataframe.lakesail_df as _lakesail_mod  # noqa: E402
-import benchbox.platforms.dataframe.pyspark_df as _pyspark_mod  # noqa: E402
+import benchbox.platforms.dataframe.lakesail_df as _lakesail_mod
+import benchbox.platforms.dataframe.pyspark_df as _pyspark_mod
 
 
 def _make_lakesail_F():

@@ -11,7 +11,7 @@ from .conftest import get_env_or_skip, skip_unless_docker_service
 try:
     from psycopg import sql as psycopg_sql
 except ImportError:
-    psycopg_sql = None  # type: ignore[assignment]
+    psycopg_sql = None
 
 pytestmark = [
     pytest.mark.integration,

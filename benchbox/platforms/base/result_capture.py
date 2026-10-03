@@ -90,17 +90,16 @@ def apply_materialized_result_validation(
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
-except ImportError:  # pragma: no cover - result models always present in real install
-    ExecutionPhases = None  # type: ignore[assignment, misc]
-    QueryDefinition = None  # type: ignore[assignment, misc]
+except ImportError:  # pragma: no cover
+    ExecutionPhases = None
+    QueryDefinition = None
 
 try:
     from benchbox.core.validation import ValidationResult
-except ImportError:  # pragma: no cover - validation always present in real install
-    ValidationResult = None  # type: ignore[assignment, misc]
+except ImportError:  # pragma: no cover
+    ValidationResult = None
 
 
-# identifier like ``COPYRIGHTS`` or ``MERGEABLE`` is not misread as DML).
 _DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY|REPLACE|UPSERT)\b", re.IGNORECASE)
 _DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b|\b(?:REPLACE|UPSERT)\s+INTO\b", re.IGNORECASE)
 _CREATE_TABLE_PREFIX_RE = re.compile(
@@ -291,7 +290,7 @@ def _collect_process_metrics(process: Any) -> dict[str, Any]:
                 process_snapshot["num_fds"] = None
 
             try:
-                process_snapshot["num_handles"] = process.num_handles()  # type: ignore[attr-defined]
+                process_snapshot["num_handles"] = process.num_handles()
             except Exception:
                 process_snapshot["num_handles"] = None
 
@@ -321,7 +320,7 @@ def _collect_process_metrics(process: Any) -> dict[str, Any]:
             except Exception:
                 process_snapshot["context_switches"] = None
 
-    except Exception:  # pragma: no cover - defensive safeguard
+    except Exception:  # pragma: no cover
         return {}
 
     return process_snapshot
@@ -433,7 +432,7 @@ class ResultCaptureMixin:
 
         try:
             process = psutil.Process(os.getpid())
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             process = None
 
         cpu_percent = None
@@ -442,7 +441,7 @@ class ResultCaptureMixin:
             psutil.cpu_percent(interval=None)
             cpu_percent = psutil.cpu_percent(interval=0.0)
             per_cpu_percent = psutil.cpu_percent(interval=0.0, percpu=True)
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             cpu_percent = None
             per_cpu_percent = None
 
@@ -451,21 +450,21 @@ class ResultCaptureMixin:
 
         try:
             load_avg = psutil.getloadavg()
-        except Exception:  # pragma: no cover - not available on Windows
+        except Exception:  # pragma: no cover
             load_avg = None
         snapshot["cpu"]["load_average"] = load_avg
 
         try:
             freq = psutil.cpu_freq()
             snapshot["cpu"]["frequency_mhz"] = freq.current if freq else None
-        except Exception:  # pragma: no cover - platform dependent
+        except Exception:  # pragma: no cover
             snapshot["cpu"]["frequency_mhz"] = None
 
         try:
             counted = psutil.cpu_count()
             if counted:
                 snapshot["cpu_count"] = counted
-        except Exception:  # pragma: no cover - fallback to os.cpu_count()
+        except Exception:  # pragma: no cover
             pass
 
         try:
@@ -476,7 +475,7 @@ class ResultCaptureMixin:
                 "used_mb": round((vm.total - vm.available) / (1024 * 1024), 2),
                 "percent": vm.percent,
             }
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             snapshot["memory"] = None
 
         try:
@@ -486,7 +485,7 @@ class ResultCaptureMixin:
                 "used_mb": round(swap.used / (1024 * 1024), 2),
                 "percent": swap.percent,
             }
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             snapshot["swap"] = None
 
         try:
@@ -498,7 +497,7 @@ class ResultCaptureMixin:
                 "free_mb": round(disk.free / (1024 * 1024), 2),
                 "percent": disk.percent,
             }
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             snapshot["disk"] = None
 
         try:
@@ -509,7 +508,7 @@ class ResultCaptureMixin:
                 "read_ops": disk_io.read_count,
                 "write_ops": disk_io.write_count,
             }
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             snapshot["disk_io"] = None
 
         try:
@@ -520,12 +519,12 @@ class ResultCaptureMixin:
                 "packets_sent": net_io.packets_sent,
                 "packets_recv": net_io.packets_recv,
             }
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             snapshot["network_io"] = None
 
         try:
             boot_time = datetime.fromtimestamp(psutil.boot_time()).isoformat()
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             boot_time = None
         snapshot["boot_time"] = boot_time
 
@@ -1517,7 +1516,7 @@ class ResultCaptureMixin:
                 platform=getattr(self, "platform_name", None),
                 tuning_config=effective_config,
             )
-        except Exception as exc:  # pragma: no cover - metadata must not fail result capture
+        except Exception as exc:  # pragma: no cover
             logger = getattr(self, "logger", None)
             if logger is not None:
                 logger.debug("Unable to build tuning profile metadata: %s", exc)

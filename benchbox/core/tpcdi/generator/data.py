@@ -19,8 +19,8 @@ from .monitoring import ResourceMonitoringMixin
 
 try:
     import duckdb
-except ImportError:  # pragma: no cover - optional dependency
-    duckdb = None  # type: ignore[assignment]
+except ImportError:  # pragma: no cover
+    duckdb = None
 
 
 class TPCDIDataGenerator(

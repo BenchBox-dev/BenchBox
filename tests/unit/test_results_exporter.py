@@ -573,6 +573,6 @@ def test_exporter_rejects_unsupported_type(tmp_path, caplog) -> None:
         timestamp = datetime.now()
 
     with pytest.raises(RuntimeError, match="Failed to export json"):
-        exporter.export_result(LegacyResult(), formats=["json"])  # type: ignore[arg-type]
+        exporter.export_result(LegacyResult(), formats=["json"])
 
     assert any("Failed to export" in record.message or "Error" in record.levelname for record in caplog.records)

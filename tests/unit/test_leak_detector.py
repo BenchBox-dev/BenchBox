@@ -39,7 +39,7 @@ def test_detect_and_restore_reports_and_restores(tmp_path) -> None:
         os.chdir(tmp_path)
         os.environ["BENCHBOX_LEAK_DETECTOR_PROBE"] = "secret-value"
         printing._QUIET = not baseline["globals"]["benchbox.utils.printing._QUIET"]
-        ci._config_provider = object()  # type: ignore[assignment]
+        ci._config_provider = object()
         problems = leak_detector.detect_and_restore(baseline)
         assert problems == [
             "cwd",
@@ -63,7 +63,7 @@ def test_provider_compared_by_identity_not_equality(monkeypatch) -> None:
     before = EqualProvider()
     monkeypatch.setattr(ci, "_config_provider", before)
     baseline = leak_detector.snapshot()
-    ci._config_provider = EqualProvider()  # type: ignore[assignment]
+    ci._config_provider = EqualProvider()
     assert leak_detector.detect_and_restore(baseline) == ["benchbox.utils.config_interface._config_provider"]
     assert ci._config_provider is before
 

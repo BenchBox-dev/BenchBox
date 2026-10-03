@@ -39,7 +39,7 @@ from benchbox.core.equivalence.dataframe_surface import (
     materialize_rows,
 )
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
+if TYPE_CHECKING:  # pragma: no cover
     from benchbox.core.tpchavoc.validation import ResultValidator
 
 
@@ -104,7 +104,7 @@ def _final_key_tied_beyond_limit(
         return False
     try:
         probe = fetch_reference_rows(connection, probe_sql)
-    except Exception:  # noqa: BLE001 - a failed probe must not crash the gate; stay strict
+    except Exception:
         return False
     if len(probe) <= n or len(probe[n]) <= max(order_by):
         return False
@@ -126,7 +126,7 @@ def _order_by_result_key(sql: str) -> list[int] | None:
 
     try:
         tree = sqlglot.parse_one(sql, read="duckdb")
-    except Exception:  # noqa: BLE001 - an unparseable query is just "no sound mapping"
+    except Exception:
         return None
     if tree is None:
         return None
@@ -1423,5 +1423,5 @@ def main(argv: list[str] | None = None) -> int:
     return run_gate(get_gate(args.benchmark), update_baseline=args.update_baseline)
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry point
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

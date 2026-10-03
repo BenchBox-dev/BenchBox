@@ -1509,8 +1509,8 @@ try:
     DATAFUSION_AVAILABLE = True
 except ImportError:
     DATAFUSION_AVAILABLE = False
-    pa = None  # type: ignore[assignment]
-    DataFusionDataFrameAdapter = None  # type: ignore[assignment]
+    pa = None
+    DataFusionDataFrameAdapter = None
 
 
 def _create_datafusion_context():

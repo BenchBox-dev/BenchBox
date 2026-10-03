@@ -13,7 +13,7 @@ try:
 
     PYSPARK_AVAILABLE = True
 except ImportError:
-    SparkSession = None  # type: ignore[assignment, misc]
+    SparkSession = None
     PYSPARK_AVAILABLE = False
 
 pytestmark = [

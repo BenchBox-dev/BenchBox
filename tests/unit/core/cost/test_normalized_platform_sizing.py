@@ -32,7 +32,7 @@ def _results(**overrides: object) -> BenchmarkResults:
         "failed_queries": 0,
     }
     base.update(overrides)
-    return BenchmarkResults(**base)  # type: ignore[arg-type]
+    return BenchmarkResults(**base)
 
 
 class TestCanonicalPlatformKey:
@@ -128,11 +128,6 @@ class TestDatabricksSizingFromNormalizedCompute:
 
     def test_observed_serverless_run_with_runtime_publishes(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
-        """Measured runtime plus observed sizing is sufficient for normalized.
-
-        The Databricks adapter reports ``execution_time_seconds`` per query,
-        so a fully observed run prices end to end with no metered DBU input.
-        """
         results = _results(
             platform_info={"name": "Databricks", "configuration": {"platform_type": "databricks"}},
             platform_cloud={"provider": "aws", "region": "us-east-1", "source": "observed"},

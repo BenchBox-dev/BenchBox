@@ -219,7 +219,7 @@ class TestReportThresholdIsNoLongerInert:
         assert self._detect(tmp_path, trend, threshold=5.0) == []
 
     def test_thresholds_at_or_above_the_default_are_unchanged(self, tmp_path):
-        superseded = lambda change, threshold: (change > 10) and (change > threshold)  # noqa: E731
+        superseded = lambda change, threshold: (change > 10) and (change > threshold)
 
         for change in (0.0, 5.0, 7.0, 11.0, 25.0, 120.0):
             for threshold in (10.0, 15.0, 20.0):

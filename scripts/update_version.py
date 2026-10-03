@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-try:  # pragma: no cover - script executed outside tests
+try:  # pragma: no cover
     from benchbox.utils.version import (
         check_version_consistency as _core_check_version_consistency,
         reset_version_cache,

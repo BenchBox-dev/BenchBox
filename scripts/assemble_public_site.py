@@ -25,7 +25,6 @@ RESULTS_FALLBACK = """<!DOCTYPE html>
       try {
         window.sessionStorage.setItem(redirectKey, originalPath);
       } catch (error) {
-        // Ignore sessionStorage failures and still redirect to the SPA entrypoint.
       }
 
       window.location.replace('/results/');

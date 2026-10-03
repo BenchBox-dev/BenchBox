@@ -19,7 +19,7 @@ class _FakeConverter:
     def __init__(self, output_file: Path):
         self._output_file = output_file
 
-    def convert(self, source_files, table_name, schema, options):  # noqa: ARG002
+    def convert(self, source_files, table_name, schema, options):
         return ConversionResult(
             output_files=[self._output_file],
             row_count=3,

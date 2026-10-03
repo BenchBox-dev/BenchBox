@@ -91,7 +91,7 @@ class SparkTPCHavocQueryTransformer:
         self.transformations_applied.append("scalar_group_by_first")
         return tree.sql(dialect="spark")
 
-    def _wrap_bare_scalars(self, node):  # type: ignore[no-untyped-def]
+    def _wrap_bare_scalars(self, node):
         from sqlglot import exp
 
         if isinstance(node, exp.Subquery):

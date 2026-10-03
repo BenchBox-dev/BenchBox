@@ -14,7 +14,7 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-import benchbox.sql_compat.rules.schema_emit.pk_capability  # noqa: F401
+import benchbox.sql_compat.rules.schema_emit.pk_capability
 from benchbox.sql_compat.registry import REGISTRY
 
 _EXPECTED_LOCK_TABLE_DIALECTS = ("datafusion", "clickhouse", "starrocks", "doris", "ducklake")

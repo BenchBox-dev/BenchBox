@@ -217,7 +217,6 @@ class TestDuckDBOLAPFeatures:
     def test_cte_recursive(self, benchmark_with_olap_data: ReadPrimitivesBenchmark, duckdb_memory_db: Any) -> None:
         query = """
         WITH RECURSIVE order_hierarchy AS (
-            -- Base case: orders with no parent (using o_orderkey as hierarchy)
             SELECT
                 o_orderkey,
                 o_custkey,
@@ -228,7 +227,6 @@ class TestDuckDBOLAPFeatures:
 
             UNION ALL
 
-            -- Recursive case: find related orders
             SELECT
                 o.o_orderkey,
                 o.o_custkey,
@@ -442,7 +440,7 @@ class TestDuckDBOLAPFeatures:
         FROM customer_metrics cm
         JOIN nation_summary ns ON cm.c_nationkey = ns.c_nationkey
         JOIN nation n ON cm.c_nationkey = n.n_nationkey
-        WHERE cm.balance_rank <= 2  -- Top 2 customers by balance in each nation
+        WHERE cm.balance_rank <= 2
         ORDER BY n.n_name, cm.balance_rank
         """
 
@@ -943,10 +941,10 @@ class TestBenchmarkExecution:
 
         data_type_query = """
         SELECT
-            c_custkey,                           -- INTEGER
-            c_name,                              -- VARCHAR
-            c_acctbal,                           -- DECIMAL/FLOAT
-            c_phone                              -- VARCHAR
+            c_custkey,
+            c_name,
+            c_acctbal,
+            c_phone
         FROM customer
         WHERE c_custkey = 1
         """

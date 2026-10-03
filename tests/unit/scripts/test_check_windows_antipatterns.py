@@ -137,9 +137,6 @@ def test_wa003_binary_reads_are_unchanged(tmp_path: Path) -> None:
     assert check_file(_write(tmp_path, src)) == []
 
 
-# noqa suppression tests                                               #
-
-
 def test_noqa_suppresses_wa001(tmp_path: Path) -> None:
     src = "import os\nos.access('/tmp/x', os.X_OK)  # noqa: WA001\n"
     violations = check_file(_write(tmp_path, src))

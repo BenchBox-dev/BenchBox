@@ -21,20 +21,20 @@ try:
 
     DELTA_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
-    DeltaTable = None  # type: ignore[assignment]
-    write_deltalake = None  # type: ignore[assignment]
-    DeltaLakeMaintenanceOperations = None  # type: ignore[assignment]
+    pa = None
+    DeltaTable = None
+    write_deltalake = None
+    DeltaLakeMaintenanceOperations = None
     DELTA_AVAILABLE = False
 
 try:
-    import pyiceberg  # noqa: F401
+    import pyiceberg
 
     from benchbox.platforms.dataframe.iceberg_maintenance import IcebergMaintenanceOperations
 
     ICEBERG_AVAILABLE = True
 except ImportError:
-    IcebergMaintenanceOperations = None  # type: ignore[assignment]
+    IcebergMaintenanceOperations = None
     ICEBERG_AVAILABLE = False
 
 
