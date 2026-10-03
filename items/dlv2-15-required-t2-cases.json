@@ -48,6 +48,15 @@
       "op": "update",
       "op_id": "a468ffbf1b1b42949236b637abceabf6",
       "session_id": "ba29a8af545648b4879af3068dbd7d3a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:5c1aaa54eb8a559e60579282",
+      "at": "2026-10-03T16:47:24Z",
+      "client": "codex-mcp-client",
+      "generation": "cba5646821fe4ce2b95c2ac1ef527bb7",
+      "op": "finish",
+      "op_id": "233fe1768e5f43099affbddd0c384ae6",
+      "session_id": "ba29a8af545648b4879af3068dbd7d3a"
     }
   ]
 }
