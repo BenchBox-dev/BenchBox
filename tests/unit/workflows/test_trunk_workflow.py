@@ -45,3 +45,14 @@ def test_shard_evidence_is_labelled_with_this_workflow() -> None:
     for command in commands:
         assert "--workflow trunk.yml" in command
         assert "--workflow ci.yml" not in command
+
+
+def test_required_local_cases_run_after_each_merge() -> None:
+    job = _workflow()["jobs"]["required-local-cases"]
+    assert job["runs-on"] == "ubuntu-latest"
+    assert job["timeout-minutes"] == 20
+    assert "needs" not in job and "if" not in job and "strategy" not in job
+    runs = [step["run"] for step in job["steps"] if "run" in step]
+    assert runs.count("make test-required-local-cases") == 1
+    assert not job.get("continue-on-error")
+    assert not any(step.get("continue-on-error") for step in job["steps"])
