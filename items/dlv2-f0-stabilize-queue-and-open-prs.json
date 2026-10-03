@@ -4,7 +4,7 @@
     "#2439, #2441, #2443 merged or enqueued with all checks green",
     "Ruleset before/after JSON archived for the tooling addition"
   ],
-  "context": "Updated 2026-10-01T21:35Z by Claude session 3931bf2a after taking over the lease from the dead agy worker. Authoritative state: /tmp/HANDOFF-dlv2-codex-20260930T1513Z.md, section A (replaces the 15:13Z stop note that was here).\n\nLanded this session: three queue-stabilization fixes #2495 (CI-leader visual baseline trusted, job list read by page), #2497 (dist-artifact runtime deps, 20 min, job-shape contract), #2507 (whole-suite collect-only tests removed), plus #2489 (fast-lane +500). Earlier sessions delivered #2447, #2470, #2464, #2476, #2474, #2448, #2457, #2472, #2473, #2468, #2477, #2475, #2467, #2488.\n\nNot done: queue is still slow (enqueue-to-merge 56-103 min; runner starvation ejected #2435 at 60 min; edited trigger and soundness-flag stale-base race remain). In flight: #2512 (SQLite Q6), #2490 (Release51), ceremony-removal step 1 (branch fix/agents-merge-without-handback). Owner directive: remove all human-approver ceremony; plan in handoff A6. Release/TestPyPI, site, hermetic, Required15, validator follow-ups remain (handoff D). Do not mark done.",
+  "context": "CLOSEOUT 2026-10-03 (session_01GZSaWtTiCz9etgrhYRuVzu), evidence from origin/develop a646ad6e. Earlier context and /tmp handoff references are historical.\nAcceptance:\n1. #2444 merged (6ab697f9, 2026-09-29 14:01Z); `tooling` is pinned in scripts/ruleset_drift_check.py required contexts and listed in docs/operations/repo-admin-settings.md. DEVIATION: `tooling` was not added separately within minutes of #2444; it was added in the single ruleset call of the flip (#2450, c7bcdb9b, 22:34Z), which swapped the old four contexts for the six unit results. ruleset-drift later passed on develop (it runs nightly now).\n2. #2439 (0697891d), #2441 (f4985943), #2443 (a1b9c9b2) merged on 2026-09-29; merged under the then-required checks.\n3. Ruleset before/after: _project/archive/dev-loop-v2/ruleset-15611785-develop-squash-only.json at dcec5ec3 (before: ci-required-result, Results Explorer browser gate, ruleset-drift, Public-site visual acceptance; queue 5/5/60m) and at b3612213 (after: core, explorer, results-data, docs, landing, tooling). No separate tooling-only pair exists because there was no separate change.\nSuperseded since: the owner retired the merge queue on 2026-10-03 (#2582 removed merge_group paths; #2566/#2567 open drafts update the drift check and docs after the ruleset change). Queue stabilization is therefore moot.",
   "description": "Unstick the open dev-loop PRs. The queue retune (builds 5->2, timeout) is MOVED INTO the flip (dlv2-f3): scripts/ruleset_drift_check.py pins APPROVED_MERGE_QUEUE (ALLGREEN, 60 min, build 5, merge 5) in code on develop, and ruleset-drift is required, so changing live queue parameters before develop's pinned values change fails every PR closed (G11). A 15-second attempt at 12:04:56-12:05:11Z on 2026-09-29 was reverted from backup; no drift run overlapped it.\nSteps: (1) #2444 (dlv2-32) green, enqueued ALONE, merged; then immediately add `tooling` to ruleset 15611785 required checks (its drift contract documents `tooling`; the gap is fail-closed until added). (2) Then enqueue green #2439 (ledger) and #2441 (chdb guard). (3) #2443 (tiering) is green and was in the queue at 12:04Z. Stale-base PRs (>~1 day behind develop) fail the fast-lane baseline guard because the exact-SHA cache key expired: rebase before enqueueing.",
   "sessions": [
     {
@@ -146,6 +146,14 @@
       "generation": "aff5a6882e5749c9a77cf52f74969c9b",
       "op": "take",
       "op_id": "12c4fa1c028e4f849e832ef98746f9b1",
+      "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486",
+      "at": "2026-10-03T18:07:54Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "96ff17700bf24688a7758fdc5a5355e1",
       "session_id": "3cd55a09f6e34c6f9a0e7970c34c3f38"
     }
   ]
