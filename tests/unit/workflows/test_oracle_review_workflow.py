@@ -40,7 +40,7 @@ def test_triggers_cover_pushes_reviews_and_merge_queue() -> None:
 
 
 def test_permissions_are_read_only() -> None:
-    assert _load()["permissions"] == {"actions": "read", "contents": "read", "pull-requests": "read"}
+    assert _load()["permissions"] == {"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read"}
     assert "permissions" not in _load()["jobs"]["oracle-review"]
 
 
