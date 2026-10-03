@@ -2663,3 +2663,34 @@ def test_uv_run_interpreter_with_dynamic_script_arguments() -> None:
 )
 def test_inert_uv_subcommands_and_simple_data_heredoc_substitutions(source: str, kinds: list) -> None:
     assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_reviewed_javascript_flows_are_exact_and_current() -> None:
+    from comment_syntax import REVIEWED_JAVASCRIPT_FLOWS, javascript_key
+
+    for path, text in REVIEWED_JAVASCRIPT_FLOWS:
+        source = (ROOT / path).read_text(encoding="utf-8")
+        row = {"kind": "coverage-error", "line": 1, "text": text}
+        key = javascript_key(path, source)
+        assert scan(path, source, "javascript", {key: [row]}) == []
+        other = "results-explorer/src/other.ts"
+        assert [f.text for f in scan(other, source, "javascript", {javascript_key(other, source): [row]})] == [text]
+
+
+def test_reviewed_javascript_flows_still_occur() -> None:
+    import json
+    import subprocess
+
+    from comment_syntax import REVIEWED_JAVASCRIPT_FLOWS
+
+    paths = sorted({path for path, _ in REVIEWED_JAVASCRIPT_FLOWS})
+    requests = {path: (ROOT / path).read_text(encoding="utf-8") for path in paths}
+    result = subprocess.run(
+        ["node", str(ROOT / "scripts/comment_syntax_js.cjs")],
+        input=json.dumps(requests),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    observed = {(path, row["text"]) for path, rows in json.loads(result.stdout).items() for row in rows}
+    assert set(REVIEWED_JAVASCRIPT_FLOWS) <= observed

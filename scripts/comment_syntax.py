@@ -467,6 +467,42 @@ def javascript_requests(path: str, source: str, lang: str) -> dict[str, str]:
     return result
 
 
+REVIEWED_JAVASCRIPT_FLOWS: dict[tuple[str, str], str] = {
+    (
+        "results-explorer/src/db.ts",
+        "unresolved executable sql payload: scan.sql",
+    ): "SNAPSHOT_READY_SCANS entries are object literals whose sql values are scanned as SQL",
+    (
+        "results-explorer/src/lib/duckdbQueries.ts",
+        "unresolved executable sql payload: query.sql",
+    ): "SnapshotRowsQuery objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: pageQueries.rows.sql",
+    ): "page query objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: pageQueries.count.sql",
+    ): "page query objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: query.sql",
+    ): "starter and builder query objects have sql property values that are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: selectQuery.sql",
+    ): "select query objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: sqlText",
+    ): "sqlText is SQL the user types into the query editor; it is runtime input, not source",
+    (
+        "results-explorer/scripts/generate-browser-fixtures.mjs",
+        "unresolved process arguments require an executable-payload adapter: spawnSync(args[0], args.slice(1))",
+    ): "the pipeline command comes from the explorer build contract data file and runs the snapshot pipeline CLI",
+}
+
+
 def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]] | None) -> list[Finding]:
     key = javascript_key(path, source)
     if js_results is None or key not in js_results:
@@ -485,7 +521,7 @@ def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]
                 )
                 for f in scan(path + "." + row["language"], row["text"], row["language"], js_results)
             )
-        else:
+        elif (path, row["text"]) not in REVIEWED_JAVASCRIPT_FLOWS:
             result.append(
                 Finding(path, row["line"], row["kind"], row["text"], row.get("symbol", ""), row.get("payload", ""))
             )
