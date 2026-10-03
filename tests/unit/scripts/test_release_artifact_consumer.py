@@ -434,10 +434,10 @@ def test_duplicate_json_key_refused(distributions, metadata):
 
 
 def test_producer_workflow_uploads_attempt_evidence_without_new_release_trigger():
-    jobs = yaml.safe_load((ROOT / ".github/workflows/trunk.yml").read_text())["jobs"]
+    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
     producer = jobs["dist-artifact"]
     assert producer["permissions"] == {"contents": "read", "actions": "read"}
-    assert producer["if"] == "${{ github.event_name == 'push' }}"
+    assert producer["if"] == "${{ github.event_name == 'merge_group' }}"
     runs = "\n".join(step.get("run", "") for step in producer["steps"])
     assert "release_artifact_consumer.py producer --dist dist" in runs
     upload = next(step for step in producer["steps"] if step["name"] == "Upload dist artifact")
