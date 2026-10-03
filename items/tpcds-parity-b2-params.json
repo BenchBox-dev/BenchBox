@@ -1,4 +1,5 @@
 {
+  "context": "Dropped 2026-10-03 as superseded: parameters now come from dsqgen -LOG through adapters (dfparity-t01, t04, t05a-h) rather than hand-aligned defaults.",
   "description": "Fix parameter-literal alignment for dms-keyed and selective-filter hand-written queries (Q22/Q39/Q62/Q99 already use d_month_seq is_between(dms, dms+11); check Q69/Q80/Q87 and any query whose default param literal selects zero rows at SF=0.01 while the SQL template literal selects rows). For each: extract the SQL template literal from runner.get_queries(dialect=duckdb) output, compare against TPCDS_DEFAULT_PARAMS, update default_parameters.yaml when the default (not the SQL) is wrong, or fix the impl filter when the impl (not the default) diverges. Parameters are valid for SF>=1 per parameters.py; changing a default requires evidence it matches dsqgen stream-0 output. SCOPE: default_parameters.yaml, parameters.py, named qN impls in queries.py only. GUARDRAILS: both backends pass; no comparator/baseline changes; SQL immutable; Q38/Q88 pass. VERIFY: staged report + pytest -m tpcds + lint + typecheck. DECISION GATE: named queries PASS or VACUOUS-classified, parameter changes cite dsqgen evidence.",
   "sessions": [
     {
@@ -8,6 +9,14 @@
       "op": "create",
       "op_id": "62788b58be97497088d10eee4977809a",
       "session_id": "9fa4e20e143f42bbb2c28661a4ed3181"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755",
+      "at": "2026-10-03T12:58:33Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "62cb69c946ba4347829b86d93ea78a69",
+      "session_id": "8da2993504e94aa4befa06cdfe65a212"
     }
   ]
 }
