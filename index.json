@@ -987,6 +987,16 @@
       "status": "open",
       "title": "Port the blog to an Astro collection with identical post URLs and an unchanged Atom feed"
     },
+    "astro-site-34-api-reference-implementation": {
+      "claim": null,
+      "needs": [
+        "astro-site-02-api-reference-decision",
+        "astro-site-31-myst-to-mdx-converter"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Implement the API reference decision from the gate in the Astro site"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],

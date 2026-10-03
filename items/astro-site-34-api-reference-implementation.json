@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Every URL under /docs/api.html and /docs/reference/python-api/** resolves per the D7 URL map (inventory diff test)",
+    "No new docstrings introduced (comment-policy-check green)",
+    "API examples, if any, are covered by example-validation",
+    "api-docs lane outputs documented and tested"
+  ],
+  "description": "Build whatever ADR D7 chose: hand-written API guide pages (option A), and if option B was chosen, a signatures-only reference made by static analysis with no docstring dependency.\n\nEvery current reference URL either serves the new page or a static redirect page to its mapped target. Update the api-docs lane contract (whatever site-deploy or publication copies) to the new outputs.\n\nDo not add docstrings to code to feed the reference (COMMENT-POLICY-001).",
+  "links": [
+    "docs/reference/python-api",
+    "docs/api.rst"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:05:13Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6f74251cf60649aea0d5346f10b2e167",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
