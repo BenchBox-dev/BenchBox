@@ -6581,10 +6581,15 @@
       "title": "Fix or classify every TPC-DS divergence that remains after parameter alignment"
     },
     "dfparity-t25-remeasure-baseline": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-04T13:48:42Z",
+        "generation": "e8c69aa0cc15421aa85bd847904bbe6f",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:3e7f73fbf95a435921c96755"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Re-measure TPC-DS DataFrame parity on develop at SF 0.01, 0.1 and 1 before the adapter batches"
     },
     "dfparity-t26-pandas-gate": {
