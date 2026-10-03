@@ -33,34 +33,49 @@ soundness = _load("auto_merge_soundness_paths")
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-def _pr_rule(count: int, code_owner: bool) -> list[dict]:
+def _pr_rule(count: int, code_owner: bool, thread_resolution: bool | None = True) -> list[dict]:
+    parameters: dict[str, object] = {
+        "required_approving_review_count": count,
+        "require_code_owner_review": code_owner,
+    }
+    if thread_resolution is not None:
+        parameters["required_review_thread_resolution"] = thread_resolution
     return [
         {"type": "required_status_checks", "parameters": {"required_status_checks": []}},
         {
             "type": "pull_request",
-            "parameters": {
-                "required_approving_review_count": count,
-                "require_code_owner_review": code_owner,
-            },
+            "parameters": parameters,
         },
     ]
 
 
 def test_enforced_ruleset_passes() -> None:
-    rules = _pr_rule(count=0, code_owner=True)
+    rules = _pr_rule(count=0, code_owner=True, thread_resolution=True)
     assert rre.is_review_enforced(rules) is True
     assert rre.review_enforcement_findings(rules) == []
 
 
-def test_unenforced_ruleset_fails() -> None:
-    findings = rre.review_enforcement_findings(_pr_rule(count=0, code_owner=False))
+def test_unenforced_code_owner_fails() -> None:
+    findings = rre.review_enforcement_findings(_pr_rule(count=0, code_owner=False, thread_resolution=True))
     assert findings
     assert "require_code_owner_review=False" in " ".join(findings)
 
 
+def test_unenforced_thread_resolution_fails() -> None:
+    findings = rre.review_enforcement_findings(_pr_rule(count=0, code_owner=True, thread_resolution=False))
+    assert findings
+    assert "required_review_thread_resolution=False" in " ".join(findings)
+
+
+def test_missing_thread_resolution_fails() -> None:
+    findings = rre.review_enforcement_findings(_pr_rule(count=0, code_owner=True, thread_resolution=None))
+    assert findings
+    assert "required_review_thread_resolution=False" in " ".join(findings)
+
+
 def test_required_approving_review_count_is_not_checked() -> None:
     for count in (0, 1, 5):
-        assert rre.review_enforcement_findings(_pr_rule(count=count, code_owner=True)) == []
+        assert rre.review_enforcement_findings(_pr_rule(count=count, code_owner=True, thread_resolution=True)) == []
 
 
 def test_missing_pull_request_rule_fails() -> None:

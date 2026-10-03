@@ -113,3 +113,84 @@ def test_suppress_xdist_worker_title_ignores_non_exec_frames(monkeypatch: pytest
     # The key invariant: THIS frame's worker_title must never be patched.
     _suppress_xdist_worker_title()
     assert globals()["worker_title"] is original_title_fn
+
+
+class _IniConfig:
+    """The slice of ``pytest.Config`` the faulthandler guard reads."""
+
+    def __init__(self, ini: dict[str, object], *, worker: bool = False) -> None:
+        self._ini = ini
+        if worker:
+            self.workerinput = {"workerid": "gw0"}
+
+    def getini(self, name: str) -> object:
+        if name not in self._ini:
+            raise ValueError(f"unknown configuration value: {name!r}")
+        return self._ini[name]
+
+
+@pytest.mark.parametrize("value", ["120", "0.5", 30.0])
+def test_configure_refuses_faulthandler_timeout(value: object) -> None:
+    with pytest.raises(pytest.exit.Exception) as excinfo:
+        safety_plugin.pytest_configure(_IniConfig({"faulthandler_timeout": value}))
+
+    assert excinfo.value.returncode == pytest.ExitCode.USAGE_ERROR
+    assert "faulthandler_timeout" in str(excinfo.value.msg)
+    assert "pytest-timeout" in str(excinfo.value.msg)
+
+
+@pytest.mark.parametrize("ini", [{"faulthandler_timeout": 0.0}, {"faulthandler_timeout": ""}, {}])
+def test_configure_allows_unset_or_unregistered_faulthandler_timeout(
+    ini: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A controller run continues into the cap report, which pops these variables. Under a capped xdist
+    # run the worker inherits them from its controller, so the test owns them for its own duration.
+    monkeypatch.delenv("BENCHBOX_XDIST_CAP_REQUESTED", raising=False)
+    monkeypatch.delenv("BENCHBOX_XDIST_CAP_EFFECTIVE", raising=False)
+
+    safety_plugin.pytest_configure(_IniConfig(ini))
+
+
+def test_configure_leaves_the_refusal_to_the_controller() -> None:
+    safety_plugin.pytest_configure(_IniConfig({"faulthandler_timeout": "120"}, worker=True))
+
+
+def test_pytest_run_with_faulthandler_timeout_exits_as_usage_error(tmp_path) -> None:
+    """The guard fires on a real run before any test starts, so the run cannot hang in the watchdog."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    probe = tmp_path / "test_probe.py"
+    probe.write_text("def test_probe():\n    pass\n")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "-q",
+            "-n",
+            "0",
+            "-p",
+            "no:cacheprovider",
+            "-m",
+            "",
+            "--rootdir",
+            str(root),
+            "-c",
+            str(root / "pytest.ini"),
+            "-o",
+            "faulthandler_timeout=120",
+            str(probe),
+        ],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+
+    assert completed.returncode == pytest.ExitCode.USAGE_ERROR, completed.stdout + completed.stderr
+    assert "faulthandler_timeout is not supported" in completed.stdout + completed.stderr
+    assert "1 passed" not in completed.stdout

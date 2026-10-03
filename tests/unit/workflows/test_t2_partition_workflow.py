@@ -46,7 +46,7 @@ def test_correctness_partitions_preserve_each_gate_once() -> None:
 def test_medium_selection_and_receipts_gate_core() -> None:
     jobs = _jobs("ci.yml")
     medium = jobs["medium-test"]
-    assert medium["strategy"] == {"fail-fast": False, "matrix": {"shard_index": [0, 1]}}
+    assert medium["strategy"] == {"fail-fast": False, "matrix": {"shard_index": [0, 1, 2, 3]}}
     assert medium["needs"] == ["ci-paths", "medium-collect"]
     selector = "medium and not (slow or stress or resource_heavy or live_integration)"
     collect_text = "\n".join(step.get("run", "") for step in jobs["medium-collect"]["steps"])
@@ -65,7 +65,23 @@ def test_medium_selection_and_receipts_gate_core() -> None:
     assert "verify-medium" in core_text
 
 
-def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
+def test_the_medium_shard_records_memory_and_stalled_stacks() -> None:
+    medium = _jobs("ci.yml")["medium-test"]
+    run_step = next(step for step in medium["steps"] if step["name"] == "Run medium speed tier")
+    assert "sample_resources &" in run_step["run"]
+    assert 'pkill -P "${sampler}"' in run_step["run"]
+    assert 'kill "${sampler}"' in run_step["run"]
+    sampler_body = run_step["run"].split("sample_resources()")[1].split("sample_resources &")[0]
+    assert "comm" in sampler_body and "args" not in sampler_body
+    names = [step["name"] for step in medium["steps"]]
+    memory_step = next(
+        step for step in medium["steps"] if step["name"] == "Record kernel memory events for the medium shard"
+    )
+    assert memory_step["if"] == "always()"
+    assert names.index(memory_step["name"]) == names.index(run_step["name"]) + 1
+
+
+def test_heavy_payload_uses_at_most_twelve_standard_linux_runners() -> None:
     jobs = _jobs("ci.yml")
     payload = (
         "medium-collect",
@@ -82,7 +98,7 @@ def test_heavy_payload_uses_at_most_ten_standard_linux_runners() -> None:
         assert jobs[name]["runs-on"] == "ubuntu-latest"
         matrix = jobs[name].get("strategy", {}).get("matrix", {})
         count += prod(len(values) for values in matrix.values())
-    assert count == 10
+    assert count == 12
 
 
 def test_native_binary_framing_remains_required_before_merge() -> None:

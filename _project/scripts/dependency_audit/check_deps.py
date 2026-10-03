@@ -53,6 +53,7 @@ SCAN_PATHS = ["benchbox", "scripts", "tests", "docs/conf.py", "docs/_static"]
 # ---------------------------------------------------------------------------
 PKG_TO_IMPORTS: dict[str, set[str]] = {
     "pyyaml": {"yaml"},
+    "markdown-it-py": {"markdown_it"},
     "psycopg2-binary": {"psycopg2"},
     "google-cloud-bigquery": {"google.cloud.bigquery", "google.cloud.bigquery_storage"},
     "google-cloud-storage": {"google.cloud.storage"},

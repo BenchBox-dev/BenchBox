@@ -525,7 +525,14 @@ def find_cross_surface_divergences(
     def reference_rows(query_id: Any) -> list[tuple[Any, ...]]:
         rows = fetch_reference_rows(connection, reference_sql(query_id))
         if reference_row_counts is not None:
-            reference_row_counts[query_id] = len(rows)
+            # Scalar-aggregation queries (SELECT MIN(...) with no GROUP BY)
+            # collapse an empty join to one all-NULL row, which len() == 1
+            # misreads as discriminating. Treat all-NULL single rows as
+            # 0-row vacuous so None == None can never pass as coverage.
+            if len(rows) == 1 and all(value is None for value in rows[0]):
+                reference_row_counts[query_id] = 0
+            else:
+                reference_row_counts[query_id] = len(rows)
         return rows
 
     def candidate_cells(
@@ -914,6 +921,143 @@ _CLICKBENCH_VACUOUS = (
 )
 _CLICKBENCH_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
     ("Q20", "Q23", "Q28", "Q29", "Q39", "Q40", "Q41", "Q42"), _CLICKBENCH_VACUOUS
+)
+
+_DATAVAULT_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell: Q17 is a scalar SUM(...) with no "
+    "GROUP BY over the small-quantity-order conjunction (brand + container literals "
+    "against part/partsupp/lineitem). Verified 2026-09-26 by executing the reference "
+    "SQL over every brand/container combination present in the built cell (25 brands x "
+    "40 containers = 1000 combos): every combination returns the single all-NULL row, "
+    "so neither surface can discriminate anything. Data/literal artifact of the bounded "
+    "cell, not a load or logic bug. Tracked: plant a satisfying brand/container pair "
+    "in the generator or gate a larger cell (do NOT change the canonical Q17 query)."
+)
+_DATAVAULT_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(("Q17",), _DATAVAULT_Q17_VACUOUS)
+
+_TPCH_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell (SF=0.01): Q17 is a scalar SUM(...) with "
+    "no GROUP BY whose default literals (Brand#23, MED BOX) match no qualifying part/lineitem "
+    "rows in the small cell, so the reference returns the single all-NULL row and neither "
+    "surface can discriminate anything: the gate asserts only that both surfaces also return "
+    "NULL, so a defect in the join, the correlated subquery or the aggregate that still "
+    "returns NULL would pass. Verified 2026-10-01 by executing the reference SQL over every "
+    "brand/container combination present in the built cell (25 brands x 40 containers = "
+    "1000 combos): 856 combinations return a non-NULL value and the other 144, including "
+    "the default pair, return the all-NULL row. The all-NULL result is a literal artifact "
+    "of the default parameters against the small cell, not a load or logic bug, and the "
+    "query is not vacuous in general. Remediation: gate Q17 with a "
+    "brand/container pair the cell satisfies on both surfaces (do NOT change the canonical "
+    "Q17 query)."
+)
+
+_TPCH_SKEW_Q17_VACUOUS = (
+    "0 discriminating rows at the bounded gate cell (SF=0.01, seed 42): Q17 is a scalar "
+    "SUM(...) with no GROUP BY whose default literals (Brand#23, MED BOX) match no "
+    "qualifying part/lineitem rows in the skewed data, so the reference returns the single "
+    "all-NULL row and neither surface can discriminate anything: the gate asserts only that "
+    "both surfaces also return NULL, so a defect in the join, the correlated subquery or the "
+    "aggregate that still returns NULL would pass. Verified 2026-10-01 by executing the "
+    "reference SQL over every brand/container combination present in the built cell (25 "
+    "brands x 40 containers = 1000 combos): 496 combinations return a non-NULL value and "
+    "the other 504, including the default pair, return the all-NULL row. The all-NULL "
+    "result is a literal artifact of the default parameters against the skewed "
+    "distribution, not a load or logic bug, and the query is not vacuous in general. "
+    "Remediation: gate Q17 with a brand/container pair the cell satisfies on "
+    "both surfaces (do NOT change the canonical Q17 query)."
+)
+
+_JOINORDER_SYNTHETIC_VACUOUS = (
+    "Synthetic selectivity, not a bug: the query's multi-table conjunction needs coordinated "
+    "real-world literals (specific keywords, notes, countries, ratings, link types) that the "
+    "bounded synthetic cell does not plant on one entity set, so the reference join is empty on "
+    "BOTH surfaces. Golden entities back the highest-traffic conjunctions (34 discriminating); "
+    "this tail stays classified until its literals are planted too. Any query NOT listed here "
+    "that goes vacuous fails the gate."
+)
+_JOINORDER_SYNTHETIC_LEGITIMATELY_EMPTY: dict[Any, str] = dict.fromkeys(
+    (
+        "1a",
+        "1c",
+        "2b",
+        "2c",
+        "3b",
+        "5b",
+        "7a",
+        "7b",
+        "7c",
+        "8a",
+        "8b",
+        "9a",
+        "9b",
+        "9c",
+        "9d",
+        "11a",
+        "11b",
+        "11c",
+        "12b",
+        "13b",
+        "13c",
+        "14a",
+        "14b",
+        "14c",
+        "15a",
+        "15b",
+        "15c",
+        "15d",
+        "17a",
+        "17b",
+        "17c",
+        "17d",
+        "18a",
+        "18b",
+        "18c",
+        "19a",
+        "19b",
+        "19c",
+        "19d",
+        "20a",
+        "20b",
+        "20c",
+        "21a",
+        "21b",
+        "21c",
+        "22a",
+        "22b",
+        "22c",
+        "22d",
+        "23a",
+        "23b",
+        "23c",
+        "24a",
+        "24b",
+        "25a",
+        "25b",
+        "25c",
+        "26a",
+        "26b",
+        "26c",
+        "27a",
+        "27b",
+        "27c",
+        "28a",
+        "28b",
+        "28c",
+        "29a",
+        "29b",
+        "29c",
+        "30a",
+        "30b",
+        "30c",
+        "31a",
+        "31b",
+        "31c",
+        "32a",
+        "33a",
+        "33b",
+        "33c",
+    ),
+    _JOINORDER_SYNTHETIC_VACUOUS,
 )
 
 # H2O-DB bounded-cell scale. Its generator base is the 10M-row small tier, so the
@@ -1452,10 +1596,6 @@ _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
         "The bounded item dimension contains no product satisfying the manufacturer range and correlated attribute "
         "conditions; the empty SQL result is mirrored by both DataFrame families."
     ),
-    "44": (
-        "The bounded cell has no store and household-demographic combination satisfying the configured rank "
-        "conditions; the empty SQL result is mirrored by both DataFrame families."
-    ),
     "49": (
         "The bounded cell has no web, catalog, and store return combination satisfying the December 2000 and "
         "profit thresholds; the empty SQL result is mirrored by both DataFrame families."
@@ -1521,6 +1661,11 @@ _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
 # belong here (registering a red gate here would be coverage theater).
 _FLIGHTDATA_SCALE = 0.01
 _DATAVAULT_SCALE = 0.01
+_TPCH_SCALE = 0.01
+_TPCDS_SCALE = 0.01
+_NYCTAXI_SCALE = 0.01
+_TSBS_DEVOPS_SCALE = 0.01
+_TPCH_SKEW_SCALE = 0.01
 
 GATES: dict[str, CrossSurfaceGate] = {
     "ssb": CrossSurfaceGate(
@@ -1575,6 +1720,7 @@ GATES: dict[str, CrossSurfaceGate] = {
     "joinorder_synthetic": CrossSurfaceGate(
         name="joinorder_synthetic",
         build=build_joinorder_synthetic_duckdb,
+        legitimately_empty=_JOINORDER_SYNTHETIC_LEGITIMATELY_EMPTY,
         surface_independence=SURFACE_INDEPENDENCE_SHARED_SPEC,
         surface_independence_rationale=(
             "Both DataFrame families are generated through shared JoinOrder translation helpers, so the "
@@ -1656,6 +1802,7 @@ GATES: dict[str, CrossSurfaceGate] = {
     "datavault": CrossSurfaceGate(
         name="datavault",
         build=build_datavault_duckdb,
+        legitimately_empty=_DATAVAULT_LEGITIMATELY_EMPTY,
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
             "Data Vault expression and pandas DataFrame implementations are separately handwritten for each "
@@ -1663,46 +1810,18 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_DATAVAULT_SCALE,
     ),
-}
-
-# Staged gates: a load-faithful builder is wired and runnable in report mode,
-# but the benchmark still has open cross-surface divergences to burn down before it can
-# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
-# counts a staged gate as a registered oracle under an explicit staged (NOT
-# CI-enforced) label, so staged status is visible there without implying CI
-# enforcement.
-# The next gateable benchmarks (nyctaxi,
-# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
-_TPCH_SCALE = 0.01
-_TPCDS_SCALE = 0.01
-_NYCTAXI_SCALE = 0.01
-_TSBS_DEVOPS_SCALE = 0.01
-_TPCH_SKEW_SCALE = 0.01
-
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
     # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q22"). SQL pinned to fixed stream 0.
+    # mechanical Q prefix ("Q1".."Q22"). SQL pinned to fixed stream 0. Q17 is
+    # legitimately empty at its default literals (see _TPCH_Q17_VACUOUS).
     "tpch": CrossSurfaceGate(
         name="tpch",
         build=build_tpch_duckdb,
+        legitimately_empty={"17": _TPCH_Q17_VACUOUS},
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
             "TPC-H expression and pandas DataFrame implementations are separately handwritten for each query."
         ),
         scale_factor=_TPCH_SCALE,
-    ),
-    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q99"). Bounded empty cells at SF=0.01
-    # are classified explicitly. Registration remains distinct from CI enforcement.
-    "tpcds": CrossSurfaceGate(
-        name="tpcds",
-        build=build_tpcds_duckdb,
-        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
-        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
-        surface_independence_rationale=(
-            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
-        ),
-        scale_factor=_TPCDS_SCALE,
     ),
     # NYC Taxi: 25 SQL slugs map 1:1 to DataFrame Q1..Q25 via the builder-local
     # hand-authored dict. Offline synthetic cell (12k trips at SF=0.01); the
@@ -1744,21 +1863,49 @@ STAGED_GATES: dict[str, CrossSurfaceGate] = {
     ),
     # TPC-H Skew: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
     # mechanical Q prefix ("Q1".."Q22"), the same convention as amplab and
-    # datavault. Bounded cell at the shared small scale. Q8 is legitimately
-    # empty: the skewed generator emits no part rows with p_type
-    # 'ECONOMY ANODIZED STEEL' at any probed scale (0.01/0.05/0.1), so the
-    # reference itself returns 0 rows independent of either surface.
+    # datavault. Bounded cell at the shared small scale. Q8 and Q17 are
+    # legitimately empty: Q8 because the skewed generator emits no part rows
+    # with p_type 'ECONOMY ANODIZED STEEL' at any probed scale (0.01/0.05/0.1),
+    # Q17 because its default literals match nothing in the skewed cell (see
+    # _TPCH_SKEW_Q17_VACUOUS). Either way the reference itself returns no
+    # discriminating rows independent of either surface.
     "tpch_skew": CrossSurfaceGate(
         name="tpch_skew",
         build=build_tpch_skew_duckdb,
         legitimately_empty={
             "8": "Skewed generator emits zero 'ECONOMY ANODIZED STEEL' part rows at SF 0.01-0.1; reference returns 0 rows.",
+            "17": _TPCH_SKEW_Q17_VACUOUS,
         },
         surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
         surface_independence_rationale=(
             "TPC-H Skew expression and pandas DataFrame implementations are separately handwritten for each query."
         ),
         scale_factor=_TPCH_SKEW_SCALE,
+    ),
+}
+
+# Staged gates: a load-faithful builder is wired and runnable in report mode,
+# but the benchmark still has open cross-surface divergences to burn down before it can
+# be promoted into GATES (and made a blocking CI gate). The oracle coverage map
+# counts a staged gate as a registered oracle under an explicit staged (NOT
+# CI-enforced) label, so staged status is visible there without implying CI
+# enforcement.
+# The next gateable benchmarks (nyctaxi,
+# tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
+
+STAGED_GATES: dict[str, CrossSurfaceGate] = {
+    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
+    # mechanical Q prefix ("Q1".."Q99"). Bounded empty cells at SF=0.01
+    # are classified explicitly. Registration remains distinct from CI enforcement.
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
     ),
 }
 

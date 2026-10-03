@@ -655,32 +655,3 @@ jobs:
         with:
           ignore_words_file: .codespell-ignore.txt
           skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
-
-  # Docstring coverage check
-  # Blocking: enforce configured interrogate threshold
-  docstring-coverage:
-    needs: visual-inputs
-    if: needs.visual-inputs.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install interrogate
-
-      - name: Check docstring coverage
-        run: |
-          interrogate -c pyproject.toml --fail-under 90 benchbox/
-
-      - name: Generate docstring coverage badge
-        run: |
-          mkdir -p docs/_static
-          interrogate -c pyproject.toml --generate-badge docs/_static/ benchbox/

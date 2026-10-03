@@ -48,7 +48,7 @@ Required CI on `develop` reports six unit results (`core`, `explorer`, `results-
 
 ## Development Workflow
 
-The canonical loop is **branch → edit → preflight → `make pr-open` → (when final) arm**. `make pr-open` **withholds** auto-merge by default so follow-up commits cannot race a half-pushed stack. When the branch is finished, arm with `make pr-ready`; `make pr-open READY=1` may arm only when it reuses an already-open, reviewed PR. A newly created PR remains held until review; then walk away — don't poll.
+The canonical loop is **branch → edit → preflight → `make pr-open` → arm → monitor to merge**. Once the branch is finished, arm it with `make pr-arm`, which checks the live PR for a hold and enqueues the exact head; the merge queue lands it when its checks are green. You are done when the PR is merged, not when it is open or green: re-enqueue (`make pr-arm` again) after a spurious ejection and fix and push after a real failure. Stop and hand back only for the exceptions listed in `AGENTS.md` `[WRITE-CLOSEOUT-001]`.
 
 1. **Create a feature worktree off `develop`.** Agents must keep the main clone read-only:
 
@@ -78,30 +78,29 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → (wh
    git commit -m "fix: resolve race in foo loader"
    ```
 
-4. **Run the local preflight, then open the PR (auto-merge withheld):**
+4. **Run the local preflight, then open the PR:**
 
    ```bash
    make pr-preflight      # local lint + path-aware content guard / fast tests
-   make pr-open           # push + gh pr create --base develop (does NOT arm auto-merge)
+   make pr-open           # push + gh pr create --base develop
    ```
 
-   `make pr-open` refuses to run from `develop` or `release`. The PR stays open without auto-merge so you can push follow-ups safely.
+   `make pr-open` refuses to run from `develop` or `release`.
 
-5. **When the branch is final, run the readiness transaction** (hands-free finish path):
+5. **Arm it and monitor until it merges:**
 
    ```bash
-   make pr-ready PR=123 HEAD=$(git rev-parse HEAD) EVIDENCE=/tmp/readiness.json
-   # Or reuse an already-open, reviewed PR and arm it in one step:
-   # make pr-open READY=1 EVIDENCE=/tmp/readiness.json
+   make pr-arm            # PR=<n> optional; refuses on a hold label, requested changes, a draft, or a head that is not pushed
    ```
 
-   The evidence file must declare `delivery_mode` (`serial` or `batch`); batch
-   mode must include the complete prepared-batch binding. `make pr-ready` (or
-   `READY=1` while reusing an already-open, reviewed PR) is the only arm path:
-   `auto-merge-on-open.yml` is revoke-only and never arms. Once the exact readiness transaction passes, the PR
-   squash-merges when required checks turn green — don't poll.
-   Soundness-critical paths and the `no-auto-merge` hold label stay withheld
-   pending review (see `docs/operations/repo-admin-settings.md`).
+   `make pr-arm` reads the live PR first, so a `no-auto-merge` label or a requested change stops it instead of
+   being mistaken for a queue failure; remove a hold deliberately to release it. Before editing an armed PR,
+   withdraw it with the revision transaction (`make pr-landing-withdraw`, see `docs/agent/review-protocol.md`),
+   push the correction, and arm the new head: a later `--match-head-commit` cannot undo a merge of the old head.
+   `make pr-ready PR=<n> HEAD=<sha>` arms an open PR through `make pr-arm`. With `EVIDENCE` or `BATCH` it runs the
+   readiness evidence transaction used to deliver a prepared batch, where the evidence file must declare
+   `delivery_mode` and the complete prepared-batch binding; a single PR does not need it.
+   `auto-merge-on-open.yml` only revokes and never arms (see `docs/operations/repo-admin-settings.md`).
 
 6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 
@@ -141,9 +140,9 @@ This runs the broader CI mirror:
 | Documentation build | `make ci-docs` |
 | Package build + install test | `make test-package` |
 
-Or run any of those individually. Additional one-offs: `make security-audit`, `make spellcheck`, `make docstring-coverage`.
+Or run any of those individually. Additional one-offs: `make security-audit` and `make spellcheck`.
 
-Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. Once the PR is armed, auto-merge still blocks on any non-required check failure that *is* surfaced (e.g. doc build), so the cost of being wrong is just a re-push (and re-arm with `make pr-ready` if needed).
+Skip `make ci-local` for everyday changes — `make pr-preflight` is the right gate. The required checks gate the merge queue, so the cost of being wrong is a re-push and `make pr-arm` for the new head.
 
 ## Testing
 

@@ -359,9 +359,9 @@ class TestTPCDIBenchmarkCoverage:
     """Test TPCDIBenchmark class for better coverage of key methods."""
 
     @pytest.fixture
-    def tpcdi_benchmark(self, small_scale_factor: float, temp_dir: Path) -> TPCDIBenchmark:
+    def tpcdi_benchmark(self, temp_dir: Path) -> TPCDIBenchmark:
         """Create a TPCDIBenchmark instance for testing."""
-        return TPCDIBenchmark(scale_factor=small_scale_factor, output_dir=temp_dir)
+        return TPCDIBenchmark(scale_factor=0.01, output_dir=temp_dir)
 
     def test_execute_query_coverage(self, tpcdi_benchmark: TPCDIBenchmark) -> None:
         """Test execute_query method variations with DuckDB."""

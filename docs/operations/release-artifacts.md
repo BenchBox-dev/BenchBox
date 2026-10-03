@@ -1,0 +1,161 @@
+# Release artifact contract
+
+Release admission consumes the exact wheel and sdist from a successful
+merge-queue CI attempt. It never rebuilds or publishes packages.
+
+## Producer
+
+The `dist-artifact` job of `.github/workflows/ci.yml` runs only on
+`merge_group`. Its artifact name is
+`dist-<full head SHA>-attempt-<positive run attempt>`.
+
+The artifact contains exactly four regular files at its root:
+
+- one wheel (`*.whl`);
+- one sdist (`*.tar.gz`);
+- `SHA256SUMS`, containing exactly their two SHA-256 hashes and basenames;
+- `producer-receipt.json`.
+
+The receipt has schema `1` and records `repository`, `repository_id`,
+`head_repository_id`, `workflow_path`, `head_sha`, `run_id`, `run_attempt`,
+`job_id`, `job_name`, `artifact_name`, `sha256sums_sha256`, and `files`.
+`files` maps each distribution basename to its `size` and `sha256`.
+The producer reads its actual job ID from the attempt-scoped GitHub jobs API.
+It cannot record the artifact ID or ZIP digest before upload; admission obtains
+those values from GitHub and binds them to this receipt.
+
+This replaces the former three-file `dist-<SHA>` format. Older artifacts lack
+attempt evidence and are refused. They cannot be upgraded by local metadata or
+by choosing an earlier successful run.
+
+## Admission
+
+Run from an exact checkout of an annotated `v*` version tag:
+
+```bash
+uv run -- python scripts/release_artifact_consumer.py admit \
+  --source . --tag v0.4.2 --output /tmp/benchbox-release-admission
+```
+
+The command fetches `develop`, checks tag/version agreement and ancestry, and
+selects the latest exact-SHA CI run. The run must belong to
+`BenchBox-dev/BenchBox`, use `.github/workflows/ci.yml`, and have completed
+successfully on `merge_group`. Its exact attempt must have one successful
+`dist-artifact` job and one unexpired attempt-qualified artifact.
+
+Admission verifies the API ZIP digest before reading any archive member. It
+rejects paths, duplicate names, links, nonregular members, encryption, extra
+files, and payloads larger than 256 MiB. It recomputes the distribution hashes,
+requires the producer receipt to match the actual run and job attempt, and
+checks package/version identity. The exact tagged source's distribution binary
+verifier must exist and pass. Metadata is read again before an admission receipt
+and verified files appear in the new output directory.
+
+API reads and downloads explicitly use `github.com`, regardless of `GH_HOST`.
+Downloads have a 60-second whole-stream deadline, including blocked reads.
+Failed downloads reap their child process and remove only their owned partial
+file. Verification reads regular files from a private snapshot of the exact
+Git commit, not mutable checkout bytes or Git archive export filters. The
+snapshot's total size is checked from tree metadata before any blob is written,
+and each blob must match its declared size. Downloads use an unbuffered pipe so
+closing a timed-out stream cannot wait on a reader's buffered lock. Download
+processes own a separate POSIX session whose remaining pipe writers are
+terminated during cleanup, including when the direct child has already exited.
+The download fails closed on Windows, because tree termination after the direct
+child exits needs a Job Object that has no native test yet.
+
+Git children disable replacement objects, hooks, and the filesystem monitor,
+ignore system and global configuration, and do not inherit `GIT_CONFIG_*`
+variables. The verifier runs from the committed snapshot under `-I -S -B`: no
+site packages, `.pth` files, `sitecustomize`, or Python environment. Because
+`-I` removes the script directory from the import path, a bootstrap maps the
+`benchbox` and `benchbox.utils` packages to the snapshot without running their
+`__init__` files, so the committed `binary_manifest` is the one that executes.
+Git and verifier children receive only an allowlisted environment (`PATH`,
+locale, and temporary-directory variables). Credentials go to the `gh`
+transport alone. The checkout is checked again before output publication.
+
+The `fetch` that establishes the develop ancestor uses the fixed repository URL
+over HTTPS only. It also forces the local version tag to the hosted tag object,
+so a hosted tag that moved after checkout makes the checkout differ from the
+tag and admission refuses it. Git is told to deny every non-HTTPS transport by
+name and to clear credential and askpass helpers, so a repository-local
+`core.sshCommand`, an `ext::` URL rewrite, a proxy command, or a different
+`remote.origin` cannot run code or redirect it. `gh` receives the allowlisted
+environment plus its own authentication, configuration location, and proxy and
+CA settings, and nothing else; `GH_HOST` is ignored because the host is pinned.
+Publication requires an output parent that is owned by the caller (or root) and
+not group- or world-writable unless sticky, resolves that parent to its real
+path, and refuses to publish if the staging directory's device and inode
+changed.
+
+Output publication uses an atomic no-replace directory rename: `renameat2` on
+Linux, `renamex_np` on macOS, and `os.rename` on Windows. An existing or racing
+destination, including an empty directory or dangling symlink, is never
+replaced. Platforms without the required operation fail closed. Because the
+download is POSIX-only, the Windows rename is not reachable through admission.
+
+An admission receipt is byte and producer evidence. It is not a cryptographic
+attestation or permission to release. Admission does not change hosted tag
+rules, environments, or publishing workflows.
+
+### Threat model
+
+Admission defends against artifacts and metadata that do not belong to the
+tagged commit: another run or attempt, a forged or edited receipt, a tampered
+archive or distribution, a tag that moved before the fetch, and a verifier that
+is not the committed one. It is not a defense against a hostile writer on the
+same filesystem while it runs. Run it on an ephemeral, single-tenant runner,
+from a checkout that no other principal can write.
+
+Limits inside that boundary:
+
+- The hosted tag is read once, at the fetch. A move during admission is not
+  detected; the tag ruleset is what forbids moves.
+- `release_flow.py` and `benchbox/utils/clock.py` are loaded into the
+  credential-bearing process from the consumer's own directory, so they are
+  trusted exactly as the consumer script is.
+- The clean-checkout re-check detects the state at that instant, not an edit
+  that is made and reverted.
+- The output-parent check covers the immediate parent only. Ancestors that
+  others can rename, and access-control lists, are not inspected. The staging
+  identity check narrows the swap window; it does not bind file contents.
+- Repository configuration that is not an executable transport helper, such as
+  proxy settings, CA bundles, includes, and URL rewrites to another HTTPS host,
+  is still honored.
+
+## Publish-side gate
+
+An admitted directory crosses a job boundary, an artifact upload and download,
+before a publisher uses it. `scripts/release_admitted_dist.py` runs in the job
+that publishes and confirms the directory is still the admitted one. It is
+offline: it builds, downloads, and publishes nothing, and no workflow calls it
+yet.
+
+The tag and commit come from the publishing run (`github.ref_name` and
+`github.sha`), never from the directory. The directory must match its admission
+receipt exactly: the five members `admit` writes, the producer receipt, the
+receipt's digest of `SHA256SUMS`, and the name, size, hash, package, and version
+of the wheel and sdist against the tag. Links, files that are not regular files,
+files over the size limit, and receipt names that point outside the directory
+are refused.
+
+`--stage` writes only the wheel and sdist, from the bytes it verified, into a
+new directory that must not exist, and the upload step publishes that directory
+instead of the admitted one. The gate binds bytes to the admission receipt. It
+does not repeat the GitHub provenance checks that admission made, and it keeps
+the admission threat model above: it reads each file once and compares what it
+read, but it does not defend against a hostile writer on the same filesystem.
+
+## Release requirements
+
+The publishing workflow still requires the live `v-tag-restricted` rule,
+verifiable provenance attestation, all twelve Python 3.11–3.14 installation and
+smoke cells across Linux/macOS/Windows, artifact-bound release UAT, the binary
+manifest, `make release-check`, ruleset drift checks, and no open
+release-blocking `t3:*` issue. Linux correctness evidence remains separate from
+the deferred Darwin digest certification.
+
+TestPyPI rehearsals must exercise refusal paths and verify installed hashes.
+Production PyPI retains owner approval. The existing `release.yml` remains
+operational until its approved replacement is accepted.
