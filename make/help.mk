@@ -30,6 +30,7 @@ help:
 	@echo "  make amplab-cross-surface-equivalence-report Gate: AMPLab DataFrame surface vs its own SQL surface"
 	@echo "  make coffeeshop-cross-surface-equivalence-report Gate: CoffeeShop DataFrame surface vs its own SQL surface"
 	@echo "  make test-local-matrix Run real local benchmark matrix (stress)"
+	@echo "  make test-required-local-cases Run the required local-engine cases; a skipped, deselected or failed case fails"
 	@echo "  make test-ci         Maintained broad local CI profile"
 	@echo ""
 	@echo "Database-Specific Testing:"
