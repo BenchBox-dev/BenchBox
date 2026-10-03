@@ -29,6 +29,7 @@ core:
   - "pytest-ci.ini"
   - ".importlinter"
   - "codecov.yml"
+  - "deploy/**"
   # Executable documentation machinery is product code: it runs under lint,
   # type, and unit tests like any other Python or template source.
   - "docs/conf.py"

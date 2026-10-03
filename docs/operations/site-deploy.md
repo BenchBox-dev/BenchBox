@@ -72,7 +72,7 @@ run fails closed until `bootstrap` is set.
 2. Read the gates before approving:
 
    ```bash
-   gh run download <run_id> -n site-deploy-build-<run_id> -D /tmp/site-deploy-<run_id>
+   gh run download <run_id> -n site-deploy-build-<run_id>-<attempt> -D /tmp/site-deploy-<run_id>
    jq '{ok, results: (.results | map_values(.status))}' /tmp/site-deploy-<run_id>/gates.json
    ```
 
@@ -169,7 +169,7 @@ whose receipt is recorded on a `github-pages` deployment). The run then:
 environment and no write scope. It serves the artifact from a local directory with
 the Pages `404.html` fallback, probes it, and runs the drill: publish the single-ref
 assembly of the same trunk SHA (A), publish the route build (B), roll back to A by
-receipt, probe, and assert the tree digest equals A. The `site-deploy-preview-<run_id>`
+receipt, probe, and assert the tree digest equals A. The `site-deploy-preview-<run_id>-<attempt>`
 artifact holds `preview-drill.json`, `parity.json` (route and byte differences against
 the single-ref assembly), `production-parity.json` (informational comparison with the
 live site), the drill receipts, and `gates.json`. Differences from the single-ref
