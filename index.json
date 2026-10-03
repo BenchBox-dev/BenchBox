@@ -894,17 +894,12 @@
       "title": "Decision gate: record the ADR for moving benchbox.dev to one Astro site"
     },
     "astro-site-01-url-content-inventory": {
-      "claim": {
-        "expires_at": "2026-10-04T17:58:39Z",
-        "generation": "262d6df14b2443b1a419768cd167ed23",
-        "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486"
-      },
+      "claim": null,
       "needs": [
         "astro-site-00-decisions-adr"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Build the URL and content inventory that serves as the parity oracle for the Astro migration"
     },
     "astro-site-02-api-reference-decision": {
