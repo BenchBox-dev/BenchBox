@@ -6,6 +6,7 @@
     "No new docstrings (comment-policy-check green); examples covered by example-validation",
     "api-docs lane outputs documented and tested"
   ],
+  "context": "Write the authored contracts as MyST Markdown in docs/reference/python-api/ at the same stems as the .rst files they replace. Until cutover, Sphinx renders them at the same URLs, and the Astro converter picks them up like any other page. The reference then never has a gap.",
   "description": "Implement ADR D7. For each symbol on the selected public surface, write Markdown contract pages: purpose, parameters, return semantics, errors, examples and compatibility notes. The content is harvested from the docstrings at the pinned SHA and edited; it is not a module dump.\n\nIf D7 chose a drift tool, wire it as a CI check that compares the authored contracts with signatures and types (with lazy exports verified). It renders nothing.\n\nThe reference is release-pinned: built from the release tag's sources per D5 and adr-independent-publication-authorities.\n\nEvery current reference URL and anchor serves the new page or a counted redirect page. Update the api-docs lane contract to the new outputs.\n\nDelete the 27 autodoc .rst files only in this item's PR, once their replacements exist. Do not add docstrings to code (COMMENT-POLICY-001).",
   "links": [
     "docs/reference/python-api",
@@ -26,6 +27,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "2512a74796f54e7c962d50396ad9833b",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:10:19Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "21222924509f4eb496165e8a3dc4623f",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
     }
   ]
