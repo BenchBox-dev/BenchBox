@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -205,6 +206,8 @@ FRAMING_TRIGGER_PATHS = [
     "tests/unit/plugins/hook.py",
     "tests/fixtures/utility_fixtures.py",
     "_benchbox_pytest_xdist_safety.py",
+    "scripts/local_validation.py",
+    "tests/duration_policy.py",
     "pytest.ini",
     "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py",
     "benchbox/__init__.py",
@@ -248,6 +251,28 @@ def test_every_registered_pytest_plugin_triggers_the_framing_job(rules: dict[str
 
     assert modules
     for module in modules:
+        path = f"{module.replace('.', '/')}.py"
+        assert (repo_root / path).is_file(), path
+        assert classify_paths([path], rules)["framing_needed"] is True, path
+
+
+def test_first_party_imports_of_pytest_startup_files_trigger_the_framing_job(rules: dict[str, list[str]]) -> None:
+    repo_root = REPO_RULES.parents[1]
+    entry_points = ["tests/conftest.py", "tests/utilities/session_isolation.py"]
+    imported: set[str] = set()
+    for entry in entry_points:
+        tree = ast.parse((repo_root / entry).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imported.add(node.module)
+            elif isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+
+    first_party = sorted(
+        module for module in imported if module.split(".")[0] in {"scripts", "tests"} and module != "tests"
+    )
+    assert "scripts.local_validation" in first_party
+    for module in first_party:
         path = f"{module.replace('.', '/')}.py"
         assert (repo_root / path).is_file(), path
         assert classify_paths([path], rules)["framing_needed"] is True, path

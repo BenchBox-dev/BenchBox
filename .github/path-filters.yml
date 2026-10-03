@@ -144,6 +144,8 @@ framing:
   - "tests/fixtures/platform_fixtures.py"
   - "tests/fixtures/utility_fixtures.py"
   - "_benchbox_pytest_xdist_safety.py"
+  - "scripts/local_validation.py"
+  - "tests/duration_policy.py"
   - "pytest.ini"
   - "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py"
   - "benchbox/__init__.py"
