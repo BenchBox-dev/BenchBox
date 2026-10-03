@@ -1008,6 +1008,15 @@
       "status": "open",
       "title": "Port the landing page and the /prompts composer to Astro with behaviour parity"
     },
+    "astro-site-36-site-metadata-and-404": {
+      "claim": null,
+      "needs": [
+        "astro-site-22-shared-layout-shell"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add sitemap, robots, canonical and Open Graph metadata, plus a 404 page that keeps the results deep-link fallback"
+    },
     "athena-configuration-validation": {
       "claim": null,
       "needs": [],

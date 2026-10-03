@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "Direct load of a nested /results/... URL and a query-string URL on a static server that mimics GitHub Pages 404 handling lands on the right Explorer view (e2e test)",
+    "Every HTML page has canonical, description and OG tags (inventory check)",
+    "sitemap.xml lists exactly the inventory HTML pages; robots.txt references it",
+    "CNAME and .nojekyll present in dist"
+  ],
+  "description": "Generate sitemap.xml and robots.txt for benchbox.dev. Neither exists today, so these are additive.\n\nEvery page gets a canonical URL (on the .html path), a meta description (from frontmatter or meta_description) and Open Graph and Twitter tags.\n\nThe 404 page must reproduce the assemble_public_site.py RESULTS_FALLBACK behaviour exactly: an unknown /results/* path stores the target in sessionStorage key benchbox.results.redirect and returns to the Explorer, which restores it. Every other path gets a styled not-found page with search.\n\nKeep CNAME and .nojekyll in the output.",
+  "links": [
+    "scripts/assemble_public_site.py",
+    "docs/CNAME"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:root@vm:105acc8b348e96e36e7cfa51",
+      "at": "2026-10-03T14:11:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "728134f510ca45fdbf9ea9fe57379752",
+      "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    }
+  ]
+}
