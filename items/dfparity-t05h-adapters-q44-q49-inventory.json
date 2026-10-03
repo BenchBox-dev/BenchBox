@@ -76,6 +76,15 @@
       "op": "update",
       "op_id": "945fdebbef9242f0956adec9e2103298",
       "session_id": "44c67cd709da49ea99eeabde2893ca2a"
+    },
+    {
+      "actor": "mcp:codex-mcp-client:joe@joe-mac-mini.local:ab23c3a6eef35cb685577a07",
+      "at": "2026-10-03T17:56:34Z",
+      "client": "codex-mcp-client",
+      "generation": "f98daa2229264ac4beb5f8b21256230a",
+      "op": "finish",
+      "op_id": "a0950b437e724530be899bb5b13711fa",
+      "session_id": "44c67cd709da49ea99eeabde2893ca2a"
     }
   ]
 }
