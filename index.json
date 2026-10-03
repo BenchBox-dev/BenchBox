@@ -20053,7 +20053,7 @@
         "tpcds-parity-b5-vacuity"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "TPC-DS parity B6: promote tpcds to enforced blocking gate"
     },
     "tpcds-pyspark-compatibility": {
