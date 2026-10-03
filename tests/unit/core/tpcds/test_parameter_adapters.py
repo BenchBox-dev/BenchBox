@@ -102,6 +102,7 @@ class TestAdapters:
         logged |= {f"ES.{index:02d}": f"education {index}" for index in (1, 2, 3)}
         logged |= {f"STATE.{index:02d}": f"S{index}" for index in range(1, 10)}
         assert ADAPTERS[13](logged) == {
+            "year": 2001,
             "demo1_marital": "D",
             "demo1_education": "education 1",
             "states1": ["S1", "S2", "S3"],
@@ -114,9 +115,10 @@ class TestAdapters:
         }
 
     def test_q14_and_q17_take_only_the_year(self):
-        # Q14's DAY reaches only the template's second statement, which the DataFrame query does not run.
+        # Q14's DAY reaches only the template's second statement, which BenchBox does not run.
         assert ADAPTERS[14]({"YEAR.01": "1999", "DAY.01": "16"}) == {"year": 1999}
-        assert ADAPTERS[17]({"YEAR.01": "2001"}) == {"year": 2001}
+        # Q17's quarters are fixed in the template; the first is bound so the implementation never falls back.
+        assert ADAPTERS[17]({"YEAR.01": "2001"}) == {"year": 2001, "quarter": 1}
 
 
 class TestBinding:

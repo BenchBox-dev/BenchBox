@@ -108,7 +108,8 @@ def _q12(values: Mapping[str, str]) -> dict[str, Any]:
 def _q13(values: Mapping[str, str]) -> dict[str, Any]:
     # The SQL has three demographic groups, each a marital status, an education status and three states.
     marital, education, states = _listed(values, "MS"), _listed(values, "ES"), _listed(values, "STATE")
-    parameters: dict[str, Any] = {}
+    # The template fixes the year at 2001 rather than drawing it.
+    parameters: dict[str, Any] = {"year": 2001}
     for group in range(3):
         parameters[f"demo{group + 1}_marital"] = marital[group]
         parameters[f"demo{group + 1}_education"] = education[group]
@@ -124,7 +125,7 @@ def _q14(values: Mapping[str, str]) -> dict[str, Any]:
 
 def _q17(values: Mapping[str, str]) -> dict[str, Any]:
     # The quarters are fixed in the template (Q1 to Q3); only the year is drawn.
-    return {"year": int(values["YEAR.01"])}
+    return {"year": int(values["YEAR.01"]), "quarter": 1}
 
 
 def _q39(values: Mapping[str, str]) -> dict[str, Any]:
